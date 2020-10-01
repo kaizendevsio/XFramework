@@ -1,0 +1,26 @@
+﻿<div class="card shadow d-block card_buttons my-2 animated fadeInUp text-center" @onclick="Onclick">
+    <div class="row px-3">
+        <div class="col-3 px-0 pt-1">
+            <i class="@Icon fas fa-lg mx-auto"></i>
+        </div>
+        <div class="col-9 px-0 pt-1">
+            <a href="@Link" onclick="">
+                <h6 class="mb-0"><strong>@Title</strong></h6>
+                @* <p class="mt-1" style="font-size: 14px;color: #a0a0a0;">@Slug</p> *@
+            </a>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string Slug { get; set; }
+    [Parameter]
+    public string Link { get; set; }
+    [Parameter]
+    public string Icon { get; set; }
+    [Parameter]
+    public EventCallback<MouseEventArgs> Onclick { get; set; }
+}

@@ -1,0 +1,11 @@
+﻿<div class="activity_header" id="activity_header">
+    <h2 class="animate__animated animate__fadeInRight theme-light" style="animation-delay:.1s">@Title</h2>
+    <p class="my-0 d-none">@Quote</p>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string Quote { get; set; }
+}

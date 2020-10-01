@@ -1,0 +1,21 @@
+﻿@page "/"
+@inject NavigationManager NavManager
+
+<div class="row h-100">
+   <div class="col-sm-12 my-auto">
+     <div class="animated fadeIn text-center">
+         <img class="mx-auto d-block fadeInUp" src="assets/client/img/cv-logo.png" width="328" alt="Alternate Text" />
+         
+         <a href="landing" class="btn btn-outline-dark btn-block py-3 rounded-pill fadeInDown" style="margin-top:15vh"><strong>Let's Get Started</strong></a>
+
+       </div>
+   </div>
+</div>
+
+@code{
+    protected override void OnInitialized()
+    {
+        NavManager.NavigateTo("/user/startup");
+    }
+}
+
