@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.30011.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XFramework.Mobile", "XFramework\Client\XFramework.Mobile\XFramework.Mobile.csproj", "{7DFA7D7B-9D7F-4BB9-9370-1C9A2505328B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Web", "XFramework\Client\XFramework.Web\XFramework.Web\XFramework.Web.csproj", "{4E0845CF-354C-4B5A-AB14-91EB87D8F311}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Web", "XFramework\Client\XFramework.Web\XFramework.Web.csproj", "{4E0845CF-354C-4B5A-AB14-91EB87D8F311}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
