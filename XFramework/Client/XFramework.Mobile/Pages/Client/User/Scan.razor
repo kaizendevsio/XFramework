@@ -1,0 +1,23 @@
+﻿@page "/user/scan"
+@layout ActivityLayout
+@inherits ScanBase
+
+<ActivityHeader Title="@ActivityTitle" Quote="@ActivityQuote" />
+
+<div class="animated slideInRight activity_body">
+
+    <div class="card shadow d-block animated fadeInUp" style="height:40vh;">
+        <video id="videoElem" style="width:100%; height:100%"></video>
+        <h6 id="videoElemAltText" class="my-auto text-center center" style="color:#ccc">QR Code Scanner</h6>
+    </div>
+
+    <div class="row d-block py-3">
+        <h6 id="" class="my-auto text-center" style="color:#ccc">Scanner QR Code</h6>
+    </div>
+    
+    @*<a href="user/register" class="btn btn-outline-dark btn-block py-3 rounded-pill mt-4 fadeInDown"><strong>Continue to Registration</strong></a>*@
+
+</div>
+
+
+

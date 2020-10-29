@@ -1,0 +1,67 @@
+﻿@page "/user/profile"
+@layout ActivityLayout
+@inherits ProfileBase
+
+<ActivityHeader Title="@ActivityTitle" />
+
+<div class="animated slideInRight activity_body">
+
+    <div>
+        <form>
+            <div class="form-group">
+                <label for="exampleInputEmail1">Name</label>
+                <input type="text" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter Name">
+            </div>
+            <div class="form-group">
+                <label for="exampleInputEmail1">Email address</label>
+                <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter email">
+                <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.</small>
+            </div>
+            <div class="form-group">
+                <label for="exampleInputEmail1">Age</label>
+                <input type="number" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter age">
+            </div>
+            <div class="form-group">
+                <label for="exampleInputEmail1">Phone</label>
+                <input type="tel" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter age">
+            </div>
+            <div class="form-group">
+                <label for="exampleInputEmail1">H/P Number</label>
+                <input type="text" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter h/p no.">
+            </div>
+            <hr />
+            <div class="form-group">
+                <label for="exampleInputEmail1">ECP Code</label>
+                <input type="text" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="To be fill up by ECP">
+            </div>
+            <div class="form-group">
+                <label for="exampleInputEmail1">Staff ID</label>
+                <input type="text" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="To be fill up by ECP">
+            </div>
+            <hr />
+            <label>New Weares?</label>
+            <br />
+            <div class="custom-control custom-radio custom-control-inline">
+                <input type="radio" id="customRadioInline1" name="customRadioInline1" class="custom-control-input">
+                <label class="custom-control-label" for="customRadioInline1">Yes</label>
+            </div>
+            <div class="custom-control custom-radio custom-control-inline">
+                <input type="radio" id="customRadioInline2" name="customRadioInline1" class="custom-control-input">
+                <label class="custom-control-label" for="customRadioInline2">No</label>
+            </div>
+            <br />
+            <div class="form-check mt-3">
+                <input type="checkbox" class="form-check-input" id="exampleCheck1">
+                <label class="form-check-label" for="exampleCheck1">I Accept <a href="#">Terms &amp; Conditions</a></label>
+            </div>
+            <a href="/staff/rate" class="btn btn-outline-dark btn-block py-3 rounded-pill mt-4 fadeInDown"><strong>Submit</strong></a>
+        </form>
+        <hr />
+        <div class="py-2 mb-5 text-center">
+            <a href="user/login">Already have an account?</a>
+        </div>
+
+    </div>
+
+</div>
+

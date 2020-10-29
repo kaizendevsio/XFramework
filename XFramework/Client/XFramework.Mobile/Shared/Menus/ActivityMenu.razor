@@ -1,0 +1,54 @@
+﻿
+<div class="w-100 px-3 activity_menu ios_blur" id="activity_menu">
+    <div class="row">
+        <div class="col-3 icons animate__animated animate__fadeIn" style="animation-delay:.5s; display: @CActivityLayout.ActivityMenu.ActivityMenuVisibility" onclick="App.Activity.GoBack();">
+            <i class="fas fa-chevron-left"></i>
+            <span>Back</span>
+        </div>
+
+        <div class="col-6">
+            <h5 class="animated fadeIn ml-2" style="text-align:left!important; display: @AlternateTitleVisibility">@Title</h5>
+            <h5 class="animated fadeIn" style=" display: @TitleVisibility">@Title</h5>
+        </div>
+        <div class="col-3 icons">
+
+        </div>
+    </div>
+
+
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    public string TitleVisibility
+    {
+        get
+        {
+            switch (CActivityLayout.ActivityMenu.IsBackEnabled)
+            {
+                case true:
+                    return "block";
+                case false:
+                    return "none";
+            }
+        }
+    }
+    public string AlternateTitleVisibility
+    {
+        get
+        {
+            switch (CActivityLayout.ActivityMenu.IsBackEnabled)
+            {
+                case true:
+                    return "none";
+                case false:
+                    return "block";
+            }
+        }
+    }
+
+    [CascadingParameter]
+    public ActivityLayout CActivityLayout { get; set; }
+
+}
