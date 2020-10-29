@@ -1,0 +1,34 @@
+﻿<div class="dropdown dropdown-inline" data-toggle="tooltip" title="" data-placement="left" data-original-title="Quick actions">
+    <a class="btn btn-hover-light-primary btn-sm btn-icon" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <i class="ki ki-bold-more-hor"></i>
+    </a>
+    <div class="dropdown-menu p-0 m-0 dropdown-menu-md dropdown-menu-right">
+        <!--begin::Navigation-->
+        <ul class="navi navi-hover">
+            <li class="navi-header font-weight-bold py-4">
+                <span class="font-size-lg">@Header</span>
+                <i class="flaticon2-information icon-md text-muted" data-toggle="tooltip" data-placement="right" title="" data-original-title="Click to learn more..."></i>
+            </li>
+            <li class="navi-separator mb-3 opacity-70"></li>
+            @Body
+            <li class="navi-separator mt-3 opacity-70"></li>
+            <li class="navi-footer py-4">
+                @Footer
+            </li>
+        </ul>
+        <!--end::Navigation-->
+    </div>
+</div>
+
+@code
+{
+    [Parameter]
+    public RenderFragment Body { get; set; }
+
+    [Parameter]
+    public RenderFragment Footer { get; set; }
+
+    [Parameter]
+    public RenderFragment Header { get; set; }
+
+}
