@@ -12,7 +12,7 @@ namespace XFramework.Api
     public class AutoMapping : Profile
     {
         public AutoMapping() {
-            CreateMap<UserBO, ValidateUserEmailCmd>();
+            CreateMap<UserBO, CreateUserCmd>();
         }
     }
 }

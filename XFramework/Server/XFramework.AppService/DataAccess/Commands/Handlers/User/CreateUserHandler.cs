@@ -7,12 +7,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
+using XFramework.Data.BO;
 using XFramework.Data.DTO;
 using XFramework.Data.Enums;
 
 namespace XFramework.Core.DataAccess.Commands.Handlers.User
 {
-    class CreateUserHandler : CommandBaseHandler, IRequestHandler<CreateUserCmd, bool>
+   public class CreateUserHandler : CommandBaseHandler, IRequestHandler<CreateUserCmd, bool>
     {
         public CreateUserHandler(IDataLayer dataLayer)
         {

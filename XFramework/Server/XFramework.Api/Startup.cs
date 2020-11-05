@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using AutoMapper;
+using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -9,10 +10,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using XFramework.Api.Extensions;
 using XFramework.Core.DataAccess;
+using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.DataAccess.Commands.Handlers;
+using XFramework.Core.DataAccess.Commands.Handlers.User;
 using XFramework.Core.Interfaces;
-using XFramework.Core.Interfaces.Commands;
+using XFramework.Core.PipelineBehaviors;
 using XFramework.Data.DTO;
 
 namespace XFramework.Api
@@ -36,12 +40,11 @@ namespace XFramework.Api
 
             services.AddDbContext<XFrameworkContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
             services.AddScoped<IDataLayer, DataLayer>();
-            services.AddScoped<IUserCommandHandler, UserCommandHandler>();
-            services.AddScoped<IApplicationCommandHandler, ApplicationCommandHandler>();
-            services.AddScoped<IEventLogCommandHandler, EventLogCommandHandler>();
             services.AddAutoMapper(typeof(Startup));
             services.AddSwaggerGen();
-            services.AddMediatR(typeof(Startup));
+            services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+            services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
             if (Env == "Development")
             {
@@ -83,9 +86,7 @@ namespace XFramework.Api
                 {
                     options.SuppressModelStateInvalidFilter = true;
                 });
-            services.AddControllers().AddNewtonsoftJson(options =>
-    options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
-);
+            services.AddControllers().AddNewtonsoftJson(options => options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -101,6 +102,7 @@ namespace XFramework.Api
             app.UseSession();
 
             //app.UseHttpsRedirection();
+            ApplicationBuilderExtension.UseFluentValidationExceptionHandler(app);
 
             app.UseRouting();
 

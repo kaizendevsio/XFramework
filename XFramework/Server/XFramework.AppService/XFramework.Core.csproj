@@ -5,10 +5,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Folder Include="DataAccess\Commands\Validations\Application\" />
+    <Folder Include="DataAccess\Commands\Validations\Events\" />
+    <Folder Include="DataAccess\Commands\Validations\UserWallet\" />
+    <Folder Include="DataAccess\Query\Validations\UserWallet\" />
+    <Folder Include="DataAccess\Query\Validations\User\" />
+    <Folder Include="Validations\" />
     <Folder Include="Services\" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="9.2.2" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="9.2.0" />
     <PackageReference Include="MediatR" Version="8.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.0-preview.8.20407.11" />
   </ItemGroup>

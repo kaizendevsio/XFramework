@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
-using XFramework.Core.Interfaces.Commands;
 using XFramework.Data.BO;
 
 
@@ -18,24 +17,18 @@ namespace XFramework.Api.Controllers.User
     [ApiController]
     public class UserController : XFrameworkControllerBase
     {
-        public UserController(IMediator mediator,IDataLayer dataLayer, IMapper mapper, IUserCommandHandler userCommandHandler, IEventLogCommandHandler eventLogCommandHandler, IConfiguration configuration, IApplicationCommandHandler applicationCommandHandler)
+        public UserController(IMediator mediator, IMapper mapper)
         {
-            _dataLayer = dataLayer;
             _mapper = mapper;
-            _userCommandHandler = userCommandHandler;
-            _eventLogCommandHandler = eventLogCommandHandler;
-            _configuration = configuration;
-            _applicationCommandHandler = applicationCommandHandler;
             _mediator = mediator;
         }
 
         
-
         [HttpPut]
         public async Task<IActionResult> Put([FromBody] UserBO body)
         {
-            var _c = _mapper.Map<ValidateUserEmailCmd>(body);
-            var result = await _mediator.Send(_c);
+            var _c = _mapper.Map<CreateUserCmd>(body);
+            var result = await _mediator.Send(_c).ConfigureAwait(true);
             return Ok(result);
 
         }

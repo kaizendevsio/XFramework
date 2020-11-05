@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="C:\Projects\Net Core\XFramework" t="IncludeFlat">
+      <e p="packages" t="ExcludeRecursive" />
+      <e p="XFramework\Server\XFramework.Api" t="IncludeRecursive">
+        <e p="appsettings.Development.json" t="Include" />
+        <e p="appsettings.json" t="Include" />
+        <e p="AutoMapping.cs" t="Include" />
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Controllers" t="Include">
+          <e p="StartupController.cs" t="Include" />
+          <e p="User" t="Include">
+            <e p="UserController.cs" t="Include" />
+          </e>
+          <e p="XFrameworkControllerBase.cs" t="Include" />
+        </e>
+        <e p="extensions" t="Include">
+          <e p="ApplicationBuilderExtension.cs" t="Include" />
+        </e>
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="netcoreapp3.1" t="Include">
+              <e p="XFramework.Api.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="Program.cs" t="Include" />
+        <e p="Properties" t="Include">
+          <e p="launchSettings.json" t="Include" />
+        </e>
+        <e p="Resources" t="Include">
+          <e p="Templates" t="Include">
+            <e p="Email" t="Include">
+              <e p="email-2fa-ga-disable.html" t="Include" />
+              <e p="email-applying-convert.html" t="Include" />
+              <e p="email-auto-reply.html" t="Include" />
+              <e p="email-bonus.html" t="Include" />
+              <e p="email-change-password.html" t="Include" />
+              <e p="email-confirmation.html" t="Include" />
+              <e p="email-conversion-successful..html" t="Include" />
+              <e p="email-forgot-password.html" t="Include" />
+              <e p="email-purchasing-trade.html" t="Include" />
+              <e p="email-receive-confirmation.html" t="Include" />
+              <e p="email-registration.html" t="Include" />
+              <e p="email-save-profile.html" t="Include" />
+              <e p="Email-Sending-Confirmation.html" t="Include" />
+              <e p="email-success-login.html" t="Include" />
+              <e p="EmailConfirmation.html" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="Startup.cs" t="Include" />
+        <e p="XFramework.Api.csproj" t="IncludeRecursive" />
+      </e>
+      <e p="XFramework\Server\XFramework.AppService" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="DataAccess" t="Include">
+          <e p="Commands" t="Include">
+            <e p="Entity" t="Include">
+              <e p="Application" t="Include">
+                <e p="GetAppInfoCmd.cs" t="Include" />
+              </e>
+              <e p="Events" t="Include">
+                <e p="CreateEventLogCmd.cs" t="Include" />
+              </e>
+              <e p="User" t="Include">
+                <e p="CreateUserCmd.cs" t="Include" />
+                <e p="RemoveUserCmd.cs" t="Include" />
+                <e p="UpdateUserAuthCmd.cs" t="Include" />
+                <e p="UpdateUserAuthStatusCmd.cs" t="Include" />
+                <e p="UpdateUserCmd.cs" t="Include" />
+                <e p="ValidateUserEmailCmd.cs" t="Include" />
+              </e>
+              <e p="UserWallet" t="Include">
+                <e p="ConvertWalletTransactionCmd.cs" t="Include" />
+                <e p="CreateWalletTransactionCmd.cs" t="Include" />
+              </e>
+            </e>
+            <e p="Handlers" t="Include">
+              <e p="Application" t="Include">
+                <e p="GetAppInfoHandler.cs" t="Include" />
+              </e>
+              <e p="CommandBaseHandler.cs" t="Include" />
+              <e p="Events" t="Include">
+                <e p="CreateEventLogHandler.cs" t="Include" />
+              </e>
+              <e p="User" t="Include">
+                <e p="CreateUserHandler.cs" t="Include" />
+                <e p="RemoveUserHandler.cs" t="Include" />
+                <e p="UpdateUserAuthHandler.cs" t="Include" />
+                <e p="UpdateUserAuthStatusHandler.cs" t="Include" />
+                <e p="UpdateUserHandler.cs" t="Include" />
+                <e p="ValidateUserEmailHandler.cs" t="Include" />
+              </e>
+              <e p="UserWallet" t="Include">
+                <e p="ConvertWalletTransactionHandler.cs" t="Include" />
+                <e p="CreateWalletTransactionHandler.cs" t="Include" />
+              </e>
+            </e>
+            <e p="Validations" t="Include">
+              <e p="Application" t="Include" />
+              <e p="Events" t="Include" />
+              <e p="User" t="Include">
+                <e p="CreateUserCmdValidator.cs" t="Include" />
+              </e>
+              <e p="UserWallet" t="Include" />
+            </e>
+          </e>
+          <e p="DataLayer.cs" t="Include" />
+          <e p="Query" t="Include">
+            <e p="Entity" t="Include">
+              <e p="User" t="Include">
+                <e p="AuthenticateUserQuery.cs" t="Include" />
+                <e p="GetUserProfileQuery.cs" t="Include" />
+              </e>
+              <e p="UserWallet" t="Include">
+                <e p="GetUserWalletQuery.cs" t="Include" />
+                <e p="GetUserWalletTransactionQuery.cs" t="Include" />
+              </e>
+            </e>
+            <e p="Handlers" t="Include">
+              <e p="QueryBaseHandler.cs" t="Include" />
+              <e p="User" t="Include">
+                <e p="AuthenticateUserHandler.cs" t="Include" />
+                <e p="GetUserProfileHandler.cs" t="Include" />
+              </e>
+              <e p="UserWallet" t="Include">
+                <e p="GetUserWalletHandler.cs" t="Include" />
+                <e p="GetUserWalletTransactionHandler.cs" t="Include" />
+              </e>
+            </e>
+            <e p="Validations" t="Include">
+              <e p="User" t="Include" />
+              <e p="UserWallet" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="Interfaces" t="Include">
+          <e p="IDataLayer.cs" t="Include" />
+        </e>
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="netcoreapp3.1" t="Include">
+              <e p="XFramework.Core.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="PipelineBehaviors" t="Include">
+          <e p="ValidationBehavior.cs" t="Include" />
+        </e>
+        <e p="Services" t="Include" />
+        <e p="Validations" t="Include" />
+        <e p="XFramework.Core.csproj" t="IncludeRecursive" />
+      </e>
+      <e p="XFramework\Server\XFramework.Entity" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="BO" t="Include">
+          <e p="AffiliateMapBO.cs" t="Include" />
+          <e p="ApiResponseBO.cs" t="Include" />
+          <e p="ApiStatusBO.cs" t="Include" />
+          <e p="AuditEntry.cs" t="Include" />
+          <e p="AuthStatus.cs" t="Include" />
+          <e p="BaseAuditBO.cs" t="Include" />
+          <e p="ExceptionResponseBO.cs" t="Include" />
+          <e p="ExchangeRateBO.cs" t="Include" />
+          <e p="HostBO.cs" t="Include" />
+          <e p="TransactionQueryBO.cs" t="Include" />
+          <e p="UserAuthBO.cs" t="Include" />
+          <e p="UserAuthStatusBO.cs" t="Include" />
+          <e p="UserAuthUpdateBO.cs" t="Include" />
+          <e p="UserBO.cs" t="Include" />
+          <e p="WalletTransactionBO.cs" t="Include" />
+        </e>
+        <e p="DTO" t="Include">
+          <e p="TblAddressEntities.cs" t="Include" />
+          <e p="TblAddresses.cs" t="Include" />
+          <e p="TblApplication.cs" t="Include" />
+          <e p="TblApplicationLogs.cs" t="Include" />
+          <e p="TblAuditFields.cs" t="Include" />
+          <e p="TblAuditHistory.cs" t="Include" />
+          <e p="TblCompanies.cs" t="Include" />
+          <e p="TblCompanyEntities.cs" t="Include" />
+          <e p="TblSessionData.cs" t="Include" />
+          <e p="TblSessionEntities.cs" t="Include" />
+          <e p="TblUserAuthHistory.cs" t="Include" />
+          <e p="TblUserContactEntities.cs" t="Include" />
+          <e p="TblUserContacts.cs" t="Include" />
+          <e p="TblUserCredentials.cs" t="Include" />
+          <e p="TblUserInfo.cs" t="Include" />
+          <e p="TblUserRoleEntities.cs" t="Include" />
+          <e p="TblUserRoles.cs" t="Include" />
+          <e p="XFrameworkContext.cs" t="Include" />
+        </e>
+        <e p="Enums" t="Include">
+          <e p="ApiStatus.cs" t="Include" />
+          <e p="ApplicationStatus.cs" t="Include" />
+          <e p="AuthStatus.cs" t="Include" />
+          <e p="CivilStatus.cs" t="Include" />
+          <e p="CurrencyType.cs" t="Include" />
+          <e p="DepositStatus.cs" t="Include" />
+          <e p="EmailStatus.cs" t="Include" />
+          <e p="EmailType.cs" t="Include" />
+          <e p="EventLogLevel.cs" t="Include" />
+          <e p="GenericStatusType.cs" t="Include" />
+          <e p="IncomeDistributionType.cs" t="Include" />
+          <e p="LoginStatus.cs" t="Include" />
+          <e p="SortingType.cs" t="Include" />
+          <e p="TransactionStatus.cs" t="Include" />
+          <e p="TransactionType.cs" t="Include" />
+          <e p="UserRole.cs" t="Include" />
+          <e p="WalletType.cs" t="Include" />
+          <e p="WithdrawalRequestStatus.cs" t="Include" />
+        </e>
+        <e p="Migrations" t="Include" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="netcoreapp3.0" t="Include">
+              <e p="XFramework.Data.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="XFramework.Data.csproj" t="IncludeRecursive" />
+      </e>
+      <e p="XFramework\Server\XFramework.ExternalUtilities" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Blockchain.cs" t="Include" />
+        <e p="Changelly.cs" t="Include" />
+        <e p="CoinCap.cs" t="Include" />
+        <e p="Cryptography.cs" t="Include" />
+        <e p="Enums" t="Include" />
+        <e p="FormUtilities.cs" t="Include" />
+        <e p="HttpUtilities.cs" t="Include" />
+        <e p="Models" t="Include">
+          <e p="BlockchainApiSettings.cs" t="Include" />
+          <e p="BlockchainResponse.cs" t="Include" />
+          <e p="BlockchainTx.cs" t="Include" />
+          <e p="ChangellyApiSettings.cs" t="Include" />
+          <e p="ChangellyMessage.cs" t="Include" />
+          <e p="ChangellyParams.cs" t="Include" />
+          <e p="ChangellyResponse.cs" t="Include" />
+          <e p="ChangellyTransactionResponse.cs" t="Include" />
+          <e p="CoinCapApiSettings.cs" t="Include" />
+          <e p="CoinProperty.cs" t="Include" />
+          <e p="GenericApiSettings.cs" t="Include" />
+          <e p="HttpResponseBO.cs" t="Include" />
+        </e>
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="netcoreapp3.0" t="Include">
+              <e p="XFramework.External.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="SeedString.cs" t="Include" />
+        <e p="XFramework.External.csproj" t="IncludeRecursive" />
+      </e>
+      <e p="XFramework\Server\XFramework.IntegrityService" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Entity" t="Include">
+          <e p="BO" t="Include">
+            <e p="ValidityResponseBO.cs" t="Include" />
+            <e p="ValiditySettings.cs" t="Include" />
+          </e>
+          <e p="Enums" t="Include">
+            <e p="ValidityState.cs" t="Include" />
+          </e>
+        </e>
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="netcoreapp3.0" t="Include">
+              <e p="XFramework.Integrity.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="ValidityService.cs" t="Include" />
+        <e p="XFramework.Integrity.csproj" t="IncludeRecursive" />
+      </e>
+      <e p="XFramework.API.sln" t="IncludeFlat" />
+    </e>
+    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.2\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.2\resharper-host\Local\Transient\Rider\v202\SolutionCaches\_XFramework.API.-1986603963.00" t="ExcludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.2\consoles\db" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.2\extensions" t="IncludeRecursive" />
+  </component>
+</project>
