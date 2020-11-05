@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ContentModelStore">
-    <e p="C:\Users\Yeyeyel\AppData\Local\JetBrains\Rider2020.2\extResources" t="IncludeRecursive" />
-    <e p="C:\Users\Yeyeyel\AppData\Local\JetBrains\Rider2020.2\resharper-host\Local\Transient\Rider\v202\SolutionCaches\_XFramework.Client.-1732364538.00" t="ExcludeRecursive" />
-    <e p="C:\Users\Yeyeyel\RiderProjects\XFramework" t="IncludeFlat">
+    <e p="C:\Users\Y E L\AppData\Local\JetBrains\Rider2020.2\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Y E L\AppData\Local\JetBrains\Rider2020.2\resharper-host\Local\Transient\Rider\v202\SolutionCaches\_XFramework.Client.1551581274.00" t="ExcludeRecursive" />
+    <e p="C:\Users\Y E L\AppData\Roaming\JetBrains\Rider2020.2\consoles\db" t="IncludeRecursive" />
+    <e p="C:\Users\Y E L\AppData\Roaming\JetBrains\Rider2020.2\extensions" t="IncludeRecursive" />
+    <e p="C:\Users\Y E L\AppData\Roaming\JetBrains\Rider2020.2\scratches" t="IncludeRecursive" />
+    <e p="C:\Users\Y E L\Documents\Projects\C#\XFramework" t="IncludeFlat">
       <e p="packages" t="ExcludeRecursive" />
       <e p="XFramework\Client\XFramework.Mobile" t="IncludeRecursive">
         <e p="_Imports.razor" t="Include" />
@@ -43,7 +46,7 @@
               <e p="Home.razor" t="Include" />
               <e p="Home.razor.cs" t="Include" />
             </e>
-            <e p="User" t="Include">
+            <e p="user" t="Include">
               <e p="Profile.razor" t="Include" />
               <e p="Profile.razor.cs" t="Include" />
               <e p="Scan.razor" t="Include" />
@@ -279,7 +282,7 @@
                         <e p="form-widgets.js" t="Include" />
                         <e p="form-widgets.min.js" t="Include" />
                       </e>
-                      <e p="widgets" t="Include">
+                      <e p="Widgets" t="Include">
                         <e p="autosize.js" t="Include" />
                         <e p="autosize.min.js" t="Include" />
                         <e p="bootstrap-datepicker.js" t="Include" />
@@ -392,7 +395,7 @@
                       <e p="profile.js" t="Include" />
                       <e p="profile.min.js" t="Include" />
                     </e>
-                    <e p="projects" t="Include">
+                    <e p="Projects" t="Include">
                       <e p="add-project.js" t="Include" />
                       <e p="add-project.min.js" t="Include" />
                       <e p="list-datatable.js" t="Include" />
@@ -402,7 +405,7 @@
                       <e p="todo.js" t="Include" />
                       <e p="todo.min.js" t="Include" />
                     </e>
-                    <e p="User" t="Include">
+                    <e p="user" t="Include">
                       <e p="add-user.js" t="Include" />
                       <e p="add-user.min.js" t="Include" />
                       <e p="edit-user.js" t="Include" />
@@ -438,7 +441,7 @@
                       <e p="list-view.js" t="Include" />
                       <e p="list-view.min.js" t="Include" />
                     </e>
-                    <e p="cards" t="Include">
+                    <e p="Cards" t="Include">
                       <e p="draggable.js" t="Include" />
                       <e p="draggable.min.js" t="Include" />
                       <e p="tools.js" t="Include" />
@@ -2567,12 +2570,31 @@
           </e>
         </e>
         <e p="Pages" t="Include">
-          <e p="Admin" t="Include" />
-          <e p="Client" t="Include" />
+          <e p="Admin" t="Include">
+            <e p="Home" t="Include">
+              <e p="DashboardPage.razor" t="Include" />
+            </e>
+            <e p="Landing" t="Include" />
+            <e p="Session" t="Include" />
+            <e p="user" t="Include" />
+          </e>
+          <e p="Client" t="Include">
+            <e p="Home" t="Include" />
+            <e p="Landing" t="Include" />
+            <e p="Session" t="Include" />
+            <e p="user" t="Include">
+              <e p="profile" t="Include">
+                <e p="AccountInfoPage.razor" t="Include" />
+                <e p="ChangePasswordPage.razor" t="Include" />
+                <e p="EmailSettingsPage.razor" t="Include" />
+                <e p="PersonalInfoPage.razor" t="Include" />
+                <e p="ProfilePage.razor" t="Include" />
+              </e>
+            </e>
+          </e>
           <e p="Counter.razor" t="Include" />
           <e p="FetchData.razor" t="Include" />
           <e p="Index.razor" t="Include" />
-          <e p="TestPage.razor" t="Include" />
         </e>
         <e p="Program.cs" t="Include" />
         <e p="Properties" t="Include">
@@ -2581,18 +2603,27 @@
         <e p="Services" t="Include" />
         <e p="Shared" t="Include">
           <e p="Components" t="Include">
-            <e p="Partials" t="Include" />
-            <e p="widgets" t="Include">
-              <e p="cards" t="Include">
+            <e p="Partials" t="Include">
+              <e p="DashboardHeader.razor" t="Include" />
+            </e>
+            <e p="Widgets" t="Include">
+              <e p="Cards" t="Include">
                 <e p="GeneralCards" t="Include">
                   <e p="BasicCard.razor" t="Include" />
+                  <e p="DashboardTabCard.razor" t="Include" />
                 </e>
                 <e p="StackedCards" t="Include" />
               </e>
-              <e p="Modal" t="Include" />
+              <e p="DashboardTabs.razor" t="Include" />
+              <e p="Modal" t="Include">
+                <e p="Dashboard.razor" t="Include" />
+                <e p="Profile1Navbar.razor" t="Include" />
+              </e>
             </e>
           </e>
-          <e p="Layouts" t="Include" />
+          <e p="Layouts" t="Include">
+            <e p="DashboardLayout.razor" t="Include" />
+          </e>
           <e p="MainLayout.razor" t="Include" />
           <e p="Menus" t="Include">
             <e p="DropdownMenu" t="Include">
@@ -2600,6 +2631,11 @@
             </e>
             <e p="Partials" t="Include">
               <e p="DropdownItem.razor" t="Include" />
+              <e p="ProfileFooter.razor" t="Include" />
+            </e>
+            <e p="Sidebar" t="Include">
+              <e p="Profile1Sidebar.razor" t="Include" />
+              <e p="Profile2Sidebar.razor" t="Include" />
             </e>
           </e>
           <e p="NavMenu.razor" t="Include" />
@@ -2788,7 +2824,7 @@
                       <e p="form-widgets.js" t="Include" />
                       <e p="form-widgets.min.js" t="Include" />
                     </e>
-                    <e p="widgets" t="Include">
+                    <e p="Widgets" t="Include">
                       <e p="autosize.js" t="Include" />
                       <e p="autosize.min.js" t="Include" />
                       <e p="bootstrap-datepicker.js" t="Include" />
@@ -2901,7 +2937,7 @@
                     <e p="profile.js" t="Include" />
                     <e p="profile.min.js" t="Include" />
                   </e>
-                  <e p="projects" t="Include">
+                  <e p="Projects" t="Include">
                     <e p="add-project.js" t="Include" />
                     <e p="add-project.min.js" t="Include" />
                     <e p="list-datatable.js" t="Include" />
@@ -2911,7 +2947,7 @@
                     <e p="todo.js" t="Include" />
                     <e p="todo.min.js" t="Include" />
                   </e>
-                  <e p="User" t="Include">
+                  <e p="user" t="Include">
                     <e p="add-user.js" t="Include" />
                     <e p="add-user.min.js" t="Include" />
                     <e p="edit-user.js" t="Include" />
@@ -2947,7 +2983,7 @@
                     <e p="list-view.js" t="Include" />
                     <e p="list-view.min.js" t="Include" />
                   </e>
-                  <e p="cards" t="Include">
+                  <e p="Cards" t="Include">
                     <e p="draggable.js" t="Include" />
                     <e p="draggable.min.js" t="Include" />
                     <e p="tools.js" t="Include" />

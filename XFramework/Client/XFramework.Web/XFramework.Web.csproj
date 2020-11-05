@@ -18,14 +18,19 @@
       <Folder Include="Entity\State" />
       <Folder Include="Entity\ViewModel" />
       <Folder Include="Helpers" />
-      <Folder Include="Pages\Admin" />
-      <Folder Include="Pages\Client" />
+      <Folder Include="Pages\Admin\Landing" />
+      <Folder Include="Pages\Admin\Session" />
+      <Folder Include="Pages\Admin\User" />
+      <Folder Include="Pages\Client\Home" />
+      <Folder Include="Pages\Client\Landing" />
+      <Folder Include="Pages\Client\Session" />
       <Folder Include="Services" />
-      <Folder Include="Shared\Components\Partials" />
       <Folder Include="Shared\Components\Widgets\Cards\StackedCards" />
-      <Folder Include="Shared\Components\Widgets\Modal" />
-      <Folder Include="Shared\Layouts" />
       <Folder Include="Shared\Utilities" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="Pages\Client\User\Profile2\Index2.razor" />
     </ItemGroup>
 
 </Project>
