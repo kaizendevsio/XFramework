@@ -1,9 +1,9 @@
-﻿using Ark.Mobile.Property;
-using Ark.Mobile.Shared.Layouts;
+﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
-using System.Threading.Tasks;
+using XFramework.Mobile.Property;
+using XFramework.Mobile.Shared.Layouts;
 
-namespace Ark.Mobile.Services
+namespace XFramework.Mobile.Services
 {
     public class ActivityBase : ComponentBase
     {

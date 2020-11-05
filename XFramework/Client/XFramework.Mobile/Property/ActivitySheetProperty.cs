@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace Ark.Mobile.Property
+﻿namespace XFramework.Mobile.Property
 {
     public class ActivitySheetProperty : BaseProperty
     {

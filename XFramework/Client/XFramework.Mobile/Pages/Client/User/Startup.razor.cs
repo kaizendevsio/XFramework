@@ -1,11 +1,8 @@
-﻿using Microsoft.AspNetCore.Components;
-using Ark.Mobile.Shared.Layouts;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System;
+using Microsoft.AspNetCore.Components;
+using XFramework.Mobile.Shared.Layouts;
 
-namespace Ark.Mobile.Pages.Client.User
+namespace XFramework.Mobile.Pages.Client.User
 {
     public class StartupBase : ComponentBase
     {

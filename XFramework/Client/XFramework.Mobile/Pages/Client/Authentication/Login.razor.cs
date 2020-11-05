@@ -1,10 +1,6 @@
-﻿using Ark.Mobile.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using XFramework.Mobile.Services;
 
-namespace Ark.Mobile.Pages.Client.Authentication
+namespace XFramework.Mobile.Pages.Client.Authentication
 {
     public class LoginBase : ActivityBase
     {

@@ -1,12 +1,10 @@
 using System;
-using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading.Tasks;
-using System.Text;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http;
 
-namespace Ark.Mobile
+namespace XFramework.Mobile
 {
     public class Program
     {

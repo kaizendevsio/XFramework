@@ -1671,13 +1671,13 @@
     <Content Update="wwwroot\service-worker.published.js" Link="wwwroot\service-worker.js" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Ark.Entity">
-      <HintPath>..\Server\Ark.Entity\bin\Debug\netcoreapp3.0\Ark.Entity.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="Entity\Enums" />
     <Folder Include="Helpers" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="XFramework.Entity, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\..\Server\XFramework.Entity\bin\Debug\netcoreapp3.0\XFramework.Entity.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

@@ -1,14 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Net.Http;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using Ark.Entity.BO;
+using XFramework.Entity.BO;
 
-
-namespace Ark.Mobile.Pages.Admin.Authentication
+namespace XFramework.Mobile.Pages.Admin.Authentication
 {
     public class LoginBase : ComponentBase
     {

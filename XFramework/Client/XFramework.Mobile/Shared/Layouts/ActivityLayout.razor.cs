@@ -1,11 +1,8 @@
-﻿using Microsoft.AspNetCore.Components;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Ark.Mobile.Property;
+﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
+using XFramework.Mobile.Property;
 
-namespace Ark.Mobile.Shared.Layouts
+namespace XFramework.Mobile.Shared.Layouts
 {
     public class ActivityLayoutBase : LayoutComponentBase
     {
