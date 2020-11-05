@@ -1,0 +1,50 @@
+﻿<div class="col-xl-8">
+
+    <div class="card card-custom card-shadowless gutter-b card-stretch card-shadowless p-0">
+
+        <ul class="dashboard-tabs nav nav-pills nav-danger row row-paddingless m-0 p-0" role="tablist">
+
+            <li class="">
+                <DashboardTabCard></DashboardTabCard>
+            </li>
+
+            <li class="">
+                <DashboardTabCard></DashboardTabCard>
+            </li>
+            <li class="">
+                <DashboardTabCard></DashboardTabCard>
+            </li>
+            <li class="">
+                <DashboardTabCard></DashboardTabCard>
+            </li>
+            <li class="">
+                <DashboardTabCard></DashboardTabCard>
+            </li>
+            <li class="">
+                <DashboardTabCard></DashboardTabCard>
+            </li>
+        </ul>
+
+
+        <div class="tab-content m-0 p-0">
+            <div class="tab-pane active" id="forms_widget_tab_1" role="tabpanel"></div>
+            <div class="tab-pane" id="forms_widget_tab_2" role="tabpanel"></div>
+            <div class="tab-pane" id="forms_widget_tab_3" role="tabpanel"></div>
+            <div class="tab-pane" id="forms_widget_tab_4" role="tabpanel"></div>
+            <div class="tab-pane" id="forms_widget_tab_6" role="tabpanel"></div>
+        </div>
+
+    </div>
+    
+
+</div>
+
+@code {
+
+    [Parameter]
+    public string Title { get; set; }
+
+    [Parameter]
+    public RenderFragment Tab { get; set; }
+
+}

@@ -1,0 +1,15 @@
+﻿<li class="navi-item">
+    <a href="#" class="navi-link">
+        <span class="navi-text">
+            <span class="label label-xl label-inline @Color">@Text</span>
+        </span>
+    </a>
+</li>
+@code
+{
+    [Parameter]
+    public string Text { get; set; }
+
+    [Parameter]
+    public string Color { get; set; } = "label-light-success";
+}
