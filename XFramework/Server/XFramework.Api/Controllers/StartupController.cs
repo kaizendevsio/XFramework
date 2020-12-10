@@ -12,23 +12,24 @@ namespace XFramework.Api.Controllers
         [HttpGet]
         public ActionResult Startup()
         {
-            ApiStatusBO apiStatus = new ApiStatusBO();
-            apiStatus.ApplicationName = Assembly.GetEntryAssembly().GetName().Name.Split(".")[0];
-            apiStatus.StartupTime = DateTime.Now;
-            apiStatus.Environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-            apiStatus.Host = new HostBO();
-
-            apiStatus.Host.Platform = Environment.OSVersion.Platform.ToString();
-            apiStatus.Host.MachineName = Environment.MachineName;
-            apiStatus.Host.ProccessorCount = Environment.ProcessorCount;
-            apiStatus.Host.Is64BitOperatingSystem = Environment.Is64BitOperatingSystem;
-            apiStatus.Host.Is64BitProccess = Environment.Is64BitProcess;
-            apiStatus.Host.SystemPageSize = Environment.SystemPageSize;
-            apiStatus.Host.TickCount64 = Environment.TickCount64;
-            apiStatus.Host.Version = Environment.OSVersion.ToString();
-
-
-            apiStatus.Status = "Running";
+            var apiStatus = new ApiStatusBO
+            {
+                ApplicationName = Assembly.GetEntryAssembly()?.GetName().Name?.Split(".")[0],
+                StartupTime = DateTime.Now,
+                Environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                Host = new HostBO
+                {
+                    Platform = Environment.OSVersion.Platform.ToString(),
+                    MachineName = Environment.MachineName,
+                    ProccessorCount = Environment.ProcessorCount,
+                    Is64BitOperatingSystem = Environment.Is64BitOperatingSystem,
+                    Is64BitProccess = Environment.Is64BitProcess,
+                    SystemPageSize = Environment.SystemPageSize,
+                    TickCount64 = Environment.TickCount64,
+                    Version = Environment.OSVersion.ToString()
+                },
+                Status = "Running"
+            };
 
             return Ok(apiStatus);
         }

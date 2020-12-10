@@ -26,7 +26,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/XFramework.Mobile.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/XFramework.Mobile.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ChangePasswordPage.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ChangePasswordPage.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/EmailSettingsPage.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/EmailSettingsPage.razor" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,7 +42,6 @@
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.Api/AutoMapping.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ProfilePage.razor" root0="FORCE_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/Server/XFramework.Api/AutoMapping.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
@@ -57,8 +59,6 @@
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile2/Index.razor" />
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Shared/Menus/Sidebar/Profile2Sidebar.razor" />
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile2/Index2.razor" />
-        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ChangePasswordPage.razor" />
-        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/EmailSettingsPage.razor" />
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/PersonalInfoPage.razor" />
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/Index1.razor" />
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Shared/Menus/Sidebar/Profile1Sidebar.razor" />
@@ -72,6 +72,16 @@
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Shared/Components/Widgets/Modal/Dashboard.razor" />
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Shared/Components/Widgets/DashboardTabs.razor" />
         <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/AccountInfoPage.razor" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Login.razor.cs" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Register.razor" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/App.razor" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/_Imports.razor" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Property/ActivityBottomBarProperty.cs" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Property/ActivityMenuProperty.cs" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Services/ActivityBase.cs" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Client/User/Startup.razor.cs" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ChangePasswordPage.razor" />
+        <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/EmailSettingsPage.razor" />
       </list>
     </option>
   </component>
@@ -90,6 +100,7 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="nodejs_package_manager_path" value="npm" />
+    <property name="settings.editor.selected.configurable" value="configurable.group.editor" />
     <property name="vue.rearranger.settings.migration" value="true" />
   </component>
   <component name="RunManager" selected=".NET Launch Settings Profile.XFramework.Web">
@@ -190,7 +201,17 @@
       <workItem from="1604475384861" duration="1795000" />
       <workItem from="1604568288764" duration="2725000" />
       <workItem from="1604583437880" duration="1029000" />
+      <workItem from="1604613577088" duration="5074000" />
+      <workItem from="1605015955749" duration="1037000" />
     </task>
+    <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
+      <created>1604612647432</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1604612647432</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -212,6 +233,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
+    <MESSAGE value="Safety Backup + Mobile Bug Fixes" />
+    <option name="LAST_COMMIT_MESSAGE" value="Safety Backup + Mobile Bug Fixes" />
   </component>
   <component name="WindowStateProjectService">
     <state width="1921" height="383" key="GridCell.Tab.0.bottom" timestamp="1604036402240">
@@ -298,6 +321,14 @@
       <screen x="1600" y="0" width="1920" height="1040" />
     </state>
     <state x="2332" y="230" key="RollbackChangesDialog/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604034041908" />
+    <state x="461" y="165" key="SettingsEditor" timestamp="1604612888588">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state x="461" y="165" key="SettingsEditor/0.0.1920.1040@0.0.1920.1040" timestamp="1604612888588" />
+    <state x="552" y="253" key="Vcs.Push.Dialog.v2" timestamp="1604612660291">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state x="552" y="253" key="Vcs.Push.Dialog.v2/0.0.1920.1040@0.0.1920.1040" timestamp="1604612660291" />
     <state x="2223" y="225" width="672" height="678" key="search.everywhere.popup" timestamp="1604391571218">
       <screen x="1600" y="0" width="1920" height="1040" />
     </state>

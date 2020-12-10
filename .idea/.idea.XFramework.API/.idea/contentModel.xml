@@ -20,7 +20,7 @@
         </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
-            <e p="netcoreapp3.1" t="Include">
+            <e p="netcoreapp5.0" t="Include">
               <e p="XFramework.Api.AssemblyInfo.cs" t="Include" />
             </e>
           </e>
@@ -141,7 +141,7 @@
         </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
-            <e p="netcoreapp3.1" t="Include">
+            <e p="netcoreapp5.0" t="Include">
               <e p="XFramework.Core.AssemblyInfo.cs" t="Include" />
             </e>
           </e>
@@ -215,7 +215,7 @@
         <e p="Migrations" t="Include" />
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
-            <e p="netcoreapp3.0" t="Include">
+            <e p="netcoreapp5.0" t="Include">
               <e p="XFramework.Data.AssemblyInfo.cs" t="Include" />
             </e>
           </e>
@@ -247,7 +247,7 @@
         </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
-            <e p="netcoreapp3.0" t="Include">
+            <e p="netcoreapp5.0" t="Include">
               <e p="XFramework.External.AssemblyInfo.cs" t="Include" />
             </e>
           </e>
@@ -268,7 +268,7 @@
         </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
-            <e p="netcoreapp3.0" t="Include">
+            <e p="netcoreapp5.0" t="Include">
               <e p="XFramework.Integrity.AssemblyInfo.cs" t="Include" />
             </e>
           </e>

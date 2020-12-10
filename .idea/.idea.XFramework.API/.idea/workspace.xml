@@ -22,20 +22,19 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3e815c30-72b3-458a-a935-4be642ff5e03" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/AutoMapping.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/AutoMapping.cs" afterDir="false" />
+    <list default="true" id="3e815c30-72b3-458a-a935-4be642ff5e03" name="Default Changelist" comment="Sa">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/contentModel.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/contentModel.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ChangePasswordPage.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ChangePasswordPage.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/EmailSettingsPage.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/EmailSettingsPage.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/StartupController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/StartupController.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/User/UserController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/User/UserController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/ValuesController.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/XFrameworkControllerBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/XFrameworkControllerBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Startup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/User/CreateUserCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/User/CreateUserCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/Interfaces/Commands/IApplicationCommandHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/Interfaces/Commands/IEventLogCommandHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/Interfaces/Commands/IUserWalletCommandHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/Interfaces/Query/IUserQueryHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/Interfaces/Query/IUserWalletQueryHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/XFramework.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/XFramework.Api.csproj" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/XFramework.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/XFramework.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/XFramework.Data.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/XFramework.Data.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/XFramework.External.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/XFramework.External.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IntegrityService/XFramework.Integrity.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IntegrityService/XFramework.Integrity.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,6 +43,14 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/User/UserController.cs" />
+        <option value="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/StartupController.cs" />
+      </list>
+    </option>
   </component>
   <component name="ProjectId" id="1jE2NGLgSOKuWcXrBFQqLHTJvUD" />
   <component name="ProjectViewState">
@@ -98,6 +105,13 @@
       <workItem from="1603354895318" duration="1320000" />
       <workItem from="1603463477985" duration="2715000" />
       <workItem from="1604493763250" duration="1717000" />
+      <workItem from="1604612356099" duration="554000" />
+      <workItem from="1604612956669" duration="609000" />
+      <workItem from="1605015791523" duration="2496000" />
+      <workItem from="1605538871743" duration="854000" />
+      <workItem from="1605542343858" duration="2680000" />
+      <workItem from="1607581051810" duration="1409000" />
+      <workItem from="1607590528879" duration="1481000" />
     </task>
     <servers />
   </component>

@@ -27,8 +27,8 @@ namespace XFramework.Api.Controllers.User
         [HttpPut]
         public async Task<IActionResult> Put([FromBody] UserBO body)
         {
-            var _c = _mapper.Map<CreateUserCmd>(body);
-            var result = await _mediator.Send(_c).ConfigureAwait(true);
+            var c = _mapper.Map<CreateUserCmd>(body);
+            var result = await _mediator.Send(c).ConfigureAwait(true);
             return Ok(result);
 
         }
