@@ -22,111 +22,45 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cba8e616-3d24-4569-b53c-18fb6b88a820" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/codeStyles/codeStyleConfig.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/contentModel.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/encodings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/indexLayout.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/projectSettingsUpdater.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/codeStyles/codeStyleConfig.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/contentModel.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/.gitattributes" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/Extension Files/OmniExtension/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/Extension Files/OmniExtension/OmniCryptography.sln" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/Extension Files/OmniExtension/OmniCryptography/Base58Encoding.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/Extension Files/OmniExtension/OmniCryptography/CurveFp.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/Extension Files/OmniExtension/OmniCryptography/OmniCryptography.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/Extension Files/OmniExtension/OmniCryptography/Point.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/Extension Files/OmniExtension/OmniCryptography/Program.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/Extension Files/OmniExtension/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/.gitattributes" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.API.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.CoreService.sln" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer.sln" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/AutoMapping.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/AutoMapping.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/StartupController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/StartupController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/User/UserController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/User/UserController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/XFrameworkControllerBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/XFrameworkControllerBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Startup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/XFramework.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/XFramework.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/Application/GetAppInfoCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/Application/GetAppInfoCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/Events/CreateEventLogCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/Events/CreateEventLogCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/CreateUserCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/CreateUserCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/RemoveUserCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/RemoveUserCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserAuthCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserAuthCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserAuthStatusCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserAuthStatusCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/ValidateUserEmailCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/ValidateUserEmailCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/UserWallet/ConvertWalletTransactionCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/UserWallet/ConvertWalletTransactionCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/UserWallet/CreateWalletTransactionCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/UserWallet/CreateWalletTransactionCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/Events/CreateEventLogHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/Events/CreateEventLogHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/DataLayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/User/AuthenticateUserQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/User/AuthenticateUserQuery.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/User/GetUserProfileQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/User/GetUserProfileQuery.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/UserWallet/GetUserWalletQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/UserWallet/GetUserWalletQuery.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/UserWallet/GetUserWalletTransactionQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/UserWallet/GetUserWalletTransactionQuery.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Handlers/User/GetUserProfileHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Handlers/User/GetUserProfileHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/Interfaces/IDataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/Interfaces/IDataLayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/XFramework.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/XFramework.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/AffiliateMapBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/ApiResponseBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/ApiStatusBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/AuditEntry.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/AuthStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/BaseAuditBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/ExceptionResponseBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/ExchangeRateBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/HostBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/TransactionQueryBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/UserAuthBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/UserAuthStatusBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/UserAuthUpdateBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/UserBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/BO/WalletTransactionBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblAddressEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblAddresses.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblApplication.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblApplicationLogs.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblAuditFields.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblAuditHistory.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblCompanies.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblCompanyEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblSessionData.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblSessionEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblUserAuthHistory.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblUserContactEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblUserContacts.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblUserCredentials.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblUserInfo.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblUserRoleEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/TblUserRoles.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/DTO/XFrameworkContext.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/ApiStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/ApplicationStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/AuthStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/CivilStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/CurrencyType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/DepositStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/EmailStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/EmailType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/EventLogLevel.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/GenericStatusType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/IncomeDistributionType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/LoginStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/SortingType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/TransactionStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/TransactionType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/UserRole.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/WalletType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/Enums/WithdrawalRequestStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Entity/XFramework.Data.csproj" beforeDir="false" />
+    <list default="true" id="cba8e616-3d24-4569-b53c-18fb6b88a820" name="Default Changelist" comment="Updated File Structure">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/contentModel.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/contentModel.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.CoreService.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.CoreService.sln" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/Application/GetAppInfoCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/Events/CreateEventLogCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/CreateUserCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/RemoveUserCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserAuthCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserAuthStatusCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/User/ValidateUserEmailCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/UserWallet/ConvertWalletTransactionCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Entity/UserWallet/CreateWalletTransactionCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/Application/GetAppInfoHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/CommandBaseHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/Events/CreateEventLogHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/User/RemoveUserHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/User/UpdateUserAuthHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/User/UpdateUserAuthStatusHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/User/UpdateUserHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/User/ValidateUserEmailHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/UserWallet/ConvertWalletTransactionHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Handlers/UserWallet/CreateWalletTransactionHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Commands/Validations/User/CreateUserCmdValidator.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/DataLayer.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/User/AuthenticateUserQuery.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/User/GetUserProfileQuery.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/UserWallet/GetUserWalletQuery.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Entity/UserWallet/GetUserWalletTransactionQuery.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Handlers/QueryBaseHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Handlers/User/AuthenticateUserHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Handlers/User/GetUserProfileHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Handlers/UserWallet/GetUserWalletHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/DataAccess/Query/Handlers/UserWallet/GetUserWalletTransactionHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/Interfaces/IDataLayer.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/PipelineBehaviors/ValidationBehavior.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.AppService/XFramework.Core.csproj" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -150,7 +84,9 @@
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
+    <property name="ASKED_SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="vue.rearranger.settings.migration" value="true" />
   </component>
@@ -194,8 +130,16 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1608303956675</updated>
-      <workItem from="1608303961074" duration="806000" />
+      <workItem from="1608303961074" duration="1097000" />
     </task>
+    <task id="LOCAL-00001" summary="Updated File Structure">
+      <created>1608304981819</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1608304981819</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -216,6 +160,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
+    <MESSAGE value="Updated File Structure" />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated File Structure" />
   </component>
   <component name="WindowStateProjectService">
     <state width="1877" height="282" key="GridCell.Tab.0.bottom" timestamp="1608304358644">

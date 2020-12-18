@@ -11,7 +11,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XFramework.External", "XFra
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XFramework.Integrity", "XFramework\Server\XFramework.CoreService\XFramework.IntegrityService\XFramework.Integrity.csproj", "{B40B95D2-4B36-4CE8-83B7-A0910B0B9984}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XFramework.Core", "XFramework\Server\XFramework.CoreService\XFramework.AppService\XFramework.Core.csproj", "{89E1C066-3E3F-4CEF-9546-5E747CA68843}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XFramework.Core", "XFramework\Server\XFramework.CoreService\XFramework.Core\XFramework.Core.csproj", "{89E1C066-3E3F-4CEF-9546-5E747CA68843}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Presentation", "Presentation", "{9D587CE6-9699-46F7-92D2-344AFC9FE807}"
 EndProject
