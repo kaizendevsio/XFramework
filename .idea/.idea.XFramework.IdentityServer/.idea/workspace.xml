@@ -19,7 +19,9 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="70e1eb87-e1bc-4776-bb1f-667e7209b08c" name="Default Changelist" comment="" />
+    <list default="true" id="70e1eb87-e1bc-4776-bb1f-667e7209b08c" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer.sln" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -33,6 +35,8 @@
       <list>
         <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/Class1.cs" />
         <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Integrity/Class1.cs" />
+        <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Class1.cs" />
+        <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Class1.cs" />
       </list>
     </option>
   </component>
@@ -55,7 +59,7 @@
       <option name="presentableId" value="Default" />
       <updated>1607914561390</updated>
       <workItem from="1607914564587" duration="1672000" />
-      <workItem from="1608288953567" duration="1856000" />
+      <workItem from="1608288953567" duration="2255000" />
     </task>
     <servers />
   </component>
@@ -80,9 +84,9 @@
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
   </component>
   <component name="WindowStateProjectService">
-    <state x="552" y="252" key="Rider.ProjectTemplateDialog.Size" timestamp="1608304560418">
+    <state x="552" y="252" key="Rider.ProjectTemplateDialog.Size" timestamp="1608305382962">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="552" y="252" key="Rider.ProjectTemplateDialog.Size/1920.0.1920.1040/0.0.1920.1040@0.0.1920.1040" timestamp="1608304560418" />
+    <state x="552" y="252" key="Rider.ProjectTemplateDialog.Size/1920.0.1920.1040/0.0.1920.1040@0.0.1920.1040" timestamp="1608305382962" />
   </component>
 </project>

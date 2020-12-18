@@ -6,10 +6,22 @@
       <e p="Domain" t="Include" />
       <e p="packages" t="ExcludeRecursive" />
       <e p="Presentation" t="Include" />
+      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Api" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Class1.cs" t="Include" />
+        <e p="IdentityServer.Api.csproj" t="IncludeRecursive" />
+        <e p="obj" t="ExcludeRecursive" />
+      </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Core" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="Class1.cs" t="Include" />
         <e p="IdentityServer.Core.csproj" t="IncludeRecursive" />
+        <e p="obj" t="ExcludeRecursive" />
+      </e>
+      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Class1.cs" t="Include" />
+        <e p="IdentityServer.Domain.csproj" t="IncludeRecursive" />
         <e p="obj" t="ExcludeRecursive" />
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Integrity" t="IncludeRecursive">
