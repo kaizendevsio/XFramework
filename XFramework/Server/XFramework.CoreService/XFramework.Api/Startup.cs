@@ -17,7 +17,7 @@ using XFramework.Core.DataAccess.Commands.Handlers;
 using XFramework.Core.DataAccess.Commands.Handlers.User;
 using XFramework.Core.Interfaces;
 using XFramework.Core.PipelineBehaviors;
-using XFramework.Data.DTO;
+using XFramework.Domain.DTO;
 
 namespace XFramework.Api
 {

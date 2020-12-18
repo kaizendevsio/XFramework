@@ -7,9 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
-using XFramework.Data.BO;
-using XFramework.Data.DTO;
-using XFramework.Data.Enums;
+using XFramework.Domain.BO;
+using XFramework.Domain.DTO;
+using XFramework.Domain.Enums;
 
 namespace XFramework.Core.DataAccess.Commands.Handlers.User
 {

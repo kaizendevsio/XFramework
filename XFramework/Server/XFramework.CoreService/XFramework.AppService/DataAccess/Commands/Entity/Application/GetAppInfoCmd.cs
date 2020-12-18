@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using XFramework.Data.DTO;
+using XFramework.Domain.DTO;
 
 namespace XFramework.Core.DataAccess.Commands.Entity.Application
 {

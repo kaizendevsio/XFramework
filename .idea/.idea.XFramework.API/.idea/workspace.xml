@@ -22,167 +22,8 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3e815c30-72b3-458a-a935-4be642ff5e03" name="Default Changelist" comment="Safety Baclup">
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/.name" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/encodings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/indexLayout.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/projectSettingsUpdater.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/riderModule.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer.sln" afterDir="false" />
+    <list default="true" id="3e815c30-72b3-458a-a935-4be642ff5e03" name="Default Changelist" comment="Updated File System Structure">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.API/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.API.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.API.sln" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/Extension Files/OmniExtension/LICENSE" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/Extension Files/OmniExtension/OmniCryptography.sln" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/Extension Files/OmniExtension/OmniCryptography/Base58Encoding.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/Extension Files/OmniExtension/OmniCryptography/CurveFp.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/Extension Files/OmniExtension/OmniCryptography/OmniCryptography.csproj" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/Extension Files/OmniExtension/OmniCryptography/Point.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/Extension Files/OmniExtension/OmniCryptography/Program.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/Extension Files/OmniExtension/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/LICENSE" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/AutoMapping.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/StartupController.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/User/UserController.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Controllers/XFrameworkControllerBase.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Extensions/ApplicationBuilderExtension.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Program.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Properties/launchSettings.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/Email-Sending-Confirmation.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/EmailConfirmation.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-2fa-ga-disable.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-applying-convert.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-auto-reply.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-bonus.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-change-password.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-confirmation.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-conversion-successful..html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-forgot-password.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-purchasing-trade.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-receive-confirmation.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-registration.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-save-profile.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Resources/Templates/Email/email-success-login.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/Startup.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/XFramework.Api.csproj" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/appsettings.Development.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Api/appsettings.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/Application/GetAppInfoCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/Events/CreateEventLogCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/User/CreateUserCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/User/RemoveUserCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserAuthCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserAuthStatusCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/User/UpdateUserCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/User/ValidateUserEmailCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/UserWallet/ConvertWalletTransactionCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Entity/UserWallet/CreateWalletTransactionCmd.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/Application/GetAppInfoHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/CommandBaseHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/Events/CreateEventLogHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/User/RemoveUserHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/User/UpdateUserAuthHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/User/UpdateUserAuthStatusHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/User/UpdateUserHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/User/ValidateUserEmailHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/UserWallet/ConvertWalletTransactionHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Handlers/UserWallet/CreateWalletTransactionHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Commands/Validations/User/CreateUserCmdValidator.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/DataLayer.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Entity/User/AuthenticateUserQuery.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Entity/User/GetUserProfileQuery.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Entity/UserWallet/GetUserWalletQuery.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Entity/UserWallet/GetUserWalletTransactionQuery.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Handlers/QueryBaseHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Handlers/User/AuthenticateUserHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Handlers/User/GetUserProfileHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Handlers/UserWallet/GetUserWalletHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/DataAccess/Query/Handlers/UserWallet/GetUserWalletTransactionHandler.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/Interfaces/IDataLayer.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/PipelineBehaviors/ValidationBehavior.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.AppService/XFramework.Core.csproj" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/AffiliateMapBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/ApiResponseBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/ApiStatusBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/AuditEntry.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/AuthStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/BaseAuditBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/ExceptionResponseBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/ExchangeRateBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/HostBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/TransactionQueryBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/UserAuthBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/UserAuthStatusBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/UserAuthUpdateBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/UserBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/BO/WalletTransactionBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblAddressEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblAddresses.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblApplication.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblApplicationLogs.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblAuditFields.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblAuditHistory.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblCompanies.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblCompanyEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblSessionData.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblSessionEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblUserAuthHistory.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblUserContactEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblUserContacts.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblUserCredentials.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblUserInfo.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblUserRoleEntities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/TblUserRoles.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/DTO/XFrameworkContext.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/ApiStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/ApplicationStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/AuthStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/CivilStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/CurrencyType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/DepositStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/EmailStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/EmailType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/EventLogLevel.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/GenericStatusType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/IncomeDistributionType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/LoginStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/SortingType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/TransactionStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/TransactionType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/UserRole.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/WalletType.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/Enums/WithdrawalRequestStatus.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.Entity/XFramework.Data.csproj" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Blockchain.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Changelly.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/CoinCap.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Cryptography.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/FormUtilities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/HttpUtilities.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/BlockchainApiSettings.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/BlockchainResponse.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/BlockchainTx.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/ChangellyApiSettings.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/ChangellyMessage.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/ChangellyParams.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/ChangellyResponse.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/ChangellyTransactionResponse.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/CoinCapApiSettings.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/CoinProperty.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/GenericApiSettings.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/Models/HttpResponseBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/SeedString.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.ExternalUtilities/XFramework.External.csproj" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IntegrityService/Entity/BO/ValidityResponseBO.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IntegrityService/Entity/BO/ValiditySettings.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IntegrityService/Entity/Enums/ValidityState.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IntegrityService/ValidityService.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IntegrityService/XFramework.Integrity.csproj" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/_OneClickDeploy.bat" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/ssh.ppk" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -262,6 +103,7 @@
       <workItem from="1607590528879" duration="3404000" />
       <workItem from="1607913400960" duration="1442000" />
       <workItem from="1608136641455" duration="5000" />
+      <workItem from="1608303481995" duration="420000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Baclup">
       <created>1607598602398</created>
@@ -270,7 +112,14 @@
       <option name="project" value="LOCAL" />
       <updated>1607598602398</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Updated File System Structure">
+      <created>1608303796389</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1608303796389</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -293,7 +142,8 @@
   <component name="VcsManagerConfiguration">
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
     <MESSAGE value="Safety Baclup" />
-    <option name="LAST_COMMIT_MESSAGE" value="Safety Baclup" />
+    <MESSAGE value="Updated File System Structure" />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated File System Structure" />
   </component>
   <component name="WindowStateProjectService">
     <state x="552" y="252" key="Rider.ProjectTemplateDialog.Size" timestamp="1607914440790">

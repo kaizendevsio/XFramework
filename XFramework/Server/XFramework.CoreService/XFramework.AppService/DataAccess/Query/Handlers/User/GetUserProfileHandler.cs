@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using XFramework.Core.DataAccess.Commands.Handlers;
 using XFramework.Core.DataAccess.Query.Entity.User;
-using XFramework.Data.BO;
+using XFramework.Domain.BO;
 
 namespace XFramework.Core.DataAccess.Query.Handlers.User
 {

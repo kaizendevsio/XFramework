@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
-using XFramework.Data.BO;
+using XFramework.Domain.BO;
 
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860

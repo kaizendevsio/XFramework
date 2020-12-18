@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Reflection;
-using XFramework.Data.BO;
+using XFramework.Domain.BO;
 using Microsoft.AspNetCore.Mvc;
 
 namespace XFramework.Api.Controllers

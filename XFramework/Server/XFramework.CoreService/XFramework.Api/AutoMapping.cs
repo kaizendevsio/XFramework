@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using AutoMapper;
 using XFramework.Core.DataAccess.Commands;
 using XFramework.Core.DataAccess.Commands.Entity.User;
-using XFramework.Data.BO;
+using XFramework.Domain.BO;
 
 namespace XFramework.Api
 {

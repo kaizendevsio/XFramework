@@ -11,9 +11,9 @@ using XFramework.Core.DataAccess.Commands;
 using XFramework.Core.DataAccess.Commands.Entity.Application;
 using XFramework.Core.DataAccess.Commands.Entity.Events;
 using XFramework.Core.Interfaces;
-using XFramework.Data.BO;
-using XFramework.Data.DTO;
-using XFramework.Data.Enums;
+using XFramework.Domain.BO;
+using XFramework.Domain.DTO;
+using XFramework.Domain.Enums;
 
 namespace XFramework.Api.Controllers
 {

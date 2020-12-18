@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using XFramework.Data.DTO;
-using XFramework.Data.BO;
+using XFramework.Domain.DTO;
+using XFramework.Domain.BO;
 using XFramework.Core.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
