@@ -1,9 +1,9 @@
-﻿using System;
+﻿﻿using System;
 using System.Reflection;
-using XFramework.Domain.BO;
+using IdentityServer.Domain.BO;
 using Microsoft.AspNetCore.Mvc;
 
-namespace XFramework.Api.Controllers
+namespace IdentityServer.Api.Controllers
 {
     [Route("[controller]")]
     [ApiController]

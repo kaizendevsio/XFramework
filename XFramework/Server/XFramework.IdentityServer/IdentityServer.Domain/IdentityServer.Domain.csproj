@@ -2,6 +2,13 @@
 
     <PropertyGroup>
         <TargetFramework>net5.0</TargetFramework>
+        <LangVersion>9</LangVersion>
     </PropertyGroup>
+
+    <ItemGroup>
+      <Folder Include="DTO" />
+      <Folder Include="Enums" />
+      <Folder Include="Migrations" />
+    </ItemGroup>
 
 </Project>

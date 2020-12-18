@@ -2,6 +2,15 @@
 
     <PropertyGroup>
         <TargetFramework>net5.0</TargetFramework>
+        <LangVersion>9</LangVersion>
     </PropertyGroup>
+
+    <ItemGroup>
+      <Folder Include="DataAccess\Commands" />
+      <Folder Include="DataAccess\Query" />
+      <Folder Include="PiplineBehaviors" />
+      <Folder Include="Services" />
+      <Folder Include="Validations" />
+    </ItemGroup>
 
 </Project>

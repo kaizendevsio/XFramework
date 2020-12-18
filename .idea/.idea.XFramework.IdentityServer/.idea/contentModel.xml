@@ -7,28 +7,78 @@
       <e p="packages" t="ExcludeRecursive" />
       <e p="Presentation" t="Include" />
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Api" t="IncludeRecursive">
+        <e p="appsettings.Development.json" t="Include" />
+        <e p="appsettings.json" t="Include" />
         <e p="bin" t="ExcludeRecursive" />
-        <e p="Class1.cs" t="Include" />
+        <e p="Controllers" t="Include">
+          <e p="StartupController.cs" t="Include" />
+        </e>
         <e p="IdentityServer.Api.csproj" t="IncludeRecursive" />
-        <e p="obj" t="ExcludeRecursive" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="netcoreapp5.0" t="Include">
+              <e p="IdentityServer.Api.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="Program.cs" t="Include" />
+        <e p="Properties" t="Include">
+          <e p="launchSettings.json" t="Include" />
+        </e>
+        <e p="Startup.cs" t="Include" />
+        <e p="WeatherForecast.cs" t="Include" />
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Core" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
-        <e p="Class1.cs" t="Include" />
+        <e p="DataAccess" t="Include">
+          <e p="Commands" t="Include" />
+          <e p="DataLayer.cs" t="Include" />
+          <e p="Query" t="Include" />
+        </e>
         <e p="IdentityServer.Core.csproj" t="IncludeRecursive" />
-        <e p="obj" t="ExcludeRecursive" />
+        <e p="Interfaces" t="Include">
+          <e p="IDataLayer.cs" t="Include" />
+        </e>
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Core.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="PiplineBehaviors" t="Include" />
+        <e p="Services" t="Include" />
+        <e p="Validations" t="Include" />
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
-        <e p="Class1.cs" t="Include" />
+        <e p="BO" t="Include">
+          <e p="ApiStatusBO.cs" t="Include" />
+          <e p="HostBO.cs" t="Include" />
+        </e>
+        <e p="DTO" t="Include" />
+        <e p="Enums" t="Include" />
         <e p="IdentityServer.Domain.csproj" t="IncludeRecursive" />
-        <e p="obj" t="ExcludeRecursive" />
+        <e p="Migrations" t="Include" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Domain.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Integrity" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="Class1.cs" t="Include" />
         <e p="IdentityServer.Integrity.csproj" t="IncludeRecursive" />
-        <e p="obj" t="ExcludeRecursive" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Integrity.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
       </e>
       <e p="XFramework.IdentityServer.sln" t="IncludeFlat" />
     </e>

@@ -12,7 +12,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Integrity", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Domain", "XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain\IdentityServer.Domain.csproj", "{0F534F8E-DF57-485C-A438-05A877F41A18}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Api", "XFramework\Server\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj", "{E5A776C5-150B-4365-9A59-09A78DE687BF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Api", "XFramework\Server\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj", "{6C891D8B-FAE2-4300-965E-1749E62ACACD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,7 +23,7 @@ Global
 		{5812C495-8B5B-40D3-9F96-BF886E1C6CCB} = {C40B8AD2-BC08-4AA9-850E-F32AFB2542EB}
 		{CAA74519-C63A-4AEA-9582-1F6B4DCB0E77} = {C40B8AD2-BC08-4AA9-850E-F32AFB2542EB}
 		{0F534F8E-DF57-485C-A438-05A877F41A18} = {B8C0B4C5-A6D0-4763-87D2-B8601C434A81}
-		{E5A776C5-150B-4365-9A59-09A78DE687BF} = {39B46295-27E9-4529-ACA7-4EC985D02AD8}
+		{6C891D8B-FAE2-4300-965E-1749E62ACACD} = {39B46295-27E9-4529-ACA7-4EC985D02AD8}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{5812C495-8B5B-40D3-9F96-BF886E1C6CCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -38,9 +38,9 @@ Global
 		{0F534F8E-DF57-485C-A438-05A877F41A18}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0F534F8E-DF57-485C-A438-05A877F41A18}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0F534F8E-DF57-485C-A438-05A877F41A18}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E5A776C5-150B-4365-9A59-09A78DE687BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E5A776C5-150B-4365-9A59-09A78DE687BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E5A776C5-150B-4365-9A59-09A78DE687BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E5A776C5-150B-4365-9A59-09A78DE687BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6C891D8B-FAE2-4300-965E-1749E62ACACD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6C891D8B-FAE2-4300-965E-1749E62ACACD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6C891D8B-FAE2-4300-965E-1749E62ACACD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6C891D8B-FAE2-4300-965E-1749E62ACACD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
