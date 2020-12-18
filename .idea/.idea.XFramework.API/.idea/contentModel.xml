@@ -3,7 +3,7 @@
   <component name="ContentModelStore">
     <e p="C:\Projects\Net Core\XFramework" t="IncludeFlat">
       <e p="packages" t="ExcludeRecursive" />
-      <e p="XFramework\Server\XFramework.Api" t="IncludeRecursive">
+      <e p="XFramework\Server\XFramework.CoreService\XFramework.Api" t="IncludeRecursive">
         <e p="appsettings.Development.json" t="Include" />
         <e p="appsettings.json" t="Include" />
         <e p="AutoMapping.cs" t="Include" />
@@ -53,7 +53,7 @@
         <e p="Startup.cs" t="Include" />
         <e p="XFramework.Api.csproj" t="IncludeRecursive" />
       </e>
-      <e p="XFramework\Server\XFramework.AppService" t="IncludeRecursive">
+      <e p="XFramework\Server\XFramework.CoreService\XFramework.AppService" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="DataAccess" t="Include">
           <e p="Commands" t="Include">
@@ -153,7 +153,7 @@
         <e p="Validations" t="Include" />
         <e p="XFramework.Core.csproj" t="IncludeRecursive" />
       </e>
-      <e p="XFramework\Server\XFramework.Entity" t="IncludeRecursive">
+      <e p="XFramework\Server\XFramework.CoreService\XFramework.Entity" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="BO" t="Include">
           <e p="AffiliateMapBO.cs" t="Include" />
@@ -222,7 +222,7 @@
         </e>
         <e p="XFramework.Data.csproj" t="IncludeRecursive" />
       </e>
-      <e p="XFramework\Server\XFramework.ExternalUtilities" t="IncludeRecursive">
+      <e p="XFramework\Server\XFramework.CoreService\XFramework.ExternalUtilities" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="Blockchain.cs" t="Include" />
         <e p="Changelly.cs" t="Include" />
@@ -255,7 +255,7 @@
         <e p="SeedString.cs" t="Include" />
         <e p="XFramework.External.csproj" t="IncludeRecursive" />
       </e>
-      <e p="XFramework\Server\XFramework.IntegrityService" t="IncludeRecursive">
+      <e p="XFramework\Server\XFramework.CoreService\XFramework.IntegrityService" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="Entity" t="Include">
           <e p="BO" t="Include">
