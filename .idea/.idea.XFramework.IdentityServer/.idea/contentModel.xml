@@ -54,12 +54,33 @@
         <e p="bin" t="ExcludeRecursive" />
         <e p="BO" t="Include">
           <e p="ApiStatusBO.cs" t="Include" />
+          <e p="AuditEntry.cs" t="Include" />
           <e p="HostBO.cs" t="Include" />
         </e>
-        <e p="DTO" t="Include" />
+        <e p="DTO" t="Include">
+          <e p="TblApplication.cs" t="Include" />
+          <e p="TblApplicationLog.cs" t="Include" />
+          <e p="TblAuditField.cs" t="Include" />
+          <e p="TblAuditHistory.cs" t="Include" />
+          <e p="TblIdentityAddress.cs" t="Include" />
+          <e p="TblIdentityAddressEntity.cs" t="Include" />
+          <e p="TblIdentityContact.cs" t="Include" />
+          <e p="TblIdentityContactEntity.cs" t="Include" />
+          <e p="TblIdentityCredential.cs" t="Include" />
+          <e p="TblIdentityInfo.cs" t="Include" />
+          <e p="TblIdentityRole.cs" t="Include" />
+          <e p="TblIdentityRoleEntity.cs" t="Include" />
+          <e p="TblIdentityVerification.cs" t="Include" />
+          <e p="TblSessionDatum.cs" t="Include" />
+          <e p="TblSessionEntity.cs" t="Include" />
+          <e p="TblVerificationType.cs" t="Include" />
+          <e p="XFrameworkIdentityServerContext.cs" t="Include" />
+        </e>
         <e p="Enums" t="Include" />
         <e p="IdentityServer.Domain.csproj" t="IncludeRecursive" />
-        <e p="Migrations" t="Include" />
+        <e p="Migrations" t="Include">
+          <e p="DbScaffolding.ps1" t="Include" />
+        </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
             <e p="net5.0" t="Include">
@@ -82,9 +103,9 @@
       </e>
       <e p="XFramework.IdentityServer.sln" t="IncludeFlat" />
     </e>
-    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.2\extResources" t="IncludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.2\resharper-host\Local\Transient\Rider\v202\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.2\consoles\db" t="IncludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.2\extensions" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.3\resharper-host\Local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\consoles\db" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\extensions" t="IncludeRecursive" />
   </component>
 </project>

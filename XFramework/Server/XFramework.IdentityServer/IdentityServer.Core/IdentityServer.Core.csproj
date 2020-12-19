@@ -13,4 +13,8 @@
       <Folder Include="Validations" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
+    </ItemGroup>
+
 </Project>
