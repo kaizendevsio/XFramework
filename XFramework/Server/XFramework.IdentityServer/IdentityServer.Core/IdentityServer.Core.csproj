@@ -6,15 +6,31 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Commands" />
-      <Folder Include="DataAccess\Query" />
-      <Folder Include="PiplineBehaviors" />
+      <Folder Include="DataAccess\Commands\Entity\Application" />
+      <Folder Include="DataAccess\Commands\Entity\Events" />
+      <Folder Include="DataAccess\Commands\Entity\Identity" />
+      <Folder Include="DataAccess\Commands\Handlers\Application" />
+      <Folder Include="DataAccess\Commands\Handlers\Events" />
+      <Folder Include="DataAccess\Commands\Handlers\Identity" />
+      <Folder Include="DataAccess\Commands\Validations" />
+      <Folder Include="DataAccess\Query\Entity\Events" />
+      <Folder Include="DataAccess\Query\Entity\Identity" />
+      <Folder Include="DataAccess\Query\Handlers\Events" />
+      <Folder Include="DataAccess\Query\Handlers\Identity" />
+      <Folder Include="DataAccess\Query\Validations" />
       <Folder Include="Services" />
       <Folder Include="Validations" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="FluentValidation" Version="9.3.0" />
+      <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="9.3.0" />
+      <PackageReference Include="MediatR" Version="9.0.0" />
+      <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
     </ItemGroup>
 
 </Project>

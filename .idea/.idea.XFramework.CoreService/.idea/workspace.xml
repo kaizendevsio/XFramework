@@ -23,33 +23,46 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cba8e616-3d24-4569-b53c-18fb6b88a820" name="Default Changelist" comment="Updated File Structure">
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BO/AuditEntry.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblApplication.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblApplicationLog.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblAuditField.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblAuditHistory.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityAddress.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityAddressEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityContact.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityContactEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityCredential.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityInfo.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityRole.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityRoleEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblIdentityVerification.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblSessionDatum.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblSessionEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/TblVerificationType.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/XFrameworkIdentityServerContext.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/Enums/Gender.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Application/ApplicationController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/XFrameworkControllerBase.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/CommandBaseHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Application/AppsListQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Application/AppsInfoQueryHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/PipelineBehaviors/ValidationBehavior.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BO/ApiResponseBO.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Enums/ApiStatus.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/contentModel.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/contentModel.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/modules.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/contentModel.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/contentModel.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/modules.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/AutoMapping.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/AutoMapping.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/StartupController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/StartupController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/User/UserController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/User/UserController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/XFramework.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/XFramework.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Entity/User/CreateUserCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Entity/User/CreateUserCmd.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Validations/User/CreateUserCmdValidator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Validations/User/CreateUserCmdValidator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/XFramework.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/XFramework.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/BO/HostBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/BO/HostBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/DTO/TblUserInfo.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/DTO/TblUserInfo.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/DTO/XFrameworkContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/DTO/XFrameworkContext.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/Enums/CivilStatus.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/Enums/CivilStatus.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/XFramework.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/XFramework.Domain.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/StartupController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/StartupController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Startup.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/appsettings.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/DataLayer.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BO/HostBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BO/HostBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/XFrameworkIdentityServerContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/XFrameworkIdentityServerContext.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/IdentityServer.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/IdentityServer.Domain.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -60,14 +73,44 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/128EEF00-630C-4CBB-ABA5-CF9A935C3C6C/f0/94edb8b5/IMediator.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/66E1834F-8F23-4F91-9044-11455BB9E7EC/2/ServiceCollectionExtensions.cs" root0="SKIP_HIGHLIGHTING" />
+  </component>
+  <component name="IdeDocumentHistory">
+    <changedPaths>
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/BO/HostBO.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/appsettings.json" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/XFramework.Core.csproj" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/XFramework.Api.csproj" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/StartupController.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/Migrations/DbScaffolding.ps1" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/BO/AuditEntry.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Validations/User/CreateUserCmdValidator.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/AutoMapping.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/Enums/Gender.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/Enums/CivilStatus.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Entity/User/CreateUserCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/DTO/TblUserInfo.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/User/UserController.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Core/DataAccess/Commands/Handlers/User/CreateUserHandler.cs" />
+    </changedPaths>
+  </component>
   <component name="ProjectId" id="1lppbJbtEcxXcgJLq121k8c8C6P" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
     <property name="ASKED_SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="DebuggerViewTab_PTCS_FirstProportionKey" value="0.34994584" />
+    <property name="DebuggerViewTab_PTCS_LastProportionKey" value="0.0" />
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="vue.rearranger.settings.migration" value="true" />
   </component>
@@ -114,7 +157,9 @@
       <workItem from="1608303961074" duration="3383000" />
       <workItem from="1608314776787" duration="665000" />
       <workItem from="1608367609914" duration="169000" />
-      <workItem from="1608368583279" duration="857000" />
+      <workItem from="1608368583279" duration="7242000" />
+      <workItem from="1608530465856" duration="612000" />
+      <workItem from="1608548252556" duration="6041000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure">
       <created>1608304981819</created>
@@ -151,26 +196,9 @@
     <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="VcsManagerConfiguration">
+    <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
     <MESSAGE value="Updated File Structure" />
     <option name="LAST_COMMIT_MESSAGE" value="Updated File Structure" />
-  </component>
-  <component name="WindowStateProjectService">
-    <state width="1877" height="282" key="GridCell.Tab.0.bottom" timestamp="1608304358644">
-      <screen x="0" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1877" height="282" key="GridCell.Tab.0.bottom/1920.0.1920.1040/0.0.1920.1040@0.0.1920.1040" timestamp="1608304358644" />
-    <state width="1877" height="282" key="GridCell.Tab.0.center" timestamp="1608304358644">
-      <screen x="0" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1877" height="282" key="GridCell.Tab.0.center/1920.0.1920.1040/0.0.1920.1040@0.0.1920.1040" timestamp="1608304358644" />
-    <state width="1877" height="282" key="GridCell.Tab.0.left" timestamp="1608304358644">
-      <screen x="0" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1877" height="282" key="GridCell.Tab.0.left/1920.0.1920.1040/0.0.1920.1040@0.0.1920.1040" timestamp="1608304358644" />
-    <state width="1877" height="282" key="GridCell.Tab.0.right" timestamp="1608304358644">
-      <screen x="0" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1877" height="282" key="GridCell.Tab.0.right/1920.0.1920.1040/0.0.1920.1040@0.0.1920.1040" timestamp="1608304358644" />
   </component>
 </project>

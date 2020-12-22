@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp5.0</TargetFramework>
-    <RootNamespace>XFramework.Data</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="DTO" />
     <Folder Include="DTO\" />
     <Folder Include="Migrations\" />
   </ItemGroup>

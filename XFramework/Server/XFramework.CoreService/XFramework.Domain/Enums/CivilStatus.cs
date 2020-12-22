@@ -8,6 +8,7 @@ namespace XFramework.Domain.Enums
     {
         Single = 0,
         Married = 1,
-        Complicated = 2
+        Complicated = 2,
+        LegallySeparated = 3
     }
 }

@@ -23,25 +23,10 @@ namespace XFramework.Api.Controllers.User
             _mediator = mediator;
         }
 
-        
-        [HttpPut]
-        public async Task<IActionResult> Put([FromBody] UserBO body)
+        [HttpPost("Create")]
+        public async Task Create([FromBody] CreateUserCmd request)
         {
-            var c = _mapper.Map<CreateUserCmd>(body);
-            var result = await _mediator.Send(c).ConfigureAwait(true);
-            return Ok(result);
-
-        }
-
-        [HttpPost("Authenticate")]
-        public async Task<IActionResult> Authenticate([FromBody]UserAuthBO userBO) {
-            return Ok();
-        }
-
-        [HttpGet("Test")]
-        public IActionResult Test()
-        {
-            return Ok("Hello World");
+            await _mediator.Send(request).ConfigureAwait(false);
         }
 
     }

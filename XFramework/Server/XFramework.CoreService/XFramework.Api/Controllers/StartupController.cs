@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reflection;
+using System.Runtime.Versioning;
 using XFramework.Domain.BO;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,7 +27,8 @@ namespace XFramework.Api.Controllers
                     Is64BitProccess = Environment.Is64BitProcess,
                     SystemPageSize = Environment.SystemPageSize,
                     TickCount64 = Environment.TickCount64,
-                    Version = Environment.OSVersion.ToString()
+                    Version = Environment.OSVersion.ToString(),
+                    RuntimeVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName
                 },
                 Status = "Running"
             };

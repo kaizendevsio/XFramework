@@ -1,6 +1,7 @@
 ﻿﻿using System;
 using System.Reflection;
-using IdentityServer.Domain.BO;
+ using System.Runtime.Versioning;
+ using IdentityServer.Domain.BO;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityServer.Api.Controllers
@@ -26,7 +27,8 @@ namespace IdentityServer.Api.Controllers
                     Is64BitProccess = Environment.Is64BitProcess,
                     SystemPageSize = Environment.SystemPageSize,
                     TickCount64 = Environment.TickCount64,
-                    Version = Environment.OSVersion.ToString()
+                    Version = Environment.OSVersion.ToString(),
+                    RuntimeVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName
                 },
                 Status = "Running"
             };

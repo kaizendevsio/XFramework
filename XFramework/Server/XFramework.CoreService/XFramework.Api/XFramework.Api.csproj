@@ -29,10 +29,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\XFramework.AppService\XFramework.Core.csproj" />
     <ProjectReference Include="..\XFramework.Core\XFramework.Core.csproj" />
     <ProjectReference Include="..\XFramework.Domain\XFramework.Domain.csproj" />
-    <ProjectReference Include="..\XFramework.Entity\XFramework.Domain.csproj" />
     <ProjectReference Include="..\XFramework.ExternalUtilities\XFramework.External.csproj" />
   </ItemGroup>
 

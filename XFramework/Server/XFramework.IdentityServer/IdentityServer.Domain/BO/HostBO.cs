@@ -10,5 +10,6 @@
         public int ProccessorCount { get; set; }
         public double SystemPageSize { get; set; }
         public double TickCount64 { get; set; }
+        public string RuntimeVersion { get; set; }
     }
 }

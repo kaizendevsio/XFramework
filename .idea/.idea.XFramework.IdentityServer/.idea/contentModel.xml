@@ -11,7 +11,11 @@
         <e p="appsettings.json" t="Include" />
         <e p="bin" t="ExcludeRecursive" />
         <e p="Controllers" t="Include">
+          <e p="Application" t="Include">
+            <e p="ApplicationController.cs" t="Include" />
+          </e>
           <e p="StartupController.cs" t="Include" />
+          <e p="XFrameworkControllerBase.cs" t="Include" />
         </e>
         <e p="IdentityServer.Api.csproj" t="IncludeRecursive" />
         <e p="obj" t="ExcludeRecursive">
@@ -31,9 +35,39 @@
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Core" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="DataAccess" t="Include">
-          <e p="Commands" t="Include" />
+          <e p="Commands" t="Include">
+            <e p="Entity" t="Include">
+              <e p="Application" t="Include" />
+              <e p="Events" t="Include" />
+              <e p="Identity" t="Include" />
+            </e>
+            <e p="Handlers" t="Include">
+              <e p="Application" t="Include" />
+              <e p="CommandBaseHandler.cs" t="Include" />
+              <e p="Events" t="Include" />
+              <e p="Identity" t="Include" />
+            </e>
+            <e p="Validations" t="Include" />
+          </e>
           <e p="DataLayer.cs" t="Include" />
-          <e p="Query" t="Include" />
+          <e p="Query" t="Include">
+            <e p="Entity" t="Include">
+              <e p="Application" t="Include">
+                <e p="AppsListQuery.cs" t="Include" />
+              </e>
+              <e p="Events" t="Include" />
+              <e p="Identity" t="Include" />
+            </e>
+            <e p="Handlers" t="Include">
+              <e p="Application" t="Include">
+                <e p="AppsInfoQueryHandler.cs" t="Include" />
+              </e>
+              <e p="Events" t="Include" />
+              <e p="Identity" t="Include" />
+              <e p="QueryBaseHandler.cs" t="Include" />
+            </e>
+            <e p="Validations" t="Include" />
+          </e>
         </e>
         <e p="IdentityServer.Core.csproj" t="IncludeRecursive" />
         <e p="Interfaces" t="Include">
@@ -46,13 +80,16 @@
             </e>
           </e>
         </e>
-        <e p="PiplineBehaviors" t="Include" />
+        <e p="PipelineBehaviors" t="Include">
+          <e p="ValidationBehavior.cs" t="Include" />
+        </e>
         <e p="Services" t="Include" />
         <e p="Validations" t="Include" />
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="BO" t="Include">
+          <e p="ApiResponseBO.cs" t="Include" />
           <e p="ApiStatusBO.cs" t="Include" />
           <e p="AuditEntry.cs" t="Include" />
           <e p="HostBO.cs" t="Include" />
@@ -76,7 +113,9 @@
           <e p="TblVerificationType.cs" t="Include" />
           <e p="XFrameworkIdentityServerContext.cs" t="Include" />
         </e>
-        <e p="Enums" t="Include" />
+        <e p="Enums" t="Include">
+          <e p="ApiStatus.cs" t="Include" />
+        </e>
         <e p="IdentityServer.Domain.csproj" t="IncludeRecursive" />
         <e p="Migrations" t="Include">
           <e p="DbScaffolding.ps1" t="Include" />

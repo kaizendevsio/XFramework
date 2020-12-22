@@ -205,6 +205,7 @@
           <e p="EmailStatus.cs" t="Include" />
           <e p="EmailType.cs" t="Include" />
           <e p="EventLogLevel.cs" t="Include" />
+          <e p="Gender.cs" t="Include" />
           <e p="GenericStatusType.cs" t="Include" />
           <e p="IncomeDistributionType.cs" t="Include" />
           <e p="LoginStatus.cs" t="Include" />
@@ -215,7 +216,9 @@
           <e p="WalletType.cs" t="Include" />
           <e p="WithdrawalRequestStatus.cs" t="Include" />
         </e>
-        <e p="Migrations" t="Include" />
+        <e p="Migrations" t="Include">
+          <e p="DbScaffolding.ps1" t="Include" />
+        </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
             <e p="netcoreapp5.0" t="Include">

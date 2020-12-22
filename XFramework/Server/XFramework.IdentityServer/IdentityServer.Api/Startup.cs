@@ -1,11 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
+using AutoMapper;
+using FluentValidation;
+using IdentityServer.Core.DataAccess;
+using IdentityServer.Core.DataAccess.Commands.Handlers;
+using IdentityServer.Core.Interfaces;
+using IdentityServer.Core.PipelineBehaviors;
+using IdentityServer.Domain.DTO;
+using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -27,6 +37,12 @@ namespace IdentityServer.Api
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
+            services.AddDbContext<XFrameworkIdentityServerContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
+            services.AddScoped<IDataLayer, DataLayer>();
+            services.AddAutoMapper(typeof(Startup));
+            services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+            services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo {Title = "IdentityServer.Api", Version = "v1"});

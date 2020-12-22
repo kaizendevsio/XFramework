@@ -23,7 +23,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\XFramework.Domain\XFramework.Domain.csproj" />
-    <ProjectReference Include="..\XFramework.Entity\XFramework.Domain.csproj" />
   </ItemGroup>
 
 </Project>

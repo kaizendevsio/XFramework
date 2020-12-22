@@ -38,7 +38,7 @@ namespace XFramework.Domain.DTO
             if (!optionsBuilder.IsConfigured)
             {
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. See http://go.microsoft.com/fwlink/?LinkId=723263 for guidance on storing connection strings.
-                //optionsBuilder.UseNpgsql("Host=localhost;Database=XFramework;Username=dbAdmin;Password=4*5WD-K8%f*NqmPY");
+                optionsBuilder.UseNpgsql("Host=localhost;Database=XFramework;Username=dbAdmin;Password=4*5WD-K8%f*NqmPY");
             }
         }
 
@@ -392,6 +392,7 @@ namespace XFramework.Domain.DTO
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
+                    .HasIdentityOptions(null, null, null, 2147483647L, null, null)
                     .UseIdentityAlwaysColumn();
 
                 entity.Property(e => e.CreatedOn).HasColumnType("timestamp with time zone");

@@ -6,7 +6,7 @@ using XFramework.Core.DataAccess.Commands.Entity.User;
 
 namespace XFramework.Core.DataAccess.Commands.Validations.User
 {
-    public class CreateUserCmdValidator : AbstractValidator<CreateUserCmd>
+    /*public class CreateUserCmdValidator : AbstractValidator<CreateUserCmd>
     {
         public CreateUserCmdValidator()
         {
@@ -24,5 +24,5 @@ namespace XFramework.Core.DataAccess.Commands.Validations.User
                 .NotEmpty();
             
         }
-    }
+    }*/
 }

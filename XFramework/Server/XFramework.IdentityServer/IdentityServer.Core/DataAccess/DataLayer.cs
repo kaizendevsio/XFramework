@@ -139,7 +139,6 @@ namespace IdentityServer.Core.DataAccess
             if (auditEntries == null || auditEntries.Count == 0)
                 return 1;
 
-
             foreach (var auditEntry in auditEntries)
             {
                 // Get the final value of the temporary properties

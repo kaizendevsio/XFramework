@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using XFramework.Domain.Enums;
 
 namespace XFramework.Domain.DTO
 {
@@ -23,9 +24,9 @@ namespace XFramework.Domain.DTO
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public DateTime Dob { get; set; }
-        public short Gender { get; set; }
+        public Gender Gender { get; set; }
         public bool IsVerified { get; set; }
-        public short CivilStatus { get; set; }
+        public CivilStatus CivilStatus { get; set; }
 
         public virtual ICollection<TblAddresses> TblAddresses { get; set; }
         public virtual ICollection<TblUserContacts> TblUserContacts { get; set; }
