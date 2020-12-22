@@ -6,6 +6,8 @@ using XFramework.Domain.BO;
 using XFramework.Core.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace XFramework.Core.DataAccess
 {
@@ -42,8 +44,18 @@ namespace XFramework.Core.DataAccess
 
         public override int SaveChanges()
         {
+            Database.EnsureCreated();
             var auditEntries = OnBeforeSaveChanges();
             var result = base.SaveChanges();
+            OnAfterSaveChanges(auditEntries);
+            return result;
+        }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            await Database.EnsureCreatedAsync(cancellationToken);
+            var auditEntries = OnBeforeSaveChanges();
+            var result = await base.SaveChangesAsync(cancellationToken);
             OnAfterSaveChanges(auditEntries);
             return result;
         }
