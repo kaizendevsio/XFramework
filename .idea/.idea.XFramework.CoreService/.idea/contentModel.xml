@@ -57,6 +57,9 @@
         <e p="XFramework.Api.csproj" t="IncludeRecursive" />
       </e>
       <e p="XFramework\Server\XFramework.CoreService\XFramework.Core" t="IncludeRecursive">
+        <e p="AutoMapper" t="Include">
+          <e p="AutoMapping.cs" t="Include" />
+        </e>
         <e p="bin" t="ExcludeRecursive" />
         <e p="DataAccess" t="Include">
           <e p="Commands" t="Include">
@@ -69,11 +72,7 @@
               </e>
               <e p="User" t="Include">
                 <e p="CreateUserCmd.cs" t="Include" />
-                <e p="RemoveUserCmd.cs" t="Include" />
-                <e p="UpdateUserAuthCmd.cs" t="Include" />
-                <e p="UpdateUserAuthStatusCmd.cs" t="Include" />
                 <e p="UpdateUserCmd.cs" t="Include" />
-                <e p="ValidateUserEmailCmd.cs" t="Include" />
               </e>
               <e p="UserWallet" t="Include">
                 <e p="ConvertWalletTransactionCmd.cs" t="Include" />
@@ -90,11 +89,7 @@
               </e>
               <e p="User" t="Include">
                 <e p="CreateUserHandler.cs" t="Include" />
-                <e p="RemoveUserHandler.cs" t="Include" />
-                <e p="UpdateUserAuthHandler.cs" t="Include" />
-                <e p="UpdateUserAuthStatusHandler.cs" t="Include" />
                 <e p="UpdateUserHandler.cs" t="Include" />
-                <e p="ValidateUserEmailHandler.cs" t="Include" />
               </e>
               <e p="UserWallet" t="Include">
                 <e p="ConvertWalletTransactionHandler.cs" t="Include" />

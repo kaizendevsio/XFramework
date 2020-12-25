@@ -13,7 +13,7 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Application
     {
         public GetAppInfoHandler(IDataLayer dataLayer)
         {
-            _dataLayer = dataLayer;
+            DataLayer = dataLayer;
         }
         public Task<bool> Handle(GetAppInfoCmd request, CancellationToken cancellationToken)
         {

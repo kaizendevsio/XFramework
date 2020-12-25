@@ -29,5 +29,6 @@ namespace XFramework.Api.Controllers.User
             await _mediator.Send(request).ConfigureAwait(false);
         }
 
+       
     }
 }

@@ -41,6 +41,7 @@ namespace XFramework.Api
             services.AddDbContext<XFrameworkContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
             services.AddScoped<IDataLayer, DataLayer>();
             services.AddAutoMapper(typeof(Startup));
+            services.AddAutoMapper(typeof(DataLayer));
             services.AddSwaggerGen();
             services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
             services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);

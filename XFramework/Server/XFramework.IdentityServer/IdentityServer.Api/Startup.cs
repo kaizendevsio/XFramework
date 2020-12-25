@@ -40,6 +40,7 @@ namespace IdentityServer.Api
             services.AddDbContext<XFrameworkIdentityServerContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
             services.AddScoped<IDataLayer, DataLayer>();
             services.AddAutoMapper(typeof(Startup));
+            services.AddAutoMapper(typeof(CommandBaseHandler));
             services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
             services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));

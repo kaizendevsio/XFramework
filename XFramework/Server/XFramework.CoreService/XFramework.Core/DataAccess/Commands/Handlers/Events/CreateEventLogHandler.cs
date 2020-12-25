@@ -16,16 +16,16 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Events
         public IConfiguration _configuration;
         public CreateEventLogHandler(IDataLayer dataLayer, IConfiguration configuration)
         {
-            _dataLayer = dataLayer;
+            DataLayer = dataLayer;
             _configuration = configuration;
         }
         public async Task<bool> Handle(CreateEventLogCmd request, CancellationToken cancellationToken)
         {
-            using (var transaction = _dataLayer.Database.BeginTransaction())
+            using (var transaction = DataLayer.Database.BeginTransaction())
             {
                 try
                 {
-                    _dataLayer.RollBack();
+                    DataLayer.RollBack();
                     TblApplicationLogs applicationLogs = new TblApplicationLogs()
                     {
                         AppId = request.AppId,
@@ -34,8 +34,8 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Events
                         Message = request.Message
                     };
 
-                    _dataLayer.Add(applicationLogs);
-                    await _dataLayer.SaveChangesAsync();
+                    DataLayer.Add(applicationLogs);
+                    await DataLayer.SaveChangesAsync();
 
                     transaction.Commit();
                 }

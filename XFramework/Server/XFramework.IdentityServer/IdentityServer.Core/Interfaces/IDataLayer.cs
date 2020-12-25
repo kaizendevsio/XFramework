@@ -6,12 +6,13 @@ using IdentityServer.Domain.BO;
 using IdentityServer.Domain.DTO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace IdentityServer.Core.Interfaces
 {
     public interface IDataLayer
     {
-        
+        public DatabaseFacade Database { get; }
         public  EntityEntry<TEntity> Entry<TEntity>([NotNull] TEntity entity) where TEntity : class;
         public  EntityEntry Remove([NotNullAttribute] object entity);
         public  EntityEntry<TEntity> Remove<TEntity>([NotNullAttribute] TEntity entity) where TEntity : class;

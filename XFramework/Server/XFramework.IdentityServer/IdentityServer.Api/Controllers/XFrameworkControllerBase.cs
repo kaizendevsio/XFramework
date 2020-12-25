@@ -12,12 +12,7 @@ namespace IdentityServer.Api.Controllers
         public IConfiguration _configuration;
         public IMediator _mediator;
 
-
-        public ApiResponseBO ApiResponse { get; set; }
         public bool RequestResult { get; set; }
         public static string RequestResponseString { get; set; }
-
-
-      
     }
 }
