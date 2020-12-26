@@ -12,9 +12,7 @@
       <Folder Include="DataAccess\Commands\Handlers\Events" />
       <Folder Include="DataAccess\Commands\Validations" />
       <Folder Include="DataAccess\Query\Entity\Events" />
-      <Folder Include="DataAccess\Query\Entity\Identity" />
       <Folder Include="DataAccess\Query\Handlers\Events" />
-      <Folder Include="DataAccess\Query\Handlers\Identity" />
       <Folder Include="DataAccess\Query\Validations" />
       <Folder Include="Services" />
       <Folder Include="Validations" />

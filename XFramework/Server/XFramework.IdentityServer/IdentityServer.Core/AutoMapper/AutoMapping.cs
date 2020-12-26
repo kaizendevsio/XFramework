@@ -1,5 +1,7 @@
-﻿using AutoMapper;
+﻿using System.Collections.Generic;
+using AutoMapper;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
+using IdentityServer.Domain.Contracts;
 using IdentityServer.Domain.DTO;
 
 namespace IdentityServer.Core.AutoMapper
@@ -9,6 +11,8 @@ namespace IdentityServer.Core.AutoMapper
         public AutoMapping()
         {
             CreateMap<CreateIdentityCmd, TblIdentityInfo>();
+            CreateMap<TblIdentityInfo, GetIdentityContract>();
+            CreateMap<List<GetApplicationListContract>, List<TblApplication>>();
         }
     }
 }

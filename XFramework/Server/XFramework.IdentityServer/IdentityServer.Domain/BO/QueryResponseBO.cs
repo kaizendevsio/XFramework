@@ -1,12 +1,11 @@
-using System.Net;
+﻿using System.Net;
 
 namespace IdentityServer.Domain.BO
 {
-    public class CmdResponseBO<T>
+    public class QueryResponseBO<T>
     {
         public HttpStatusCode HttpStatusCode { get; set; }
         public string Message { get; set; }
-        public T Request { get; set; }
-        public string RedirectUrl { get; set; }
+        public T Response { get; set; }
     }
 }

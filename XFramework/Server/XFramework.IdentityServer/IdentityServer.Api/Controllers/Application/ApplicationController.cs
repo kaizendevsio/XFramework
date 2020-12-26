@@ -6,17 +6,17 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityServer.Api.Controllers.Application
 {
-    [Route("Api/Application/[controller]")]
+    [Route("Api/[controller]")]
     [ApiController]
-    public class DiscoveryController : XFrameworkControllerBase
+    public class ApplicationController : XFrameworkControllerBase
     {
-        public DiscoveryController(IMediator mediator, IMapper mapper)
+        public ApplicationController(IMediator mediator, IMapper mapper)
         {
             _mapper = mapper;
             _mediator = mediator;
         }
 
-        [HttpGet("All")]
+        [HttpGet("Discovery/All")]
         public async Task<JsonResult> Get()
         {
             var q = new AppsListQuery();

@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
 using FluentValidation;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BO;
-using IdentityServer.Domain.Enums;
 using MediatR;
 
 namespace IdentityServer.Core.PipelineBehaviors
@@ -44,16 +44,17 @@ namespace IdentityServer.Core.PipelineBehaviors
 
                 // Commit data layer transaction
                 await transaction.CommitAsync(cancellationToken);
-                await PostHandler(request,_response);                
+                await PostHandler(request);                
 
                 return _response;
             }
             catch (Exception e)
             {
-                if (_response.GetType() != typeof(CmdResponseBO<TRequest>)) throw new ArgumentException($"Error: {e.Message}; Inner Exception: {e.InnerException?.Message}");
-
-                _response.GetType().GetProperty("Message")?.SetValue(_response, $"Error: {e.Message}; Inner Exception: {e.InnerException?.Message}", null);
-                return _response;
+                var _responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
+                
+                _responseInstance.GetType().GetProperty("Message")?.SetValue(_responseInstance, $"Error: {e.Message}; Inner Exception: {e.InnerException?.Message}", null);
+                _responseInstance.GetType().GetProperty("HttpStatusCode")?.SetValue(_responseInstance, HttpStatusCode.InternalServerError, null);
+                return (TResponse) _responseInstance;
             }
         }
 
@@ -74,14 +75,24 @@ namespace IdentityServer.Core.PipelineBehaviors
             await Task.FromResult(new Unit());
         }
 
-        private async Task PostHandler(TRequest request, TResponse response)
+        private async Task PostHandler(TRequest request)
         {
-            if (_response.GetType() != typeof(CmdResponseBO<TRequest>)) return;
+            if (_response.GetType() == typeof(CmdResponseBO<TRequest>))
+            {
+                _response.GetType().GetProperty("Request")?.SetValue(_response, request, null);
+            }
 
-            _response.GetType().GetProperty("Message")?.SetValue(_response, $"Success", null);
-            _response.GetType().GetProperty("HttpStatusCode")?.SetValue(_response, ApiStatus.Success, null);
-            _response.GetType().GetProperty("Request")?.SetValue(_response, request, null);
+            if (_response.GetType().GetProperty("Message")?.GetValue(_response) == null)
+            {
+                _response.GetType().GetProperty("Message")?.SetValue(_response, HttpStatusCode.Accepted.ToString(), null);
+            }
 
+            if (_response.GetType().GetProperty("HttpStatusCode")?.GetValue(_response)?.ToString() == "0")
+            {
+                _response.GetType().GetProperty("HttpStatusCode")?.SetValue(_response, HttpStatusCode.Accepted, null);
+            }
+            
+            
             await Task.FromResult(_response);
         }
     }

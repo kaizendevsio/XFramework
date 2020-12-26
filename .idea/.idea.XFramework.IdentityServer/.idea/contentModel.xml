@@ -12,10 +12,10 @@
         <e p="bin" t="ExcludeRecursive" />
         <e p="Controllers" t="Include">
           <e p="Application" t="Include">
-            <e p="DiscoveryController.cs" t="Include" />
+            <e p="ApplicationController.cs" t="Include" />
           </e>
           <e p="Identity" t="Include">
-            <e p="DiscoveryController.cs" t="Include" />
+            <e p="IdentityController.cs" t="Include" />
           </e>
           <e p="StartupController.cs" t="Include" />
           <e p="XFrameworkControllerBase.cs" t="Include" />
@@ -47,6 +47,7 @@
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
                 <e p="CreateIdentityCmd.cs" t="Include" />
+                <e p="UpdateIdentityCmd.cs" t="Include" />
               </e>
             </e>
             <e p="Handlers" t="Include">
@@ -66,14 +67,18 @@
                 <e p="AppsListQuery.cs" t="Include" />
               </e>
               <e p="Events" t="Include" />
-              <e p="Identity" t="Include" />
+              <e p="Identity" t="Include">
+                <e p="GetIdentityQuery.cs" t="Include" />
+              </e>
             </e>
             <e p="Handlers" t="Include">
               <e p="Application" t="Include">
                 <e p="AppsInfoQueryHandler.cs" t="Include" />
               </e>
               <e p="Events" t="Include" />
-              <e p="Identity" t="Include" />
+              <e p="Identity" t="Include">
+                <e p="GetIdentityHandler.cs" t="Include" />
+              </e>
               <e p="QueryBaseHandler.cs" t="Include" />
             </e>
             <e p="Validations" t="Include" />
@@ -103,6 +108,11 @@
           <e p="AuditEntry.cs" t="Include" />
           <e p="CmdResponseBO.cs" t="Include" />
           <e p="HostBO.cs" t="Include" />
+          <e p="QueryResponseBO.cs" t="Include" />
+        </e>
+        <e p="Contracts" t="Include">
+          <e p="GetApplicationListContract.cs" t="Include" />
+          <e p="GetIdentityContract.cs" t="Include" />
         </e>
         <e p="DTO" t="Include">
           <e p="TblApplication.cs" t="Include" />
@@ -123,9 +133,7 @@
           <e p="TblVerificationType.cs" t="Include" />
           <e p="XFrameworkIdentityServerContext.cs" t="Include" />
         </e>
-        <e p="Enums" t="Include">
-          <e p="ApiStatus.cs" t="Include" />
-        </e>
+        <e p="Enums" t="Include" />
         <e p="IdentityServer.Domain.csproj" t="IncludeRecursive" />
         <e p="Migrations" t="Include">
           <e p="DbScaffolding.ps1" t="Include" />
