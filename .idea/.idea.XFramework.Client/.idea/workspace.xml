@@ -25,9 +25,8 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="Updated Xframework.Client">
+    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="XFramework.Web.csproj Update">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Client.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Client.sln" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Index.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Index.razor" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -39,8 +38,7 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Index.razor" root0="SKIP_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" root2="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ProfilePage.razor" root0="FORCE_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Index.razor" root0="FORCE_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" root2="FORCE_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
@@ -172,6 +170,7 @@
       <workItem from="1608548349458" duration="17000" />
       <workItem from="1609233210981" duration="3079000" />
       <workItem from="1609236384580" duration="38000" />
+      <workItem from="1609236454328" duration="756000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -194,7 +193,14 @@
       <option name="project" value="LOCAL" />
       <updated>1609235094770</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="XFramework.Web.csproj Update">
+      <created>1609236614419</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1609236614419</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -218,6 +224,7 @@
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
     <MESSAGE value="Safety Backup + Mobile Bug Fixes" />
     <MESSAGE value="Updated Xframework.Client" />
-    <option name="LAST_COMMIT_MESSAGE" value="Updated Xframework.Client" />
+    <MESSAGE value="XFramework.Web.csproj Update" />
+    <option name="LAST_COMMIT_MESSAGE" value="XFramework.Web.csproj Update" />
   </component>
 </project>
