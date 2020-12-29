@@ -1675,8 +1675,8 @@
     <Folder Include="Helpers" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="XFramework.Entity, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>..\..\Server\XFramework.Entity\bin\Debug\netcoreapp3.0\XFramework.Entity.dll</HintPath>
+    <Reference Include="XFramework.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\..\Server\XFramework.CoreService\XFramework.Domain\bin\Debug\netcoreapp5.0\XFramework.Domain.dll</HintPath>
     </Reference>
   </ItemGroup>
 

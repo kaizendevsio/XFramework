@@ -15,6 +15,7 @@
             <e p="ApplicationController.cs" t="Include" />
           </e>
           <e p="Identity" t="Include">
+            <e p="IdentityAuthorization.cs" t="Include" />
             <e p="IdentityController.cs" t="Include" />
           </e>
           <e p="StartupController.cs" t="Include" />
@@ -46,7 +47,9 @@
               <e p="Application" t="Include" />
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
+                <e p="Authorization" t="Include" />
                 <e p="CreateIdentityCmd.cs" t="Include" />
+                <e p="DeleteIdentityCmd.cs" t="Include" />
                 <e p="UpdateIdentityCmd.cs" t="Include" />
               </e>
             </e>
@@ -55,7 +58,10 @@
               <e p="CommandBaseHandler.cs" t="Include" />
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
+                <e p="Authorization" t="Include" />
                 <e p="CreateIdentityHandler.cs" t="Include" />
+                <e p="DeleteIdentityHandler.cs" t="Include" />
+                <e p="UpdateIdentityHandler.cs" t="Include" />
               </e>
             </e>
             <e p="Validations" t="Include" />
@@ -64,19 +70,25 @@
           <e p="Query" t="Include">
             <e p="Entity" t="Include">
               <e p="Application" t="Include">
-                <e p="AppsListQuery.cs" t="Include" />
+                <e p="GetAllAppListQuery.cs" t="Include" />
               </e>
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="AuthorizeIdentityQuery.cs" t="Include" />
+                </e>
+                <e p="GetAllIdentityQuery.cs" t="Include" />
                 <e p="GetIdentityQuery.cs" t="Include" />
               </e>
             </e>
             <e p="Handlers" t="Include">
               <e p="Application" t="Include">
-                <e p="AppsInfoQueryHandler.cs" t="Include" />
+                <e p="GetAllAppInfoQueryHandler.cs" t="Include" />
               </e>
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
+                <e p="Authorization" t="Include" />
+                <e p="GetAllIdentityHandler.cs" t="Include" />
                 <e p="GetIdentityHandler.cs" t="Include" />
               </e>
               <e p="QueryBaseHandler.cs" t="Include" />

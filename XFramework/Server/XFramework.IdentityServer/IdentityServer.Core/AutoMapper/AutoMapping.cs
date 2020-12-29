@@ -12,7 +12,7 @@ namespace IdentityServer.Core.AutoMapper
         {
             CreateMap<CreateIdentityCmd, TblIdentityInfo>();
             CreateMap<TblIdentityInfo, GetIdentityContract>();
-            CreateMap<List<GetApplicationListContract>, List<TblApplication>>();
+            CreateMap<TblApplication,GetApplicationListContract>();
         }
     }
 }

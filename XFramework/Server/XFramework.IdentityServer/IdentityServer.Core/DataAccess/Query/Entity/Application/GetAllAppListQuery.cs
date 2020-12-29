@@ -6,7 +6,7 @@ using MediatR;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Application
 {
-    public class AppsListQuery : IRequest<QueryResponseBO<List<GetApplicationListContract>>>
+    public class GetAppAppListQuery : IRequest<QueryResponseBO<List<GetApplicationListContract>>>
     {
         
     }

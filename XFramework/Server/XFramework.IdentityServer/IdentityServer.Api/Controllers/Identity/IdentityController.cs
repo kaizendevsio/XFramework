@@ -18,15 +18,36 @@ namespace IdentityServer.Api.Controllers.Identity
             _mapper = mapper;
         }
 
-        [HttpGet("Discovery")]
+        [HttpGet("All")]
+        public async Task<JsonResult> GetAll()
+        {
+            var result = await _mediator.Send(new GetAllIdentityQuery());
+            return new JsonResult(result);
+        }
+        
+        [HttpGet]
         public async Task<JsonResult> Get(Guid id)
         {
             var result = await _mediator.Send(new GetIdentityQuery() { Uid = id});
             return new JsonResult(result);
         }
 
-        [HttpPut("Discovery")]
+        [HttpPut]
         public async Task<JsonResult> Put([FromBody] CreateIdentityCmd request)
+        {
+            var result = await _mediator.Send(request).ConfigureAwait(false);
+            return new JsonResult(result);
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> Post([FromBody] UpdateIdentityCmd request)
+        {
+            var result = await _mediator.Send(request).ConfigureAwait(false);
+            return new JsonResult(result);
+        }
+        
+        [HttpDelete]
+        public async Task<JsonResult> Delete([FromBody] DeleteIdentityCmd request)
         {
             var result = await _mediator.Send(request).ConfigureAwait(false);
             return new JsonResult(result);

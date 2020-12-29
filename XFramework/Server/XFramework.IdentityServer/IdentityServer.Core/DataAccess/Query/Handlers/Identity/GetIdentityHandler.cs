@@ -21,9 +21,9 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
         }
         public async Task<QueryResponseBO<GetIdentityContract>> Handle(GetIdentityQuery request, CancellationToken cancellationToken)
         {
-            var result = await _dataLayer.TblIdentityInfos.FirstOrDefaultAsync(i => i.Uid == request.Uid.ToString(), cancellationToken: cancellationToken);
+            var entity = await _dataLayer.TblIdentityInfos.FirstOrDefaultAsync(i => i.Uid == request.Uid.ToString(), cancellationToken: cancellationToken);
            
-            if (result == null)
+            if (entity == null)
             {
                 return new QueryResponseBO<GetIdentityContract>()
                 {
@@ -34,7 +34,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
 
             return new QueryResponseBO<GetIdentityContract>()
             {
-                Response = _mapper.Map<GetIdentityContract>(result)
+                Response = _mapper.Map<GetIdentityContract>(entity)
             };
             
         }

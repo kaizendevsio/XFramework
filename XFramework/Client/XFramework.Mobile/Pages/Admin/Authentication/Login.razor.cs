@@ -3,7 +3,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using XFramework.Entity.BO;
+using XFramework.Domain.BO;
 
 namespace XFramework.Mobile.Pages.Admin.Authentication
 {

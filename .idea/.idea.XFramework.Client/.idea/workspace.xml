@@ -26,31 +26,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Application/ApplicationController.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/XFrameworkControllerBase.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/CommandBaseHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Application/AppsListQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Application/AppsInfoQueryHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/PipelineBehaviors/ValidationBehavior.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BO/ApiResponseBO.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Enums/ApiStatus.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Identity/IdentityAuthorization.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/DeleteIdentityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/DeleteIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/UpdateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Authorization/AuthorizeIdentityQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/GetAllIdentityQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetAllIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/contentModel.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/contentModel.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.CoreService/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/contentModel.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/contentModel.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/StartupController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/Controllers/StartupController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Api/appsettings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/BO/HostBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.CoreService/XFramework.Domain/BO/HostBO.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/StartupController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/StartupController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Startup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/appsettings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/DataLayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Login.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Login.razor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Register.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Register.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/XFramework.Mobile.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/XFramework.Mobile.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/_Imports.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Application/ApplicationController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Application/ApplicationController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Identity/IdentityController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Identity/IdentityController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/AutoMapper/AutoMapping.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/AutoMapper/AutoMapping.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/UpdateIdentityCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/UpdateIdentityCmd.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Application/AppsListQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Application/GetAllAppListQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Application/AppsInfoQueryHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Application/GetAllAppInfoQueryHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetIdentityHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BO/HostBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BO/HostBO.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/XFrameworkIdentityServerContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/XFrameworkIdentityServerContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/IdentityServer.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/IdentityServer.Domain.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,6 +62,13 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ProfilePage.razor" root0="FORCE_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" />
+  </component>
+  <component name="IdeDocumentHistory">
+    <changedPaths>
+      <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/_Imports.razor" />
+      <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Login.razor.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Register.razor" />
+    </changedPaths>
   </component>
   <component name="ProjectId" id="1jXpWjPohVH74iW3Tx0MkCA17Sd" />
   <component name="ProjectLevelVcsManager">
@@ -182,6 +189,7 @@
       <workItem from="1604613577088" duration="5074000" />
       <workItem from="1605015955749" duration="1037000" />
       <workItem from="1608548349458" duration="17000" />
+      <workItem from="1609233210981" duration="228000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -214,103 +222,5 @@
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
     <MESSAGE value="Safety Backup + Mobile Bug Fixes" />
     <option name="LAST_COMMIT_MESSAGE" value="Safety Backup + Mobile Bug Fixes" />
-  </component>
-  <component name="WindowStateProjectService">
-    <state width="1921" height="383" key="GridCell.Tab.0.bottom" timestamp="1604036402240">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.0.bottom/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402240" />
-    <state width="1921" height="383" key="GridCell.Tab.0.center" timestamp="1604036402240">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.0.center/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402240" />
-    <state width="1921" height="383" key="GridCell.Tab.0.left" timestamp="1604036402240">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.0.left/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402240" />
-    <state width="1921" height="383" key="GridCell.Tab.0.right" timestamp="1604036402240">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.0.right/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402240" />
-    <state width="1921" height="383" key="GridCell.Tab.1.bottom" timestamp="1604036402241">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.1.bottom/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402241" />
-    <state width="1921" height="383" key="GridCell.Tab.1.center" timestamp="1604036402241">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.1.center/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402241" />
-    <state width="1921" height="383" key="GridCell.Tab.1.left" timestamp="1604036402240">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.1.left/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402240" />
-    <state width="1921" height="383" key="GridCell.Tab.1.right" timestamp="1604036402241">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.1.right/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402241" />
-    <state width="1921" height="383" key="GridCell.Tab.2.bottom" timestamp="1604036402241">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.2.bottom/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402241" />
-    <state width="1921" height="383" key="GridCell.Tab.2.center" timestamp="1604036402241">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.2.center/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402241" />
-    <state width="1921" height="383" key="GridCell.Tab.2.left" timestamp="1604036402241">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.2.left/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402241" />
-    <state width="1921" height="383" key="GridCell.Tab.2.right" timestamp="1604036402241">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.2.right/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402241" />
-    <state width="1921" height="383" key="GridCell.Tab.3.bottom" timestamp="1604036402242">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.3.bottom/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402242" />
-    <state width="1921" height="383" key="GridCell.Tab.3.center" timestamp="1604036402242">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.3.center/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402242" />
-    <state width="1921" height="383" key="GridCell.Tab.3.left" timestamp="1604036402242">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.3.left/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402242" />
-    <state width="1921" height="383" key="GridCell.Tab.3.right" timestamp="1604036402242">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.3.right/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402242" />
-    <state width="1921" height="383" key="GridCell.Tab.4.bottom" timestamp="1604036402242">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.4.bottom/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402242" />
-    <state width="1921" height="383" key="GridCell.Tab.4.center" timestamp="1604036402242">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.4.center/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402242" />
-    <state width="1921" height="383" key="GridCell.Tab.4.left" timestamp="1604036402242">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.4.left/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402242" />
-    <state width="1921" height="383" key="GridCell.Tab.4.right" timestamp="1604036402242">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state width="1921" height="383" key="GridCell.Tab.4.right/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604036402242" />
-    <state x="2332" y="230" key="RollbackChangesDialog" timestamp="1604034041908">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state x="2332" y="230" key="RollbackChangesDialog/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604034041908" />
-    <state x="461" y="165" key="SettingsEditor" timestamp="1604612888588">
-      <screen x="0" y="0" width="1920" height="1040" />
-    </state>
-    <state x="461" y="165" key="SettingsEditor/0.0.1920.1040@0.0.1920.1040" timestamp="1604612888588" />
-    <state x="552" y="253" key="Vcs.Push.Dialog.v2" timestamp="1604612660291">
-      <screen x="0" y="0" width="1920" height="1040" />
-    </state>
-    <state x="552" y="253" key="Vcs.Push.Dialog.v2/0.0.1920.1040@0.0.1920.1040" timestamp="1604612660291" />
-    <state x="2223" y="225" width="672" height="678" key="search.everywhere.popup" timestamp="1604391571218">
-      <screen x="1600" y="0" width="1920" height="1040" />
-    </state>
-    <state x="2223" y="225" width="672" height="678" key="search.everywhere.popup/0.0.1600.860/1600.0.1920.1040@1600.0.1920.1040" timestamp="1604391571218" />
   </component>
 </project>

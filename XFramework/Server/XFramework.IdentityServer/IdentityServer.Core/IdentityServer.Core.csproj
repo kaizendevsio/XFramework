@@ -8,11 +8,14 @@
     <ItemGroup>
       <Folder Include="DataAccess\Commands\Entity\Application" />
       <Folder Include="DataAccess\Commands\Entity\Events" />
+      <Folder Include="DataAccess\Commands\Entity\Identity\Authorization" />
       <Folder Include="DataAccess\Commands\Handlers\Application" />
       <Folder Include="DataAccess\Commands\Handlers\Events" />
+      <Folder Include="DataAccess\Commands\Handlers\Identity\Authorization" />
       <Folder Include="DataAccess\Commands\Validations" />
       <Folder Include="DataAccess\Query\Entity\Events" />
       <Folder Include="DataAccess\Query\Handlers\Events" />
+      <Folder Include="DataAccess\Query\Handlers\Identity\Authorization" />
       <Folder Include="DataAccess\Query\Validations" />
       <Folder Include="Services" />
       <Folder Include="Validations" />

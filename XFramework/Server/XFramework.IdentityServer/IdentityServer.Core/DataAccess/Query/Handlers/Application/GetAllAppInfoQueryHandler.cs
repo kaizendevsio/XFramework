@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using AutoMapper;
 using IdentityServer.Core.DataAccess.Query.Entity.Application;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BO;
@@ -13,13 +14,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Application
 {
-    public class AppsInfoQueryHandler : QueryBaseHandler, IRequestHandler<AppsListQuery, QueryResponseBO<List<GetApplicationListContract>>>
+    public class GetAllAppInfoQueryHandler : QueryBaseHandler, IRequestHandler<GetAppAppListQuery, QueryResponseBO<List<GetApplicationListContract>>>
     {
-        public AppsInfoQueryHandler(IDataLayer dataLayer)
+        public GetAllAppInfoQueryHandler(IDataLayer dataLayer, IMapper mapper)
         {
+            _mapper = mapper;
             _dataLayer = dataLayer;
         }
-        public async Task<QueryResponseBO<List<GetApplicationListContract>>> Handle(AppsListQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponseBO<List<GetApplicationListContract>>> Handle(GetAppAppListQuery request, CancellationToken cancellationToken)
         {
             var result = await _dataLayer.TblApplications.ToListAsync(cancellationToken: cancellationToken);
             if (!result.Any())
@@ -30,10 +32,11 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Application
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            
+
+            var r = _mapper.Map<List<TblApplication>,List<GetApplicationListContract>>(result);
             return new QueryResponseBO<List<GetApplicationListContract>>()
             {
-                Response = _mapper.Map<List<GetApplicationListContract>>(result)
+                Response = r
             };
         }
     }
