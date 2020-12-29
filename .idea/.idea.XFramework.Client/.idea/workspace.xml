@@ -27,8 +27,8 @@
   <component name="ChangeListManager">
     <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="Updated Xframework.Client">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Shared/Layouts/ActivityLayout.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Shared/Layouts/ActivityLayout.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/_Imports.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Client.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Client.sln" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Index.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Index.razor" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,7 +39,7 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/Client/XFramework.Mobile/_Imports.razor" root0="SKIP_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" root2="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Index.razor" root0="SKIP_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" root2="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Client/User/Profile/ProfilePage.razor" root0="FORCE_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
@@ -48,6 +48,7 @@
       <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Pages/Admin/Authentication/Register.razor" />
       <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/_Imports.razor" />
       <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Mobile/Shared/Layouts/ActivityLayout.razor.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Client/XFramework.Web/Pages/Index.razor" />
     </changedPaths>
   </component>
   <component name="ProjectId" id="1jXpWjPohVH74iW3Tx0MkCA17Sd" />
@@ -169,7 +170,8 @@
       <workItem from="1604613577088" duration="5074000" />
       <workItem from="1605015955749" duration="1037000" />
       <workItem from="1608548349458" duration="17000" />
-      <workItem from="1609233210981" duration="1718000" />
+      <workItem from="1609233210981" duration="3079000" />
+      <workItem from="1609236384580" duration="38000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -185,7 +187,14 @@
       <option name="project" value="LOCAL" />
       <updated>1609233464130</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Updated Xframework.Client">
+      <created>1609235094770</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1609235094770</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
