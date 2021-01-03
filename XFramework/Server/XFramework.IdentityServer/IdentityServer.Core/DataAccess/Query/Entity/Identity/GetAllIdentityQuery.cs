@@ -5,7 +5,7 @@ using MediatR;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity
 {
-    public class GetAllIdentityQuery : IRequest<QueryResponseBO<List<GetIdentityContract>>>
+    public class GetAllIdentityQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<GetIdentityContract>>>
     {
         
     }

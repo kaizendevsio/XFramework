@@ -45,6 +45,7 @@
           <e p="Commands" t="Include">
             <e p="Entity" t="Include">
               <e p="Application" t="Include" />
+              <e p="CommandBaseEntity.cs" t="Include" />
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
                 <e p="Authorization" t="Include" />
@@ -80,6 +81,7 @@
                 <e p="GetAllIdentityQuery.cs" t="Include" />
                 <e p="GetIdentityQuery.cs" t="Include" />
               </e>
+              <e p="QueryBaseEntity.cs" t="Include" />
             </e>
             <e p="Handlers" t="Include">
               <e p="Application" t="Include">
@@ -87,7 +89,9 @@
               </e>
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
-                <e p="Authorization" t="Include" />
+                <e p="Authorization" t="Include">
+                  <e p="AuthorizeIdentityHandler.cs" t="Include" />
+                </e>
                 <e p="GetAllIdentityHandler.cs" t="Include" />
                 <e p="GetIdentityHandler.cs" t="Include" />
               </e>
@@ -98,6 +102,7 @@
         </e>
         <e p="IdentityServer.Core.csproj" t="IncludeRecursive" />
         <e p="Interfaces" t="Include">
+          <e p="ICachingService.cs" t="Include" />
           <e p="IDataLayer.cs" t="Include" />
         </e>
         <e p="obj" t="ExcludeRecursive">
@@ -110,7 +115,9 @@
         <e p="PipelineBehaviors" t="Include">
           <e p="ValidationBehavior.cs" t="Include" />
         </e>
-        <e p="Services" t="Include" />
+        <e p="Services" t="Include">
+          <e p="CachingService.cs" t="Include" />
+        </e>
         <e p="Validations" t="Include" />
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
@@ -120,17 +127,25 @@
           <e p="AuditEntry.cs" t="Include" />
           <e p="CmdResponseBO.cs" t="Include" />
           <e p="HostBO.cs" t="Include" />
+          <e p="IdentitySessionBO.cs" t="Include" />
           <e p="QueryResponseBO.cs" t="Include" />
+          <e p="RequestServerBO.cs" t="Include" />
         </e>
         <e p="Contracts" t="Include">
           <e p="GetApplicationListContract.cs" t="Include" />
           <e p="GetIdentityContract.cs" t="Include" />
         </e>
         <e p="DTO" t="Include">
+          <e p="TblAddressBarangay.cs" t="Include" />
+          <e p="TblAddressCity.cs" t="Include" />
+          <e p="TblAddressCountry.cs" t="Include" />
+          <e p="TblAddressProvince.cs" t="Include" />
+          <e p="TblAddressRegion.cs" t="Include" />
           <e p="TblApplication.cs" t="Include" />
           <e p="TblApplicationLog.cs" t="Include" />
           <e p="TblAuditField.cs" t="Include" />
           <e p="TblAuditHistory.cs" t="Include" />
+          <e p="TblEnterprise.cs" t="Include" />
           <e p="TblIdentityAddress.cs" t="Include" />
           <e p="TblIdentityAddressEntity.cs" t="Include" />
           <e p="TblIdentityContact.cs" t="Include" />
@@ -140,12 +155,16 @@
           <e p="TblIdentityRole.cs" t="Include" />
           <e p="TblIdentityRoleEntity.cs" t="Include" />
           <e p="TblIdentityVerification.cs" t="Include" />
+          <e p="TblIdentityVerificationEntity.cs" t="Include" />
           <e p="TblSessionDatum.cs" t="Include" />
           <e p="TblSessionEntity.cs" t="Include" />
           <e p="TblVerificationType.cs" t="Include" />
-          <e p="XFrameworkIdentityServerContext.cs" t="Include" />
+          <e p="XFrameworkContext.cs" t="Include" />
         </e>
-        <e p="Enums" t="Include" />
+        <e p="Enums" t="Include">
+          <e p="AuthorizeBy.cs" t="Include" />
+          <e p="SessionState.cs" t="Include" />
+        </e>
         <e p="IdentityServer.Domain.csproj" t="IncludeRecursive" />
         <e p="Migrations" t="Include">
           <e p="DbScaffolding.ps1" t="Include" />
@@ -172,8 +191,8 @@
       </e>
       <e p="XFramework.IdentityServer.sln" t="IncludeFlat" />
     </e>
-    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.3\resharper-host\Local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\resharper-host\local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
     <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\consoles\db" t="IncludeRecursive" />
     <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\extensions" t="IncludeRecursive" />
   </component>

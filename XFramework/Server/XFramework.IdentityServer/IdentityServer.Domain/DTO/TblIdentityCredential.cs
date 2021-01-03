@@ -9,6 +9,7 @@ namespace IdentityServer.Domain.DTO
     {
         public TblIdentityCredential()
         {
+            TblIdentityContacts = new HashSet<TblIdentityContact>();
             TblIdentityRoles = new HashSet<TblIdentityRole>();
             TblIdentityVerifications = new HashSet<TblIdentityVerification>();
             TblSessionData = new HashSet<TblSessionDatum>();
@@ -30,6 +31,7 @@ namespace IdentityServer.Domain.DTO
 
         public virtual TblApplication App { get; set; }
         public virtual TblIdentityInfo IdentityInfo { get; set; }
+        public virtual ICollection<TblIdentityContact> TblIdentityContacts { get; set; }
         public virtual ICollection<TblIdentityRole> TblIdentityRoles { get; set; }
         public virtual ICollection<TblIdentityVerification> TblIdentityVerifications { get; set; }
         public virtual ICollection<TblSessionDatum> TblSessionData { get; set; }

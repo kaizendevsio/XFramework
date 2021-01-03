@@ -4,7 +4,7 @@ using MediatR;
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity
 {
-    public class CreateIdentityCmd : IRequest<CmdResponseBO<CreateIdentityCmd>>
+    public class CreateIdentityCmd :CommandBaseEntity, IRequest<CmdResponseBO<CreateIdentityCmd>>
     {
         public string FirstName { get; set; }
         public string MiddleName { get; set; }

@@ -4,7 +4,7 @@ using System;
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity
 {
-    public class UpdateIdentityCmd : IRequest<CmdResponseBO<UpdateIdentityCmd>>
+    public class UpdateIdentityCmd : CommandBaseEntity, IRequest<CmdResponseBO<UpdateIdentityCmd>>
     {
         public string FirstName { get; set; }
         public string MiddleName { get; set; }

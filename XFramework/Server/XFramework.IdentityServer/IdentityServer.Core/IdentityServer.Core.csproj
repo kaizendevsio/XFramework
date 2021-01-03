@@ -15,9 +15,7 @@
       <Folder Include="DataAccess\Commands\Validations" />
       <Folder Include="DataAccess\Query\Entity\Events" />
       <Folder Include="DataAccess\Query\Handlers\Events" />
-      <Folder Include="DataAccess\Query\Handlers\Identity\Authorization" />
       <Folder Include="DataAccess\Query\Validations" />
-      <Folder Include="Services" />
       <Folder Include="Validations" />
     </ItemGroup>
 

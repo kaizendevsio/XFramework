@@ -6,11 +6,13 @@
 <table cellpadding="100">
     <tr>
         <td>
-        <select @bind="TrafficLightStatus">
-            <option value="Red">Red</option>
-            <option value="Yellow">Yellow</option>
-            <option value="Green">Green</option>
-        </select>
+            <select @bind="TrafficLightStatus">
+                @foreach (var i in asdas)
+                {
+                    <option value="Red">Red</option>
+                }
+
+            </select>
         </td>
         
         <td>

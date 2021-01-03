@@ -9,6 +9,7 @@ using IdentityServer.Core.DataAccess;
 using IdentityServer.Core.DataAccess.Commands.Handlers;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Core.PipelineBehaviors;
+using IdentityServer.Core.Services;
 using IdentityServer.Domain.DTO;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -39,6 +40,7 @@ namespace IdentityServer.Api
             services.AddControllers();
             services.AddDbContext<XFrameworkIdentityServerContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
             services.AddScoped<IDataLayer, DataLayer>();
+            services.AddSingleton<ICachingService, CachingService>();
             services.AddAutoMapper(typeof(Startup));
             services.AddAutoMapper(typeof(CommandBaseHandler));
             services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);

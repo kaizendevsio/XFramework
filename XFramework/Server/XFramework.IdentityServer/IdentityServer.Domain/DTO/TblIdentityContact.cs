@@ -14,11 +14,11 @@ namespace IdentityServer.Domain.DTO
         public DateTime? ModifiedOn { get; set; }
         public long? ModifiedBy { get; set; }
         public bool IsDeleted { get; set; }
-        public long? UserInfoId { get; set; }
         public long? UcentitiesId { get; set; }
         public string Value { get; set; }
+        public long? UserCredentialId { get; set; }
 
         public virtual TblIdentityContactEntity Ucentities { get; set; }
-        public virtual TblIdentityInfo UserInfo { get; set; }
+        public virtual TblIdentityCredential UserCredential { get; set; }
     }
 }

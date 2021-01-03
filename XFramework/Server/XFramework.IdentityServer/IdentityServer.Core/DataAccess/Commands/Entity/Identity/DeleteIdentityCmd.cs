@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity
 {
-    public class DeleteIdentityCmd : IRequest<CmdResponseBO<DeleteIdentityCmd>>
+    public class DeleteIdentityCmd : CommandBaseEntity, IRequest<CmdResponseBO<DeleteIdentityCmd>>
     {
         public Guid Uid { get; set; }
     }

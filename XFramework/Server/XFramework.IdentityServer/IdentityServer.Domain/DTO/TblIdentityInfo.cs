@@ -10,7 +10,6 @@ namespace IdentityServer.Domain.DTO
         public TblIdentityInfo()
         {
             TblIdentityAddresses = new HashSet<TblIdentityAddress>();
-            TblIdentityContacts = new HashSet<TblIdentityContact>();
             TblIdentityCredentials = new HashSet<TblIdentityCredential>();
         }
 
@@ -33,7 +32,6 @@ namespace IdentityServer.Domain.DTO
         public short CivilStatus { get; set; }
 
         public virtual ICollection<TblIdentityAddress> TblIdentityAddresses { get; set; }
-        public virtual ICollection<TblIdentityContact> TblIdentityContacts { get; set; }
         public virtual ICollection<TblIdentityCredential> TblIdentityCredentials { get; set; }
     }
 }

@@ -22,6 +22,6 @@ namespace IdentityServer.Domain.DTO
         public DateTime? Expiry { get; set; }
 
         public virtual TblIdentityCredential IdentityCred { get; set; }
-        public virtual TblVerificationType VerificationType { get; set; }
+        public virtual TblIdentityVerificationEntity VerificationType { get; set; }
     }
 }
