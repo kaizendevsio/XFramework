@@ -26,6 +26,7 @@ namespace IdentityServer.Domain.DTO
         public virtual DbSet<TblAuditField> TblAuditFields { get; set; }
         public virtual DbSet<TblAuditHistory> TblAuditHistories { get; set; }
         public virtual DbSet<TblAuthorizationLog> TblAuthorizationLogs { get; set; }
+        public virtual DbSet<TblConfiguration> TblConfigurations { get; set; }
         public virtual DbSet<TblCurrency> TblCurrencies { get; set; }
         public virtual DbSet<TblEnterprise> TblEnterprises { get; set; }
         public virtual DbSet<TblExchangeRate> TblExchangeRates { get; set; }
@@ -184,6 +185,8 @@ namespace IdentityServer.Domain.DTO
                     .HasColumnType("character varying")
                     .HasColumnName("UID");
 
+                entity.Property(e => e.Version).HasPrecision(6, 3);
+
                 entity.HasOne(d => d.Enterprise)
                     .WithMany(p => p.TblApplications)
                     .HasForeignKey(d => d.EnterpriseId)
@@ -256,6 +259,33 @@ namespace IdentityServer.Domain.DTO
                     .HasForeignKey(d => d.IdentityCredentialsId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("tbl_userauthhistory_fk");
+            });
+
+            modelBuilder.Entity<TblConfiguration>(entity =>
+            {
+                entity.ToTable("tbl_Configurations", "Registry");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasDefaultValueSql("nextval('\"Registry\".\"tbl_Configuration_ID_seq\"'::regclass)");
+
+                entity.Property(e => e.ApplicationId).HasColumnName("ApplicationID");
+
+                entity.Property(e => e.CreatedOn).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Key)
+                    .IsRequired()
+                    .HasColumnType("character varying");
+
+                entity.Property(e => e.ModifiedOn).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Value).HasColumnType("character varying");
+
+                entity.HasOne(d => d.Application)
+                    .WithMany(p => p.TblConfigurations)
+                    .HasForeignKey(d => d.ApplicationId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_applicationconfiguration_tbl_application_id_fk");
             });
 
             modelBuilder.Entity<TblCurrency>(entity =>

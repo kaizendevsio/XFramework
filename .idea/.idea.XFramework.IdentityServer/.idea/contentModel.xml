@@ -146,6 +146,7 @@
           <e p="TblAuditField.cs" t="Include" />
           <e p="TblAuditHistory.cs" t="Include" />
           <e p="TblAuthorizationLog.cs" t="Include" />
+          <e p="TblConfiguration.cs" t="Include" />
           <e p="TblCurrency.cs" t="Include" />
           <e p="TblEnterprise.cs" t="Include" />
           <e p="TblExchangeRate.cs" t="Include" />

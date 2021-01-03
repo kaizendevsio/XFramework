@@ -9,6 +9,7 @@ namespace IdentityServer.Domain.DTO
     {
         public TblApplication()
         {
+            TblConfigurations = new HashSet<TblConfiguration>();
             TblIdentityCredentials = new HashSet<TblIdentityCredential>();
             TblLogs = new HashSet<TblLog>();
         }
@@ -23,8 +24,10 @@ namespace IdentityServer.Domain.DTO
         public long? ParentAppId { get; set; }
         public DateTime? CreatedOn { get; set; }
         public long EnterpriseId { get; set; }
+        public decimal Version { get; set; }
 
         public virtual TblEnterprise Enterprise { get; set; }
+        public virtual ICollection<TblConfiguration> TblConfigurations { get; set; }
         public virtual ICollection<TblIdentityCredential> TblIdentityCredentials { get; set; }
         public virtual ICollection<TblLog> TblLogs { get; set; }
     }

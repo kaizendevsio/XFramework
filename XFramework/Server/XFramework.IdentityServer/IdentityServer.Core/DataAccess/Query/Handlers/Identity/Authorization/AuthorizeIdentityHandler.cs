@@ -29,19 +29,31 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
         public async Task<QueryResponseBO<bool>> Handle(AuthorizeIdentityQuery request, CancellationToken cancellationToken)
         {
             TblIdentityCredential result = null;
-            
-            switch (request.AuthorizeBy)
+            var authorizeBy = request.AuthorizeBy;
+            reAuth:
+            switch (authorizeBy)
             {
                 case AuthorizeBy.Default:
+                    var getDefaults = await _dataLayer.TblConfigurations.FirstOrDefaultAsync(i =>
+                        i.ApplicationId == request.RequestServer.ApplicationId & i.Key == "DefaultAuthorizeBy", cancellationToken: cancellationToken);
+                    authorizeBy = (AuthorizeBy)int.Parse(getDefaults.Value);
+                    goto reAuth;
+                    
                     break;
                 case AuthorizeBy.UsernameEmailPhone:
+                    result = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.UserName == request.Username, cancellationToken: cancellationToken);
+                    result ??= _dataLayer.TblIdentityContacts.FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 1)?.UserCredential;
+                    result ??= _dataLayer.TblIdentityContacts.FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 2)?.UserCredential;
+                    
                     break;
                 case AuthorizeBy.Username:
                     result = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.UserName == request.Username, cancellationToken: cancellationToken);
                     break;
                 case AuthorizeBy.Email:
+                    result = _dataLayer.TblIdentityContacts.FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 1)?.UserCredential;
                     break;
                 case AuthorizeBy.Phone:
+                    result = _dataLayer.TblIdentityContacts.FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 2)?.UserCredential;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
