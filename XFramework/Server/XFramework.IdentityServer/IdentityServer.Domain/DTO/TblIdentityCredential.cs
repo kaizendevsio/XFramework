@@ -28,7 +28,7 @@ namespace IdentityServer.Domain.DTO
         public string UserAlias { get; set; }
         public short? LogInStatus { get; set; }
         public byte[] PasswordByte { get; set; }
-        public long? AppId { get; set; }
+        public long AppId { get; set; }
 
         public virtual TblApplication App { get; set; }
         public virtual TblIdentityInfo IdentityInfo { get; set; }

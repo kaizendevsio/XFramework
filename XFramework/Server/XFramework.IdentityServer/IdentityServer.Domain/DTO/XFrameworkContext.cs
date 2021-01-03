@@ -48,7 +48,7 @@ namespace IdentityServer.Domain.DTO
             if (!optionsBuilder.IsConfigured)
             {
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-                //optionsBuilder.UseNpgsql("Host=localhost;Database=XFramework;Username=dbAdmin;Password=4*5WD-K8%f*NqmPY");
+                optionsBuilder.UseNpgsql("Host=localhost;Database=XFramework;Username=dbAdmin;Password=4*5WD-K8%f*NqmPY");
             }
         }
 
@@ -337,7 +337,7 @@ namespace IdentityServer.Domain.DTO
 
                 entity.HasIndex(e => e.AddressEntitiesId, "IX_tbl_IdentityAddresses_AddressEntitiesID");
 
-                entity.HasIndex(e => e.UserInfoId, "IX_tbl_IdentityAddresses_UserInfoID");
+                entity.HasIndex(e => e.IdentityInfoId, "IX_tbl_IdentityAddresses_UserInfoID");
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
@@ -350,6 +350,8 @@ namespace IdentityServer.Domain.DTO
 
                 entity.Property(e => e.CreatedOn).HasColumnType("timestamp with time zone");
 
+                entity.Property(e => e.IdentityInfoId).HasColumnName("IdentityInfoID");
+
                 entity.Property(e => e.ModifiedOn).HasColumnType("timestamp with time zone");
 
                 entity.Property(e => e.Street).HasMaxLength(500);
@@ -357,8 +359,6 @@ namespace IdentityServer.Domain.DTO
                 entity.Property(e => e.Subdivision).HasMaxLength(500);
 
                 entity.Property(e => e.UnitNumber).HasMaxLength(500);
-
-                entity.Property(e => e.UserInfoId).HasColumnName("UserInfoID");
 
                 entity.HasOne(d => d.AddressEntities)
                     .WithMany(p => p.TblIdentityAddresses)
@@ -380,6 +380,11 @@ namespace IdentityServer.Domain.DTO
                     .HasForeignKey(d => d.Country)
                     .HasConstraintName("tbl_identityaddresses_tbl_addresscountry__fk");
 
+                entity.HasOne(d => d.IdentityInfo)
+                    .WithMany(p => p.TblIdentityAddresses)
+                    .HasForeignKey(d => d.IdentityInfoId)
+                    .HasConstraintName("UserInfoID");
+
                 entity.HasOne(d => d.ProvinceNavigation)
                     .WithMany(p => p.TblIdentityAddresses)
                     .HasForeignKey(d => d.Province)
@@ -389,11 +394,6 @@ namespace IdentityServer.Domain.DTO
                     .WithMany(p => p.TblIdentityAddresses)
                     .HasForeignKey(d => d.Region)
                     .HasConstraintName("tbl_identityaddresses__id_fk");
-
-                entity.HasOne(d => d.UserInfo)
-                    .WithMany(p => p.TblIdentityAddresses)
-                    .HasForeignKey(d => d.UserInfoId)
-                    .HasConstraintName("UserInfoID");
             });
 
             modelBuilder.Entity<TblIdentityAddressEntity>(entity =>
@@ -469,8 +469,6 @@ namespace IdentityServer.Domain.DTO
             {
                 entity.ToTable("tbl_IdentityCredentials", "Identity");
 
-                entity.HasIndex(e => e.AppId, "IX_tbl_IdentityCredentials_AppID");
-
                 entity.HasIndex(e => e.IdentityInfoId, "IX_tbl_IdentityCredentials_IdentityInfoID");
 
                 entity.HasIndex(e => e.UserName, "tbl_identitycredentials_un")
@@ -496,7 +494,8 @@ namespace IdentityServer.Domain.DTO
                 entity.HasOne(d => d.App)
                     .WithMany(p => p.TblIdentityCredentials)
                     .HasForeignKey(d => d.AppId)
-                    .HasConstraintName("tbl_identitycredentials1___fk");
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_identitycredentials___fk");
 
                 entity.HasOne(d => d.IdentityInfo)
                     .WithMany(p => p.TblIdentityCredentials)

@@ -14,7 +14,7 @@ namespace IdentityServer.Domain.DTO
         public DateTime? ModifiedOn { get; set; }
         public long? ModifiedBy { get; set; }
         public bool IsDeleted { get; set; }
-        public long? UserInfoId { get; set; }
+        public long? IdentityInfoId { get; set; }
         public string UnitNumber { get; set; }
         public string Street { get; set; }
         public string Building { get; set; }
@@ -31,8 +31,8 @@ namespace IdentityServer.Domain.DTO
         public virtual TblAddressBarangay BarangayNavigation { get; set; }
         public virtual TblAddressCity CityNavigation { get; set; }
         public virtual TblAddressCountry CountryNavigation { get; set; }
+        public virtual TblIdentityInfo IdentityInfo { get; set; }
         public virtual TblAddressProvince ProvinceNavigation { get; set; }
         public virtual TblAddressRegion RegionNavigation { get; set; }
-        public virtual TblIdentityInfo UserInfo { get; set; }
     }
 }

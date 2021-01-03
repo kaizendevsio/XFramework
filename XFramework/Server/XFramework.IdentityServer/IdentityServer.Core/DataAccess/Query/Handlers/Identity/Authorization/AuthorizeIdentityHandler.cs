@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
@@ -10,6 +11,8 @@ using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BO;
 using IdentityServer.Domain.Contracts;
+using IdentityServer.Domain.DTO;
+using IdentityServer.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,8 +28,27 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
         }
         public async Task<QueryResponseBO<bool>> Handle(AuthorizeIdentityQuery request, CancellationToken cancellationToken)
         {
+            TblIdentityCredential result = null;
+            
+            switch (request.AuthorizeBy)
+            {
+                case AuthorizeBy.Default:
+                    break;
+                case AuthorizeBy.UsernameEmailPhone:
+                    break;
+                case AuthorizeBy.Username:
+                    result = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.UserName == request.Username, cancellationToken: cancellationToken);
+                    break;
+                case AuthorizeBy.Email:
+                    break;
+                case AuthorizeBy.Phone:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+            
             // Check if username exists
-            var result = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.UserName == request.Username, cancellationToken: cancellationToken);
+            
             if (result == null)
             {
                 return new QueryResponseBO<bool>()
