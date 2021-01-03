@@ -23,6 +23,9 @@ namespace IdentityServer.Domain.DTO
         public virtual DbSet<TblAddressProvince> TblAddressProvinces { get; set; }
         public virtual DbSet<TblAddressRegion> TblAddressRegions { get; set; }
         public virtual DbSet<TblApplication> TblApplications { get; set; }
+        public virtual DbSet<TblAuditField> TblAuditFields { get; set; }
+        public virtual DbSet<TblAuditHistory> TblAuditHistories { get; set; }
+        public virtual DbSet<TblAuthorizationLog> TblAuthorizationLogs { get; set; }
         public virtual DbSet<TblCurrency> TblCurrencies { get; set; }
         public virtual DbSet<TblEnterprise> TblEnterprises { get; set; }
         public virtual DbSet<TblExchangeRate> TblExchangeRates { get; set; }
@@ -36,6 +39,7 @@ namespace IdentityServer.Domain.DTO
         public virtual DbSet<TblIdentityRoleEntity> TblIdentityRoleEntities { get; set; }
         public virtual DbSet<TblIdentityVerification> TblIdentityVerifications { get; set; }
         public virtual DbSet<TblIdentityVerificationEntity> TblIdentityVerificationEntities { get; set; }
+        public virtual DbSet<TblLog> TblLogs { get; set; }
         public virtual DbSet<TblSessionDatum> TblSessionData { get; set; }
         public virtual DbSet<TblSessionEntity> TblSessionEntities { get; set; }
 
@@ -44,7 +48,7 @@ namespace IdentityServer.Domain.DTO
             if (!optionsBuilder.IsConfigured)
             {
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-                optionsBuilder.UseNpgsql("Host=localhost;Database=XFramework;Username=dbAdmin;Password=4*5WD-K8%f*NqmPY");
+                //optionsBuilder.UseNpgsql("Host=localhost;Database=XFramework;Username=dbAdmin;Password=4*5WD-K8%f*NqmPY");
             }
         }
 
@@ -185,6 +189,73 @@ namespace IdentityServer.Domain.DTO
                     .HasForeignKey(d => d.EnterpriseId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("tbl_applications_tbl_enterprises_id_fk");
+            });
+
+            modelBuilder.Entity<TblAuditField>(entity =>
+            {
+                entity.ToTable("tbl_AuditFields", "Audit");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn();
+
+                entity.Property(e => e.CreatedOn).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedOn).HasColumnType("timestamp with time zone");
+            });
+
+            modelBuilder.Entity<TblAuditHistory>(entity =>
+            {
+                entity.ToTable("tbl_AuditHistory", "Audit");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn();
+
+                entity.Property(e => e.CreatedOn).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.KeyValues).HasColumnType("character varying");
+
+                entity.Property(e => e.NewValues).HasColumnType("character varying");
+
+                entity.Property(e => e.OldValues).HasColumnType("character varying");
+
+                entity.Property(e => e.QueryAction).HasColumnType("character varying");
+
+                entity.Property(e => e.TableName).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<TblAuthorizationLog>(entity =>
+            {
+                entity.ToTable("tbl_AuthorizationLogs", "Audit");
+
+                entity.HasIndex(e => e.IdentityCredentialsId, "IX_tbl_IdentityAuthorizationLogs_IdentityCredentialsID");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn();
+
+                entity.Property(e => e.CreatedOn).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.DeviceName).HasMaxLength(50);
+
+                entity.Property(e => e.IdentityCredentialsId).HasColumnName("IdentityCredentialsID");
+
+                entity.Property(e => e.Ipaddress)
+                    .HasMaxLength(18)
+                    .HasColumnName("IPAddress");
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.LoginSource).HasMaxLength(50);
+
+                entity.Property(e => e.ModifiedOn).HasColumnType("timestamp with time zone");
+
+                entity.HasOne(d => d.IdentityCredentials)
+                    .WithMany(p => p.TblAuthorizationLogs)
+                    .HasForeignKey(d => d.IdentityCredentialsId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_userauthhistory_fk");
             });
 
             modelBuilder.Entity<TblCurrency>(entity =>
@@ -578,6 +649,30 @@ namespace IdentityServer.Domain.DTO
                 entity.Property(e => e.ModifiedOn).HasColumnType("timestamp with time zone");
 
                 entity.Property(e => e.Name).HasMaxLength(100);
+            });
+
+            modelBuilder.Entity<TblLog>(entity =>
+            {
+                entity.ToTable("tbl_Logs", "Audit");
+
+                entity.HasIndex(e => e.AppId, "IX_tbl_ApplicationLogs_AppID");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn();
+
+                entity.Property(e => e.AppId).HasColumnName("AppID");
+
+                entity.Property(e => e.CreatedOn).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Initiator).HasColumnType("character varying");
+
+                entity.Property(e => e.Message).HasColumnType("character varying");
+
+                entity.HasOne(d => d.App)
+                    .WithMany(p => p.TblLogs)
+                    .HasForeignKey(d => d.AppId)
+                    .HasConstraintName("tbl_applogs_appid_fk");
             });
 
             modelBuilder.Entity<TblSessionDatum>(entity =>

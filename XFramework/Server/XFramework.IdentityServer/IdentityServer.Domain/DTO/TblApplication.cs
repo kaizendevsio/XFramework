@@ -10,6 +10,7 @@ namespace IdentityServer.Domain.DTO
         public TblApplication()
         {
             TblIdentityCredentials = new HashSet<TblIdentityCredential>();
+            TblLogs = new HashSet<TblLog>();
         }
 
         public long Id { get; set; }
@@ -25,5 +26,6 @@ namespace IdentityServer.Domain.DTO
 
         public virtual TblEnterprise Enterprise { get; set; }
         public virtual ICollection<TblIdentityCredential> TblIdentityCredentials { get; set; }
+        public virtual ICollection<TblLog> TblLogs { get; set; }
     }
 }

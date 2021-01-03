@@ -145,7 +145,10 @@
           <e p="TblApplicationLog.cs" t="Include" />
           <e p="TblAuditField.cs" t="Include" />
           <e p="TblAuditHistory.cs" t="Include" />
+          <e p="TblAuthorizationLog.cs" t="Include" />
+          <e p="TblCurrency.cs" t="Include" />
           <e p="TblEnterprise.cs" t="Include" />
+          <e p="TblExchangeRate.cs" t="Include" />
           <e p="TblIdentityAddress.cs" t="Include" />
           <e p="TblIdentityAddressEntity.cs" t="Include" />
           <e p="TblIdentityContact.cs" t="Include" />
@@ -156,6 +159,7 @@
           <e p="TblIdentityRoleEntity.cs" t="Include" />
           <e p="TblIdentityVerification.cs" t="Include" />
           <e p="TblIdentityVerificationEntity.cs" t="Include" />
+          <e p="TblLog.cs" t="Include" />
           <e p="TblSessionDatum.cs" t="Include" />
           <e p="TblSessionEntity.cs" t="Include" />
           <e p="TblVerificationType.cs" t="Include" />

@@ -38,7 +38,7 @@ namespace IdentityServer.Api
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
-            services.AddDbContext<XFrameworkIdentityServerContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
+            services.AddDbContext<XFrameworkContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
             services.AddScoped<IDataLayer, DataLayer>();
             services.AddSingleton<ICachingService, CachingService>();
             services.AddAutoMapper(typeof(Startup));

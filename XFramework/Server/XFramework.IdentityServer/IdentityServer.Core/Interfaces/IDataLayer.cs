@@ -30,21 +30,30 @@ namespace IdentityServer.Core.Interfaces
         public void RollBack();
         public List<AuditEntry> OnBeforeSaveChanges();
         
-        public DbSet<TblApplication> TblApplications { get; set; }
-        public DbSet<TblApplicationLog> TblApplicationLogs { get; set; }
-        public DbSet<TblAuditField> TblAuditFields { get; set; }
-        public DbSet<TblAuditHistory> TblAuditHistories { get; set; }
-        public DbSet<TblIdentityAddress> TblIdentityAddresses { get; set; }
-        public DbSet<TblIdentityAddressEntity> TblIdentityAddressEntities { get; set; }
-        public DbSet<TblIdentityContact> TblIdentityContacts { get; set; }
-        public DbSet<TblIdentityContactEntity> TblIdentityContactEntities { get; set; }
-        public DbSet<TblIdentityCredential> TblIdentityCredentials { get; set; }
-        public DbSet<TblIdentityInfo> TblIdentityInfos { get; set; }
-        public DbSet<TblIdentityRole> TblIdentityRoles { get; set; }
-        public DbSet<TblIdentityRoleEntity> TblIdentityRoleEntities { get; set; }
-        public DbSet<TblIdentityVerification> TblIdentityVerifications { get; set; }
-        public DbSet<TblSessionDatum> TblSessionData { get; set; }
-        public DbSet<TblSessionEntity> TblSessionEntities { get; set; }
-        public DbSet<TblVerificationType> TblVerificationTypes { get; set; }
+        public  DbSet<TblAddressBarangay> TblAddressBarangays { get; set; }
+        public  DbSet<TblAddressCity> TblAddressCities { get; set; }
+        public  DbSet<TblAddressCountry> TblAddressCountries { get; set; }
+        public  DbSet<TblAddressProvince> TblAddressProvinces { get; set; }
+        public  DbSet<TblAddressRegion> TblAddressRegions { get; set; }
+        public  DbSet<TblApplication> TblApplications { get; set; }
+        public  DbSet<TblAuditField> TblAuditFields { get; set; }
+        public  DbSet<TblAuditHistory> TblAuditHistories { get; set; }
+        public  DbSet<TblAuthorizationLog> TblAuthorizationLogs { get; set; }
+        public  DbSet<TblCurrency> TblCurrencies { get; set; }
+        public  DbSet<TblEnterprise> TblEnterprises { get; set; }
+        public  DbSet<TblExchangeRate> TblExchangeRates { get; set; }
+        public  DbSet<TblIdentityAddress> TblIdentityAddresses { get; set; }
+        public  DbSet<TblIdentityAddressEntity> TblIdentityAddressEntities { get; set; }
+        public  DbSet<TblIdentityContact> TblIdentityContacts { get; set; }
+        public  DbSet<TblIdentityContactEntity> TblIdentityContactEntities { get; set; }
+        public  DbSet<TblIdentityCredential> TblIdentityCredentials { get; set; }
+        public  DbSet<TblIdentityInfo> TblIdentityInfos { get; set; }
+        public  DbSet<TblIdentityRole> TblIdentityRoles { get; set; }
+        public  DbSet<TblIdentityRoleEntity> TblIdentityRoleEntities { get; set; }
+        public  DbSet<TblIdentityVerification> TblIdentityVerifications { get; set; }
+        public  DbSet<TblIdentityVerificationEntity> TblIdentityVerificationEntities { get; set; }
+        public  DbSet<TblLog> TblLogs { get; set; }
+        public  DbSet<TblSessionDatum> TblSessionData { get; set; }
+        public  DbSet<TblSessionEntity> TblSessionEntities { get; set; }
     }
 }

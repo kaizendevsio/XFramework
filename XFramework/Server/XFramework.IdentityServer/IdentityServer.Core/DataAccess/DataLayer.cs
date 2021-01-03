@@ -10,9 +10,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IdentityServer.Core.DataAccess
 {
-      public class DataLayer : XFrameworkIdentityServerContext, IDataLayer
+      public class DataLayer : XFrameworkContext, IDataLayer
     {
-        public DataLayer(DbContextOptions<XFrameworkIdentityServerContext> options)
+        public DataLayer(DbContextOptions<XFrameworkContext> options)
            : base(options)
         {
         }
