@@ -9,9 +9,9 @@ using System.Threading.Tasks;
 using AutoMapper;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BO;
+using IdentityServer.Domain.BusinessObject;
 using IdentityServer.Domain.Contracts;
-using IdentityServer.Domain.DTO;
+using IdentityServer.Domain.DataTableObject;
 using IdentityServer.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +30,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
         {
             TblIdentityCredential result = null;
             var authorizeBy = request.AuthorizeBy;
+            
             reAuth:
             switch (authorizeBy)
             {
@@ -59,7 +60,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                     throw new ArgumentOutOfRangeException();
             }
             
-            // Check if username exists
+            // Check if identity credential exists
             
             if (result == null)
             {
@@ -86,8 +87,6 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                     HttpStatusCode = HttpStatusCode.BadRequest
                 };
             }
-            
-            
             
             return new QueryResponseBO<bool>()
             {

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using AutoMapper;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BO;
+using IdentityServer.Domain.BusinessObject;
 using IdentityServer.Domain.Contracts;
 using MediatR;
 using Microsoft.EntityFrameworkCore;

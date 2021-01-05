@@ -1,4 +1,4 @@
-﻿using IdentityServer.Domain.BO;
+﻿using IdentityServer.Domain.BusinessObject;
 using IdentityServer.Domain.Enums;
 using MediatR;
 

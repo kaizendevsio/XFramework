@@ -1,8 +1,8 @@
 ﻿﻿using System;
 using System.Reflection;
  using System.Runtime.Versioning;
- using IdentityServer.Domain.BO;
-using Microsoft.AspNetCore.Mvc;
+ using IdentityServer.Domain.BusinessObject;
+ using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityServer.Api.Controllers
 {

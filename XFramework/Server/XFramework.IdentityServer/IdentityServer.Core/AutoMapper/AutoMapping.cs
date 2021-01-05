@@ -2,7 +2,7 @@
 using AutoMapper;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Domain.Contracts;
-using IdentityServer.Domain.DTO;
+using IdentityServer.Domain.DataTableObject;
 
 namespace IdentityServer.Core.AutoMapper
 {

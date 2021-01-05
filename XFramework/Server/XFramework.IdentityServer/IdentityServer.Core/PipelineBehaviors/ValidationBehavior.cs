@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using AutoMapper;
 using FluentValidation;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BO;
+using IdentityServer.Domain.BusinessObject;
 using MediatR;
 
 namespace IdentityServer.Core.PipelineBehaviors

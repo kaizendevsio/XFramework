@@ -10,7 +10,7 @@ using IdentityServer.Core.DataAccess.Commands.Handlers;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Core.PipelineBehaviors;
 using IdentityServer.Core.Services;
-using IdentityServer.Domain.DTO;
+using IdentityServer.Domain.DataTableObject;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

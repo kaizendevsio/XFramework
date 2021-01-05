@@ -1,7 +1,6 @@
 ﻿using AutoMapper;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BO;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -11,6 +10,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using IdentityServer.Domain.BusinessObject;
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
 {

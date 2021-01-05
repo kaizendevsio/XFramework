@@ -122,7 +122,7 @@
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
-        <e p="BO" t="Include">
+        <e p="BusinessObject" t="Include">
           <e p="ApiStatusBO.cs" t="Include" />
           <e p="AuditEntry.cs" t="Include" />
           <e p="CmdResponseBO.cs" t="Include" />
@@ -135,7 +135,7 @@
           <e p="GetApplicationListContract.cs" t="Include" />
           <e p="GetIdentityContract.cs" t="Include" />
         </e>
-        <e p="DTO" t="Include">
+        <e p="DataTableObject" t="Include">
           <e p="TblAddressBarangay.cs" t="Include" />
           <e p="TblAddressCity.cs" t="Include" />
           <e p="TblAddressCountry.cs" t="Include" />
@@ -148,6 +148,7 @@
           <e p="TblAuthorizationLog.cs" t="Include" />
           <e p="TblConfiguration.cs" t="Include" />
           <e p="TblCurrency.cs" t="Include" />
+          <e p="TblCurrencyEntity.cs" t="Include" />
           <e p="TblEnterprise.cs" t="Include" />
           <e p="TblExchangeRate.cs" t="Include" />
           <e p="TblIdentityAddress.cs" t="Include" />

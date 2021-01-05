@@ -1,5 +1,4 @@
 ﻿using AutoMapper;
-using IdentityServer.Domain.BO;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;

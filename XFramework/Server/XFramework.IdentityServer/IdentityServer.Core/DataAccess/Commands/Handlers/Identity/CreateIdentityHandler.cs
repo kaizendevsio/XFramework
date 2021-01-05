@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using AutoMapper;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BO;
-using IdentityServer.Domain.DTO;
+using IdentityServer.Domain.BusinessObject;
+using IdentityServer.Domain.DataTableObject;
 using MediatR;
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity

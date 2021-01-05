@@ -1,4 +1,4 @@
-﻿using IdentityServer.Domain.BO;
+﻿using IdentityServer.Domain.BusinessObject;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity
 {

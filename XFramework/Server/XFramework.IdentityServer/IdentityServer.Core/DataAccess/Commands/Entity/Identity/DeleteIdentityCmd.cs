@@ -1,10 +1,10 @@
-﻿using IdentityServer.Domain.BO;
-using MediatR;
+﻿using MediatR;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using IdentityServer.Domain.BusinessObject;
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity
 {

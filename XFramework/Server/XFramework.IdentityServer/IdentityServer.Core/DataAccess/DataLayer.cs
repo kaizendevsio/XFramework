@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BO;
-using IdentityServer.Domain.DTO;
+using IdentityServer.Domain.BusinessObject;
+using IdentityServer.Domain.DataTableObject;
 using Microsoft.EntityFrameworkCore;
 
 namespace IdentityServer.Core.DataAccess
