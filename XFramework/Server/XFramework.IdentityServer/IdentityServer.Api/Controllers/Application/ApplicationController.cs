@@ -1,5 +1,4 @@
 ﻿using System.Threading.Tasks;
-using AutoMapper;
 using IdentityServer.Core.DataAccess.Query.Entity.Application;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -10,9 +9,8 @@ namespace IdentityServer.Api.Controllers.Application
     [ApiController]
     public class ApplicationController : XFrameworkControllerBase
     {
-        public ApplicationController(IMediator mediator, IMapper mapper)
+        public ApplicationController(IMediator mediator)
         {
-            _mapper = mapper;
             _mediator = mediator;
         }
 

@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using FluentValidation;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObject;
@@ -17,14 +16,12 @@ namespace IdentityServer.Core.PipelineBehaviors
     {
         private readonly IEnumerable<IValidator<TRequest>> _validators;
         private readonly IDataLayer _dataLayer;
-        private readonly IMapper _mapper;
         private TResponse _response;
 
-        public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators, IDataLayer dataLayer, IMapper mapper)
+        public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators, IDataLayer dataLayer)
         {
             _validators = validators;
             _dataLayer = dataLayer;
-            _mapper = mapper;
         }
 
         public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)

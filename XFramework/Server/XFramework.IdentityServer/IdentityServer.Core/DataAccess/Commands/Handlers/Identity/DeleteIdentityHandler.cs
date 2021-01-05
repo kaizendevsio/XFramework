@@ -5,7 +5,6 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObject;
@@ -16,10 +15,9 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
 {
     public class DeleteIdentityHandler : CommandBaseHandler ,IRequestHandler<DeleteIdentityCmd, CmdResponseBO<DeleteIdentityCmd>>
     {
-        public DeleteIdentityHandler(IDataLayer dataLayer, IMapper mapper)
+        public DeleteIdentityHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
-            _mapper = mapper;
         }
         public async Task<CmdResponseBO<DeleteIdentityCmd>> Handle(DeleteIdentityCmd request, CancellationToken cancellationToken)
         {

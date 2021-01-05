@@ -1,11 +1,11 @@
 ﻿using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObject;
 using IdentityServer.Domain.Contracts;
+using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,10 +14,9 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
     public class GetIdentityHandler : QueryBaseHandler ,IRequestHandler<GetIdentityQuery, QueryResponseBO<GetIdentityContract>>
     {
 
-        public GetIdentityHandler(IDataLayer dataLayer, IMapper mapper)
+        public GetIdentityHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
-            _mapper = mapper;
         }
         public async Task<QueryResponseBO<GetIdentityContract>> Handle(GetIdentityQuery request, CancellationToken cancellationToken)
         {
@@ -34,7 +33,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
 
             return new QueryResponseBO<GetIdentityContract>()
             {
-                Response = _mapper.Map<GetIdentityContract>(entity)
+                Response = entity.Adapt<GetIdentityContract>()
             };
             
         }

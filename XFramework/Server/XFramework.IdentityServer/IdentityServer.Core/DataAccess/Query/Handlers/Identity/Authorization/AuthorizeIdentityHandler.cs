@@ -6,7 +6,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObject;
@@ -20,10 +19,9 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
 {
     public class AuthorizeIdentityHandler : QueryBaseHandler, IRequestHandler<AuthorizeIdentityQuery, QueryResponseBO<bool>>
     {
-        public AuthorizeIdentityHandler(IDataLayer dataLayer, IMapper mapper, ICachingService cachingService)
+        public AuthorizeIdentityHandler(IDataLayer dataLayer, ICachingService cachingService)
         {
             _dataLayer = dataLayer;
-            _mapper = mapper;
             _cachingService = cachingService;
         }
         public async Task<QueryResponseBO<bool>> Handle(AuthorizeIdentityQuery request, CancellationToken cancellationToken)

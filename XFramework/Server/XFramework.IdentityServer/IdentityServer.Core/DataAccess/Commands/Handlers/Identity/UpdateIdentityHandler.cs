@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
+﻿using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.Interfaces;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -11,15 +10,15 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Domain.BusinessObject;
+using Mapster;
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
 {
     public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateIdentityCmd, CmdResponseBO<UpdateIdentityCmd>>
     {
-        public UpdateIdentityHandler(IDataLayer dataLayer, IMapper mapper)
+        public UpdateIdentityHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
-            _mapper = mapper;
         }
         public async Task<CmdResponseBO<UpdateIdentityCmd>> Handle(UpdateIdentityCmd request, CancellationToken cancellationToken)
         {
@@ -34,7 +33,7 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
                 };
             }
 
-            entity = _mapper.Map(request, entity);
+            entity = request.Adapt(entity);
             _dataLayer.Update(entity);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 

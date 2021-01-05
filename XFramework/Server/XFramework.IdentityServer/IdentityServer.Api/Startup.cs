@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-using AutoMapper;
 using FluentValidation;
 using IdentityServer.Core.DataAccess;
 using IdentityServer.Core.DataAccess.Commands.Handlers;
@@ -41,8 +40,6 @@ namespace IdentityServer.Api
             services.AddDbContext<XFrameworkContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
             services.AddScoped<IDataLayer, DataLayer>();
             services.AddSingleton<ICachingService, CachingService>();
-            services.AddAutoMapper(typeof(Startup));
-            services.AddAutoMapper(typeof(CommandBaseHandler));
             services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
             services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));

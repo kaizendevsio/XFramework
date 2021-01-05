@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using AutoMapper;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -11,10 +10,9 @@ namespace IdentityServer.Api.Controllers.Identity
     [ApiController]
     public class IdentityAuthorization : XFrameworkControllerBase
     {
-        public IdentityAuthorization(IMediator mediator, IMapper mapper)
+        public IdentityAuthorization(IMediator mediator)
         {
             _mediator = mediator;
-            _mapper = mapper;
         }
         
         [HttpPost]

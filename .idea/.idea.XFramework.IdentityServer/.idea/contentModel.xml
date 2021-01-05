@@ -37,9 +37,6 @@
         <e p="WeatherForecast.cs" t="Include" />
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Core" t="IncludeRecursive">
-        <e p="AutoMapper" t="Include">
-          <e p="AutoMapping.cs" t="Include" />
-        </e>
         <e p="bin" t="ExcludeRecursive" />
         <e p="DataAccess" t="Include">
           <e p="Commands" t="Include">

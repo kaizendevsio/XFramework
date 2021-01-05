@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using AutoMapper;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using MediatR;
@@ -12,10 +11,9 @@ namespace IdentityServer.Api.Controllers.Identity
     [ApiController]
     public class IdentityController : XFrameworkControllerBase
     {
-        public IdentityController(IMediator mediator, IMapper mapper)
+        public IdentityController(IMediator mediator)
         {
             _mediator = mediator;
-            _mapper = mapper;
         }
 
         [HttpGet("All")]
