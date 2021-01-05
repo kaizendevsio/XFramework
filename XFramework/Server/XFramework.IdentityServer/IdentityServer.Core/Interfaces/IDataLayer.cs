@@ -30,31 +30,31 @@ namespace IdentityServer.Core.Interfaces
         public void RollBack();
         public List<AuditEntry> OnBeforeSaveChanges();
         
-        public virtual DbSet<TblAddressBarangay> TblAddressBarangays { get; set; }
-        public virtual DbSet<TblAddressCity> TblAddressCities { get; set; }
-        public virtual DbSet<TblAddressCountry> TblAddressCountries { get; set; }
-        public virtual DbSet<TblAddressProvince> TblAddressProvinces { get; set; }
-        public virtual DbSet<TblAddressRegion> TblAddressRegions { get; set; }
-        public virtual DbSet<TblApplication> TblApplications { get; set; }
-        public virtual DbSet<TblAuditField> TblAuditFields { get; set; }
-        public virtual DbSet<TblAuditHistory> TblAuditHistories { get; set; }
-        public virtual DbSet<TblAuthorizationLog> TblAuthorizationLogs { get; set; }
-        public virtual DbSet<TblConfiguration> TblConfigurations { get; set; }
-        public virtual DbSet<TblCurrencyEntity> TblCurrencyEntities { get; set; }
-        public virtual DbSet<TblEnterprise> TblEnterprises { get; set; }
-        public virtual DbSet<TblExchangeRate> TblExchangeRates { get; set; }
-        public virtual DbSet<TblIdentityAddress> TblIdentityAddresses { get; set; }
-        public virtual DbSet<TblIdentityAddressEntity> TblIdentityAddressEntities { get; set; }
-        public virtual DbSet<TblIdentityContact> TblIdentityContacts { get; set; }
-        public virtual DbSet<TblIdentityContactEntity> TblIdentityContactEntities { get; set; }
-        public virtual DbSet<TblIdentityCredential> TblIdentityCredentials { get; set; }
-        public virtual DbSet<TblIdentityInfo> TblIdentityInfos { get; set; }
-        public virtual DbSet<TblIdentityRole> TblIdentityRoles { get; set; }
-        public virtual DbSet<TblIdentityRoleEntity> TblIdentityRoleEntities { get; set; }
-        public virtual DbSet<TblIdentityVerification> TblIdentityVerifications { get; set; }
-        public virtual DbSet<TblIdentityVerificationEntity> TblIdentityVerificationEntities { get; set; }
-        public virtual DbSet<TblLog> TblLogs { get; set; }
-        public virtual DbSet<TblSessionDatum> TblSessionData { get; set; }
-        public virtual DbSet<TblSessionEntity> TblSessionEntities { get; set; }
+        public DbSet<TblAddressBarangay> TblAddressBarangays { get; set; }
+        public DbSet<TblAddressCity> TblAddressCities { get; set; }
+        public DbSet<TblAddressCountry> TblAddressCountries { get; set; }
+        public DbSet<TblAddressProvince> TblAddressProvinces { get; set; }
+        public DbSet<TblAddressRegion> TblAddressRegions { get; set; }
+        public DbSet<TblApplication> TblApplications { get; set; }
+        public DbSet<TblAuditField> TblAuditFields { get; set; }
+        public DbSet<TblAuditHistory> TblAuditHistories { get; set; }
+        public DbSet<TblAuthorizationLog> TblAuthorizationLogs { get; set; }
+        public DbSet<TblConfiguration> TblConfigurations { get; set; }
+        public DbSet<TblCurrencyEntity> TblCurrencyEntities { get; set; }
+        public DbSet<TblEnterprise> TblEnterprises { get; set; }
+        public DbSet<TblExchangeRate> TblExchangeRates { get; set; }
+        public DbSet<TblIdentityAddress> TblIdentityAddresses { get; set; }
+        public DbSet<TblIdentityAddressEntity> TblIdentityAddressEntities { get; set; }
+        public DbSet<TblIdentityContact> TblIdentityContacts { get; set; }
+        public DbSet<TblIdentityContactEntity> TblIdentityContactEntities { get; set; }
+        public DbSet<TblIdentityCredential> TblIdentityCredentials { get; set; }
+        public DbSet<TblIdentityInfo> TblIdentityInfos { get; set; }
+        public DbSet<TblIdentityRole> TblIdentityRoles { get; set; }
+        public DbSet<TblIdentityRoleEntity> TblIdentityRoleEntities { get; set; }
+        public DbSet<TblIdentityVerification> TblIdentityVerifications { get; set; }
+        public DbSet<TblIdentityVerificationEntity> TblIdentityVerificationEntities { get; set; }
+        public DbSet<TblLog> TblLogs { get; set; }
+        public DbSet<TblSessionDatum> TblSessionData { get; set; }
+        public DbSet<TblSessionEntity> TblSessionEntities { get; set; }
     }
 }
