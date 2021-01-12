@@ -119,7 +119,7 @@
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
-        <e p="BusinessObject" t="Include">
+        <e p="BusinessObjects" t="Include">
           <e p="ApiStatusBO.cs" t="Include" />
           <e p="AuditEntry.cs" t="Include" />
           <e p="CmdResponseBO.cs" t="Include" />

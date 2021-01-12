@@ -1,4 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObject;
+﻿using IdentityServer.Domain.BusinessObjects;
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity
 {

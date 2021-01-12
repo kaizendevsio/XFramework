@@ -1,5 +1,5 @@
 ﻿using System;
-using IdentityServer.Domain.BusinessObject;
+using IdentityServer.Domain.BusinessObjects;
 using MediatR;
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity

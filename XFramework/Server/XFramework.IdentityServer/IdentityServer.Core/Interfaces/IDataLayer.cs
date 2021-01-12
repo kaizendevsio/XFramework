@@ -2,7 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
-using IdentityServer.Domain.BusinessObject;
+using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.DataTableObject;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;

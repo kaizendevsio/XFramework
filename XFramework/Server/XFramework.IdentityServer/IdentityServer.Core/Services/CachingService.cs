@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObject;
+using IdentityServer.Domain.BusinessObjects;
 
 namespace IdentityServer.Core.Services
 {

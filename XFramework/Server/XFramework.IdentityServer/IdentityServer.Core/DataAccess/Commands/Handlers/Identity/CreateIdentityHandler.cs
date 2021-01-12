@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObject;
+using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.DataTableObject;
 using Mapster;
 using MediatR;
@@ -12,7 +12,6 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
 {
     public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateIdentityCmd,CmdResponseBO<CreateIdentityCmd>>
     {
-
         public CreateIdentityHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;

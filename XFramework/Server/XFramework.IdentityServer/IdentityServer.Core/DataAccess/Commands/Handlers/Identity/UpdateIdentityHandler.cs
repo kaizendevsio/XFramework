@@ -9,7 +9,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using IdentityServer.Domain.BusinessObject;
+using IdentityServer.Domain.BusinessObjects;
 using Mapster;
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity

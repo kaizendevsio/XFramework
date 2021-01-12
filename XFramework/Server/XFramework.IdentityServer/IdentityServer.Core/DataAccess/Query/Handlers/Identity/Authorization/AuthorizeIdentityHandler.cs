@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObject;
+using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.Contracts;
 using IdentityServer.Domain.DataTableObject;
 using IdentityServer.Domain.Enums;
