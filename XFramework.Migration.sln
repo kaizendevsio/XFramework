@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Application", "Application", "{BC648602-A9E9-466E-A840-699D30D40EC9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Domain", "Domain", "{2F98A9E5-3E7A-4BEB-82AC-A8DA462108B8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Core", "XFramework\Server\XFramework.Migration\XFramework.Core\XFramework.Core.csproj", "{37AEF2F7-32A5-42A2-8D6B-0134ECE4536C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain", "XFramework\Server\XFramework.Migration\XFramework.Domain\XFramework.Domain.csproj", "{10EA4DB8-FC16-49F6-AA1F-EFC09DCD6CE3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{37AEF2F7-32A5-42A2-8D6B-0134ECE4536C} = {BC648602-A9E9-466E-A840-699D30D40EC9}
+		{10EA4DB8-FC16-49F6-AA1F-EFC09DCD6CE3} = {2F98A9E5-3E7A-4BEB-82AC-A8DA462108B8}
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{37AEF2F7-32A5-42A2-8D6B-0134ECE4536C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{37AEF2F7-32A5-42A2-8D6B-0134ECE4536C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{37AEF2F7-32A5-42A2-8D6B-0134ECE4536C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{37AEF2F7-32A5-42A2-8D6B-0134ECE4536C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10EA4DB8-FC16-49F6-AA1F-EFC09DCD6CE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10EA4DB8-FC16-49F6-AA1F-EFC09DCD6CE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10EA4DB8-FC16-49F6-AA1F-EFC09DCD6CE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10EA4DB8-FC16-49F6-AA1F-EFC09DCD6CE3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

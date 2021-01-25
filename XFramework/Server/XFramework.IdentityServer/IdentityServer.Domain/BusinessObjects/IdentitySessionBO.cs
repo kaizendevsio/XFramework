@@ -6,6 +6,7 @@ namespace IdentityServer.Domain.BusinessObjects
 {
     public class IdentitySessionBO
     {
+        public string Token { get; set; }
         public Guid Guid { get; set; }
         public DateTime LogonDateTime { get; set; }
         public TimeSpan MaxSessionTimeSpan { get; set; }

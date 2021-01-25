@@ -45,7 +45,9 @@
               <e p="CommandBaseEntity.cs" t="Include" />
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
-                <e p="Authorization" t="Include" />
+                <e p="Authorization" t="Include">
+                  <e p="CreateAuthorizeIdentityCmd.cs" t="Include" />
+                </e>
                 <e p="CreateIdentityCmd.cs" t="Include" />
                 <e p="DeleteIdentityCmd.cs" t="Include" />
                 <e p="UpdateIdentityCmd.cs" t="Include" />
@@ -56,7 +58,9 @@
               <e p="CommandBaseHandler.cs" t="Include" />
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
-                <e p="Authorization" t="Include" />
+                <e p="Authorization" t="Include">
+                  <e p="CreateAuthorizeIdentityHandler.cs" t="Include" />
+                </e>
                 <e p="CreateIdentityHandler.cs" t="Include" />
                 <e p="DeleteIdentityHandler.cs" t="Include" />
                 <e p="UpdateIdentityHandler.cs" t="Include" />
@@ -101,6 +105,7 @@
         <e p="Interfaces" t="Include">
           <e p="ICachingService.cs" t="Include" />
           <e p="IDataLayer.cs" t="Include" />
+          <e p="IHelperService.cs" t="Include" />
         </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
@@ -110,10 +115,11 @@
           </e>
         </e>
         <e p="PipelineBehaviors" t="Include">
-          <e p="ValidationBehavior.cs" t="Include" />
+          <e p="BasePipelineBehavior.cs" t="Include" />
         </e>
         <e p="Services" t="Include">
           <e p="CachingService.cs" t="Include" />
+          <e p="HelperService.cs" t="Include" />
         </e>
         <e p="Validations" t="Include" />
       </e>
@@ -129,10 +135,11 @@
           <e p="RequestServerBO.cs" t="Include" />
         </e>
         <e p="Contracts" t="Include">
+          <e p="AuthorizeIdentityContract.cs" t="Include" />
           <e p="GetApplicationListContract.cs" t="Include" />
           <e p="GetIdentityContract.cs" t="Include" />
         </e>
-        <e p="DataTableObject" t="Include">
+        <e p="DataTableObjects" t="Include">
           <e p="TblAddressBarangay.cs" t="Include" />
           <e p="TblAddressCity.cs" t="Include" />
           <e p="TblAddressCountry.cs" t="Include" />
@@ -191,6 +198,31 @@
             </e>
           </e>
         </e>
+      </e>
+      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Stream" t="IncludeRecursive">
+        <e p="appsettings.Development.json" t="Include" />
+        <e p="appsettings.json" t="Include" />
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Controllers" t="Include">
+          <e p="WeatherForecastController.cs" t="Include" />
+        </e>
+        <e p="IdentityServer.Stream.csproj" t="IncludeRecursive" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Stream.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="Program.cs" t="Include" />
+        <e p="Properties" t="Include">
+          <e p="launchSettings.json" t="Include" />
+        </e>
+        <e p="SignalR" t="Include">
+          <e p="Hubs" t="Include" />
+        </e>
+        <e p="Startup.cs" t="Include" />
+        <e p="WeatherForecast.cs" t="Include" />
       </e>
       <e p="XFramework.IdentityServer.sln" t="IncludeFlat" />
     </e>

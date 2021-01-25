@@ -6,5 +6,6 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers
     {
         public IDataLayer _dataLayer;
         public ICachingService _cachingService;
+        public IHelperService _helperService;
     }
 }

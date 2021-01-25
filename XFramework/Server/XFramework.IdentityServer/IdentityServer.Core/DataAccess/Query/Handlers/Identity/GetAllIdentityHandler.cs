@@ -7,7 +7,6 @@ using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.Contracts;
-using IdentityServer.Domain.DataTableObject;
 using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +27,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
                 return new QueryResponseBO<List<GetIdentityContract>>()
                 {
                     Message = $"No identity exist",
-                    HttpStatusCode = HttpStatusCode.NotFound
+                    HttpStatusCode = HttpStatusCode.NoContent
                 };
             }
 

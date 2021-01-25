@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.DataTableObject;
+using IdentityServer.Domain.DataTableObjects;
 using Mapster;
 using MediatR;
 

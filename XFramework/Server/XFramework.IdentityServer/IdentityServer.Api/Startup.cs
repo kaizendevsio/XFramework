@@ -9,7 +9,7 @@ using IdentityServer.Core.DataAccess.Commands.Handlers;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Core.PipelineBehaviors;
 using IdentityServer.Core.Services;
-using IdentityServer.Domain.DataTableObject;
+using IdentityServer.Domain.DataTableObjects;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -40,9 +40,10 @@ namespace IdentityServer.Api
             services.AddDbContext<XFrameworkContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
             services.AddScoped<IDataLayer, DataLayer>();
             services.AddSingleton<ICachingService, CachingService>();
+            services.AddSingleton<IHelperService, HelperService>();
             services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
             services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
-            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo {Title = "IdentityServer.Api", Version = "v1"});

@@ -7,7 +7,6 @@ using IdentityServer.Core.DataAccess.Query.Entity.Application;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.Contracts;
-using IdentityServer.Domain.DataTableObject;
 using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
