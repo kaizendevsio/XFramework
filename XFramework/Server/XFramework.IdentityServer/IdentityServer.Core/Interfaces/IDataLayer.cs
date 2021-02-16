@@ -48,7 +48,7 @@ namespace IdentityServer.Core.Interfaces
         public DbSet<TblIdentityContact> TblIdentityContacts { get; set; }
         public DbSet<TblIdentityContactEntity> TblIdentityContactEntities { get; set; }
         public DbSet<TblIdentityCredential> TblIdentityCredentials { get; set; }
-        public DbSet<TblIdentityInfo> TblIdentityInfos { get; set; }
+        public DbSet<TblIdentityInformation> TblIdentityInformations { get; set; }
         public DbSet<TblIdentityRole> TblIdentityRoles { get; set; }
         public DbSet<TblIdentityRoleEntity> TblIdentityRoleEntities { get; set; }
         public DbSet<TblIdentityVerification> TblIdentityVerifications { get; set; }

@@ -17,15 +17,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
 {
-    public class AuthorizeIdentityHandler : QueryBaseHandler, IRequestHandler<AuthorizeIdentityQuery, QueryResponseBO<AuthorizeIdentityContract>>
+    public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<AuthenticateIdentityQuery, QueryResponseBO<AuthorizeIdentityContract>>
     {
-        public AuthorizeIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService)
+        public AuthenticateIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService)
         {
             _helperService = helperService;
             _dataLayer = dataLayer;
             _cachingService = cachingService;
         }
-        public async Task<QueryResponseBO<AuthorizeIdentityContract>> Handle(AuthorizeIdentityQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponseBO<AuthorizeIdentityContract>> Handle(AuthenticateIdentityQuery request, CancellationToken cancellationToken)
         {
             TblIdentityCredential result = null;
             var authorizeBy = request.AuthorizeBy;
@@ -95,7 +95,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
             }
 
             // Add token to caching server
-            var identitySession = _cachingService.IdentitySessions.FirstOrDefault(i => i.Guid == Guid.Parse(result.IdentityInfo.Uid));
+            var identitySession = _cachingService.IdentitySessions.FirstOrDefault(i => i.Guid == Guid.Parse(result.IdentityInfo.Uuid));
 
             _cachingService.IdentitySessions.Remove(identitySession);
             _cachingService.IdentitySessions.Add(new IdentitySessionBO()

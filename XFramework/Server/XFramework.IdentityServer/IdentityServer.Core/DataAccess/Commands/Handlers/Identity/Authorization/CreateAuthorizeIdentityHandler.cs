@@ -21,7 +21,7 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Authorizatio
         }
         public async Task<CmdResponseBO<CreateAuthorizeIdentityCmd>> Handle(CreateAuthorizeIdentityCmd request, CancellationToken cancellationToken)
         {
-            var identityInfo = await _dataLayer.TblIdentityInfos.FirstOrDefaultAsync(i => i.Uid == request.Uid.ToString(), cancellationToken: cancellationToken);
+            var identityInfo = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Uuid == request.Uid.ToString(), cancellationToken: cancellationToken);
             var entity = request.Adapt<TblIdentityCredential>();
             
             SHA512 shaM = new SHA512Managed();

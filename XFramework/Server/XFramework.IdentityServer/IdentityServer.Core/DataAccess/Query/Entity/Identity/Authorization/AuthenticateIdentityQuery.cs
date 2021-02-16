@@ -5,7 +5,7 @@ using MediatR;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization
 {
-    public class AuthorizeIdentityQuery : QueryBaseEntity, IRequest<QueryResponseBO<AuthorizeIdentityContract>>
+    public class AuthenticateIdentityQuery : QueryBaseEntity, IRequest<QueryResponseBO<AuthorizeIdentityContract>>
     {
         public string Username { get; set; }
         public string Password { get; set; }

@@ -22,7 +22,7 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
         }
         public async Task<CmdResponseBO<UpdateIdentityCmd>> Handle(UpdateIdentityCmd request, CancellationToken cancellationToken)
         {
-            var entity = await _dataLayer.TblIdentityInfos.FirstOrDefaultAsync(i => i.Uid == request.Uid.ToString(), cancellationToken);
+            var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Uuid == request.Uid.ToString(), cancellationToken);
 
             if (entity == null)
             {

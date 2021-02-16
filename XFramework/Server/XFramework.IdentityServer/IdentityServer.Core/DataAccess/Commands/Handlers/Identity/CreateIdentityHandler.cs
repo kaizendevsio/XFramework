@@ -18,10 +18,10 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
         }
         public async Task<CmdResponseBO<CreateIdentityCmd>> Handle(CreateIdentityCmd request, CancellationToken cancellationToken)
         {
-            var entity = request.Adapt<TblIdentityInfo>();
-            entity.Uid = Guid.NewGuid().ToString();
+            var entity = request.Adapt<TblIdentityInformation>();
+            entity.Uuid = Guid.NewGuid().ToString();
             
-            await _dataLayer.TblIdentityInfos.AddAsync(entity, cancellationToken);
+            await _dataLayer.TblIdentityInformations.AddAsync(entity, cancellationToken);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
             return new();

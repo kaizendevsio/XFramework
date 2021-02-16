@@ -7,11 +7,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityServer.Api.Controllers.Identity
 {
-    [Route("Api/[controller]")]
+    [Route("Api/Identity/[controller]")]
     [ApiController]
-    public class IdentityController : XFrameworkControllerBase
+    public class InformationController : XFrameworkControllerBase
     {
-        public IdentityController(IMediator mediator)
+        public InformationController(IMediator mediator)
         {
             _mediator = mediator;
         }

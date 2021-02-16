@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 #nullable disable
 
@@ -33,7 +35,7 @@ namespace IdentityServer.Domain.DataTableObjects
         public virtual DbSet<TblIdentityContact> TblIdentityContacts { get; set; }
         public virtual DbSet<TblIdentityContactEntity> TblIdentityContactEntities { get; set; }
         public virtual DbSet<TblIdentityCredential> TblIdentityCredentials { get; set; }
-        public virtual DbSet<TblIdentityInfo> TblIdentityInfos { get; set; }
+        public virtual DbSet<TblIdentityInformation> TblIdentityInformations { get; set; }
         public virtual DbSet<TblIdentityRole> TblIdentityRoles { get; set; }
         public virtual DbSet<TblIdentityRoleEntity> TblIdentityRoleEntities { get; set; }
         public virtual DbSet<TblIdentityVerification> TblIdentityVerifications { get; set; }
@@ -538,11 +540,11 @@ namespace IdentityServer.Domain.DataTableObjects
                     .HasConstraintName("tbl_identitycredentials_fk");
             });
 
-            modelBuilder.Entity<TblIdentityInfo>(entity =>
+            modelBuilder.Entity<TblIdentityInformation>(entity =>
             {
-                entity.ToTable("tbl_IdentityInfo", "Identity");
+                entity.ToTable("tbl_IdentityInformation", "Identity");
 
-                entity.HasIndex(e => e.Uid, "tbl_userinfo_un")
+                entity.HasIndex(e => e.Uuid, "tbl_userinfo_un")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -550,38 +552,30 @@ namespace IdentityServer.Domain.DataTableObjects
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L, null, null);
 
-                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.BirthDate).HasColumnType("date");
 
-                entity.Property(e => e.Dob)
-                    .HasColumnType("date")
-                    .HasColumnName("DOB");
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
 
                 entity.Property(e => e.FirstName)
                     .IsRequired()
                     .HasMaxLength(100);
 
-                entity.Property(e => e.IdentityDescription)
-                    .IsRequired()
-                    .HasMaxLength(100);
+                entity.Property(e => e.IdentityDescription).HasMaxLength(100);
 
-                entity.Property(e => e.IdentityName)
-                    .IsRequired()
-                    .HasMaxLength(100);
+                entity.Property(e => e.IdentityName).HasMaxLength(100);
 
                 entity.Property(e => e.LastName)
                     .IsRequired()
                     .HasMaxLength(100);
 
-                entity.Property(e => e.MiddleName)
-                    .IsRequired()
-                    .HasMaxLength(100);
+                entity.Property(e => e.MiddleName).HasMaxLength(100);
 
                 entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
 
-                entity.Property(e => e.Uid)
+                entity.Property(e => e.Uuid)
                     .IsRequired()
                     .HasMaxLength(500)
-                    .HasColumnName("UID");
+                    .HasColumnName("UUID");
             });
 
             modelBuilder.Entity<TblIdentityRole>(entity =>

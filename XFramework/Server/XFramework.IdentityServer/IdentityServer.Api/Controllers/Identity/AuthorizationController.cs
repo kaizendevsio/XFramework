@@ -10,21 +10,21 @@ namespace IdentityServer.Api.Controllers.Identity
 {
     [Route("Api/Identity/Authorization")]
     [ApiController]
-    public class IdentityAuthorization : XFrameworkControllerBase
+    public class AuthorizationController : XFrameworkControllerBase
     {
-        public IdentityAuthorization(IMediator mediator)
+        public AuthorizationController(IMediator mediator)
         {
             _mediator = mediator;
         }
       
-        [HttpPost]
-        public async Task<JsonResult> Post([FromBody] AuthorizeIdentityQuery request)
+        [HttpPost("Authenticate")]
+        public async Task<JsonResult> Post([FromBody] AuthenticateIdentityQuery request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
         
-        [HttpPost("Create")]
+        [HttpPost]
         public async Task<JsonResult> PostCreate([FromBody] CreateAuthorizeIdentityCmd request)
         {
             var result = await _mediator.Send(request);

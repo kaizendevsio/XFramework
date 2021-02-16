@@ -15,8 +15,8 @@
             <e p="ApplicationController.cs" t="Include" />
           </e>
           <e p="Identity" t="Include">
-            <e p="IdentityAuthorization.cs" t="Include" />
-            <e p="IdentityController.cs" t="Include" />
+            <e p="AuthorizationController.cs" t="Include" />
+            <e p="InformationController.cs" t="Include" />
           </e>
           <e p="StartupController.cs" t="Include" />
           <e p="XFrameworkControllerBase.cs" t="Include" />
@@ -47,6 +47,8 @@
               <e p="Identity" t="Include">
                 <e p="Authorization" t="Include">
                   <e p="CreateAuthorizeIdentityCmd.cs" t="Include" />
+                  <e p="DeleteAuthorizeIdentityCmd.cs" t="Include" />
+                  <e p="UpdateAuthorizeIdentityCmd.cs" t="Include" />
                 </e>
                 <e p="CreateIdentityCmd.cs" t="Include" />
                 <e p="DeleteIdentityCmd.cs" t="Include" />
@@ -60,6 +62,7 @@
               <e p="Identity" t="Include">
                 <e p="Authorization" t="Include">
                   <e p="CreateAuthorizeIdentityHandler.cs" t="Include" />
+                  <e p="DeleteAuthorizeIdentityHandler.cs" t="Include" />
                 </e>
                 <e p="CreateIdentityHandler.cs" t="Include" />
                 <e p="DeleteIdentityHandler.cs" t="Include" />
@@ -77,7 +80,7 @@
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
                 <e p="Authorization" t="Include">
-                  <e p="AuthorizeIdentityQuery.cs" t="Include" />
+                  <e p="AuthenticateIdentityQuery.cs" t="Include" />
                 </e>
                 <e p="GetAllIdentityQuery.cs" t="Include" />
                 <e p="GetIdentityQuery.cs" t="Include" />
@@ -91,7 +94,7 @@
               <e p="Events" t="Include" />
               <e p="Identity" t="Include">
                 <e p="Authorization" t="Include">
-                  <e p="AuthorizeIdentityHandler.cs" t="Include" />
+                  <e p="AuthenticateIdentityHandler.cs" t="Include" />
                 </e>
                 <e p="GetAllIdentityHandler.cs" t="Include" />
                 <e p="GetIdentityHandler.cs" t="Include" />
@@ -161,6 +164,7 @@
           <e p="TblIdentityContactEntity.cs" t="Include" />
           <e p="TblIdentityCredential.cs" t="Include" />
           <e p="TblIdentityInfo.cs" t="Include" />
+          <e p="TblIdentityInformation.cs" t="Include" />
           <e p="TblIdentityRole.cs" t="Include" />
           <e p="TblIdentityRoleEntity.cs" t="Include" />
           <e p="TblIdentityVerification.cs" t="Include" />
@@ -228,7 +232,5 @@
     </e>
     <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
     <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\resharper-host\local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\consoles\db" t="IncludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\extensions" t="IncludeRecursive" />
   </component>
 </project>

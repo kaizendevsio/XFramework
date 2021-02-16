@@ -32,7 +32,7 @@ namespace IdentityServer.Domain.DataTableObjects
         public string Token { get; set; }
 
         public virtual TblApplication Application { get; set; }
-        public virtual TblIdentityInfo IdentityInfo { get; set; }
+        public virtual TblIdentityInformation IdentityInfo { get; set; }
         public virtual ICollection<TblAuthorizationLog> TblAuthorizationLogs { get; set; }
         public virtual ICollection<TblIdentityContact> TblIdentityContacts { get; set; }
         public virtual ICollection<TblIdentityRole> TblIdentityRoles { get; set; }

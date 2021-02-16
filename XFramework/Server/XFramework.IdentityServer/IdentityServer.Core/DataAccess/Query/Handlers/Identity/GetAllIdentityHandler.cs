@@ -21,7 +21,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
         }
         public async Task<QueryResponseBO<List<GetIdentityContract>>> Handle(GetAllIdentityQuery request, CancellationToken cancellationToken)
         {
-            var result = await _dataLayer.TblIdentityInfos.ToListAsync(cancellationToken: cancellationToken);
+            var result = await _dataLayer.TblIdentityInformations.ToListAsync(cancellationToken: cancellationToken);
             if (!result.Any())
             {
                 return new QueryResponseBO<List<GetIdentityContract>>()

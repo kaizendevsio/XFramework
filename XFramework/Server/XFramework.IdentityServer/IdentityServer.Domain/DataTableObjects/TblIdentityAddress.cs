@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 #nullable disable
 
@@ -30,7 +31,7 @@ namespace IdentityServer.Domain.DataTableObjects
         public virtual TblAddressBarangay BarangayNavigation { get; set; }
         public virtual TblAddressCity CityNavigation { get; set; }
         public virtual TblAddressCountry CountryNavigation { get; set; }
-        public virtual TblIdentityInfo IdentityInfo { get; set; }
+        public virtual TblIdentityInformation IdentityInfo { get; set; }
         public virtual TblAddressProvince ProvinceNavigation { get; set; }
         public virtual TblAddressRegion RegionNavigation { get; set; }
     }
