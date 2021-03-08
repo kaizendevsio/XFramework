@@ -1,0 +1,36 @@
+﻿@page "/Client/Session/AccountSwitcher"
+@layout SessionLayout
+
+<div class="row">
+    <div class="animate__animated animate__zoomIn d-inline-block col-2  d-md-none d-sm-block">
+        <img src="https://retailer.loadmanna.ph/assets/common/img/app_logo.png" width="64px" alt="Loading" class="mx-auto">
+    </div>
+
+    <div class="d-inline-block col-10">
+        <h3 class="animate__animated animate__faster animate__fadeInUp">Choose an account</h3>
+        <p class="animate__animated animate__faster animate__fadeInUp" style="animation-delay: 0.5s;">to continue to @AppLink</p>
+    </div>
+</div>
+
+<div class="py-3">
+    <AvatarComponent Name="Jay Eraldo" AvatarImage="https://www.w3schools.com/howto/img_avatar.png"/>
+    <AvatarComponent Name="Alvier" AvatarImage="https://www.w3schools.com/w3images/avatar2.png"/>
+    <AvatarComponent Name="Wilben" AvatarImage="https://www.w3schools.com/w3images/avatar6.png"/>
+</div>
+
+<hr>
+<div class="mb-3">
+    <h6>Other options</h6>
+    <a href="/Client/Session/SignIn" class="btn shadow-sm btn-block btn-light rounded-lg"><i class="fab fa-google mr-2"></i> Sign In to another account</a>
+    <a href="/Client/Session/Signup" class="btn shadow-sm btn-block btn-light rounded-lg"><i class="fab fa-google mr-2"></i> Create new account</a>
+</div>
+
+<div>
+    <p class="text-muted">To continue, @AppName will share your name, email address, language preference, and profile picture with @AppLink. Before useing this app, you can review @AppLink's <a href="#">privacy policy</a> and <a href="#">terms of service</a>.</p>
+</div>
+
+
+@code {
+    public string AppName { get; set; } = "LoadManna";
+    public string AppLink { get; set; } = "MannaMall";
+}

@@ -63,6 +63,7 @@
                 <e p="Authorization" t="Include">
                   <e p="CreateAuthorizeIdentityHandler.cs" t="Include" />
                   <e p="DeleteAuthorizeIdentityHandler.cs" t="Include" />
+                  <e p="UpdateAuthorizeIdentityHandler.cs" t="Include" />
                 </e>
                 <e p="CreateIdentityHandler.cs" t="Include" />
                 <e p="DeleteIdentityHandler.cs" t="Include" />

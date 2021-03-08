@@ -3,37 +3,135 @@
   <component name="ContentModelStore">
     <e p="C:\Projects\Net Core\XFramework" t="IncludeFlat">
       <e p="packages" t="ExcludeRecursive" />
-      <e p="XFramework\Client\XFramework.Web" t="IncludeRecursive">
-        <e p="_Imports.razor" t="Include" />
-        <e p="App.razor" t="Include" />
+      <e p="XFramework\Client\XFramework.Identity.Shared" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
-        <e p="Models" t="Include">
-          <e p="PersonCallOut.cs" t="Include" />
+        <e p="Core" t="Include">
+          <e p="Cache" t="Include" />
+          <e p="Helpers" t="Include" />
+          <e p="Interfaces" t="Include">
+            <e p="IActivityHistoryService.cs" t="Include" />
+            <e p="IStateService.cs" t="Include" />
+          </e>
+          <e p="Services" t="Include">
+            <e p="HttpClientService.cs" t="Include" />
+            <e p="LoggingService.cs" t="Include" />
+            <e p="SecurityService.cs" t="Include" />
+            <e p="SessionService.cs" t="Include" />
+            <e p="StateService.cs" t="Include" />
+            <e p="StorageService.cs" t="Include" />
+          </e>
+        </e>
+        <e p="Entity" t="Include">
+          <e p="Components" t="Include" />
+          <e p="Enums" t="Include">
+            <e p="GenderEnum.cs" t="Include" />
+            <e p="ModalFooterButtons.cs" t="Include" />
+            <e p="ModalHeaderButtons.cs" t="Include" />
+            <e p="ModalSize.cs" t="Include" />
+          </e>
+          <e p="Properties" t="Include">
+            <e p="ActivityBase.cs" t="Include" />
+            <e p="ActivityBaseProp.cs" t="Include" />
+            <e p="ActivityHistoryProp.cs" t="Include" />
+            <e p="ActivityProp.cs" t="Include" />
+            <e p="ApplicationProp.cs" t="Include" />
+            <e p="BackButtonProp.cs" t="Include" />
+            <e p="BaseApiRequestProp.cs" t="Include" />
+            <e p="HttpRequestBaseProp.cs" t="Include" />
+            <e p="SideBarButtonProp.cs" t="Include" />
+            <e p="ThemeColorProp.cs" t="Include" />
+            <e p="TitleProp.cs" t="Include" />
+            <e p="ToolbarProp.cs" t="Include" />
+          </e>
+          <e p="Validations" t="Include">
+            <e p="BaseValidator.cs" t="Include" />
+            <e p="Profile" t="Include">
+              <e p="AccountInfoVmValidator.cs" t="Include" />
+              <e p="ChangePasswordVmValidator.cs" t="Include" />
+              <e p="PersonalInfoVmValidator.cs" t="Include" />
+              <e p="VerificationsVmValidator.cs" t="Include" />
+            </e>
+            <e p="Session" t="Include">
+              <e p="ForgotPasswordVmValidator.cs" t="Include" />
+              <e p="OtpVmValidator.cs" t="Include" />
+              <e p="SignInVmValidator.cs" t="Include" />
+              <e p="SignUpVmValidator.cs" t="Include" />
+            </e>
+            <e p="SystemLogVmValidator.cs" t="Include" />
+          </e>
+          <e p="ViewModels" t="Include">
+            <e p="Persistent" t="Include">
+              <e p="UserDataVm.cs" t="Include" />
+            </e>
+            <e p="Profile" t="Include">
+              <e p="AccountInfoVm.cs" t="Include" />
+              <e p="AddressInfoVm.cs" t="Include" />
+              <e p="ChangePasswordVm.cs" t="Include" />
+              <e p="IdTypeVm.cs" t="Include" />
+              <e p="PersonalInfoVm.cs" t="Include" />
+              <e p="VerificationsVm.cs" t="Include" />
+            </e>
+            <e p="System" t="Include">
+              <e p="SystemLogVm.cs" t="Include" />
+            </e>
+            <e p="User" t="Include">
+              <e p="Session" t="Include">
+                <e p="ForgotPasswordVm.cs" t="Include" />
+                <e p="OtpVm.cs" t="Include" />
+                <e p="SignInVm.cs" t="Include" />
+                <e p="SignUpVm.cs" t="Include" />
+              </e>
+            </e>
+            <e p="Wallets" t="Include">
+              <e p="WalletTransactionVm.cs" t="Include" />
+              <e p="WalletVm.cs" t="Include" />
+            </e>
+          </e>
         </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">
             <e p="net5.0" t="Include">
-              <e p="XFramework.Web.AssemblyInfo.cs" t="Include" />
+              <e p="XFramework.Identity.Shared.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="XFramework.Identity.Shared.csproj" t="IncludeRecursive" />
+      </e>
+      <e p="XFramework\Client\XFramework.Identity.Web" t="IncludeRecursive">
+        <e p="_Imports.razor" t="Include" />
+        <e p="App.razor" t="Include" />
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="XFramework.Identity.Web.AssemblyInfo.cs" t="Include" />
             </e>
           </e>
         </e>
         <e p="Pages" t="Include">
-          <e p="Counter.razor" t="Include" />
-          <e p="FetchData.razor" t="Include" />
-          <e p="Test1.razor" t="Include" />
-          <e p="Test2.razor" t="Include" />
-          <e p="Test3.razor" t="Include" />
+          <e p="Client" t="Include">
+            <e p="Session" t="Include">
+              <e p="AccountSwitcher.razor" t="Include" />
+              <e p="SignIn.razor" t="Include" />
+              <e p="SignIn.razor.cs" t="Include" />
+              <e p="SignUp.razor" t="Include" />
+              <e p="SignUp.razor.cs" t="Include" />
+            </e>
+          </e>
+          <e p="Index.razor" t="Include" />
         </e>
         <e p="Program.cs" t="Include" />
         <e p="Properties" t="Include">
           <e p="launchSettings.json" t="Include" />
         </e>
         <e p="Shared" t="Include">
-          <e p="MainLayout.razor" t="Include" />
-          <e p="MainLayout.razor.css" t="Include" />
-          <e p="NavMenu.razor" t="Include" />
-          <e p="NavMenu.razor.css" t="Include" />
-          <e p="SurveyPrompt.razor" t="Include" />
+          <e p="Components" t="Include">
+            <e p="AvatarComponent.razor" t="Include" />
+          </e>
+          <e p="Layouts" t="Include">
+            <e p="MainLayout.razor" t="Include" />
+            <e p="SessionLayout.razor" t="Include" />
+          </e>
         </e>
         <e p="wwwroot" t="Include">
           <e p="css" t="Include">
@@ -66,13 +164,12 @@
             <e p="weather.json" t="Include" />
           </e>
         </e>
-        <e p="XFramework.Web.csproj" t="IncludeRecursive" />
+        <e p="XFramework.Identity.Web.csproj" t="IncludeRecursive" />
       </e>
       <e p="XFramework.Client.sln" t="IncludeFlat" />
     </e>
     <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
     <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.3\resharper-host\Local\Transient\Rider\v203\SolutionCaches\_XFramework.Client.1408045358.00" t="ExcludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\consoles\db" t="IncludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\extensions" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Roaming\JetBrains\Rider2020.3\javascript\extLibs\http_cdnjs.cloudflare.com_ajax_libs_animate.css_4.1.1_animate.css" t="IncludeRecursive" />
   </component>
 </project>

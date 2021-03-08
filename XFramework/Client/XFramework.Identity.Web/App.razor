@@ -1,0 +1,10 @@
+<Router AppAssembly="@typeof(Program).Assembly" PreferExactMatches="@true">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <p class="text-center text-muted" style="margin-top: 48vh"><b>404</b> | Resource does not exist</p>
+        </LayoutView>
+    </NotFound>
+</Router>

@@ -18,14 +18,28 @@ namespace IdentityServer.Api.Controllers.Identity
         }
       
         [HttpPost("Authenticate")]
-        public async Task<JsonResult> Post([FromBody] AuthenticateIdentityQuery request)
+        public async Task<JsonResult> Authenticate([FromBody] AuthenticateIdentityQuery request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
         
         [HttpPost]
-        public async Task<JsonResult> PostCreate([FromBody] CreateAuthorizeIdentityCmd request)
+        public async Task<JsonResult> Post([FromBody] CreateAuthorizeIdentityCmd request)
+        {
+            var result = await _mediator.Send(request);
+            return new JsonResult(result);
+        }
+     
+        [HttpPut]
+        public async Task<JsonResult> Put([FromBody] UpdateAuthorizeIdentityCmd request)
+        {
+            var result = await _mediator.Send(request);
+            return new JsonResult(result);
+        }
+        
+        [HttpDelete]
+        public async Task<JsonResult> Delete([FromBody] DeleteAuthorizeIdentityCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);

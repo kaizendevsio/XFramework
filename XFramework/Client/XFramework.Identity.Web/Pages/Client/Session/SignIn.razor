@@ -1,0 +1,50 @@
+﻿@page "/Client/Session/SignIn"
+@inherits SignInBase
+@layout SessionLayout
+<div class="animate__animated animate__fadeIn">
+
+<div class="row">
+    <div class="animate__animated animate__zoomIn d-inline-block col-2  d-md-none d-sm-block">
+        <img src="https://retailer.loadmanna.ph/assets/common/img/app_logo.png" width="64px" alt="Loading" class="mx-auto">
+    </div>
+
+    <div class="d-inline-block col-10">
+        <h3 class="animate__animated animate__faster animate__fadeInUp">Sign In Jay</h3>
+        <p class="animate__animated animate__faster animate__fadeInUp" style="animation-delay: 0.5s;">to continue to @AppLink</p>
+    </div>
+</div>
+
+  <EditForm class="form-signin" Model="SignInVm" OnValidSubmit="() => SessionService.SignIn(SignInVm)">
+    <div class="form-floating mb-3">
+      <InputText class="form-control" type="text" id="inputUsername" autocomplete="off" placeholder="Username" @bind-Value="SignInVm.Username" bind:event="oninput"/>
+      <label for="inputUsername">Username</label>
+      <div class="text-danger">
+        <ValidationMessage For="() => SignInVm.Username"></ValidationMessage>
+      </div>
+    </div>
+
+    <div class="form-floating">
+      <InputText class="form-control" type="password" id="inputPassword" autocomplete="off" placeholder="Passowrd" @bind-Value="SignInVm.Username" bind:event="oninput"/>
+      <label for="inputPassword">Password</label>
+      <div class="text-danger">
+        <ValidationMessage For="() => SignInVm.Username"></ValidationMessage>
+      </div>
+    </div>
+    <br>
+    <button class="btn btn-lg btn-primary btn-block text-uppercase" type="submit">Sign In</button>
+    
+    <p class="text-center mt-3">Don't have an account? <a href="/Client/Session/SignUp">Sign Up</a> instead</p>
+    @*<hr class="my-4">
+  <button class="btn btn-lg btn-google btn-block text-uppercase" type="submit"><i class="fab fa-google mr-2"></i> Sign up with Google</button>
+  <button class="btn btn-lg btn-facebook btn-block text-uppercase" type="submit"><i class="fab fa-facebook-f mr-2"></i> Sign up with Facebook</button>*@
+  </EditForm>
+
+  <div class="pt-2">
+    <p class="text-muted">Not your computer? Use a private browsing window to sign in <a href="#">Learn more</a>.</p>
+  </div>
+</div>
+
+
+@code {
+  public string AppLink { get; set; } = "MannaMall";
+}

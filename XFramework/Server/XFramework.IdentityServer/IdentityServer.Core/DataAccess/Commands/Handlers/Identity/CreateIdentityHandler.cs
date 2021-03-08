@@ -24,7 +24,7 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
             await _dataLayer.TblIdentityInformations.AddAsync(entity, cancellationToken);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
-            return new();
+           return new();
         }
     }
 }
