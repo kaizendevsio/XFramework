@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Authorization;
+using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
 using Mapster;
 using MediatR;
@@ -12,6 +13,10 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Authorizatio
 {
     public class UpdateAuthorizeIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateAuthorizeIdentityCmd, CmdResponseBO<UpdateAuthorizeIdentityCmd>>
     {
+        public UpdateAuthorizeIdentityHandler(IDataLayer dataLayer)
+        {
+            _dataLayer = dataLayer;
+        }
         public async Task<CmdResponseBO<UpdateAuthorizeIdentityCmd>> Handle(UpdateAuthorizeIdentityCmd request, CancellationToken cancellationToken)
         {
             var entity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.IdentityInfo.Uuid == request.Uid.ToString() & i.UserName == request.Username , cancellationToken);

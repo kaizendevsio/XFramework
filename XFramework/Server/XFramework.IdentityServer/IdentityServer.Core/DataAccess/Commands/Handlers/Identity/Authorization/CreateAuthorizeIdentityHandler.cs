@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,6 +24,15 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Authorizatio
         {
             var identityInfo = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Uuid == request.Uid.ToString(), cancellationToken: cancellationToken);
             var entity = request.Adapt<TblIdentityCredential>();
+            
+            if (identityInfo == null)
+            {
+                return new CmdResponseBO<CreateAuthorizeIdentityCmd>
+                {
+                    Message = $"Identity with UID {request.Uid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
             
             SHA512 shaM = new SHA512Managed();
             var passwordByte = Encoding.ASCII.GetBytes(request.PasswordString);

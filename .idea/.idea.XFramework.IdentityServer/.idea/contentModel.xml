@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ContentModelStore">
-    <e p="C:\Projects\Net Core\XFramework" t="IncludeFlat">
+    <e p="C:\Users\joven\AppData\local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\joven\AppData\local\JetBrains\Rider2020.3\resharper-host\local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.486044809.00" t="ExcludeRecursive" />
+    <e p="D:\Projects\XFramework" t="IncludeFlat">
       <e p="Application" t="Include" />
       <e p="Domain" t="Include" />
       <e p="packages" t="ExcludeRecursive" />
@@ -231,7 +233,5 @@
       </e>
       <e p="XFramework.IdentityServer.sln" t="IncludeFlat" />
     </e>
-    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\resharper-host\local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
   </component>
 </project>

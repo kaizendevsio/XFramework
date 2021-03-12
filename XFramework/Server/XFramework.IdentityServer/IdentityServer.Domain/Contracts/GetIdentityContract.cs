@@ -8,7 +8,7 @@ namespace IdentityServer.Domain.Contracts
         public long? CreatedBy { get; set; }
         public DateTime? ModifiedOn { get; set; }
         public long? ModifiedBy { get; set; }
-        public string Uid { get; set; }
+        public string Uuid { get; set; }
         public string FirstName { get; set; }
         public string MiddleName { get; set; }
         public string LastName { get; set; }

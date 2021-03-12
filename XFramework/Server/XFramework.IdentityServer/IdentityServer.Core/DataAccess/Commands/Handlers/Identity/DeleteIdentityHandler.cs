@@ -32,6 +32,15 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
                 };
             }
 
+            if (_dataLayer.TblIdentityCredentials.Any(i => i.IdentityInfoId == entity.Id))
+            {
+                return new CmdResponseBO<DeleteIdentityCmd>
+                {
+                    Message = $"Identity with UID {request.Uid} has existing credentials and cannot be deleted",
+                    HttpStatusCode = HttpStatusCode.Forbidden
+                };
+            }
+            
             _dataLayer.Remove(entity);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 

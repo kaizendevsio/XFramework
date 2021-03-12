@@ -40,7 +40,7 @@ namespace IdentityServer.Api.Controllers.Identity
         [HttpPut]
         public async Task<JsonResult> Put([FromBody] UpdateIdentityCmd request, Guid uid)
         {
-            request.Uid ??= uid;
+            request.Uuid = uid;
             var result = await _mediator.Send(request).ConfigureAwait(false);
             return new JsonResult(result);
         }

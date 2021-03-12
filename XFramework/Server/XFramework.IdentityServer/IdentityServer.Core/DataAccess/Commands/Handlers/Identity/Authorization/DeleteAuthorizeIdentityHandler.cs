@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Authorization;
+using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,10 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Authorizatio
 {
     public class DeleteAuthorizeIdentityHandler : CommandBaseHandler, IRequestHandler<DeleteAuthorizeIdentityCmd, CmdResponseBO<DeleteAuthorizeIdentityCmd>>
     {
+        public DeleteAuthorizeIdentityHandler(IDataLayer dataLayer)
+        {
+            _dataLayer = dataLayer;
+        }
         public async Task<CmdResponseBO<DeleteAuthorizeIdentityCmd>> Handle(DeleteAuthorizeIdentityCmd request, CancellationToken cancellationToken)
         {
             var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Uuid == request.Uid.ToString(), cancellationToken: cancellationToken);
