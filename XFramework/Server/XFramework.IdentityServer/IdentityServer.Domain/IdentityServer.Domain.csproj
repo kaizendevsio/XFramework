@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="DataTableObjects" />
+      <Folder Include="DataTransferObjects" />
       <Folder Include="Migrations" />
     </ItemGroup>
 

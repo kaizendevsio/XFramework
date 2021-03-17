@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.DataTableObjects;
+using IdentityServer.Domain.DataTransferObjects;
 using Microsoft.EntityFrameworkCore;
 
 namespace IdentityServer.Core.DataAccess
@@ -59,16 +59,16 @@ namespace IdentityServer.Core.DataAccess
             return result;
         }
 
-        public List<AuditEntry> OnBeforeSaveChanges()
+        public List<AuditEntryBO> OnBeforeSaveChanges()
         {
             ChangeTracker.DetectChanges();
-            var auditEntries = new List<AuditEntry>();
+            var auditEntries = new List<AuditEntryBO>();
             foreach (var entry in ChangeTracker.Entries())
             {
                 if (entry.Entity is TblAuditHistory || entry.State == EntityState.Detached || entry.State == EntityState.Unchanged)
                     continue;
 
-                var auditEntry = new AuditEntry(entry);
+                var auditEntry = new AuditEntryBO(entry);
                 auditEntry.TableName = entry.Metadata.GetTableName();
                 auditEntries.Add(auditEntry);
 
@@ -146,7 +146,7 @@ namespace IdentityServer.Core.DataAccess
             return auditEntries.Where(_ => _.HasTemporaryProperties).ToList();
         }
 
-        private int OnAfterSaveChanges(List<AuditEntry> auditEntries)
+        private int OnAfterSaveChanges(List<AuditEntryBO> auditEntries)
         {
             if (auditEntries == null || auditEntries.Count == 0)
                 return 1;

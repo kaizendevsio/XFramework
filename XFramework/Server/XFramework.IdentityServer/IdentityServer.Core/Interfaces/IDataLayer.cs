@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.DataTableObjects;
+using IdentityServer.Domain.DataTransferObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -28,7 +28,7 @@ namespace IdentityServer.Core.Interfaces
         public  void UpdateRange([NotNullAttribute] params object[] entities);
 
         public void RollBack();
-        public List<AuditEntry> OnBeforeSaveChanges();
+        public List<AuditEntryBO> OnBeforeSaveChanges();
         
         public DbSet<TblAddressBarangay> TblAddressBarangays { get; set; }
         public DbSet<TblAddressCity> TblAddressCities { get; set; }

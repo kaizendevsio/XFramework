@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.DataTableObjects;
+using IdentityServer.Domain.DataTransferObjects;
 using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;

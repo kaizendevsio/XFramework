@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ContentModelStore">
-    <e p="C:\Users\joven\AppData\local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
-    <e p="C:\Users\joven\AppData\local\JetBrains\Rider2020.3\resharper-host\local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.486044809.00" t="ExcludeRecursive" />
-    <e p="D:\Projects\XFramework" t="IncludeFlat">
+    <e p="C:\Projects\Net Core\XFramework" t="IncludeFlat">
       <e p="Application" t="Include" />
       <e p="Domain" t="Include" />
       <e p="packages" t="ExcludeRecursive" />
@@ -133,7 +131,7 @@
         <e p="bin" t="ExcludeRecursive" />
         <e p="BusinessObjects" t="Include">
           <e p="ApiStatusBO.cs" t="Include" />
-          <e p="AuditEntry.cs" t="Include" />
+          <e p="AuditEntryBO.cs" t="Include" />
           <e p="CmdResponseBO.cs" t="Include" />
           <e p="HostBO.cs" t="Include" />
           <e p="IdentitySessionBO.cs" t="Include" />
@@ -145,7 +143,7 @@
           <e p="GetApplicationListContract.cs" t="Include" />
           <e p="GetIdentityContract.cs" t="Include" />
         </e>
-        <e p="DataTableObjects" t="Include">
+        <e p="DataTransferObjects" t="Include">
           <e p="TblAddressBarangay.cs" t="Include" />
           <e p="TblAddressCity.cs" t="Include" />
           <e p="TblAddressCountry.cs" t="Include" />
@@ -233,5 +231,7 @@
       </e>
       <e p="XFramework.IdentityServer.sln" t="IncludeFlat" />
     </e>
+    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\resharper-host\local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
   </component>
 </project>

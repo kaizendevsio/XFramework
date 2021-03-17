@@ -10,7 +10,7 @@ using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.Contracts;
-using IdentityServer.Domain.DataTableObjects;
+using IdentityServer.Domain.DataTransferObjects;
 using IdentityServer.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -39,7 +39,6 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                     authorizeBy = (AuthorizeBy)int.Parse(getDefaults.Value);
                     goto reAuth;
                     
-                    break;
                 case AuthorizeBy.UsernameEmailPhone:
                     result = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.UserName == request.Username, cancellationToken: cancellationToken);
                     result ??= _dataLayer.TblIdentityContacts.FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 1)?.UserCredential;

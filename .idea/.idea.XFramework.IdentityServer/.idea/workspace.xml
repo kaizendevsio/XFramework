@@ -27,17 +27,49 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="70e1eb87-e1bc-4776-bb1f-667e7209b08c" name="Default Changelist" comment="Update on Identity Server">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/contentModel.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/contentModel.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Identity/InformationController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Identity/InformationController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/UpdateIdentityCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/UpdateIdentityCmd.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Startup.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/CreateAuthorizeIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/CreateAuthorizeIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/DeleteAuthorizeIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/DeleteAuthorizeIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/UpdateAuthorizeIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/UpdateAuthorizeIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/DeleteIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/DeleteIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/UpdateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/UpdateIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/DataLayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetAllIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetAllIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Contracts/GetIdentityContract.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Contracts/GetIdentityContract.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/Interfaces/IDataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/Interfaces/IDataLayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BusinessObjects/AuditEntry.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BusinessObjects/AuditEntryBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblAddressBarangay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAddressBarangay.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblAddressCity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAddressCity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblAddressCountry.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAddressCountry.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblAddressProvince.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAddressProvince.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblAddressRegion.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAddressRegion.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblApplication.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblApplication.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblApplicationLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblApplicationLog.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblAuditField.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAuditField.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblAuditHistory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAuditHistory.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblAuthorizationLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAuthorizationLog.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblConfiguration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblConfiguration.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblCurrency.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblCurrency.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblCurrencyEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblCurrencyEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblEnterprise.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblEnterprise.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblExchangeRate.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblExchangeRate.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityAddress.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityAddress.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityAddressEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityAddressEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityContact.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityContact.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityContactEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityContactEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityCredential.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityCredential.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityInfo.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityInfo.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityInformation.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityInformation.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityRole.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityRole.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityRoleEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityRoleEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityVerification.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityVerification.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblIdentityVerificationEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblIdentityVerificationEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblLog.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblSessionDatum.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblSessionDatum.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblSessionEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblSessionEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/TblVerificationType.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblVerificationType.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTableObjects/XFrameworkContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/XFrameworkContext.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/IdentityServer.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/IdentityServer.Domain.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,16 +94,14 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Application/GetAllAppInfoQueryHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Authorization/AuthenticateIdentityQuery.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Enums/SessionState.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/DataLayer.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Authorization/AuthenticateIdentityQuery.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Startup.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Enums/SessionState.cs" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
-      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Application/GetAllAppListQuery.cs" />
-      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/CommandBaseEntity.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/DeleteIdentityCmd.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/DataLayer.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DTO/XFrameworkContext.cs" />
@@ -106,13 +136,10 @@
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Identity/InfoController.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthorizeIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/Interfaces/IDataLayer.cs" />
-      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/Authorization/DeleteAuthorizeIdentityCmd.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/Authorization/UpdateAuthorizeIdentityCmd.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Api/Controllers/Identity/AuthorizationController.cs" />
-      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetIdentityHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetAllIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/Contracts/GetIdentityContract.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/UpdateIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Entity/Identity/UpdateIdentityCmd.cs" />
@@ -121,6 +148,11 @@
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/CreateAuthorizeIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/UpdateAuthorizeIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/DeleteAuthorizeIdentityHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetAllIdentityHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/TblAddressCity.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Domain/BusinessObjects/AuditEntryBO.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" />
     </changedPaths>
   </component>
   <component name="ProjectId" id="1ld6KvzrIF5MXSkkITGNmdOfNcb" />
@@ -290,6 +322,10 @@
       <workItem from="1615268242200" duration="3552000" />
       <workItem from="1615520367345" duration="817000" />
       <workItem from="1615521944822" duration="616000" />
+      <workItem from="1615821980496" duration="1854000" />
+      <workItem from="1615877194317" duration="1250000" />
+      <workItem from="1615880592478" duration="10881000" />
+      <workItem from="1615962875954" duration="2025000" />
     </task>
     <task id="LOCAL-00001" summary="Added Identity Server Solution">
       <created>1608305427254</created>
@@ -427,14 +463,7 @@
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework/Server/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Authorization/CreateAuthorizeIdentityHandler.cs</url>
           <line>24</line>
-          <properties documentPath="D:\Projects\XFramework\XFramework\Server\XFramework.IdentityServer\IdentityServer.Core\DataAccess\Commands\Handlers\Identity\Authorization\CreateAuthorizeIdentityHandler.cs" initialLine="23" containingFunctionPresentation="method 'Handle'">
-            <startOffsets>
-              <option value="944" />
-            </startOffsets>
-            <endOffsets>
-              <option value="1101" />
-            </endOffsets>
-          </properties>
+          <properties documentPath="D:\Projects\XFramework\XFramework\Server\XFramework.IdentityServer\IdentityServer.Core\DataAccess\Commands\Handlers\Identity\Authorization\CreateAuthorizeIdentityHandler.cs" initialLine="23" containingFunctionPresentation="method 'Handle'" />
           <option name="timeStamp" value="2" />
         </line-breakpoint>
       </breakpoints>
