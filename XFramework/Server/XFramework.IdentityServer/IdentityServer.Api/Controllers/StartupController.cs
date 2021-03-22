@@ -2,6 +2,8 @@
 using System.Reflection;
  using System.Runtime.Versioning;
  using IdentityServer.Domain.BusinessObjects;
+ using Microsoft.AspNetCore.Authentication.JwtBearer;
+ using Microsoft.AspNetCore.Authorization;
  using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityServer.Api.Controllers

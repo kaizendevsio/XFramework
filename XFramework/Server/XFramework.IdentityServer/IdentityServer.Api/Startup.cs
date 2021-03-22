@@ -4,6 +4,8 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using FluentValidation;
+using IdentityServer.Api.Installers;
+using IdentityServer.Api.Options;
 using IdentityServer.Core.DataAccess;
 using IdentityServer.Core.DataAccess.Commands.Handlers;
 using IdentityServer.Core.Interfaces;
@@ -36,18 +38,7 @@ namespace IdentityServer.Api
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
-            services.AddDbContext<XFrameworkContext>(options => options.UseNpgsql(Configuration.GetConnectionString("DatabaseConnection")));
-            services.AddScoped<IDataLayer, DataLayer>();
-            services.AddSingleton<ICachingService, CachingService>();
-            services.AddSingleton<IHelperService, HelperService>();
-            services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
-            services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
-            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
-            services.AddSwaggerGen(c =>
-            {
-                c.SwaggerDoc("v1", new OpenApiInfo {Title = "IdentityServer.Api", Version = "v1"});
-            });
+           services.InstallServicesInAssembly(Configuration);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -56,14 +47,26 @@ namespace IdentityServer.Api
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "IdentityServer.Api v1"));
             }
+            
+            var swaggerOptions = new SwaggerOptions();
+            Configuration.GetSection(nameof(SwaggerOptions)).Bind(swaggerOptions);
 
+            app.UseSwagger(options =>
+            {
+                options.RouteTemplate = swaggerOptions.JsonRoute;
+            });
+            
+            app.UseSwaggerUI(c => c.SwaggerEndpoint(swaggerOptions.UiEndpoint, swaggerOptions.Description));
+            
             app.UseHttpsRedirection();
+
+            app.UseHsts();
 
             app.UseRouting();
 
+            app.UseAuthentication();
+            
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints => { endpoints.MapControllers(); });

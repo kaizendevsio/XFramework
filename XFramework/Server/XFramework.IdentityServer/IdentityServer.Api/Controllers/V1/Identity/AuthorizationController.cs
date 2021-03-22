@@ -1,14 +1,13 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Authorization;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace IdentityServer.Api.Controllers.Identity
+namespace IdentityServer.Api.Controllers.V1.Identity
 {
-    [Route("Api/Identity/Authorization")]
+    [Route("Api/V1/Identity/Authorization")]
     [ApiController]
     public class AuthorizationController : XFrameworkControllerBase
     {
@@ -32,6 +31,7 @@ namespace IdentityServer.Api.Controllers.Identity
         }
      
         [HttpPut]
+        [Authorize]
         public async Task<JsonResult> Put([FromBody] UpdateAuthorizeIdentityCmd request)
         {
             var result = await _mediator.Send(request);
@@ -39,6 +39,7 @@ namespace IdentityServer.Api.Controllers.Identity
         }
         
         [HttpDelete]
+        [Authorize]
         public async Task<JsonResult> Delete([FromBody] DeleteAuthorizeIdentityCmd request)
         {
             var result = await _mediator.Send(request);

@@ -1,12 +1,14 @@
 ﻿using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Query.Entity.Application;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace IdentityServer.Api.Controllers.Application
+namespace IdentityServer.Api.Controllers.V1.Application
 {
-    [Route("Api/[controller]")]
+    [Route("Api/V1/[controller]")]
     [ApiController]
+    [Authorize]
     public class ApplicationController : XFrameworkControllerBase
     {
         public ApplicationController(IMediator mediator)

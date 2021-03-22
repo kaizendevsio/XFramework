@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
@@ -24,7 +26,8 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
             await _dataLayer.TblIdentityInformations.AddAsync(entity, cancellationToken);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
-           return new();
+            return new();
         }
+
     }
 }

@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 #nullable disable
 
@@ -15,6 +17,10 @@ namespace IdentityServer.Domain.DataTransferObjects
         {
         }
 
+        public virtual DbSet<Player> Players { get; set; }
+        public virtual DbSet<Position> Positions { get; set; }
+        public virtual DbSet<Salary> Salaries { get; set; }
+        public virtual DbSet<ScoredGoal> ScoredGoals { get; set; }
         public virtual DbSet<TblAddressBarangay> TblAddressBarangays { get; set; }
         public virtual DbSet<TblAddressCity> TblAddressCities { get; set; }
         public virtual DbSet<TblAddressCountry> TblAddressCountries { get; set; }
@@ -54,6 +60,64 @@ namespace IdentityServer.Domain.DataTransferObjects
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.HasAnnotation("Relational:Collation", "English_United States.1252");
+
+            modelBuilder.Entity<Player>(entity =>
+            {
+                entity.ToTable("Players", "Application");
+
+                entity.Property(e => e.PlayerId).HasColumnName("PlayerID");
+
+                entity.Property(e => e.FirstName).HasMaxLength(100);
+
+                entity.Property(e => e.LastName).HasMaxLength(100);
+
+                entity.Property(e => e.PositionId).HasColumnName("PositionID");
+
+                entity.HasOne(d => d.Position)
+                    .WithMany(p => p.Players)
+                    .HasForeignKey(d => d.PositionId)
+                    .HasConstraintName("players_sa__fk");
+            });
+
+            modelBuilder.Entity<Position>(entity =>
+            {
+                entity.ToTable("Positions", "Application");
+
+                entity.Property(e => e.PositionId).HasColumnName("PositionID");
+
+                entity.Property(e => e.PositionName).HasMaxLength(100);
+            });
+
+            modelBuilder.Entity<Salary>(entity =>
+            {
+                entity.ToTable("Salaries", "Application");
+
+                entity.Property(e => e.SalaryId).HasColumnName("SalaryID");
+
+                entity.Property(e => e.PlayerId).HasColumnName("PlayerID");
+
+                entity.HasOne(d => d.Player)
+                    .WithMany(p => p.Salaries)
+                    .HasForeignKey(d => d.PlayerId)
+                    .HasConstraintName("salaries_pla__fk");
+            });
+
+            modelBuilder.Entity<ScoredGoal>(entity =>
+            {
+                entity.HasKey(e => e.GoalId)
+                    .HasName("scoredgoals_pk");
+
+                entity.ToTable("ScoredGoals", "Application");
+
+                entity.Property(e => e.GameId).HasColumnName("GameID");
+
+                entity.Property(e => e.PlayerId).HasColumnName("PlayerID");
+
+                entity.HasOne(d => d.Player)
+                    .WithMany(p => p.ScoredGoals)
+                    .HasForeignKey(d => d.PlayerId)
+                    .HasConstraintName("scoredgoals_asdasd__fk");
+            });
 
             modelBuilder.Entity<TblAddressBarangay>(entity =>
             {
@@ -515,6 +579,10 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.Property(e => e.ApplicationId).HasColumnName("ApplicationID");
 
                 entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Cuid)
+                    .HasMaxLength(500)
+                    .HasColumnName("cuid");
 
                 entity.Property(e => e.IdentityInfoId).HasColumnName("IdentityInfoID");
 

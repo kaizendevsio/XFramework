@@ -3,11 +3,12 @@ using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace IdentityServer.Api.Controllers.Identity
+namespace IdentityServer.Api.Controllers.V1.Identity
 {
-    [Route("Api/Identity/[controller]")]
+    [Route("Api/V1/Identity/[controller]")]
     [ApiController]
     public class InformationController : XFrameworkControllerBase
     {

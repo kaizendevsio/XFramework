@@ -1,6 +1,6 @@
-﻿namespace IdentityServer.Domain.Contracts
+﻿namespace IdentityServer.Domain.BusinessObjects
 {
-    public class AuthorizeIdentityContract
+    public class JwtTokenBO
     {
         public string AccessToken  { get; set; }
         public string RefreshToken  { get; set; }

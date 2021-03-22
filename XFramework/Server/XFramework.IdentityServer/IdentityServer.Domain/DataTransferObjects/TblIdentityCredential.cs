@@ -30,6 +30,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public byte[] PasswordByte { get; set; }
         public long ApplicationId { get; set; }
         public string Token { get; set; }
+        public string Cuid { get; set; }
 
         public virtual TblApplication Application { get; set; }
         public virtual TblIdentityInformation IdentityInfo { get; set; }

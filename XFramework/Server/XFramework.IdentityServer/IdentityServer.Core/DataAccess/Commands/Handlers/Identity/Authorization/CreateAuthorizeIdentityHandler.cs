@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -38,6 +39,7 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Authorizatio
             var passwordByte = Encoding.ASCII.GetBytes(request.PasswordString);
             var hashPasswordByte = shaM.ComputeHash(passwordByte);
 
+            entity.Cuid = Guid.NewGuid().ToString();
             entity.PasswordByte = hashPasswordByte;
             entity.IdentityInfoId = identityInfo.Id;
             entity.ApplicationId = request.RequestServer.ApplicationId;
