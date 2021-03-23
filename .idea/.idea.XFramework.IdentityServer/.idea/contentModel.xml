@@ -84,7 +84,14 @@
                 <e p="UpdateIdentityHandler.cs" t="Include" />
               </e>
             </e>
-            <e p="Validations" t="Include" />
+            <e p="Validations" t="Include">
+              <e p="CommandBaseValidator.cs" t="Include" />
+              <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="CreateAuthorizeIdentityValidator.cs" t="Include" />
+                </e>
+              </e>
+            </e>
           </e>
           <e p="DataLayer.cs" t="Include" />
           <e p="Query" t="Include">
@@ -116,7 +123,14 @@
               </e>
               <e p="QueryBaseHandler.cs" t="Include" />
             </e>
-            <e p="Validations" t="Include" />
+            <e p="Validations" t="Include">
+              <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="AuthenticateIdentityValidator.cs" t="Include" />
+                </e>
+              </e>
+              <e p="QueryBaseValidator.cs" t="Include" />
+            </e>
           </e>
         </e>
         <e p="IdentityServer.Core.csproj" t="IncludeRecursive" />
@@ -141,7 +155,11 @@
           <e p="HelperService.cs" t="Include" />
           <e p="JwtService.cs" t="Include" />
         </e>
-        <e p="Validations" t="Include" />
+        <e p="Validations" t="Include">
+          <e p="Common" t="Include">
+            <e p="RequestServerBOValidator.cs" t="Include" />
+          </e>
+        </e>
       </e>
       <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />

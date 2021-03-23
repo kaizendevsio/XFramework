@@ -26,15 +26,15 @@ namespace IdentityServer.Core.PipelineBehaviors
 
         public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
         {
-            // Pre Validation
-            await PreValidation(request);
-            // Post Validation
-            
-            // Create data layer transaction
-            var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
-            
             try
             {
+                // Pre Validation
+                await PreValidation(request);
+                // Post Validation
+            
+                // Create data layer transaction
+                var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
+                
                 // Pre Handler
                 _response = await next();
                 // Post Handler
@@ -49,8 +49,18 @@ namespace IdentityServer.Core.PipelineBehaviors
             {
                 var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
                 
-                responseInstance?.GetType().GetProperty("Message")?.SetValue(responseInstance, $"Error: {e.Message}; Inner Exception: {e.InnerException?.Message}", null);
-                responseInstance?.GetType().GetProperty("HttpStatusCode")?.SetValue(responseInstance, HttpStatusCode.InternalServerError, null);
+                responseInstance?.GetType().GetProperty("Message")?
+                    .SetValue(responseInstance, $"Error: {e.Message};", null);
+                
+                if (e.InnerException != null)
+                {
+                    responseInstance?.GetType().GetProperty("Message")?
+                        .SetValue(responseInstance, $"{responseInstance?.GetType().GetProperty("Message")?.GetValue(responseInstance)} Inner Exception: {e.InnerException?.Message}", null);
+                }
+                
+                responseInstance?.GetType().GetProperty("HttpStatusCode")?
+                    .SetValue(responseInstance, HttpStatusCode.InternalServerError, null);
+                
                 return (TResponse) responseInstance;
             }
         }
@@ -66,7 +76,7 @@ namespace IdentityServer.Core.PipelineBehaviors
 
             if (failures.Any())
             {
-                throw new ValidationException(failures);
+                throw new ArgumentException(string.Join("; ", failures.Select(i => i.ErrorMessage)));
             }
 
             await Task.FromResult(new Unit());

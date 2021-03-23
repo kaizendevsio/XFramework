@@ -53,12 +53,12 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                 };
             }
             
-            var token = await _jwtService.GenerateToken(request.Username, new Guid(credential.Cuid), _jwtOptions);
+            var token = await _jwtService.GenerateToken(request.Username, new Guid(credential.Cuid));
             return new()
             {
                 Message = $"Identity Authorized",
                 HttpStatusCode = HttpStatusCode.Accepted,
-                Response = new AuthorizeIdentityContract()
+                Response = new()
                 {
                     AccessToken = token.AccessToken,
                     RefreshToken = token.RefreshToken
