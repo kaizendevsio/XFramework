@@ -1,6 +1,7 @@
 ﻿﻿using System;
 using System.Reflection;
  using System.Runtime.Versioning;
+ using System.Threading.Tasks;
  using IdentityServer.Domain.BusinessObjects;
  using Microsoft.AspNetCore.Authentication.JwtBearer;
  using Microsoft.AspNetCore.Authorization;
@@ -13,7 +14,7 @@ namespace IdentityServer.Api.Controllers
     public class StartupController : ControllerBase
     {
         [HttpGet]
-        public ActionResult Startup()
+        public virtual async Task<ActionResult> Startup()
         {
             var apiStatus = new ApiStatusBO
             {

@@ -17,14 +17,14 @@ namespace IdentityServer.Api.Controllers.V1.Identity
         }
       
         [HttpPost("Authenticate")]
-        public async Task<JsonResult> Authenticate([FromBody] AuthenticateIdentityQuery request)
+        public virtual async Task<JsonResult> Authenticate([FromBody] AuthenticateIdentityQuery request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
         
         [HttpPost]
-        public async Task<JsonResult> Post([FromBody] CreateAuthorizeIdentityCmd request)
+        public virtual async Task<JsonResult> Post([FromBody] CreateAuthorizeIdentityCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
@@ -32,7 +32,7 @@ namespace IdentityServer.Api.Controllers.V1.Identity
      
         [HttpPut]
         [Authorize]
-        public async Task<JsonResult> Put([FromBody] UpdateAuthorizeIdentityCmd request)
+        public virtual async Task<JsonResult> Put([FromBody] UpdateAuthorizeIdentityCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
@@ -40,7 +40,7 @@ namespace IdentityServer.Api.Controllers.V1.Identity
         
         [HttpDelete]
         [Authorize]
-        public async Task<JsonResult> Delete([FromBody] DeleteAuthorizeIdentityCmd request)
+        public virtual async Task<JsonResult> Delete([FromBody] DeleteAuthorizeIdentityCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
