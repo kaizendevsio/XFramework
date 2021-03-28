@@ -13,17 +13,20 @@ using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.Contracts;
 using IdentityServer.Domain.DataTransferObjects;
 using IdentityServer.Domain.Enums;
+using IdentityServer.Integration.Interfaces;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using XFramework.Domain.Generic.Enums;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
 {
     public class AuthenticateIdentityHandler : QueryBaseHandler,
         IRequestHandler<AuthenticateIdentityQuery, QueryResponseBO<AuthorizeIdentityContract>>
     {
-        public AuthenticateIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService)
+        public AuthenticateIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService, IRecordsWrapper recordsWrapper)
         {
+            _recordsService = recordsWrapper;
             _jwtService = jwtService;
             _jwtOptions = jwtOptionsBo;
             _helperService = helperService;
@@ -42,18 +45,23 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-
+            
+            var cuid = new Guid(credential.Cuid);
             credential = await ValidatePassword(request, request.AuthorizeBy, credential, cancellationToken);
             if (credential == null)
             {
+                _recordsService.NewAuthorizationLog(AuthenticationState.WrongPassword, cuid);
                 return new()
                 {
                     Message = $"Identity Authentication Failed",
                     HttpStatusCode = HttpStatusCode.BadRequest
                 };
             }
+
             
-            var token = await _jwtService.GenerateToken(request.Username, new Guid(credential.Cuid));
+            var token = await _jwtService.GenerateToken(request.Username, cuid);
+            _recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
+            
             return new()
             {
                 Message = $"Identity Authorized",

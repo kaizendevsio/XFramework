@@ -22,8 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="DataTableObjects" />
-    <Folder Include="DataTableObjects\" />
+    <Folder Include="DataTransferObjects" />
+    <Folder Include="DataTransferObjects\" />
     <Folder Include="Migrations\" />
   </ItemGroup>
 

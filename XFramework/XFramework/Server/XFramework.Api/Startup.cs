@@ -17,7 +17,7 @@ using XFramework.Core.DataAccess.Commands.Handlers;
 using XFramework.Core.DataAccess.Commands.Handlers.User;
 using XFramework.Core.Interfaces;
 using XFramework.Core.PipelineBehaviors;
-using XFramework.Domain.DataTableObjects;
+using XFramework.Domain.DataTransferObjects;
 
 namespace XFramework.Api
 {

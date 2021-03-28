@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using XFramework.Domain.BusinessObjects;
-using XFramework.Domain.DataTableObjects;
+using XFramework.Domain.DataTransferObjects;
 
 namespace XFramework.Core.Interfaces
 {

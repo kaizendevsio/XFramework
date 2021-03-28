@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using XFramework.Core.DataAccess.Commands.Entity.Events;
 using XFramework.Core.Interfaces;
-using XFramework.Domain.DataTableObjects;
+using XFramework.Domain.DataTransferObjects;
 
 namespace XFramework.Core.DataAccess.Commands.Handlers.Events
 {

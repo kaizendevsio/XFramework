@@ -6,6 +6,27 @@
       <e p="Domain" t="Include" />
       <e p="packages" t="ExcludeRecursive" />
       <e p="Presentation" t="Include" />
+      <e p="XFramework.IdentityServer\IdentityServer.Integration" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="IdentityServer.Integration.csproj" t="IncludeRecursive" />
+        <e p="Interfaces" t="Include">
+          <e p="IRecordsWrapper.cs" t="Include" />
+          <e p="IStreamFlowWrapper.cs" t="Include" />
+        </e>
+        <e p="Models" t="Include" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Integration.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="Services" t="Include" />
+        <e p="Wrappers" t="Include">
+          <e p="RecordsWrapper.cs" t="Include" />
+          <e p="StreamFlowWrapper.cs" t="Include" />
+        </e>
+      </e>
       <e p="XFramework.IdentityServer\Server\IdentityServer.Api" t="IncludeRecursive">
         <e p="appsettings.Development.json" t="Include" />
         <e p="appsettings.json" t="Include" />
@@ -139,7 +160,6 @@
           <e p="IDataLayer.cs" t="Include" />
           <e p="IHelperService.cs" t="Include" />
           <e p="IJwtService.cs" t="Include" />
-          <e p="ILoggerService.cs" t="Include" />
         </e>
         <e p="obj" t="ExcludeRecursive">
           <e p="Debug" t="Include">

@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using XFramework.Domain.BusinessObjects;
-using XFramework.Domain.DataTableObjects;
+using XFramework.Domain.DataTransferObjects;
 
 namespace XFramework.Core.DataAccess
 {

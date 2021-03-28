@@ -6,7 +6,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
-using XFramework.Domain.DataTableObjects;
+using XFramework.Domain.DataTransferObjects;
 
 namespace XFramework.Core.DataAccess.Commands.Handlers.User
 {
