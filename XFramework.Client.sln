@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30011.22
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Identity.Web", "XFramework\Client\XFramework.Identity.Web\XFramework.Identity.Web.csproj", "{5A058577-BE6A-4DAE-84C9-9552435D25C6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Identity.Web", "XFramework\XFramework\Client\XFramework.Identity.Web\XFramework.Identity.Web.csproj", "{5A058577-BE6A-4DAE-84C9-9552435D25C6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Identity.Shared", "XFramework\Client\XFramework.Identity.Shared\XFramework.Identity.Shared.csproj", "{3A153313-F1AE-4BDF-A3C2-F602C2429734}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Identity.Shared", "XFramework\XFramework\Client\XFramework.Identity.Shared\XFramework.Identity.Shared.csproj", "{3A153313-F1AE-4BDF-A3C2-F602C2429734}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

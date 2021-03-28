@@ -148,5 +148,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                 MaxSessionTimeSpan = TimeSpan.FromMinutes(30)
             });
         }
+        
+      
     }
 }

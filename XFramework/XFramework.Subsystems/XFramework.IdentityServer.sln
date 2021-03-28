@@ -6,15 +6,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Domain", "Domain", "{B8C0B4
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Presentation", "Presentation", "{39B46295-27E9-4529-ACA7-4EC985D02AD8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Core", "XFramework\Server\XFramework.IdentityServer\IdentityServer.Core\IdentityServer.Core.csproj", "{5812C495-8B5B-40D3-9F96-BF886E1C6CCB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Core", "XFramework.IdentityServer\Server\IdentityServer.Core\IdentityServer.Core.csproj", "{5812C495-8B5B-40D3-9F96-BF886E1C6CCB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Integrity", "XFramework\Server\XFramework.IdentityServer\IdentityServer.Integrity\IdentityServer.Integrity.csproj", "{CAA74519-C63A-4AEA-9582-1F6B4DCB0E77}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Integrity", "XFramework.IdentityServer\Server\IdentityServer.Integrity\IdentityServer.Integrity.csproj", "{CAA74519-C63A-4AEA-9582-1F6B4DCB0E77}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Domain", "XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain\IdentityServer.Domain.csproj", "{0F534F8E-DF57-485C-A438-05A877F41A18}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Domain", "XFramework.IdentityServer\Server\IdentityServer.Domain\IdentityServer.Domain.csproj", "{0F534F8E-DF57-485C-A438-05A877F41A18}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Api", "XFramework\Server\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj", "{6C891D8B-FAE2-4300-965E-1749E62ACACD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Api", "XFramework.IdentityServer\Server\IdentityServer.Api\IdentityServer.Api.csproj", "{6C891D8B-FAE2-4300-965E-1749E62ACACD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Stream", "XFramework\Server\XFramework.IdentityServer\IdentityServer.Stream\IdentityServer.Stream.csproj", "{6FBB1AC8-15D9-4514-859F-6CFB339ED506}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Stream", "XFramework.IdentityServer\Server\IdentityServer.Stream\IdentityServer.Stream.csproj", "{6FBB1AC8-15D9-4514-859F-6CFB339ED506}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

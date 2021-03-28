@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ContentModelStore">
-    <e p="C:\Projects\Net Core\XFramework" t="IncludeFlat">
+    <e p="C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems" t="IncludeFlat">
       <e p="Application" t="Include" />
       <e p="Domain" t="Include" />
       <e p="packages" t="ExcludeRecursive" />
       <e p="Presentation" t="Include" />
-      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Api" t="IncludeRecursive">
+      <e p="XFramework.IdentityServer\Server\IdentityServer.Api" t="IncludeRecursive">
         <e p="appsettings.Development.json" t="Include" />
         <e p="appsettings.json" t="Include" />
         <e p="bin" t="ExcludeRecursive" />
@@ -50,7 +50,7 @@
         <e p="Startup.cs" t="Include" />
         <e p="WeatherForecast.cs" t="Include" />
       </e>
-      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Core" t="IncludeRecursive">
+      <e p="XFramework.IdentityServer\Server\IdentityServer.Core" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="DataAccess" t="Include">
           <e p="Commands" t="Include">
@@ -162,7 +162,7 @@
           </e>
         </e>
       </e>
-      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
+      <e p="XFramework.IdentityServer\Server\IdentityServer.Domain" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="BusinessObjects" t="Include">
           <e p="ApiStatusBO.cs" t="Include" />
@@ -230,7 +230,7 @@
           </e>
         </e>
       </e>
-      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Integrity" t="IncludeRecursive">
+      <e p="XFramework.IdentityServer\Server\IdentityServer.Integrity" t="IncludeRecursive">
         <e p="bin" t="ExcludeRecursive" />
         <e p="Class1.cs" t="Include" />
         <e p="IdentityServer.Integrity.csproj" t="IncludeRecursive" />
@@ -242,7 +242,7 @@
           </e>
         </e>
       </e>
-      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Stream" t="IncludeRecursive">
+      <e p="XFramework.IdentityServer\Server\IdentityServer.Stream" t="IncludeRecursive">
         <e p="appsettings.Development.json" t="Include" />
         <e p="appsettings.json" t="Include" />
         <e p="bin" t="ExcludeRecursive" />
@@ -269,7 +269,7 @@
       </e>
       <e p="XFramework.IdentityServer.sln" t="IncludeFlat" />
     </e>
-    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
-    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\resharper-host\local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\Local\JetBrains\Rider2020.3\resharper-host\Local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.-1110896106.00" t="ExcludeRecursive" />
   </component>
 </project>
