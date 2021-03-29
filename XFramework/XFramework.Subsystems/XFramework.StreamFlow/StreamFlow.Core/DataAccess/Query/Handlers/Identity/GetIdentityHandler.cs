@@ -1,6 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.Contracts;
-using Mapster;
+﻿using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StreamFlow.Core.DataAccess.Query.Entity.Identity;
@@ -8,6 +6,8 @@ using StreamFlow.Core.Interfaces;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Contracts;
 
 namespace StreamFlow.Core.DataAccess.Query.Handlers.Identity
 {

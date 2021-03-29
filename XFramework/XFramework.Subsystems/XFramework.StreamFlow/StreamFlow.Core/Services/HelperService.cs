@@ -1,5 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.IdentityModel.Tokens;
 using StreamFlow.Core.DataAccess.Query.Entity.Identity.Authorization;
 using StreamFlow.Core.Interfaces;
 using System;

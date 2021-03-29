@@ -1,15 +1,12 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using MediatR;
+﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StreamFlow.Core.DataAccess.Commands.Entity.Identity;
 using StreamFlow.Core.Interfaces;
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.DataAccess.Commands.Handlers.Identity
 {

@@ -1,7 +1,7 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.Contracts;
-using IdentityServer.Domain.Enums;
-using MediatR;
+﻿using MediatR;
+using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Contracts;
+using StreamFlow.Domain.Enums;
 
 namespace StreamFlow.Core.DataAccess.Query.Entity.Identity.Authorization
 {

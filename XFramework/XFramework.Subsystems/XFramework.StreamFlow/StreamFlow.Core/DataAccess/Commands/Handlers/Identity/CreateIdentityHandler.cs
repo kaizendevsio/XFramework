@@ -1,14 +1,12 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.DataTransferObjects;
-using Mapster;
+﻿using Mapster;
 using MediatR;
 using StreamFlow.Core.DataAccess.Commands.Entity.Identity;
 using StreamFlow.Core.Interfaces;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.DataTransferObjects;
 
 namespace StreamFlow.Core.DataAccess.Commands.Handlers.Identity
 {

@@ -1,5 +1,5 @@
 ﻿using FluentValidation;
-using IdentityServer.Domain.BusinessObjects;
+using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.Validations.Common
 {

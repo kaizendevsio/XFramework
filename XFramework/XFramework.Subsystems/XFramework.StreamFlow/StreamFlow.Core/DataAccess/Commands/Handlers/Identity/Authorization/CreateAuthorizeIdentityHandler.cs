@@ -1,6 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.DataTransferObjects;
-using Mapster;
+﻿using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StreamFlow.Core.DataAccess.Commands.Entity.Identity.Authorization;
@@ -11,6 +9,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.DataTransferObjects;
 
 namespace StreamFlow.Core.DataAccess.Commands.Handlers.Identity.Authorization
 {

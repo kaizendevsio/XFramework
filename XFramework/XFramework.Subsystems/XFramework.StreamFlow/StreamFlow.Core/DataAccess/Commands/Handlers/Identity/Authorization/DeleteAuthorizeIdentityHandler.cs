@@ -1,11 +1,11 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using MediatR;
+﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StreamFlow.Core.DataAccess.Commands.Entity.Identity.Authorization;
 using StreamFlow.Core.Interfaces;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.DataAccess.Commands.Handlers.Identity.Authorization
 {

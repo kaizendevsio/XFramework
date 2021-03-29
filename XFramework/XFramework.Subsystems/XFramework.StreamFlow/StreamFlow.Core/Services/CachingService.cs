@@ -1,6 +1,6 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using StreamFlow.Core.Interfaces;
+﻿using StreamFlow.Core.Interfaces;
 using System.Collections.Generic;
+using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.Services
 {

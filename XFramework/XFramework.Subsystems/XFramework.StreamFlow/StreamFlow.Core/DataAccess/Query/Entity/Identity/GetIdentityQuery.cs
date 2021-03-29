@@ -1,7 +1,7 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.Contracts;
-using MediatR;
+﻿using MediatR;
 using System;
+using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Contracts;
 
 namespace StreamFlow.Core.DataAccess.Query.Entity.Identity
 {

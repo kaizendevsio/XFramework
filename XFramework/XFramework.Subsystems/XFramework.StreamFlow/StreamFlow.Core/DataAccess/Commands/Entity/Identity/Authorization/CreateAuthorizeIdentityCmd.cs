@@ -1,6 +1,6 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using MediatR;
+﻿using MediatR;
 using System;
+using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.DataAccess.Commands.Entity.Identity.Authorization
 {

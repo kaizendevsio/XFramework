@@ -1,4 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
+﻿using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.DataAccess.Commands.Entity
 {

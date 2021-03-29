@@ -23,4 +23,8 @@
       <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.7.1" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\StreamFlow.Domain\StreamFlow.Domain.csproj" />
+    </ItemGroup>
+
 </Project>

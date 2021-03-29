@@ -1,6 +1,6 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using StreamFlow.Core.Interfaces;
+using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.DataAccess.Query.Handlers
 {

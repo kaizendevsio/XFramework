@@ -1,5 +1,4 @@
 ﻿using FluentValidation;
-using IdentityServer.Domain.BusinessObjects;
 using MediatR;
 using StreamFlow.Core.Interfaces;
 using System;
@@ -8,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.PipelineBehaviors
 {

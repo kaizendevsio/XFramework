@@ -1,21 +1,18 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.Contracts;
-using IdentityServer.Domain.DataTransferObjects;
-using IdentityServer.Domain.Enums;
-using MediatR;
+﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using StreamFlow.Core.DataAccess.Query.Entity.Identity.Authorization;
 using StreamFlow.Core.Interfaces;
 using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Contracts;
+using StreamFlow.Domain.DataTransferObjects;
+using StreamFlow.Domain.Enums;
 
 namespace StreamFlow.Core.DataAccess.Query.Handlers.Identity.Authorization
 {

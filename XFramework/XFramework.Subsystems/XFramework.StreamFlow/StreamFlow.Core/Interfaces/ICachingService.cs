@@ -1,5 +1,5 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using StreamFlow.Domain.BusinessObjects;
 
 namespace StreamFlow.Core.Interfaces
 {
