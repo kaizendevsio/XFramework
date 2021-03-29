@@ -4,8 +4,8 @@
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
     "iisExpress": {
-      "applicationUrl": "http://localhost:35640",
-      "sslPort": 44353
+      "applicationUrl": "http://localhost:25269",
+      "sslPort": 44337
     }
   },
   "profiles": {
@@ -20,7 +20,7 @@
     "StreamFlow.Stream": {
       "commandName": "Project",
       "dotnetRunMessages": "true",
-      "launchBrowser": true,
+      "launchBrowser": false,
       "launchUrl": "swagger",
       "applicationUrl": "https://localhost:5001;http://localhost:5000",
       "environmentVariables": {
