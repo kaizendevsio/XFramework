@@ -8,9 +8,9 @@ namespace StreamFlow.Core.Services
     {
         public CachingService()
         {
-            IdentitySessions = new List<IdentitySessionBO>();
+            Clients = new();
         }
 
-        public List<IdentitySessionBO> IdentitySessions { get; set; }
+        public List<StreamFlowClientBO> Clients { get; set; }
     }
 }

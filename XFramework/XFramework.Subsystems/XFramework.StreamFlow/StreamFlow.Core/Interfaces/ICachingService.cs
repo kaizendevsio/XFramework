@@ -5,6 +5,6 @@ namespace StreamFlow.Core.Interfaces
 {
     public interface ICachingService
     {
-        public List<IdentitySessionBO> IdentitySessions { get; set; }
+        public List<StreamFlowClientBO> Clients { get; set; }
     }
 }

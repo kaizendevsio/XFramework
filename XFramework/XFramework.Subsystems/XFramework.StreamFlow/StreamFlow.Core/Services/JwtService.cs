@@ -1,5 +1,4 @@
 ﻿using Microsoft.IdentityModel.Tokens;
-using StreamFlow.Core.DataAccess.Query.Entity.Identity.Authorization;
 using StreamFlow.Core.Interfaces;
 using System;
 using System.Collections.Generic;

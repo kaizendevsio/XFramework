@@ -51,7 +51,7 @@ namespace StreamFlow.Stream
 
             app.UseAuthorization();
 
-            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+            app.InstallEndpointConfigInAssembly(env);
         }
     }
 }

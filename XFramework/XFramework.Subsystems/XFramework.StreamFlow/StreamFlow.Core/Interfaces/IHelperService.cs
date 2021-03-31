@@ -1,5 +1,4 @@
-﻿using StreamFlow.Core.DataAccess.Query.Entity.Identity.Authorization;
-using System;
+﻿using System;
 using System.IdentityModel.Tokens.Jwt;
 
 namespace StreamFlow.Core.Interfaces
