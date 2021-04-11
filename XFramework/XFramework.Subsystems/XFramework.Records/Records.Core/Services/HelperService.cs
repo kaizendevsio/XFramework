@@ -1,11 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using Microsoft.IdentityModel.Tokens;
-using Records.Core.DataAccess.Query.Entity.Identity.Authorization;
-using Records.Core.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+﻿using Records.Core.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
 

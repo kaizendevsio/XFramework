@@ -1,4 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
+﻿using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Api.Options
 {

@@ -1,12 +1,7 @@
-﻿using FluentValidation;
-using IdentityServer.Core.DataAccess.Commands.Handlers;
-using IdentityServer.Core.Interfaces;
-using IdentityServer.Core.PipelineBehaviors;
-using IdentityServer.Core.Services;
-using MediatR;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System.Reflection;
+using Records.Core.Interfaces;
+using Records.Core.Services;
 
 namespace Records.Api.Installers
 {

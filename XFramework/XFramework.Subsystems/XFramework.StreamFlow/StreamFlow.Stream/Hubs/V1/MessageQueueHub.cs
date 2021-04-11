@@ -43,13 +43,12 @@ namespace StreamFlow.Stream.Hubs.V1
                 return HttpStatusCode.Forbidden;
             }
             
-            Thread.Sleep(1000);
             PushMessageCmd entity = new()
             {
                 MessageQueue = request,
                 RequestServer = new()
                 {
-                    ClientGuid = client.Guid
+                   Guid = client.Guid
                 }
             };
             await _mediator.Send(entity).ConfigureAwait(false);

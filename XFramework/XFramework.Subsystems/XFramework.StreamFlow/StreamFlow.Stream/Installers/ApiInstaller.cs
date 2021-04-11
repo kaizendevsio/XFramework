@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using StreamFlow.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Stream.Installers
 {

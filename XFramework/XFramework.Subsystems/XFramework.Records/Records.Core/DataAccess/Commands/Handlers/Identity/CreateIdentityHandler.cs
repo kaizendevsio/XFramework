@@ -1,14 +1,13 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.DataTransferObjects;
-using Mapster;
+﻿using Mapster;
 using MediatR;
 using Records.Core.DataAccess.Commands.Entity.Identity;
 using Records.Core.Interfaces;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Records.Domain.BusinessObjects;
+using Records.Domain.DataTransferObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.DataAccess.Commands.Handlers.Identity
 {

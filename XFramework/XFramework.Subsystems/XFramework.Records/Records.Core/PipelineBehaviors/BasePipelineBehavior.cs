@@ -1,5 +1,4 @@
 ﻿using FluentValidation;
-using IdentityServer.Domain.BusinessObjects;
 using MediatR;
 using Records.Core.Interfaces;
 using System;
@@ -8,6 +7,8 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Records.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.PipelineBehaviors
 {

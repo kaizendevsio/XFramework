@@ -10,6 +10,7 @@ using StreamFlow.Domain.BusinessObjects;
 using StreamFlow.Domain.Enums;
 using StreamFlow.Stream.Hubs.V1;
 using StreamFlow.Stream.Services.Entity.Events;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Stream.Services.Handlers.Events
 {

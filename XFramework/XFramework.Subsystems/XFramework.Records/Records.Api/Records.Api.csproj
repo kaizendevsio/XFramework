@@ -17,10 +17,17 @@
     <ItemGroup>
       <ProjectReference Include="..\IdentityServer.Core\IdentityServer.Core.csproj" />
       <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
+      <ProjectReference Include="..\Records.Core\Records.Core.csproj" />
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="Controllers\V1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
+      </Reference>
     </ItemGroup>
 
 </Project>

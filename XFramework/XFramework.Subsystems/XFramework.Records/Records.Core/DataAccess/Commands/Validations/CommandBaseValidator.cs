@@ -1,5 +1,4 @@
 ﻿using FluentValidation;
-using Records.Core.DataAccess.Commands.Entity;
 using Records.Core.Validations.Common;
 
 namespace Records.Core.DataAccess.Commands.Validations

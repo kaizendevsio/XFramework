@@ -1,6 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.DataTransferObjects;
-using Mapster;
+﻿using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Records.Core.DataAccess.Commands.Entity.Identity.Authorization;
@@ -11,6 +9,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Records.Domain.BusinessObjects;
+using Records.Domain.DataTransferObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.DataAccess.Commands.Handlers.Identity.Authorization
 {

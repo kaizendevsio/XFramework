@@ -1,9 +1,10 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Records.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.Interfaces
 {

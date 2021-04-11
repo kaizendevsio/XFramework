@@ -1,13 +1,13 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using Mapster;
+﻿using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Records.Core.DataAccess.Commands.Entity.Identity;
 using Records.Core.DataAccess.Commands.Entity.Identity.Authorization;
 using Records.Core.Interfaces;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Records.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.DataAccess.Commands.Handlers.Identity.Authorization
 {

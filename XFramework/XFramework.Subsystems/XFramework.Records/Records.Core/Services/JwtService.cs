@@ -1,6 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using Microsoft.IdentityModel.Tokens;
-using Records.Core.DataAccess.Query.Entity.Identity.Authorization;
+﻿using Microsoft.IdentityModel.Tokens;
 using Records.Core.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -10,6 +8,8 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Records.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.Services
 {

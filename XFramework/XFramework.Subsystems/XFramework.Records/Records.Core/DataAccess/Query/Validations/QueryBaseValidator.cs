@@ -1,6 +1,4 @@
 ﻿using FluentValidation;
-using IdentityServer.Domain.BusinessObjects;
-using Records.Core.DataAccess.Query.Entity;
 using Records.Core.Validations.Common;
 
 namespace Records.Core.DataAccess.Query.Validations

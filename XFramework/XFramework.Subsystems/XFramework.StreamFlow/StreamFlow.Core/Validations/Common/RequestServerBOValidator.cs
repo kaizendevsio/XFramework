@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using StreamFlow.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Core.Validations.Common
 {

@@ -3,6 +3,7 @@ using System;
 using System.Reflection;
 using System.Runtime.Versioning;
 using StreamFlow.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Stream.Controllers
 {

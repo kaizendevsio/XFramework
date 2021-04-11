@@ -1,9 +1,9 @@
-﻿using IdentityServer.Core.DataAccess;
-using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.DataTransferObjects;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Records.Core.DataAccess;
+using Records.Core.Interfaces;
+using Records.Domain.DataTransferObjects;
 
 namespace Records.Api.Installers
 {

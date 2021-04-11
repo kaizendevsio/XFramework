@@ -1,10 +1,7 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using MediatR;
+﻿using MediatR;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Records.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.DataAccess.Commands.Entity.Identity
 {

@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
-using IdentityServer.Domain.BusinessObjects;
+using Records.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.Validations.Common
 {

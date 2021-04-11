@@ -1,6 +1,7 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Records.Core.Interfaces;
+using Records.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.DataAccess.Query.Handlers
 {

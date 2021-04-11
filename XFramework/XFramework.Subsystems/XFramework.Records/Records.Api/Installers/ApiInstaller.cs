@@ -1,5 +1,4 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -8,6 +7,7 @@ using Records.Api.Options;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Api.Installers
 {

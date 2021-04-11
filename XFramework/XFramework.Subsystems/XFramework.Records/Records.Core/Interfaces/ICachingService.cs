@@ -1,5 +1,6 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Records.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.Interfaces
 {

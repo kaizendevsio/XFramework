@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Core.DataAccess.Query.Handlers
 {
