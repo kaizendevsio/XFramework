@@ -7,8 +7,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObjects;
 using Microsoft.IdentityModel.Tokens;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Core.Services
 {

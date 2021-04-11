@@ -1,11 +1,9 @@
-﻿﻿using System;
+﻿using System;
 using System.Reflection;
- using System.Runtime.Versioning;
- using System.Threading.Tasks;
- using IdentityServer.Domain.BusinessObjects;
- using Microsoft.AspNetCore.Authentication.JwtBearer;
- using Microsoft.AspNetCore.Authorization;
- using Microsoft.AspNetCore.Mvc;
+using System.Runtime.Versioning;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Api.Controllers
 {
@@ -31,7 +29,8 @@ namespace IdentityServer.Api.Controllers
                     SystemPageSize = Environment.SystemPageSize,
                     TickCount64 = Environment.TickCount64,
                     Version = Environment.OSVersion.ToString(),
-                    RuntimeVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName
+                    RuntimeVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()
+                        ?.FrameworkName
                 },
                 Status = "Running"
             };

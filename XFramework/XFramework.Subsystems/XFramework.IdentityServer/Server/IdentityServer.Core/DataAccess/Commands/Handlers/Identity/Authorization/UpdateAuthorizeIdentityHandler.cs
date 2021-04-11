@@ -3,10 +3,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObjects;
 using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Authorization
 {

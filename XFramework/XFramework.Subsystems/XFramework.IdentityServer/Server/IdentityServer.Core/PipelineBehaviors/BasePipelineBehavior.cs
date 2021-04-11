@@ -6,8 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentValidation;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObjects;
 using MediatR;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Core.PipelineBehaviors
 {

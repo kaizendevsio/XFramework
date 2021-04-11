@@ -1,6 +1,6 @@
 ﻿using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObjects;
 using Microsoft.Extensions.Configuration;
+using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Interfaces;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers

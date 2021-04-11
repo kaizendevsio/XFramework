@@ -7,11 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.Contracts;
 using IdentityServer.Domain.DataTransferObjects;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 

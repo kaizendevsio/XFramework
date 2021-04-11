@@ -1,6 +1,6 @@
-﻿using IdentityServer.Domain.BusinessObjects;
-using IdentityServer.Domain.Contracts;
+﻿using IdentityServer.Domain.Contracts;
 using MediatR;
+using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization

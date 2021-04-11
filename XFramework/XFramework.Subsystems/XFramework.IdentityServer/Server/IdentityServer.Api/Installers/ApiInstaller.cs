@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 using IdentityServer.Api.Options;
-using IdentityServer.Domain.BusinessObjects;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Api.Installers
 {

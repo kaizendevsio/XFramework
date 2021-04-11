@@ -1,28 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
-using FluentValidation;
 using IdentityServer.Api.Installers;
 using IdentityServer.Api.Options;
-using IdentityServer.Core.DataAccess;
-using IdentityServer.Core.DataAccess.Commands.Handlers;
-using IdentityServer.Core.Interfaces;
-using IdentityServer.Core.PipelineBehaviors;
-using IdentityServer.Core.Services;
-using IdentityServer.Domain.DataTransferObjects;
-using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
 
 namespace IdentityServer.Api
 {

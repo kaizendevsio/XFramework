@@ -3,11 +3,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.Contracts;
 using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
 {

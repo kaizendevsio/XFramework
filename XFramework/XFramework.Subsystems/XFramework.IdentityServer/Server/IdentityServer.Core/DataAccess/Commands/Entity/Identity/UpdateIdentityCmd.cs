@@ -1,6 +1,6 @@
 ﻿using MediatR;
 using System;
-using IdentityServer.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity
 {

@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using IdentityServer.Domain.BusinessObjects;
 using Mapster;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
 {
