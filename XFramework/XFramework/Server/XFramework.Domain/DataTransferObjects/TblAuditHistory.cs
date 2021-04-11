@@ -6,7 +6,7 @@ namespace XFramework.Domain.DataTransferObjects
     {
         public long Id { get; set; }
         public string TableName { get; set; }
-        public DateTime? CreatedOn { get; set; }
+        public DateTime? CreatedAt { get; set; }
         public string KeyValues { get; set; }
         public string OldValues { get; set; }
         public string NewValues { get; set; }

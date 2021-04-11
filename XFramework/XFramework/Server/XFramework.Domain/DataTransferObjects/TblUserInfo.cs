@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using XFramework.Domain.Enums;
+using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Domain.DataTransferObjects
 {

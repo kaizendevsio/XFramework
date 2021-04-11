@@ -168,7 +168,7 @@ namespace XFramework.Domain.DataTransferObjects
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn();
 
-                entity.Property(e => e.CreatedOn).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
 
                 entity.Property(e => e.KeyValues).HasColumnType("character varying");
 

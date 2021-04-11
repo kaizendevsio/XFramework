@@ -14,10 +14,10 @@ namespace StreamFlow.Stream.Installers
         {
             // MediatR
             services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
 
             // FluentValidation
             services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
-            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
 
 
         }

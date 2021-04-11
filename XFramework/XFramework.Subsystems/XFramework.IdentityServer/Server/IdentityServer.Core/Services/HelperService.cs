@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.BusinessObjects;
-using Microsoft.IdentityModel.Tokens;
 
 namespace IdentityServer.Core.Services
 {

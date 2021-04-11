@@ -1,0 +1,15 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace XFramework.Domain.Generic.Configurations
+{
+    public class StreamFlowConfiguration
+    {
+        public List<Uri> ServerUrls { get; set; }
+        public Guid ClientGuid { get; set; }
+        public string ClientName { get; set; }
+        public string ClientDescription { get; set; }
+        public int ReconnectDelay { get; set; }
+        public int MaxRetry { get; set; }
+    }
+}

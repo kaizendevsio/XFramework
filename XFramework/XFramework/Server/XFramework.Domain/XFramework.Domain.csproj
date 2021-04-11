@@ -18,12 +18,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
     <ProjectReference Include="..\XFramework.ExternalUtilities\XFramework.External.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Contracts" />
     <Folder Include="DataTransferObjects" />
     <Folder Include="DataTransferObjects\" />
+    <Folder Include="Enums" />
     <Folder Include="Migrations\" />
   </ItemGroup>
 

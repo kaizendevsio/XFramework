@@ -41,9 +41,9 @@ namespace StreamFlow.Stream
 
             app.UseSwaggerUI(c => c.SwaggerEndpoint(swaggerOptions.UiEndpoint, swaggerOptions.Description));
 
-            app.UseHttpsRedirection();
+            //app.UseHttpsRedirection();
 
-            app.UseHsts();
+            //app.UseHsts();
 
             app.UseRouting();
 

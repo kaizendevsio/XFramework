@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
@@ -12,12 +10,10 @@ using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
 using IdentityServer.Domain.Contracts;
 using IdentityServer.Domain.DataTransferObjects;
-using IdentityServer.Domain.Enums;
-using IdentityServer.Integration.Interfaces;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.Enums;
+using XFramework.Integration.Interfaces;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
 {

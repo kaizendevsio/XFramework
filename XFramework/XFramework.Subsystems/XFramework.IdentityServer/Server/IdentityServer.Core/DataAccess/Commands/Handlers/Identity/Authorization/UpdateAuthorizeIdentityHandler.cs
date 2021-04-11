@@ -1,7 +1,6 @@
 ﻿using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;

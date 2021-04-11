@@ -1,8 +1,11 @@
 ﻿using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using StreamFlow.Core.Services;
+using StreamFlow.Stream.Hubs.V1;
 
 namespace StreamFlow.Stream.Installers
 {

@@ -1,5 +1,4 @@
 ﻿using FluentValidation;
-using IdentityServer.Core.DataAccess.Commands.Entity;
 using IdentityServer.Core.Validations.Common;
 
 namespace IdentityServer.Core.DataAccess.Commands.Validations

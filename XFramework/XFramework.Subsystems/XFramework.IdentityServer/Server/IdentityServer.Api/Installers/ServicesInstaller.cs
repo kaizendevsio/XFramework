@@ -1,14 +1,10 @@
-﻿using System.Reflection;
-using FluentValidation;
-using IdentityServer.Core.DataAccess.Commands.Handlers;
-using IdentityServer.Core.Interfaces;
-using IdentityServer.Core.PipelineBehaviors;
+﻿using IdentityServer.Core.Interfaces;
 using IdentityServer.Core.Services;
-using IdentityServer.Integration.Interfaces;
-using IdentityServer.Integration.Wrappers;
-using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using XFramework.Integration.Interfaces;
+using XFramework.Integration.Services;
+using XFramework.Integration.Wrappers;
 
 namespace IdentityServer.Api.Installers
 {
@@ -18,9 +14,10 @@ namespace IdentityServer.Api.Installers
         {
             services.AddSingleton<ICachingService, CachingService>();
             services.AddSingleton<IHelperService, HelperService>();
-            services.AddSingleton<IStreamFlowWrapper, StreamFlowWrapper>();
+            services.AddSingleton<IStreamFlowWrapper, StreamFlowSignalRWrapper>();
             services.AddSingleton<IRecordsWrapper, RecordsWrapper>();
             services.AddSingleton<IJwtService, JwtService>();
+            services.AddSingleton<SignalRService>();
           
         }
     }

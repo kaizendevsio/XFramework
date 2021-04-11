@@ -6,7 +6,6 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.BusinessObjects;
 using Microsoft.IdentityModel.Tokens;

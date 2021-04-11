@@ -15,8 +15,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\IdentityServer.Integration\IdentityServer.Integration.csproj" />
       <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
+      <ProjectReference Include="..\IdentityServer.Integration\IdentityServer.Integration.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -31,6 +31,9 @@
     <ItemGroup>
       <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
+      </Reference>
+      <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\XFramework.Integration.dll</HintPath>
       </Reference>
     </ItemGroup>
 

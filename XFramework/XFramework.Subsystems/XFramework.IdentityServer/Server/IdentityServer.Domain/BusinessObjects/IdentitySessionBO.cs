@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Net;
-using IdentityServer.Domain.Enums;
+using XFramework.Domain.Generic.Enums;
 
 namespace IdentityServer.Domain.BusinessObjects
 {

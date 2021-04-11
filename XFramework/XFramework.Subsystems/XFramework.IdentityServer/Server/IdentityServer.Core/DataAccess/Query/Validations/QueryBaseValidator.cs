@@ -1,7 +1,5 @@
 ﻿using FluentValidation;
-using IdentityServer.Core.DataAccess.Query.Entity;
 using IdentityServer.Core.Validations.Common;
-using IdentityServer.Domain.BusinessObjects;
 
 namespace IdentityServer.Core.DataAccess.Query.Validations
 {

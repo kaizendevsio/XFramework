@@ -25,4 +25,9 @@
       </Reference>
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="DataAccess\Commands\Entity\Events" />
+      <Folder Include="DataAccess\Commands\Handlers\Events" />
+    </ItemGroup>
+
 </Project>

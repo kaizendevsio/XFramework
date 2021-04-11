@@ -18,10 +18,10 @@ namespace StreamFlow.Core.PipelineBehaviors
         private readonly IDataLayer _dataLayer;
         private TResponse _response;
 
-        public BasePipelineBehavior(IEnumerable<IValidator<TRequest>> validators, IDataLayer dataLayer)
+        public BasePipelineBehavior(IEnumerable<IValidator<TRequest>> validators)//, IDataLayer dataLayer)
         {
             _validators = validators;
-            _dataLayer = dataLayer;
+            //_dataLayer = dataLayer;
         }
 
         public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
@@ -33,14 +33,14 @@ namespace StreamFlow.Core.PipelineBehaviors
                 // Post Validation
 
                 // Create data layer transaction
-                var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
+                //var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
 
                 // Pre Handler
                 _response = await next();
                 // Post Handler
 
                 // Commit data layer transaction
-                await transaction.CommitAsync(cancellationToken);
+                //await transaction.CommitAsync(cancellationToken);
                 await PostHandler(request);
 
                 return _response;

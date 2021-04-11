@@ -8,9 +8,8 @@ namespace StreamFlow.Core.Services
     {
         public CachingService()
         {
-            Clients = new();
         }
 
-        public List<StreamFlowClientBO> Clients { get; set; }
+        public List<StreamFlowClientBO> Clients { get; set; } = new();
     }
 }

@@ -21,6 +21,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Domain", "Domain", "{19CBDE
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain.Generic", "XFramework\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj", "{7F3F2989-B7D3-4B7A-A4BF-9120158C0131}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Integration", "XFramework\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj", "{7E04B9B6-E63D-4AAA-9118-8C25B516EA39}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +53,10 @@ Global
 		{7F3F2989-B7D3-4B7A-A4BF-9120158C0131}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7F3F2989-B7D3-4B7A-A4BF-9120158C0131}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7F3F2989-B7D3-4B7A-A4BF-9120158C0131}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E04B9B6-E63D-4AAA-9118-8C25B516EA39}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E04B9B6-E63D-4AAA-9118-8C25B516EA39}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E04B9B6-E63D-4AAA-9118-8C25B516EA39}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E04B9B6-E63D-4AAA-9118-8C25B516EA39}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -65,5 +71,6 @@ Global
 		{B0BEECD5-D6CF-4BA9-B742-A6E16D01635C} = {2BB0FE18-DE6E-4EF0-9D98-6431FFB91801}
 		{B40B95D2-4B36-4CE8-83B7-A0910B0B9984} = {2BB0FE18-DE6E-4EF0-9D98-6431FFB91801}
 		{7F3F2989-B7D3-4B7A-A4BF-9120158C0131} = {19CBDE44-59AA-47ED-894E-EEE4626E817F}
+		{7E04B9B6-E63D-4AAA-9118-8C25B516EA39} = {2BB0FE18-DE6E-4EF0-9D98-6431FFB91801}
 	EndGlobalSection
 EndGlobal

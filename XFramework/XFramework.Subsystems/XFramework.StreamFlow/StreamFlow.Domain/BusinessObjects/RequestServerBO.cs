@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 
 namespace StreamFlow.Domain.BusinessObjects
 {
@@ -6,5 +7,6 @@ namespace StreamFlow.Domain.BusinessObjects
     {
         public long ApplicationId { get; set; }
         public string IpAddress { get; set; }
+        public Guid ClientGuid { get; set; }
     }
 }

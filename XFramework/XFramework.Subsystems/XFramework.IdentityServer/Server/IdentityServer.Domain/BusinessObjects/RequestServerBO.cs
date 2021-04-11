@@ -1,6 +1,4 @@
-﻿using System.Net;
-
-namespace IdentityServer.Domain.BusinessObjects
+﻿namespace IdentityServer.Domain.BusinessObjects
 {
     public class RequestServerBO
     {

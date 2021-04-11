@@ -17,10 +17,17 @@
     <ItemGroup>
       <ProjectReference Include="..\IdentityServer.Core\IdentityServer.Core.csproj" />
       <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
+      <ProjectReference Include="..\IdentityServer.Integration\IdentityServer.Integration.csproj" />
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="Controllers\V1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\XFramework.Integration.dll</HintPath>
+      </Reference>
     </ItemGroup>
 
 </Project>
