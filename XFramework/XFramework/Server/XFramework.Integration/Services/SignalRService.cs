@@ -27,8 +27,9 @@ namespace XFramework.Integration.Services
                 .WithUrl(StreamFlowConfiguration.ServerUrls.First())
                 .WithAutomaticReconnect()
                 .Build();
+            
+            HandleEvents();
         }
-
         public SignalRService(IConfiguration configuration)
         {
             _configuration = configuration;
@@ -38,9 +39,11 @@ namespace XFramework.Integration.Services
                 .WithUrl(StreamFlowConfiguration.ServerUrls.First())
                 .WithAutomaticReconnect()
                 .Build();
+            
+            HandleEvents();
         }
 
-        private async Task HandleEvents()
+        private void HandleEvents()
         {
             Connection.On<string, string>("Ping", (intent, message) =>
                 {
@@ -52,7 +55,6 @@ namespace XFramework.Integration.Services
             HandleReconnectedEvent();
             HandleClosedEvent();
         }
-
         private void HandleClosedEvent()
         {
             Connection.Closed += connectionId =>
