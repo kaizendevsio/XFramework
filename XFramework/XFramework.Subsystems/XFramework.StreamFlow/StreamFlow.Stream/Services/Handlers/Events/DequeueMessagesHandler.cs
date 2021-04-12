@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,16 +27,23 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
         public async Task<CmdResponseBO<DequeueMessagesCmd>> Handle(DequeueMessagesCmd request, CancellationToken cancellationToken)
         {
-            var queuedMessages = _cachingService.QueuedMessages.Where(i => i.Recipient == request.Client.Guid);
-            foreach (var message in queuedMessages)
+            var queuedMessages = _cachingService.QueuedMessages.Where(i => i.Recipient == request.Client.Guid).ToList();
+            if (queuedMessages.Any())
             {
-                var entity = new PushMessageCmd()
+                Console.WriteLine($"Dequeuing items from cache..");
+                foreach (var message in queuedMessages)
                 {
-                    Context = request.Context,
-                    MessageQueue = message
-                };
-                await _mediator.Send(entity).ConfigureAwait(false);
+                    var entity = new PushMessageCmd()
+                    {
+                        Context = request.Context,
+                        MessageQueue = message
+                    };
+                    await _mediator.Send(entity).ConfigureAwait(false);
+                    _cachingService.QueuedMessages.Remove(message);
+                }
+                Console.WriteLine($"Dequeued {queuedMessages.Count} item(s) from cache");
             }
+            
 
             return new()
             {

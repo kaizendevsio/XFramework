@@ -69,8 +69,8 @@ namespace XFramework.Integration.Services
         }
         private void HandleTelemetryCallEvent()
         {
-            Connection.On<string>("TelemetryCall",
-                (message) =>
+            Connection.On<string,string>("TelemetryCall",
+                (message,data) =>
                 {
                     Console.WriteLine($"Telemetry Call ({DateTime.Now}): {message}");
                 });
@@ -99,6 +99,8 @@ namespace XFramework.Integration.Services
                     InvokeVoidAsync(valueTuple.Item1, valueTuple.Item2);
                 }
                 Console.WriteLine($"Dequeued {_queueList.Count} item(s) from cache");
+                _queueList.Clear();
+                
                 return Task.CompletedTask;
             };
         }

@@ -51,7 +51,7 @@ namespace IdentityServer.Api.Controllers
                 MethodName = "TelemetryCall",
                 Message = "Hello fucking world",
                 ExchangeType = MessageExchangeType.Direct,
-                Recipient = new Guid("3902761a-822d-4c6b-8e2d-323fd501b0d1")
+                Recipient = new Guid("5c573dcf-ca54-4b04-80c9-f100c360bb3a")
             });
             
             return Ok(apiStatus);

@@ -58,7 +58,7 @@ namespace StreamFlow.Stream.Hubs.V1
                 Client = request
             };
             var response = await _mediator.Send(entity).ConfigureAwait(false);
-            _mediator.Send(new DequeueMessagesCmd(){Client = request}).ConfigureAwait(false);
+            _mediator.Send(new DequeueMessagesCmd(){Client = request, Context = Context}).ConfigureAwait(false);
             
             return response.HttpStatusCode;
         }
