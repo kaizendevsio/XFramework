@@ -37,24 +37,13 @@ namespace StreamFlow.Stream.Hubs.V1
 
         public async Task<HttpStatusCode> Push(StreamFlowMessageBO request)
         {
-            var client = _cachingService.Clients.FirstOrDefault(x => x.StreamId == Context.ConnectionId);
-            if (client == null)
+            var entity = new PushMessageCmd()
             {
-                Debug.WriteLine($"Unknown or unauthorized client detected");
-                Clients.Caller.SendAsync("TelemetryCall","Client Unknown or Unauthorized");
-                return HttpStatusCode.Forbidden;
-            }
-            
-            PushMessageCmd entity = new()
-            {
-                MessageQueue = request,
-                RequestServer = new()
-                {
-                   Guid = client.Guid
-                }
+                Context = Context,
+                MessageQueue = request
             };
-            await _mediator.Send(entity).ConfigureAwait(false);
-            return HttpStatusCode.Accepted;
+            var response = await _mediator.Send(entity).ConfigureAwait(false);
+            return response.HttpStatusCode;
         }
         public async Task<HttpStatusCode> Subscribe(StreamFlowClientBO request)
         {
@@ -63,14 +52,15 @@ namespace StreamFlow.Stream.Hubs.V1
         }
         public async Task<HttpStatusCode> Register(StreamFlowClientBO request)
         {
-            _cachingService.Clients.Add(new()
+            var entity = new RegisterClientCmd()
             {
-                StreamId = Context.ConnectionId,
-                Guid = request.Guid,
-                Name = request.Name
-            });
-            Console.WriteLine($"Connection Registered with ID {Context.ConnectionId} : {request.Guid} : {request.Name}");
-            return HttpStatusCode.Accepted;
+                Context = Context,
+                Client = request
+            };
+            var response = await _mediator.Send(entity).ConfigureAwait(false);
+            _mediator.Send(new DequeueMessagesCmd(){Client = request}).ConfigureAwait(false);
+            
+            return response.HttpStatusCode;
         }
         public async Task<HttpStatusCode> Unsubscribe(StreamFlowClientBO request)
         {

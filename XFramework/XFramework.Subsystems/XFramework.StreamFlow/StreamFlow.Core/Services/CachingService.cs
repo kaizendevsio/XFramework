@@ -11,5 +11,7 @@ namespace StreamFlow.Core.Services
         }
 
         public List<StreamFlowClientBO> Clients { get; set; } = new();
+        public List<StreamFlowClientBO> AbsoluteClients { get; set; } = new();
+        public List<StreamFlowMessageBO> QueuedMessages { get; set; } = new();
     }
 }

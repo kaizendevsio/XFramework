@@ -6,6 +6,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StreamFlow.Core.Services;
 using StreamFlow.Stream.Hubs.V1;
+using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Domain.Generic.Configurations;
 
 namespace StreamFlow.Stream.Installers
 {
@@ -19,6 +21,10 @@ namespace StreamFlow.Stream.Installers
                 opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
                     new[] { "application/octet-stream" });
             });
+            
+            var streamFlowConfiguration = new StreamFlowConfiguration();
+            configuration.Bind(nameof(streamFlowConfiguration), streamFlowConfiguration);
+            services.AddSingleton(streamFlowConfiguration);
         }
     }
 }

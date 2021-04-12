@@ -11,5 +11,8 @@ namespace XFramework.Domain.Generic.Configurations
         public string ClientDescription { get; set; }
         public int ReconnectDelay { get; set; }
         public int MaxRetry { get; set; }
+        public string Signature { get; set; }
+        public int QueueDepth { get; set; }
+        public bool QueueMessages { get; set; }
     }
 }

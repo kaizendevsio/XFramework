@@ -1,4 +1,5 @@
 ﻿using MediatR;
+using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.DataAccess.Commands.Entity;
 using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;

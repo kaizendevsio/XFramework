@@ -3,7 +3,11 @@ using System.Reflection;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Enums;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Interfaces;
+using XFramework.Integration.Services;
 
 namespace IdentityServer.Api.Controllers
 {
@@ -11,6 +15,13 @@ namespace IdentityServer.Api.Controllers
     [ApiController]
     public class StartupController : ControllerBase
     {
+        public IStreamFlowWrapper StreamFlowWrapper { get; }
+
+        public StartupController(IStreamFlowWrapper streamFlowWrapper)
+        {
+            StreamFlowWrapper = streamFlowWrapper;
+        }
+        
         [HttpGet]
         public virtual async Task<ActionResult> Startup()
         {
@@ -35,6 +46,14 @@ namespace IdentityServer.Api.Controllers
                 Status = "Running"
             };
 
+            await StreamFlowWrapper.Push(new StreamFlowMessageBO()
+            {
+                MethodName = "TelemetryCall",
+                Message = "Hello fucking world",
+                ExchangeType = MessageExchangeType.Direct,
+                Recipient = new Guid("3902761a-822d-4c6b-8e2d-323fd501b0d1")
+            });
+            
             return Ok(apiStatus);
         }
     }

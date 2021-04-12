@@ -80,7 +80,12 @@ namespace XFramework.Integration.Services
             Connection.Reconnected += connectionId =>
             {
                 Debug.Assert(Connection.State == HubConnectionState.Connected);
-                Task.Run(() => InvokeVoidAsync("Register", new StreamFlowClientBO() {Guid = StreamFlowConfiguration.ClientGuid})).Wait();
+                Task.Run(() => InvokeVoidAsync("Register", new StreamFlowClientBO()
+                {
+                    Guid = StreamFlowConfiguration.ClientGuid,
+                    Name = StreamFlowConfiguration.ClientName
+                })).Wait();
+                
                 _isRegistered = true;
                 // Notify users the connection was reestablished.
                 // Start dequeuing messages queued while reconnecting if any.
