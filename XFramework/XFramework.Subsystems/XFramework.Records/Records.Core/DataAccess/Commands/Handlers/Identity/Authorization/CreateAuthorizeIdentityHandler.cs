@@ -43,7 +43,7 @@ namespace Records.Core.DataAccess.Commands.Handlers.Identity.Authorization
             entity.Cuid = Guid.NewGuid().ToString();
             entity.PasswordByte = hashPasswordByte;
             entity.IdentityInfoId = identityInfo.Id;
-            entity.ApplicationId = request.RequestServer.ApplicationId;
+            entity.ApplicationId = request.RequestServer.;
 
             await _dataLayer.TblIdentityCredentials.AddAsync(entity, cancellationToken);
             await _dataLayer.SaveChangesAsync(cancellationToken);
