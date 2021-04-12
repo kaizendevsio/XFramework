@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Records.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Domain.Generic.Interfaces;
 
-namespace Records.Core.Interfaces
+namespace XFramework.Integration.Interfaces
 {
-    public interface IJwtService
+    public interface IJwtService : IXFrameworkService
     {
         public Task<JwtTokenBO> GenerateToken(string username, Guid cuid);
         public Task<JwtTokenBO> GenerateToken(List<Claim> claims);

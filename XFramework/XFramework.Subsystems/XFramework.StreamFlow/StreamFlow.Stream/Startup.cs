@@ -52,6 +52,7 @@ namespace StreamFlow.Stream
             app.UseAuthorization();
 
             app.InstallEndpointConfigInAssembly(env);
+            app.WarmUpServices(env);
         }
     }
 }

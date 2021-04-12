@@ -8,16 +8,17 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
+using XFramework.Domain.Generic.Interfaces;
 
 namespace XFramework.Integration.Services
 {
-    public class SignalRService
+    public class SignalRService : IXFrameworkService
     {
         private readonly IConfiguration _configuration;
         private bool _isRegistered;
         private List<(string, object)> _queueList = new();
         private HubConnection Connection { get; set; }
-        private StreamFlowConfiguration StreamFlowConfiguration { get; set; }
+        private StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
 
         public SignalRService(StreamFlowConfiguration configuration)
         {
@@ -29,6 +30,7 @@ namespace XFramework.Integration.Services
                 .Build();
             
             HandleEvents();
+            Task.Run(async () => await EnsureConnection()).Wait();
         }
         public SignalRService(IConfiguration configuration)
         {
@@ -41,6 +43,7 @@ namespace XFramework.Integration.Services
                 .Build();
             
             HandleEvents();
+            Task.Run(async () => await EnsureConnection()).Wait();
         }
 
         private void HandleEvents()
@@ -59,7 +62,7 @@ namespace XFramework.Integration.Services
         {
             Connection.Closed += connectionId =>
             {
-                Console.WriteLine("Connection to streamFlow server closed");
+                Console.WriteLine("Connection to StreamFlow server closed");
                 Connection.StartAsync();
                 return Task.CompletedTask;
             };
@@ -81,7 +84,7 @@ namespace XFramework.Integration.Services
                 _isRegistered = true;
                 // Notify users the connection was reestablished.
                 // Start dequeuing messages queued while reconnecting if any.
-                Console.WriteLine("Connection to streamFlow server restored");
+                Console.WriteLine("Connection to StreamFlow server restored");
 
                 if (!_queueList.Any()) return Task.CompletedTask;
                 
@@ -102,7 +105,7 @@ namespace XFramework.Integration.Services
                 _isRegistered = false;
                 // Notify users the connection was lost and the client is reconnecting.
                 // Start queuing or dropping messages.
-                Console.WriteLine("Connection to streamFlow server lost, trying to reconnect..");
+                Console.WriteLine("Connection to StreamFlow server lost, trying to reconnect..");
                 return Task.CompletedTask;
             };
         }
@@ -117,20 +120,24 @@ namespace XFramework.Integration.Services
             {
                 retry++;
                 var startTime = DateTime.Now;
-                Console.WriteLine("Connecting to streamFlow server..");
+                Console.WriteLine("Connecting to StreamFlow server..");
                 await Connection.StartAsync();
                 var endTime = DateTime.Now;
                 var elapsedTime = endTime - startTime;
-                Console.WriteLine($"Connected to streamFlow server in {elapsedTime.TotalMilliseconds}ms");
+                Console.WriteLine($"Connected to StreamFlow server in {elapsedTime.TotalMilliseconds}ms");
 
-                await InvokeVoidAsync("Register", new StreamFlowClientBO(){Guid = StreamFlowConfiguration.ClientGuid});
+                await InvokeVoidAsync("Register", new StreamFlowClientBO()
+                {
+                    Guid = StreamFlowConfiguration.ClientGuid,
+                    Name = StreamFlowConfiguration.ClientName
+                });
                 _isRegistered = true;
                 
                 return true;
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed to connect to streamFlow server: {e.Message} : {e.InnerException?.Message}");
+                Console.WriteLine($"Failed to connect to StreamFlow server: {e.Message} : {e.InnerException?.Message}");
                 if (retry >= StreamFlowConfiguration.MaxRetry) return false;
                 Console.WriteLine($"Retrying in {StreamFlowConfiguration.ReconnectDelay}ms");
                 await Task.Delay(StreamFlowConfiguration.ReconnectDelay);
@@ -165,5 +172,6 @@ namespace XFramework.Integration.Services
             Console.WriteLine($"Invoked Method '{methodName}' returned {result} in {elapsedTime.TotalMilliseconds}ms");
             return result;
         }
+
     }
 }

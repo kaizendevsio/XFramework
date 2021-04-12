@@ -12,6 +12,10 @@ namespace Records.Api
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
-                .ConfigureWebHostDefaults(webBuilder => { webBuilder.UseStartup<Startup>(); });
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.UseStartup<Startup>(); 
+                    webBuilder.UseUrls("http://0.0.0.0:6231","https://0.0.0.0:6232");
+                });
     }
 }

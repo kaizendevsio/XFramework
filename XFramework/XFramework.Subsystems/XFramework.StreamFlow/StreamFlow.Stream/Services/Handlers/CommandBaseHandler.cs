@@ -1,9 +1,8 @@
-﻿using System;
-using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Stream.Hubs.V1;
 
-namespace StreamFlow.Core.DataAccess.Commands.Handlers
+namespace StreamFlow.Stream.Services.Handlers
 {
     public class CommandBaseHandler
     {

@@ -15,22 +15,24 @@ namespace IdentityServer.Api
             Configuration = configuration;
         }
 
-        public virtual IConfiguration Configuration { get; }
+        public IConfiguration Configuration { get; }
+        public IServiceCollection Services { get; set; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
-        public virtual void ConfigureServices(IServiceCollection services)
+        public void ConfigureServices(IServiceCollection services)
         {
-           services.InstallServicesInAssembly(Configuration);
+            Services = services;
+            services.InstallServicesInAssembly(Configuration);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public virtual void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
             }
-            
+
             var swaggerOptions = new SwaggerOptions();
             Configuration.GetSection(nameof(SwaggerOptions)).Bind(swaggerOptions);
 
@@ -38,9 +40,9 @@ namespace IdentityServer.Api
             {
                 options.RouteTemplate = swaggerOptions.JsonRoute;
             });
-            
+
             app.UseSwaggerUI(c => c.SwaggerEndpoint(swaggerOptions.UiEndpoint, swaggerOptions.Description));
-            
+
             app.UseHttpsRedirection();
 
             app.UseHsts();
@@ -48,10 +50,12 @@ namespace IdentityServer.Api
             app.UseRouting();
 
             app.UseAuthentication();
-            
+
             app.UseAuthorization();
 
-            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+            app.InstallEndpointConfigInAssembly(env);
+            
+            app.WarmUpServices(Services, ServiceLifetime.Singleton);
         }
     }
 }

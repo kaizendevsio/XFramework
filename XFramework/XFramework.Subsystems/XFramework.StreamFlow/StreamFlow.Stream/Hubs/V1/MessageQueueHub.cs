@@ -23,16 +23,18 @@ namespace StreamFlow.Stream.Hubs.V1
         }
         public override async Task OnConnectedAsync()
         {
-            Debug.WriteLine(Context.ConnectionId);
+            Console.WriteLine($"New Connection Detected with ID {Context.ConnectionId}");
             await base.OnConnectedAsync();
         }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
+            var client = _cachingService.Clients.FirstOrDefault(i => i.StreamId == Context.ConnectionId);
+            _cachingService.Clients.Remove(client);
             await base.OnDisconnectedAsync(exception);
+            Console.WriteLine($"Connection Lost and Unregistered with ID {Context.ConnectionId} : {client?.Guid} : {client?.Name}");
         }
 
-        
         public async Task<HttpStatusCode> Push(StreamFlowMessageBO request)
         {
             var client = _cachingService.Clients.FirstOrDefault(x => x.StreamId == Context.ConnectionId);
@@ -54,20 +56,20 @@ namespace StreamFlow.Stream.Hubs.V1
             await _mediator.Send(entity).ConfigureAwait(false);
             return HttpStatusCode.Accepted;
         }
-        
         public async Task<HttpStatusCode> Subscribe(StreamFlowClientBO request)
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, request.Queue.Guid.ToString());
             return HttpStatusCode.Accepted;
         }
-
         public async Task<HttpStatusCode> Register(StreamFlowClientBO request)
         {
             _cachingService.Clients.Add(new()
             {
                 StreamId = Context.ConnectionId,
-                Guid = request.Guid
+                Guid = request.Guid,
+                Name = request.Name
             });
+            Console.WriteLine($"Connection Registered with ID {Context.ConnectionId} : {request.Guid} : {request.Name}");
             return HttpStatusCode.Accepted;
         }
         public async Task<HttpStatusCode> Unsubscribe(StreamFlowClientBO request)

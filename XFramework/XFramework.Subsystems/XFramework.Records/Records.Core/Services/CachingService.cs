@@ -1,6 +1,5 @@
-﻿using Records.Core.Interfaces;
-using System.Collections.Generic;
-using Records.Domain.BusinessObjects;
+﻿using System.Collections.Generic;
+using Records.Core.Interfaces;
 using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Records.Core.Services

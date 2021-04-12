@@ -11,22 +11,25 @@
         <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="5.0.1" NoWarn="NU1605" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="5.0.1" NoWarn="NU1605" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.5" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="5.6.3" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\IdentityServer.Core\IdentityServer.Core.csproj" />
-      <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
       <ProjectReference Include="..\Records.Core\Records.Core.csproj" />
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="Controllers\V1" />
+      <Folder Include="HostedService" />
     </ItemGroup>
 
     <ItemGroup>
       <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
+      </Reference>
+      <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\XFramework.Integration.dll</HintPath>
       </Reference>
     </ItemGroup>
 

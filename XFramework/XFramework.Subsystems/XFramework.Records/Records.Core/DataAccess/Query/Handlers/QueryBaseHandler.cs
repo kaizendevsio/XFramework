@@ -2,6 +2,7 @@
 using Records.Core.Interfaces;
 using Records.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Interfaces;
 
 namespace Records.Core.DataAccess.Query.Handlers
 {

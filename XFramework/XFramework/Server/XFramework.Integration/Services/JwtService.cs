@@ -6,11 +6,11 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using IdentityServer.Core.Interfaces;
 using Microsoft.IdentityModel.Tokens;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Interfaces;
 
-namespace IdentityServer.Core.Services
+namespace XFramework.Integration.Services
 {
     public class JwtService : IJwtService
     {

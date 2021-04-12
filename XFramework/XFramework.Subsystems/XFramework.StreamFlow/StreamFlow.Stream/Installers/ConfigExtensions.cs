@@ -18,5 +18,10 @@ namespace StreamFlow.Stream.Installers
             });
             
         }
+
+        public static void WarmUpServices(this IApplicationBuilder app, IWebHostEnvironment env)
+        {
+            
+        }
     }
 }

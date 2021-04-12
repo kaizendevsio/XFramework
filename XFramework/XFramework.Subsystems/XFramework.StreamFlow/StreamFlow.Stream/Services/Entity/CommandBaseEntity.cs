@@ -1,7 +1,6 @@
-﻿using StreamFlow.Domain.BusinessObjects;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using XFramework.Domain.Generic.BusinessObjects;
 
-namespace StreamFlow.Core.DataAccess.Commands.Entity
+namespace StreamFlow.Stream.Services.Entity
 {
     public class CommandBaseEntity
     {

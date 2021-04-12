@@ -1,3 +1,4 @@
+using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -16,10 +17,12 @@ namespace Records.Api
         }
 
         public IConfiguration Configuration { get; }
+        public IServiceCollection Services { get; set; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            Services = services;
             services.InstallServicesInAssembly(Configuration);
         }
 
@@ -51,7 +54,9 @@ namespace Records.Api
 
             app.UseAuthorization();
 
-            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+            app.InstallEndpointConfigInAssembly(env);
+            
+            app.WarmUpServices(Services, ServiceLifetime.Singleton);
         }
     }
 }

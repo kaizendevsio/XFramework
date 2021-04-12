@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
+using XFramework.Domain.Generic.Interfaces;
 using XFramework.Integration.Interfaces;
 
 namespace XFramework.Integration.Wrappers

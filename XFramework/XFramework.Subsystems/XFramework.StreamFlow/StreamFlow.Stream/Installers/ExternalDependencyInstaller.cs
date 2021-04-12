@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using StreamFlow.Core.DataAccess.Commands.Handlers;
 using StreamFlow.Core.PipelineBehaviors;
+using CommandBaseHandler = StreamFlow.Stream.Services.Handlers.CommandBaseHandler;
 
 namespace StreamFlow.Stream.Installers
 {
