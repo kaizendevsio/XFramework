@@ -1,6 +1,6 @@
 ﻿using System;
 using MediatR;
-using XFramework.Domain.Enums;
+using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Core.DataAccess.Commands.Entity.User
 {

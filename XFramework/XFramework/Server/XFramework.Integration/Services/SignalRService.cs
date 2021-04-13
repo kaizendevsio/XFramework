@@ -151,7 +151,6 @@ namespace XFramework.Integration.Services
                 goto RetryConnection;
             }
         }
-
         public async Task<HttpStatusCode>InvokeVoidAsync<T>(string methodName, T args1)
         {
             await EnsureConnection();

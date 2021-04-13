@@ -5,7 +5,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using XFramework.Domain.DataTransferObjects;
 
-namespace XFramework.Domain.Generic.BusinessObjects
+namespace XFramework.Domain.BusinessObjects
 {
    public class AuditEntryBO
     {

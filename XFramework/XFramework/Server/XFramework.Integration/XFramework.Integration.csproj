@@ -5,7 +5,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Models" />
+      <Folder Include="Entity" />
     </ItemGroup>
 
     <ItemGroup>
@@ -20,6 +20,9 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Reference Include="IdentityServer.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\Server\IdentityServer.Domain\bin\Debug\net5.0\IdentityServer.Domain.dll</HintPath>
+      </Reference>
       <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net5.0\StreamFlow.Domain.dll</HintPath>
       </Reference>

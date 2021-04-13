@@ -1,14 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using XFramework.Domain.BusinessObjects;
 using XFramework.Domain.DataTransferObjects;
 
 namespace XFramework.Core.Interfaces
@@ -51,7 +49,7 @@ namespace XFramework.Core.Interfaces
         public  void UpdateRange([NotNullAttribute] params object[] entities);
 
         public void RollBack();
-        public List<AuditEntry> OnBeforeSaveChanges();
+        public List<AuditEntryBO> OnBeforeSaveChanges();
 
         public DbSet<TblAddressEntities> TblAddressEntities { get; set; }
         public DbSet<TblAddresses> TblAddresses { get; set; }

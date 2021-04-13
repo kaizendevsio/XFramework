@@ -2,7 +2,7 @@
 using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.AspNetCore.Mvc;
-using XFramework.Domain.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace XFramework.Api.Controllers
 {

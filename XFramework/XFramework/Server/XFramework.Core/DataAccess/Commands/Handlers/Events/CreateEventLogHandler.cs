@@ -1,8 +1,6 @@
 ﻿using MediatR;
 using Microsoft.Extensions.Configuration;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using XFramework.Core.DataAccess.Commands.Entity.Events;

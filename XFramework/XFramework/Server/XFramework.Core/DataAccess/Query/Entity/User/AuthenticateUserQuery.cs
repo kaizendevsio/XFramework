@@ -1,13 +1,13 @@
 ﻿using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using XFramework.Domain.BusinessObjects;
+using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Core.DataAccess.Query.Entity.User
 {
-   public class AuthenticateUserQuery : UserAuthBO, IRequest<bool>
+   public class AuthenticateUserQuery : IRequest<bool>
     {
-      
+        public string Username { get; set; }
+        public string Password { get; set; }
+        public bool Remember { get; set; }
+        public AuthorizeBy AuthorizeBy { get; set; }
     }
 }

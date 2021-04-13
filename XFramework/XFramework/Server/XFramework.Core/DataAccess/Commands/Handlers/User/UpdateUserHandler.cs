@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Mapster;
@@ -7,7 +6,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
-using XFramework.External.Models;
 
 namespace XFramework.Core.DataAccess.Commands.Handlers.User
 {
