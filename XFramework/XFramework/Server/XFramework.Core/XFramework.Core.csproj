@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Folder Include="DataAccess\Commands\Handlers\User\Credential" />
     <Folder Include="DataAccess\Commands\Validations\Application\" />
     <Folder Include="DataAccess\Commands\Validations\Events\" />
     <Folder Include="DataAccess\Commands\Validations\UserWallet\" />
@@ -19,12 +20,13 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="9.2.0" />
     <PackageReference Include="Mapster" Version="7.0.1" />
     <PackageReference Include="MediatR" Version="8.1.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.2" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.5" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\XFramework.Domain\XFramework.Domain.csproj" />
+    <ProjectReference Include="..\XFramework.Integration\XFramework.Integration.csproj" />
   </ItemGroup>
 
   <ItemGroup>

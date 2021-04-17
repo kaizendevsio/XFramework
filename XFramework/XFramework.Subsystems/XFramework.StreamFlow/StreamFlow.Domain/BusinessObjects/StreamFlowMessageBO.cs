@@ -7,7 +7,7 @@ namespace StreamFlow.Domain.BusinessObjects
     public class StreamFlowMessageBO
     {
         public string Data { get; set; }
-        public Guid Recipient { get; set; }
+        public Guid? Recipient { get; set; }
         public string Message { get; set; }
         public string MethodName { get; set; }
         public StreamFlowServiceBO StreamFlowService { get; set; } = new();

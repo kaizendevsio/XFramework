@@ -2,9 +2,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using XFramework.Core.Interfaces;
 using XFramework.Core.Services;
+using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
+using XFramework.Integration.Interfaces.Wrappers;
 using XFramework.Integration.Services;
-using XFramework.Integration.Wrappers;
 
 namespace XFramework.Api.Installers
 {
@@ -14,8 +15,8 @@ namespace XFramework.Api.Installers
         {
             services.AddSingleton<ICachingService, CachingService>();
             services.AddSingleton<IHelperService, HelperService>();
-            services.AddSingleton<IStreamFlowWrapper, StreamFlowSignalRWrapper>();
-            services.AddSingleton<IRecordsWrapper, RecordsWrapper>();
+            services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
+            services.AddSingleton<ILoggerWrapper, RecordsDriver>();
             services.AddSingleton<IJwtService, JwtService>();
             services.AddSingleton<SignalRService>();
           

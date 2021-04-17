@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json;
 
 namespace XFramework.Domain.Generic.Configurations
 {
@@ -14,5 +15,9 @@ namespace XFramework.Domain.Generic.Configurations
         public string Signature { get; set; }
         public int QueueDepth { get; set; }
         public bool QueueMessages { get; set; }
+        public List<(string,string)> Targets { get; set; }
+        
+        
     }
+
 }

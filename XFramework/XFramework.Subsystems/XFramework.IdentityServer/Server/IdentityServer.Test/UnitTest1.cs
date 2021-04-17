@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using XFramework.Domain.Generic.Configurations;
+using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services;
 using XFramework.Integration.Wrappers;
@@ -15,7 +16,7 @@ namespace IdentityServer.Test
     {
         public UnitTest1()
         {
-            StreamFlowWrapper = new StreamFlowSignalRWrapper(
+            StreamFlowWrapper = new StreamFlowDriverSignalR(
                 new SignalRService(
                     new StreamFlowConfiguration
                     {
@@ -30,7 +31,7 @@ namespace IdentityServer.Test
                 ));
         }
 
-        private IStreamFlowWrapper StreamFlowWrapper { get; set; }
+        private IMessageBusWrapper StreamFlowWrapper { get; set; }
         
         [TestMethod]
         public async Task TestMethod1()

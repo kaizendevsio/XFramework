@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
-using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Authorization;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
+using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,14 +17,14 @@ namespace IdentityServer.Api.Controllers.V1.Identity
         }
       
         [HttpPost("Authenticate")]
-        public virtual async Task<JsonResult> Authenticate([FromBody] AuthenticateIdentityQuery request)
+        public virtual async Task<JsonResult> Authenticate([FromBody] AuthenticateCredentialQuery request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
         
         [HttpPost]
-        public virtual async Task<JsonResult> Post([FromBody] CreateAuthorizeIdentityCmd request)
+        public virtual async Task<JsonResult> Post([FromBody] CreateCredentialCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
@@ -32,7 +32,7 @@ namespace IdentityServer.Api.Controllers.V1.Identity
      
         [HttpPut]
         [Authorize]
-        public virtual async Task<JsonResult> Put([FromBody] UpdateAuthorizeIdentityCmd request)
+        public virtual async Task<JsonResult> Put([FromBody] UpdateCredentialCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
@@ -40,7 +40,7 @@ namespace IdentityServer.Api.Controllers.V1.Identity
         
         [HttpDelete]
         [Authorize]
-        public virtual async Task<JsonResult> Delete([FromBody] DeleteAuthorizeIdentityCmd request)
+        public virtual async Task<JsonResult> Delete([FromBody] DeleteCredentialCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);

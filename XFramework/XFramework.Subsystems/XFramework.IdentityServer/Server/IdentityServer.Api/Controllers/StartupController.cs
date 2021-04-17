@@ -15,11 +15,8 @@ namespace IdentityServer.Api.Controllers
     [ApiController]
     public class StartupController : ControllerBase
     {
-        public IStreamFlowWrapper StreamFlowWrapper { get; }
-
-        public StartupController(IStreamFlowWrapper streamFlowWrapper)
+        public StartupController()
         {
-            StreamFlowWrapper = streamFlowWrapper;
         }
         
         [HttpGet]
@@ -46,14 +43,6 @@ namespace IdentityServer.Api.Controllers
                 Status = "Running"
             };
 
-            await StreamFlowWrapper.Push(new StreamFlowMessageBO()
-            {
-                MethodName = "TelemetryCall",
-                Message = "Hello fucking world",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = new Guid("5c573dcf-ca54-4b04-80c9-f100c360bb3a")
-            });
-            
             return Ok(apiStatus);
         }
     }

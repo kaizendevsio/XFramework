@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.Contracts;
 using IdentityServer.Domain.DataTransferObjects;
@@ -14,13 +14,14 @@ using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
+using XFramework.Integration.Wrappers;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
 {
     public class AuthenticateIdentityHandler : QueryBaseHandler,
-        IRequestHandler<AuthenticateIdentityQuery, QueryResponseBO<AuthorizeIdentityContract>>
+        IRequestHandler<AuthenticateCredentialQuery, QueryResponseBO<AuthorizeIdentityContract>>
     {
-        public AuthenticateIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService, IRecordsWrapper recordsWrapper)
+        public AuthenticateIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService, ILoggerWrapper recordsWrapper)
         {
             _recordsService = recordsWrapper;
             _jwtService = jwtService;
@@ -30,7 +31,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
             _cachingService = cachingService;
         }
 
-        public async Task<QueryResponseBO<AuthorizeIdentityContract>> Handle(AuthenticateIdentityQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponseBO<AuthorizeIdentityContract>> Handle(AuthenticateCredentialQuery request, CancellationToken cancellationToken)
         {
             var credential = await ValidateAuthorization(request, cancellationToken, request.AuthorizeBy);
             if (credential == null)
@@ -70,7 +71,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
             };
         }
 
-        private async Task<TblIdentityCredential> ValidateAuthorization(AuthenticateIdentityQuery request, CancellationToken cancellationToken, AuthorizeBy authorizeBy)
+        private async Task<TblIdentityCredential> ValidateAuthorization(AuthenticateCredentialQuery request, CancellationToken cancellationToken, AuthorizeBy authorizeBy)
         {
             TblIdentityCredential result;
             
@@ -123,7 +124,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
             return result;
         }
 
-        private async Task<TblIdentityCredential> ValidatePassword(AuthenticateIdentityQuery request, AuthorizeBy authorizeBy, TblIdentityCredential credential, CancellationToken cancellationToken)
+        private async Task<TblIdentityCredential> ValidatePassword(AuthenticateCredentialQuery request, AuthorizeBy authorizeBy, TblIdentityCredential credential, CancellationToken cancellationToken)
         {
             SHA512 shaM = new SHA512Managed();
             var passwordByte = Encoding.ASCII.GetBytes(request.Password);

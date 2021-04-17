@@ -1,9 +1,9 @@
 ﻿using FluentValidation;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Authorization;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
 
 namespace IdentityServer.Core.DataAccess.Query.Validations.Identity.Authorization
 {
-    public class AuthenticateIdentityValidator : QueryBaseValidator<AuthenticateIdentityQuery>
+    public class AuthenticateIdentityValidator : QueryBaseValidator<AuthenticateCredentialQuery>
     {
         public AuthenticateIdentityValidator()
         {

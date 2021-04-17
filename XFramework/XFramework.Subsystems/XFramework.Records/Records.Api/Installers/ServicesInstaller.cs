@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Records.Core.Interfaces;
 using Records.Core.Services;
+using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services;
 using XFramework.Integration.Wrappers;
@@ -16,7 +17,7 @@ namespace Records.Api.Installers
             services.AddSingleton<IHelperService, HelperService>();
             services.AddSingleton<IJwtService, JwtService>();
             services.AddSingleton<SignalRService>();
-            services.AddSingleton<IStreamFlowWrapper, StreamFlowSignalRWrapper>();
+            services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
         }
     }
 }

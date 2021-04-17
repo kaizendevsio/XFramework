@@ -1,6 +1,7 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 using XFramework.Integration.Interfaces;
+using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Services
 {
@@ -16,10 +17,7 @@ namespace XFramework.Integration.Services
             new RNGCryptoServiceProvider().GetBytes(b);
             return Encoding.ASCII.GetString(b);
         }
-        
-      
 
-        
-        
+        public HttpHelper HttpHelper { get; set; } = new();
     }
 }

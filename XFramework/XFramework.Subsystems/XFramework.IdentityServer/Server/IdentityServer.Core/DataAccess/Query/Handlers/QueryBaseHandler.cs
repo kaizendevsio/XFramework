@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Interfaces;
+using XFramework.Integration.Wrappers;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers
 {
@@ -12,7 +13,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers
         public IHelperService _helperService;
         public IConfiguration _configuration;
         public IJwtService _jwtService;
-        public IRecordsWrapper _recordsService;
+        public ILoggerWrapper _recordsService;
         public JwtOptionsBO _jwtOptions;
 
 

@@ -1,9 +1,9 @@
 ﻿using FluentValidation;
-using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Authorization;
+using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
 
 namespace IdentityServer.Core.DataAccess.Commands.Validations.Identity.Authorization
 {
-    public class CreateAuthorizeIdentityValidator : CommandBaseValidator<CreateAuthorizeIdentityCmd>
+    public class CreateAuthorizeIdentityValidator : CommandBaseValidator<CreateCredentialCmd>
     {
         public CreateAuthorizeIdentityValidator()
         {

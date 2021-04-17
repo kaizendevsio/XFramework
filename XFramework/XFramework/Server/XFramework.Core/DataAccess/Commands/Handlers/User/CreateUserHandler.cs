@@ -5,17 +5,18 @@ using MediatR;
 using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
 using XFramework.Domain.DataTransferObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 
 namespace XFramework.Core.DataAccess.Commands.Handlers.User
 {
-    public class CreateUserHandler : CommandBaseHandler, IRequestHandler<CreateUserCmd,bool>
+    public class CreateUserHandler : CommandBaseHandler, IRequestHandler<CreateUserCmd,CmdResponseBO<CreateUserCmd>>
     {
         public CreateUserHandler(IDataLayer dataLayer)
         {
             DataLayer = dataLayer;
         }
         
-        public async Task<bool> Handle(CreateUserCmd request, CancellationToken cancellationToken)
+        public async Task<CmdResponseBO<CreateUserCmd>> Handle(CreateUserCmd request, CancellationToken cancellationToken)
         {
             await DataLayer.TblUserInfo.AddAsync(new TblUserInfo()
             {
@@ -28,7 +29,7 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.User
             }, cancellationToken);
 
             await DataLayer.SaveChangesAsync(cancellationToken);
-            return true;
+            return new();
         }
     }
 }
