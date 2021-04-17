@@ -2,10 +2,12 @@
 
 namespace XFramework.Domain.Generic.BusinessObjects
 {
-   public class HttpResponseBO
+   public class HttpResponseBO<T>
     {
-        public CookieCollection ResponseCookies { get; set; }
+        public CookieCollection Cookies { get; set; }
 
-        public string ResponseResult { get; set; }
+        public T Result { get; set; }
+        public HttpStatusCode StatusCode { get; set; }
+        public string ReasonPhrase { get; set; }
     }
 }
