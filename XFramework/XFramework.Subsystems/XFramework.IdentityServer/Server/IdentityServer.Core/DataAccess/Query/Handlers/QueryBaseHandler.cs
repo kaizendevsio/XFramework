@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Interfaces;
-using XFramework.Integration.Wrappers;
+using XFramework.Integration.Interfaces.Wrappers;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers
 {

@@ -2,7 +2,13 @@
 using System;
 using System.Reflection;
 using System.Runtime.Versioning;
+using System.Text.Json;
+using System.Threading.Tasks;
+using IdentityServer.Domain.Generic.Contracts.Requests;
+using StreamFlow.Domain.Enums;
+using StreamFlow.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Interfaces.Wrappers;
 
 namespace Records.Api.Controllers
 {
@@ -10,8 +16,15 @@ namespace Records.Api.Controllers
     [ApiController]
     public class StartupController : ControllerBase
     {
+        public IMessageBusWrapper StreamFlowWrapper { get; }
+
+        public StartupController(IMessageBusWrapper streamFlowWrapper)
+        {
+            StreamFlowWrapper = streamFlowWrapper;
+        }
+        
         [HttpGet]
-        public ActionResult Startup()
+        public async Task<ActionResult> Startup()
         {
             var apiStatus = new ApiStatusBO
             {
@@ -32,6 +45,18 @@ namespace Records.Api.Controllers
                 },
                 Status = "Running"
             };
+
+            var entity = new CreateIdentityRequest()
+            {
+                FirstName = "Jay Test 111",
+                LastName = "Eraldo"
+            };
+            await StreamFlowWrapper.Push(new(entity)
+            {
+                ExchangeType = MessageExchangeType.Direct,
+                Recipient = new Guid("3902761a-822d-4c6b-8e2d-323fd501bcd6")
+            });
+            
 
             return Ok(apiStatus);
         }

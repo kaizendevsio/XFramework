@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Query.Entity.Application;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.Contracts;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;

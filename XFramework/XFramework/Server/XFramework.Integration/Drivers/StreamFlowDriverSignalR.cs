@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Threading.Tasks;
-using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
-using XFramework.Integration.Services;
 
 namespace XFramework.Integration.Drivers
 {
     public class StreamFlowDriverSignalR : IMessageBusWrapper
     {
-        private SignalRService SignalRService { get; set; }
+        private ISignalRService SignalRService { get; set; }
         public Guid? TargetClient { get; set; }
 
-        public StreamFlowDriverSignalR(SignalRService signalRService)
+        public StreamFlowDriverSignalR(ISignalRService signalRService)
         {
             SignalRService = signalRService;
         }

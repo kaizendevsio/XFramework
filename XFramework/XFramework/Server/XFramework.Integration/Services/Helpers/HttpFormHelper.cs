@@ -62,9 +62,12 @@ namespace XFramework.Integration.Services.Helpers
         public static string JsonToQuery(this string jsonQuery)
         {
             string str = "?";
-            str += jsonQuery.Replace(":", "=").Replace("{", "").
-                Replace("}", "").Replace(",", "&").
-                Replace("\"", "");
+            str += jsonQuery
+                .Replace(":", "=")
+                .Replace("{", "")
+                .Replace("}", "")
+                .Replace(",", "&")
+                .Replace("\"", "");
             return str;
         }
     }

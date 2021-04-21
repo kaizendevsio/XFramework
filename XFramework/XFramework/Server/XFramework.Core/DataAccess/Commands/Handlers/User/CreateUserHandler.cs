@@ -6,18 +6,23 @@ using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
 using XFramework.Domain.DataTransferObjects;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Core.DataAccess.Commands.Handlers.User
 {
     public class CreateUserHandler : CommandBaseHandler, IRequestHandler<CreateUserCmd,CmdResponseBO<CreateUserCmd>>
     {
-        public CreateUserHandler(IDataLayer dataLayer)
+        public CreateUserHandler(IDataLayer dataLayer, IIdentityServiceWrapper identityServiceWrapper)
         {
+            IdentityServiceWrapper = identityServiceWrapper;
             DataLayer = dataLayer;
         }
         
         public async Task<CmdResponseBO<CreateUserCmd>> Handle(CreateUserCmd request, CancellationToken cancellationToken)
         {
+            await IdentityServiceWrapper.CreateIdentity();
+            
+            
             await DataLayer.TblUserInfo.AddAsync(new TblUserInfo()
             {
                 FirstName = request.FirstName,

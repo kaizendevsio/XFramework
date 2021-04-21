@@ -1,11 +1,13 @@
-﻿using IdentityServer.Core.Interfaces;
+﻿using IdentityServer.Api.SignalR;
+using IdentityServer.Core.Interfaces;
 using IdentityServer.Core.Services;
+using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
+using XFramework.Integration.Interfaces.Wrappers;
 using XFramework.Integration.Services;
-using XFramework.Integration.Wrappers;
 
 namespace IdentityServer.Api.Installers
 {
@@ -18,7 +20,7 @@ namespace IdentityServer.Api.Installers
             services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
             services.AddSingleton<ILoggerWrapper, RecordsDriver>();
             services.AddSingleton<IJwtService, JwtService>();
-            services.AddSingleton<SignalRService>();
+            services.AddSingleton<ISignalRService, SignalRWrapper>();
           
         }
     }

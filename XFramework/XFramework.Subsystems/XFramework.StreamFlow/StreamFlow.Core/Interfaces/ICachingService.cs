@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Core.Interfaces
 {

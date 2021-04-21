@@ -7,14 +7,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
 using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.Contracts;
 using IdentityServer.Domain.DataTransferObjects;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
-using XFramework.Integration.Wrappers;
+using XFramework.Integration.Interfaces.Wrappers;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
 {

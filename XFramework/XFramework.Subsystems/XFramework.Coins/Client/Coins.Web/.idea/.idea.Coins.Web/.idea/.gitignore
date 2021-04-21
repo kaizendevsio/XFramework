@@ -1,0 +1,13 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Rider ignored files
+/modules.xml
+/projectSettingsUpdater.xml
+/.idea.Coins.Web.iml
+/contentModel.xml
+# Datasource local storage ignored files
+/../../../../../../../../../../../../:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Coins\Client\Coins.Web\.idea\.idea.Coins.Web\.idea/dataSources/
+/dataSources.local.xml
+# Editor-based HTTP Client requests
+/httpRequests/

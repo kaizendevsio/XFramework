@@ -61,10 +61,22 @@ namespace XFramework.Integration.Services.Helpers
                 }
             }
 
+            HttpResponseMessage x;
             var requestModelJson = param != null ? JsonSerializer.Serialize(param).JsonToQuery() : string.Empty;
-            HttpResponseMessage x = await client.GetAsync($"{baseUrl.AbsoluteUri}{url}{requestModelJson}");
+            try
+            {
+                x = await client.GetAsync($"{baseUrl.AbsoluteUri}{url}{requestModelJson}");
+            }
+            catch (Exception e)
+            {
+                return new HttpResponseBO<T>
+                {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ReasonPhrase = $"{e.Message} : {e.InnerException?.Message}",
+                    Result = (T)Activator.CreateInstance(typeof(T))
+                };
+            }
             CookieCollection responseCookies = cookies.GetCookies(baseUrl);
-
             var response = new HttpResponseBO<T>
             {
                 StatusCode = x.StatusCode,
@@ -74,6 +86,7 @@ namespace XFramework.Integration.Services.Helpers
                     ? JsonSerializer.Deserialize<T>(x.Content.ReadAsStringAsync().Result, new(){PropertyNameCaseInsensitive = true}) 
                     : (T)Activator.CreateInstance(typeof(T), x.Content.ReadAsStringAsync().Result.ToCharArray())
             };
+            
             return response;
         }
     }

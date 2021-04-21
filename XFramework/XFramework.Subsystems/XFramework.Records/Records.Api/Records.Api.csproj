@@ -25,6 +25,12 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\XFramework.IdentityServer\Server\IdentityServer.Domain.Generic\bin\Debug\net5.0\IdentityServer.Domain.Generic.dll</HintPath>
+      </Reference>
+      <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net5.0\StreamFlow.Domain.Generic.dll</HintPath>
+      </Reference>
       <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
       </Reference>

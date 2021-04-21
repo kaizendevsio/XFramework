@@ -1,16 +1,11 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
-using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
-using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Stream.Services.Entity.Events;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Enums;
 
 namespace StreamFlow.Stream.Hubs.V1
 {

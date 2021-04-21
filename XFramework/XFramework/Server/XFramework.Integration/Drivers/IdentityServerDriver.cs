@@ -1,29 +1,30 @@
 ﻿using System;
 using System.Net;
 using System.Threading.Tasks;
-using IdentityServer.Domain.Contracts;
+using IdentityServer.Domain.Generic.Contracts.Responses;
+using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Integration.Drivers
 {
-    public class IdentityServerDriver : IIdentityServiceWrapper
+    public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     {
         public IMessageBusWrapper StreamFlowDriverSignalR { get; }
 
-        public IdentityServerDriver(IMessageBusWrapper streamFlowDriverSignalR)
+        public IdentityServerDriver(IMessageBusWrapper streamFlowDriverSignalR, IConfiguration configuration)
         {
             StreamFlowDriverSignalR = streamFlowDriverSignalR;
-            StreamFlowDriverSignalR.TargetClient = new Guid("3902761a-822d-4c6b-8e2d-323fd501bcd6");
+            Configuration = configuration;
+            StreamFlowDriverSignalR.TargetClient = Configuration.GetValue<Guid>("StreamFlowConfiguration:Targets:IdentityServerService");
         }
         
         public async Task<QueryResponseBO<AuthorizeIdentityContract>> Authenticate()
         {
-            await StreamFlowDriverSignalR.Push(new()
+            /*await StreamFlowDriverSignalR.Push(new()
             {
                 MethodName = ""
-            });
+            });*/
 
             return new()
             {
@@ -54,6 +55,8 @@ namespace XFramework.Integration.Drivers
 
         public Task<CmdResponseBO<HttpStatusCode>> CreateIdentity()
         {
+            
+            
             throw new System.NotImplementedException();
         }
 

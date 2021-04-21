@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
@@ -10,6 +11,7 @@ using StreamFlow.Core.DataAccess.Commands.Handlers;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.BusinessObjects;
 using StreamFlow.Domain.Enums;
+using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Stream.Hubs.V1;
 using StreamFlow.Stream.Services.Entity.Events;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -45,19 +47,26 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                 Guid = client.Guid,
                 Name = client.Name
             };
-            
+
+            var telemetry = new StreamFlowTelemetryBO
+            {
+                ClientGuid = client.Guid,
+                RequestGuid = request.MessageQueue.RequestGuid,
+                ConsumerGuid = request.MessageQueue.ConsumerGuid
+            };
+
             // Execute Sending Message
             switch (request.MessageQueue.ExchangeType)
             {
                 case MessageExchangeType.FanOut:
-                    await _hubContext.Clients.All.SendAsync(request.MessageQueue.MethodName, request.MessageQueue.Message, request.MessageQueue.Data, cancellationToken: cancellationToken);
+                    await _hubContext.Clients.All.SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken: cancellationToken);
                     break;
                 case MessageExchangeType.Direct:
                     var c = _cachingService.Clients.FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
 
                     if (c != null)
                     {
-                        await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.MethodName, request.MessageQueue.Message, request.MessageQueue.Data,cancellationToken);
+                        await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
                         break;
                     }
 
@@ -84,7 +93,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                    
                     break;
                 case MessageExchangeType.Topic:
-                    await _hubContext.Clients.Group(request.MessageQueue.Recipient.ToString()).SendAsync(request.MessageQueue.MethodName, request.MessageQueue.Message,request.MessageQueue.Data, cancellationToken: cancellationToken);
+                    await _hubContext.Clients.Group(request.MessageQueue.Recipient.ToString()).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken: cancellationToken);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

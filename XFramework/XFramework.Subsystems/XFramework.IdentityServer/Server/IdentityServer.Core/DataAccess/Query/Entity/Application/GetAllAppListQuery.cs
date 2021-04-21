@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using IdentityServer.Domain.Contracts;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 using MediatR;
 using XFramework.Domain.Generic.BusinessObjects;
 

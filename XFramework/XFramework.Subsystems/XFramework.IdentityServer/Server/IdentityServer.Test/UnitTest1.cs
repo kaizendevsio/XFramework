@@ -1,13 +1,18 @@
 using System;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using IdentityServer.Domain.Generic.Contracts.Requests;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using StreamFlow.Domain.Enums;
 using XFramework.Domain.Generic.Configurations;
+using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
+using XFramework.Integration.Interfaces.Wrappers;
 using XFramework.Integration.Services;
-using XFramework.Integration.Wrappers;
+using XFramework.Integration.Services.Helpers;
 
 namespace IdentityServer.Test
 {
@@ -16,7 +21,7 @@ namespace IdentityServer.Test
     {
         public UnitTest1()
         {
-            StreamFlowWrapper = new StreamFlowDriverSignalR(
+            /*StreamFlowWrapper = new StreamFlowDriverSignalR(
                 new SignalRService(
                     new StreamFlowConfiguration
                     {
@@ -26,9 +31,11 @@ namespace IdentityServer.Test
                         },
                         ReconnectDelay = 1500,
                         MaxRetry = 3,
-                        ClientGuid = new Guid("3902761a-822d-4c6b-8e2d-323fd501bcd6")
-                    }
-                ));
+                        ClientGuid = new Guid("3902761a-822d-4c6b-8e2d-323fd501bcd6"),
+                        ClientName = "Unit Test"
+                    },
+                    new()
+                ));*/
         }
 
         private IMessageBusWrapper StreamFlowWrapper { get; set; }
@@ -41,12 +48,19 @@ namespace IdentityServer.Test
 
             if (await StreamFlowWrapper.Connect())
             {
-                for (var i = 0; i < 20; i++)
+                for (var i = 0; i < 1; i++)
                 {
-                    await StreamFlowWrapper.Push(new()
+                    await StreamFlowWrapper.Push(new(new CreateIdentityRequest())
                     {
-                        MethodName = "Ping",
-                        Message = "Hello",
+                        Message = "Hello fucking world",
+                        ExchangeType = MessageExchangeType.Direct,
+                        Recipient = new Guid("3902761a-822d-4c6b-8e2d-323fd501bcd6"),
+                        Data = JsonSerializer.Serialize(new
+                        {
+                            Table = "",
+                            Fucker = "hehehe",
+                            Re = 123.43
+                        })
                     });
                     
                     Thread.Sleep(1000); 

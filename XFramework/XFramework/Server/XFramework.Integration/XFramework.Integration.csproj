@@ -9,6 +9,8 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="Mapster" Version="7.2.0" />
+      <PackageReference Include="MediatR" Version="9.0.0" />
       <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.5" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="5.0.0" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="5.0.0" />
@@ -24,8 +26,11 @@
       <Reference Include="IdentityServer.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\Server\IdentityServer.Domain\bin\Debug\net5.0\IdentityServer.Domain.dll</HintPath>
       </Reference>
-      <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net5.0\StreamFlow.Domain.dll</HintPath>
+      <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\Server\IdentityServer.Domain.Generic\bin\Debug\net5.0\IdentityServer.Domain.Generic.dll</HintPath>
+      </Reference>
+      <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net5.0\StreamFlow.Domain.Generic.dll</HintPath>
       </Reference>
     </ItemGroup>
 

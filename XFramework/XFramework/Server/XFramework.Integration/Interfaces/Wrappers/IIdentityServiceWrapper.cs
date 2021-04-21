@@ -1,6 +1,6 @@
 ﻿using System.Net;
 using System.Threading.Tasks;
-using IdentityServer.Domain.Contracts;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Interfaces;
 

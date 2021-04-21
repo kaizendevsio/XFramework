@@ -1,0 +1,65 @@
+﻿@page "/transactions"
+@using Coins.Domain.BusinessObjects
+@using System.Text.Json
+@using Coins.Web.Models
+@inject HttpClient Http
+
+<h1>Recent Transactions</h1>
+
+<p>This component demonstrates fetching data from the server.</p>
+
+@if (TransactionList == null)
+{
+    <p>
+        <em>Loading...</em>
+    </p>
+}
+else
+{
+    <table class="table">
+        <thead>
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">Name</th>
+            <th scope="col">To Address</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Date</th>
+        </tr>
+        </thead>
+        <tbody>
+
+        @for (var index = 0; index < TransactionList.Count; index++)
+        {
+            var btcTransactionBo = TransactionList[index];
+            <tr>
+                <th scope="row">@index</th>
+                <td>@btcTransactionBo.Name</td>
+                <td>@btcTransactionBo.BtcAddress</td>
+                <td>@btcTransactionBo.BtcAmount</td>
+                <td>@btcTransactionBo.DateTime</td>
+            </tr>
+        }
+
+        </tbody>
+    </table>
+}
+
+@code {
+    public List<TransactionVM> TransactionList { get; set; } = new();
+    
+    [Inject]
+    public IJSRuntime JsRuntime { get; set; }
+
+   protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+       if (firstRender)
+       {
+           TransactionList = JsonSerializer.Deserialize<List<TransactionVM>>(await JsRuntime.InvokeAsync<string>("getTxs"));
+           StateHasChanged();
+       }
+        /*forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("sample-data/weather.json");*/
+    }
+
+  
+
+}

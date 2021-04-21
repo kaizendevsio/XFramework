@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
-using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Integration.Drivers
@@ -20,7 +19,7 @@ namespace XFramework.Integration.Drivers
         {
             guid ??= Guid.NewGuid();
             
-            await MessageBusWrapper.Push(new StreamFlowMessageBO()
+            /*await MessageBusWrapper.Push(new StreamFlowMessageBO()
             {
                 StreamFlowService = new StreamFlowServiceBO()
                 {
@@ -28,7 +27,7 @@ namespace XFramework.Integration.Drivers
                 },
                 MethodName = "NewLog",
                 Data = ""
-            });
+            });*/
             return guid;
         }
 

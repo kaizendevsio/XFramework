@@ -16,6 +16,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
       <ProjectReference Include="..\StreamFlow.Domain\StreamFlow.Domain.csproj" />
     </ItemGroup>
 

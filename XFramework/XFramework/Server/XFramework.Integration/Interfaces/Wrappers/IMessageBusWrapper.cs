@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using StreamFlow.Domain.BusinessObjects;
+using StreamFlow.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Interfaces;
 
 namespace XFramework.Integration.Interfaces.Wrappers

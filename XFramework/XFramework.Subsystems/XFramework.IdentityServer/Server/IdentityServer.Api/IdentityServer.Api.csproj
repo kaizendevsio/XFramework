@@ -17,6 +17,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\IdentityServer.Core\IdentityServer.Core.csproj" />
+      <ProjectReference Include="..\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
       <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
       <ProjectReference Include="..\IdentityServer.Integration\IdentityServer.Integration.csproj" />
     </ItemGroup>
@@ -28,6 +29,9 @@
     <ItemGroup>
       <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net5.0\StreamFlow.Domain.dll</HintPath>
+      </Reference>
+      <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net5.0\StreamFlow.Domain.Generic.dll</HintPath>
       </Reference>
       <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>

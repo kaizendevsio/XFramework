@@ -1,0 +1,157 @@
+﻿@page "/"
+@using Coins.Domain.BusinessObjects
+@using System.Text.Json
+@using Coins.Web.Models
+@using Mapster
+@using XFramework.Domain.Generic.BusinessObjects
+@inject HttpClient Http
+
+<h1>Bulk Bitcoin Sender</h1>
+
+<!-- Button trigger modal -->
+<button type="button" class="mb-3 btn btn-success float-right" data-toggle="modal" data-target="#confirmModal">
+  Send Bitcoin
+</button>
+
+<!-- Button trigger modal -->
+<button type="button" class="mb-3 btn btn-primary float-right mr-3" data-toggle="modal" data-target="#exampleModal">
+  Add New Recipient
+</button>
+
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">New Recipient</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="exampleInputEmail1">Bitcoin Address</label>
+          <input @bind="Transaction.BtcAddress" type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter BTC address..">
+          <small id="emailHelp" class="form-text text-muted">Make sure it's a real BTC address</small>
+        </div>
+        <div class="form-group">
+          <label for="exampleInputPassword1">Amount</label>
+          <input @bind="Transaction.BtcAmount" type="number" class="form-control" id="exampleInputPassword1" placeholder="">
+          <small id="emailHelp" class="form-text text-muted">In BTC amount, <b>NOT satoshi</b></small>
+        </div>
+      </div>
+      <button type="button" class="btn btn-primary w-25 m-3" @onclick="() => AddNewTx()">Submit</button>
+      
+      
+      
+      <div class="border-top border-primary p-3">
+        <h4>Import CSV </h4>
+        <textarea class="w-100" @bind="Csv"></textarea>
+        <button type="button" class="btn btn-primary w-25" @onclick="() => ImportCsv()">Import CSV</button>
+      </div>
+      
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Confirm</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <h4>Are you sure you want to send this transaction?</h4>
+        <br>
+        <h5>@Status</h5>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" @onclick="() => SendBtc()">Submit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Name</th>
+      <th scope="col">To Address</th>
+      <th scope="col">Amount</th>
+      <th scope="col"></th>
+    </tr>
+  </thead>
+  <tbody>
+
+  @foreach (var btcTransactionBo in TransactionList)
+  {
+    <tr>
+      <th scope="row">@btcTransactionBo.Id</th>
+      <td>@btcTransactionBo.Name</td>
+      <td>@btcTransactionBo.BtcAddress</td>
+      <td>@btcTransactionBo.BtcAmount</td>
+    </tr>
+  }
+
+  </tbody>
+</table>
+
+@code{
+
+  public string Csv { get; set; }
+  public TransactionVM Transaction { get; set; } = new();
+  public List<TransactionVM> TransactionList { get; set; } = new();
+  public string Status { get; set; }
+  [Inject]
+  public IJSRuntime JsRuntime { get; set; }
+  
+  private void AddNewTx()
+  {
+    Transaction.Id = TransactionList.Count;
+    TransactionList.Add(Transaction);
+    Transaction = new();
+  }
+
+  private async Task SendBtc()
+  {
+    Status = "Processing..";
+    var result = await Http.PostAsJsonAsync("Blockchain/Send",TransactionList.Adapt<List<BtcTransactionBO>>());
+    var resObject = JsonSerializer.Deserialize<ResponseVm>(await result.Content.ReadAsStringAsync(), new JsonSerializerOptions(){PropertyNameCaseInsensitive = true});
+
+    Console.WriteLine($"{resObject.HttpStatusCode} : {resObject.Message}");
+    
+    Status = resObject.Message;
+    var tmp = TransactionList.Adapt<List<TransactionVM>>();
+    await JsRuntime.InvokeVoidAsync("saveTxs", JsonSerializer.Serialize(tmp));
+  }
+
+  private async Task ImportCsv()
+  {
+    var csvItems = Csv.Split('\n');
+    var dictionary = new Dictionary<string, DateTime>();
+
+    foreach (var item in csvItems)
+    {
+      if (!string.IsNullOrWhiteSpace(item))
+      {
+        var itemParts = item.Split('	');
+        TransactionList.Add(new()
+        {
+          Name = itemParts[0],
+          BtcAddress = itemParts[1],
+          BtcAmount = decimal.Parse(itemParts[2])
+        });
+      }
+    }
+  }
+
+}

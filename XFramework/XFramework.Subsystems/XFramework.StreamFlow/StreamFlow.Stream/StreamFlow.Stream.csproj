@@ -20,6 +20,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\StreamFlow.Core\StreamFlow.Core.csproj" />
+      <ProjectReference Include="..\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
       <ProjectReference Include="..\StreamFlow.Domain\StreamFlow.Domain.csproj" />
     </ItemGroup>
 
