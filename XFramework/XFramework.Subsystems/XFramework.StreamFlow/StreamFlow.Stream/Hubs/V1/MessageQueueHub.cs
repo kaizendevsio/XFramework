@@ -5,13 +5,15 @@ using System.Threading.Tasks;
 using MediatR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Generic.BusinessObjects;
+using StreamFlow.Domain.Generic.Contracts.Requests;
+using StreamFlow.Domain.Generic.Contracts.Responses;
 using StreamFlow.Stream.Services.Entity.Events;
 
 namespace StreamFlow.Stream.Hubs.V1
 {
     public class MessageQueueHub : HubBase
     {
-        public MessageQueueHub(IMediator mediator, ICachingService cachingService)
+        public MessageQueueHub(IMediator mediator, ICachingService cachingService) 
         {
             _cachingService = cachingService;
             _mediator = mediator;
@@ -30,6 +32,28 @@ namespace StreamFlow.Stream.Hubs.V1
             Console.WriteLine($"Connection Lost and Unregistered with ID {Context.ConnectionId} : {client?.Guid} : {client?.Name}");
         }
 
+        public async Task<StreamFlowInvokeResponse> Invoke(StreamFlowMessageBO request)
+        {
+            var entity = new InvokeMethodQuery()
+            {
+                Context = Context,
+                MessageQueue = request
+            };
+            var response = await _mediator.Send(entity).ConfigureAwait(false);
+            return response.Response;
+        }
+        
+        public async Task<HttpStatusCode> InvokeResponse(StreamFlowMessageBO request)
+        {
+            var entity = new InvokeMethodResponseCmd()
+            {
+                Context = Context,
+                MessageQueue = request
+            };
+            var response = await _mediator.Send(entity).ConfigureAwait(false);
+            return response.HttpStatusCode;
+        }
+        
         public async Task<HttpStatusCode> Push(StreamFlowMessageBO request)
         {
             var entity = new PushMessageCmd()

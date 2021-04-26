@@ -14,7 +14,7 @@ namespace IdentityServer.Api.SignalR.Handlers
         public void Handle(HubConnection connection, IMediator mediator)
         {
             connection.On<string,string, StreamFlowTelemetryBO>(GetType().Name.Replace("Handler", string.Empty),
-                async (data,message, telemetry) =>
+                async (data,message,telemetry) =>
                 {
                     StopWatch.Start("Invoked");
                     try

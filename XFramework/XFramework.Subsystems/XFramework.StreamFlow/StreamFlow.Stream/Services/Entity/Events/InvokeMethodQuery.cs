@@ -1,24 +1,23 @@
 ﻿using MediatR;
-using Microsoft.AspNetCore.SignalR;
-using StreamFlow.Core.DataAccess.Commands.Entity;
-using StreamFlow.Domain.BusinessObjects;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
+using StreamFlow.Domain.Generic.Contracts.Responses;
 using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Stream.Services.Entity.Events
 {
-    public class PushMessageCmd : CommandBaseEntity, IRequest<CmdResponseBO<PushMessageCmd>>
+    public class InvokeMethodQuery : CommandBaseEntity, IRequest<QueryResponseBO<StreamFlowInvokeResponse>>
     {
-        public PushMessageCmd()
+        public InvokeMethodQuery()
         {
             
         }
 
-        public PushMessageCmd(StreamFlowMessageBO messageQueue)
+        public InvokeMethodQuery(StreamFlowMessageBO messageQueue)
         {
             MessageQueue = messageQueue;
         }
+        
         public StreamFlowMessageBO MessageQueue { get; set; }
     }
 }

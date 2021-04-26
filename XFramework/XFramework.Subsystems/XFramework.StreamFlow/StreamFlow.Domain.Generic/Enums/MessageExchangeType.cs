@@ -1,4 +1,4 @@
-﻿namespace StreamFlow.Domain.Enums
+﻿namespace StreamFlow.Domain.Generic.Enums
 {
     public enum MessageExchangeType
     {
