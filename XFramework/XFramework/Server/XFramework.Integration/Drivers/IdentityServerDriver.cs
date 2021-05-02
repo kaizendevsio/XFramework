@@ -26,7 +26,7 @@ namespace XFramework.Integration.Drivers
         {
             var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
             {
-                CommandName = "CreateIdentity",
+                CommandName = "Authenticate",
                 ExchangeType = MessageExchangeType.Direct,
             });
             return result.Adapt<QueryResponseBO<AuthorizeIdentityContract>>();
@@ -36,7 +36,7 @@ namespace XFramework.Integration.Drivers
         {
             var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
             {
-                CommandName = "CreateIdentity",
+                CommandName = "CreateCredential",
                 ExchangeType = MessageExchangeType.Direct,
             });
             return result.Adapt<CmdResponseBO>();
@@ -46,26 +46,31 @@ namespace XFramework.Integration.Drivers
         {
             var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
             {
-                CommandName = "CreateIdentity",
+                CommandName = "UpdateCredential",
                 ExchangeType = MessageExchangeType.Direct,
             });
             return result.Adapt<CmdResponseBO>();
         }
 
-        public async Task<CmdResponseBO> DeleteCredential(UpdateCredentialRequest request)
+        public async Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request)
         {
             var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
             {
-                CommandName = "CreateIdentity",
+                CommandName = "DeleteCredential",
                 ExchangeType = MessageExchangeType.Direct,
             });
             return result.Adapt<CmdResponseBO>();
         }
         
 
-        public async Task<CmdResponseBO> GetIdentity()
+        public async Task<QueryResponseBO<GetIdentityContract>> GetIdentity(GetIdentityRequest request)
         {
-            throw new System.NotImplementedException();
+            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            {
+                CommandName = "GetIdentity",
+                ExchangeType = MessageExchangeType.Direct,
+            });
+            return result.Adapt<QueryResponseBO<GetIdentityContract>>();
         }
 
         public async Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request)
@@ -82,7 +87,7 @@ namespace XFramework.Integration.Drivers
         {
             var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
             {
-                CommandName = "CreateIdentity",
+                CommandName = "UpdateIdentity",
                 ExchangeType = MessageExchangeType.Direct,
             });
             return result.Adapt<CmdResponseBO>();
@@ -92,7 +97,7 @@ namespace XFramework.Integration.Drivers
         {
             var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
             {
-                CommandName = "CreateIdentity",
+                CommandName = "DeleteIdentity",
                 ExchangeType = MessageExchangeType.Direct,
             });
             return result.Adapt<CmdResponseBO>();

@@ -1,11 +1,9 @@
 ﻿using System;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
 
-namespace XFramework.Core.DataAccess.Commands.Entity.User
+namespace XFramework.Domain.Generic.Contracts.Requests
 {
-    public class CreateUserCmd : CommandBaseEntity ,IRequest<CmdResponseBO<CreateUserCmd>>
+    public class CreateUserRequest
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }

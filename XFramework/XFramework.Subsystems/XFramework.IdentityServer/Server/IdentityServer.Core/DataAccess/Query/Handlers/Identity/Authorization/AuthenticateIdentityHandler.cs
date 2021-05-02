@@ -66,7 +66,8 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                 Response = new()
                 {
                     AccessToken = token.AccessToken,
-                    RefreshToken = token.RefreshToken
+                    RefreshToken = token.RefreshToken,
+                    Uid = Guid.Parse(credential.IdentityInfo.Uuid)
                 }
             };
         }
@@ -86,33 +87,45 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                     goto reAuth;
                 case AuthorizeBy.UsernameEmailPhone:
                     result = await _dataLayer.TblIdentityCredentials
+                        .Include(i => i.IdentityInfo)
                         .AsNoTracking()
                         .FirstOrDefaultAsync(i => i.UserName == request.Username,
                         cancellationToken: cancellationToken);
                     result ??= _dataLayer.TblIdentityContacts
+                        .Include(i => i.UserCredential)
+                        .ThenInclude(i => i.IdentityInfo)
                         .AsNoTracking()
                         .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 1)?.UserCredential;
                     result ??= _dataLayer.TblIdentityContacts
+                        .Include(i => i.UserCredential)
+                        .ThenInclude(i => i.IdentityInfo)
+                        .AsNoTracking()
                         .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 2)?.UserCredential;
                     break;
                 case AuthorizeBy.Username:
                     result = await _dataLayer.TblIdentityCredentials
+                        .Include(i => i.IdentityInfo)
                         .AsNoTracking()
                         .FirstOrDefaultAsync(i => i.UserName == request.Username,
                         cancellationToken: cancellationToken);
                     break;
                 case AuthorizeBy.Email:
                     result = _dataLayer.TblIdentityContacts
+                        .Include(i => i.UserCredential)
+                        .ThenInclude(i => i.IdentityInfo)
                         .AsNoTracking()
                         .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 1)?.UserCredential;
                     break;
                 case AuthorizeBy.Phone:
                     result = _dataLayer.TblIdentityContacts
+                        .Include(i => i.UserCredential)
+                        .ThenInclude(i => i.IdentityInfo)
                         .AsNoTracking()
                         .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 2)?.UserCredential;
                     break;
                 case AuthorizeBy.Token:
                     result = await _dataLayer.TblIdentityCredentials
+                        .Include(i => i.IdentityInfo)
                         .AsNoTracking()
                         .FirstOrDefaultAsync(i => i.UserName == request.Username,
                         cancellationToken: cancellationToken);

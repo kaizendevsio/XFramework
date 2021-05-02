@@ -13,5 +13,7 @@ namespace IdentityServer.Domain.Generic.Contracts.Requests
         public short Gender { get; set; }
         public bool IsVerified { get; set; }
         public short CivilStatus { get; set; }
+        
+        public Guid Uid { get; set; }
     }
 }

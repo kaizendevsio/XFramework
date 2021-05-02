@@ -12,9 +12,9 @@ namespace XFramework.Integration.Interfaces.Wrappers
         public Task<QueryResponseBO<AuthorizeIdentityContract>> Authenticate(AuthenticateCredentialRequest request);
         public Task<CmdResponseBO> CreateCredential(CreateCredentialRequest request);
         public Task<CmdResponseBO> UpdateCredential(UpdateCredentialRequest request);
-        public Task<CmdResponseBO> DeleteCredential(UpdateCredentialRequest request);
+        public Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request);
         
-        public Task<CmdResponseBO> GetIdentity();
+        public Task<QueryResponseBO<GetIdentityContract>> GetIdentity(GetIdentityRequest request);
         public Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request);
         public Task<CmdResponseBO> UpdateIdentity(UpdateIdentityRequest request);
         public Task<CmdResponseBO> DeleteIdentity(DeleteIdentityRequest request);

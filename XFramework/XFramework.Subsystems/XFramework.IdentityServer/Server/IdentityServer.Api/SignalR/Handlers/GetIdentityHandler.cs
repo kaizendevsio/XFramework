@@ -1,6 +1,8 @@
 ﻿using System;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using IdentityServer.Domain.Generic.Contracts.Requests;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 using Mapster;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -20,11 +22,11 @@ namespace IdentityServer.Api.SignalR.Handlers
                     StopWatch.Start();
                     try
                     {
-                        var r = data.AsMediatorCmd<UpdateIdentityRequest, UpdateIdentityCmd>();
+                        var r = data.AsMediatorCmd<GetIdentityRequest, GetIdentityQuery>();
                         var result = await mediator.Send(r).ConfigureAwait(false);
                         StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode.ToString()}"); 
                         
-                        await RespondToInvoke(connection, telemetry, result.Adapt<CmdResponseBO>());
+                        await RespondToInvoke(connection, telemetry, result.Adapt<QueryResponseBO<GetIdentityContract>>());
                     }
                     catch (Exception e)
                     {

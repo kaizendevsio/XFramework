@@ -2,7 +2,7 @@
 using MediatR;
 using XFramework.Domain.Generic.BusinessObjects;
 
-namespace XFramework.Core.DataAccess.Commands.Entity.User.Credential
+namespace XFramework.Core.DataAccess.Commands.Entity.Identity.Credential
 {
     public class DeleteCredentialCmd : CommandBaseEntity, IRequest<CmdResponseBO<DeleteCredentialCmd>>
     {
