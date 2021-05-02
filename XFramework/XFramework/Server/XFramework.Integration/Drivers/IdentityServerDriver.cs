@@ -19,7 +19,7 @@ namespace XFramework.Integration.Drivers
         {
             StreamFlowDriver = streamFlowDriver;
             Configuration = configuration;
-            StreamFlowDriver.TargetClient = Configuration.GetValue<Guid>("StreamFlowConfiguration:Targets:IdentityServerService");
+            StreamFlowDriver.TargetClient = new Guid("3902761a-822d-4c6b-8e2d-323fd501bcd6"); //Configuration.GetValue<Guid>("StreamFlowConfiguration:Targets:IdentityServerService");
         }
         
         public async Task<QueryResponseBO<AuthorizeIdentityContract>> Authenticate(AuthenticateCredentialRequest request)
