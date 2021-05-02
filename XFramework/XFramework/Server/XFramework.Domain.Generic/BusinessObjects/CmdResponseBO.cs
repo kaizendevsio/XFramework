@@ -9,4 +9,11 @@ namespace XFramework.Domain.Generic.BusinessObjects
         public T Request { get; set; }
         public string RedirectUrl { get; set; }
     }
+    
+    public class CmdResponseBO
+    {
+        public HttpStatusCode HttpStatusCode { get; set; }
+        public string Message { get; set; }
+        public string RedirectUrl { get; set; }
+    }
 }

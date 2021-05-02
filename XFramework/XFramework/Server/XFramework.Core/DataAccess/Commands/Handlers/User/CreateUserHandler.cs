@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using IdentityServer.Domain.Generic.Contracts.Requests;
+using Mapster;
 using MediatR;
 using XFramework.Core.DataAccess.Commands.Entity.User;
 using XFramework.Core.Interfaces;
@@ -10,31 +13,39 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Core.DataAccess.Commands.Handlers.User
 {
-    public class CreateUserHandler : CommandBaseHandler, IRequestHandler<CreateUserCmd,CmdResponseBO<CreateUserCmd>>
+    public class CreateUserHandler : CommandBaseHandler, IRequestHandler<CreateUserCmd, CmdResponseBO<CreateUserCmd>>
     {
-        public CreateUserHandler(IDataLayer dataLayer, IIdentityServiceWrapper identityServiceWrapper)
+        public CreateUserHandler(IIdentityServiceWrapper identityServiceWrapper)
         {
             IdentityServiceWrapper = identityServiceWrapper;
-            DataLayer = dataLayer;
         }
-        
+
         public async Task<CmdResponseBO<CreateUserCmd>> Handle(CreateUserCmd request, CancellationToken cancellationToken)
         {
-            await IdentityServiceWrapper.CreateIdentity();
-            
-            
-            await DataLayer.TblUserInfo.AddAsync(new TblUserInfo()
+            var response = await IdentityServiceWrapper.CreateIdentity(request.Adapt<CreateIdentityRequest>());
+            if (response.HttpStatusCode != HttpStatusCode.Accepted)
             {
-                FirstName = request.FirstName,
-                LastName =  request.LastName,
-                Dob = request.Dob,
-                Gender = request.Gender,
-                CivilStatus = request.CivilStatus,
-                Uid = Guid.NewGuid().ToString()
-            }, cancellationToken);
+                return new()
+                {
+                    HttpStatusCode = response.HttpStatusCode,
+                    Message = response.Message
+                };
+            }
 
-            await DataLayer.SaveChangesAsync(cancellationToken);
-            return new();
+            response = await IdentityServiceWrapper.CreateCredential(request.Adapt<CreateCredentialRequest>());
+            if (response.HttpStatusCode != HttpStatusCode.Accepted)
+            {
+                return new()
+                {
+                    HttpStatusCode = response.HttpStatusCode,
+                    Message = response.Message
+                };
+            }
+
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
         }
     }
 }

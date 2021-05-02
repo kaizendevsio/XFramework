@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Text.Json;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
+using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
 using IdentityServer.Domain.Generic.Contracts.Requests;
 using Mapster;
 using MediatR;
@@ -11,9 +11,9 @@ using XFramework.Integration.Services.Helpers;
 
 namespace IdentityServer.Api.SignalR.Handlers
 {
-    public class CreateIdentityHandler : BaseSignalRHandler, ISignalREventHandler
+    public class DeleteCredentialHandler : BaseSignalRHandler, ISignalREventHandler
     {
-       public void Handle(HubConnection connection, IMediator mediator)
+        public void Handle(HubConnection connection, IMediator mediator)
         {
             connection.On<string,string,StreamFlowTelemetryBO>(GetType().Name.Replace("Handler", string.Empty),
                 async (data,message,telemetry) =>
@@ -21,7 +21,7 @@ namespace IdentityServer.Api.SignalR.Handlers
                     StopWatch.Start();
                     try
                     {
-                        var r = data.AsMediatorCmd<CreateIdentityRequest, CreateIdentityCmd>();
+                        var r = data.AsMediatorCmd<DeleteCredentialRequest, DeleteCredentialCmd>();
                         var result = await mediator.Send(r).ConfigureAwait(false);
                         StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode.ToString()}"); 
                         
