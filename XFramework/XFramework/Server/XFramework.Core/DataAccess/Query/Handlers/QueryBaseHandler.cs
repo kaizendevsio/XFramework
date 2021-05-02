@@ -5,7 +5,6 @@ namespace XFramework.Core.DataAccess.Query.Handlers
 {
     public class QueryBaseHandler
     {
-        public IDataLayer _dataLayer;
         protected IIdentityServiceWrapper IdentityServiceWrapper;
     }
 }

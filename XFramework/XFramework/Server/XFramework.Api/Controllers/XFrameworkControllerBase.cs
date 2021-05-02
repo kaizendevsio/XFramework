@@ -8,12 +8,5 @@ namespace XFramework.Api.Controllers
     {
         public IConfiguration _configuration;
         public IMediator _mediator;
-
-
-        public bool RequestResult { get; set; }
-        public static string RequestResponseString { get; set; }
-
-
-      
     }
 }

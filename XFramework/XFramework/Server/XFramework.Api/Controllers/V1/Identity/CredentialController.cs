@@ -1,10 +1,9 @@
 ﻿using System.Threading.Tasks;
-using IdentityServer.Domain.Generic.Contracts.Requests;
 using Mapster;
+using IdentityServer.Domain.Generic.Contracts.Requests;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using XFramework.Core.DataAccess.Commands.Entity.Identity.Credential;
-using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Api.Controllers.V1.Identity
 {
@@ -18,21 +17,24 @@ namespace XFramework.Api.Controllers.V1.Identity
         }
         
         [HttpPost("Create")]
-        public async Task Create([FromBody] CreateCredentialRequest request)
+        public async Task<JsonResult> Create([FromBody] CreateCredentialRequest request)
         {
-            await _mediator.Send(request.Adapt<CreateCredentialCmd>()).ConfigureAwait(false);
+            var result = await _mediator.Send(request.Adapt<CreateCredentialCmd>()).ConfigureAwait(false);
+            return new JsonResult(result);
         }
         
         [HttpPost("Update")]
-        public async Task Update([FromBody] UpdateCredentialRequest request)
+        public async Task<JsonResult> Update([FromBody] UpdateCredentialRequest request)
         {
-            await _mediator.Send(request.Adapt<UpdateCredentialCmd>()).ConfigureAwait(false);
+            var result = await _mediator.Send(request.Adapt<UpdateCredentialCmd>()).ConfigureAwait(false);
+            return new JsonResult(result);
         }
 
         [HttpPost("Delete")]
-        public async Task Delete([FromBody] DeleteCredentialRequest request)
+        public async Task<JsonResult> Delete([FromBody] DeleteCredentialRequest request)
         {
-            await _mediator.Send(request.Adapt<DeleteCredentialCmd>()).ConfigureAwait(false);
+            var result = await _mediator.Send(request.Adapt<DeleteCredentialCmd>()).ConfigureAwait(false);
+            return new JsonResult(result);
         }
     }
 }

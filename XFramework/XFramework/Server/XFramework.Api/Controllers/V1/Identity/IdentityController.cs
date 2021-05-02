@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using IdentityServer.Domain.Generic.Contracts.Requests;
 using Mapster;
+using IdentityServer.Domain.Generic.Contracts.Requests;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using XFramework.Core.DataAccess.Commands.Entity.Identity;
@@ -23,33 +23,38 @@ namespace XFramework.Api.Controllers.V1.Identity
         }
 
         [HttpGet]
-        public async Task Get(Guid guid)
+        public async Task<JsonResult> Get(Guid guid)
         {
-            await _mediator.Send(new GetIdentityQuery(){Uid = guid}).ConfigureAwait(false);
+            var result = await _mediator.Send(new GetIdentityQuery(){Uid = guid}).ConfigureAwait(false);
+            return new JsonResult(result);
         }
         
         [HttpPost("Create")]
-        public async Task Create([FromBody] CreateUserRequest request)
+        public async Task<JsonResult> Create([FromBody] CreateUserRequest request)
         {
-            await _mediator.Send(request.Adapt<CreateIdentityCmd>()).ConfigureAwait(false);
+            var result = await _mediator.Send(request.Adapt<CreateIdentityCmd>()).ConfigureAwait(false);
+            return new JsonResult(result);
         }
         
         [HttpPost("Update")]
-        public async Task Update([FromBody] UpdateIdentityRequest request)
+        public async Task<JsonResult> Update([FromBody] UpdateIdentityRequest request)
         {
-            await _mediator.Send(request.Adapt<UpdateIdentityCmd>()).ConfigureAwait(false);
+            var result = await _mediator.Send(request.Adapt<UpdateIdentityCmd>()).ConfigureAwait(false);
+            return new JsonResult(result);
         }
 
         [HttpPost("Delete")]
-        public async Task Delete([FromBody] DeleteIdentityRequest request)
+        public async Task<JsonResult> Delete([FromBody] DeleteIdentityRequest request)
         {
-            await _mediator.Send(request.Adapt<DeleteIdentityCmd>()).ConfigureAwait(false);
+            var result = await _mediator.Send(request.Adapt<DeleteIdentityCmd>()).ConfigureAwait(false);
+            return new JsonResult(result);
         }
        
         [HttpPost("Authenticate")]
-        public async Task Authenticate([FromBody] AuthenticateCredentialRequest request)
+        public async Task<JsonResult> Authenticate([FromBody] AuthenticateCredentialRequest request)
         {
-            await _mediator.Send(request.Adapt<AuthenticateIdentityQuery>()).ConfigureAwait(false);
+            var result = await _mediator.Send(request.Adapt<AuthenticateIdentityQuery>()).ConfigureAwait(false);
+            return new JsonResult(result);
         }
     }
 }
