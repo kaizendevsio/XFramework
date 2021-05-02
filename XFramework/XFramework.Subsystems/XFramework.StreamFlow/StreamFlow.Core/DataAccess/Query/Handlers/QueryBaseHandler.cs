@@ -2,6 +2,7 @@
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Interfaces;
 
 namespace StreamFlow.Core.DataAccess.Query.Handlers
 {

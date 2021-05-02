@@ -6,22 +6,42 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="409723ac-d59d-499a-9f6f-0d22e3f077ee" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Responses/StreamFlowInvokeResponse.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Entity/Events/InvokeMethodQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Entity/Events/InvokeMethodResponseCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodResponseHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/TestSignalRHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Entity/Contracts/Responses/SignalRResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Entity/Contracts/Responses/StreamFlowInvokeResult.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Records/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Records/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/Interfaces/ICachingService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/Interfaces/ICachingService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/Services/CachingService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/Services/CachingService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowMessageBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Enums/MessageExchangeType.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Enums/MessageExchangeType.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/StreamFlow.Domain.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/StreamFlow.Domain.Generic.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/V1/MessageQueueHub.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/V1/MessageQueueHub.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Entity/Events/PushMessageCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Entity/Events/PushMessageCmd.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/DeleteCredentialRequest.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/DeleteIdentityRequest.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateCredentialRequest.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateIdentityHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Test/UnitTest1.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Test/UnitTest1.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Api/Controllers/StartupController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Api/Controllers/StartupController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Api/Records.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Api/Records.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Api/SignalR/SignalRWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Api/SignalR/SignalRWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/Interfaces/IHelperService.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/Interfaces/IJwtService.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/Services/HelperService.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/Services/JwtService.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/StreamFlow.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/StreamFlow.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowTelemetryBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowTelemetryBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/ServicesInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/ServicesInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/CommandBaseHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/CommandBaseHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodResponseHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodResponseHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/IHelperService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/IHelperService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/ISignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/ISignalRService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IMessageBusWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IMessageBusWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/HelperService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/HelperService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/HelpersTest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/HelpersTest.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,52 +65,52 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/61F5185B-E9CF-48B9-8487-181D7861EB9C/199/Monitor.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowMessageBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/61F5185B-E9CF-48B9-8487-181D7861EB9C/2B7/RuntimeHelpers.CoreCLR.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Test/UnitTest1.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/400F8772-CB9F-4C33-A6B2-E1B0D2CA5312/31/f8a93376/IMessageBusWrapper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/4494F067-09EB-431E-9517-6A2CB286ACC8/17/d54bc2a5/IRecordsWrapper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/A/ServiceProvider.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowClientBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/RequestServerBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/StreamFlowHelper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Interfaces/IXFrameworkService.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ServicesInstaller.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/1BA52DC0-B103-422E-BA91-AD87A1AA9FE3/9/ServiceProviderServiceExtensions.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/CreateIdentityCmd.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Controllers/StartupController.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Configurations/StreamFlowConfiguration.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/Credential/DeleteCredentialCmd.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowClientBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/IL/400F8772-CB9F-4C33-A6B2-E1B0D2CA5312/a0/f826210f/0200000D.il" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/RequestServerBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/737EA614-F8F8-4B29-9890-78F66D6FC7F7/C/HubConnectionExtensions.InvokeAsync.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/D2B0EF7B-A8C3-4AF1-95CC-501C0131D7BA/08/fb4d00bc/EntityEntry.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/61F5185B-E9CF-48B9-8487-181D7861EB9C/199/Monitor.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/61F5185B-E9CF-48B9-8487-181D7861EB9C/2B7/RuntimeHelpers.CoreCLR.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/4494F067-09EB-431E-9517-6A2CB286ACC8/17/d54bc2a5/IRecordsWrapper.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/1F/ServiceProviderEngineScope.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/1E/ServiceProviderEngine.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Interfaces/IXFrameworkService.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/917010EA-8F23-45DE-AD3D-F26FDF1EEBBA/8/ConcurrentDictionary.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/CreateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/14/DynamicServiceProviderEngine.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/UpdateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Configurations/StreamFlowConfiguration.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/CreateIdentityCmd.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/E/CallSiteRuntimeResolver.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/FFCA546A-B5DF-401D-A393-49EF3A2FAD11/1F/HostingLoggerExtensions.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/Credential/DeleteCredentialCmd.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/61F5185B-E9CF-48B9-8487-181D7861EB9C/233/ExceptionDispatchInfo.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/16B044BD-3929-4FB6-8989-62C10A56B9ED/d0/89a15d63/IMessageBusWrapper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/3F/String.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/37/Object.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/B2/Nullable.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/10/CallSiteVisitor.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Test/UnitTest1.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/38966B65-A94A-4794-97B7-7A72FC6E92DE/e9/2ea342d4/JsonSerializer.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/8B/Guid.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Controllers/StartupController.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/21/StackGuard.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/IL/400F8772-CB9F-4C33-A6B2-E1B0D2CA5312/a0/f826210f/0200000D.il" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/D2B0EF7B-A8C3-4AF1-95CC-501C0131D7BA/08/fb4d00bc/EntityEntry.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/CreateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/UpdateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/16B044BD-3929-4FB6-8989-62C10A56B9ED/d0/89a15d63/IMessageBusWrapper.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/400F8772-CB9F-4C33-A6B2-E1B0D2CA5312/31/f8a93376/IMessageBusWrapper.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/StreamFlowHelper.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/8B/Guid.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/B2/Nullable.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ServicesInstaller.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/37/Object.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/3F/String.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/1BA52DC0-B103-422E-BA91-AD87A1AA9FE3/9/ServiceProviderServiceExtensions.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowTelemetryBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/A/ServiceProvider.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/Interfaces/ICachingService.cs" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/Interfaces/IHelperService.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.Development.json" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/Credential/CreateAuthorizeIdentityCmd.cs" />
@@ -126,7 +146,6 @@
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Controllers/StartupController.cs" />
       <option value="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/StreamFlowHelper.cs" />
       <option value="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Test/UnitTest1.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/SignalRBaseHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ServicesInstaller.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ExternalDependencyInstaller.cs" />
@@ -137,9 +156,12 @@
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/DeleteIdentityRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateCredentialRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateIdentityHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateIdentityHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Test/UnitTest1.cs" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowTelemetryBO.cs" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/TestSignalRHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" />
     </changedPaths>
   </component>
   <component name="ProjectId" id="1qOncsCSonRsHoyplss4wKExcko" />
@@ -275,6 +297,11 @@
       <workItem from="1619198155305" duration="604000" />
       <workItem from="1619271887167" duration="1221000" />
       <workItem from="1619361447905" duration="604000" />
+      <workItem from="1619434523513" duration="1672000" />
+      <workItem from="1619504780769" duration="5351000" />
+      <workItem from="1619585030714" duration="1786000" />
+      <workItem from="1619635107549" duration="3625000" />
+      <workItem from="1619932832753" duration="10381000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure To Support Sub-Systems">
       <created>1616960634242</created>

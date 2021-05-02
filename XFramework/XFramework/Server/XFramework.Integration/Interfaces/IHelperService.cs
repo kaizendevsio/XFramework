@@ -6,6 +6,7 @@ namespace XFramework.Integration.Interfaces
     public interface IHelperService : IXFrameworkService
     {
         public string GenerateRandomString(int size);
-        public HttpHelper HttpHelper { get; set; }
+        public HttpHelper Http { get; set; }
+        public StopWatchHelper StopWatch { get; set; }
     }
 }

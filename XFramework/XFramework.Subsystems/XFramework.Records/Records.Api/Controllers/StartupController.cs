@@ -5,8 +5,7 @@ using System.Runtime.Versioning;
 using System.Text.Json;
 using System.Threading.Tasks;
 using IdentityServer.Domain.Generic.Contracts.Requests;
-using StreamFlow.Domain.Enums;
-using StreamFlow.Domain.Generic.BusinessObjects;
+using StreamFlow.Domain.Generic.Enums;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Interfaces.Wrappers;
 
@@ -51,12 +50,14 @@ namespace Records.Api.Controllers
                 FirstName = "Jay Test 111",
                 LastName = "Eraldo"
             };
-            await StreamFlowWrapper.Push(new(entity)
+            var result = await StreamFlowWrapper.InvokeAsync<ApiStatusBO>(new(entity)
             {
+                CommandName = "TestSignalR",
                 ExchangeType = MessageExchangeType.Direct,
                 Recipient = new Guid("3902761a-822d-4c6b-8e2d-323fd501bcd6")
             });
-            
+
+            Console.WriteLine(result.HttpStatusCode);
 
             return Ok(apiStatus);
         }

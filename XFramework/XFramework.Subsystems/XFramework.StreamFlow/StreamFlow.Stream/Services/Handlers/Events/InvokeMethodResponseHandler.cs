@@ -62,6 +62,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     methodCallCompletionSource.SetResult(request.MessageQueue);
                 }
 
+                Console.WriteLine("Response for Invoked Method Received");
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Accepted

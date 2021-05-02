@@ -18,6 +18,7 @@ namespace XFramework.Integration.Services
             return Encoding.ASCII.GetString(b);
         }
 
-        public HttpHelper HttpHelper { get; set; } = new();
+        public HttpHelper Http { get; set; } = new();
+        public StopWatchHelper StopWatch { get; set; } = new();
     }
 }

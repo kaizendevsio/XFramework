@@ -8,7 +8,9 @@ using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using StreamFlow.Domain.Generic.BusinessObjects;
+using StreamFlow.Domain.Generic.Contracts.Responses;
 using XFramework.Domain.Generic.Configurations;
+using XFramework.Integration.Entity.Contracts.Responses;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services.Helpers;
 
@@ -190,5 +192,34 @@ namespace XFramework.Integration.Services
             StopWatch.Stop($"Invoked Method '{methodName}' returned {result}");
             return result;
         }
+        
+        public async Task<SignalRResponse> InvokeAsync<T>(string methodName, T args1)
+        {
+            await EnsureConnection();
+            StopWatch.Start();
+            var result = new SignalRResponse();
+            try
+            {
+                if (Connection.State == HubConnectionState.Reconnecting || (_isRegistered == false & methodName != "Register"))
+                {
+                    Console.WriteLine($"Invoked Method '{methodName}' is queued, waiting for connection to be re-established");
+                    _queueList.Add(new(methodName, args1));
+                    return new()
+                    {
+                        HttpStatusCode = HttpStatusCode.Processing
+                    };
+                }
+                result = await Connection.InvokeAsync<SignalRResponse>(methodName, args1);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Invoked Method '{methodName}' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
+            }
+
+            StopWatch.Stop($"Invoked Method '{methodName}' returned {result}");
+            return result;
+        }
+        
+      
     }
 }

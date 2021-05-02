@@ -22,7 +22,7 @@ namespace XFramework.Tests
                 HalfHourFee = 13.232m
             };
             
-            var result1 = await helpService.HttpHelper.PostAsync<string>(new Uri("https://asdasdasdsad.free.beeceptor.com"), "api/v1/fees/recommended",request);
+            var result1 = await helpService.Http.PostAsync<string>(new Uri("https://asdasdasdsad.free.beeceptor.com"), "api/v1/fees/recommended",request);
             Console.WriteLine(JsonSerializer.Serialize(result1));
         }
         
@@ -37,7 +37,7 @@ namespace XFramework.Tests
                 HalfHourFee = 13.232m
             };
             
-            var result1 = await helpService.HttpHelper.GetAsync<string>(new Uri("https://asdasdasdsad.free.beeceptor.com"), "api/v1/fees/recommended");
+            var result1 = await helpService.Http.GetAsync<string>(new Uri("https://asdasdasdsad.free.beeceptor.com"), "api/v1/fees/recommended");
             Console.WriteLine(JsonSerializer.Serialize(result1));
         }
     }

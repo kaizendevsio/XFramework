@@ -5,14 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Domain.Generic.Contracts.Requests;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using StreamFlow.Domain.Enums;
-using XFramework.Domain.Generic.Configurations;
-using XFramework.Domain.Generic.Contracts.Requests;
-using XFramework.Integration.Drivers;
-using XFramework.Integration.Interfaces;
+using StreamFlow.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces.Wrappers;
-using XFramework.Integration.Services;
-using XFramework.Integration.Services.Helpers;
 
 namespace IdentityServer.Test
 {
@@ -50,7 +44,7 @@ namespace IdentityServer.Test
             {
                 for (var i = 0; i < 1; i++)
                 {
-                    await StreamFlowWrapper.Push(new(new CreateIdentityRequest())
+                    await StreamFlowWrapper.PushAsync(new(new CreateIdentityRequest())
                     {
                         Message = "Hello fucking world",
                         ExchangeType = MessageExchangeType.Direct,

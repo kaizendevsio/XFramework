@@ -74,7 +74,10 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     if (_cachingService.AbsoluteClients.All(x => x.Guid != request.MessageQueue.Recipient))
                     {
                         Console.WriteLine($"Connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has invalid recipient");
-                        break;
+                        return new()
+                        {
+                            HttpStatusCode = HttpStatusCode.NotFound
+                        };
                     }
 
                     if (!_streamFlowConfiguration.QueueMessages)

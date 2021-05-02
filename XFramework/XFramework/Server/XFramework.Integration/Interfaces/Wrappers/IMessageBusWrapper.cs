@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
 using StreamFlow.Domain.Generic.BusinessObjects;
+using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Interfaces;
+using XFramework.Integration.Entity.Contracts.Responses;
 
 namespace XFramework.Integration.Interfaces.Wrappers
 {
@@ -9,7 +11,8 @@ namespace XFramework.Integration.Interfaces.Wrappers
     {
         public Guid? TargetClient { get; set; }
         public Task<bool> Connect();
-        public Task Push(StreamFlowMessageBO request);
+        public Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request);
+        public Task PushAsync(StreamFlowMessageBO request);
         public Task Subscribe(StreamFlowClientBO request);
         public Task Unsubscribe(StreamFlowClientBO request);
     }

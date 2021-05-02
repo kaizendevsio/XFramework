@@ -2,6 +2,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Core.Services;
+using XFramework.Integration.Interfaces;
+using XFramework.Integration.Services;
 
 namespace StreamFlow.Stream.Installers
 {

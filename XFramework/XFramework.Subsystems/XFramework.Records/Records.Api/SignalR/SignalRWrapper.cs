@@ -9,7 +9,7 @@ namespace Records.Api.SignalR
 {
     public class SignalRWrapper : SignalRService
     {
-        public SignalRWrapper(StreamFlowConfiguration configuration, IMediator mediator) : base(configuration, mediator)
+        public SignalRWrapper(StreamFlowConfiguration configuration) : base(configuration)
         {
         }
 

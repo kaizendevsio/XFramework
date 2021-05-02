@@ -14,13 +14,15 @@ using StreamFlow.Stream.Hubs.V1;
 using StreamFlow.Stream.Services.Entity.Events;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
+using XFramework.Integration.Interfaces;
 
 namespace StreamFlow.Stream.Services.Handlers.Events
 {
     public class InvokeMethodHandler : CommandBaseHandler, IRequestHandler<InvokeMethodQuery, QueryResponseBO<StreamFlowInvokeResponse>>
     {
-        public InvokeMethodHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
+        public InvokeMethodHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration, IHelperService helperService)
         {
+            _helperService = helperService;
             _cachingService = cachingService;
             _hubContext = hubContext;
             _streamFlowConfiguration = streamFlowConfiguration;
@@ -56,28 +58,30 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
             if (c != null)
             {
+                _helperService.StopWatch.Start("Invoked Method");
                 var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessageBO>();
 
-                if (_cachingService.PendingMethodCalls.TryAdd(request.MessageQueue.RequestGuid,methodCallCompletionSource))
+                if (!_cachingService.PendingMethodCalls.TryAdd(request.MessageQueue.RequestGuid,methodCallCompletionSource))
                 {
-                    await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
-                    var response = await methodCallCompletionSource.Task;
-
                     return new()
                     {
-                        HttpStatusCode = HttpStatusCode.Accepted,
-                        Response = new ()
-                        {
-                            HttpStatusCode = HttpStatusCode.Accepted,
-                            Response = JsonSerializer.Serialize(response)
-                        }
+                        HttpStatusCode = HttpStatusCode.InternalServerError,
+                        Message = $"Error while invoking method '{request.MessageQueue.CommandName}' on {request.MessageQueue.Recipient}"
                     };
                 }
+                
+                await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
+                var response = await methodCallCompletionSource.Task;
 
+                _helperService.StopWatch.Stop("Invoke Response Received");
                 return new()
                 {
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
-                    Message = $"Error while invoking method '{request.MessageQueue.CommandName}' on {request.MessageQueue.Recipient}"
+                    HttpStatusCode = HttpStatusCode.Accepted,
+                    Response = new ()
+                    {
+                        HttpStatusCode = HttpStatusCode.Accepted,
+                        Response = response.Data
+                    }
                 };
 
             }
@@ -85,29 +89,25 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             if (_cachingService.AbsoluteClients.All(x => x.Guid != request.MessageQueue.Recipient))
             {
                 Console.WriteLine($"Connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has invalid recipient");
-                goto returnYield;
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.NotFound,
+                    Response = new()
+                    {
+                        HttpStatusCode = HttpStatusCode.NotFound
+                    }
+                };
             }
 
-            if (!_streamFlowConfiguration.QueueMessages)
-            {
-                Console.WriteLine($"[Message Queue Disabled]; Message from connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
-                goto returnYield;
-            }
 
-            if (_cachingService.QueuedMessages.Where(i => i.Recipient == request.MessageQueue.Recipient).Count() > _streamFlowConfiguration.QueueDepth)
-            {
-                Console.WriteLine($"Message from connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} cannot be queued: Queue depth has been exhausted");
-                goto returnYield;
-            }
-                    
-            _cachingService.QueuedMessages.Add(request.MessageQueue);
-            Console.WriteLine($"Message from connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has been queued; Recipient unavailable");
-
-            returnYield:
-
+            Console.WriteLine($"Message from connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
             return new()
             {
-                HttpStatusCode = HttpStatusCode.Accepted
+                HttpStatusCode = HttpStatusCode.ServiceUnavailable,
+                Response = new()
+                {
+                    HttpStatusCode = HttpStatusCode.NotFound
+                }
             };
         }
     }
