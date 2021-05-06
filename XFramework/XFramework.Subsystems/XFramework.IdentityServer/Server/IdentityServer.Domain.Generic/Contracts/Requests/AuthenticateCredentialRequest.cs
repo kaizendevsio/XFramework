@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests
 {
-    public class AuthenticateCredentialRequest
+    public class AuthenticateCredentialRequest : RequestBase
     {
         public string Username { get; set; }
         public string Password { get; set; }

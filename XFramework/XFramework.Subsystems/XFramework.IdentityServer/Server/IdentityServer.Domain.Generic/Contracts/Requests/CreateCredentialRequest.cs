@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests
 {
-    public class CreateCredentialRequest
+    public class CreateCredentialRequest : RequestBase
     {
         public string UserAlias { get; set; }
         public string UserName { get; set; }

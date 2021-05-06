@@ -4,6 +4,7 @@ using System.Net;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Mapster;
 using MediatR;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
@@ -34,7 +35,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             if (client == null)
             {
                 Console.WriteLine($"Unknown or unauthorized client detected");
-                _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
+                await _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Forbidden
@@ -60,7 +61,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             {
                 _helperService.StopWatch.Start("Invoked Method");
                 var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessageBO>();
-
+                //methodCallCompletionSource.RunContinuationsAsynchronously();
                 if (!_cachingService.PendingMethodCalls.TryAdd(request.MessageQueue.RequestGuid,methodCallCompletionSource))
                 {
                     return new()
@@ -71,7 +72,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                 }
                 
                 await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
-                var response = await methodCallCompletionSource.Task;
+                var response = await methodCallCompletionSource.Task.ConfigureAwait(false);
 
                 _helperService.StopWatch.Stop("Invoke Response Received");
                 return new()
@@ -79,7 +80,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     HttpStatusCode = HttpStatusCode.Accepted,
                     Response = new ()
                     {
-                        HttpStatusCode = HttpStatusCode.Accepted,
+                        HttpStatusCode = response.Adapt<CmdResponseBO>().HttpStatusCode,
                         Response = response.Data
                     }
                 };

@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Domain.Generic.Contracts.Requests;
@@ -19,16 +20,23 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
 
         public async Task<CmdResponseBO<CreateIdentityCmd>> Handle(CreateIdentityCmd request, CancellationToken cancellationToken)
         {
-            var response = await IdentityServiceWrapper.CreateIdentity(request.Adapt<CreateIdentityRequest>());
+            var uuid = Guid.NewGuid();
+            var req = request.Adapt<CreateIdentityRequest>();
+            req.Uuid = uuid;
+            
+            var response = await IdentityServiceWrapper.CreateIdentity(req);
             if (response.HttpStatusCode != HttpStatusCode.Accepted)
             {
                 return response.Adapt<CmdResponseBO<CreateIdentityCmd>>();
             }
 
-            response = await IdentityServiceWrapper.CreateCredential(request.Adapt<CreateCredentialRequest>());
-            if (response.HttpStatusCode != HttpStatusCode.Accepted)
+            var req2 = request.Adapt<CreateCredentialRequest>();
+            req2.Uid = uuid;
+            
+            var response2 = await IdentityServiceWrapper.CreateCredential(req2);
+            if (response2.HttpStatusCode != HttpStatusCode.Accepted)
             {
-                return response.Adapt<CmdResponseBO<CreateIdentityCmd>>();
+                return response2.Adapt<CmdResponseBO<CreateIdentityCmd>>();
             }
 
             return new()

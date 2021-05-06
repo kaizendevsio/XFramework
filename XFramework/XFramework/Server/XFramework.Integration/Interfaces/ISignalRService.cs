@@ -14,7 +14,7 @@ namespace XFramework.Integration.Interfaces
         public Task<bool> EnsureConnection();
 
         public Task<HttpStatusCode> InvokeVoidAsync<T>(string methodName, T args1);
-        public Task<SignalRResponse> InvokeAsync<T>(string methodName, T args1);
+        public Task<SignalRResponse> InvokeAsync<T>(T args1);
     }
     
     

@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Domain.Generic.Contracts.Requests
 {
-    public class CreateUserRequest
+    public class CreateUserRequest : RequestBase
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }

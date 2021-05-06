@@ -34,7 +34,7 @@ namespace Records.Core.PipelineBehaviors
                 // Post Validation
 
                 // Create data layer transaction
-                var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
+                await using var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
 
                 // Pre Handler
                 _response = await next();

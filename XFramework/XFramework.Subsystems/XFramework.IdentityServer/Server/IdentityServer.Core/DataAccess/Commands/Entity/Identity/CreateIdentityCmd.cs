@@ -15,5 +15,7 @@ namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity
         public short Gender { get; set; }
         public bool IsVerified { get; set; }
         public short CivilStatus { get; set; }
+        
+        public string Uuid { get; set; }
     }
 }

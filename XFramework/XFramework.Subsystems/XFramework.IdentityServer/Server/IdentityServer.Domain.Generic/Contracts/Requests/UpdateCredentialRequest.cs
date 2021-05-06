@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests
 {
-    public class UpdateCredentialRequest
+    public class UpdateCredentialRequest : RequestBase
     {
         public Guid Uid { get; set; }
         public string UserAlias { get; set; }

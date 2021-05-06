@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests
 {
-    public class CreateIdentityRequest
+    public class CreateIdentityRequest : RequestBase
     {
         public string FirstName { get; set; }
         public string MiddleName { get; set; }
@@ -13,5 +13,7 @@ namespace IdentityServer.Domain.Generic.Contracts.Requests
         public short Gender { get; set; }
         public bool IsVerified { get; set; }
         public short CivilStatus { get; set; }
+        
+        public Guid Uuid { get; set; }
     }
 }

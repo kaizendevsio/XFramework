@@ -16,11 +16,12 @@ namespace IdentityServer.Api.SignalR.Handlers
         {
             var request = new StreamFlowMessageBO(data)
             {
+                CommandName = "InvokeResponseHandler",
                 RequestGuid = telemetry.RequestGuid,
                 Data = JsonSerializer.Serialize(data),
                 Recipient = telemetry.ClientGuid
             };
-           return await connection.InvokeAsync<HttpStatusCode>("InvokeResponse",request);
+           return await connection.InvokeAsync<HttpStatusCode>("Push",request);
         }
     }
 }

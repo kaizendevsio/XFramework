@@ -59,7 +59,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             {
                 if (_cachingService.PendingMethodCalls.TryRemove(request.MessageQueue.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
                 {
-                    methodCallCompletionSource.SetResult(request.MessageQueue);
+                    await Task.Run(() => methodCallCompletionSource.SetResult(request.MessageQueue), cancellationToken);
                 }
 
                 Console.WriteLine("Response for Invoked Method Received");

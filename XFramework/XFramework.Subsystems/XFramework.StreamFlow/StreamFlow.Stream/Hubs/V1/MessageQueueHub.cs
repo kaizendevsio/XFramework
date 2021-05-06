@@ -32,14 +32,14 @@ namespace StreamFlow.Stream.Hubs.V1
             Console.WriteLine($"Connection Lost and Unregistered with ID {Context.ConnectionId} : {client?.Guid} : {client?.Name}");
         }
 
-        public async Task<StreamFlowInvokeResponse> Invoke(StreamFlowMessageBO request)
+        public StreamFlowInvokeResponse Invoke(StreamFlowMessageBO request)
         {
             var entity = new InvokeMethodQuery()
             {
                 Context = Context,
                 MessageQueue = request
             };
-            var response = await _mediator.Send(entity).ConfigureAwait(false);
+            var response = _mediator.Send(entity).Result;
             return response.Response;
         }
         

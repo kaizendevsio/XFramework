@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts.Requests
 {
-    public class TelemetryCallRequest
+    public class TelemetryCallRequest : RequestBase
     {
         
     }

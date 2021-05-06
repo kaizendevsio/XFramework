@@ -19,7 +19,9 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
         public async Task<CmdResponseBO<CreateIdentityCmd>> Handle(CreateIdentityCmd request, CancellationToken cancellationToken)
         {
             var entity = request.Adapt<TblIdentityInformation>();
-            entity.Uuid = Guid.NewGuid().ToString();
+            entity.Uuid = string.IsNullOrEmpty(entity.Uuid) 
+                ? Guid.NewGuid().ToString() 
+                : entity.Uuid;
             
             await _dataLayer.TblIdentityInformations.AddAsync(entity, cancellationToken);
             await _dataLayer.SaveChangesAsync(cancellationToken);

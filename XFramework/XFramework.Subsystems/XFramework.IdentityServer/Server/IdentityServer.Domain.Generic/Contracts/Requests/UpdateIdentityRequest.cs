@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests
 {
-    public class UpdateIdentityRequest
+    public class UpdateIdentityRequest : RequestBase
     {
         public string FirstName { get; set; }
         public string MiddleName { get; set; }

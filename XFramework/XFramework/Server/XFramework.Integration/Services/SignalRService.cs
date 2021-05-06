@@ -1,14 +1,18 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Mapster;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using StreamFlow.Domain.Generic.BusinessObjects;
+using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Contracts.Responses;
+using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
 using XFramework.Integration.Entity.Contracts.Responses;
 using XFramework.Integration.Interfaces;
@@ -26,7 +30,7 @@ namespace XFramework.Integration.Services
         public HubConnection Connection { get; set; }
         public StopWatchHelper StopWatch { get; set; } = new();
         private StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
-
+        public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; } = new();
         public SignalRService(StreamFlowConfiguration configuration)
         {
             StreamFlowConfiguration = configuration;
@@ -68,12 +72,42 @@ namespace XFramework.Integration.Services
                 });
             
             Handle(_mediator);
+            HandleInvokeResponseEvent();
             HandleTelemetryCallEvent();
             HandleReconnectingEvent();
             HandleReconnectedEvent();
             HandleClosedEvent();
         }
 
+        private void HandleInvokeResponseEvent()
+        {
+            Connection.On<string,string,StreamFlowTelemetryBO>("InvokeResponseHandler",
+                async (data,message,telemetry) =>
+                {
+                    StopWatch.Start();
+                    try
+                    {
+                        if (PendingMethodCalls.TryRemove(telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
+                        {
+                            var result = new StreamFlowMessageBO()
+                            {
+                                ConsumerGuid = telemetry.ConsumerGuid,
+                                RequestGuid = telemetry.RequestGuid,
+                                Data = data,
+                                Message = message
+                            };
+                            await Task.Run(() => methodCallCompletionSource.SetResult(result));
+                        }
+                        StopWatch.Stop("Response for Invoked Method Received"); 
+                    }
+                    catch (Exception e)
+                    {
+                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception {e.Message}"); 
+                    }
+                 
+                });
+        }
+        
         private void HandleClosedEvent()
         {
             Connection.Closed += connectionId =>
@@ -193,31 +227,54 @@ namespace XFramework.Integration.Services
             return result;
         }
         
-        public async Task<SignalRResponse> InvokeAsync<T>(string methodName, T args1)
+        public async Task<SignalRResponse> InvokeAsync<T>(T args1)
         {
-            await EnsureConnection();
             StopWatch.Start();
-            var result = new SignalRResponse();
+            var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessageBO>();
+            var request = args1.Adapt<StreamFlowMessageBO>();
+            
             try
             {
-                if (Connection.State == HubConnectionState.Reconnecting || (_isRegistered == false & methodName != "Register"))
+                if (!PendingMethodCalls.TryAdd(request.RequestGuid,methodCallCompletionSource))
                 {
-                    Console.WriteLine($"Invoked Method '{methodName}' is queued, waiting for connection to be re-established");
-                    _queueList.Add(new(methodName, args1));
                     return new()
                     {
-                        HttpStatusCode = HttpStatusCode.Processing
+                        HttpStatusCode = HttpStatusCode.InternalServerError,
+                        Message = $"Error while invoking method '{request.CommandName}' on {request.Recipient}"
                     };
                 }
-                result = await Connection.InvokeAsync<SignalRResponse>(methodName, args1);
+                
+                var response = methodCallCompletionSource.Task.ConfigureAwait(false);
+                
+                var signalRResponse = await InvokeVoidAsync("Push", args1);
+                if (signalRResponse is HttpStatusCode.ServiceUnavailable or HttpStatusCode.NotFound)
+                {
+                    return new ()
+                    {
+                        HttpStatusCode = signalRResponse
+                    };
+                }
+                
+                var streamFlowMessage = await response;
+                var result = streamFlowMessage.Data.Adapt<CmdResponseBO>();
+                StopWatch.Stop($"Invoked Method '{request.CommandName}' returned {result.HttpStatusCode}");
+                return new()
+                {
+                    HttpStatusCode = result.HttpStatusCode,
+                    Response = streamFlowMessage.Data,
+                    Message = streamFlowMessage.Message
+                };
+
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Invoked Method '{methodName}' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
+                Console.WriteLine($"Invoked Method 'push' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    Message = $"Error while invoking method '{request.CommandName}' on {request.Recipient}"
+                };
             }
-
-            StopWatch.Stop($"Invoked Method '{methodName}' returned {result}");
-            return result;
         }
         
       
