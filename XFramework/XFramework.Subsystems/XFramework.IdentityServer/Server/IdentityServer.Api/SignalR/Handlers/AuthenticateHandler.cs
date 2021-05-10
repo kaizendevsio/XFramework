@@ -16,6 +16,7 @@ namespace IdentityServer.Api.SignalR.Handlers
     {
         public void Handle(HubConnection connection, IMediator mediator)
         {
+            Console.WriteLine($"{GetType().Name} Initialized");
             connection.On<string,string,StreamFlowTelemetryBO>(GetType().Name.Replace("Handler", string.Empty),
                 async (data,message,telemetry) =>
                 {
@@ -30,7 +31,7 @@ namespace IdentityServer.Api.SignalR.Handlers
                     }
                     catch (Exception e)
                     {
-                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception {e.Message}"); 
+                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}]"); 
                     }
                  
                 });

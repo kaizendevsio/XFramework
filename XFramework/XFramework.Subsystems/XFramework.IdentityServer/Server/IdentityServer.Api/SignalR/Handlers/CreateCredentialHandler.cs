@@ -29,7 +29,7 @@ namespace IdentityServer.Api.SignalR.Handlers
                     }
                     catch (Exception e)
                     {
-                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception {e.Message}");
+                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}]");
                     }
                 });
         }

@@ -5,7 +5,7 @@ using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Core.DataAccess.Query.Entity.Identity
 {
-   public class AuthenticateIdentityQuery : IRequest<QueryResponseBO<AuthorizeIdentityContract>>
+   public class AuthenticateIdentityQuery : QueryBaseEntity, IRequest<QueryResponseBO<AuthorizeIdentityContract>>
     {
         public string Username { get; set; }
         public string Password { get; set; }

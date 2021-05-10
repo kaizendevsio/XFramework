@@ -24,83 +24,83 @@ namespace XFramework.Integration.Drivers
         
         public async Task<QueryResponseBO<AuthorizeIdentityContract>> Authenticate(AuthenticateCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
                 CommandName = "Authenticate",
                 ExchangeType = MessageExchangeType.Direct,
             });
-            return result.Adapt<QueryResponseBO<AuthorizeIdentityContract>>();
+            return result.Response.Adapt<QueryResponseBO<AuthorizeIdentityContract>>();
         }
 
         public async Task<CmdResponseBO> CreateCredential(CreateCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
                 CommandName = "CreateCredential",
                 ExchangeType = MessageExchangeType.Direct,
             });
-            return result.Adapt<CmdResponseBO>();
+            return result.Response.Adapt<CmdResponseBO>();
         }
 
         public async Task<CmdResponseBO> UpdateCredential(UpdateCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
                 CommandName = "UpdateCredential",
                 ExchangeType = MessageExchangeType.Direct,
             });
-            return result.Adapt<CmdResponseBO>();
+            return result.Response.Adapt<CmdResponseBO>();
         }
 
         public async Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
                 CommandName = "DeleteCredential",
                 ExchangeType = MessageExchangeType.Direct,
             });
-            return result.Adapt<CmdResponseBO>();
+            return result.Response.Adapt<CmdResponseBO>();
         }
         
 
         public async Task<QueryResponseBO<GetIdentityContract>> GetIdentity(GetIdentityRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
                 CommandName = "GetIdentity",
                 ExchangeType = MessageExchangeType.Direct,
             });
-            return result.Adapt<QueryResponseBO<GetIdentityContract>>();
+            return result.Response.Adapt<QueryResponseBO<GetIdentityContract>>();
         }
 
         public async Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
                 CommandName = "CreateIdentity",
                 ExchangeType = MessageExchangeType.Direct,
             });
-            return result.Adapt<CmdResponseBO>();
+            return result.Response.Adapt<CmdResponseBO>();
         }
 
         public async Task<CmdResponseBO> UpdateIdentity(UpdateIdentityRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
                 CommandName = "UpdateIdentity",
                 ExchangeType = MessageExchangeType.Direct,
             });
-            return result.Adapt<CmdResponseBO>();
+            return result.Response.Adapt<CmdResponseBO>();
         }
 
         public async Task<CmdResponseBO> DeleteIdentity(DeleteIdentityRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<ApiStatusBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
                 CommandName = "DeleteIdentity",
                 ExchangeType = MessageExchangeType.Direct,
             });
-            return result.Adapt<CmdResponseBO>();
+            return result.Response.Adapt<CmdResponseBO>();
         }
     }
 }

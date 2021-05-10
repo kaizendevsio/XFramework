@@ -47,6 +47,7 @@ namespace IdentityServer.Core.PipelineBehaviors
             }
             catch (Exception e)
             {
+                _dataLayer.RollBack();
                 var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
                 
                 responseInstance?.GetType().GetProperty("Message")?

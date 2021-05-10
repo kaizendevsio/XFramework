@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Mapster;
 using MediatR;
@@ -256,11 +257,10 @@ namespace XFramework.Integration.Services
                 }
                 
                 var streamFlowMessage = await response;
-                var result = streamFlowMessage.Data.Adapt<CmdResponseBO>();
-                StopWatch.Stop($"Invoked Method '{request.CommandName}' returned {result.HttpStatusCode}");
+                StopWatch.Stop($"Invoked Method '{request.CommandName}'");
                 return new()
                 {
-                    HttpStatusCode = result.HttpStatusCode,
+                    HttpStatusCode = HttpStatusCode.Accepted,
                     Response = streamFlowMessage.Data,
                     Message = streamFlowMessage.Message
                 };
