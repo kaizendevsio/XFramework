@@ -50,7 +50,7 @@ namespace Records.Api.Installers
             // Swagger
             services.AddSwaggerGen(c =>
             {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "Records.Api", Version = "v1" });
+                c.SwaggerDoc($"v{configuration.GetValue<string>("SwaggerOptions:Version")}", new OpenApiInfo {Title = $"{configuration.GetValue<string>("SwaggerOptions:Title")}", Version = $"v{configuration.GetValue<string>("SwaggerOptions:Version")}"});
 
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
                 {

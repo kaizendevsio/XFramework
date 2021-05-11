@@ -51,7 +51,7 @@ namespace StreamFlow.Stream.Installers
             // Swagger
             services.AddSwaggerGen(c =>
             {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "StreamFlow.Stream", Version = "v1" });
+                c.SwaggerDoc($"v{configuration.GetValue<string>("SwaggerOptions:Version")}", new OpenApiInfo {Title = $"{configuration.GetValue<string>("SwaggerOptions:Title")}", Version = $"v{configuration.GetValue<string>("SwaggerOptions:Version")}"});
 
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
                 {

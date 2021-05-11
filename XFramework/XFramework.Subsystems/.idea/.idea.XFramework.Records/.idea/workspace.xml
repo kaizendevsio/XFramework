@@ -6,33 +6,28 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f3ef9b1-c682-45ef-b656-c1f4e160ec8c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/RequestBase.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Records/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Records/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/CreateIdentityCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/CreateIdentityCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/AuthenticateCredentialRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/AuthenticateCredentialRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/CreateCredentialRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/CreateCredentialRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/CreateIdentityRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/CreateIdentityRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/DeleteCredentialRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/DeleteCredentialRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/DeleteIdentityRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/DeleteIdentityRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/GetIdentityRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/GetIdentityRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/UpdateCredentialRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/UpdateCredentialRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/UpdateIdentityRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/UpdateIdentityRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/V1/MessageQueueHub.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/V1/MessageQueueHub.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodResponseHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodResponseHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Commands/Validations/User/CreateUserCmdValidator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Commands/Validations/User/CreateIdentityCmdValidator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/CreateUserRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/CreateUserRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/TelemetryCallRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/TelemetryCallRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/ISignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/ISignalRService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ApiInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ApiInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Options/SwaggerOptions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Options/SwaggerOptions.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Startup.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Api/Installers/ApiInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Api/Installers/ApiInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Api/Options/SwaggerOptions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Api/Options/SwaggerOptions.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Api/Startup.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/ApiInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/ApiInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Options/SwaggerOptions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Options/SwaggerOptions.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Startup.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Installers/ApiInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Installers/ApiInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Options/SwaggerOptions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Options/SwaggerOptions.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Startup.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,7 +61,6 @@
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/HostedService/BootService.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Installers/BootUpServiceInstaller.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/HostedService/BootUpService.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Startup.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/HostedService/SampleService.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Installers/HostedServiceInstaller.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Installers/InstallerExtensions.cs" />
@@ -74,7 +68,6 @@
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Installers/ConfigExtensions.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Program.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/appsettings.json" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Core/Validations/Common/RequestServerBOValidator.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Core/DataAccess/Commands/Handlers/Identity/Authorization/CreateAuthorizeIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Domain.Generic/Class1.cs" />
@@ -84,8 +77,12 @@
       <option value="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowMessageBO.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/SignalR/SignalRWrapper.cs" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Controllers/StartupController.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/appsettings.Development.json" />
       <option value="$PROJECT_DIR$/XFramework.Records/Records.Core/PipelineBehaviors/BasePipelineBehavior.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Startup.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Options/SwaggerOptions.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/Installers/ApiInstaller.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/appsettings.json" />
+      <option value="$PROJECT_DIR$/XFramework.Records/Records.Api/appsettings.Development.json" />
     </changedPaths>
   </component>
   <component name="ProjectId" id="1qOsY22SBcri1lrFWY1bJrQ7lyH" />
@@ -195,6 +192,7 @@
       <workItem from="1619932776444" duration="12250000" />
       <workItem from="1620119258751" duration="593000" />
       <workItem from="1620197785682" duration="1033000" />
+      <workItem from="1620717343074" duration="111000" />
     </task>
     <servers />
   </component>

@@ -41,11 +41,13 @@ namespace XFramework.Api
                 options.RouteTemplate = swaggerOptions.JsonRoute;
             });
 
-            app.UseSwaggerUI(c => c.SwaggerEndpoint(swaggerOptions.UiEndpoint, swaggerOptions.Description));
+            app.UseSwaggerUI(c => c.SwaggerEndpoint($"v{swaggerOptions.Version}{swaggerOptions.UiEndpoint}", swaggerOptions.Description));
 
             app.UseHttpsRedirection();
 
             app.UseHsts();
+
+            app.UseCors(o => o.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
 
             app.UseRouting();
 
