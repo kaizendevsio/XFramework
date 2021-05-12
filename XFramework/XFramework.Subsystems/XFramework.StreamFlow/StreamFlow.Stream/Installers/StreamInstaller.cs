@@ -15,7 +15,9 @@ namespace StreamFlow.Stream.Installers
     {
         public void InstallServices(IServiceCollection services, IConfiguration configuration)
         {
-            services.AddSignalR();
+            services.AddSignalR(o => o.MaximumReceiveMessageSize = 5242880)
+                .AddMessagePackProtocol();
+            
             services.AddResponseCompression(opts =>
             {
                 opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(

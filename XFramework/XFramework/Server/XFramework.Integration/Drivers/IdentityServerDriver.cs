@@ -13,13 +13,11 @@ namespace XFramework.Integration.Drivers
 {
     public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     {
-        public IMessageBusWrapper StreamFlowDriver { get; }
-
         public IdentityServerDriver(IMessageBusWrapper streamFlowDriver, IConfiguration configuration)
         {
             StreamFlowDriver = streamFlowDriver;
             Configuration = configuration;
-            StreamFlowDriver.TargetClient = new Guid("3902761a-822d-4c6b-8e2d-323fd501bcd6"); //Configuration.GetValue<Guid>("StreamFlowConfiguration:Targets:IdentityServerService");
+            TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:IdentityServerService"));
         }
         
         public async Task<QueryResponseBO<AuthorizeIdentityContract>> Authenticate(AuthenticateCredentialRequest request)
@@ -28,6 +26,7 @@ namespace XFramework.Integration.Drivers
             {
                 CommandName = "Authenticate",
                 ExchangeType = MessageExchangeType.Direct,
+                Recipient = TargetClient
             });
             return result.Response.Adapt<QueryResponseBO<AuthorizeIdentityContract>>();
         }
@@ -38,6 +37,7 @@ namespace XFramework.Integration.Drivers
             {
                 CommandName = "CreateCredential",
                 ExchangeType = MessageExchangeType.Direct,
+                Recipient = TargetClient
             });
             return result.Response.Adapt<CmdResponseBO>();
         }
@@ -48,6 +48,7 @@ namespace XFramework.Integration.Drivers
             {
                 CommandName = "UpdateCredential",
                 ExchangeType = MessageExchangeType.Direct,
+                Recipient = TargetClient
             });
             return result.Response.Adapt<CmdResponseBO>();
         }
@@ -58,6 +59,7 @@ namespace XFramework.Integration.Drivers
             {
                 CommandName = "DeleteCredential",
                 ExchangeType = MessageExchangeType.Direct,
+                Recipient = TargetClient
             });
             return result.Response.Adapt<CmdResponseBO>();
         }
@@ -69,6 +71,7 @@ namespace XFramework.Integration.Drivers
             {
                 CommandName = "GetIdentity",
                 ExchangeType = MessageExchangeType.Direct,
+                Recipient = TargetClient
             });
             return result.Response.Adapt<QueryResponseBO<GetIdentityContract>>();
         }
@@ -79,6 +82,7 @@ namespace XFramework.Integration.Drivers
             {
                 CommandName = "CreateIdentity",
                 ExchangeType = MessageExchangeType.Direct,
+                Recipient = TargetClient
             });
             return result.Response.Adapt<CmdResponseBO>();
         }
@@ -89,6 +93,7 @@ namespace XFramework.Integration.Drivers
             {
                 CommandName = "UpdateIdentity",
                 ExchangeType = MessageExchangeType.Direct,
+                Recipient = TargetClient
             });
             return result.Response.Adapt<CmdResponseBO>();
         }
@@ -99,6 +104,7 @@ namespace XFramework.Integration.Drivers
             {
                 CommandName = "DeleteIdentity",
                 ExchangeType = MessageExchangeType.Direct,
+                Recipient = TargetClient
             });
             return result.Response.Adapt<CmdResponseBO>();
         }

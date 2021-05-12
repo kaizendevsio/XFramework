@@ -32,7 +32,7 @@ namespace XFramework.Integration.Drivers
 
         public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request)
         {
-            request.Recipient ??= TargetClient;
+            //request.Recipient ??= TargetClient;
             var signalRResponse = await SignalRService.InvokeAsync(request);
             
             return new(){

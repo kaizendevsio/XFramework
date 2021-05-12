@@ -10,6 +10,7 @@ using Mapster;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Contracts.Responses;
@@ -39,6 +40,7 @@ namespace XFramework.Integration.Services
             Connection = new HubConnectionBuilder()
                 .WithUrl(StreamFlowConfiguration.ServerUrls.First())
                 .WithAutomaticReconnect()
+                .AddMessagePackProtocol()
                 .Build();
 
             HandleEvents();
@@ -54,6 +56,7 @@ namespace XFramework.Integration.Services
             Connection = new HubConnectionBuilder()
                 .WithUrl(StreamFlowConfiguration.ServerUrls.First())
                 .WithAutomaticReconnect()
+                .AddMessagePackProtocol()
                 .Build();
 
             HandleEvents();
@@ -82,12 +85,14 @@ namespace XFramework.Integration.Services
 
         private void HandleInvokeResponseEvent()
         {
-            Connection.On<string,string,StreamFlowTelemetryBO>("InvokeResponseHandler",
-                async (data,message,telemetry) =>
+            Connection.On<string,string,string>("InvokeResponseHandler",
+                async (data,message,telemetryString) =>
                 {
                     StopWatch.Start();
                     try
                     {
+                        var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
+                        
                         if (PendingMethodCalls.TryRemove(telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
                         {
                             var result = new StreamFlowMessageBO()
