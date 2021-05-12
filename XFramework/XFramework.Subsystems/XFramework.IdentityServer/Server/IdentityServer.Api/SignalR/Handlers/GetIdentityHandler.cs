@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 using IdentityServer.Core.DataAccess.Query.Entity.Identity;
 using IdentityServer.Domain.Generic.Contracts.Requests;
@@ -16,12 +17,14 @@ namespace IdentityServer.Api.SignalR.Handlers
     {
         public void Handle(HubConnection connection, IMediator mediator)
         {
-            connection.On<string,string,StreamFlowTelemetryBO>(GetType().Name.Replace("Handler", string.Empty),
-                async (data,message,telemetry) =>
+            connection.On<string,string,string>(GetType().Name.Replace("Handler", string.Empty),
+                async (data,message,telemetryString) =>
                 {
                     StopWatch.Start();
                     try
                     {
+                        var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
+                        
                         var r = data.AsMediatorCmd<GetIdentityRequest, GetIdentityQuery>();
                         var result = await mediator.Send(r).ConfigureAwait(false);
                         StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode.ToString()}"); 

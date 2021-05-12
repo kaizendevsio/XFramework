@@ -17,7 +17,6 @@
     <ItemGroup>
       <ProjectReference Include="..\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
       <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
-      <ProjectReference Include="..\IdentityServer.Integration\IdentityServer.Integration.csproj" />
     </ItemGroup>
 
     <ItemGroup>

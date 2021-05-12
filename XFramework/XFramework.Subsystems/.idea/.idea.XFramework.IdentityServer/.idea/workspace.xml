@@ -7,21 +7,17 @@
   <component name="ChangeListManager">
     <list default="true" id="409723ac-d59d-499a-9f6f-0d22e3f077ee" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ApiInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ApiInstaller.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Options/SwaggerOptions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Options/SwaggerOptions.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Startup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/ApiInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/ApiInstaller.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Options/SwaggerOptions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Options/SwaggerOptions.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Startup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/appsettings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Installers/ApiInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Installers/ApiInstaller.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Options/SwaggerOptions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Options/SwaggerOptions.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Startup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/AuthenticateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/AuthenticateHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/DeleteCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/DeleteCredentialHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/DeleteIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/DeleteIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/GetIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/GetIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateCredentialHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/IdentityServer.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/IdentityServer.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -128,9 +124,14 @@
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/RequestBase.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/UpdateCredentialRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/UpdateIdentityRequest.cs" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/PipelineBehaviors/BasePipelineBehavior.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/DataLayer.cs" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.Development.json" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Startup.cs" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Options/SwaggerOptions.cs" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ApiInstaller.cs" />
+      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/AuthenticateHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateIdentityHandler.cs" />
@@ -139,11 +140,6 @@
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/GetIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateCredentialHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/UpdateIdentityHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.Development.json" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Startup.cs" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Options/SwaggerOptions.cs" />
-      <option value="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ApiInstaller.cs" />
     </changedPaths>
   </component>
   <component name="ProjectId" id="1qOncsCSonRsHoyplss4wKExcko" />
@@ -290,6 +286,8 @@
       <workItem from="1620426017753" duration="11787000" />
       <workItem from="1620603163264" duration="1342000" />
       <workItem from="1620717160662" duration="152000" />
+      <workItem from="1620731931824" duration="4430000" />
+      <workItem from="1620798021510" duration="1372000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure To Support Sub-Systems">
       <created>1616960634242</created>
@@ -402,26 +400,26 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateCredentialHandler.cs</url>
-          <line>23</line>
+          <line>26</line>
           <properties documentPath="C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.IdentityServer\Server\IdentityServer.Api\SignalR\Handlers\CreateCredentialHandler.cs" initialLine="23" containingFunctionPresentation="lambda expression inside method 'Handle'">
             <startOffsets>
-              <option value="949" />
+              <option value="1095" />
             </startOffsets>
             <endOffsets>
-              <option value="1024" />
+              <option value="1170" />
             </endOffsets>
           </properties>
           <option name="timeStamp" value="4" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/CreateIdentityHandler.cs</url>
-          <line>23</line>
+          <line>25</line>
           <properties documentPath="C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.IdentityServer\Server\IdentityServer.Api\SignalR\Handlers\CreateIdentityHandler.cs" initialLine="23" containingFunctionPresentation="lambda expression inside method 'Handle'">
             <startOffsets>
-              <option value="883" />
+              <option value="1007" />
             </startOffsets>
             <endOffsets>
-              <option value="954" />
+              <option value="1078" />
             </endOffsets>
           </properties>
           <option name="timeStamp" value="10" />

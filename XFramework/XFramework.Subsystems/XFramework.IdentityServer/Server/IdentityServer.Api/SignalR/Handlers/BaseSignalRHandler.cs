@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR.Client;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
+using StreamFlow.Domain.Generic.Enums;
 using XFramework.Integration.Services.Helpers;
 
 namespace IdentityServer.Api.SignalR.Handlers
@@ -19,7 +20,8 @@ namespace IdentityServer.Api.SignalR.Handlers
                 CommandName = "InvokeResponseHandler",
                 RequestGuid = telemetry.RequestGuid,
                 Data = JsonSerializer.Serialize(data),
-                Recipient = telemetry.ClientGuid
+                Recipient = telemetry.ClientGuid,
+                ExchangeType = MessageExchangeType.Direct
             };
            return await connection.InvokeAsync<HttpStatusCode>("Push",request);
         }

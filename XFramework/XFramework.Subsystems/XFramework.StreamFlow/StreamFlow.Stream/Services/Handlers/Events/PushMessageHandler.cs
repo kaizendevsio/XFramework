@@ -36,7 +36,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             if (client == null)
             {
                 Console.WriteLine($"Unknown or unauthorized client detected");
-                _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
+                await _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Forbidden
@@ -60,14 +60,14 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             switch (request.MessageQueue.ExchangeType)
             {
                 case MessageExchangeType.FanOut:
-                    await _hubContext.Clients.All.SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken: cancellationToken);
+                    await _hubContext.Clients.All.SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, JsonSerializer.Serialize(telemetry), cancellationToken: cancellationToken);
                     break;
                 case MessageExchangeType.Direct:
                     var c = _cachingService.Clients.FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
 
                     if (c != null)
                     {
-                        await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
+                        await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, JsonSerializer.Serialize(telemetry), cancellationToken);
                         break;
                     }
 
@@ -97,7 +97,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                    
                     break;
                 case MessageExchangeType.Topic:
-                    await _hubContext.Clients.Group(request.MessageQueue.Recipient.ToString()).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken: cancellationToken);
+                    await _hubContext.Clients.Group(request.MessageQueue.Recipient.ToString()).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, JsonSerializer.Serialize(telemetry), cancellationToken: cancellationToken);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
