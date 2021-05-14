@@ -50,6 +50,11 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     Name = request.Client.Name
                 });
             }
+            else
+            {
+                var client = _cachingService.AbsoluteClients.FirstOrDefault(i => i.Guid != request.Client.Guid);
+                client.StreamId = request.Context.ConnectionId;
+            }
         }
     }
 }

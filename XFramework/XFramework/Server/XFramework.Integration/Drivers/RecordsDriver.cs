@@ -31,15 +31,16 @@ namespace XFramework.Integration.Drivers
             return guid;
         }
 
-        public Task<Guid?> NewAuthorizationLog(AuthenticationState authenticationState, Guid cuid)
+        public async Task<Guid?> NewAuthorizationLog(AuthenticationState authenticationState, Guid cuid)
         {
-            throw new NotImplementedException();
+            //throw new NotImplementedException();
+            return new();
         }
 
-        public Task UpdateLog(Guid guid, string title, string message, LogType logType = LogType.ApplicationServiceLog,
+        public async Task UpdateLog(Guid guid, string title, string message, LogType logType = LogType.ApplicationServiceLog,
             GenericPriorityType priorityType = GenericPriorityType.Information)
         {
-            throw new NotImplementedException();
+            //throw new NotImplementedException();
         }
     }
 }
