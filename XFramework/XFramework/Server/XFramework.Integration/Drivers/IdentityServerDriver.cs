@@ -22,7 +22,7 @@ namespace XFramework.Integration.Drivers
         
         public async Task<QueryResponseBO<AuthorizeIdentityContract>> Authenticate(AuthenticateCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
+            var result = await StreamFlowDriver.InvokeAsync<QueryResponseBO<AuthorizeIdentityContract>>(new(request)
             {
                 CommandName = "Authenticate",
                 ExchangeType = MessageExchangeType.Direct,

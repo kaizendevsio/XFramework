@@ -34,6 +34,20 @@ namespace XFramework.Integration.Drivers
         {
             //request.Recipient ??= TargetClient;
             var signalRResponse = await SignalRService.InvokeAsync(request);
+
+            if (signalRResponse.HttpStatusCode == HttpStatusCode.NotFound)
+            {
+                var tResponse = Activator.CreateInstance<TResponse>();
+                tResponse.GetType().GetProperty("Message")?
+                    .SetValue(tResponse, $"Service is currently offline", null);
+                tResponse.GetType().GetProperty("HttpStatusCode")?
+                    .SetValue(tResponse, HttpStatusCode.NotFound, null);
+                
+                return new(){
+                    HttpStatusCode = HttpStatusCode.NotFound,
+                    Response = tResponse
+                };
+            }
             
             return new(){
                 HttpStatusCode = HttpStatusCode.Accepted,

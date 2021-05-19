@@ -1,7 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Xml.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -69,6 +71,15 @@ namespace XFramework.Integration.Services.Helpers
                 .Replace(",", "&")
                 .Replace("\"", "");
             return str;
+        }
+
+        public static T ToXmlObject<T>(this string stringObject)
+        {
+            var serializer = new XmlSerializer(typeof(T));
+            using var reader = new StringReader(stringObject);
+            var result = (T)(serializer.Deserialize(reader));
+            
+            return result;
         }
     }
 }

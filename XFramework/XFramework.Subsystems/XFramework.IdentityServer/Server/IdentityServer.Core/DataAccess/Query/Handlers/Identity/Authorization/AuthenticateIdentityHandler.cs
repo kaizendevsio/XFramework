@@ -67,7 +67,8 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                 {
                     AccessToken = token.AccessToken,
                     RefreshToken = token.RefreshToken,
-                    Uid = Guid.Parse(credential.IdentityInfo.Uuid)
+                    Uid = Guid.Parse(credential.IdentityInfo.Uuid),
+                    Cuid = Guid.Parse(credential.Cuid)
                 }
             };
         }
