@@ -14,6 +14,16 @@ namespace Wallets.Domain.DataTransferObjects
             TblIdentityRoles = new HashSet<TblIdentityRole>();
             TblIdentityVerifications = new HashSet<TblIdentityVerification>();
             TblSessionData = new HashSet<TblSessionDatum>();
+            TblUserBusinessPackageConsumedByNavigations = new HashSet<TblUserBusinessPackage>();
+            TblUserBusinessPackageRecipientAuths = new HashSet<TblUserBusinessPackage>();
+            TblUserBusinessPackageUserAuths = new HashSet<TblUserBusinessPackage>();
+            TblUserDepositRequests = new HashSet<TblUserDepositRequest>();
+            TblUserIncomeTransactions = new HashSet<TblUserIncomeTransaction>();
+            TblUserMaps = new HashSet<TblUserMap>();
+            TblUserWalletAddresses = new HashSet<TblUserWalletAddress>();
+            TblUserWalletTransactions = new HashSet<TblUserWalletTransaction>();
+            TblUserWallets = new HashSet<TblUserWallet>();
+            TblUserWithdrawalRequests = new HashSet<TblUserWithdrawalRequest>();
         }
 
         public long Id { get; set; }
@@ -39,5 +49,15 @@ namespace Wallets.Domain.DataTransferObjects
         public virtual ICollection<TblIdentityRole> TblIdentityRoles { get; set; }
         public virtual ICollection<TblIdentityVerification> TblIdentityVerifications { get; set; }
         public virtual ICollection<TblSessionDatum> TblSessionData { get; set; }
+        public virtual ICollection<TblUserBusinessPackage> TblUserBusinessPackageConsumedByNavigations { get; set; }
+        public virtual ICollection<TblUserBusinessPackage> TblUserBusinessPackageRecipientAuths { get; set; }
+        public virtual ICollection<TblUserBusinessPackage> TblUserBusinessPackageUserAuths { get; set; }
+        public virtual ICollection<TblUserDepositRequest> TblUserDepositRequests { get; set; }
+        public virtual ICollection<TblUserIncomeTransaction> TblUserIncomeTransactions { get; set; }
+        public virtual ICollection<TblUserMap> TblUserMaps { get; set; }
+        public virtual ICollection<TblUserWalletAddress> TblUserWalletAddresses { get; set; }
+        public virtual ICollection<TblUserWalletTransaction> TblUserWalletTransactions { get; set; }
+        public virtual ICollection<TblUserWallet> TblUserWallets { get; set; }
+        public virtual ICollection<TblUserWithdrawalRequest> TblUserWithdrawalRequests { get; set; }
     }
 }

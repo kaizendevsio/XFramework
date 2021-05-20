@@ -13,11 +13,8 @@
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="5.0.5" NoWarn="NU1605" />
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.5" />
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.0-preview.3.21201.13" />
+        <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="5.0.2" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="6.1.2" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Controllers\V1" />
     </ItemGroup>
 
     <ItemGroup>

@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Wallets.Domain.DataTransferObjects
 {
-    public partial class TblAuthorizationLog
+    public partial class TblUserWalletAddress
     {
         public long Id { get; set; }
         public bool? IsEnabled { get; set; }
@@ -14,13 +14,13 @@ namespace Wallets.Domain.DataTransferObjects
         public DateTime? ModifiedAt { get; set; }
         public long? ModifiedBy { get; set; }
         public DateTime? LastChanged { get; set; }
-        public long IdentityCredentialsId { get; set; }
-        public string Ipaddress { get; set; }
-        public bool? IsSuccess { get; set; }
-        public short? AuthStatus { get; set; }
-        public string LoginSource { get; set; }
-        public string DeviceName { get; set; }
+        public long UserAuthId { get; set; }
+        public string Address { get; set; }
+        public decimal? Balance { get; set; }
+        public long WalletTypeId { get; set; }
+        public string Remarks { get; set; }
 
-        public virtual TblIdentityCredential IdentityCredentials { get; set; }
+        public virtual TblIdentityCredential UserAuth { get; set; }
+        public virtual TblWalletEntity WalletType { get; set; }
     }
 }

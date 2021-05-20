@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 #nullable disable
 
@@ -41,18 +43,30 @@ namespace Wallets.Domain.DataTransferObjects
         public virtual DbSet<TblLog> TblLogs { get; set; }
         public virtual DbSet<TblSessionDatum> TblSessionData { get; set; }
         public virtual DbSet<TblSessionEntity> TblSessionEntities { get; set; }
+        public virtual DbSet<TblUserBinaryList> TblUserBinaryLists { get; set; }
+        public virtual DbSet<TblUserBusinessPackage> TblUserBusinessPackages { get; set; }
+        public virtual DbSet<TblUserDepositRequest> TblUserDepositRequests { get; set; }
+        public virtual DbSet<TblUserIncomePartition> TblUserIncomePartitions { get; set; }
+        public virtual DbSet<TblUserIncomeTransaction> TblUserIncomeTransactions { get; set; }
+        public virtual DbSet<TblUserMap> TblUserMaps { get; set; }
+        public virtual DbSet<TblUserWallet> TblUserWallets { get; set; }
+        public virtual DbSet<TblUserWalletAddress> TblUserWalletAddresses { get; set; }
+        public virtual DbSet<TblUserWalletTransaction> TblUserWalletTransactions { get; set; }
+        public virtual DbSet<TblUserWithdrawalRequest> TblUserWithdrawalRequests { get; set; }
+        public virtual DbSet<TblWalletEntity> TblWalletEntities { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)
             {
-
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
+                optionsBuilder.UseNpgsql("Host=localhost;Database=XFramework;Username=dbAdmin;Password=4*5WD-K8%f*NqmPY");
             }
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.HasAnnotation("Relational:Collation", "English_United States.1252");
+            modelBuilder.HasAnnotation("Relational:Collation", "English_Philippines.1252");
 
             modelBuilder.Entity<TblAddressBarangay>(entity =>
             {
@@ -756,6 +770,389 @@ namespace Wallets.Domain.DataTransferObjects
                 entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<TblUserBinaryList>(entity =>
+            {
+                entity.ToTable("tbl_UserBinaryList", "UserData");
+
+                entity.Property(e => e.Id).HasColumnName("id");
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.SourceUserMapId).HasColumnName("SourceUserMapID");
+
+                entity.Property(e => e.TargetUserMapId).HasColumnName("TargetUserMapID");
+
+                entity.HasOne(d => d.SourceUserMap)
+                    .WithMany(p => p.TblUserBinaryListSourceUserMaps)
+                    .HasForeignKey(d => d.SourceUserMapId)
+                    .HasConstraintName("tbl_userbinarylist_tbl_usermap_id_fk_2");
+
+                entity.HasOne(d => d.TargetUserMap)
+                    .WithMany(p => p.TblUserBinaryListTargetUserMaps)
+                    .HasForeignKey(d => d.TargetUserMapId)
+                    .HasConstraintName("tbl_userbinarylist_tbl_usermap_id_fk");
+            });
+
+            modelBuilder.Entity<TblUserBusinessPackage>(entity =>
+            {
+                entity.ToTable("tbl_UserBusinessPackage", "UserData");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasIdentityOptions(null, null, null, 2147483647L, null, null);
+
+                entity.Property(e => e.ActivationDate).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.BusinessPackageId).HasColumnName("BusinessPackageID");
+
+                entity.Property(e => e.CodeString).HasMaxLength(100);
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ExpiryDate).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.UserAuthId).HasColumnName("UserAuthID");
+
+                entity.Property(e => e.UserDepositRequestId).HasColumnName("UserDepositRequestID");
+
+                entity.HasOne(d => d.ConsumedByNavigation)
+                    .WithMany(p => p.TblUserBusinessPackageConsumedByNavigations)
+                    .HasForeignKey(d => d.ConsumedBy)
+                    .HasConstraintName("tbl_userbusinesspackage_fk");
+
+                entity.HasOne(d => d.RecipientAuth)
+                    .WithMany(p => p.TblUserBusinessPackageRecipientAuths)
+                    .HasForeignKey(d => d.RecipientAuthId)
+                    .HasConstraintName("tbl_userbusinesspackage_tbl_userauth_id_fk");
+
+                entity.HasOne(d => d.UserAuth)
+                    .WithMany(p => p.TblUserBusinessPackageUserAuths)
+                    .HasForeignKey(d => d.UserAuthId)
+                    .HasConstraintName("UserAuthID");
+
+                entity.HasOne(d => d.UserDepositRequest)
+                    .WithMany(p => p.TblUserBusinessPackages)
+                    .HasForeignKey(d => d.UserDepositRequestId)
+                    .HasConstraintName("UserDepositRequestID");
+            });
+
+            modelBuilder.Entity<TblUserDepositRequest>(entity =>
+            {
+                entity.ToTable("tbl_UserDepositRequest", "UserData");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn();
+
+                entity.Property(e => e.Address).HasMaxLength(500);
+
+                entity.Property(e => e.Amount).HasPrecision(18, 10);
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ExpiryDate).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.RawData).HasMaxLength(10000);
+
+                entity.Property(e => e.RawResponseData).HasMaxLength(5000);
+
+                entity.Property(e => e.ReferenceNo).HasMaxLength(35);
+
+                entity.Property(e => e.Remarks).HasMaxLength(500);
+
+                entity.Property(e => e.UserAuthId).HasColumnName("UserAuthID");
+
+                entity.HasOne(d => d.SourceCurrency)
+                    .WithMany(p => p.TblUserDepositRequests)
+                    .HasForeignKey(d => d.SourceCurrencyId)
+                    .HasConstraintName("SourceCurrencyId");
+
+                entity.HasOne(d => d.TargetWalletType)
+                    .WithMany(p => p.TblUserDepositRequests)
+                    .HasForeignKey(d => d.TargetWalletTypeId)
+                    .HasConstraintName("TargetWalletTypeId");
+
+                entity.HasOne(d => d.UserAuth)
+                    .WithMany(p => p.TblUserDepositRequests)
+                    .HasForeignKey(d => d.UserAuthId)
+                    .HasConstraintName("UserAuthID");
+            });
+
+            modelBuilder.Entity<TblUserIncomePartition>(entity =>
+            {
+                entity.ToTable("tbl_UserIncomePartition", "UserData");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Percentage).HasPrecision(18, 8);
+
+                entity.HasOne(d => d.UserRole)
+                    .WithMany(p => p.TblUserIncomePartitions)
+                    .HasForeignKey(d => d.UserRoleId)
+                    .HasConstraintName("UserRoleId");
+            });
+
+            modelBuilder.Entity<TblUserIncomeTransaction>(entity =>
+            {
+                entity.ToTable("tbl_UserIncomeTransaction", "UserData");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn()
+                    .HasIdentityOptions(null, null, null, 2147483647L, null, null);
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.IncomePercentage).HasPrecision(18, 10);
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Remarks).HasMaxLength(500);
+
+                entity.HasOne(d => d.PairMap)
+                    .WithMany(p => p.TblUserIncomeTransactionPairMaps)
+                    .HasForeignKey(d => d.PairMapId)
+                    .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk_3");
+
+                entity.HasOne(d => d.SourceMap)
+                    .WithMany(p => p.TblUserIncomeTransactionSourceMaps)
+                    .HasForeignKey(d => d.SourceMapId)
+                    .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk_2");
+
+                entity.HasOne(d => d.TargetMap)
+                    .WithMany(p => p.TblUserIncomeTransactionTargetMaps)
+                    .HasForeignKey(d => d.TargetMapId)
+                    .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk");
+
+                entity.HasOne(d => d.UserAuth)
+                    .WithMany(p => p.TblUserIncomeTransactions)
+                    .HasForeignKey(d => d.UserAuthId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("UserAuthID");
+            });
+
+            modelBuilder.Entity<TblUserMap>(entity =>
+            {
+                entity.ToTable("tbl_UserMap", "UserData");
+
+                entity.HasIndex(e => e.Alias, "tbl_usermap_alias_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .ValueGeneratedNever()
+                    .HasColumnName("ID");
+
+                entity.Property(e => e.Alias).HasColumnType("character varying");
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.UserUid)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.HasOne(d => d.IdNavigation)
+                    .WithOne(p => p.TblUserMapIdNavigation)
+                    .HasForeignKey<TblUserMap>(d => d.Id)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_usermap_fk");
+
+                entity.HasOne(d => d.SponsorUser)
+                    .WithMany(p => p.TblUserMaps)
+                    .HasForeignKey(d => d.SponsorUserId)
+                    .HasConstraintName("SponsorUserId");
+
+                entity.HasOne(d => d.UplineUser)
+                    .WithMany(p => p.TblUserMapUplineUsers)
+                    .HasForeignKey(d => d.UplineUserId)
+                    .HasConstraintName("uplineuserbpid");
+            });
+
+            modelBuilder.Entity<TblUserWallet>(entity =>
+            {
+                entity.ToTable("tbl_UserWallet", "UserData");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.Balance).HasPrecision(24, 8);
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.HasOne(d => d.UserAuth)
+                    .WithMany(p => p.TblUserWallets)
+                    .HasForeignKey(d => d.UserAuthId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_UserWallet_UserAuthId_fkey");
+
+                entity.HasOne(d => d.WalletType)
+                    .WithMany(p => p.TblUserWallets)
+                    .HasForeignKey(d => d.WalletTypeId)
+                    .HasConstraintName("tbl_UserWallet_WalletTypeId_fkey");
+            });
+
+            modelBuilder.Entity<TblUserWalletAddress>(entity =>
+            {
+                entity.ToTable("tbl_UserWalletAddress", "UserData");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn();
+
+                entity.Property(e => e.Address).HasMaxLength(512);
+
+                entity.Property(e => e.Balance).HasPrecision(18, 10);
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Remarks).HasMaxLength(100);
+
+                entity.HasOne(d => d.UserAuth)
+                    .WithMany(p => p.TblUserWalletAddresses)
+                    .HasForeignKey(d => d.UserAuthId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("UserAuthID");
+
+                entity.HasOne(d => d.WalletType)
+                    .WithMany(p => p.TblUserWalletAddresses)
+                    .HasForeignKey(d => d.WalletTypeId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_userwalletaddress_fk");
+            });
+
+            modelBuilder.Entity<TblUserWalletTransaction>(entity =>
+            {
+                entity.ToTable("tbl_UserWalletTransaction", "UserData");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn()
+                    .HasIdentityOptions(null, null, null, 2147483647L, null, null);
+
+                entity.Property(e => e.Amount).HasPrecision(24, 8);
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Description).HasMaxLength(500);
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Remarks).HasMaxLength(500);
+
+                entity.Property(e => e.RunningBalance).HasPrecision(24, 8);
+
+                entity.HasOne(d => d.SourceUserWallet)
+                    .WithMany(p => p.TblUserWalletTransactions)
+                    .HasForeignKey(d => d.SourceUserWalletId)
+                    .HasConstraintName("SourceUserWalletId");
+
+                entity.HasOne(d => d.UserAuth)
+                    .WithMany(p => p.TblUserWalletTransactions)
+                    .HasForeignKey(d => d.UserAuthId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("UserAuthID");
+            });
+
+            modelBuilder.Entity<TblUserWithdrawalRequest>(entity =>
+            {
+                entity.ToTable("tbl_UserWithdrawalRequest", "UserData");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn();
+
+                entity.Property(e => e.Address).HasMaxLength(500);
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Remarks).HasColumnType("character varying");
+
+                entity.Property(e => e.TotalAmount).HasPrecision(18, 10);
+
+                entity.HasOne(d => d.SourceWalletType)
+                    .WithMany(p => p.TblUserWithdrawalRequestSourceWalletTypes)
+                    .HasForeignKey(d => d.SourceWalletTypeId)
+                    .HasConstraintName("SourceWalletTypeId");
+
+                entity.HasOne(d => d.TargetCurrency)
+                    .WithMany(p => p.TblUserWithdrawalRequestTargetCurrencies)
+                    .HasForeignKey(d => d.TargetCurrencyId)
+                    .HasConstraintName("TargetCurrencyId");
+
+                entity.HasOne(d => d.UserAuth)
+                    .WithMany(p => p.TblUserWithdrawalRequests)
+                    .HasForeignKey(d => d.UserAuthId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("UserAuthID");
+            });
+
+            modelBuilder.Entity<TblWalletEntity>(entity =>
+            {
+                entity.ToTable("tbl_WalletEntities", "Wallet");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn()
+                    .HasIdentityOptions(null, null, null, 2147483647L, null, null);
+
+                entity.Property(e => e.Code)
+                    .IsRequired()
+                    .HasMaxLength(9);
+
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.CurrencyEntityId).HasColumnName("CurrencyEntityID");
+
+                entity.Property(e => e.Desc).HasMaxLength(500);
+
+                entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasMaxLength(20);
+
+                entity.HasOne(d => d.CurrencyEntity)
+                    .WithMany(p => p.TblWalletEntities)
+                    .HasForeignKey(d => d.CurrencyEntityId)
+                    .HasConstraintName("CurrencyID");
             });
 
             OnModelCreatingPartial(modelBuilder);
