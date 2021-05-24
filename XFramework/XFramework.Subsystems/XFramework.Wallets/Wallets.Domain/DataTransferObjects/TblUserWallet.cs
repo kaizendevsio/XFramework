@@ -9,7 +9,8 @@ namespace Wallets.Domain.DataTransferObjects
     {
         public TblUserWallet()
         {
-            TblUserWalletTransactions = new HashSet<TblUserWalletTransaction>();
+            TblUserWalletTransactionSourceUserWallets = new HashSet<TblUserWalletTransaction>();
+            TblUserWalletTransactionTargetUserWallets = new HashSet<TblUserWalletTransaction>();
         }
 
         public long Id { get; set; }
@@ -22,9 +23,11 @@ namespace Wallets.Domain.DataTransferObjects
         public long UserAuthId { get; set; }
         public long? WalletTypeId { get; set; }
         public decimal? Balance { get; set; }
+        public string Uid { get; set; }
 
         public virtual TblIdentityCredential UserAuth { get; set; }
         public virtual TblWalletEntity WalletType { get; set; }
-        public virtual ICollection<TblUserWalletTransaction> TblUserWalletTransactions { get; set; }
+        public virtual ICollection<TblUserWalletTransaction> TblUserWalletTransactionSourceUserWallets { get; set; }
+        public virtual ICollection<TblUserWalletTransaction> TblUserWalletTransactionTargetUserWallets { get; set; }
     }
 }

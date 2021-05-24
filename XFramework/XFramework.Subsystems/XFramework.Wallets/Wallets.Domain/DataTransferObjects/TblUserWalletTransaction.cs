@@ -20,8 +20,10 @@ namespace Wallets.Domain.DataTransferObjects
         public string Remarks { get; set; }
         public decimal? RunningBalance { get; set; }
         public string Description { get; set; }
+        public long? TargetUserWalletId { get; set; }
 
         public virtual TblUserWallet SourceUserWallet { get; set; }
+        public virtual TblUserWallet TargetUserWallet { get; set; }
         public virtual TblIdentityCredential UserAuth { get; set; }
     }
 }

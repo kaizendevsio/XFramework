@@ -5,61 +5,46 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d37d412-dd63-4bc1-9000-5a758e6c9722" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/UserWalletsController.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/WalletsController.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/CreateWalletCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/DeleteWalletCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/UpdateWalletCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/CreateWalletHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/DeleteWalletHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/UpdateWalletHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/GetAllWalletQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/GetWalletQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetAllWalletHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetWalletHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/GetWalletContract.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserBinaryList.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserBusinessPackage.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserDepositRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserIncomePartition.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserIncomeTransaction.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserMap.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWallet.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWalletAddress.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWalletTransaction.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWithdrawalRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblWalletEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/CreateIdentityWalletCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/DecrementIdentityWalletCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/DeleteIdentityWalletCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/IncrementIdentityWalletCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/TransferIdentityWalletCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/UpdateIdentityWalletCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/CreateIdentityWalletHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/DecrementIdentityWalletHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/DeleteIdentityWalletHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/IncrementIdentityWalletHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/TransferIdentityWalletHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/UpdateIdentityWalletHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/GetAllWalletIdentityQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/GetWalletIdentityQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetAllWalletIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetWalletIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/GetWalletIdentityContract.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Interfaces/IDataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Interfaces/IDataLayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Wallets.Domain.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Wallets.Domain.Generic.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAddressBarangay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAddressBarangay.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAddressCity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAddressCity.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAddressProvince.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAddressProvince.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAddressRegion.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAddressRegion.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAuditField.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAuditField.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAuditHistory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAuditHistory.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAuthorizationLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblAuthorizationLog.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblConfiguration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblConfiguration.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblCurrencyEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblCurrencyEntity.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblExchangeRate.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblExchangeRate.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityAddress.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityAddress.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityContact.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityContact.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityCredential.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityCredential.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityRole.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityRole.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityVerification.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblIdentityVerification.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblLog.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblSessionDatum.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblSessionDatum.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/UserWalletsController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/UserWalletsController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/DecrementWalletCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/IncrementWalletCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/TransferWalletCmd.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/UpdateWalletHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/UpdateWalletHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetAllWalletHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetAllWalletHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWallet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWallet.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWalletTransaction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWalletTransaction.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/Migrations/DbScaffolding.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="package.json" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
@@ -77,12 +62,6 @@
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/DataLayer.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/StartupController.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/SignalR/Handlers/AuthenticateHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Installers/DbInstaller.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Installers/ExternalDependencyInstaller.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Installers/ServicesInstaller.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.json" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/BusinessPackages/BusinessPackagesController.cs" />
@@ -97,18 +76,43 @@
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/GetWalletCmd.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Interfaces/IDataLayer.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/CreateWalletHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/UpdateWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/DeleteWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/GetAllWalletContract.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/GetWalletContract.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/GetAllWalletCmd.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetAllWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/GetWalletQuery.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/GetAllWalletQuery.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/UserWallets.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/package.json" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/TransferWalletCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/DecrementWalletCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/IncrementWalletCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/CreateIdentityWallet.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/TransferWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/DecrementWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/IncrementWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/WalletsController.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/CreateIdentityWalletCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/DeleteIdentityWalletCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/CreateIdentityWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/DecrementIdentityWalletCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/GetWalletIdentityContract.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/GetWalletIdentityQuery.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/GetAllWalletIdentityQuery.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetWalletIdentityHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetAllWalletIdentityHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetAllWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/DeleteIdentityWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/UpdateWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/UpdateIdentityWalletCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/DecrementIdentityWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/IncrementIdentityWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/IncrementIdentityWalletCmd.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/UserWalletsController.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/UpdateIdentityWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/TransferIdentityWalletCmd.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/TransferIdentityWalletHandler.cs" />
     </changedPaths>
   </component>
   <component name="ProjectId" id="1skPeWMhtYbvpIIFE4o5MJxsrWG" />
@@ -171,7 +175,7 @@
       <updated>1621413709882</updated>
       <workItem from="1621413712481" duration="886000" />
       <workItem from="1621416513200" duration="6680000" />
-      <workItem from="1621499830745" duration="5769000" />
+      <workItem from="1621499830745" duration="20842000" />
     </task>
     <task id="LOCAL-00001" summary="Initial Template">
       <created>1621423842771</created>

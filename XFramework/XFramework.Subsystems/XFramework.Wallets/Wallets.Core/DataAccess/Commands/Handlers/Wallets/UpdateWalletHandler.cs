@@ -37,7 +37,7 @@ namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
-                Message = $"Wallet successfully updated; Wallet ID: {request.Id}"
+                Message = $"Wallet ID:{request.Id} has been updated successfully."
             };
         }
     }

@@ -995,7 +995,9 @@ namespace Wallets.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_UserWallet", "UserData");
 
-                entity.Property(e => e.Id).HasColumnName("ID");
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasIdentityOptions(null, null, null, 2147483647L, null, null);
 
                 entity.Property(e => e.Balance).HasPrecision(24, 8);
 
@@ -1004,6 +1006,8 @@ namespace Wallets.Domain.DataTransferObjects
                 entity.Property(e => e.LastChanged).HasColumnType("timestamp with time zone");
 
                 entity.Property(e => e.ModifiedAt).HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Uid).HasMaxLength(64);
 
                 entity.HasOne(d => d.UserAuth)
                     .WithMany(p => p.TblUserWallets)
@@ -1074,9 +1078,14 @@ namespace Wallets.Domain.DataTransferObjects
                 entity.Property(e => e.RunningBalance).HasPrecision(24, 8);
 
                 entity.HasOne(d => d.SourceUserWallet)
-                    .WithMany(p => p.TblUserWalletTransactions)
+                    .WithMany(p => p.TblUserWalletTransactionSourceUserWallets)
                     .HasForeignKey(d => d.SourceUserWalletId)
                     .HasConstraintName("SourceUserWalletId");
+
+                entity.HasOne(d => d.TargetUserWallet)
+                    .WithMany(p => p.TblUserWalletTransactionTargetUserWallets)
+                    .HasForeignKey(d => d.TargetUserWalletId)
+                    .HasConstraintName("tbl_userwallettransaction_tbl_userwallet_id_fk");
 
                 entity.HasOne(d => d.UserAuth)
                     .WithMany(p => p.TblUserWalletTransactions)
