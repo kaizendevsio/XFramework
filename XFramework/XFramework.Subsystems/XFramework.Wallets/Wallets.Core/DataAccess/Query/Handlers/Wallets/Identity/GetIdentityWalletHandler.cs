@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Mapster;
@@ -11,22 +12,25 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity
 {
-    public class GetWalletIdentityHandler : QueryBaseHandler, IRequestHandler<GetIdentityWalletQuery, QueryResponseBO<GetIdentityWalletContract>>
+    public class GetIdentityWalletHandler : QueryBaseHandler, IRequestHandler<GetIdentityWalletQuery, QueryResponseBO<GetIdentityWalletContract>>
     {
-        public GetWalletIdentityHandler(IDataLayer dataLayer)
+        public GetIdentityWalletHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
         }
         
         public async Task<QueryResponseBO<GetIdentityWalletContract>> Handle(GetIdentityWalletQuery request, CancellationToken cancellationToken)
         {
-            var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Uuid == request.Id.ToString(), cancellationToken: cancellationToken);
+            var entity = await _dataLayer.TblUserWallets
+                .Where(i => i.UserAuthId == request.UserAuthId)
+                .Where(i => i.WalletTypeId == request.WalletTypeId)
+                .FirstOrDefaultAsync(cancellationToken);
            
             if (entity == null)
             {
                 return new QueryResponseBO<GetIdentityWalletContract>()
                 {
-                    Message = $" Wallet identity with UID {request.Id} does not exist",
+                    Message = $" Wallet identity with UID {request.UserAuthId} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }

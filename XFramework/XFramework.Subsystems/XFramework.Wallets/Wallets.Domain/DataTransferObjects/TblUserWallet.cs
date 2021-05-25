@@ -24,6 +24,7 @@ namespace Wallets.Domain.DataTransferObjects
         public long? WalletTypeId { get; set; }
         public decimal? Balance { get; set; }
         public string Uid { get; set; }
+        public bool? IsDeleted { get; set; }
 
         public virtual TblIdentityCredential UserAuth { get; set; }
         public virtual TblWalletEntity WalletType { get; set; }

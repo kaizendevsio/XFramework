@@ -10,9 +10,9 @@ namespace Wallets.Api.Controllers.V1.Wallets
     [Route("API/v1/[controller]")]
     [ApiController]
 
-    public class UserWalletsController : XFrameworkControllerBase
+    public class IdentityWalletsController : XFrameworkControllerBase
     {
-        public UserWalletsController(IMediator mediator)
+        public IdentityWalletsController(IMediator mediator)
         {
             _mediator = mediator;
         }

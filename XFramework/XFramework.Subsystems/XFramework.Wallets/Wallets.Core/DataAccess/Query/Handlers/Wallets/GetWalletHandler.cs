@@ -20,9 +20,8 @@ namespace Wallets.Core.DataAccess.Query.Handlers.Wallets
         
         public async Task<QueryResponseBO<GetWalletContract>> Handle(GetWalletQuery request, CancellationToken cancellationToken)
         {
-            var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Uuid == request.Id.ToString(), cancellationToken: cancellationToken);
-           
-            if (entity == null)
+            var entity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Code == request.Code || i.Id == request.Id, cancellationToken: cancellationToken);
+           if (entity == null)
             {
                 return new QueryResponseBO<GetWalletContract>()
                 {

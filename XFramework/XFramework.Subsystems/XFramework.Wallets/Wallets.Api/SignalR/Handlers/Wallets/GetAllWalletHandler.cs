@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using Mapster;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -18,12 +19,13 @@ namespace Wallets.Api.SignalR.Handlers.Wallets
         public void Handle(HubConnection connection, IMediator mediator)
         {
             Console.WriteLine($"{GetType().Name} Initialized");
-            connection.On<string, string, StreamFlowTelemetryBO>(GetType().Name.Replace("Handler", string.Empty),
-                async (data, message, telemetry) =>
+            connection.On<string, string, string>(GetType().Name.Replace("Handler", string.Empty),
+                async (data, message, telemetryString) =>
                 {
                     StopWatch.Start();
                     try
                     {
+                        var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
                         var r = data.AsMediatorCmd<GetAllWalletRequest, GetAllWalletQuery>();
                         var result = await mediator.Send(r).ConfigureAwait(false);
                         StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode.ToString()}");

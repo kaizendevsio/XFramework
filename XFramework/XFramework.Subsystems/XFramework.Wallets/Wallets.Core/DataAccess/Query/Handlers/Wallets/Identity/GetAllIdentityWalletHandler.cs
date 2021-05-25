@@ -14,18 +14,18 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity
 {
-    public class GetAllWalletIdentityHandler : QueryBaseHandler, IRequestHandler<GetAllIdentityWalletQuery, QueryResponseBO<List<GetIdentityWalletContract>>>
+    public class GetAllIdentityWalletHandler : QueryBaseHandler, IRequestHandler<GetAllIdentityWalletQuery, QueryResponseBO<List<GetIdentityWalletContract>>>
     {
         private readonly IDataLayer _dataLayer;
 
-        public GetAllWalletIdentityHandler(IDataLayer dataLayer)
+        public GetAllIdentityWalletHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
         }
         
         public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> Handle(GetAllIdentityWalletQuery request, CancellationToken cancellationToken)
         {
-            var result = await _dataLayer.TblWalletEntities.Take(1000).AsNoTracking().ToListAsync(cancellationToken: cancellationToken);
+            var result = await _dataLayer.TblUserWallets.Take(1000).AsNoTracking().ToListAsync(cancellationToken: cancellationToken);
             if (!result.Any())
             {
                 return new QueryResponseBO<List<GetIdentityWalletContract>>()

@@ -27,8 +27,9 @@ namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            
-            _dataLayer.Remove(entity);
+
+            entity.IsDeleted = true;
+            _dataLayer.Update(entity);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
             return new()

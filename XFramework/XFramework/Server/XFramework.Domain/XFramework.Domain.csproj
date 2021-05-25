@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
-    <ProjectReference Include="..\XFramework.ExternalUtilities\XFramework.External.csproj" />
   </ItemGroup>
 
   <ItemGroup>

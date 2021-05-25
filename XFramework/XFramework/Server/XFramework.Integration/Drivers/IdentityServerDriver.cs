@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using IdentityServer.Domain.Generic.Contracts.Requests;
@@ -13,100 +14,59 @@ namespace XFramework.Integration.Drivers
 {
     public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     {
-        public IdentityServerDriver(IMessageBusWrapper streamFlowDriver, IConfiguration configuration)
+        public IdentityServerDriver(IMessageBusWrapper messageBusDriver, IConfiguration configuration)
         {
-            StreamFlowDriver = streamFlowDriver;
+            MessageBusDriver = messageBusDriver;
             Configuration = configuration;
-            TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:IdentityServerService"));
+            TargetClient =
+                Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:IdentityServerService"));
         }
-        
-        public async Task<QueryResponseBO<AuthorizeIdentityContract>> Authenticate(AuthenticateCredentialRequest request)
+
+        public async Task<QueryResponseBO<AuthorizeIdentityContract>> AuthenticateCredential(AuthenticateCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<QueryResponseBO<AuthorizeIdentityContract>>(new(request)
-            {
-                CommandName = "Authenticate",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = TargetClient
-            });
-            return result.Response.Adapt<QueryResponseBO<AuthorizeIdentityContract>>();
+            return await SendAsync<AuthenticateCredentialRequest, AuthorizeIdentityContract>("Authenticate", request);
         }
 
         public async Task<CmdResponseBO> CreateCredential(CreateCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
-            {
-                CommandName = "CreateCredential",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = TargetClient
-            });
-            return result.Response.Adapt<CmdResponseBO>();
+            var result = await SendAsync<CreateCredentialRequest, CmdResponseBO>("CreateCredential", request);
+            return result.Adapt<CmdResponseBO>();
         }
 
         public async Task<CmdResponseBO> UpdateCredential(UpdateCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
-            {
-                CommandName = "UpdateCredential",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = TargetClient
-            });
-            return result.Response.Adapt<CmdResponseBO>();
+            var result = await SendAsync<UpdateCredentialRequest, CmdResponseBO>("UpdateCredential", request);
+            return result.Adapt<CmdResponseBO>();
         }
 
         public async Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
-            {
-                CommandName = "DeleteCredential",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = TargetClient
-            });
-            return result.Response.Adapt<CmdResponseBO>();
+            var result = await SendAsync<DeleteCredentialRequest, CmdResponseBO>("DeleteCredential", request);
+            return result.Adapt<CmdResponseBO>();
         }
-        
+
 
         public async Task<QueryResponseBO<GetIdentityContract>> GetIdentity(GetIdentityRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
-            {
-                CommandName = "GetIdentity",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = TargetClient
-            });
-            return result.Response.Adapt<QueryResponseBO<GetIdentityContract>>();
+            return await SendAsync<GetIdentityRequest, GetIdentityContract>("GetIdentity", request);
         }
 
         public async Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
-            {
-                CommandName = "CreateIdentity",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = TargetClient
-            });
-            return result.Response.Adapt<CmdResponseBO>();
+            var result = await SendAsync<CreateIdentityRequest, CmdResponseBO>("CreateIdentity", request);
+            return result.Adapt<CmdResponseBO>();
         }
 
         public async Task<CmdResponseBO> UpdateIdentity(UpdateIdentityRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
-            {
-                CommandName = "UpdateIdentity",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = TargetClient
-            });
-            return result.Response.Adapt<CmdResponseBO>();
+            var result = await SendAsync<UpdateIdentityRequest, CmdResponseBO>("UpdateIdentity", request);
+            return result.Adapt<CmdResponseBO>();
         }
 
         public async Task<CmdResponseBO> DeleteIdentity(DeleteIdentityRequest request)
         {
-            var result = await StreamFlowDriver.InvokeAsync<CmdResponseBO>(new(request)
-            {
-                CommandName = "DeleteIdentity",
-                ExchangeType = MessageExchangeType.Direct,
-                Recipient = TargetClient
-            });
-            return result.Response.Adapt<CmdResponseBO>();
+            var result = await SendAsync<DeleteIdentityRequest, CmdResponseBO>("DeleteIdentity", request);
+            return result.Adapt<CmdResponseBO>();
         }
     }
 }

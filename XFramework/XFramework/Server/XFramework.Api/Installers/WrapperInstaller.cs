@@ -12,6 +12,7 @@ namespace XFramework.Api.Installers
             services.AddSingleton<IIdentityServiceWrapper, IdentityServerDriver>();
             services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
             services.AddSingleton<ILoggerWrapper, RecordsDriver>();
+            services.AddSingleton<IWalletServiceWrapper, WalletServiceDriver>();
         }
     }
 }
