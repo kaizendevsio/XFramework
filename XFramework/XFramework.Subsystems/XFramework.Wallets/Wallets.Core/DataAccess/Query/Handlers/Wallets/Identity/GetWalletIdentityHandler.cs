@@ -11,29 +11,29 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity
 {
-    public class GetWalletIdentityHandler : QueryBaseHandler, IRequestHandler<GetWalletIdentityQuery, QueryResponseBO<GetWalletIdentityContract>>
+    public class GetWalletIdentityHandler : QueryBaseHandler, IRequestHandler<GetIdentityWalletQuery, QueryResponseBO<GetIdentityWalletContract>>
     {
         public GetWalletIdentityHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
         }
         
-        public async Task<QueryResponseBO<GetWalletIdentityContract>> Handle(GetWalletIdentityQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponseBO<GetIdentityWalletContract>> Handle(GetIdentityWalletQuery request, CancellationToken cancellationToken)
         {
             var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Uuid == request.Id.ToString(), cancellationToken: cancellationToken);
            
             if (entity == null)
             {
-                return new QueryResponseBO<GetWalletIdentityContract>()
+                return new QueryResponseBO<GetIdentityWalletContract>()
                 {
                     Message = $" Wallet identity with UID {request.Id} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
 
-            return new QueryResponseBO<GetWalletIdentityContract>()
+            return new QueryResponseBO<GetIdentityWalletContract>()
             {
-                Response = entity.Adapt<GetWalletIdentityContract>()
+                Response = entity.Adapt<GetIdentityWalletContract>()
             };
         }
         

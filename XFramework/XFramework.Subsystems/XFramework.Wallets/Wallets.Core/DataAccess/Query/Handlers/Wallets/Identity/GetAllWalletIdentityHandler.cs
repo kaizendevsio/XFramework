@@ -14,7 +14,7 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity
 {
-    public class GetAllWalletIdentityHandler : QueryBaseHandler, IRequestHandler<GetAllWalletIdentityQuery, QueryResponseBO<List<GetWalletIdentityContract>>>
+    public class GetAllWalletIdentityHandler : QueryBaseHandler, IRequestHandler<GetAllIdentityWalletQuery, QueryResponseBO<List<GetIdentityWalletContract>>>
     {
         private readonly IDataLayer _dataLayer;
 
@@ -23,20 +23,20 @@ namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity
             _dataLayer = dataLayer;
         }
         
-        public async Task<QueryResponseBO<List<GetWalletIdentityContract>>> Handle(GetAllWalletIdentityQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> Handle(GetAllIdentityWalletQuery request, CancellationToken cancellationToken)
         {
             var result = await _dataLayer.TblWalletEntities.Take(1000).AsNoTracking().ToListAsync(cancellationToken: cancellationToken);
             if (!result.Any())
             {
-                return new QueryResponseBO<List<GetWalletIdentityContract>>()
+                return new QueryResponseBO<List<GetIdentityWalletContract>>()
                 {
                     Message = $"No identity exists",
                     HttpStatusCode = HttpStatusCode.NoContent
                 };
             }
 
-            var r = result.Adapt<List<GetWalletIdentityContract>>();
-            return new QueryResponseBO<List<GetWalletIdentityContract>>()
+            var r = result.Adapt<List<GetIdentityWalletContract>>();
+            return new QueryResponseBO<List<GetIdentityWalletContract>>()
             {
                 Response = r
             };

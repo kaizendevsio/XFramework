@@ -5,7 +5,7 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Wallets.Core.DataAccess.Query.Entity.Wallets.Identity
 {
-    public class GetWalletIdentityQuery : CommandBaseEntity, IRequest<QueryResponseBO<GetWalletIdentityQuery>>, IRequest<QueryResponseBO<GetWalletIdentityContract>>
+    public class GetIdentityWalletQuery : QueryBaseEntity, IRequest<QueryResponseBO<GetIdentityWalletContract>>
     {
         public long Id { get; set; }
         public string Code { get; set; }

@@ -2,7 +2,7 @@
 
 namespace Wallets.Domain.Generic.Contracts.Responses
 {
-    public class GetWalletIdentityContract
+    public class GetIdentityWalletContract
     {
         public long Id { get; set; }
         public bool? IsEnabled { get; set; }
