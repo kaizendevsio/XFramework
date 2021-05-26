@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Wallets.Core.DataAccess.Commands.Entity.Wallets;
 using Wallets.Core.DataAccess.Commands.Entity.Wallets.Identity;
 using Wallets.Core.DataAccess.Query.Entity.Wallets;
+using Wallets.Core.DataAccess.Query.Entity.Wallets.Identity;
 
 namespace Wallets.Api.Controllers.V1.Wallets
 {
@@ -25,14 +26,14 @@ namespace Wallets.Api.Controllers.V1.Wallets
         }
 
         [HttpPost("Get")]
-        public async Task<JsonResult> Get([FromBody] GetWalletQuery request)
+        public async Task<JsonResult> Get([FromBody] GetIdentityWalletQuery request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
 
         [HttpPost("GetAll")]
-        public async Task<JsonResult> GetAll([FromBody] GetAllWalletQuery request)
+        public async Task<JsonResult> GetAll([FromBody] GetAllIdentityWalletQuery request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);

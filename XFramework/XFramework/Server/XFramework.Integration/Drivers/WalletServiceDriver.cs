@@ -28,16 +28,15 @@ namespace XFramework.Integration.Drivers
             return result.Adapt<CmdResponseBO>();
         }
 
-        public async Task<CmdResponseBO> GetWallet(GetWalletRequest request)
+
+        public async Task<QueryResponseBO<GetWalletContract>> GetWallet(GetWalletRequest request)
         {
-            var result = await SendAsync<GetWalletRequest, CmdResponseBO>("GetWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendAsync<GetWalletRequest, GetWalletContract>("GetWallet", request);
         }
 
-        public async Task<CmdResponseBO> GetAllWallet(GetAllWalletRequest request)
+        public async Task<QueryResponseBO<List<GetWalletContract>>> GetAllWallet(GetAllWalletRequest request)
         {
-            var result = await SendAsync<GetAllWalletRequest, CmdResponseBO>("GetAllWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendAsync<GetAllWalletRequest, List<GetWalletContract>>("GetAllWallet", request);
         }
 
         public async Task<CmdResponseBO> UpdateWallet(UpdateWalletRequest request)
@@ -60,14 +59,13 @@ namespace XFramework.Integration.Drivers
 
         public async Task<QueryResponseBO<GetIdentityWalletContract>> GetIdentityWallet(GetIdentityWalletRequest request)
         {
-            var result = await SendAsync<GetIdentityWalletRequest, GetIdentityWalletContract>("GetIdentityWallet", request);
-            return result;
+          return await SendAsync<GetIdentityWalletRequest, GetIdentityWalletContract>("GetIdentityWallet", request);
         }
 
-        public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> GetAllIdentityWallet(GetAllIdentityWalletRequest request)
+        public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> GetAllIdentityWallet(
+            GetAllIdentityWalletRequest request)
         {
-            var result = await SendAsync<GetAllIdentityWalletRequest, List<GetIdentityWalletContract>>("GetAllIdentityWallet", request);
-            return result;
+           return await SendAsync<GetAllIdentityWalletRequest, List<GetIdentityWalletContract>>("GetAllIdentityWallet", request);
         }
 
         public async Task<CmdResponseBO> UpdateIdentityWallet(UpdateIdentityWalletRequest request)
