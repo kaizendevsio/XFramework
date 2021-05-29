@@ -31,10 +31,6 @@
   </ItemGroup>
 
  <ItemGroup>
-   <Folder Include="Controllers\V1" />
- </ItemGroup>
-
- <ItemGroup>
    <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
      <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\Server\IdentityServer.Domain.Generic\bin\Debug\net5.0\IdentityServer.Domain.Generic.dll</HintPath>
    </Reference>

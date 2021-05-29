@@ -3,13 +3,14 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Web;
 using System.Xml.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace XFramework.Integration.Services.Helpers
+namespace XFramework.Integration.Extensions
 {
-    public static class HttpFormHelper
+    public static class HttpFormExtension
     {
         private static IDictionary<string, string> ToKeyValue(this object metaToken)
         {
@@ -19,7 +20,7 @@ namespace XFramework.Integration.Services.Helpers
             }
 
             // Added by me: avoid cyclic references
-            var serializer = new JsonSerializer { ReferenceLoopHandling = ReferenceLoopHandling.Ignore };
+            var serializer = new JsonSerializer {ReferenceLoopHandling = ReferenceLoopHandling.Ignore};
             var token = metaToken as JToken;
             if (token == null)
             {
@@ -31,7 +32,7 @@ namespace XFramework.Integration.Services.Helpers
             {
                 var contentData = new Dictionary<string, string>();
                 foreach (var child in token.Children().ToList())
-                {   
+                {
                     var childContent = child.ToKeyValue();
                     if (childContent != null)
                     {
@@ -49,18 +50,20 @@ namespace XFramework.Integration.Services.Helpers
                 return null;
             }
 
-            var value = jValue?.Type == JTokenType.Date ?
-                jValue?.ToString("o", CultureInfo.InvariantCulture) :
-                jValue?.ToString(CultureInfo.InvariantCulture);
+            var value = jValue?.Type == JTokenType.Date
+                ? jValue?.ToString("o", CultureInfo.InvariantCulture)
+                : jValue?.ToString(CultureInfo.InvariantCulture);
 
-            return new Dictionary<string, string> { { token.Path, value } };
+            return new Dictionary<string, string> {{token.Path, value}};
         }
+
         public static FormUrlEncodedContent ToFormData(this object obj)
         {
             var formData = obj.ToKeyValue();
 
             return new FormUrlEncodedContent(formData);
         }
+
         public static string JsonToQuery(this string jsonQuery)
         {
             string str = "?";
@@ -72,7 +75,7 @@ namespace XFramework.Integration.Services.Helpers
                 .Replace("\"", "");
             return str;
         }
-
+        
         public static T ToXmlObject<T>(this string stringObject)
         {
             var serializer = new XmlSerializer(typeof(T));
@@ -80,6 +83,16 @@ namespace XFramework.Integration.Services.Helpers
             var result = (T)(serializer.Deserialize(reader));
             
             return result;
+        }
+        
+        public static string UrlEncode(this string text)
+        {
+            return HttpUtility.UrlEncode(text);
+        }
+        
+        public static string UrlDecode(this string text)
+        {
+            return HttpUtility.UrlDecode(text);
         }
     }
 }

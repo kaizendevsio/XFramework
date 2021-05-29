@@ -7,7 +7,7 @@ namespace XFramework.Integration.Interfaces
     {
         public string GenerateRandomString(int size);
         public string GenerateReferenceString();
-        public HttpHelper Http { get; set; }
+        public HttpHelper Http { get; }
         public StopWatchHelper StopWatch { get; set; }
     }
 }
