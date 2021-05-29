@@ -21,7 +21,7 @@ namespace XFramework.Core.DataAccess.Query.Handlers.Identity
         
         public async Task<QueryResponseBO<AuthorizeIdentityContract>> Handle(AuthenticateIdentityQuery request, CancellationToken cancellationToken)
         {
-            var response = await IdentityServiceWrapper.Authenticate(request.Adapt<AuthenticateCredentialRequest>());
+            var response = await IdentityServiceWrapper.AuthenticateCredential(request.Adapt<AuthenticateCredentialRequest>());
             return response.Adapt<QueryResponseBO<AuthorizeIdentityContract>>();
         }
     }

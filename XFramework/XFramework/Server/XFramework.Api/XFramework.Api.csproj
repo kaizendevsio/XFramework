@@ -22,7 +22,6 @@
   <ItemGroup>
     <ProjectReference Include="..\XFramework.Core\XFramework.Core.csproj" />
     <ProjectReference Include="..\XFramework.Domain\XFramework.Domain.csproj" />
-    <ProjectReference Include="..\XFramework.ExternalUtilities\XFramework.External.csproj" />
     <ProjectReference Include="..\XFramework.Integration\XFramework.Integration.csproj" />
   </ItemGroup>
 
@@ -33,6 +32,9 @@
  <ItemGroup>
    <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
      <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\Server\IdentityServer.Domain.Generic\bin\Debug\net5.0\IdentityServer.Domain.Generic.dll</HintPath>
+   </Reference>
+   <Reference Include="Wallets.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+     <HintPath>..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\bin\Debug\net5.0\Wallets.Domain.Generic.dll</HintPath>
    </Reference>
  </ItemGroup>
 

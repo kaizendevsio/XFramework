@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net5.0</TargetFramework>
+        <LangVersion>9</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Folder Include="DataAccess\Commands\Entity\Application" />
+      <Folder Include="DataAccess\Commands\Entity\Events" />
+      <Folder Include="DataAccess\Commands\Handlers\Application" />
+      <Folder Include="DataAccess\Commands\Handlers\Events" />
+      <Folder Include="DataAccess\Query\Entity\Application" />
+      <Folder Include="DataAccess\Query\Entity\Events" />
+      <Folder Include="DataAccess\Query\Handlers\Application" />
+      <Folder Include="DataAccess\Query\Handlers\Events" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="FluentValidation" Version="9.3.0" />
+      <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="9.3.0" />
+      <PackageReference Include="Mapster" Version="7.0.1" />
+      <PackageReference Include="MediatR" Version="9.0.0" />
+      <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="5.0.0" />
+      <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.7.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
+      </Reference>
+      <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\XFramework.Integration.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
+      <ProjectReference Include="..\Wallets.Domain\Wallets.Domain.csproj" />
+    </ItemGroup>
+
+</Project>

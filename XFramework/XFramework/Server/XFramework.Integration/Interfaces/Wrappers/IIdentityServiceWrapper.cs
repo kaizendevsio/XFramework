@@ -9,7 +9,7 @@ namespace XFramework.Integration.Interfaces.Wrappers
 {
     public interface IIdentityServiceWrapper : IXFrameworkService
     {
-        public Task<QueryResponseBO<AuthorizeIdentityContract>> Authenticate(AuthenticateCredentialRequest request);
+        public Task<QueryResponseBO<AuthorizeIdentityContract>> AuthenticateCredential(AuthenticateCredentialRequest request);
         public Task<CmdResponseBO> CreateCredential(CreateCredentialRequest request);
         public Task<CmdResponseBO> UpdateCredential(UpdateCredentialRequest request);
         public Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request);
