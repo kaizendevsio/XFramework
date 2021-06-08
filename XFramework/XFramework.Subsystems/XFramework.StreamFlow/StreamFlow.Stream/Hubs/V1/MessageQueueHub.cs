@@ -42,7 +42,6 @@ namespace StreamFlow.Stream.Hubs.V1
             var response = _mediator.Send(entity).Result;
             return response.Response;
         }
-        
         public async Task<HttpStatusCode> InvokeResponse(StreamFlowMessageBO request)
         {
             var entity = new InvokeMethodResponseCmd()
@@ -53,7 +52,6 @@ namespace StreamFlow.Stream.Hubs.V1
             var response = await _mediator.Send(entity).ConfigureAwait(false);
             return response.HttpStatusCode;
         }
-        
         public async Task<HttpStatusCode> Push(StreamFlowMessageBO request)
         {
             var entity = new PushMessageCmd()

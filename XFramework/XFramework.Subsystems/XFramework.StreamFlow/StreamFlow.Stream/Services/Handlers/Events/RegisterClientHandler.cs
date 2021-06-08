@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
+using Microsoft.AspNetCore.Http.Connections.Features;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Stream.Hubs.V1;
@@ -32,7 +33,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             });
             RememberClient(request);
 
-            Console.WriteLine($"Connection Registered with ID {request.Context.ConnectionId} : {request.Client.Guid} : {request.Client.Name}");
+            Console.WriteLine($"Connection Registered with ID {request.Context.ConnectionId} : {request.Client.Guid} [{request.Context.Features.Get<IHttpTransportFeature>()?.TransportType.ToString()}] : {request.Client.Name}");
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted

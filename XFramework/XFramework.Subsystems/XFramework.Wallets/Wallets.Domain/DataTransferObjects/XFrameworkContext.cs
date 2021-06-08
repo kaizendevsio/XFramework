@@ -66,7 +66,7 @@ namespace Wallets.Domain.DataTransferObjects
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.HasAnnotation("Relational:Collation", "English_Philippines.1252");
+            modelBuilder.HasAnnotation("Relational:Collation", "English_United States.1252");
 
             modelBuilder.Entity<TblAddressBarangay>(entity =>
             {
