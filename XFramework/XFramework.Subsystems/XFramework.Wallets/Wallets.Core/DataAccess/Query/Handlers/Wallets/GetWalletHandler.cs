@@ -11,17 +11,20 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets
 {
-    public class GetWalletHandler  : QueryBaseHandler, IRequestHandler<GetWalletQuery, QueryResponseBO<GetWalletContract>>
+    public class GetWalletHandler : QueryBaseHandler,
+        IRequestHandler<GetWalletQuery, QueryResponseBO<GetWalletContract>>
     {
         public GetWalletHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
         }
-        
-        public async Task<QueryResponseBO<GetWalletContract>> Handle(GetWalletQuery request, CancellationToken cancellationToken)
+
+        public async Task<QueryResponseBO<GetWalletContract>> Handle(GetWalletQuery request,
+            CancellationToken cancellationToken)
         {
-            var entity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Code == request.Code || i.Id == request.Id, cancellationToken: cancellationToken);
-           if (entity == null)
+            var entity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(
+                i => i.Code == request.Code || i.Id == request.Id, cancellationToken: cancellationToken);
+            if (entity == null)
             {
                 return new QueryResponseBO<GetWalletContract>()
                 {
