@@ -5,11 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d37d412-dd63-4bc1-9000-5a758e6c9722" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/V1/MessageQueueHub.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/V1/MessageQueueHub.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/RegisterClientHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/RegisterClientHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetWalletHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetWalletHandler.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,41 +32,13 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework/Server/XFramework.Api/Controllers/V1/Wallets/IdentityWalletsController.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/RegisterClientHandler.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/IdentityWalletsController.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/RegisterClientHandler.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/GetWalletHandler.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWalletTransaction.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/GetWalletHandler.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.PaymentGateways/PaymentGateways.Api/Controllers/StartupController.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework/Server/XFramework.Api/Controllers/V1/Hubs/HubBase.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWallet.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/StreamInstaller.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/IdentityWalletsController.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWallet.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/5BFD8D9A-6B3C-4231-A94A-A60A37A737BB/46/2958e781/TypeAdapter.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/GetWalletRequest.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWalletTransaction.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/CreateWalletCmd.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/Installers/StreamInstaller.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWalletTransaction.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework/Server/XFramework.Api/Controllers/V1/Wallets/WalletsController.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/Hubs/V1/MessageQueueHub.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/GetWalletRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/V1/MessageQueueHub.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/TblUserWallet.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.PaymentGateways/PaymentGateways.Api/Controllers/StartupController.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework/Server/XFramework.Api/Controllers/V1/Wallets/WalletsController.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XFrameworkContext.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/E6E6B40B-308C-4FE1-9C93-7C26C144C865/233/ExceptionDispatchInfo.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/5BFD8D9A-6B3C-4231-A94A-A60A37A737BB/46/2958e781/TypeAdapter.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/IncrementIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/TransferIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/UpdateIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/GetAllIdentityWalletRequest.cs" />
@@ -120,7 +89,6 @@
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/IdentityWalletsController.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/GetWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetWalletHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/StreamInstaller.cs" />
     </changedPaths>
   </component>
   <component name="ProjectId" id="1skPeWMhtYbvpIIFE4o5MJxsrWG" />
@@ -247,13 +215,27 @@
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/CreateWalletHandler.cs</url>
           <line>23</line>
-          <properties documentPath="D:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Core\DataAccess\Commands\Handlers\Wallets\CreateWalletHandler.cs" initialLine="23" containingFunctionPresentation="method 'Handle'" />
+          <properties documentPath="D:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Core\DataAccess\Commands\Handlers\Wallets\CreateWalletHandler.cs" initialLine="23" containingFunctionPresentation="method 'Handle'">
+            <startOffsets>
+              <option value="744" />
+            </startOffsets>
+            <endOffsets>
+              <option value="811" />
+            </endOffsets>
+          </properties>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetIdentityWalletHandler.cs</url>
           <line>28</line>
-          <properties documentPath="D:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Core\DataAccess\Query\Handlers\Wallets\Identity\GetIdentityWalletHandler.cs" initialLine="28" containingFunctionPresentation="method 'Handle'" />
+          <properties documentPath="D:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Core\DataAccess\Query\Handlers\Wallets\Identity\GetIdentityWalletHandler.cs" initialLine="28" containingFunctionPresentation="method 'Handle'">
+            <startOffsets>
+              <option value="1123" />
+            </startOffsets>
+            <endOffsets>
+              <option value="1142" />
+            </endOffsets>
+          </properties>
           <option name="timeStamp" value="7" />
         </line-breakpoint>
       </breakpoints>
