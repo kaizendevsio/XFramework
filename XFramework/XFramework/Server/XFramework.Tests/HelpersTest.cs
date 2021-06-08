@@ -14,7 +14,7 @@ namespace XFramework.Tests
         [TestMethod]
         public async Task TestPost()
         {
-            IHelperService helpService = new HelperService();
+            /*IHelperService helpService = new HelperService();
             var request = new TestModel()
             {
                 FastestFee = 123.3m,
@@ -23,13 +23,13 @@ namespace XFramework.Tests
             };
             
             var result1 = await helpService.Http.PostAsync<string>(new Uri("https://asdasdasdsad.free.beeceptor.com"), "api/v1/fees/recommended",request);
-            Console.WriteLine(JsonSerializer.Serialize(result1));
+            Console.WriteLine(JsonSerializer.Serialize(result1));*/
         }
         
         [TestMethod]
         public async Task TestGet()
         {
-            IHelperService helpService = new HelperService();
+            /*IHelperService helpService = new HelperService();
             var request = new TestModel()
             {
                 FastestFee = 123.3m,
@@ -38,7 +38,7 @@ namespace XFramework.Tests
             };
             
             var result1 = await helpService.Http.GetAsync<string>(new Uri("https://asdasdasdsad.free.beeceptor.com"), "api/v1/fees/recommended");
-            Console.WriteLine(JsonSerializer.Serialize(result1));
+            Console.WriteLine(JsonSerializer.Serialize(result1));*/
         }
     }
     
