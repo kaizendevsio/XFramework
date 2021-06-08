@@ -25,16 +25,22 @@ namespace XFramework.Api.Controllers.V1.Wallets
             return new JsonResult(result);
         }
 
-        [HttpPost("Get")]
-        public async Task<JsonResult> Get([FromBody] GetWalletRequest request)
+        [HttpGet("Get")]
+        public async Task<JsonResult> Get(long id, string code)
         {
+            var request = new GetWalletRequest()
+            {
+                Id = id,
+                Code = code
+            };
             var result = await WalletServiceWrapper.GetWallet(request);
             return new JsonResult(result);
         }
 
-        [HttpPost("GetAll")]
-        public async Task<JsonResult> GetAll([FromBody] GetAllWalletRequest request)
+        [HttpGet("GetAll")]
+        public async Task<JsonResult> GetAll()
         {
+            var request = new GetAllWalletRequest();
             var result = await WalletServiceWrapper.GetAllWallet(request);
             return new JsonResult(result);
         }

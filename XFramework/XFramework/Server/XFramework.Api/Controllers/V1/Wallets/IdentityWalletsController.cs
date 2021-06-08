@@ -25,16 +25,26 @@ namespace XFramework.Api.Controllers.V1.Wallets
             return new JsonResult(result);
         }
 
-        [HttpPost("Get")]
-        public async Task<JsonResult> Get([FromBody] GetIdentityWalletRequest request)
+        [HttpGet("Get")]
+        public async Task<JsonResult> Get(long userAuthId, long walletTypeId)
         {
+            var request = new GetIdentityWalletRequest()
+            {
+                UserAuthId = userAuthId,
+                WalletTypeId = walletTypeId
+            };
             var result = await WalletServiceWrapper.GetIdentityWallet(request);
             return new JsonResult(result);
         }
 
-        [HttpPost("GetAll")]
-        public async Task<JsonResult> GetAll([FromBody] GetAllIdentityWalletRequest request)
+        [HttpGet("GetAll")]
+        public async Task<JsonResult> GetAll(long userAuthId)
         {
+            var request = new GetAllIdentityWalletRequest()
+            {
+                UserAuthId = userAuthId
+            };
+            
             var result = await WalletServiceWrapper.GetAllIdentityWallet(request);
             return new JsonResult(result);
         }

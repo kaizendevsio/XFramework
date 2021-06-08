@@ -25,7 +25,11 @@ namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity
         
         public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> Handle(GetAllIdentityWalletQuery request, CancellationToken cancellationToken)
         {
-            var result = await _dataLayer.TblUserWallets.Take(1000).AsNoTracking().ToListAsync(cancellationToken: cancellationToken);
+            var result = await _dataLayer.TblUserWallets
+                .Where(i => i.UserAuthId == request.UserAuthId)
+                .Take(1000)
+                .AsNoTracking()
+                .ToListAsync(cancellationToken: cancellationToken);
             if (!result.Any())
             {
                 return new QueryResponseBO<List<GetIdentityWalletContract>>()

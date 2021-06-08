@@ -10,14 +10,13 @@ namespace Wallets.Api.Controllers.V1.Wallets
 {
     [Route("API/v1/[controller]")]
     [ApiController]
-
     public class IdentityWalletsController : XFrameworkControllerBase
     {
         public IdentityWalletsController(IMediator mediator)
         {
             _mediator = mediator;
         }
-        
+
         [HttpPost("Create")]
         public async Task<JsonResult> Create([FromBody] CreateIdentityWalletCmd request)
         {
@@ -25,16 +24,22 @@ namespace Wallets.Api.Controllers.V1.Wallets
             return new JsonResult(result);
         }
 
-        [HttpPost("Get")]
-        public async Task<JsonResult> Get([FromBody] GetIdentityWalletQuery request)
+        [HttpGet("Get")]
+        public async Task<JsonResult> Get(long userAuthId, long walletTypeId)
         {
+            var request = new GetIdentityWalletQuery()
+            {
+                UserAuthId = userAuthId,
+                WalletTypeId = walletTypeId
+            };
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
 
-        [HttpPost("GetAll")]
-        public async Task<JsonResult> GetAll([FromBody] GetAllIdentityWalletQuery request)
+        [HttpGet("GetAll")]
+        public async Task<JsonResult> GetAll()
         {
+            var request = new GetAllIdentityWalletQuery();
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
@@ -52,27 +57,26 @@ namespace Wallets.Api.Controllers.V1.Wallets
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
-        
+
         [HttpPost("Increment")]
         public async Task<JsonResult> Increment([FromBody] IncrementIdentityWalletCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
-        
+
         [HttpPost("Decrement")]
         public async Task<JsonResult> Decrement([FromBody] DecrementIdentityWalletCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
-        
+
         [HttpPost("Transfer")]
         public async Task<JsonResult> Transfer([FromBody] TransferIdentityWalletCmd request)
         {
             var result = await _mediator.Send(request);
             return new JsonResult(result);
         }
-
     }
 }

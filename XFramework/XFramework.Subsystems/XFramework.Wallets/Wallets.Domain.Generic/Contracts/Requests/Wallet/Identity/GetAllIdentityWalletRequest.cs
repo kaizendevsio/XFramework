@@ -2,6 +2,6 @@
 {
     public class GetAllIdentityWalletRequest
     {
-        
+        public long UserAuthId { get; set; }
     }
 }
