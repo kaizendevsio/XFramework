@@ -22,6 +22,12 @@ namespace XFramework.Integration.Services
             new RNGCryptoServiceProvider().GetBytes(b);
             return Encoding.ASCII.GetString(b);
         }
+        public long GenerateRandomNumber(int start, int end)
+        {
+            var rnd = new Random();
+            var n  = rnd.Next(start, end);
+            return n;
+        }
         public string GenerateReferenceString()
         {
             var ticks = new DateTime(2021,1,1).Ticks;

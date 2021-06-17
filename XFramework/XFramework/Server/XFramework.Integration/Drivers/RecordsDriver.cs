@@ -6,9 +6,9 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Integration.Drivers
 {
-    public class RecordsDriver : ILoggerWrapper
+    public class RecordsDriver// : ILoggerWrapper
     {
-        private IMessageBusWrapper MessageBusWrapper { get; }
+        /*private IMessageBusWrapper MessageBusWrapper { get; }
 
         public RecordsDriver(IMessageBusWrapper messageBusWrapper)
         {
@@ -27,7 +27,7 @@ namespace XFramework.Integration.Drivers
                 },
                 MethodName = "NewLog",
                 Data = ""
-            });*/
+            });#1#
             return guid;
         }
 
@@ -41,6 +41,6 @@ namespace XFramework.Integration.Drivers
             GenericPriorityType priorityType = GenericPriorityType.Information)
         {
             //throw new NotImplementedException();
-        }
+        }*/
     }
 }
