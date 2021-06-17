@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>netcoreapp5.0</TargetFramework>
+        <LangVersion>9</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Mapster" Version="7.2.0" />
+        <PackageReference Include="MediatR" Version="9.0.0" />
+        <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="5.0.5" NoWarn="NU1605" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="5.0.5" NoWarn="NU1605" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.5" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.1.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\RBS.Core\RBS.Core.csproj" />
+      <ProjectReference Include="..\RBS.Domain\RBS.Domain.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net5.0\StreamFlow.Domain.dll</HintPath>
+      </Reference>
+      <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\StreamFlow.Domain.Generic.dll</HintPath>
+      </Reference>
+      <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
+      </Reference>
+      <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\XFramework.Integration.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

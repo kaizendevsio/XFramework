@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net5.0</TargetFramework>
+        <LangVersion>9</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.1" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="5.0.1">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="5.0.1" />
+      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="5.0.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

@@ -5,7 +5,48 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d37d412-dd63-4bc1-9000-5a758e6c9722" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/shelf/Uncommitted_changes_before_Update_at_08_06_2021_11_14_AM__Default_Changelist_.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/shelf/Uncommitted_changes_before_Update_at_08_06_2021_11_14_AM__Default_Changelist_.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.RBS/.idea/encodings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.RBS/.idea/indexLayout.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.RBS/.idea/projectSettingsUpdater.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.RBS/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.RBS/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Entity/CommandBaseEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Entity/Identity/CreateIdentityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Entity/Identity/Credential/CreateCredentialCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Entity/Identity/Credential/DeleteCredentialCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Entity/Identity/Credential/UpdateCredentialCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Entity/Identity/DeleteIdentityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Entity/Identity/UpdateIdentityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Handlers/CommandBaseHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Handlers/Identity/Credential/CreateAuthorizeIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Handlers/Identity/Credential/DeleteAuthorizeIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Handlers/Identity/Credential/UpdateAuthorizeIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Handlers/Identity/DeleteIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Handlers/Identity/UpdateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Validations/CommandBaseValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Commands/Validations/Identity/Authorization/CreateAuthorizeIdentityValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/DataLayer.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Entity/Application/GetAllAppListQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Entity/Identity/Credential/AuthenticateCredentialQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Entity/Identity/GetAllIdentityQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Entity/Identity/GetIdentityQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Entity/QueryBaseEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Handlers/Application/GetAllAppInfoQueryHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Handlers/Identity/GetAllIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Handlers/Identity/GetIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Validations/Identity/Authorization/AuthenticateIdentityValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/DataAccess/Query/Validations/QueryBaseValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/Interfaces/ICachingService.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/Interfaces/IDataLayer.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/RBS.Core.csproj" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/Services/CachingService.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.RBS/RBS.Core/Validations/Common/RequestServerBOValidator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/shelf/Uncommitted_changes_before_Update_at_08_06_2021_11_14_AM_[Default_Changelist]/shelved.patch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/shelf/Uncommitted_changes_before_Update_at_08_06_2021_11_14_AM__Default_Changelist_.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -33,11 +74,11 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/E6E6B40B-308C-4FE1-9C93-7C26C144C865/233/ExceptionDispatchInfo.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/5BFD8D9A-6B3C-4231-A94A-A60A37A737BB/46/2958e781/TypeAdapter.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/IncrementIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/TransferIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/UpdateIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/GetAllIdentityWalletRequest.cs" />
@@ -45,12 +86,10 @@
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/CreateIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/DecrementWalletIdentityRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/DeleteIdentityWalletRequest.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/GetAllIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/IncrementIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/TransferIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/UpdateIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/DecrementWalletRequest.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/GetAllWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/GetWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/CreateWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/DeleteWalletRequest.cs" />
@@ -59,7 +98,6 @@
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/GetWalletIdentityQuery.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/CreateWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/DecrementIdentityWalletRequest.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/GetAllIdentityWalletQuery.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/GetIdentityWalletContract.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.json" />
@@ -78,16 +116,20 @@
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/Identity/GetAllIdentityWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetAllWalletIdentityHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetWalletIdentityHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetAllIdentityWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/GetIdentityWalletQuery.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetIdentityWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/GetIdentityWalletRequest.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/Identity/GetIdentityWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/DeleteWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/DeleteIdentityWalletHandler.cs" />
-      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/IdentityWalletsController.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/GetWalletHandler.cs" />
       <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetWalletHandler.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/IdentityWalletsController.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/Wallets/WalletsController.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/Identity/GetAllIdentityWalletRequest.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Wallet/GetAllWalletRequest.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/GetAllIdentityWalletQuery.cs" />
+      <option value="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetAllIdentityWalletHandler.cs" />
     </changedPaths>
   </component>
   <component name="ProjectId" id="1skPeWMhtYbvpIIFE4o5MJxsrWG" />
@@ -100,7 +142,7 @@
   </component>
   <component name="PropertiesComponent">
     <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
-    <property name="DebuggerViewTab_PTCS_FirstProportionKey" value="0.34994584" />
+    <property name="DebuggerViewTab_PTCS_FirstProportionKey" value="0.34981194" />
     <property name="DebuggerViewTab_PTCS_LastProportionKey" value="0.0" />
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
@@ -158,7 +200,8 @@
       <workItem from="1622696916560" duration="6000" />
       <workItem from="1622699913494" duration="2322000" />
       <workItem from="1623116705280" duration="13000" />
-      <workItem from="1623204443802" duration="1196000" />
+      <workItem from="1623902883777" duration="1000" />
+      <workItem from="1623902913806" duration="234000" />
     </task>
     <task id="LOCAL-00001" summary="Initial Template">
       <created>1621423842771</created>
@@ -215,13 +258,27 @@
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/CreateWalletHandler.cs</url>
           <line>23</line>
-          <properties documentPath="D:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Core\DataAccess\Commands\Handlers\Wallets\CreateWalletHandler.cs" initialLine="23" containingFunctionPresentation="method 'Handle'" />
+          <properties documentPath="D:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Core\DataAccess\Commands\Handlers\Wallets\CreateWalletHandler.cs" initialLine="23" containingFunctionPresentation="method 'Handle'">
+            <startOffsets>
+              <option value="744" />
+            </startOffsets>
+            <endOffsets>
+              <option value="811" />
+            </endOffsets>
+          </properties>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetIdentityWalletHandler.cs</url>
           <line>28</line>
-          <properties documentPath="D:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Core\DataAccess\Query\Handlers\Wallets\Identity\GetIdentityWalletHandler.cs" initialLine="28" containingFunctionPresentation="method 'Handle'" />
+          <properties documentPath="D:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Core\DataAccess\Query\Handlers\Wallets\Identity\GetIdentityWalletHandler.cs" initialLine="28" containingFunctionPresentation="method 'Handle'">
+            <startOffsets>
+              <option value="1123" />
+            </startOffsets>
+            <endOffsets>
+              <option value="1142" />
+            </endOffsets>
+          </properties>
           <option name="timeStamp" value="7" />
         </line-breakpoint>
       </breakpoints>
