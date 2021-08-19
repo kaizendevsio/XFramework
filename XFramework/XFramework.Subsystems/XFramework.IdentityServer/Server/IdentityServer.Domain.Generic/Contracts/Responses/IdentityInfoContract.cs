@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace PaymentGateways.Domain.Generic.Contracts.Responses
+namespace IdentityServer.Domain.Generic.Contracts.Responses
 {
-    public class GetIdentityContract
+    public class IdentityInfoContract
     {
         public DateTime CreatedAt { get; set; }
         public long? CreatedBy { get; set; }

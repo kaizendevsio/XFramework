@@ -11,29 +11,29 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
 {
-    public class GetIdentityHandler : QueryBaseHandler ,IRequestHandler<GetIdentityQuery, QueryResponseBO<GetIdentityContract>>
+    public class GetIdentityHandler : QueryBaseHandler ,IRequestHandler<GetIdentityQuery, QueryResponseBO<IdentityInfoContract>>
     {
 
         public GetIdentityHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
         }
-        public async Task<QueryResponseBO<GetIdentityContract>> Handle(GetIdentityQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponseBO<IdentityInfoContract>> Handle(GetIdentityQuery request, CancellationToken cancellationToken)
         {
             var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Uuid == request.Uid.ToString(), cancellationToken: cancellationToken);
            
             if (entity == null)
             {
-                return new QueryResponseBO<GetIdentityContract>()
+                return new QueryResponseBO<IdentityInfoContract>()
                 {
                     Message = $"Identity with UID {request.Uid} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
 
-            return new QueryResponseBO<GetIdentityContract>()
+            return new QueryResponseBO<IdentityInfoContract>()
             {
-                Response = entity.Adapt<GetIdentityContract>()
+                Response = entity.Adapt<IdentityInfoContract>()
             };
             
         }

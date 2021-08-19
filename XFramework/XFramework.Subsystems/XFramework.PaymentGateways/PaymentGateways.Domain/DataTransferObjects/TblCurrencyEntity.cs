@@ -12,6 +12,8 @@ namespace PaymentGateways.Domain.DataTransferObjects
             TblAddressCountries = new HashSet<TblAddressCountry>();
             TblExchangeRateSourceCurrencyEntities = new HashSet<TblExchangeRate>();
             TblExchangeRateTargetCurrencyEntities = new HashSet<TblExchangeRate>();
+            TblUserDepositRequests = new HashSet<TblUserDepositRequest>();
+            TblWalletEntities = new HashSet<TblWalletEntity>();
         }
 
         public long Id { get; set; }
@@ -28,5 +30,7 @@ namespace PaymentGateways.Domain.DataTransferObjects
         public virtual ICollection<TblAddressCountry> TblAddressCountries { get; set; }
         public virtual ICollection<TblExchangeRate> TblExchangeRateSourceCurrencyEntities { get; set; }
         public virtual ICollection<TblExchangeRate> TblExchangeRateTargetCurrencyEntities { get; set; }
+        public virtual ICollection<TblUserDepositRequest> TblUserDepositRequests { get; set; }
+        public virtual ICollection<TblWalletEntity> TblWalletEntities { get; set; }
     }
 }

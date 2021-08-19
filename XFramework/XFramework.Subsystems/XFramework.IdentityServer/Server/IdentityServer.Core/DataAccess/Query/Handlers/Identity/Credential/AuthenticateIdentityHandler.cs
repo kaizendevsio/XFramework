@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
@@ -9,6 +10,7 @@ using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
 using IdentityServer.Core.Interfaces;
 using IdentityServer.Domain.DataTransferObjects;
 using IdentityServer.Domain.Generic.Contracts.Responses;
+using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -16,10 +18,9 @@ using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
-namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
+namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential
 {
-    public class AuthenticateIdentityHandler : QueryBaseHandler,
-        IRequestHandler<AuthenticateCredentialQuery, QueryResponseBO<AuthorizeIdentityContract>>
+    public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<AuthenticateCredentialQuery, QueryResponseBO<AuthorizeIdentityContract>>
     {
         public AuthenticateIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService, ILoggerWrapper recordsWrapper)
         {
@@ -55,7 +56,8 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                 };
             }
 
-            
+            var roleList = await GetRoleList(cancellationToken, credential, cuid);
+
             var token = await _jwtService.GenerateToken(request.Username, cuid);
             _recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
             
@@ -68,9 +70,26 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Authorization
                     AccessToken = token.AccessToken,
                     RefreshToken = token.RefreshToken,
                     Uid = Guid.Parse(credential.IdentityInfo.Uuid),
-                    Cuid = Guid.Parse(credential.Cuid)
+                    Cuid = Guid.Parse(credential.Cuid),
+                    RoleList = roleList.Adapt<List<IdentityRoleContract>>() 
                 }
             };
+        }
+
+        private async Task<List<TblIdentityRole>> GetRoleList(CancellationToken cancellationToken, TblIdentityCredential credential, Guid cuid)
+        {
+            var roleList = await _dataLayer.TblIdentityRoles
+                .AsNoTracking()
+                .Where(i => i.UserCredId == credential.Id)
+                .ToListAsync(cancellationToken: cancellationToken);
+
+            if (roleList == null)
+            {
+                _recordsService.NewAuthorizationLog(AuthenticationState.InvalidUser, cuid);
+                return roleList;
+            }
+
+            return roleList;
         }
 
         private async Task<TblIdentityCredential> ValidateAuthorization(AuthenticateCredentialQuery request, CancellationToken cancellationToken, AuthorizeBy authorizeBy)

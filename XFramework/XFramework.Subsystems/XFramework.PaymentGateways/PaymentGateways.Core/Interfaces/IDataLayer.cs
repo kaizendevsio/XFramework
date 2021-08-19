@@ -30,7 +30,7 @@ namespace PaymentGateways.Core.Interfaces
         public void RollBack();
         public List<AuditEntryBO> OnBeforeSaveChanges();
 
-        public DbSet<TblAddressBarangay> TblAddressBarangays { get; set; }
+       public DbSet<TblAddressBarangay> TblAddressBarangays { get; set; }
         public DbSet<TblAddressCity> TblAddressCities { get; set; }
         public DbSet<TblAddressCountry> TblAddressCountries { get; set; }
         public DbSet<TblAddressProvince> TblAddressProvinces { get; set; }
@@ -40,9 +40,14 @@ namespace PaymentGateways.Core.Interfaces
         public DbSet<TblAuditHistory> TblAuditHistories { get; set; }
         public DbSet<TblAuthorizationLog> TblAuthorizationLogs { get; set; }
         public DbSet<TblConfiguration> TblConfigurations { get; set; }
+        public DbSet<TblConfigurationGroup> TblConfigurationGroups { get; set; }
         public DbSet<TblCurrencyEntity> TblCurrencyEntities { get; set; }
         public DbSet<TblEnterprise> TblEnterprises { get; set; }
         public DbSet<TblExchangeRate> TblExchangeRates { get; set; }
+        public DbSet<TblGateway> TblGateways { get; set; }
+        public DbSet<TblGatewayCategory> TblGatewayCategories { get; set; }
+        public DbSet<TblGatewayEndpoint> TblGatewayEndpoints { get; set; }
+        public DbSet<TblGatewayEntity> TblGatewayEntities { get; set; }
         public DbSet<TblIdentityAddress> TblIdentityAddresses { get; set; }
         public DbSet<TblIdentityAddressEntity> TblIdentityAddressEntities { get; set; }
         public DbSet<TblIdentityContact> TblIdentityContacts { get; set; }
@@ -53,8 +58,23 @@ namespace PaymentGateways.Core.Interfaces
         public DbSet<TblIdentityRoleEntity> TblIdentityRoleEntities { get; set; }
         public DbSet<TblIdentityVerification> TblIdentityVerifications { get; set; }
         public DbSet<TblIdentityVerificationEntity> TblIdentityVerificationEntities { get; set; }
+        public DbSet<TblIncomeDistribution> TblIncomeDistributions { get; set; }
+        public DbSet<TblIncomeEntity> TblIncomeEntities { get; set; }
         public DbSet<TblLog> TblLogs { get; set; }
         public DbSet<TblSessionDatum> TblSessionData { get; set; }
         public DbSet<TblSessionEntity> TblSessionEntities { get; set; }
+        public DbSet<TblUserBillsPaymentTransaction> TblUserBillsPaymentTransactions { get; set; }
+        public DbSet<TblUserBinaryList> TblUserBinaryLists { get; set; }
+        public DbSet<TblUserBusinessPackage> TblUserBusinessPackages { get; set; }
+        public DbSet<TblUserDepositRequest> TblUserDepositRequests { get; set; }
+        public DbSet<TblUserEloadTransaction> TblUserEloadTransactions { get; set; }
+        public DbSet<TblUserIncomePartition> TblUserIncomePartitions { get; set; }
+        public DbSet<TblUserIncomeTransaction> TblUserIncomeTransactions { get; set; }
+        public DbSet<TblUserMap> TblUserMaps { get; set; }
+        public DbSet<TblUserWallet> TblUserWallets { get; set; }
+        public DbSet<TblUserWalletAddress> TblUserWalletAddresses { get; set; }
+        public DbSet<TblUserWalletTransaction> TblUserWalletTransactions { get; set; }
+        public DbSet<TblUserWithdrawalRequest> TblUserWithdrawalRequests { get; set; }
+        public DbSet<TblWalletEntity> TblWalletEntities { get; set; }
     }
 }

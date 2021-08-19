@@ -46,9 +46,14 @@ namespace XFramework.Integration.Drivers
         }
 
 
-        public async Task<QueryResponseBO<GetIdentityContract>> GetIdentity(GetIdentityRequest request)
+        public async Task<QueryResponseBO<IdentityInfoContract>> GetIdentity(GetIdentityRequest request)
         {
-            return await SendAsync<GetIdentityRequest, GetIdentityContract>("GetIdentity", request);
+            return await SendAsync<GetIdentityRequest, IdentityInfoContract>("GetIdentity", request);
+        }
+
+        public async Task<QueryResponseBO<List<IdentityCredentialContract>>> GetIdentityCredentialList(GetIdentityCredentialListRequest request)
+        {
+            return await SendAsync<GetIdentityCredentialListRequest, List<IdentityCredentialContract>>("GetIdentityCredentialList", request);
         }
 
         public async Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request)

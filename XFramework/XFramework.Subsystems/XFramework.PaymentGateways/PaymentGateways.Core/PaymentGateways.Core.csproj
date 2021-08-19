@@ -24,6 +24,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj" />
       <ProjectReference Include="..\PaymentGateways.Domain\PaymentGateways.Domain.csproj" />
     </ItemGroup>
 

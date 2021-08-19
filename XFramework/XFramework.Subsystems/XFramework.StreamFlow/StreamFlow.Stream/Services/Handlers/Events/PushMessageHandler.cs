@@ -67,6 +67,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
                     if (c != null)
                     {
+                        Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {c.Name}");
                         await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, JsonSerializer.Serialize(telemetry), cancellationToken);
                         break;
                     }

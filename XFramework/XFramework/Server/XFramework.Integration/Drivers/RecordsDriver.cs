@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Threading.Tasks;
 using StreamFlow.Domain.Generic.BusinessObjects;
+using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Integration.Drivers
 {
-    public class RecordsDriver// : ILoggerWrapper
+    public class RecordsDriver : ILoggerWrapper
     {
-        /*private IMessageBusWrapper MessageBusWrapper { get; }
+        private IMessageBusWrapper MessageBusWrapper { get; }
 
         public RecordsDriver(IMessageBusWrapper messageBusWrapper)
         {
@@ -27,8 +28,13 @@ namespace XFramework.Integration.Drivers
                 },
                 MethodName = "NewLog",
                 Data = ""
-            });#1#
+            });*/
             return guid;
+        }
+
+        public Task<Guid?> NewLog(string name, string message, string initiator, RequestServerBO requestServer, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task<Guid?> NewAuthorizationLog(AuthenticationState authenticationState, Guid cuid)
@@ -37,10 +43,9 @@ namespace XFramework.Integration.Drivers
             return new();
         }
 
-        public async Task UpdateLog(Guid guid, string title, string message, LogType logType = LogType.ApplicationServiceLog,
-            GenericPriorityType priorityType = GenericPriorityType.Information)
+        public async Task UpdateLog(Guid guid, string title, string message, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
         {
             //throw new NotImplementedException();
-        }*/
+        }
     }
 }

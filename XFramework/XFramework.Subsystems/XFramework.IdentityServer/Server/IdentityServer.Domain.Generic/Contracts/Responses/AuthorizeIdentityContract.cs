@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace IdentityServer.Domain.Generic.Contracts.Responses
 {
@@ -8,5 +9,7 @@ namespace IdentityServer.Domain.Generic.Contracts.Responses
         public Guid Cuid { get; set; }
         public string AccessToken  { get; set; }
         public string RefreshToken  { get; set; }
+
+        public List<IdentityRoleContract> RoleList { get; set; }
     }
 }

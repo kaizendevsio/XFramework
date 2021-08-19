@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 #nullable disable
 
@@ -6,6 +7,11 @@ namespace PaymentGateways.Domain.DataTransferObjects
 {
     public partial class TblIdentityRole
     {
+        public TblIdentityRole()
+        {
+            TblUserIncomePartitions = new HashSet<TblUserIncomePartition>();
+        }
+
         public long Id { get; set; }
         public bool IsEnabled { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -19,5 +25,6 @@ namespace PaymentGateways.Domain.DataTransferObjects
 
         public virtual TblIdentityRoleEntity RoleEntity { get; set; }
         public virtual TblIdentityCredential UserCred { get; set; }
+        public virtual ICollection<TblUserIncomePartition> TblUserIncomePartitions { get; set; }
     }
 }

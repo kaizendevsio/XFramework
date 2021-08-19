@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
 using IdentityServer.Domain.Generic.Contracts.Requests;
 using IdentityServer.Domain.Generic.Contracts.Responses;
@@ -14,7 +15,8 @@ namespace XFramework.Integration.Interfaces.Wrappers
         public Task<CmdResponseBO> UpdateCredential(UpdateCredentialRequest request);
         public Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request);
         
-        public Task<QueryResponseBO<GetIdentityContract>> GetIdentity(GetIdentityRequest request);
+        public Task<QueryResponseBO<IdentityInfoContract>> GetIdentity(GetIdentityRequest request);
+        public Task<QueryResponseBO<List<IdentityCredentialContract>>> GetIdentityCredentialList(GetIdentityCredentialListRequest request);
         public Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request);
         public Task<CmdResponseBO> UpdateIdentity(UpdateIdentityRequest request);
         public Task<CmdResponseBO> DeleteIdentity(DeleteIdentityRequest request);

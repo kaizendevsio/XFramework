@@ -85,6 +85,7 @@ namespace XFramework.Integration.Services
 
         private void HandleInvokeResponseEvent()
         {
+            Console.WriteLine($"InvokeResponseHandler Initialized");
             Connection.On<string,string,string>("InvokeResponseHandler",
                 async (data,message,telemetryString) =>
                 {
@@ -92,6 +93,7 @@ namespace XFramework.Integration.Services
                     try
                     {
                         var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
+                        Console.WriteLine($"Received InvokeResponseEvent: {telemetry.ClientGuid}");
                         
                         if (PendingMethodCalls.TryRemove(telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
                         {
@@ -260,7 +262,8 @@ namespace XFramework.Integration.Services
                         HttpStatusCode = signalRResponse
                     };
                 }
-                
+
+                Console.WriteLine($"Invoke Method '{request.CommandName}', awaiting response...");
                 var streamFlowMessage = await response;
                 StopWatch.Stop($"Invoked Method '{request.CommandName}'");
                 return new()

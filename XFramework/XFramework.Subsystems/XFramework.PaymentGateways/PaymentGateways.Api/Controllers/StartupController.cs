@@ -1,13 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using StreamFlow.Domain.BusinessObjects;
-using StreamFlow.Domain.Enums;
 using System;
 using System.Reflection;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Integration.Interfaces;
-using XFramework.Integration.Services;
 
 namespace PaymentGateways.Api.Controllers
 {

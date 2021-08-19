@@ -18,17 +18,11 @@
 
     <ItemGroup>
       <ProjectReference Include="..\PaymentGateways.Core\PaymentGateways.Core.csproj" />
+      <ProjectReference Include="..\PaymentGateways.Domain\PaymentGateways.Domain.csproj" />
       <ProjectReference Include="..\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Controllers\V1" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net5.0\StreamFlow.Domain.dll</HintPath>
-      </Reference>
       <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\StreamFlow.Domain.Generic.dll</HintPath>
       </Reference>

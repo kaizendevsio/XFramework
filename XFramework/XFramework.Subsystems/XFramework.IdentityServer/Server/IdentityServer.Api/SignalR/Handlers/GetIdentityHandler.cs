@@ -29,7 +29,7 @@ namespace IdentityServer.Api.SignalR.Handlers
                         var result = await mediator.Send(r).ConfigureAwait(false);
                         StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode.ToString()}"); 
                         
-                        await RespondToInvoke(connection, telemetry, result.Adapt<QueryResponseBO<GetIdentityContract>>());
+                        await RespondToInvoke(connection, telemetry, result.Adapt<QueryResponseBO<IdentityInfoContract>>());
                     }
                     catch (Exception e)
                     {

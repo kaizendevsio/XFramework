@@ -6,16 +6,102 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="409723ac-d59d-499a-9f6f-0d22e3f077ee" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/EncryptedRequestBase.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Security/Cryptography.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/GetIdentityCredentialListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credential/GetIdentityCredentialListQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/GetIdentityCredentialListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Requests/GetIdentityCredentialListRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Responses/IdentityCredentialContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Responses/IdentityRoleContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Responses/IdentityRoleEntityContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Enums/RoleEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Controllers/V1/GatewayController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/NewTransactionCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/NewTransactionHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Entity/Gateway/GetGatewayListQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Entity/Transactions/GetTransactionsQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/Gateway/GetGatewayListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/Transactions/GetTransactionsHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Services/LoggerService.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Requests/DepositRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/CurrencyEntityContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/GatewayCategoryContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/GatewayContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/GatewayEndpointContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/UserDepositContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/WalletEntityContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblConfigurationGroup.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblGateway.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblGatewayCategory.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblGatewayEndpoint.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblGatewayEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIncomeDistribution.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIncomeEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserBillsPaymentTransaction.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserBinaryList.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserBusinessPackage.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserDepositRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserEloadTransaction.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserIncomePartition.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserIncomeTransaction.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserMap.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserWallet.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserWalletAddress.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserWalletTransaction.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserWithdrawalRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblWalletEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Coins/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Coins/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/IdentityServer.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/IdentityServer.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/appsettings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/HttpFormHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/HttpFormHelper.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/HttpHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/HttpHelper.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/shelf/Uncommitted_changes_before_Update_at_08_06_2021_11_14_AM_[Default_Changelist]/shelved.patch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/shelf/Uncommitted_changes_before_Update_at_08_06_2021_11_14_AM__Default_Changelist_.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/GetIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/SignalR/Handlers/GetIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Entity/Identity/GetAllIdentityQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Entity/Identity/GetAllIdentityQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Entity/Identity/GetIdentityQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Entity/Identity/GetIdentityQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/AuthenticateIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetAllIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetAllIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/GetIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Responses/AuthorizeIdentityContract.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Responses/AuthorizeIdentityContract.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Responses/GetIdentityContract.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/Contracts/Responses/IdentityInfoContract.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/IdentityServer.Domain.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Domain.Generic/IdentityServer.Domain.Generic.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Controllers/StartupController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Controllers/StartupController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Installers/DbInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Installers/DbInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Installers/ServicesInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Installers/ServicesInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/PaymentGateways.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/PaymentGateways.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Startup.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Interfaces/IDataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Interfaces/IDataLayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/PaymentGateways.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/PaymentGateways.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Requests/AuthenticateCredentialRequest.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/AuthorizeIdentityContract.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/GetApplicationListContract.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/GetIdentityContract.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressBarangay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressBarangay.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressCity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressCity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressProvince.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressProvince.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressRegion.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressRegion.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuditField.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuditField.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuditHistory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuditHistory.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuthorizationLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuthorizationLog.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblConfiguration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblConfiguration.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblCurrencyEntity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblCurrencyEntity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblExchangeRate.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblExchangeRate.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityAddress.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityAddress.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityContact.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityContact.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityCredential.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityCredential.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityRole.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityRole.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityVerification.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityVerification.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblLog.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblSessionDatum.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblSessionDatum.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/XFrameworkContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/XFrameworkContext.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Migrations/DbScaffolding.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Controllers/V1/Identity/CredentialController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Controllers/V1/Identity/CredentialController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Query/Entity/Identity/GetIdentityQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Query/Entity/Identity/GetIdentityQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Query/Handlers/Identity/GetIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Query/Handlers/Identity/GetIdentityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/RecordsDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/RecordsDriver.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IIdentityServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IIdentityServiceWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,65 +125,30 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/RequestServerBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/StreamFlowHelper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/QueryResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/CreateIdentityCmd.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/IL/400F8772-CB9F-4C33-A6B2-E1B0D2CA5312/a0/f826210f/0200000D.il" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/RequestServerBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/3834795B-F41B-4E62-8161-509ECA0F5822/F/RequestHandlerWrapper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/UpdateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Configurations/StreamFlowConfiguration.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/D2B0EF7B-A8C3-4AF1-95CC-501C0131D7BA/08/fb4d00bc/EntityEntry.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/61F5185B-E9CF-48B9-8487-181D7861EB9C/199/Monitor.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/61F5185B-E9CF-48B9-8487-181D7861EB9C/2B7/RuntimeHelpers.CoreCLR.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/4494F067-09EB-431E-9517-6A2CB286ACC8/17/d54bc2a5/IRecordsWrapper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/1F/ServiceProviderEngineScope.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/1E/ServiceProviderEngine.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Interfaces/IXFrameworkService.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/CreateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/Credential/DeleteCredentialCmd.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowTelemetryBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Test/UnitTest1.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Controllers/StartupController.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Authorization/AuthenticateIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowClientBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/38966B65-A94A-4794-97B7-7A72FC6E92DE/e9/2ea342d4/JsonSerializer.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/21/StackGuard.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/CreateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/UpdateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/StreamFlowHelper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/2EE/TaskAwaiter.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ServicesInstaller.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/QueryResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/ac9773be43af416d9e5453237fe90c7f5400/2c/1bfac411/AuthenticationState.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Entity/Identity/Credential/DeleteCredentialCmd.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/F758DD2F-9E4C-41A0-B7A1-63138D66F75D/A/ServiceProvider.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Controllers/StartupController.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Configurations/StreamFlowConfiguration.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/appsettings.json" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowClientBO.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/737EA614-F8F8-4B29-9890-78F66D6FC7F7/C/HubConnectionExtensions.InvokeAsync.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/233/ExceptionDispatchInfo.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/D2B0EF7B-A8C3-4AF1-95CC-501C0131D7BA/4b/4b387557/DbContext.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/16B044BD-3929-4FB6-8989-62C10A56B9ED/d0/89a15d63/IMessageBusWrapper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/400F8772-CB9F-4C33-A6B2-E1B0D2CA5312/31/f8a93376/IMessageBusWrapper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/8B/Guid.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/B2/Nullable.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/37/Object.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/B8EF69D3-A481-43FE-8568-E981A8FFA98B/3F/String.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/1BA52DC0-B103-422E-BA91-AD87A1AA9FE3/9/ServiceProviderServiceExtensions.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Installers/ServicesInstaller.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/CreateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/UpdateAuthorizeIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/AuthenticateIdentityHandler.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/RecordsDriver.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Api/Controllers/StartupController.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/StreamFlowHelper.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowTelemetryBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/RequestServerBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowClientBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/Server/IdentityServer.Test/UnitTest1.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Interfaces/IXFrameworkService.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
@@ -301,6 +352,9 @@
       <workItem from="1620731931824" duration="4430000" />
       <workItem from="1620798021510" duration="2351000" />
       <workItem from="1621337695653" duration="1247000" />
+      <workItem from="1628927442735" duration="618000" />
+      <workItem from="1629280863228" duration="4365000" />
+      <workItem from="1629305968693" duration="11413000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure To Support Sub-Systems">
       <created>1616960634242</created>
@@ -372,14 +426,6 @@
       <option name="project" value="LOCAL" />
       <updated>1620799647599</updated>
     </task>
-    <task id="LOCAL-00011" summary="Safety Backup">
-      <created>1621411252825</created>
-      <option name="number" value="00011" />
-      <option name="presentableId" value="LOCAL-00011" />
-      <option name="project" value="LOCAL" />
-      <updated>1621411252825</updated>
-    </task>
-    <option name="localTasksCounter" value="12" />
     <task id="LOCAL-00011" summary="Safety back up">
       <created>1621506428264</created>
       <option name="number" value="00011" />
@@ -393,6 +439,7 @@
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="UnityCheckinConfiguration" checkUnsavedScenes="true" />
   <component name="UnityProjectConfiguration" hasMinimizedUI="false" />
   <component name="UnityUnitTestConfiguration" currentTestLauncher="NUnit" />
   <component name="Vcs.Log.Tabs.Properties">
