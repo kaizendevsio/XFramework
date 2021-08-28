@@ -2,6 +2,7 @@
 {
     public enum GenericContactType
     {
+        NotSpecified = 0,
         Email = 1,
         Phone = 2,
         Facebook = 3,

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -34,20 +35,57 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Credential
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
+
+            var anyCredential = _dataLayer.TblIdentityCredentials
+                .AsNoTracking()
+                .Any(i => i.UserName == request.UserName);
+            
+            if (anyCredential)
+            {
+                return new()
+                {
+                    Message = $"Username '{request.Uid}' already exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
             
             SHA512 shaM = new SHA512Managed();
             var passwordByte = Encoding.ASCII.GetBytes(request.PasswordString);
             var hashPasswordByte = shaM.ComputeHash(passwordByte);
 
-            entity.Cuid = Guid.NewGuid().ToString();
+            entity.Cuid = request.Cuid != null ? request.Cuid.ToString() : Guid.NewGuid().ToString();
             entity.PasswordByte = hashPasswordByte;
             entity.IdentityInfoId = identityInfo.Id;
             entity.ApplicationId = request.RequestServer.ApplicationId;
-            
+
             await _dataLayer.TblIdentityCredentials.AddAsync(entity, cancellationToken);
+            
+            var roleEntity = await _dataLayer.TblIdentityRoleEntities
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Id == (long)request.RoleEntity, cancellationToken: cancellationToken);
+
+            if (roleEntity == null)
+            {
+                return new ()
+                {
+                    Message = $"Role {request.RoleEntity} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+
+            var role = new TblIdentityRole()
+            {
+                UserCred = entity,
+                RoleEntityId = roleEntity.Id
+            };
+
+            await _dataLayer.TblIdentityRoles.AddAsync(role, cancellationToken);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
-            return new();
+            return new ()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
         }
     }
 }

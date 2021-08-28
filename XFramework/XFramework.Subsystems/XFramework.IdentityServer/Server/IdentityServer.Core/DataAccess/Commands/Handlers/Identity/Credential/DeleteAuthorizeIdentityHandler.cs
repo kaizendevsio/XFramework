@@ -33,7 +33,10 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Credential
             _dataLayer.Remove(result);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
-            return new();
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
         }
     }
 }

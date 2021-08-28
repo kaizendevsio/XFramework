@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity;
@@ -22,11 +23,15 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
             entity.Uuid = string.IsNullOrEmpty(entity.Uuid) 
                 ? Guid.NewGuid().ToString() 
                 : entity.Uuid;
+            entity.BirthDate = request.Dob;
             
             await _dataLayer.TblIdentityInformations.AddAsync(entity, cancellationToken);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
-            return new();
+            return new ()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
         }
 
     }

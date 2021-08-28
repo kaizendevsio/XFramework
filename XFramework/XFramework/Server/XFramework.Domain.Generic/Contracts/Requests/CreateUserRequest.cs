@@ -16,6 +16,13 @@ namespace XFramework.Domain.Generic.Contracts.Requests
         public string UserAlias { get; set; }
         public string UserName { get; set; }
         public string PasswordString { get; set; }
+        public string ConfirmPasswordString { get; set; }
+        public int RoleEntity { get; set; }
         
+        public Guid Uid { get; set; }
+        public Guid Cuid { get; set; }
+        
+        public long PhoneCid { get; set; }
+        public long EmailCid { get; set; }
     }
 }

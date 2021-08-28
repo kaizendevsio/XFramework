@@ -33,6 +33,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity
 
             return new QueryResponseBO<IdentityInfoContract>()
             {
+                HttpStatusCode = HttpStatusCode.Accepted,
                 Response = entity.Adapt<IdentityInfoContract>()
             };
             

@@ -2,9 +2,10 @@
 {
     public enum CivilStatus
     {
-        Single = 0,
-        Married = 1,
-        Complicated = 2,
-        LegallySeparated = 3
+        NotSpecified = 0,
+        Single = 1,
+        Married = 2,
+        Complicated = 3,
+        LegallySeparated = 4
     }
 }

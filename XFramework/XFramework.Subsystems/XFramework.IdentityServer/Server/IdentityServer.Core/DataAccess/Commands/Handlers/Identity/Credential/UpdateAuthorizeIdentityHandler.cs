@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
@@ -18,7 +19,10 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Credential
         }
         public async Task<CmdResponseBO<UpdateCredentialCmd>> Handle(UpdateCredentialCmd request, CancellationToken cancellationToken)
         {
-            var entity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.IdentityInfo.Uuid == request.Uid.ToString() & i.UserName == request.UserName , cancellationToken);
+            var entity = await _dataLayer.TblIdentityCredentials
+                .Where(i => i.IdentityInfo.Uuid == request.Uid.ToString())
+                .Where(i => i.Cuid == request.Cuid.ToString())
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (entity == null)
             {
@@ -33,7 +37,10 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Credential
             _dataLayer.Update(entity);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
-            return new();
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
         }
     }
 }

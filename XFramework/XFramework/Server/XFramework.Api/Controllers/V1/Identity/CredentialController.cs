@@ -30,24 +30,31 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
+        [HttpPost("Validate")]
+        public async Task<JsonResult> Validate([FromBody] CheckCredentialExistenceRequest request)
+        {
+            var result = await _identityServiceWrapper.CheckCredentialExistence(request);
+            return new JsonResult(result);
+        }
+        
         [HttpPost("Create")]
         public async Task<JsonResult> Create([FromBody] CreateCredentialRequest request)
         {
-            var result = await _mediator.Send(request.Adapt<CreateCredentialCmd>()).ConfigureAwait(false);
+            var result = await _identityServiceWrapper.CreateCredential(request);
             return new JsonResult(result);
         }
         
         [HttpPost("Update")]
         public async Task<JsonResult> Update([FromBody] UpdateCredentialRequest request)
         {
-            var result = await _mediator.Send(request.Adapt<UpdateCredentialCmd>()).ConfigureAwait(false);
+            var result = await _identityServiceWrapper.UpdateCredential(request);
             return new JsonResult(result);
         }
 
         [HttpPost("Delete")]
         public async Task<JsonResult> Delete([FromBody] DeleteCredentialRequest request)
         {
-            var result = await _mediator.Send(request.Adapt<DeleteCredentialCmd>()).ConfigureAwait(false);
+            var result = await _identityServiceWrapper.DeleteCredential(request);
             return new JsonResult(result);
         }
     }

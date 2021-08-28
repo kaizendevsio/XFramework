@@ -42,7 +42,7 @@ namespace IdentityServer.Api.Controllers.V1.Identity
         [HttpPut]
         public virtual async Task<JsonResult> Put([FromBody] UpdateIdentityCmd request, Guid uid)
         {
-            request.Uuid = uid;
+            request.Uid = uid;
             var result = await _mediator.Send(request).ConfigureAwait(false);
             return new JsonResult(result);
         }

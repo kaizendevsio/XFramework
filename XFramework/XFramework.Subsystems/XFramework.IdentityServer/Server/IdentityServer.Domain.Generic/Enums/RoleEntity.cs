@@ -2,6 +2,7 @@
 {
     public enum RoleEntity
     {
+        NotSpecified = 0,
         Administrator = 1,
         SuperUser = 3,
         Client = 2,

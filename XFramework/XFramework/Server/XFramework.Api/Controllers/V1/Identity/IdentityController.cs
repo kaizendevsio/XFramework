@@ -3,10 +3,12 @@ using System.Threading.Tasks;
 using Mapster;
 using IdentityServer.Domain.Generic.Contracts.Requests;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using XFramework.Core.DataAccess.Commands.Entity.Identity;
 using XFramework.Core.DataAccess.Query.Entity.Identity;
 using XFramework.Domain.Generic.Contracts.Requests;
+using XFramework.Integration.Interfaces.Wrappers;
 
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -17,15 +19,25 @@ namespace XFramework.Api.Controllers.V1.Identity
     [ApiController]
     public class IdentityController : XFrameworkControllerBase
     {
-        public IdentityController(IMediator mediator)
+        private readonly IIdentityServiceWrapper _identityServiceWrapper;
+
+        public IdentityController(IMediator mediator, IIdentityServiceWrapper identityServiceWrapper)
         {
+            _identityServiceWrapper = identityServiceWrapper;
             _mediator = mediator;
         }
 
         [HttpGet]
         public async Task<JsonResult> Get(Guid guid)
         {
-            var result = await _mediator.Send(new GetIdentityQuery(){Uid = guid}).ConfigureAwait(false);
+            var result = await _identityServiceWrapper.GetIdentity(new GetIdentityRequest() { Uid = guid });
+            return new JsonResult(result);
+        }
+        
+        [HttpPost("Validate")]
+        public async Task<JsonResult> Validate([FromBody] CheckIdentityExistenceRequest request)
+        {
+            var result = await _identityServiceWrapper.CheckIdentityExistence(request);
             return new JsonResult(result);
         }
         
@@ -39,21 +51,21 @@ namespace XFramework.Api.Controllers.V1.Identity
         [HttpPost("Update")]
         public async Task<JsonResult> Update([FromBody] UpdateIdentityRequest request)
         {
-            var result = await _mediator.Send(request.Adapt<UpdateIdentityCmd>()).ConfigureAwait(false);
+            var result = await _identityServiceWrapper.UpdateIdentity(request);
             return new JsonResult(result);
         }
 
         [HttpPost("Delete")]
         public async Task<JsonResult> Delete([FromBody] DeleteIdentityRequest request)
         {
-            var result = await _mediator.Send(request.Adapt<DeleteIdentityCmd>()).ConfigureAwait(false);
+            var result = await _identityServiceWrapper.DeleteIdentity(request);
             return new JsonResult(result);
         }
        
         [HttpPost("Authenticate")]
         public async Task<JsonResult> Authenticate([FromBody] AuthenticateCredentialRequest request)
         {
-            var result = await _mediator.Send(request.Adapt<AuthenticateIdentityQuery>()).ConfigureAwait(false);
+            var result = await _identityServiceWrapper.AuthenticateCredential(request);
             return new JsonResult(result);
         }
     }

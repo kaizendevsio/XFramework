@@ -41,7 +41,10 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity
             _dataLayer.Remove(entity);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 
-            return new();
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
 
         }
     }

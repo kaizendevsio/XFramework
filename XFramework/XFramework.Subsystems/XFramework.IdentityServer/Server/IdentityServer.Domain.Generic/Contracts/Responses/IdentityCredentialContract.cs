@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace IdentityServer.Domain.Generic.Contracts.Responses
 {
@@ -17,5 +18,7 @@ namespace IdentityServer.Domain.Generic.Contracts.Responses
         public string Cuid { get; set; }
 
         public virtual IdentityInfoContract IdentityInfo { get; set; }
+        public virtual List<IdentityRoleContract> TblIdentityRoles { get; set; }
+        public virtual List<IdentityContactContract> TblIdentityContacts { get; set; }
     }
 }
