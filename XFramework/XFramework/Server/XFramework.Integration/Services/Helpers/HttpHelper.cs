@@ -1,10 +1,6 @@
-﻿using System;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Contracts.Requests;
@@ -47,7 +43,7 @@ namespace XFramework.Integration.Services.Helpers
                 ReasonPhrase = x.ReasonPhrase,
                 Cookies = responseCookies, 
                 Result = typeof(T) != typeof(string) 
-                    ? JsonSerializer.Deserialize<T>(x.Content.ReadAsStringAsync().Result, new(){PropertyNameCaseInsensitive = true}) 
+                    ? JsonSerializer.Deserialize<T>(x.Content.ReadAsStringAsync().Result, new JsonSerializerOptions(){PropertyNameCaseInsensitive = true} ) 
                     : (T)Activator.CreateInstance(typeof(T), x.Content.ReadAsStringAsync().Result.ToCharArray())
             };
             return response;
@@ -93,7 +89,7 @@ namespace XFramework.Integration.Services.Helpers
                 ReasonPhrase = x.ReasonPhrase,
                 Cookies = responseCookies, 
                 Result = typeof(T) != typeof(string) 
-                    ? JsonSerializer.Deserialize<T>(x.Content.ReadAsStringAsync().Result, new(){PropertyNameCaseInsensitive = true}) 
+                    ? JsonSerializer.Deserialize<T>(x.Content.ReadAsStringAsync().Result, new JsonSerializerOptions(){PropertyNameCaseInsensitive = true}) 
                     : (T)Activator.CreateInstance(typeof(T), x.Content.ReadAsStringAsync().Result.ToCharArray())
             };
             

@@ -30,7 +30,7 @@ namespace Wallets.Domain.DataTransferObjects
         public long? CurrencyEntityId { get; set; }
         public decimal? MinTransfer { get; set; }
         public decimal? MaxTransfer { get; set; }
-        public bool? IsDeleted { get; set; }
+        //public bool? IsDeleted { get; set; }
 
         public virtual TblCurrencyEntity CurrencyEntity { get; set; }
         public virtual ICollection<TblUserDepositRequest> TblUserDepositRequests { get; set; }

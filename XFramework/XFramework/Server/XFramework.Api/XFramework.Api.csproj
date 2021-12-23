@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>10</LangVersion>
+
     <RootNamespace>XFramework.Api</RootNamespace>
     <AssemblyName>XFramework.Api</AssemblyName>
     <AssemblyVersion>1.0.69.69</AssemblyVersion>
@@ -12,11 +15,12 @@
     <PackageReference Include="Mapster" Version="7.2.0" />
     <PackageReference Include="MediatR" Version="9.0.0" />
     <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="5.0.5" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="5.0.5" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.5" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.0-preview.3.21201.13" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.1.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,10 +35,10 @@
 
  <ItemGroup>
    <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-     <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\Server\IdentityServer.Domain.Generic\bin\Debug\net5.0\IdentityServer.Domain.Generic.dll</HintPath>
+     <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
    </Reference>
    <Reference Include="Wallets.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-     <HintPath>..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\bin\Debug\net5.0\Wallets.Domain.Generic.dll</HintPath>
+     <HintPath>..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
    </Reference>
  </ItemGroup>
 

@@ -1,14 +1,21 @@
-﻿using System.Threading.Tasks;
+﻿using System.Security.Claims;
+using System.Threading.Tasks;
+using Mapster;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Wallets.Domain.Generic.Contracts.Requests.Wallet;
 using Wallets.Domain.Generic.Contracts.Requests.Wallet.Identity;
+using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Wallets
 {
-    [Route("API/v1/[controller]")]
+    [Authorize]
+    [Route("API/[controller]")]
     [ApiController]
+    [ApiVersion("1.0")]
     public class IdentityWalletsController : XFrameworkControllerBase
     {
         public IWalletServiceWrapper WalletServiceWrapper { get; }
@@ -81,6 +88,20 @@ namespace XFramework.Api.Controllers.V1.Wallets
         public async Task<JsonResult> Transfer([FromBody] TransferIdentityWalletRequest request)
         {
             var result = await WalletServiceWrapper.TransferIdentityWallet(request);
+            return new JsonResult(result);
+        }
+        
+        [HttpPost("Deposit")]
+        public async Task<JsonResult> Deposit([FromBody] CreateIdentityWalletDepositRequest request)
+        {
+            var result = await WalletServiceWrapper.CreateDepositRequest(ValidateIdentityElevation(request));
+            return new JsonResult(result);
+        }
+        
+        [HttpPost("Withdraw")]
+        public async Task<JsonResult> Withdraw([FromBody] CreateIdentityWalletWithdrawalRequest request)
+        {
+            var result = await WalletServiceWrapper.CreateWithdrawalRequest(ValidateIdentityElevation(request));
             return new JsonResult(result);
         }
     }

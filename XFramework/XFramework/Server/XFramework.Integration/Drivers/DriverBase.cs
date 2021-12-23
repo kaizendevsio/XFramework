@@ -14,7 +14,7 @@ namespace XFramework.Integration.Drivers
         public IMessageBusWrapper MessageBusDriver { get; set; }
         public Guid? TargetClient { get; set; }
         
-        public async Task<QueryResponseBO<TResponse>> SendVoidAsync<TRequest, TResponse>(string commandName ,TRequest request)
+        public async Task<CmdResponseBO> SendVoidAsync<TRequest, TResponse>(string commandName ,TRequest request)
         {
             var result = await MessageBusDriver.InvokeAsync<CmdResponseBO>(new(request)
             {
@@ -22,7 +22,7 @@ namespace XFramework.Integration.Drivers
                 ExchangeType = MessageExchangeType.Direct,
                 Recipient = TargetClient
             });
-            return result.Response.Adapt<QueryResponseBO<TResponse>>();
+            return result.Response;
         }
         public async Task<QueryResponseBO<TResponse>> SendAsync<TRequest, TResponse>(string commandName ,TRequest request)
         {

@@ -62,8 +62,7 @@ namespace XFramework.Integration.Drivers
           return await SendAsync<GetIdentityWalletRequest, GetIdentityWalletContract>("GetIdentityWallet", request);
         }
 
-        public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> GetAllIdentityWallet(
-            GetAllIdentityWalletRequest request)
+        public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> GetAllIdentityWallet(GetAllIdentityWalletRequest request)
         {
            return await SendAsync<GetAllIdentityWalletRequest, List<GetIdentityWalletContract>>("GetAllIdentityWallet", request);
         }
@@ -95,14 +94,22 @@ namespace XFramework.Integration.Drivers
                 await SendAsync<IncrementIdentityWalletRequest, CmdResponseBO>("IncrementIdentityWallet", request);
             return result.Adapt<CmdResponseBO>();
             throw new System.NotImplementedException();
-        }
+        } 
 
         public async Task<CmdResponseBO> TransferIdentityWallet(TransferIdentityWalletRequest request)
         {
-            var result =
-                await SendAsync<TransferIdentityWalletRequest, CmdResponseBO>("TransferIdentityWallet", request);
+            var result = await SendAsync<TransferIdentityWalletRequest, CmdResponseBO>("TransferIdentityWallet", request);
             return result.Adapt<CmdResponseBO>();
-            throw new System.NotImplementedException();
+        }
+
+        public async Task<QueryResponseBO<WalletDepositContract>> CreateDepositRequest(CreateIdentityWalletDepositRequest request)
+        {
+            return await SendAsync<CreateIdentityWalletDepositRequest, WalletDepositContract>("CreateIdentityWalletDeposit", request);
+        }
+
+        public async Task<QueryResponseBO<WalletDepositContract>> CreateWithdrawalRequest(CreateIdentityWalletWithdrawalRequest request)
+        {
+            return await SendAsync<CreateIdentityWalletWithdrawalRequest, WalletDepositContract>("WithdrawalIdentityWallet", request);
         }
     }
 }

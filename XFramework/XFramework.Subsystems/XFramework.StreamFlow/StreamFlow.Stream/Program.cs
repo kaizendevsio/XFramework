@@ -15,7 +15,6 @@ namespace StreamFlow.Stream
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>(); 
-                    webBuilder.UseUrls("http://0.0.0.0:6000","https://0.0.0.0:6001");
                 });
         
     }

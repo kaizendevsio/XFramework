@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -20,6 +21,12 @@ namespace XFramework.Api.Installers
             var jwtOptions = new JwtOptions();
             configuration.Bind(nameof(jwtOptions),jwtOptions);
             services.AddSingleton<JwtOptionsBO>(jwtOptions);
+            
+            services.AddApiVersioning(o =>
+            {
+                o.AssumeDefaultVersionWhenUnspecified = true;
+                o.DefaultApiVersion = new ApiVersion(1, 0);
+            });
 
             // Install JWT Authentication
             services.AddAuthentication(x =>
@@ -46,6 +53,7 @@ namespace XFramework.Api.Installers
                 });
             
             services.AddControllers();
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
             
             // Swagger
             services.AddSwaggerGen(c =>

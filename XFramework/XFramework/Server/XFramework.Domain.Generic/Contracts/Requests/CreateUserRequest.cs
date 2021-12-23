@@ -19,8 +19,8 @@ namespace XFramework.Domain.Generic.Contracts.Requests
         public string ConfirmPasswordString { get; set; }
         public int RoleEntity { get; set; }
         
-        public Guid Uid { get; set; }
-        public Guid Cuid { get; set; }
+        public string Uid { get; set; }
+        public string Cuid { get; set; }
         
         public long PhoneCid { get; set; }
         public long EmailCid { get; set; }

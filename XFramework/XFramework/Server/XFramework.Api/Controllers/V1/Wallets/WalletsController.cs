@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wallets.Domain.Generic.Contracts.Requests.Wallet;
 using XFramework.Core.DataAccess.Query.Entity.Identity;
@@ -7,8 +8,10 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Wallets
 {
-    [Route("API/v1/[controller]")]
+    [Authorize]
+    [Route("API/[controller]")]
     [ApiController]
+    [ApiVersion("1.0")]
     public class WalletsController : XFrameworkControllerBase
     {
         public IWalletServiceWrapper WalletServiceWrapper { get; }

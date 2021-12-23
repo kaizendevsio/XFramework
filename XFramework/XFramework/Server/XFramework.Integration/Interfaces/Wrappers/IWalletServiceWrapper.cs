@@ -26,15 +26,15 @@ namespace XFramework.Integration.Interfaces.Wrappers
 
         public Task<CmdResponseBO> CreateIdentityWallet(CreateIdentityWalletRequest request);
         public Task<QueryResponseBO<GetIdentityWalletContract>> GetIdentityWallet(GetIdentityWalletRequest request);
-
-        public Task<QueryResponseBO<List<GetIdentityWalletContract>>> GetAllIdentityWallet(
-            GetAllIdentityWalletRequest request);
-
+        public Task<QueryResponseBO<List<GetIdentityWalletContract>>> GetAllIdentityWallet(GetAllIdentityWalletRequest request);
         public Task<CmdResponseBO> UpdateIdentityWallet(UpdateIdentityWalletRequest request);
         public Task<CmdResponseBO> DeleteIdentityWallet(DeleteIdentityWalletRequest request);
         public Task<CmdResponseBO> DecrementIdentityWallet(DecrementIdentityWalletRequest request);
         public Task<CmdResponseBO> IncrementIdentityWallet(IncrementIdentityWalletRequest request);
         public Task<CmdResponseBO> TransferIdentityWallet(TransferIdentityWalletRequest request);
+        
+        public Task<QueryResponseBO<WalletDepositContract>> CreateDepositRequest(CreateIdentityWalletDepositRequest request);
+        public Task<QueryResponseBO<WalletDepositContract>> CreateWithdrawalRequest(CreateIdentityWalletWithdrawalRequest request);
 
         #endregion
     }

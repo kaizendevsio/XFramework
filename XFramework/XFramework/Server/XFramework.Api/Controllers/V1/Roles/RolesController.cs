@@ -6,8 +6,9 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Roles
 {
-    [Route("Api/V1/[controller]")]
+    [Route("Api/[controller]")]
     [ApiController]
+    [ApiVersion("1.0")]
     public class RolesController : XFrameworkControllerBase
     {
         private readonly IIdentityServiceWrapper _identityServiceWrapper;

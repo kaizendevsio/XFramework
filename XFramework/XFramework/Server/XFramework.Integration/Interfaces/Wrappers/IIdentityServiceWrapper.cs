@@ -15,6 +15,7 @@ namespace XFramework.Integration.Interfaces.Wrappers
         public Task<CmdResponseBO> CreateCredential(CreateCredentialRequest request);
         public Task<CmdResponseBO> UpdateCredential(UpdateCredentialRequest request);
         public Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request);
+        public Task<CmdResponseBO> ChangePassword(ChangePasswordRequest request);
         public Task<QueryResponseBO<ExistenceContract>> CheckCredentialExistence(CheckCredentialExistenceRequest request);
         public Task<QueryResponseBO<List<IdentityCredentialContract>>> GetIdentityCredentialList(GetIdentityCredentialListRequest request);
         

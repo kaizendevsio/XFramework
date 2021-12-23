@@ -16,7 +16,7 @@ namespace XFramework.Integration.Services
             Http = new HttpHelper(configuration);
         }
         
-        public string GenerateRandomString(int size)
+        public string GenerateRandomString(long size)
         {
             var b = new byte[size];
             new RNGCryptoServiceProvider().GetBytes(b);
@@ -28,6 +28,22 @@ namespace XFramework.Integration.Services
             var n  = rnd.Next(start, end);
             return n;
         }
+        
+        public long GenerateRandomNumber(long min, long max)
+        {
+            var rand = new Random();
+            byte[] buf = new byte[8];
+            rand.NextBytes(buf);
+            long longRand = BitConverter.ToInt64(buf, 0);
+
+            return (Math.Abs(longRand % (max - min)) + min);
+        }
+
+        public string GenerateRandomString(int size)
+        {
+            throw new NotImplementedException();
+        }
+
         public string GenerateReferenceString()
         {
             var ticks = new DateTime(2021,1,1).Ticks;

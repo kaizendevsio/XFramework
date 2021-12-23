@@ -28,7 +28,7 @@ namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets
                 };
             }
 
-            entity.IsDeleted = true;
+            //entity.IsDeleted = true;
             _dataLayer.Update(entity);
             await _dataLayer.SaveChangesAsync(cancellationToken);
 

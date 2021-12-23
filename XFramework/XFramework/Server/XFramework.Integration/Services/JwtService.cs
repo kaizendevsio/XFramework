@@ -5,7 +5,9 @@ using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using IdentityServer.Domain.Generic.Enums;
 using Microsoft.IdentityModel.Tokens;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Interfaces;
@@ -20,12 +22,13 @@ namespace XFramework.Integration.Services
         {
             _jwtOptions = jwtOptions;
         }
-        public virtual async Task<JwtTokenBO> GenerateToken(string username, Guid cuid)
+        public virtual async Task<JwtTokenBO> GenerateToken(string username, Guid cuid, List<RoleEntity> roleEntity)
         {
             var authClaims = new List<Claim>  
             {  
-                new (JwtRegisteredClaimNames.GivenName, username),
-                new (JwtRegisteredClaimNames.UniqueName, cuid.ToString()),
+                new (ClaimTypes.GivenName, username),
+                new (ClaimTypes.Role, JsonSerializer.Serialize(roleEntity)),
+                new (ClaimTypes.Name, cuid.ToString()),
                 new (JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new (JwtRegisteredClaimNames.AuthTime, DateTime.UtcNow.ToString())
             };

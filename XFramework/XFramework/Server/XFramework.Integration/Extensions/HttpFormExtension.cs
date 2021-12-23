@@ -1,8 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
+﻿using System.Globalization;
 using System.Web;
 using System.Xml.Serialization;
 using Newtonsoft.Json;
@@ -20,7 +16,7 @@ namespace XFramework.Integration.Extensions
             }
 
             // Added by me: avoid cyclic references
-            var serializer = new JsonSerializer {ReferenceLoopHandling = ReferenceLoopHandling.Ignore};
+            var serializer = new JsonSerializer { ReferenceLoopHandling = ReferenceLoopHandling.Ignore };
             var token = metaToken as JToken;
             if (token == null)
             {
@@ -54,7 +50,7 @@ namespace XFramework.Integration.Extensions
                 ? jValue?.ToString("o", CultureInfo.InvariantCulture)
                 : jValue?.ToString(CultureInfo.InvariantCulture);
 
-            return new Dictionary<string, string> {{token.Path, value}};
+            return new Dictionary<string, string> { { token.Path, value } };
         }
 
         public static FormUrlEncodedContent ToFormData(this object obj)
@@ -75,21 +71,21 @@ namespace XFramework.Integration.Extensions
                 .Replace("\"", "");
             return str;
         }
-        
+
         public static T ToXmlObject<T>(this string stringObject)
         {
             var serializer = new XmlSerializer(typeof(T));
             using var reader = new StringReader(stringObject);
             var result = (T)(serializer.Deserialize(reader));
-            
+
             return result;
         }
-        
+
         public static string UrlEncode(this string text)
         {
             return HttpUtility.UrlEncode(text);
         }
-        
+
         public static string UrlDecode(this string text)
         {
             return HttpUtility.UrlDecode(text);

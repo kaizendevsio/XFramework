@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>        
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Folder Include="Core\Extensions" />
+      <Folder Include="Core\Features" />
+      <Folder Include="Core\Helpers" />
+      <Folder Include="Core\Services" />
+      <Folder Include="Entity\Enums" />
+      <Folder Include="Entity\Models\Objects" />
+      <Folder Include="Entity\Models\Requests" />
+      <Folder Include="Entity\Models\Responses" />
+      <Folder Include="Entity\Validations" />
+      <Folder Include="Razor\Components\Mobile" />
+      <Folder Include="Razor\Components\Web" />
+      <Folder Include="Razor\Layouts\Mobile" />
+      <Folder Include="Razor\Layouts\Web" />
+    </ItemGroup>
+
+</Project>

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -12,7 +13,7 @@ namespace XFramework.Integration.Security
             var md5Provider = new MD5CryptoServiceProvider();
             var bytes = md5Provider.ComputeHash(new UTF8Encoding().GetBytes(stringData));
             return GetStringFromHash(bytes);
-          }
+        }
 
         public static string ToSha256(this string stringData)
         {
@@ -31,7 +32,7 @@ namespace XFramework.Integration.Security
 
             return GetStringFromHash(bytes);
         }
-        
+
         private static string GetStringFromHash(byte[] hash)
         {
             var result = new StringBuilder();
@@ -39,7 +40,7 @@ namespace XFramework.Integration.Security
             {
                 result.Append(t.ToString("X2"));
             }
-            
+
             return result.ToString().ToLower();
         }
 
@@ -128,7 +129,7 @@ namespace XFramework.Integration.Security
             //return the Clear decrypted TEXT
             return Encoding.UTF8.GetString(resultArray);
         }
-        
+
         public static string EncryptWithAes(this string text, string keyString)
         {
             var key = Encoding.UTF8.GetBytes(keyString);
@@ -146,9 +147,7 @@ namespace XFramework.Integration.Security
                         }
 
                         var iv = aesAlg.IV;
-
                         var decryptedContent = msEncrypt.ToArray();
-
                         var result = new byte[iv.Length + decryptedContent.Length];
 
                         Buffer.BlockCopy(iv, 0, result, 0, iv.Length);
@@ -159,7 +158,7 @@ namespace XFramework.Integration.Security
                 }
             }
         }
-        
+
         public static string DecryptWithAes(this string cipherText, string keyString)
         {
             var fullCipher = Convert.FromBase64String(cipherText);
@@ -193,12 +192,52 @@ namespace XFramework.Integration.Security
             }
         }
         
-        public static string ToBase64(this string plainText) {
+        public static string Encrypt(this string text, string keyString, PbeEncryptionAlgorithm encryptionAlgorithm = PbeEncryptionAlgorithm.Aes256Cbc)
+        {
+            var encryptedString = string.Empty;
+            switch (encryptionAlgorithm)
+            {
+                case PbeEncryptionAlgorithm.Unknown:
+                    throw new ArgumentException("Encryption algorithm not set");
+                case PbeEncryptionAlgorithm.Aes128Cbc:
+                    if (keyString.Length < 16)
+                    {
+                        throw new ArgumentException("Encryption key should be at least 128 bits");
+                    }
+                    encryptedString = EncryptWithAes(text, keyString);
+                    break;
+                case PbeEncryptionAlgorithm.Aes192Cbc:
+                    if (keyString.Length < 24)
+                    {
+                        throw new ArgumentException("Encryption key should be at least 192 bits");
+                    }
+                    encryptedString = EncryptWithAes(text, keyString);
+                    break;
+                case PbeEncryptionAlgorithm.Aes256Cbc:
+                    if (keyString.Length < 32)
+                    {
+                        throw new ArgumentException("Encryption key should be at least 256 bits");
+                    }
+                    encryptedString = EncryptWithAes(text, keyString);
+                    break;
+                case PbeEncryptionAlgorithm.TripleDes3KeyPkcs12:
+                    encryptedString = EncryptWith3Des(text, keyString);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(encryptionAlgorithm), encryptionAlgorithm, null);
+            }
+
+            return encryptedString;
+        }
+
+        public static string ToBase64(this string plainText)
+        {
             var plainTextBytes = System.Text.Encoding.UTF8.GetBytes(plainText);
             return System.Convert.ToBase64String(plainTextBytes);
         }
-        
-        public static string FromBase64(this string base64EncodedData) {
+
+        public static string FromBase64(this string base64EncodedData)
+        {
             var base64EncodedBytes = System.Convert.FromBase64String(base64EncodedData);
             return System.Text.Encoding.UTF8.GetString(base64EncodedBytes);
         }

@@ -15,8 +15,9 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Identity
 {
-    [Route("Api/V1/Identity")]
+    [Route("Api/[controller]")]
     [ApiController]
+    [ApiVersion("1.0")]
     public class IdentityController : XFrameworkControllerBase
     {
         private readonly IIdentityServiceWrapper _identityServiceWrapper;
@@ -27,6 +28,7 @@ namespace XFramework.Api.Controllers.V1.Identity
             _mediator = mediator;
         }
 
+        [Authorize]
         [HttpGet]
         public async Task<JsonResult> Get(Guid guid)
         {
@@ -34,6 +36,7 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
+        [Authorize]
         [HttpPost("Validate")]
         public async Task<JsonResult> Validate([FromBody] CheckIdentityExistenceRequest request)
         {
@@ -41,13 +44,15 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
+        [Authorize]
         [HttpPost("Create")]
-        public async Task<JsonResult> Create([FromBody] CreateUserRequest request)
+        public async Task<JsonResult> Create([FromBody] CreateUserRequest request)                                                                                                                                                                              
         {
             var result = await _mediator.Send(request.Adapt<CreateIdentityCmd>()).ConfigureAwait(false);
             return new JsonResult(result);
         }
         
+        [Authorize]
         [HttpPost("Update")]
         public async Task<JsonResult> Update([FromBody] UpdateIdentityRequest request)
         {
@@ -55,6 +60,7 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
 
+        [Authorize]
         [HttpPost("Delete")]
         public async Task<JsonResult> Delete([FromBody] DeleteIdentityRequest request)
         {

@@ -39,7 +39,14 @@ namespace XFramework.Integration.Services
 
             Connection = new HubConnectionBuilder()
                 .WithUrl(StreamFlowConfiguration.ServerUrls.First())
-                .WithAutomaticReconnect()
+                .WithAutomaticReconnect(new []
+                {
+                    TimeSpan.FromSeconds(2),
+                    TimeSpan.FromSeconds(5),
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromSeconds(10),
+                })
                 .AddMessagePackProtocol()
                 .Build();
 
@@ -118,11 +125,10 @@ namespace XFramework.Integration.Services
         
         private void HandleClosedEvent()
         {
-            Connection.Closed += connectionId =>
+            Connection.Closed += async connectionId =>
             {
                 Console.WriteLine("Connection to StreamFlow server closed");
-                Connection.StartAsync();
-                return Task.CompletedTask;
+                await EnsureConnection();
             };
         }
 
@@ -181,8 +187,7 @@ namespace XFramework.Integration.Services
             var retry = 0;
 
             RetryConnection:
-            if (!(Connection.State != HubConnectionState.Connected &
-                  Connection.State != HubConnectionState.Reconnecting)) return true;
+            if (Connection.State is HubConnectionState.Connected or HubConnectionState.Reconnecting) return true;
 
             try
             {

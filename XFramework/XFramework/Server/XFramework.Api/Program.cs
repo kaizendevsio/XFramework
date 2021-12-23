@@ -15,7 +15,6 @@ namespace XFramework.Api
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
-                    webBuilder.UseUrls("https://localhost:55007", "http://localhost:55006");
                 });
     }
 }

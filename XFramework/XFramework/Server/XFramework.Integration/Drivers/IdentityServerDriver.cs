@@ -19,8 +19,7 @@ namespace XFramework.Integration.Drivers
         {
             MessageBusDriver = messageBusDriver;
             Configuration = configuration;
-            TargetClient =
-                Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:IdentityServerService"));
+            TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:IdentityServerService"));
         }
 
         public async Task<QueryResponseBO<AuthorizeIdentityContract>> AuthenticateCredential(AuthenticateCredentialRequest request)
@@ -30,20 +29,22 @@ namespace XFramework.Integration.Drivers
 
         public async Task<CmdResponseBO> CreateCredential(CreateCredentialRequest request)
         {
-            var result = await SendVoidAsync<CreateCredentialRequest, CmdResponseBO>("CreateCredential", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<CreateCredentialRequest, CmdResponseBO>("CreateCredential", request);
         }
 
         public async Task<CmdResponseBO> UpdateCredential(UpdateCredentialRequest request)
         {
-            var result = await SendVoidAsync<UpdateCredentialRequest, CmdResponseBO>("UpdateCredential", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<UpdateCredentialRequest, CmdResponseBO>("UpdateCredential", request);
         }
 
         public async Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request)
         {
-            var result = await SendVoidAsync<DeleteCredentialRequest, CmdResponseBO>("DeleteCredential", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<DeleteCredentialRequest, CmdResponseBO>("DeleteCredential", request);
+        }
+
+        public async Task<CmdResponseBO> ChangePassword(ChangePasswordRequest request)
+        {
+            return await SendVoidAsync<ChangePasswordRequest, CmdResponseBO>("ChangePassword", request);
         }
 
         public async Task<QueryResponseBO<ExistenceContract>> CheckCredentialExistence(CheckCredentialExistenceRequest request)
@@ -78,38 +79,32 @@ namespace XFramework.Integration.Drivers
 
         public async Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request)
         {
-            var result = await SendVoidAsync<CreateIdentityRequest, CmdResponseBO>("CreateIdentity", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<CreateIdentityRequest, CmdResponseBO>("CreateIdentity", request);
         }
 
         public async Task<CmdResponseBO> UpdateIdentity(UpdateIdentityRequest request)
         {
-            var result = await SendVoidAsync<UpdateIdentityRequest, CmdResponseBO>("UpdateIdentity", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<UpdateIdentityRequest, CmdResponseBO>("UpdateIdentity", request);
         }
 
         public async Task<CmdResponseBO> DeleteIdentity(DeleteIdentityRequest request)
         {
-            var result = await SendVoidAsync<DeleteIdentityRequest, CmdResponseBO>("DeleteIdentity", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<DeleteIdentityRequest, CmdResponseBO>("DeleteIdentity", request);
         }
 
         public async Task<CmdResponseBO> CreateContact(CreateContactRequest request)
         {
-            var result = await SendVoidAsync<CreateContactRequest, CmdResponseBO>("CreateContact", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<CreateContactRequest, CmdResponseBO>("CreateContact", request);
         }
 
         public async Task<CmdResponseBO> UpdateContact(UpdateContactRequest request)
         {
-            var result = await SendVoidAsync<UpdateContactRequest, CmdResponseBO>("CreateContact", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<UpdateContactRequest, CmdResponseBO>("UpdateContact", request);
         }
 
         public async Task<CmdResponseBO> DeleteContact(DeleteContactRequest request)
         {
-            var result = await SendVoidAsync<DeleteContactRequest, CmdResponseBO>("CreateContact", request);
-            return result.Adapt<CmdResponseBO>();
+            return await SendVoidAsync<DeleteContactRequest, CmdResponseBO>("DeleteContact", request);
         }
 
         public async Task<QueryResponseBO<ExistenceContract>> CheckContactExistence(CheckContactExistenceRequest request)

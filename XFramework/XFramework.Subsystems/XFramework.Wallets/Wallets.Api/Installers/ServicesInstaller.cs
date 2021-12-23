@@ -17,10 +17,7 @@ namespace Wallets.Api.Installers
         {
             services.AddSingleton<ICachingService, CachingService>();
             services.AddSingleton<IHelperService, HelperService>();
-            services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
-            services.AddSingleton<ILoggerWrapper, RecordsDriver>();
             services.AddSingleton<IJwtService, JwtService>();
-            services.AddSingleton<ISignalRService, SignalRWrapper>();
 
         }
     }

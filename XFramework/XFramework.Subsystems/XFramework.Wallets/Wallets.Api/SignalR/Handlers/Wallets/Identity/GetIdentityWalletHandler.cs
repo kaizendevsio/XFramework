@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Mapster;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -22,20 +23,23 @@ namespace Wallets.Api.SignalR.Handlers.Wallets.Identity
             connection.On<string, string, string>(GetType().Name.Replace("Handler", string.Empty),
                 async (data, message, telemetryString) =>
                 {
-                    StopWatch.Start();
-                    try
+                    Task.Run(async () =>
                     {
-                        var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
-                        var r = data.AsMediatorCmd<GetIdentityWalletRequest, GetIdentityWalletQuery>();
-                        var result = await mediator.Send(r).ConfigureAwait(false);
-                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode.ToString()}");
+                        StopWatch.Start();
+                        try
+                        {
+                            var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
+                            var r = data.AsMediatorCmd<GetIdentityWalletRequest, GetIdentityWalletQuery>();
+                            var result = await mediator.Send(r).ConfigureAwait(false);
+                            StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode.ToString()}");
 
-                        await RespondToInvoke(connection, telemetry, result.Adapt<QueryResponseBO<GetIdentityWalletContract>>());
-                    }
-                    catch (Exception e)
-                    {
-                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}]");
-                    }
+                            await RespondToInvoke(connection, telemetry, result.Adapt<QueryResponseBO<GetIdentityWalletContract>>());
+                        }
+                        catch (Exception e)
+                        {
+                            StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}]");
+                        }
+                    });
 
                 });
         }

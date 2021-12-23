@@ -1,12 +1,14 @@
 ﻿using System.Threading.Tasks;
 using IdentityServer.Domain.Generic.Contracts.Requests;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Identity
 {
-    [Route("Api/V1/Identity/[controller]")]
+    [Route("Api/Identity/[controller]")]
     [ApiController]
+    [ApiVersion("1.0")]
     public class ContactsController : XFrameworkControllerBase
     {
         private readonly IIdentityServiceWrapper _identityServiceWrapper;
@@ -15,7 +17,7 @@ namespace XFramework.Api.Controllers.V1.Identity
         {
             _identityServiceWrapper = identityServiceWrapper;
         }
-        
+        [Authorize]
         [HttpPost("Validate")]
         public async Task<JsonResult> Validate([FromBody] CheckContactExistenceRequest request)
         {
@@ -23,6 +25,7 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
+        [Authorize]
         [HttpPost("Create")]
         public async Task<JsonResult> Create([FromBody] CreateContactRequest request)
         {
@@ -30,6 +33,7 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
+        [Authorize]
         [HttpPost("Update")]
         public async Task<JsonResult> Update([FromBody] UpdateContactRequest request)
         {
@@ -37,6 +41,7 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
 
+        [Authorize]
         [HttpPost("Delete")]
         public async Task<JsonResult> Delete([FromBody] DeleteContactRequest request)
         {

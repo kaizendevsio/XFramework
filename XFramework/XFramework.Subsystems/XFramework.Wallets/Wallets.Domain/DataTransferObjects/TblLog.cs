@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-#nullable disable
+﻿#nullable disable
 
 namespace Wallets.Domain.DataTransferObjects
 {
@@ -14,6 +11,10 @@ namespace Wallets.Domain.DataTransferObjects
         public DateTime? CreatedAt { get; set; }
         public bool IsDeleted { get; set; }
         public string Initiator { get; set; }
+        public short? Type { get; set; }
+        public string Name { get; set; }
+        public bool? Seen { get; set; }
+        public string Uuid { get; set; }
 
         public virtual TblApplication Application { get; set; }
     }
