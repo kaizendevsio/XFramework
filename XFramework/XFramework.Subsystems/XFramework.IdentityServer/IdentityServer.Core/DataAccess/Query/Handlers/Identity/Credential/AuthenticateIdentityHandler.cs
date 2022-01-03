@@ -122,7 +122,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential
                         .Include(i => i.UserCredential)
                         .ThenInclude(i => i.IdentityInfo)
                         .AsNoTracking()
-                        .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == (long?)GenericContactType.Phone)?.UserCredential;
+                        .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(true) & i.UcentitiesId == (long?)GenericContactType.Phone)?.UserCredential;
                     break;
                 case AuthorizeBy.Username:
                     result = await _dataLayer.TblIdentityCredentials
@@ -144,7 +144,7 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential
                         .Include(i => i.UserCredential)
                         .ThenInclude(i => i.IdentityInfo)
                         .AsNoTracking()
-                        .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 2)?.UserCredential;
+                        .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(false) & i.UcentitiesId == 2)?.UserCredential;
                     break;
                 case AuthorizeBy.Token:
                     result = await _dataLayer.TblIdentityCredentials

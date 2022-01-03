@@ -13,7 +13,7 @@ using XFramework.Integration.Interfaces.Wrappers;
 namespace XFramework.Api.Controllers.V1.Wallets
 {
     [Authorize]
-    [Route("API/[controller]")]
+    [Route("Api/[controller]")]
     [ApiController]
     [ApiVersion("1.0")]
     public class IdentityWalletsController : XFrameworkControllerBase
@@ -33,11 +33,11 @@ namespace XFramework.Api.Controllers.V1.Wallets
         }
 
         [HttpGet("Get")]
-        public async Task<JsonResult> Get(long userAuthId, long walletTypeId)
+        public async Task<JsonResult> Get(long cuid, long walletTypeId)
         {
             var request = new GetIdentityWalletRequest()
             {
-                UserAuthId = userAuthId,
+                Cuid = cuid,
                 WalletTypeId = walletTypeId
             };
             var result = await WalletServiceWrapper.GetIdentityWallet(request);
@@ -45,11 +45,11 @@ namespace XFramework.Api.Controllers.V1.Wallets
         }
 
         [HttpGet("GetAll")]
-        public async Task<JsonResult> GetAll(long userAuthId)
+        public async Task<JsonResult> GetAll(long cuid)
         {
             var request = new GetAllIdentityWalletRequest()
             {
-                UserAuthId = userAuthId
+                Cuid = cuid
             };
             
             var result = await WalletServiceWrapper.GetAllIdentityWallet(request);

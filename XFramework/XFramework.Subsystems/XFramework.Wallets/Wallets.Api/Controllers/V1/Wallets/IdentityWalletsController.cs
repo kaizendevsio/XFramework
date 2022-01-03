@@ -25,11 +25,11 @@ namespace Wallets.Api.Controllers.V1.Wallets
         }
 
         [HttpGet("Get")]
-        public async Task<JsonResult> Get(long userAuthId, long walletTypeId)
+        public async Task<JsonResult> Get(string cuid, long walletTypeId)
         {
             var request = new GetIdentityWalletQuery()
             {
-                UserAuthId = userAuthId,
+                Cuid = cuid,
                 WalletTypeId = walletTypeId
             };
             var result = await _mediator.Send(request);

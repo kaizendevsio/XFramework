@@ -7,7 +7,7 @@ namespace Wallets.Core.DataAccess.Query.Entity.Wallets.Identity
 {
     public class GetIdentityWalletQuery : QueryBaseEntity, IRequest<QueryResponseBO<GetIdentityWalletContract>>
     {
-        public long UserAuthId { get; set; }
+        public string Cuid { get; set; }
         public long? WalletTypeId { get; set; }
     }
 }

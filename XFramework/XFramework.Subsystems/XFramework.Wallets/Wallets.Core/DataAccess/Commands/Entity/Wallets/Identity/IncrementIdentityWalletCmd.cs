@@ -5,7 +5,7 @@ namespace Wallets.Core.DataAccess.Commands.Entity.Wallets.Identity
 {
     public class IncrementIdentityWalletCmd  : CommandBaseEntity, IRequest<CmdResponseBO<IncrementIdentityWalletCmd>>
     {
-        public long UserCredentialId { get; set; }
+        public string Cuid { get; set; }
         public long? WalletTypeId { get; set; }
         public decimal? Amount { get; set; }
     }

@@ -29,6 +29,16 @@ namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity
             var wrapperRequest = request.Adapt<CreatePaymentRequest>();
             wrapperRequest.TransactionGuid = Guid.NewGuid();
             
+            var identityEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Cuid == request.Cuid, cancellationToken);
+            if (identityEntity == null)
+            {
+                return new()
+                {
+                    Message = $"Identity with CUID {request.Cuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            
             var entity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Code == request.WalletTypeCode, cancellationToken: cancellationToken);
             if (entity == null)
             {

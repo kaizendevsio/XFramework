@@ -9,7 +9,7 @@ using XFramework.Integration.Interfaces.Wrappers;
 namespace XFramework.Api.Controllers.V1.Wallets
 {
     [Authorize]
-    [Route("API/[controller]")]
+    [Route("Api/[controller]")]
     [ApiController]
     [ApiVersion("1.0")]
     public class WalletsController : XFrameworkControllerBase

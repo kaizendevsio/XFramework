@@ -8,7 +8,7 @@ namespace Wallets.Core.DataAccess.Commands.Entity.Wallets.Identity
         public long? FromWalletTypeId { get; set; }
         public long? ToWalletTypeId { get; set; }
         public decimal? Amount { get; set; }
-        public long? FromUserCredentialId { get; set; }
-        public long? ToUserCredentialId { get; set; }
+        public long? FromUserCuid { get; set; }
+        public long? ToUserCuid { get; set; }
     }
 }

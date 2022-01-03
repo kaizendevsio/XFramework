@@ -52,7 +52,7 @@ namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Credential
             }
             var entityList1 = _dataLayer.TblIdentityContacts
                 .Include(i => i.UserCredential)
-                .Where(i => i.Value == request.PhoneNumber.ValidatePhoneNumber() && i.UcentitiesId == (long?)GenericContactType.Phone)
+                .Where(i => i.Value == request.PhoneNumber.ValidatePhoneNumber(false) && i.UcentitiesId == (long?)GenericContactType.Phone)
                 .Select(i => i.UserCredential)
                 .ToList();
 

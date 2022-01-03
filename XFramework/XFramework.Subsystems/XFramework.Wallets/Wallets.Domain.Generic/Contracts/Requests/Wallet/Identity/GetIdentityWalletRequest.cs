@@ -2,7 +2,7 @@
 {
     public class GetIdentityWalletRequest
     {
-        public long UserAuthId { get; set; }
+        public long Cuid { get; set; }
         public long? WalletTypeId { get; set; }
     }
 }

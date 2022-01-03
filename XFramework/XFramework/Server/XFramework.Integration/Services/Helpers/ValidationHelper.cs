@@ -6,8 +6,18 @@ namespace XFramework.Integration.Services.Helpers
 {
     public static class ValidationHelper
     {
-        public static string ValidatePhoneNumber(this string phoneNumber)
+        public static string ValidatePhoneNumber(this string phoneNumber, bool convertOnly = false)
         {
+            if (convertOnly)
+            {
+                if (phoneNumber.Any(char.IsLetter)) return phoneNumber;
+                if (phoneNumber.Contains('+') != true)
+                {
+                    phoneNumber = $"+63{phoneNumber.Substring(1)}";
+                }
+                return phoneNumber;
+            }
+            
             if (string.IsNullOrEmpty(phoneNumber))
             {
                 throw new ArgumentException("Phone number is required");
@@ -18,7 +28,7 @@ namespace XFramework.Integration.Services.Helpers
                 throw new ArgumentException("Phone number should not contain letters");
             }
             
-            if (phoneNumber.Contains("+"))
+            if (phoneNumber.Contains('+'))
             {
                 if (phoneNumber.Length != 13)
                 {
@@ -32,7 +42,7 @@ namespace XFramework.Integration.Services.Helpers
                     throw new ArgumentException("Incorrect Phone number format, format should be +63XXXXXXXXXX or 09XXXXXXXXX");
                 }
             }
-            if (phoneNumber.Contains("+") != true)
+            if (phoneNumber.Contains('+') != true)
             {
                 phoneNumber = $"+63{phoneNumber.Substring(1)}";
             }

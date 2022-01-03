@@ -4,7 +4,7 @@ namespace Wallets.Domain.Generic.Contracts.Requests.Wallet.Identity
 {
     public class IncrementIdentityWalletRequest: RequestBase
     {
-        public long UserCredentialId { get; set; }
+        public string Cuid { get; set; }
         public long? WalletTypeId { get; set; }
         public decimal? Amount { get; set; }
        
