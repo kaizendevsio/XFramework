@@ -25,6 +25,21 @@ namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity
         
         public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> Handle(GetAllIdentityWalletQuery request, CancellationToken cancellationToken)
         {
+            var credential = await _dataLayer.TblIdentityCredentials
+                .Include(i => i.IdentityInfo)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.UserName == request.Username,
+            
+            if (credential == null)
+            {
+                return new()
+                {
+                    Message = $"Identity does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+
+                    
             var result = await _dataLayer.TblUserWallets
                 .Where(i => i.ui == request.Cuid)
                 .Take(1000)

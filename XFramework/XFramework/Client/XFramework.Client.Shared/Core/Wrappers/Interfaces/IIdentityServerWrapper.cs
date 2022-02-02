@@ -1,4 +1,6 @@
-﻿namespace XFramework.Client.Shared.Core.Wrappers.Interfaces
+﻿
+
+namespace XFramework.Client.Shared.Core.Wrappers.Interfaces
 {
     public interface IIdentityServerWrapper
     {

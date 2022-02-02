@@ -11,6 +11,7 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Identity
 {
+    [Authorize]
     [Route("Api/Identity/[controller]")]
     [ApiController]
     [ApiVersion("1.0")]
@@ -24,7 +25,6 @@ namespace XFramework.Api.Controllers.V1.Identity
             _mediator = mediator;
         }
         
-        [Authorize]
         [HttpPost("List")]
         public async Task<JsonResult> GetList([FromBody] GetIdentityCredentialListRequest request)
         {
@@ -32,7 +32,6 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
-        [Authorize]
         [HttpPost("Validate")]
         public async Task<JsonResult> Validate([FromBody] CheckCredentialExistenceRequest request)
         {
@@ -40,7 +39,6 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
-        [Authorize]
         [HttpPost("Create")]
         public async Task<JsonResult> Create([FromBody] CreateCredentialRequest request)
         {
@@ -48,7 +46,6 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
-        [Authorize]
         [HttpPost("Update")]
         public async Task<JsonResult> Update([FromBody] UpdateCredentialRequest request)
         {
@@ -56,7 +53,6 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
 
-        [Authorize]
         [HttpPost("Delete")]
         public async Task<JsonResult> Delete([FromBody] DeleteCredentialRequest request)
         {
@@ -64,7 +60,6 @@ namespace XFramework.Api.Controllers.V1.Identity
             return new JsonResult(result);
         }
         
-        [Authorize]
         [HttpPost("ChangePassword")]
         public async Task<JsonResult> ForgotPassword([FromBody] ChangePasswordRequest request)
         {

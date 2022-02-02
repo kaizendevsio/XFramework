@@ -10,12 +10,20 @@
             
         }
 
-        public string Title { get => Toolbar.Title.Text; set => Toolbar.Title.Text = value; }
+        public string Title { get; set; }
+        
+        
+        
+        /*public string Title { get => Toolbar.Title.Text; set => Toolbar.Title.Text = value; }*/
         public string SubTitle { get; set; }
         public ToolbarProp Toolbar { get; set; }
         public FooterProp Footer { get; set; }
         public NavigationTabProp NavigationTab { get; set; }
+        
         public string CustomClass { get; set; }
+        
+        
+
 
     }
 }

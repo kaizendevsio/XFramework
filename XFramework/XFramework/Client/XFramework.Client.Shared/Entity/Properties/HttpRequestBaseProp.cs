@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace XFramework.Client.Shared.Entity.Properties
 {
     public class HttpRequestBaseProp<T> : BaseApiRequestProp
