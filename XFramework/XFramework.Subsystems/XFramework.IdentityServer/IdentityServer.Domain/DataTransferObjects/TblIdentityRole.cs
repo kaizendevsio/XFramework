@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace IdentityServer.Domain.DataTransferObjects
 {
     public partial class TblIdentityRole

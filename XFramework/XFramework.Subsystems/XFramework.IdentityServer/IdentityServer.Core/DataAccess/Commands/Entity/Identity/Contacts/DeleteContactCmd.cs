@@ -1,14 +1,8 @@
-﻿using System;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Enums;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 
-namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Contacts
+namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Contacts;
+
+public class DeleteContactCmd : DeleteContactRequest, IRequest<CmdResponseBO<DeleteContactCmd>>
 {
-    public class DeleteContactCmd : CommandBaseEntity, IRequest<CmdResponseBO<DeleteContactCmd>>
-    {
-        public GenericContactType ContactType { get; set; }
-        public Guid Cuid { get; set; }
-        public long Cid { get; set; }
-    }
+
 }

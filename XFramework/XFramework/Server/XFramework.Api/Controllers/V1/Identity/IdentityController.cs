@@ -1,14 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
-using Mapster;
-using IdentityServer.Domain.Generic.Contracts.Requests;
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using XFramework.Core.DataAccess.Commands.Entity.Identity;
-using XFramework.Core.DataAccess.Query.Entity.Identity;
-using XFramework.Domain.Generic.Contracts.Requests;
-using XFramework.Integration.Interfaces.Wrappers;
+using XFramework.Domain.Generic.Contracts.Requests.Create;
 
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -32,7 +26,7 @@ namespace XFramework.Api.Controllers.V1.Identity
         [HttpGet]
         public async Task<JsonResult> Get(Guid guid)
         {
-            var result = await _identityServiceWrapper.GetIdentity(new GetIdentityRequest() { Uid = guid });
+            var result = await _identityServiceWrapper.GetIdentity(new () { Guid = guid });
             return new JsonResult(result);
         }
         

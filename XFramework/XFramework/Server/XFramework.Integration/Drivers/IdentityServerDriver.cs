@@ -1,17 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Threading.Tasks;
-using IdentityServer.Domain.Generic.Contracts.Requests;
-using IdentityServer.Domain.Generic.Contracts.Responses;
-using Mapster;
-using Microsoft.Extensions.Configuration;
-using StreamFlow.Domain.Generic.Enums;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Contracts.Responses;
-using XFramework.Integration.Interfaces.Wrappers;
-
-namespace XFramework.Integration.Drivers
+﻿namespace XFramework.Integration.Drivers
 {
     public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     {
@@ -22,9 +9,14 @@ namespace XFramework.Integration.Drivers
             TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:IdentityServerService"));
         }
 
-        public async Task<QueryResponseBO<AuthorizeIdentityContract>> AuthenticateCredential(AuthenticateCredentialRequest request)
+        public async Task<QueryResponseBO<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request)
         {
-            return await SendAsync<AuthenticateCredentialRequest, AuthorizeIdentityContract>("Authenticate", request);
+            return await SendAsync<AuthenticateCredentialRequest, AuthorizeIdentityResponse>("Authenticate", request);
+        }
+
+        public async Task<QueryResponseBO<IdentityCredentialResponse>> GetCredential(GetCredentialRequest request)
+        {
+            return await SendAsync<GetCredentialRequest, IdentityCredentialResponse>("GetCredential", request);
         }
 
         public async Task<CmdResponseBO> CreateCredential(CreateCredentialRequest request)
@@ -42,39 +34,39 @@ namespace XFramework.Integration.Drivers
             return await SendVoidAsync<DeleteCredentialRequest, CmdResponseBO>("DeleteCredential", request);
         }
 
-        public async Task<CmdResponseBO> ChangePassword(ChangePasswordRequest request)
+        public async Task<CmdResponseBO> ChangePassword(UpdatePasswordRequest request)
         {
-            return await SendVoidAsync<ChangePasswordRequest, CmdResponseBO>("ChangePassword", request);
+            return await SendVoidAsync<UpdatePasswordRequest, CmdResponseBO>("ChangePassword", request);
         }
 
-        public async Task<QueryResponseBO<ExistenceContract>> CheckCredentialExistence(CheckCredentialExistenceRequest request)
+        public async Task<QueryResponseBO<ExistenceResponse>> CheckCredentialExistence(CheckCredentialExistenceRequest request)
         {
-            return await SendAsync<CheckCredentialExistenceRequest, ExistenceContract>("CheckCredentialExistence", request);
+            return await SendAsync<CheckCredentialExistenceRequest, ExistenceResponse>("CheckCredentialExistence", request);
         }
 
-        public async Task<QueryResponseBO<ExistenceContract>> CheckIdentityExistence(CheckIdentityExistenceRequest request)
+        public async Task<QueryResponseBO<ExistenceResponse>> CheckIdentityExistence(CheckIdentityExistenceRequest request)
         {
-            return await SendAsync<CheckIdentityExistenceRequest, ExistenceContract>("CheckIdentityExistence", request);
+            return await SendAsync<CheckIdentityExistenceRequest, ExistenceResponse>("CheckIdentityExistence", request);
         }
 
-        public async Task<QueryResponseBO<IdentityInfoContract>> GetIdentity(GetIdentityRequest request)
+        public async Task<QueryResponseBO<IdentityInfoResponse>> GetIdentity(GetIdentityRequest request)
         {
-            return await SendAsync<GetIdentityRequest, IdentityInfoContract>("GetIdentity", request);
+            return await SendAsync<GetIdentityRequest, IdentityInfoResponse>("GetIdentity", request);
         }
 
-        public async Task<QueryResponseBO<List<IdentityCredentialContract>>> GetIdentityCredentialList(GetIdentityCredentialListRequest request)
+        public async Task<QueryResponseBO<List<IdentityCredentialResponse>>> GetCredentialList(GetIdentityCredentialListRequest request)
         {
-            return await SendAsync<GetIdentityCredentialListRequest, List<IdentityCredentialContract>>("GetIdentityCredentialList", request);
+            return await SendAsync<GetIdentityCredentialListRequest, List<IdentityCredentialResponse>>("GetIdentityCredentialList", request);
         }
 
-        public async Task<QueryResponseBO<List<IdentityCredentialContract>>> GetIdentityRoleList(GetIdentityRoleListRequest request)
+        public async Task<QueryResponseBO<List<IdentityCredentialResponse>>> GetIdentityRoleList(GetIdentityRoleListRequest request)
         {
-            return await SendAsync<GetIdentityRoleListRequest, List<IdentityCredentialContract>>("GetIdentityRoleList", request);
+            return await SendAsync<GetIdentityRoleListRequest, List<IdentityCredentialResponse>>("GetIdentityRoleList", request);
         }
 
-        public async Task<QueryResponseBO<List<IdentityRoleEntityContract>>> GetRoleEntityList(GetRoleEntityListRequest request)
+        public async Task<QueryResponseBO<List<IdentityRoleEntityResponse>>> GetRoleEntityList(GetRoleEntityListRequest request)
         {
-            return await SendAsync<GetRoleEntityListRequest, List<IdentityRoleEntityContract>>("GetRoleEntityList", request);
+            return await SendAsync<GetRoleEntityListRequest, List<IdentityRoleEntityResponse>>("GetRoleEntityList", request);
         }
 
         public async Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request)
@@ -92,6 +84,11 @@ namespace XFramework.Integration.Drivers
             return await SendVoidAsync<DeleteIdentityRequest, CmdResponseBO>("DeleteIdentity", request);
         }
 
+        public async Task<QueryResponseBO<IdentityContactResponse>> GetContact(GetContactRequest request)
+        {
+            return await SendAsync<GetContactRequest, IdentityContactResponse>("GetContact", request);
+        }
+
         public async Task<CmdResponseBO> CreateContact(CreateContactRequest request)
         {
             return await SendVoidAsync<CreateContactRequest, CmdResponseBO>("CreateContact", request);
@@ -107,9 +104,9 @@ namespace XFramework.Integration.Drivers
             return await SendVoidAsync<DeleteContactRequest, CmdResponseBO>("DeleteContact", request);
         }
 
-        public async Task<QueryResponseBO<ExistenceContract>> CheckContactExistence(CheckContactExistenceRequest request)
+        public async Task<QueryResponseBO<ExistenceResponse>> CheckContactExistence(CheckContactExistenceRequest request)
         {
-            return await SendAsync<CheckContactExistenceRequest, ExistenceContract>("CheckContactExistence", request);
+            return await SendAsync<CheckContactExistenceRequest, ExistenceResponse>("CheckContactExistence", request);
         }
     }
 }

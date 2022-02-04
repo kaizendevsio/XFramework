@@ -1,14 +1,10 @@
-﻿using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.Enums;
+﻿using XFramework.Domain.Generic.Contracts.Responses;
 
-namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Contacts
+namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Contacts;
+
+public class CheckContactExistenceQuery : QueryBaseEntity, IRequest<QueryResponseBO<ExistenceResponse>>
 {
-    public class CheckContactExistenceQuery : QueryBaseEntity, IRequest<QueryResponseBO<ExistenceContract>>
-    {
-        public GenericContactType ContactType { get; set; }
-        public string Value { get; set; }
-        public long Cid { get; set; }
-    }
+    public GenericContactType ContactType { get; set; }
+    public string Value { get; set; }
+    public long Cid { get; set; }
 }

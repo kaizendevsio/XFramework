@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace IdentityServer.Domain.DataTransferObjects
 {
     public partial class TblIdentityContact
@@ -17,6 +15,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public long? UcentitiesId { get; set; }
         public string Value { get; set; }
         public long? UserCredentialId { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblIdentityContactEntity Ucentities { get; set; }
         public virtual TblIdentityCredential UserCredential { get; set; }

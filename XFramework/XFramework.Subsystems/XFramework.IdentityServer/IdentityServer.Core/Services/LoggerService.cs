@@ -1,47 +1,42 @@
-﻿using IdentityServer.Core.Interfaces;
-using IdentityServer.Domain.DataTransferObjects;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Enums;
-using XFramework.Integration.Interfaces.Wrappers;
+﻿using XFramework.Integration.Interfaces.Wrappers;
 
-namespace IdentityServer.Core.Services
+namespace IdentityServer.Core.Services;
+
+public class LoggerService : ILoggerWrapper
 {
-    public class LoggerService : ILoggerWrapper
+    private readonly IDataLayer _dataLayer;
+
+    public LoggerService(IDataLayer dataLayer)
     {
-        private readonly IDataLayer _dataLayer;
-
-        public LoggerService(IDataLayer dataLayer)
-        {
-            _dataLayer = dataLayer;
-        }
+        _dataLayer = dataLayer;
+    }
         
-        public async Task<Guid?> NewLog(string name, string message, string initiator, RequestServerBO requestServer, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
+    public async Task<Guid?> NewLog(string name, string message, string initiator, RequestServerBO requestServer, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
+    {
+        var log = new TblLog()
         {
-            var log = new TblLog()
-            {
-                ApplicationId = requestServer.ApplicationId,
-                Initiator = initiator,
-                Severity = (short) priorityType,
-                Message = message,
-                Name = name,
-                Type = (short?) logType,
-                Uuid = requestServer.Guid.ToString()
-            };
+            ApplicationId = requestServer.ApplicationId,
+            Initiator = initiator,
+            Severity = (short) priorityType,
+            Message = message,
+            Name = name,
+            Type = (short?) logType,
+            Uuid = requestServer.Guid.ToString()
+        };
 
-            _dataLayer.TblLogs.Add(log);
-            await _dataLayer.SaveChangesAsync();
+        _dataLayer.TblLogs.Add(log);
+        await _dataLayer.SaveChangesAsync();
 
-            return requestServer.Guid;
-        }
+        return requestServer.Guid;
+    }
 
-        public Task<Guid?> NewAuthorizationLog(AuthenticationState authenticationState, Guid cuid)
-        {
-            throw new NotImplementedException();
-        }
+    public Task<Guid?> NewAuthorizationLog(AuthenticationState authenticationState, Guid cuid)
+    {
+        throw new NotImplementedException();
+    }
 
-        public Task UpdateLog(Guid guid, string title, string message, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
-        {
-            throw new NotImplementedException();
-        }
+    public Task UpdateLog(Guid guid, string title, string message, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
+    {
+        throw new NotImplementedException();
     }
 }

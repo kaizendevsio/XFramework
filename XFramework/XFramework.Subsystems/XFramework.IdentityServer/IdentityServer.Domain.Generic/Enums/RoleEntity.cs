@@ -1,11 +1,10 @@
-﻿namespace IdentityServer.Domain.Generic.Enums
+﻿namespace IdentityServer.Domain.Generic.Enums;
+
+public enum RoleEntity
 {
-    public enum RoleEntity
-    {
-        NotSpecified = 0,
-        Administrator = 1,
-        SuperUser = 3,
-        Client = 2,
-        Vendor = 4
-    }
+    NotSpecified = 0,
+    Administrator = 1,
+    SuperUser = 3,
+    Client = 2,
+    Vendor = 4
 }

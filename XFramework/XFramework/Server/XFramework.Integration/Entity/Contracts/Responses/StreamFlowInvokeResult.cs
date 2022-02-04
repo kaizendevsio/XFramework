@@ -1,6 +1,4 @@
-﻿using System.Net;
-
-namespace XFramework.Integration.Entity.Contracts.Responses
+﻿namespace XFramework.Integration.Entity.Contracts.Responses
 {
     public class StreamFlowInvokeResult<TResult>
     {

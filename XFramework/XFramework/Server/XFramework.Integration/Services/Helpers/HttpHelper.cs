@@ -1,8 +1,5 @@
-﻿using System.Net;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.Security;

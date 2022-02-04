@@ -1,15 +1,8 @@
-﻿using System;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Enums;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Update;
 
-namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Contacts
+namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Contacts;
+
+public class UpdateContactCmd : UpdateContactRequest, IRequest<CmdResponseBO<UpdateContactCmd>>
 {
-    public class UpdateContactCmd : CommandBaseEntity, IRequest<CmdResponseBO<UpdateContactCmd>>
-    {
-        public GenericContactType ContactType { get; set; }
-        public string Value { get; set; }
-        public string Cuid { get; set; }
-        public long Cid { get; set; }
-    }
+
 }

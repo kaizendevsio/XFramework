@@ -1,15 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using IdentityServer.Domain.Generic.Enums;
 using Microsoft.IdentityModel.Tokens;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Interfaces;
 
 namespace XFramework.Integration.Services

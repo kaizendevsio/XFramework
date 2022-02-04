@@ -1,8 +1,4 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Hosting;
-
-namespace XFramework.Api.HostedService
+﻿namespace XFramework.Api.HostedService
 {
     public class SampleService : IHostedService
     {

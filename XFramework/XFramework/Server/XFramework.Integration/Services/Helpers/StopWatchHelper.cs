@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace XFramework.Integration.Services.Helpers
+﻿namespace XFramework.Integration.Services.Helpers
 {
     public class StopWatchHelper
     {

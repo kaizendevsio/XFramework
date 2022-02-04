@@ -1,12 +1,8 @@
-﻿using System.Collections.Generic;
-using IdentityServer.Domain.Generic.Contracts.Responses;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using IdentityServer.Domain.Generic.Contracts.Responses;
 
-namespace IdentityServer.Core.DataAccess.Query.Entity.Application
+namespace IdentityServer.Core.DataAccess.Query.Entity.Application;
+
+public class GetAppAppListQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<GetApplicationListResponse>>>
 {
-    public class GetAppAppListQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<GetApplicationListContract>>>
-    {
         
-    }
 }

@@ -1,11 +1,7 @@
-﻿using MediatR;
-using System;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 
-namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity
+namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity;
+
+public class DeleteIdentityCmd : DeleteIdentityRequest, IRequest<CmdResponseBO<DeleteIdentityCmd>>
 {
-    public class DeleteIdentityCmd : CommandBaseEntity, IRequest<CmdResponseBO<DeleteIdentityCmd>>
-    {
-        public Guid Uid { get; set; }
-    }
 }

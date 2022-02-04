@@ -1,13 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
-using Mapster;
-using IdentityServer.Domain.Generic.Contracts.Requests;
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using XFramework.Core.DataAccess.Commands.Entity.Identity.Credential;
-using XFramework.Core.DataAccess.Query.Entity.Identity;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Identity
 {
@@ -25,10 +18,17 @@ namespace XFramework.Api.Controllers.V1.Identity
             _mediator = mediator;
         }
         
+        [HttpGet]
+        public async Task<JsonResult> Get(Guid guid)
+        {
+            var result = await _identityServiceWrapper.GetCredential(new () { Guid = guid });
+            return new JsonResult(result);
+        }
+        
         [HttpPost("List")]
         public async Task<JsonResult> GetList([FromBody] GetIdentityCredentialListRequest request)
         {
-            var result = await _identityServiceWrapper.GetIdentityCredentialList(request);
+            var result = await _identityServiceWrapper.GetCredentialList(request);
             return new JsonResult(result);
         }
         
@@ -61,7 +61,7 @@ namespace XFramework.Api.Controllers.V1.Identity
         }
         
         [HttpPost("ChangePassword")]
-        public async Task<JsonResult> ForgotPassword([FromBody] ChangePasswordRequest request)
+        public async Task<JsonResult> ForgotPassword([FromBody] UpdatePasswordRequest request)
         {
             var result = await _identityServiceWrapper.ChangePassword(request);
             return new JsonResult(result);

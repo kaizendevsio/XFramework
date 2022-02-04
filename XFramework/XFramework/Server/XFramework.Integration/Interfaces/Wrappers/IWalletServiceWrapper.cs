@@ -1,10 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using IdentityServer.Domain.Generic.Contracts.Requests;
-using Wallets.Domain.Generic.Contracts.Requests.Wallet;
+﻿using Wallets.Domain.Generic.Contracts.Requests.Wallet;
 using Wallets.Domain.Generic.Contracts.Requests.Wallet.Identity;
 using Wallets.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Interfaces;
 
 namespace XFramework.Integration.Interfaces.Wrappers

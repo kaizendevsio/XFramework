@@ -1,8 +1,6 @@
 ﻿using System.Reflection;
 using FluentValidation;
 using MediatR;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using XFramework.Core.DataAccess.Commands.Handlers;
 using XFramework.Core.PipelineBehaviors;
 

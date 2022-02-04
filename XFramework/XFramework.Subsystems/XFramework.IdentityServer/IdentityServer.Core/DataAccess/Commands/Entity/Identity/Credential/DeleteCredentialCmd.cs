@@ -1,13 +1,8 @@
-﻿using System;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 
-namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential
+namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
+
+public class DeleteCredentialCmd : DeleteCredentialRequest, IRequest<CmdResponseBO<DeleteCredentialCmd>>
 {
-    public class DeleteCredentialCmd : CommandBaseEntity, IRequest<CmdResponseBO<DeleteCredentialCmd>>
-    {
-        public Guid Uid { get; set; }
-        public string Username { get; set; }
         
-    }
 }

@@ -1,11 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using XFramework.Core.DataAccess;
-using XFramework.Core.Interfaces;
-using XFramework.Domain.DataTransferObjects;
-
-namespace XFramework.Api.Installers
+﻿namespace XFramework.Api.Installers
 {
     public class DbInstaller : IInstaller
     {

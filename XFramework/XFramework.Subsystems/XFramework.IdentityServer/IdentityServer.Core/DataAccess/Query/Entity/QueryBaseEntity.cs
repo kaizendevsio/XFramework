@@ -1,9 +1,6 @@
-﻿using XFramework.Domain.Generic.BusinessObjects;
+﻿namespace IdentityServer.Core.DataAccess.Query.Entity;
 
-namespace IdentityServer.Core.DataAccess.Query.Entity
+public class QueryBaseEntity
 {
-    public class QueryBaseEntity
-    {
-        public RequestServerBO RequestServer { get; set; }
-    }
+    public RequestServerBO RequestServer { get; set; }
 }

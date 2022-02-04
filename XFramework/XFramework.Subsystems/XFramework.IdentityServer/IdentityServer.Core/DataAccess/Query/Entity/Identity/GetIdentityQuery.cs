@@ -1,12 +1,8 @@
-﻿using System;
-using IdentityServer.Domain.Generic.Contracts.Responses;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using IdentityServer.Domain.Generic.Contracts.Responses;
 
-namespace IdentityServer.Core.DataAccess.Query.Entity.Identity
+namespace IdentityServer.Core.DataAccess.Query.Entity.Identity;
+
+public class GetIdentityQuery : QueryBaseEntity, IRequest<QueryResponseBO<IdentityInfoResponse>>
 {
-    public class GetIdentityQuery : QueryBaseEntity, IRequest<QueryResponseBO<IdentityInfoContract>>
-    {
-        public Guid Uid { get; set; }   
-    }
+    public Guid Guid { get; set; }   
 }

@@ -1,15 +1,4 @@
-﻿using System;
-using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-using IdentityServer.Domain.Generic.Contracts.Requests;
-using Mapster;
-using MediatR;
-using XFramework.Core.DataAccess.Commands.Entity.Identity;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Enums;
-using XFramework.Integration.Interfaces.Wrappers;
-
+﻿
 namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
 {
     public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateIdentityCmd, CmdResponseBO>
@@ -24,17 +13,16 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
 
         public async Task<CmdResponseBO> Handle(CreateIdentityCmd request, CancellationToken cancellationToken)
         {
-                 
             var uuid = Guid.NewGuid();
             var cuid = Guid.NewGuid();
             var req = request.Adapt<CreateIdentityRequest>();
-            req.Uuid = uuid;
+            req.Guid = uuid;
             
             var phoneContact = new CreateContactRequest()
             {
                 RequestServer = request.RequestServer,
                 ContactType = GenericContactType.Phone,
-                Cuid = cuid,
+                CredentialGuid = cuid,
                 Value = request.PhoneNumber
             };
 
@@ -42,7 +30,7 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
             {
                 RequestServer = request.RequestServer,
                 ContactType = GenericContactType.Email,
-                Cuid = cuid,
+                CredentialGuid = cuid,
                 Value = request.Email
             };
             
@@ -94,8 +82,8 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
             }
 
             var req2 = request.Adapt<CreateCredentialRequest>();
-            req2.Uid = uuid;
-            req2.Cuid = cuid;
+            req2.IdentityGuid = uuid;
+            req2.Guid = cuid;
             
             var response2 = await IdentityServiceWrapper.CreateCredential(req2);
             if (response2.HttpStatusCode != HttpStatusCode.Accepted)

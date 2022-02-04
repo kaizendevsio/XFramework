@@ -1,7 +1,5 @@
-﻿using System;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services.Helpers;
 

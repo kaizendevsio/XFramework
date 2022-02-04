@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace IdentityServer.Domain.DataTransferObjects
 {
     public partial class TblIdentityCredential
@@ -30,7 +28,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public byte[] PasswordByte { get; set; }
         public long ApplicationId { get; set; }
         public string Token { get; set; }
-        public string Cuid { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblApplication Application { get; set; }
         public virtual TblIdentityInformation IdentityInfo { get; set; }

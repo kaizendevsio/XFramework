@@ -1,12 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using XFramework.Domain.Generic.Interfaces;
-
-namespace XFramework.Api.Installers
+﻿namespace XFramework.Api.Installers
 {
     public static class ConfigExtensions
     {

@@ -1,15 +1,8 @@
-﻿using System;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Update;
 
-namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential
+namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
+
+public class UpdateCredentialCmd : UpdateCredentialRequest, IRequest<CmdResponseBO<UpdateCredentialCmd>>
 {
-    public class UpdateCredentialCmd : CommandBaseEntity, IRequest<CmdResponseBO<UpdateCredentialCmd>>
-    {
-        public Guid Uid { get; set; }
-        public string Cuid { get; set; }
-        public string UserAlias { get; set; }
-        public string UserName { get; set; }
-        public string Token { get; set; }
-    }
+
 }

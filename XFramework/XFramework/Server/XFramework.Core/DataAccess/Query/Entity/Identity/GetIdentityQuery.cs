@@ -5,7 +5,7 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace XFramework.Core.DataAccess.Query.Entity.Identity
 {
-    public class GetIdentityQuery : IRequest<QueryResponseBO<IdentityInfoContract>>
+    public class GetIdentityQuery : IRequest<QueryResponseBO<IdentityInfoResponse>>
     {
         public Guid Uid { get; set; }   
     }

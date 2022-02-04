@@ -1,7 +1,4 @@
-﻿using System.Net;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.SignalR.Client;
-using StreamFlow.Domain.Generic.Contracts.Responses;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.Interfaces;
 using XFramework.Integration.Entity.Contracts.Responses;
 

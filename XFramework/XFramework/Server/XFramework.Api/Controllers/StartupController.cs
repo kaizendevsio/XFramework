@@ -1,13 +1,12 @@
-﻿using System;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.AspNetCore.Mvc;
-using XFramework.Domain.Generic.BusinessObjects;
 
 namespace XFramework.Api.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [ApiVersion("2.0")]
     public class StartupController : ControllerBase
     {
         [HttpGet]

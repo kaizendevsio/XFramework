@@ -1,9 +1,6 @@
-﻿using XFramework.Domain.Generic.BusinessObjects;
+﻿namespace IdentityServer.Api.Options;
 
-namespace IdentityServer.Api.Options
+public class JwtOptions : JwtOptionsBO
 {
-    public class JwtOptions : JwtOptionsBO
-    {
         
-    }
 }

@@ -1,12 +1,8 @@
-﻿using System.Collections.Generic;
-using IdentityServer.Domain.Generic.Contracts.Responses;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using IdentityServer.Domain.Generic.Contracts.Responses;
 
-namespace IdentityServer.Core.DataAccess.Query.Entity.Roles
+namespace IdentityServer.Core.DataAccess.Query.Entity.Roles;
+
+public class GetRoleEntityListQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<IdentityRoleEntityResponse>>>
 {
-    public class GetRoleEntityListQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<IdentityRoleEntityContract>>>
-    {
         
-    }
 }

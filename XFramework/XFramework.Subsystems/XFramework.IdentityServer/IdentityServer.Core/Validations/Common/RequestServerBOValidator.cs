@@ -1,15 +1,13 @@
 ﻿using FluentValidation;
-using XFramework.Domain.Generic.BusinessObjects;
 
-namespace IdentityServer.Core.Validations.Common
+namespace IdentityServer.Core.Validations.Common;
+
+public class RequestServerBoValidator : AbstractValidator<RequestServerBO>
 {
-    public class RequestServerBoValidator : AbstractValidator<RequestServerBO>
+    public RequestServerBoValidator()
     {
-        public RequestServerBoValidator()
-        {
-            RuleFor(x => x.ApplicationId)
-                .NotEmpty()
-                .WithMessage("Application Id is Required");
-        }
+        RuleFor(x => x.ApplicationId)
+            .NotEmpty()
+            .WithMessage("Application Id is Required");
     }
 }

@@ -1,14 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using IdentityServer.Domain.Generic.Contracts.Requests;
-using Mapster;
-using Microsoft.Extensions.Configuration;
-using Wallets.Domain.Generic.Contracts.Requests.Wallet;
+﻿using Wallets.Domain.Generic.Contracts.Requests.Wallet;
 using Wallets.Domain.Generic.Contracts.Requests.Wallet.Identity;
 using Wallets.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Integration.Drivers
 {

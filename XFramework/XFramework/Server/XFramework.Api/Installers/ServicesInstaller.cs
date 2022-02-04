@@ -1,10 +1,6 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using XFramework.Core.Interfaces;
+﻿using XFramework.Core.Interfaces;
 using XFramework.Core.Services;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
-using XFramework.Integration.Interfaces.Wrappers;
 using XFramework.Integration.Services;
 
 namespace XFramework.Api.Installers

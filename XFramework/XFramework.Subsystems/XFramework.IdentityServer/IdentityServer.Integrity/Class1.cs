@@ -1,6 +1,5 @@
-﻿namespace IdentityServer.Integrity
+﻿namespace IdentityServer.Integrity;
+
+public class Class1
 {
-    public class Class1
-    {
-    }
 }

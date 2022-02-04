@@ -1,11 +1,8 @@
 ﻿using System.Security.Claims;
 using System.Text.Json;
 using IdentityServer.Domain.Generic.Enums;
-using Mapster;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace XFramework.Api.Controllers
 {

@@ -1,15 +1,14 @@
 ﻿using FluentValidation;
 using IdentityServer.Core.Validations.Common;
 
-namespace IdentityServer.Core.DataAccess.Commands.Validations
+namespace IdentityServer.Core.DataAccess.Commands.Validations;
+
+public class CommandBaseValidator<T> : AbstractValidator<T>
 {
-    public class CommandBaseValidator<T> : AbstractValidator<T>
-    {
-        public RequestServerBoValidator RequestServerValidator { get; set; }
+    public RequestServerBoValidator RequestServerValidator { get; set; }
         
-        public CommandBaseValidator()
-        {
-            RequestServerValidator = new RequestServerBoValidator();
-        }
+    public CommandBaseValidator()
+    {
+        RequestServerValidator = new RequestServerBoValidator();
     }
 }

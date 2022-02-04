@@ -1,9 +1,4 @@
-﻿using System.Threading.Tasks;
-using IdentityServer.Domain.Generic.Contracts.Requests;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using XFramework.Integration.Interfaces.Wrappers;
-
+﻿
 namespace XFramework.Api.Controllers.V1.Identity
 {
     [Authorize]
@@ -18,6 +13,14 @@ namespace XFramework.Api.Controllers.V1.Identity
         {
             _identityServiceWrapper = identityServiceWrapper;
         }
+        
+        [HttpGet]
+        public async Task<JsonResult> Get(Guid guid)
+        {
+            var result = await _identityServiceWrapper.GetContact(new () { Guid = guid });
+            return new JsonResult(result);
+        }
+        
         [HttpPost("Validate")]
         public async Task<JsonResult> Validate([FromBody] CheckContactExistenceRequest request)
         {

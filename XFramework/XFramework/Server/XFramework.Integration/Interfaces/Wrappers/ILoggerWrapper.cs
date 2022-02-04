@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Enums;
+﻿using XFramework.Domain.Generic.Enums;
 using XFramework.Domain.Generic.Interfaces;
 
 namespace XFramework.Integration.Interfaces.Wrappers

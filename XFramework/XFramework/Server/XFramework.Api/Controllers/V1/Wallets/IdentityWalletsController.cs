@@ -1,14 +1,6 @@
-﻿using System.Security.Claims;
-using System.Threading.Tasks;
-using Mapster;
-using MediatR;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Wallets.Domain.Generic.Contracts.Requests.Wallet;
 using Wallets.Domain.Generic.Contracts.Requests.Wallet.Identity;
-using XFramework.Domain.Generic.Contracts.Requests;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Wallets
 {

@@ -1,9 +1,6 @@
-﻿using System.Threading.Tasks;
-using IdentityServer.Domain.Generic.Contracts.Requests;
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Api.Controllers.V1.Roles
 {
