@@ -3,7 +3,7 @@
 namespace XFramework.Api.Controllers.V2.Identity
 {
     [Authorize]
-    [Route("Api/Identity/[controller]")]
+    [Route("Api/v{version:apiVersion}/Identity/[controller]")]
     [ApiController]
     [ApiVersion("2.0")]
     public class CredentialController : XFrameworkControllerBase
@@ -23,42 +23,44 @@ namespace XFramework.Api.Controllers.V2.Identity
             return new JsonResult(result);
         }
         
-        [HttpPost("List")]
-        public async Task<JsonResult> GetList([FromBody] GetIdentityCredentialListRequest request)
+        [HttpGet("List")]
+        public async Task<JsonResult> List([FromBody] GetIdentityCredentialListRequest request)
         {
             var result = await _identityServiceWrapper.GetCredentialList(request);
             return new JsonResult(result);
         }
         
-        [HttpPost("Validate")]
+        [HttpGet("Validate")]
         public async Task<JsonResult> Validate([FromBody] CheckCredentialExistenceRequest request)
         {
             var result = await _identityServiceWrapper.CheckCredentialExistence(request);
             return new JsonResult(result);
         }
         
-        [HttpPost("Create")]
+        [HttpPost]
         public async Task<JsonResult> Create([FromBody] CreateCredentialRequest request)
         {
             var result = await _identityServiceWrapper.CreateCredential(request);
             return new JsonResult(result);
         }
         
-        [HttpPost("Update")]
-        public async Task<JsonResult> Update([FromBody] UpdateCredentialRequest request)
+        [HttpPatch]
+        public async Task<JsonResult> Update([FromBody] UpdateCredentialRequest request, Guid guid)
         {
+            request.Guid = guid;
             var result = await _identityServiceWrapper.UpdateCredential(request);
             return new JsonResult(result);
         }
 
-        [HttpPost("Delete")]
-        public async Task<JsonResult> Delete([FromBody] DeleteCredentialRequest request)
+        [HttpDelete]
+        public async Task<JsonResult> Delete(Guid guid)
         {
+            var request = new DeleteCredentialRequest() { Guid = guid};
             var result = await _identityServiceWrapper.DeleteCredential(request);
             return new JsonResult(result);
         }
         
-        [HttpPost("ChangePassword")]
+        [HttpPatch("ChangePassword")]
         public async Task<JsonResult> ForgotPassword([FromBody] UpdatePasswordRequest request)
         {
             var result = await _identityServiceWrapper.ChangePassword(request);

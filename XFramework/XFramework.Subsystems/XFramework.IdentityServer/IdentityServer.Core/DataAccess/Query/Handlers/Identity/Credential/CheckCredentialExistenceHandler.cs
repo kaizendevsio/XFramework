@@ -1,4 +1,4 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
+﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 using IdentityServer.Domain.DataTransferObjects.Legacy;
 using XFramework.Domain.Generic.Contracts.Responses;
 

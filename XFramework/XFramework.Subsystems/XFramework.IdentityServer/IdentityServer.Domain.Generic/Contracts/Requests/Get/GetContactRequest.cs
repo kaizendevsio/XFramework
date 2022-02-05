@@ -4,5 +4,5 @@ namespace IdentityServer.Domain.Generic.Contracts.Requests.Get;
 
 public class GetContactRequest : RequestBase
 {
-    public Guid Guid { get; set; }
+    public Guid? Guid { get; set; }
 }

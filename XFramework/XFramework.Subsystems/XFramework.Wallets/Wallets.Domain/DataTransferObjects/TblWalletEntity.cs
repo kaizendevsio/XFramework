@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblWalletEntity
@@ -30,8 +28,11 @@ namespace Wallets.Domain.DataTransferObjects
         public long? CurrencyEntityId { get; set; }
         public decimal? MinTransfer { get; set; }
         public decimal? MaxTransfer { get; set; }
-        //public bool? IsDeleted { get; set; }
+        public string Guid { get; set; }
+        public bool IsDeleted { get; set; }
+        public long? ApplicationId { get; set; }
 
+        public virtual TblApplication Application { get; set; }
         public virtual TblCurrencyEntity CurrencyEntity { get; set; }
         public virtual ICollection<TblUserDepositRequest> TblUserDepositRequests { get; set; }
         public virtual ICollection<TblUserWalletAddress> TblUserWalletAddresses { get; set; }

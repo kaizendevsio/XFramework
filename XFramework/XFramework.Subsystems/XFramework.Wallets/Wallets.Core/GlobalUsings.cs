@@ -1,0 +1,19 @@
+﻿global using System;
+global using System.Net;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using Mapster;
+global using MediatR;
+global using XFramework.Domain.Generic.BusinessObjects;
+global using Microsoft.EntityFrameworkCore;
+global using System.Text;
+global using XFramework.Domain.Generic.Enums;
+global using XFramework.Integration.Services.Helpers;
+global using Wallets.Domain.Generic.Contracts.Requests.Create;
+global using Wallets.Domain.Generic.Contracts.Requests.Update;
+global using Wallets.Domain.Generic.Contracts.Requests.Delete;
+global using Wallets.Domain.Generic.Contracts.Responses;
+
+global using Wallets.Core.DataAccess.Commands.Entity.Wallets;
+global using Wallets.Core.Interfaces;
+global using Wallets.Domain.DataTransferObjects;

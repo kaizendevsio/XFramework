@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblUserBinaryList
@@ -14,6 +12,7 @@ namespace Wallets.Domain.DataTransferObjects
         public long? TargetUserMapId { get; set; }
         public long? SourceUserMapId { get; set; }
         public int? Placement { get; set; }
+        public int? Level { get; set; }
 
         public virtual TblUserMap SourceUserMap { get; set; }
         public virtual TblUserMap TargetUserMap { get; set; }

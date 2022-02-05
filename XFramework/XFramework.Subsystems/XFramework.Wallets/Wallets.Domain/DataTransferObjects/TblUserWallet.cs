@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblUserWallet
@@ -23,8 +21,8 @@ namespace Wallets.Domain.DataTransferObjects
         public long UserAuthId { get; set; }
         public long? WalletTypeId { get; set; }
         public decimal? Balance { get; set; }
-        public string Uid { get; set; }
         public bool? IsDeleted { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblIdentityCredential UserAuth { get; set; }
         public virtual TblWalletEntity WalletType { get; set; }

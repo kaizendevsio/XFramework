@@ -1,5 +1,5 @@
 ﻿using FluentValidation;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 
 namespace IdentityServer.Core.DataAccess.Query.Validations.Identity.Authorization;
 

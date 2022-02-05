@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblEnterprise
@@ -20,6 +18,7 @@ namespace Wallets.Domain.DataTransferObjects
         public long? ModifiedBy { get; set; }
         public bool IsDeleted { get; set; }
         public string Name { get; set; }
+        public string Guid { get; set; }
 
         public virtual ICollection<TblApplication> TblApplications { get; set; }
     }

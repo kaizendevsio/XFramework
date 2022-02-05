@@ -1,5 +1,7 @@
-﻿using Wallets.Domain.Generic.Contracts.Requests.Wallet;
-using Wallets.Domain.Generic.Contracts.Requests.Wallet.Identity;
+﻿using Wallets.Domain.Generic.Contracts.Requests.Create;
+using Wallets.Domain.Generic.Contracts.Requests.Delete;
+using Wallets.Domain.Generic.Contracts.Requests.Get;
+using Wallets.Domain.Generic.Contracts.Requests.Update;
 using Wallets.Domain.Generic.Contracts.Responses;
 
 namespace XFramework.Integration.Drivers
@@ -13,22 +15,48 @@ namespace XFramework.Integration.Drivers
             TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:WalletService"));
         }
 
+        public async Task<QueryResponseBO<WalletEntityResponse>> GetWalletEntity(GetWalletEntityRequest request)
+        {
+            return await SendAsync<GetWalletEntityRequest, WalletEntityResponse>("GetWalletEntity", request);
+        }
+
+        public async Task<QueryResponseBO<List<WalletEntityResponse>>> GetWalletEntityList(GetWalletEntityListRequest request)
+        {
+            return await SendAsync<GetWalletEntityListRequest, List<WalletEntityResponse>>("GetWalletEntityList", request);
+        }
+        
+        public async Task<CmdResponseBO> CreateWalletEntity(CreateWalletEntityRequest request)
+        {
+            var result = await SendAsync<CreateWalletEntityRequest, CmdResponseBO>("CreateEntityWallet", request);
+            return result.Adapt<CmdResponseBO>();
+        }
+
+        public async Task<CmdResponseBO> UpdateWalletEntity(UpdateWalletEntityRequest request)
+        {
+            var result = await SendAsync<UpdateWalletEntityRequest, CmdResponseBO>("UpdateWalletEntity", request);
+            return result.Adapt<CmdResponseBO>();
+        }
+
+        public async Task<CmdResponseBO> DeleteWalletEntity(DeleteWalletEntityRequest request)
+        {
+            var result = await SendAsync<DeleteWalletEntityRequest, CmdResponseBO>("DeleteWalletEntity", request);
+            return result.Adapt<CmdResponseBO>();
+        }
+
+        public async Task<QueryResponseBO<WalletResponse>> GetWallet(GetWalletRequest request)
+        {
+          return await SendAsync<GetWalletRequest, WalletResponse>("GetWallet", request);
+        }
+
+        public async Task<QueryResponseBO<List<WalletResponse>>> GetWalletList(GetWalletListRequest request)
+        {
+           return await SendAsync<GetWalletListRequest, List<WalletResponse>>("GetWalletList", request);
+        }
 
         public async Task<CmdResponseBO> CreateWallet(CreateWalletRequest request)
         {
             var result = await SendAsync<CreateWalletRequest, CmdResponseBO>("CreateWallet", request);
             return result.Adapt<CmdResponseBO>();
-        }
-
-
-        public async Task<QueryResponseBO<GetWalletContract>> GetWallet(GetWalletRequest request)
-        {
-            return await SendAsync<GetWalletRequest, GetWalletContract>("GetWallet", request);
-        }
-
-        public async Task<QueryResponseBO<List<GetWalletContract>>> GetAllWallet(GetAllWalletRequest request)
-        {
-            return await SendAsync<GetAllWalletRequest, List<GetWalletContract>>("GetAllWallet", request);
         }
 
         public async Task<CmdResponseBO> UpdateWallet(UpdateWalletRequest request)
@@ -43,65 +71,32 @@ namespace XFramework.Integration.Drivers
             return result.Adapt<CmdResponseBO>();
         }
 
-        public async Task<CmdResponseBO> CreateIdentityWallet(CreateIdentityWalletRequest request)
+        public async Task<CmdResponseBO> DecrementWallet(DecrementWalletRequest request)
         {
-            var result = await SendAsync<CreateIdentityWalletRequest, CmdResponseBO>("CreateIdentityWallet", request);
+            var result = await SendAsync<DecrementWalletRequest, CmdResponseBO>("DecrementWallet", request);
             return result.Adapt<CmdResponseBO>();
         }
 
-        public async Task<QueryResponseBO<GetIdentityWalletContract>> GetIdentityWallet(GetIdentityWalletRequest request)
+        public async Task<CmdResponseBO> IncrementWallet(IncrementWalletRequest request)
         {
-          return await SendAsync<GetIdentityWalletRequest, GetIdentityWalletContract>("GetIdentityWallet", request);
-        }
-
-        public async Task<QueryResponseBO<List<GetIdentityWalletContract>>> GetAllIdentityWallet(GetAllIdentityWalletRequest request)
-        {
-           return await SendAsync<GetAllIdentityWalletRequest, List<GetIdentityWalletContract>>("GetAllIdentityWallet", request);
-        }
-
-        public async Task<CmdResponseBO> UpdateIdentityWallet(UpdateIdentityWalletRequest request)
-        {
-            var result = await SendAsync<UpdateIdentityWalletRequest, CmdResponseBO>("UpdateIdentityWallet", request);
+            var result = await SendAsync<IncrementWalletRequest, CmdResponseBO>("IncrementWallet", request);
             return result.Adapt<CmdResponseBO>();
-        }
-
-        public async Task<CmdResponseBO> DeleteIdentityWallet(DeleteIdentityWalletRequest request)
-        {
-            var result = await SendAsync<DeleteIdentityWalletRequest, CmdResponseBO>("DeleteIdentityWallet", request);
-            return result.Adapt<CmdResponseBO>();
-            throw new System.NotImplementedException();
-        }
-
-        public async Task<CmdResponseBO> DecrementIdentityWallet(DecrementIdentityWalletRequest request)
-        {
-            var result =
-                await SendAsync<DecrementIdentityWalletRequest, CmdResponseBO>("DecrementIdentityWallet", request);
-            return result.Adapt<CmdResponseBO>();
-            throw new System.NotImplementedException();
-        }
-
-        public async Task<CmdResponseBO> IncrementIdentityWallet(IncrementIdentityWalletRequest request)
-        {
-            var result =
-                await SendAsync<IncrementIdentityWalletRequest, CmdResponseBO>("IncrementIdentityWallet", request);
-            return result.Adapt<CmdResponseBO>();
-            throw new System.NotImplementedException();
         } 
 
-        public async Task<CmdResponseBO> TransferIdentityWallet(TransferIdentityWalletRequest request)
+        public async Task<CmdResponseBO> TransferWallet(TransferWalletRequest request)
         {
-            var result = await SendAsync<TransferIdentityWalletRequest, CmdResponseBO>("TransferIdentityWallet", request);
+            var result = await SendAsync<TransferWalletRequest, CmdResponseBO>("TransferWallet", request);
             return result.Adapt<CmdResponseBO>();
         }
 
-        public async Task<QueryResponseBO<WalletDepositContract>> CreateDepositRequest(CreateIdentityWalletDepositRequest request)
+        public async Task<QueryResponseBO<WalletDepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request)
         {
-            return await SendAsync<CreateIdentityWalletDepositRequest, WalletDepositContract>("CreateIdentityWalletDeposit", request);
+            return await SendAsync<CreateWalletDepositRequest, WalletDepositResponse>("CreateWalletDeposit", request);
         }
 
-        public async Task<QueryResponseBO<WalletDepositContract>> CreateWithdrawalRequest(CreateIdentityWalletWithdrawalRequest request)
+        public async Task<QueryResponseBO<WalletDepositResponse>> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request)
         {
-            return await SendAsync<CreateIdentityWalletWithdrawalRequest, WalletDepositContract>("WithdrawalIdentityWallet", request);
+            return await SendAsync<CreateWalletWithdrawalRequest, WalletDepositResponse>("WithdrawalWallet", request);
         }
     }
 }

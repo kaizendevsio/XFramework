@@ -39,6 +39,11 @@
             return await SendVoidAsync<UpdatePasswordRequest, CmdResponseBO>("ChangePassword", request);
         }
 
+        public async Task<QueryResponseBO<IdentityRoleResponse>> GetIdentityRole(GetIdentityRoleRequest request)
+        {
+            return await SendAsync<GetIdentityRoleRequest, IdentityRoleResponse>("GetIdentityRole", request);
+        }
+
         public async Task<QueryResponseBO<ExistenceResponse>> CheckCredentialExistence(CheckCredentialExistenceRequest request)
         {
             return await SendAsync<CheckCredentialExistenceRequest, ExistenceResponse>("CheckCredentialExistence", request);
@@ -59,14 +64,19 @@
             return await SendAsync<GetIdentityCredentialListRequest, List<IdentityCredentialResponse>>("GetIdentityCredentialList", request);
         }
 
-        public async Task<QueryResponseBO<List<IdentityCredentialResponse>>> GetIdentityRoleList(GetIdentityRoleListRequest request)
+        public async Task<QueryResponseBO<List<IdentityRoleResponse>>> GetIdentityRoleList(GetIdentityRoleListRequest request)
         {
-            return await SendAsync<GetIdentityRoleListRequest, List<IdentityCredentialResponse>>("GetIdentityRoleList", request);
+            return await SendAsync<GetIdentityRoleListRequest, List<IdentityRoleResponse>>("GetIdentityRoleList", request);
         }
 
-        public async Task<QueryResponseBO<List<IdentityRoleEntityResponse>>> GetRoleEntityList(GetRoleEntityListRequest request)
+        public async Task<QueryResponseBO<RoleEntityResponse>> GetRoleEntity(GetRoleEntityRequest request)
         {
-            return await SendAsync<GetRoleEntityListRequest, List<IdentityRoleEntityResponse>>("GetRoleEntityList", request);
+            return await SendAsync<GetRoleEntityRequest, RoleEntityResponse>("GetRoleEntity", request);
+        }
+
+        public async Task<QueryResponseBO<List<RoleEntityResponse>>> GetRoleEntityList(GetRoleEntityListRequest request)
+        {
+            return await SendAsync<GetRoleEntityListRequest, List<RoleEntityResponse>>("GetRoleEntityList", request);
         }
 
         public async Task<CmdResponseBO> CreateIdentity(CreateIdentityRequest request)

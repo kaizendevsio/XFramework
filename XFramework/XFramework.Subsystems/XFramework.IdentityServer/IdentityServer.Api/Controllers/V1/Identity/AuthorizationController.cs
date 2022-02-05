@@ -1,5 +1,4 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityServer.Api.Controllers.V1.Identity;

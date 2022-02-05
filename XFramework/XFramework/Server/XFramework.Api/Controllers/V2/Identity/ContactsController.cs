@@ -2,7 +2,7 @@
 namespace XFramework.Api.Controllers.V2.Identity
 {
     [Authorize]
-    [Route("Api/Identity/[controller]")]
+    [Route("Api/v{version:apiVersion}/Identity/[controller]")]
     [ApiController]
     [ApiVersion("2.0")]
     public class ContactsController : XFrameworkControllerBase
@@ -21,30 +21,32 @@ namespace XFramework.Api.Controllers.V2.Identity
             return new JsonResult(result);
         }
         
-        [HttpPost("Validate")]
+        [HttpGet("Validate")]
         public async Task<JsonResult> Validate([FromBody] CheckContactExistenceRequest request)
         {
             var result = await _identityServiceWrapper.CheckContactExistence(request);
             return new JsonResult(result);
         }
         
-        [HttpPost("Create")]
+        [HttpPost]
         public async Task<JsonResult> Create([FromBody] CreateContactRequest request)
         {
             var result = await _identityServiceWrapper.CreateContact(request);
             return new JsonResult(result);
         }
         
-        [HttpPost("Update")]
-        public async Task<JsonResult> Update([FromBody] UpdateContactRequest request)
+        [HttpPatch]
+        public async Task<JsonResult> Update([FromBody] UpdateContactRequest request, Guid guid)
         {
+            request.Guid = guid;
             var result = await _identityServiceWrapper.UpdateContact(request);
             return new JsonResult(result);
         }
 
-        [HttpPost("Delete")]
-        public async Task<JsonResult> Delete([FromBody] DeleteContactRequest request)
+        [HttpDelete]
+        public async Task<JsonResult> Delete(Guid guid)
         {
+            var request = new DeleteContactRequest() { Guid = guid};
             var result = await _identityServiceWrapper.DeleteContact(request);
             return new JsonResult(result);
         }

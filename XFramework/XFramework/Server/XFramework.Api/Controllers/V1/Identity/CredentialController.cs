@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace XFramework.Api.Controllers.V1.Identity
 {
     [Authorize]
+    [Route("Api/v{version:apiVersion}/Identity/[controller]")]
     [Route("Api/Identity/[controller]")]
     [ApiController]
     [ApiVersion("1.0")]

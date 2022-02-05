@@ -1,15 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblUserBusinessPackage
     {
         public TblUserBusinessPackage()
         {
-            TblUserMapUplineUsers = new HashSet<TblUserMap>();
+            TblUserBusinessPackageUpgradeTransactions = new HashSet<TblUserBusinessPackageUpgradeTransaction>();
+            TblUserCommissionDeductionRequests = new HashSet<TblUserCommissionDeductionRequest>();
         }
 
         public long Id { get; set; }
@@ -29,12 +28,16 @@ namespace Wallets.Domain.DataTransferObjects
         public long? RecipientAuthId { get; set; }
         public string CodeString { get; set; }
         public long? ConsumedBy { get; set; }
+        public int? PackageType { get; set; }
+        public string CodeHash { get; set; }
+        public string Remarks { get; set; }
 
         public virtual TblIdentityCredential ConsumedByNavigation { get; set; }
         public virtual TblIdentityCredential RecipientAuth { get; set; }
         public virtual TblIdentityCredential UserAuth { get; set; }
         public virtual TblUserDepositRequest UserDepositRequest { get; set; }
-        public virtual TblUserMap TblUserMapIdNavigation { get; set; }
-        public virtual ICollection<TblUserMap> TblUserMapUplineUsers { get; set; }
+        public virtual TblUserMap TblUserMap { get; set; }
+        public virtual ICollection<TblUserBusinessPackageUpgradeTransaction> TblUserBusinessPackageUpgradeTransactions { get; set; }
+        public virtual ICollection<TblUserCommissionDeductionRequest> TblUserCommissionDeductionRequests { get; set; }
     }
 }

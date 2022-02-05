@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblAddressCity
@@ -18,6 +16,9 @@ namespace Wallets.Domain.DataTransferObjects
         public string Description { get; set; }
         public long ProvCode { get; set; }
         public long Code { get; set; }
+        public int? RegCode { get; set; }
+        public DateTime? CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
         public virtual TblAddressProvince ProvCodeNavigation { get; set; }
         public virtual ICollection<TblAddressBarangay> TblAddressBarangays { get; set; }

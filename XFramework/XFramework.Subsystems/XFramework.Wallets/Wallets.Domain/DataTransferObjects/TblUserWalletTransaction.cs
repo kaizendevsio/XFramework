@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblUserWalletTransaction
@@ -21,6 +19,7 @@ namespace Wallets.Domain.DataTransferObjects
         public decimal? RunningBalance { get; set; }
         public string Description { get; set; }
         public long? TargetUserWalletId { get; set; }
+        public decimal? PreviousBalance { get; set; }
 
         public virtual TblUserWallet SourceUserWallet { get; set; }
         public virtual TblUserWallet TargetUserWallet { get; set; }

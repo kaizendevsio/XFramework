@@ -1,6 +1,4 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Contacts;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
+﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Contacts;
 
 namespace IdentityServer.Api.SignalR.Handlers;
 

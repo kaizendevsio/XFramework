@@ -449,7 +449,8 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.Property(e => e.Guid)
                     .IsRequired()
-                    .HasColumnType("character varying");
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.UcentitiesId).HasColumnName("UCEntitiesID");
 
@@ -571,6 +572,10 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
 
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
                 entity.Property(e => e.RoleEntityId).HasColumnName("RoleEntityID");
 
                 entity.Property(e => e.UserCredId).HasColumnName("UserCredID");
@@ -596,6 +601,10 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasMaxLength(100);
             });

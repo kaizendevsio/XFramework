@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblIdentityRoleEntity
@@ -21,6 +19,7 @@ namespace Wallets.Domain.DataTransferObjects
         public bool IsDeleted { get; set; }
         public string Name { get; set; }
         public short? RoleLevel { get; set; }
+        public string Guid { get; set; }
 
         public virtual ICollection<TblIdentityRole> TblIdentityRoles { get; set; }
     }

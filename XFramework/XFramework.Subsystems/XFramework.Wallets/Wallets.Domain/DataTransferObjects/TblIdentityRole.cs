@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblIdentityRole
@@ -22,6 +20,7 @@ namespace Wallets.Domain.DataTransferObjects
         public long? UserCredId { get; set; }
         public long? RoleEntityId { get; set; }
         public DateTime RoleExpiration { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblIdentityRoleEntity RoleEntity { get; set; }
         public virtual TblIdentityCredential UserCred { get; set; }

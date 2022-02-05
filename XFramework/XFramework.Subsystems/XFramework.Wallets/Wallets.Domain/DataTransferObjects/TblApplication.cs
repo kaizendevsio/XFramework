@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblApplication
@@ -12,12 +10,13 @@ namespace Wallets.Domain.DataTransferObjects
             TblConfigurations = new HashSet<TblConfiguration>();
             TblIdentityCredentials = new HashSet<TblIdentityCredential>();
             TblLogs = new HashSet<TblLog>();
+            TblWalletEntities = new HashSet<TblWalletEntity>();
         }
 
         public long Id { get; set; }
         public string AppName { get; set; }
         public string Description { get; set; }
-        public string Uid { get; set; }
+        public string Guid { get; set; }
         public short? Status { get; set; }
         public DateTime? Expiration { get; set; }
         public DateTime? AvailabilityDate { get; set; }
@@ -30,5 +29,6 @@ namespace Wallets.Domain.DataTransferObjects
         public virtual ICollection<TblConfiguration> TblConfigurations { get; set; }
         public virtual ICollection<TblIdentityCredential> TblIdentityCredentials { get; set; }
         public virtual ICollection<TblLog> TblLogs { get; set; }
+        public virtual ICollection<TblWalletEntity> TblWalletEntities { get; set; }
     }
 }

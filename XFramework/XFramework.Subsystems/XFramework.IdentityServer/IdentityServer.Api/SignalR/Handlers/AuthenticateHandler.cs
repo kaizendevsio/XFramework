@@ -1,5 +1,4 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
-using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 
 namespace IdentityServer.Api.SignalR.Handlers;
 

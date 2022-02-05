@@ -12,8 +12,10 @@ namespace XFramework.Integration.Interfaces.Wrappers
         public Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request);
         public Task<CmdResponseBO> ChangePassword(UpdatePasswordRequest request);
         
-        public Task<QueryResponseBO<List<IdentityCredentialResponse>>> GetIdentityRoleList(GetIdentityRoleListRequest request);
-        public Task<QueryResponseBO<List<IdentityRoleEntityResponse>>> GetRoleEntityList(GetRoleEntityListRequest request);
+        public Task<QueryResponseBO<IdentityRoleResponse>> GetIdentityRole(GetIdentityRoleRequest request);
+        public Task<QueryResponseBO<List<IdentityRoleResponse>>> GetIdentityRoleList(GetIdentityRoleListRequest request);
+        public Task<QueryResponseBO<RoleEntityResponse>> GetRoleEntity(GetRoleEntityRequest request);
+        public Task<QueryResponseBO<List<RoleEntityResponse>>> GetRoleEntityList(GetRoleEntityListRequest request);
         
         public Task<QueryResponseBO<IdentityInfoResponse>> GetIdentity(GetIdentityRequest request);
         public Task<QueryResponseBO<ExistenceResponse>> CheckIdentityExistence(CheckIdentityExistenceRequest request);

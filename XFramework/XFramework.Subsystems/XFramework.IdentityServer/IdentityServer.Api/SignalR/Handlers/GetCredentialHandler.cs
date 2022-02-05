@@ -1,7 +1,4 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
-
-namespace IdentityServer.Api.SignalR.Handlers;
+﻿namespace IdentityServer.Api.SignalR.Handlers;
 
 public class GetCredentialHandler : BaseSignalRHandler, ISignalREventHandler
 {

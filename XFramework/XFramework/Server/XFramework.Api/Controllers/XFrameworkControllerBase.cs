@@ -14,28 +14,31 @@ namespace XFramework.Api.Controllers
         public TResponse AsApiRequest<TResponse, TRequest> (TResponse request)
         {
             var response = request.Adapt<TResponse>();
-            string cuid = User.FindFirstValue(ClaimTypes.Name);
+            string credentialGuid = User.FindFirstValue(ClaimTypes.Name);
 
-            var propertyInfo = response.GetType().GetProperty("Cuid");
+            var propertyInfo = response.GetType().GetProperty("CredentialGuid");
             if (propertyInfo is not null)
             {
-                propertyInfo.SetValue(response,cuid);
+                propertyInfo.SetValue(response,credentialGuid);
             }
 
             return response;
         }
 
-        public TResponse ValidateIdentityElevation<TResponse>(TResponse request)
+        public TResponse InjectAuthorization<TResponse>(TResponse request)
         {
-            var cuid = User.FindFirstValue(ClaimTypes.Name);
+            var credentialGuid = User.FindFirstValue(ClaimTypes.Name);
             var roleString = User.FindFirstValue(ClaimTypes.Role);
             var roleList = JsonSerializer.Deserialize<List<RoleEntity>>(roleString);
 
             if (roleList.Any(i => i == RoleEntity.Administrator)) return request;
             
-            var propertyInfo = request.GetType().GetProperty("Cuid");
-            propertyInfo?.SetValue(request, cuid);
-
+            var propertyInfo = request.GetType().GetProperty("CredentialGuid");
+            var requestValue = propertyInfo.GetValue(request);
+            if (string.IsNullOrEmpty($"{requestValue}"))
+            {
+                propertyInfo?.SetValue(request, credentialGuid);
+            }
             return request;
         }
         

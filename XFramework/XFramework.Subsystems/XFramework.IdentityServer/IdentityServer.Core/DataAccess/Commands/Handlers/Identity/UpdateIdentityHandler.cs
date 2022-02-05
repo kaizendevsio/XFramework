@@ -9,7 +9,6 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
     public async Task<CmdResponseBO<UpdateIdentityCmd>> Handle(UpdateIdentityCmd request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
-
         if (entity == null)
         {
             return new CmdResponseBO<UpdateIdentityCmd>
@@ -18,6 +17,7 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
+        
         entity = request.Adapt(entity);
         _dataLayer.Update(entity);
         await _dataLayer.SaveChangesAsync(cancellationToken);

@@ -1,4 +1,4 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credential;
+﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;

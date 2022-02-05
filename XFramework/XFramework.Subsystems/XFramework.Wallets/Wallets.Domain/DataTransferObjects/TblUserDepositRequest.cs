@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblUserDepositRequest
@@ -27,9 +25,15 @@ namespace Wallets.Domain.DataTransferObjects
         public string Remarks { get; set; }
         public short? DepositStatus { get; set; }
         public DateTime? ExpiryDate { get; set; }
-        public string RawData { get; set; }
+        public string RawRequestData { get; set; }
         public string ReferenceNo { get; set; }
         public string RawResponseData { get; set; }
+        public string TempCredentialUid { get; set; }
+        public decimal? Discount { get; set; }
+        public decimal? ConvenienceFee { get; set; }
+        public decimal? SystemFee { get; set; }
+        public int? DiscountType { get; set; }
+        public long? GatewayId { get; set; }
 
         public virtual TblCurrencyEntity SourceCurrency { get; set; }
         public virtual TblWalletEntity TargetWalletType { get; set; }

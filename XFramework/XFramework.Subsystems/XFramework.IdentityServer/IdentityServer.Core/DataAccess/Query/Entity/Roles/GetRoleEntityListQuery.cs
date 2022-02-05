@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Roles;
 
-public class GetRoleEntityListQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<IdentityRoleEntityResponse>>>
+public class GetRoleEntityListQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<RoleEntityResponse>>>
 {
         
 }

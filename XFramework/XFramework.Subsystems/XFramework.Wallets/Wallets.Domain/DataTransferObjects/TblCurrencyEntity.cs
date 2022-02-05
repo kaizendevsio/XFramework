@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblCurrencyEntity
@@ -26,6 +24,7 @@ namespace Wallets.Domain.DataTransferObjects
         public string CurrencyIsoCode3 { get; set; }
         public string Description { get; set; }
         public short? CurrencyType { get; set; }
+        public string Guid { get; set; }
 
         public virtual ICollection<TblAddressCountry> TblAddressCountries { get; set; }
         public virtual ICollection<TblExchangeRate> TblExchangeRateSourceCurrencyEntities { get; set; }

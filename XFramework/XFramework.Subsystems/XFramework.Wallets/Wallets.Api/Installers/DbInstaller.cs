@@ -5,14 +5,13 @@ using Wallets.Core.DataAccess;
 using Wallets.Core.Interfaces;
 using Wallets.Domain.DataTransferObjects;
 
-namespace Wallets.Api.Installers
+namespace Wallets.Api.Installers;
+
+public class DbInstaller : IInstaller
 {
-    public class DbInstaller : IInstaller
+    public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
-        {
-            services.AddDbContext<XFrameworkContext>(options => options.UseNpgsql(configuration.GetConnectionString("DatabaseConnection")));
-            services.AddTransient<IDataLayer, DataLayer>();
-        }
+        services.AddDbContext<XnelSystemsContext>(options => options.UseNpgsql(configuration.GetConnectionString("DatabaseConnection")));
+        services.AddTransient<IDataLayer, DataLayer>();
     }
 }

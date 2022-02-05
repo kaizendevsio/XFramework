@@ -9,6 +9,7 @@ using XFramework.Domain.Generic.Contracts.Requests.Create;
 
 namespace XFramework.Api.Controllers.V1.Identity
 {
+    [Route("Api/v{version:apiVersion}/[controller]")]
     [Route("Api/[controller]")]
     [ApiController]
     [ApiVersion("1.0")]

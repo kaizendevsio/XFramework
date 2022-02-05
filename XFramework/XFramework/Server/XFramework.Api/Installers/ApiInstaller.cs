@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using XFramework.Api.Options;
+using XFramework.Domain.Generic.Configurations;
 
 namespace XFramework.Api.Installers
 {
@@ -21,6 +22,13 @@ namespace XFramework.Api.Installers
             {
                 o.AssumeDefaultVersionWhenUnspecified = true;
                 o.DefaultApiVersion = new ApiVersion(1, 0);
+                o.ReportApiVersions = true;
+            });
+
+            services.AddVersionedApiExplorer(setup =>
+            {
+                setup.GroupNameFormat = "'v'VVV";
+                setup.SubstituteApiVersionInUrl = true;
             });
 
             // Install JWT Authentication
@@ -51,30 +59,8 @@ namespace XFramework.Api.Installers
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
             
             // Swagger
-            services.AddSwaggerGen(c =>
-            {
-                c.SwaggerDoc($"v{configuration.GetValue<string>("SwaggerOptions:Version")}", new OpenApiInfo {Title = $"{configuration.GetValue<string>("SwaggerOptions:Title")}", Version = $"v{configuration.GetValue<string>("SwaggerOptions:Version")}"});
-                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
-                {
-                    Name = "Authorization",
-                    Type = SecuritySchemeType.ApiKey,
-                    Scheme = "Bearer",
-                    BearerFormat = "JWT",
-                    In = ParameterLocation.Header,
-                    Description = "Enter 'Bearer' [space] and then your valid token in the text input below.\r\n\r\nExample: \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\""
-                });
-                
-                c.AddSecurityRequirement(new OpenApiSecurityRequirement{ 
-                    {
-                        new OpenApiSecurityScheme{
-                            Reference = new OpenApiReference{
-                                Id = "Bearer", //The name of the previously defined security scheme.
-                                Type = ReferenceType.SecurityScheme
-                            }
-                        },new List<string>()
-                    }
-                });
-            });
+            services.AddSwaggerGen();
+            services.ConfigureOptions<SwaggerOptionsConfiguration>();
         }
     }
 }

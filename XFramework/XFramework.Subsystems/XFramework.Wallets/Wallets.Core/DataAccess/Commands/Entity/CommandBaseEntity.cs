@@ -1,9 +1,6 @@
-﻿using XFramework.Domain.Generic.BusinessObjects;
+﻿namespace Wallets.Core.DataAccess.Commands.Entity;
 
-namespace Wallets.Core.DataAccess.Commands.Entity
+public class CommandBaseEntity
 {
-    public class CommandBaseEntity
-    {
-        public RequestServerBO RequestServer { get; set; }
-    }
+    public RequestServerBO RequestServer { get; set; }
 }

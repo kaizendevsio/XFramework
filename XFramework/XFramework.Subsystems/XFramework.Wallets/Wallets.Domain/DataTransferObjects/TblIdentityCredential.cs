@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblIdentityCredential
@@ -14,12 +12,15 @@ namespace Wallets.Domain.DataTransferObjects
             TblIdentityRoles = new HashSet<TblIdentityRole>();
             TblIdentityVerifications = new HashSet<TblIdentityVerification>();
             TblSessionData = new HashSet<TblSessionDatum>();
+            TblUserBillsPaymentTransactions = new HashSet<TblUserBillsPaymentTransaction>();
             TblUserBusinessPackageConsumedByNavigations = new HashSet<TblUserBusinessPackage>();
             TblUserBusinessPackageRecipientAuths = new HashSet<TblUserBusinessPackage>();
+            TblUserBusinessPackageUpgradeTransactions = new HashSet<TblUserBusinessPackageUpgradeTransaction>();
             TblUserBusinessPackageUserAuths = new HashSet<TblUserBusinessPackage>();
+            TblUserBusinessTypes = new HashSet<TblUserBusinessType>();
             TblUserDepositRequests = new HashSet<TblUserDepositRequest>();
+            TblUserFavorites = new HashSet<TblUserFavorite>();
             TblUserIncomeTransactions = new HashSet<TblUserIncomeTransaction>();
-            TblUserMaps = new HashSet<TblUserMap>();
             TblUserWalletAddresses = new HashSet<TblUserWalletAddress>();
             TblUserWalletTransactions = new HashSet<TblUserWalletTransaction>();
             TblUserWallets = new HashSet<TblUserWallet>();
@@ -40,7 +41,7 @@ namespace Wallets.Domain.DataTransferObjects
         public byte[] PasswordByte { get; set; }
         public long ApplicationId { get; set; }
         public string Token { get; set; }
-        public string Cuid { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblApplication Application { get; set; }
         public virtual TblIdentityInformation IdentityInfo { get; set; }
@@ -49,12 +50,15 @@ namespace Wallets.Domain.DataTransferObjects
         public virtual ICollection<TblIdentityRole> TblIdentityRoles { get; set; }
         public virtual ICollection<TblIdentityVerification> TblIdentityVerifications { get; set; }
         public virtual ICollection<TblSessionDatum> TblSessionData { get; set; }
+        public virtual ICollection<TblUserBillsPaymentTransaction> TblUserBillsPaymentTransactions { get; set; }
         public virtual ICollection<TblUserBusinessPackage> TblUserBusinessPackageConsumedByNavigations { get; set; }
         public virtual ICollection<TblUserBusinessPackage> TblUserBusinessPackageRecipientAuths { get; set; }
+        public virtual ICollection<TblUserBusinessPackageUpgradeTransaction> TblUserBusinessPackageUpgradeTransactions { get; set; }
         public virtual ICollection<TblUserBusinessPackage> TblUserBusinessPackageUserAuths { get; set; }
+        public virtual ICollection<TblUserBusinessType> TblUserBusinessTypes { get; set; }
         public virtual ICollection<TblUserDepositRequest> TblUserDepositRequests { get; set; }
+        public virtual ICollection<TblUserFavorite> TblUserFavorites { get; set; }
         public virtual ICollection<TblUserIncomeTransaction> TblUserIncomeTransactions { get; set; }
-        public virtual ICollection<TblUserMap> TblUserMaps { get; set; }
         public virtual ICollection<TblUserWalletAddress> TblUserWalletAddresses { get; set; }
         public virtual ICollection<TblUserWalletTransaction> TblUserWalletTransactions { get; set; }
         public virtual ICollection<TblUserWallet> TblUserWallets { get; set; }

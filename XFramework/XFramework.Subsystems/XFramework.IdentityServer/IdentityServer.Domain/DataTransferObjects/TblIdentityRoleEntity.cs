@@ -19,6 +19,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public bool IsDeleted { get; set; }
         public string Name { get; set; }
         public short? RoleLevel { get; set; }
+        public string Guid { get; set; }
 
         public virtual ICollection<TblIdentityRole> TblIdentityRoles { get; set; }
     }

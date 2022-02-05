@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 
-#nullable disable
-
 namespace Wallets.Domain.DataTransferObjects
 {
     public partial class TblConfiguration
@@ -14,7 +12,10 @@ namespace Wallets.Domain.DataTransferObjects
         public DateTime? CreatedAt { get; set; }
         public DateTime? ModifiedAt { get; set; }
         public bool IsDeleted { get; set; }
+        public long? GroupId { get; set; }
+        public string Unit { get; set; }
 
         public virtual TblApplication Application { get; set; }
+        public virtual TblConfigurationGroup Group { get; set; }
     }
 }

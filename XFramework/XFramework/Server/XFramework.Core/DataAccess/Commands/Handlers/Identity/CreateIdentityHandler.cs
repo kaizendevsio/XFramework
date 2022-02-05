@@ -102,29 +102,7 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
             {
                 return response4.Adapt<CmdResponseBO>();
             }
-            
-            // TODO: Temporary Code, for refactor
-            var lmwWallet = await WalletServiceWrapper.GetWallet(new() {Code = "LMW"});
-            await WalletServiceWrapper.CreateIdentityWallet(new()
-            {
-                Balance = 0m,
-                WalletTypeId = lmwWallet.Response?.Id
-            });
-            
-            var imwWallet = await WalletServiceWrapper.GetWallet(new() {Code = "IMW"});
-            await WalletServiceWrapper.CreateIdentityWallet(new()
-            {
-                Balance = 0m,
-                WalletTypeId = imwWallet.Response?.Id
-            });
-            
-            var ldwWallet = await WalletServiceWrapper.GetWallet(new() {Code = "LDW"});
-            await WalletServiceWrapper.CreateIdentityWallet(new()
-            {
-                Balance = 0m,
-                WalletTypeId = ldwWallet.Response?.Id
-            });
-            
+
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted
