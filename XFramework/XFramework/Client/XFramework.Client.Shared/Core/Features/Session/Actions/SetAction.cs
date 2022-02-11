@@ -1,6 +1,6 @@
-﻿
+﻿// ReSharper disable once CheckNamespace
+using XFramework.Domain.Generic.Contracts.Responses;
 
-// ReSharper disable once CheckNamespace
 namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState

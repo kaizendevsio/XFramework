@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity;
 
-public class GetAllIdentityQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<IdentityInfoResponse>>>
+public class GetAllIdentityQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<IdentityResponse>>>
 {
         
 }

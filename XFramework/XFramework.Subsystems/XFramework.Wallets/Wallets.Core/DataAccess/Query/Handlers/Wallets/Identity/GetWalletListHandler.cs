@@ -26,11 +26,9 @@ public class GetWalletListHandler : QueryBaseHandler, IRequestHandler<GetWalletL
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-
                     
         var result = await _dataLayer.TblUserWallets
             .Where(i => i.UserAuthId == credential.Id)
-            .Take(1000)
             .AsNoTracking()
             .ToListAsync(cancellationToken: cancellationToken);
         if (!result.Any())

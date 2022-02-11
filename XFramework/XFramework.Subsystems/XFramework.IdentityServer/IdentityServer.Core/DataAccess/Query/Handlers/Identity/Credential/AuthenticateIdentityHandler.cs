@@ -1,4 +1,5 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
+﻿using System.Diagnostics;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
@@ -47,6 +48,8 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         var token = await _jwtService.GenerateToken(request.Username, cuid, roleList.Select(i => i.RoleEntityId).Adapt<List<RoleEntity>>());
         _recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
             
+        
+        
         return new()
         {
             Message = $"Identity Authorized",
@@ -57,7 +60,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                 RefreshToken = token.RefreshToken,
                 IdentityGuid = Guid.Parse(credential.IdentityInfo.Guid),
                 CredentialGuid = Guid.Parse(credential.Guid),
-                RoleList = roleList.Adapt<List<IdentityRoleResponse>>() 
+                RoleList = roleList.Adapt<List<RoleResponse>>() 
             }
         };
     }
@@ -86,9 +89,15 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         switch (authorizeBy)
         {
             case AuthorizeBy.Default:
+                var application = await GetApplication(request.RequestServer.ApplicationId);
+                
                 var getDefaults = await _dataLayer.TblConfigurations
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(i => i.ApplicationId == request.RequestServer.ApplicationId & i.Key == "DefaultAuthorizeBy", cancellationToken: cancellationToken);
+                    .FirstOrDefaultAsync(i => i.ApplicationId == application.Id & i.Key == "DefaultAuthorizeBy", cancellationToken: cancellationToken);
+                if (getDefaults is null)
+                {
+                    throw new ArgumentException($"Unable to login: Application with Guid '{application.Guid}' does not have 'DefaultAuthorizeBy' key in registry");
+                }
                 authorizeBy = (AuthorizeBy) int.Parse(getDefaults.Value);
                 goto reAuth;
             case AuthorizeBy.UsernameEmailPhone:
@@ -147,11 +156,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
     private async Task<TblIdentityCredential> ValidatePassword(AuthenticateCredentialQuery request, AuthorizeBy authorizeBy, TblIdentityCredential credential, CancellationToken cancellationToken)
     {
         if (authorizeBy == AuthorizeBy.Token) return credential;
-            
-        credential = await _dataLayer.TblIdentityCredentials
-            .Include(i => i.IdentityInfo)
-            .FirstOrDefaultAsync(i => i.Id == credential.Id, cancellationToken: cancellationToken);
-            
+
         var hashPassword = Encoding.ASCII.GetString(credential.PasswordByte);
         return !BCrypt.Net.BCrypt.Verify(request.Password, hashPassword) ? null : credential;
     }
@@ -171,5 +176,5 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         });
     }
         
-      
+    
 }

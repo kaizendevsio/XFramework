@@ -1,6 +1,6 @@
 ﻿namespace IdentityServer.Domain.Generic.Contracts.Responses;
 
-public class IdentityInfoResponse
+public class IdentityResponse
 {
     public Guid? Guid { get; set; }
     public DateTime CreatedAt { get; set; }

@@ -11,8 +11,8 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
         var entity = request.Adapt<TblIdentityInformation>();
         entity.Guid = string.IsNullOrEmpty(entity.Guid) 
             ? Guid.NewGuid().ToString() 
-            : entity.Guid;
-        entity.BirthDate = request.Dob;
+            : $"{request.Guid}";
+        entity.BirthDate = DateOnly.FromDateTime(request.Dob);
             
         await _dataLayer.TblIdentityInformations.AddAsync(entity, cancellationToken);
         await _dataLayer.SaveChangesAsync(cancellationToken);

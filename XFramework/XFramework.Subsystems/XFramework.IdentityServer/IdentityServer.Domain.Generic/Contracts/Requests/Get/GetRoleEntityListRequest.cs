@@ -4,5 +4,5 @@ namespace IdentityServer.Domain.Generic.Contracts.Requests.Get;
 
 public class GetRoleEntityListRequest : RequestBase
 {
-        
+    public Guid? ApplicationGuid { get; set; }
 }

@@ -20,7 +20,9 @@ namespace IdentityServer.Domain.DataTransferObjects
         public string Name { get; set; }
         public short? RoleLevel { get; set; }
         public string Guid { get; set; }
+        public long ApplicationId { get; set; }
 
+        public virtual TblApplication Application { get; set; }
         public virtual ICollection<TblIdentityRole> TblIdentityRoles { get; set; }
     }
 }

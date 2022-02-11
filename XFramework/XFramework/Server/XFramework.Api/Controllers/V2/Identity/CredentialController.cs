@@ -2,7 +2,7 @@
 
 namespace XFramework.Api.Controllers.V2.Identity
 {
-    [Authorize]
+    /*[Authorize]*/
     [Route("Api/v{version:apiVersion}/Identity/[controller]")]
     [ApiController]
     [ApiVersion("2.0")]
@@ -24,8 +24,9 @@ namespace XFramework.Api.Controllers.V2.Identity
         }
         
         [HttpGet("List")]
-        public async Task<JsonResult> List([FromBody] GetIdentityCredentialListRequest request)
+        public async Task<JsonResult> List(Guid? applicationGuid)
         {
+            var request = new GetCredentialListRequest(){ApplicationGuid = applicationGuid};
             var result = await _identityServiceWrapper.GetCredentialList(request);
             return new JsonResult(result);
         }

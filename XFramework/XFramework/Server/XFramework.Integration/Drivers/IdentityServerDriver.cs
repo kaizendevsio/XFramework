@@ -14,9 +14,9 @@
             return await SendAsync<AuthenticateCredentialRequest, AuthorizeIdentityResponse>("Authenticate", request);
         }
 
-        public async Task<QueryResponseBO<IdentityCredentialResponse>> GetCredential(GetCredentialRequest request)
+        public async Task<QueryResponseBO<CredentialResponse>> GetCredential(GetCredentialRequest request)
         {
-            return await SendAsync<GetCredentialRequest, IdentityCredentialResponse>("GetCredential", request);
+            return await SendAsync<GetCredentialRequest, CredentialResponse>("GetCredential", request);
         }
 
         public async Task<CmdResponseBO> CreateCredential(CreateCredentialRequest request)
@@ -39,9 +39,9 @@
             return await SendVoidAsync<UpdatePasswordRequest, CmdResponseBO>("ChangePassword", request);
         }
 
-        public async Task<QueryResponseBO<IdentityRoleResponse>> GetIdentityRole(GetIdentityRoleRequest request)
+        public async Task<QueryResponseBO<RoleResponse>> GetRole(GetRoleRequest request)
         {
-            return await SendAsync<GetIdentityRoleRequest, IdentityRoleResponse>("GetIdentityRole", request);
+            return await SendAsync<GetRoleRequest, RoleResponse>("GetRole", request);
         }
 
         public async Task<QueryResponseBO<ExistenceResponse>> CheckCredentialExistence(CheckCredentialExistenceRequest request)
@@ -54,19 +54,24 @@
             return await SendAsync<CheckIdentityExistenceRequest, ExistenceResponse>("CheckIdentityExistence", request);
         }
 
-        public async Task<QueryResponseBO<IdentityInfoResponse>> GetIdentity(GetIdentityRequest request)
+        public async Task<QueryResponseBO<IdentityResponse>> GetIdentity(GetIdentityRequest request)
         {
-            return await SendAsync<GetIdentityRequest, IdentityInfoResponse>("GetIdentity", request);
+            return await SendAsync<GetIdentityRequest, IdentityResponse>("GetIdentity", request);
         }
 
-        public async Task<QueryResponseBO<List<IdentityCredentialResponse>>> GetCredentialList(GetIdentityCredentialListRequest request)
+        public async Task<QueryResponseBO<List<CredentialResponse>>> LegacyGetCredentialList(GetCredentialListRequest request)
         {
-            return await SendAsync<GetIdentityCredentialListRequest, List<IdentityCredentialResponse>>("GetIdentityCredentialList", request);
+            return await SendAsync<GetCredentialListRequest, List<CredentialResponse>>("LegacyGetCredentialList", request);
         }
 
-        public async Task<QueryResponseBO<List<IdentityRoleResponse>>> GetIdentityRoleList(GetIdentityRoleListRequest request)
+        public async Task<QueryResponseBO<List<CredentialResponse>>> GetCredentialList(GetCredentialListRequest request)
         {
-            return await SendAsync<GetIdentityRoleListRequest, List<IdentityRoleResponse>>("GetIdentityRoleList", request);
+            return await SendAsync<GetCredentialListRequest, List<CredentialResponse>>("GetCredentialList", request);
+        }
+
+        public async Task<QueryResponseBO<List<RoleResponse>>> GetRoleList(GetRoleListRequest request)
+        {
+            return await SendAsync<GetRoleListRequest, List<RoleResponse>>("GetRoleList", request);
         }
 
         public async Task<QueryResponseBO<RoleEntityResponse>> GetRoleEntity(GetRoleEntityRequest request)
@@ -94,9 +99,14 @@
             return await SendVoidAsync<DeleteIdentityRequest, CmdResponseBO>("DeleteIdentity", request);
         }
 
-        public async Task<QueryResponseBO<IdentityContactResponse>> GetContact(GetContactRequest request)
+        public async Task<QueryResponseBO<ContactResponse>> GetContact(GetContactRequest request)
         {
-            return await SendAsync<GetContactRequest, IdentityContactResponse>("GetContact", request);
+            return await SendAsync<GetContactRequest, ContactResponse>("GetContact", request);
+        }
+
+        public async Task<QueryResponseBO<List<ContactResponse>>> GetContactList(GetContactListRequest request)
+        {
+            return await SendAsync<GetContactListRequest, List<ContactResponse>>("GetContactList", request);
         }
 
         public async Task<CmdResponseBO> CreateContact(CreateContactRequest request)

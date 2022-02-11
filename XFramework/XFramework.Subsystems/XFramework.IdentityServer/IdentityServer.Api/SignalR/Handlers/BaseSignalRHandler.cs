@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Enums;
@@ -7,7 +8,7 @@ namespace IdentityServer.Api.SignalR.Handlers;
 
 public class BaseSignalRHandler
 {
-    public StopWatchHelper StopWatch { get; set; } = new();
+    public Stopwatch Stopwatch { get; set; } = new();
 
     public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, StreamFlowTelemetryBO telemetry, TResult data)
     {
@@ -30,20 +31,22 @@ public class BaseSignalRHandler
             {
                 Task.Run(async () =>
                 {
-                    StopWatch.Start();
+                    Stopwatch.Restart();
                     try
                     {
                         var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
 
                         var r = data.AsMediatorCmd<TRequest, TQuery>();
                         var result = await mediator.Send(r).ConfigureAwait(false);
-                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.GetType().GetProperty("HttpStatusCode")?.GetValue(result)}");
-
+                        Stopwatch.Stop();
+                        Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.GetType().GetProperty("HttpStatusCode")?.GetValue(result)} in {Stopwatch.ElapsedMilliseconds}ms");
+                        
                         await RespondToInvoke(connection, telemetry, result);
                     }
                     catch (Exception e)
                     {
-                        StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}]");
+                        Stopwatch.Stop();
+                        Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}] in {Stopwatch.ElapsedMilliseconds}ms");
                     }
                 });
             });

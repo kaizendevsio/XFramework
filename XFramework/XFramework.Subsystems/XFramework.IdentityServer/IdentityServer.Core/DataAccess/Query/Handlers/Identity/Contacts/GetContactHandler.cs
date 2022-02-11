@@ -3,14 +3,14 @@ using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Contacts;
 
-public class GetContactHandler : QueryBaseHandler ,IRequestHandler<GetContactQuery, QueryResponse<IdentityContactResponse>>
+public class GetContactHandler : QueryBaseHandler ,IRequestHandler<GetContactQuery, QueryResponse<ContactResponse>>
 {
     public GetContactHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<QueryResponse<IdentityContactResponse>> Handle(GetContactQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<ContactResponse>> Handle(GetContactQuery request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblIdentityContacts
             .Include( i => i.Ucentities)
@@ -30,7 +30,7 @@ public class GetContactHandler : QueryBaseHandler ,IRequestHandler<GetContactQue
         return new ()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            Response = entity.Adapt<IdentityContactResponse>()
+            Response = entity.Adapt<ContactResponse>()
         };
     }
 }

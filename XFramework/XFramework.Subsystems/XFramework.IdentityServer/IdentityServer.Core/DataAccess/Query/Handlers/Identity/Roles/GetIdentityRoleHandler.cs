@@ -3,14 +3,14 @@ using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Roles;
 
-public class GetIdentityRoleHandler : QueryBaseHandler, IRequestHandler<GetIdentityRoleQuery, QueryResponseBO<IdentityRoleResponse>>
+public class GetIdentityRoleHandler : QueryBaseHandler, IRequestHandler<GetRoleQuery, QueryResponseBO<RoleResponse>>
 {
     public GetIdentityRoleHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<QueryResponseBO<IdentityRoleResponse>> Handle(GetIdentityRoleQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponseBO<RoleResponse>> Handle(GetRoleQuery request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblIdentityCredentials
             .Include( i => i.IdentityInfo)
@@ -30,7 +30,7 @@ public class GetIdentityRoleHandler : QueryBaseHandler, IRequestHandler<GetIdent
         return new ()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            Response = entity.Adapt<IdentityRoleResponse>()
+            Response = entity.Adapt<RoleResponse>()
         };
     }
 }

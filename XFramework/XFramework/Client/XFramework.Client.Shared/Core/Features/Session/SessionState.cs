@@ -1,4 +1,6 @@
 ﻿
+using XFramework.Domain.Generic.Contracts.Responses;
+
 namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState : State<SessionState>

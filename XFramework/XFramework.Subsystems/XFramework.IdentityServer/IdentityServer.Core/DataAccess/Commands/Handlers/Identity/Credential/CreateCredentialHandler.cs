@@ -9,7 +9,8 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
     }
     public async Task<CmdResponseBO<CreateCredentialCmd>> Handle(CreateCredentialCmd request, CancellationToken cancellationToken)
     {
-        var identityInfo = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        var application = await GetApplication(request.RequestServer.ApplicationId);
+        var identityInfo = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.IdentityGuid}", cancellationToken: cancellationToken);
         var entity = request.Adapt<TblIdentityCredential>();
             
         if (identityInfo == null)
@@ -38,19 +39,19 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
         entity.Guid = request.Guid != null ? request.Guid.ToString() : Guid.NewGuid().ToString();
         entity.PasswordByte = hashPasswordByte;
         entity.IdentityInfoId = identityInfo.Id;
-        entity.ApplicationId = request.RequestServer.ApplicationId;
+        entity.ApplicationId = application.Id;
 
         await _dataLayer.TblIdentityCredentials.AddAsync(entity, cancellationToken);
             
         var roleEntity = await _dataLayer.TblIdentityRoleEntities
             .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == (long)request.RoleEntity, cancellationToken: cancellationToken);
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.RoleEntity}", cancellationToken: cancellationToken);
 
         if (roleEntity == null)
         {
             return new ()
             {
-                Message = $"Role {request.RoleEntity} does not exist",
+                Message = $"Role with Guid '{request.RoleEntity}' does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }

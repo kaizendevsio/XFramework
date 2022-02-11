@@ -20,9 +20,9 @@ namespace XFramework.Api.Controllers.V1.Roles
         }
         
         [HttpPost("IdentityRoleList")]
-        public async Task<JsonResult> GetIdentityRoleList([FromBody] GetIdentityRoleListRequest request)
+        public async Task<JsonResult> GetIdentityRoleList([FromBody] GetRoleListRequest request)
         {
-            var result = await _identityServiceWrapper.GetIdentityRoleList(request);
+            var result = await _identityServiceWrapper.GetRoleList(request);
             return new JsonResult(result);
         }
         

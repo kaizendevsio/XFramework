@@ -1,5 +1,7 @@
 ﻿
 
+using XFramework.Domain.Generic.Contracts.Responses;
+
 namespace XFramework.Client.Shared.Core.Helpers;
 
 public class HttpClientHelper : IHttpClient
@@ -7,7 +9,7 @@ public class HttpClientHelper : IHttpClient
     public IStore Store { get; }
     private readonly HttpClient HttpClient;
     private SessionState SessionState => Store.GetState<SessionState>();
-    private AuthenticationResponse Authentication => SessionState.Authentication;
+    private AuthenticationResponse Authentication { get; set; }
     public JsonSerializerOptions JsonSerializerOptions { get; set; }
     
     public HttpClientHelper(HttpClient httpClient, IStore store)

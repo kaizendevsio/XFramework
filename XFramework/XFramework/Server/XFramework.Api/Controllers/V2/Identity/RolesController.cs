@@ -19,15 +19,15 @@ namespace XFramework.Api.Controllers.V2.Identity
         [HttpGet]
         public async Task<JsonResult> Get(Guid guid)
         {
-            var result = await _identityServiceWrapper.GetIdentityRole(new () { Guid = guid });
+            var result = await _identityServiceWrapper.GetRole(new () { Guid = guid });
             return new JsonResult(result);
         }
         
         [HttpGet("List")]
-        public async Task<JsonResult> GetList()
+        public async Task<JsonResult> GetList(Guid? credentialGuid)
         {
-            var request = new GetIdentityRoleListRequest();
-            var result = await _identityServiceWrapper.GetIdentityRoleList(request);
+            var request = new GetRoleListRequest(){CredentialGuid = credentialGuid};
+            var result = await _identityServiceWrapper.GetRoleList(InjectAuthorization(request));
             return new JsonResult(result);
         }
         

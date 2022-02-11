@@ -12,8 +12,18 @@ public class GetRoleEntityListHandler : QueryBaseHandler, IRequestHandler<GetRol
         
     public async Task<QueryResponseBO<List<RoleEntityResponse>>> Handle(GetRoleEntityListQuery request, CancellationToken cancellationToken)
     {
+        var appEntity = await _dataLayer.TblApplications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
+        if (appEntity == null)
+        {
+            return new ()
+            {
+                Message = $"Identity with Guid {request.ApplicationGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
         var result = await _dataLayer.TblIdentityRoleEntities
-            .Take(1000)
+            .Where(i => i.ApplicationId == appEntity.Id)
             .AsNoTracking()
             .ToListAsync(cancellationToken: cancellationToken);
             

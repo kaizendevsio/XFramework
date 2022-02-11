@@ -3,7 +3,6 @@ using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Roles;
 
-public class GetIdentityRoleQuery : GetIdentityRoleRequest, IRequest<QueryResponseBO<IdentityRoleResponse>>
+public class GetRoleListQuery : GetRoleListRequest, IRequest<QueryResponseBO<List<RoleResponse>>>
 {
-    
 }

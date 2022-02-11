@@ -1,6 +1,6 @@
 ﻿namespace IdentityServer.Domain.Generic.Contracts.Responses;
 
-public class IdentityContactResponse
+public class ContactResponse
 {
     public Guid? Guid { get; set; }
     public bool IsEnabled { get; set; }
@@ -13,5 +13,5 @@ public class IdentityContactResponse
     public string Value { get; set; }
     public Guid? CredentialGuid { get; set; }
 
-    public virtual IdentityContactEntityResponse Ucentities { get; set; }
+    public virtual ContactEntityResponse Ucentities { get; set; }
 }

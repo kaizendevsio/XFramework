@@ -18,6 +18,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public long? ModifiedBy { get; set; }
         public bool IsDeleted { get; set; }
         public string Name { get; set; }
+        public string Guid { get; set; }
 
         public virtual ICollection<TblApplication> TblApplications { get; set; }
     }

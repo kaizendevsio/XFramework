@@ -74,11 +74,11 @@ public class DataLayer : XnelSystemsContext, IDataLayer
                     case "CreatedAt":
                         if (entry.State == EntityState.Added)
                         {
-                            property.CurrentValue = DateTime.Now;
+                            property.CurrentValue = DateTime.Now.ToUniversalTime();
                         }
                         break;
                     case "ModifiedAt":
-                        property.CurrentValue = DateTime.Now;
+                        property.CurrentValue = DateTime.Now.ToUniversalTime();
                         break;
                     case "IsDeleted":
                         property.CurrentValue ??= false;

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using IdentityServer.Domain.Converters;
 using IdentityServer.Domain.DataTransferObjects;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
@@ -26,13 +27,16 @@ public class AuditEntryBO
 
     public TblAuditHistory ToAudit()
     {
+       var jsonSerializerOptions = new JsonSerializerOptions();
+       jsonSerializerOptions.Converters.Add(new DateOnlyConverter());
+        
         var audit = new TblAuditHistory();
         audit.TableName = TableName;
         audit.CreatedAt = DateTime.UtcNow;
-        audit.KeyValues = JsonSerializer.Serialize(KeyValues);
+        audit.KeyValues = JsonSerializer.Serialize(KeyValues, jsonSerializerOptions);
         audit.QueryAction = QueryAction;
-        audit.OldValues = OldValues.Count == 0 ? null : JsonSerializer.Serialize(OldValues);
-        audit.NewValues = NewValues.Count == 0 ? null : JsonSerializer.Serialize(NewValues);
+        audit.OldValues = OldValues.Count == 0 ? null : JsonSerializer.Serialize(OldValues, jsonSerializerOptions);
+        audit.NewValues = NewValues.Count == 0 ? null : JsonSerializer.Serialize(NewValues, jsonSerializerOptions);
         return audit;
     }
 }

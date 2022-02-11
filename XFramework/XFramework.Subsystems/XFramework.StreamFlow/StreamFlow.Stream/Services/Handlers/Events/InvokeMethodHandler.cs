@@ -44,7 +44,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
             request.RequestServer = new()
             {
-                Guid = client.Guid,
+                RequestId = client.Guid,
                 Name = client.Name
             };
 
@@ -89,7 +89,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
             if (_cachingService.AbsoluteClients.All(x => x.Guid != request.MessageQueue.Recipient))
             {
-                Console.WriteLine($"Connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has invalid recipient");
+                Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.NotFound,
@@ -101,7 +101,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             }
 
 
-            Console.WriteLine($"Message from connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
+            Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
             return new()
             {
                 HttpStatusCode = HttpStatusCode.ServiceUnavailable,

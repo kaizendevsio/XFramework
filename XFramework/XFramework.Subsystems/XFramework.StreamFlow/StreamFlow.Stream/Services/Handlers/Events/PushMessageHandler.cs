@@ -45,7 +45,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
             request.RequestServer = new()
             {
-                Guid = client.Guid,
+                RequestId = client.Guid,
                 Name = client.Name
             };
 
@@ -74,7 +74,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
                     if (_cachingService.AbsoluteClients.All(x => x.Guid != request.MessageQueue.Recipient))
                     {
-                        Console.WriteLine($"Connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has invalid recipient");
+                        Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
                         return new()
                         {
                             HttpStatusCode = HttpStatusCode.NotFound
@@ -83,18 +83,18 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
                     if (!_streamFlowConfiguration.QueueMessages)
                     {
-                        Console.WriteLine($"[Message Queue Disabled]; Message from connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
+                        Console.WriteLine($"[Message Queue Disabled]; Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
                         break;
                     }
 
                     if (_cachingService.QueuedMessages.Where(i => i.Recipient == request.MessageQueue.Recipient).Count() > _streamFlowConfiguration.QueueDepth)
                     {
-                        Console.WriteLine($"Message from connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} cannot be queued: Queue depth has been exhausted");
+                        Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} cannot be queued: Queue depth has been exhausted");
                         break;
                     }
                     
                     _cachingService.QueuedMessages.Add(request.MessageQueue);
-                    Console.WriteLine($"Message from connection with ID {request.RequestServer.Guid} : {request.RequestServer.Name} has been queued; Recipient unavailable");
+                    Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been queued; Recipient unavailable");
                    
                     break;
                 case MessageExchangeType.Topic:

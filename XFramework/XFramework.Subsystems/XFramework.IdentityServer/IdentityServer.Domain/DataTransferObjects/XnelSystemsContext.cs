@@ -168,11 +168,12 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.Property(e => e.EnterpriseId).HasColumnName("EnterpriseID");
 
-                entity.Property(e => e.ParentAppId).HasColumnName("ParentAppID");
-
-                entity.Property(e => e.Uid)
+                entity.Property(e => e.Guid)
+                    .IsRequired()
                     .HasColumnType("character varying")
-                    .HasColumnName("UID");
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.ParentAppId).HasColumnName("ParentAppID");
 
                 entity.Property(e => e.Version).HasPrecision(6, 3);
 
@@ -294,6 +295,10 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.Property(e => e.Description).HasMaxLength(500);
 
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
                 entity.Property(e => e.Name).HasMaxLength(256);
             });
 
@@ -305,6 +310,11 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasMaxLength(500);
             });
@@ -319,6 +329,10 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasIdentityOptions(null, null, null, 2147483647L);
 
                 entity.Property(e => e.Fee).HasPrecision(18, 10);
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.SourceCurrencyEntityId).HasColumnName("SourceCurrencyEntityID");
 
@@ -602,11 +616,19 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
 
+                entity.Property(e => e.ApplicationId).HasDefaultValueSql("1");
+
                 entity.Property(e => e.Guid)
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasMaxLength(100);
+
+                entity.HasOne(d => d.Application)
+                    .WithMany(p => p.TblIdentityRoleEntities)
+                    .HasForeignKey(d => d.ApplicationId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_identityroleentities_tbl_applications_id_fk");
             });
 
             modelBuilder.Entity<TblIdentityVerification>(entity =>

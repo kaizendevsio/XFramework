@@ -3,13 +3,13 @@ using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity;
 
-public class GetAllIdentityHandler : QueryBaseHandler, IRequestHandler<GetAllIdentityQuery, QueryResponseBO<List<IdentityInfoResponse>>>
+public class GetAllIdentityHandler : QueryBaseHandler, IRequestHandler<GetAllIdentityQuery, QueryResponseBO<List<IdentityResponse>>>
 {
     public GetAllIdentityHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
-    public async Task<QueryResponseBO<List<IdentityInfoResponse>>> Handle(GetAllIdentityQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponseBO<List<IdentityResponse>>> Handle(GetAllIdentityQuery request, CancellationToken cancellationToken)
     {
         var result = await _dataLayer.TblIdentityInformations
             .Take(1000)
@@ -18,15 +18,15 @@ public class GetAllIdentityHandler : QueryBaseHandler, IRequestHandler<GetAllIde
             
         if (!result.Any())
         {
-            return new QueryResponseBO<List<IdentityInfoResponse>>()
+            return new QueryResponseBO<List<IdentityResponse>>()
             {
                 Message = $"No identity exist",
                 HttpStatusCode = HttpStatusCode.NoContent
             };
         }
 
-        var r = result.Adapt<List<IdentityInfoResponse>>();
-        return new QueryResponseBO<List<IdentityInfoResponse>>()
+        var r = result.Adapt<List<IdentityResponse>>();
+        return new QueryResponseBO<List<IdentityResponse>>()
         {
             Response = r
         };

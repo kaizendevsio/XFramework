@@ -6,7 +6,7 @@ namespace XFramework.Domain.Generic.Contracts.Requests.Create
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }
-        public DateOnly Dob { get; set; }
+        public DateTime Dob { get; set; }
         public Gender Gender { get; set; }
         public CivilStatus CivilStatus { get; set; }
         public string Email { get; set; }
@@ -15,6 +15,6 @@ namespace XFramework.Domain.Generic.Contracts.Requests.Create
         public string UserAlias { get; set; }
         public string UserName { get; set; }
         public string PasswordString { get; set; }
-        public int RoleEntity { get; set; }
+        public Guid? RoleEntity { get; set; }
     }
 }

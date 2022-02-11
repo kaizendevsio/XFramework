@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests.Get;
 
-public class GetIdentityRoleListRequest : RequestBase
+public class GetRoleListRequest : RequestBase
 {
-        
+    public Guid? CredentialGuid { get; set; }
 }

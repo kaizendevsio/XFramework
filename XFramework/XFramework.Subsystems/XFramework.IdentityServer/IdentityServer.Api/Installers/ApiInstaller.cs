@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using XFramework.Integration.Extensions;
 
 namespace IdentityServer.Api.Installers;
 
@@ -39,7 +40,7 @@ public class ApiInstaller : IInstaller
                 };
             });
             
-        services.AddControllers();
+        services.AddControllers().AddJsonOptions(opt => opt.JsonSerializerOptions.AddDateOnlyConverters());;
             
         // Swagger
         services.AddSwaggerGen(c =>

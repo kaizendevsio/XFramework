@@ -43,9 +43,9 @@ public class Startup
 
         app.UseSwaggerUI(c => c.SwaggerEndpoint($"v{swaggerOptions.Version}{swaggerOptions.UiEndpoint}", swaggerOptions.Description));
 
-        app.UseHttpsRedirection();
+        /*app.UseHttpsRedirection();
 
-        app.UseHsts();
+        app.UseHsts();*/
 
         app.UseCors(o => o.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
 

@@ -22,6 +22,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public string CurrencyIsoCode3 { get; set; }
         public string Description { get; set; }
         public short? CurrencyType { get; set; }
+        public string Guid { get; set; }
 
         public virtual ICollection<TblAddressCountry> TblAddressCountries { get; set; }
         public virtual ICollection<TblExchangeRate> TblExchangeRateSourceCurrencyEntities { get; set; }

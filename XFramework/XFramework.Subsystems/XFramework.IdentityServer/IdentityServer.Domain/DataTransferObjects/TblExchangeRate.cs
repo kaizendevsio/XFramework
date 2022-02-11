@@ -17,6 +17,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public decimal? Fee { get; set; }
         public DateTime? EffectivityDate { get; set; }
         public DateTime? ExpiryDate { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblCurrencyEntity SourceCurrencyEntity { get; set; }
         public virtual TblCurrencyEntity TargetCurrencyEntity { get; set; }

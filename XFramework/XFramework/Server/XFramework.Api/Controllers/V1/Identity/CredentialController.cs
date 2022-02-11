@@ -27,9 +27,9 @@ namespace XFramework.Api.Controllers.V1.Identity
         }
         
         [HttpPost("List")]
-        public async Task<JsonResult> GetList([FromBody] GetIdentityCredentialListRequest request)
+        public async Task<JsonResult> GetList([FromBody] GetCredentialListRequest request)
         {
-            var result = await _identityServiceWrapper.GetCredentialList(request);
+            var result = await _identityServiceWrapper.LegacyGetCredentialList(request);
             return new JsonResult(result);
         }
         

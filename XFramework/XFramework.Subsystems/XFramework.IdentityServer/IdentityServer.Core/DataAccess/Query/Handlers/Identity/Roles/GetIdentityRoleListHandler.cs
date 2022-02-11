@@ -3,17 +3,19 @@ using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Roles;
 
-public class GetIdentityRoleListHandler : QueryBaseHandler, IRequestHandler<GetIdentityRoleListQuery, QueryResponseBO<List<IdentityRoleResponse>>>
+public class GetIdentityRoleListHandler : QueryBaseHandler, IRequestHandler<GetRoleListQuery, QueryResponseBO<List<RoleResponse>>>
 {
     public GetIdentityRoleListHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<QueryResponseBO<List<IdentityRoleResponse>>> Handle(GetIdentityRoleListQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponseBO<List<RoleResponse>>> Handle(GetRoleListQuery request, CancellationToken cancellationToken)
     {
+        var application = await GetApplication(request.RequestServer.ApplicationId);
+        
         var result = await _dataLayer.TblIdentityRoles
-            .Where(i => i.UserCred.ApplicationId == request.RequestServer.ApplicationId)
+            .Where(i => i.UserCred.ApplicationId == application.Id)
             .Take(1000)
             .AsNoTracking()
             .AsSplitQuery()
@@ -28,7 +30,7 @@ public class GetIdentityRoleListHandler : QueryBaseHandler, IRequestHandler<GetI
             };
         }
 
-        var r = result.Adapt<List<IdentityRoleResponse>>();
+        var r = result.Adapt<List<RoleResponse>>();
         return new ()
         {
             HttpStatusCode = HttpStatusCode.Accepted,

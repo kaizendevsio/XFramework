@@ -21,6 +21,14 @@ namespace XFramework.Api.Controllers.V2.Identity
             return new JsonResult(result);
         }
         
+        [HttpGet("List")]
+        public async Task<JsonResult> GetList(Guid? credentialGuid)
+        {
+            var request = new GetContactListRequest(){CredentialGuid = credentialGuid};
+            var result = await _identityServiceWrapper.GetContactList(InjectAuthorization(request));
+            return new JsonResult(result);
+        }
+        
         [HttpGet("Validate")]
         public async Task<JsonResult> Validate([FromBody] CheckContactExistenceRequest request)
         {

@@ -24,8 +24,9 @@ namespace XFramework.Api.Controllers.V2.Roles
         }
         
         [HttpPost("List")]
-        public async Task<JsonResult> GeList([FromBody] GetRoleEntityListRequest request)
+        public async Task<JsonResult> GeList(Guid? applicationGuid)
         {
+            var request = new GetRoleEntityListRequest(){ApplicationGuid = applicationGuid};
             var result = await _identityServiceWrapper.GetRoleEntityList(request);
             return new JsonResult(result);
         }

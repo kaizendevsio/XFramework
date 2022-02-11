@@ -1,6 +1,6 @@
 ﻿namespace IdentityServer.Domain.Generic.Contracts.Responses;
 
-public class IdentityCredentialResponse
+public class CredentialResponse
 {
     public Guid? Guid { get; set; }
     public bool IsEnabled { get; set; }
@@ -13,7 +13,7 @@ public class IdentityCredentialResponse
     public long ApplicationId { get; set; }
     public string Token { get; set; }
 
-    public virtual IdentityInfoResponse IdentityInfo { get; set; }
-    public virtual List<IdentityRoleResponse> TblIdentityRoles { get; set; }
-    public virtual List<IdentityContactResponse> TblIdentityContacts { get; set; }
+    public virtual IdentityResponse Identity { get; set; }
+    public virtual List<RoleResponse> TblIdentityRoles { get; set; }
+    public virtual List<ContactResponse> TblIdentityContacts { get; set; }
 }

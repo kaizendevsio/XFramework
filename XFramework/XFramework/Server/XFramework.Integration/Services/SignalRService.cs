@@ -22,6 +22,7 @@ namespace XFramework.Integration.Services
         protected  List<(string, object)> _queueList = new();
         public HubConnection Connection { get; set; }
         public StopWatchHelper StopWatch { get; set; } = new();
+        public Stopwatch Stopwatch { get; set; } = new();
         private StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
         public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; } = new();
         public SignalRService(StreamFlowConfiguration configuration)
@@ -42,7 +43,7 @@ namespace XFramework.Integration.Services
                 .Build();
 
             HandleEvents();
-            Task.Run(async () => await EnsureConnection()).Wait();
+            Task.Run(async () => await EnsureConnection());
         }
 
         public SignalRService(IConfiguration configuration, IMediator mediator)
@@ -58,7 +59,7 @@ namespace XFramework.Integration.Services
                 .Build();
 
             HandleEvents();
-            Task.Run(async () => await EnsureConnection()).Wait();
+            Task.Run(async () => await EnsureConnection());
         }
 
         public virtual void Handle(IMediator mediator)
@@ -91,7 +92,7 @@ namespace XFramework.Integration.Services
                     try
                     {
                         var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
-                        Console.WriteLine($"Received InvokeResponseEvent: {telemetry.ClientGuid}");
+                        //Console.WriteLine($"Received InvokeResponseEvent: {telemetry.ClientGuid}");
                         
                         if (PendingMethodCalls.TryRemove(telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
                         {
@@ -104,7 +105,7 @@ namespace XFramework.Integration.Services
                             };
                             await Task.Run(() => methodCallCompletionSource.SetResult(result));
                         }
-                        StopWatch.Stop("Response for Invoked Method Received"); 
+                        //StopWatch.Stop("Response for Invoked Method Received"); 
                     }
                     catch (Exception e)
                     {
@@ -131,32 +132,32 @@ namespace XFramework.Integration.Services
 
         private void HandleReconnectedEvent()
         {
-            Connection.Reconnected += connectionId =>
+            Connection.Reconnected += async connectionId =>
             {
                 Debug.Assert(Connection.State == HubConnectionState.Connected);
-                Task.Run(() => InvokeVoidAsync("Register", new StreamFlowClientBO()
+                await Task.Run(() => InvokeVoidAsync("Register", new StreamFlowClientBO()
                 {
                     Guid = StreamFlowConfiguration.ClientGuid,
                     Name = StreamFlowConfiguration.ClientName
-                })).Wait();
-
-                _isRegistered = true;
-                // Notify users the connection was reestablished.
-                // Start dequeuing messages queued while reconnecting if any.
-                Console.WriteLine("Connection to StreamFlow server restored");
-
-                if (!_queueList.Any()) return Task.CompletedTask;
-
-                Console.WriteLine($"Dequeuing items from cache..");
-                foreach (var valueTuple in _queueList)
+                })).ContinueWith(async m =>
                 {
-                    InvokeVoidAsync(valueTuple.Item1, valueTuple.Item2);
-                }
+                    _isRegistered = true;
+                    // Notify users the connection was reestablished.
+                    // Start dequeuing messages queued while reconnecting if any.
+                    Console.WriteLine("Connection to StreamFlow server restored");
 
-                Console.WriteLine($"Dequeued {_queueList.Count} item(s) from cache");
-                _queueList.Clear();
+                    if (!_queueList.Any()) return;
 
-                return Task.CompletedTask;
+                    Console.WriteLine($"Dequeuing items from cache..");
+                    foreach (var valueTuple in _queueList)
+                    {
+                        InvokeVoidAsync(valueTuple.Item1, valueTuple.Item2);
+                    }
+
+                    Console.WriteLine($"Dequeued {_queueList.Count} item(s) from cache");
+                    _queueList.Clear();
+
+                });
             };
         }
 
@@ -227,13 +228,13 @@ namespace XFramework.Integration.Services
                 Console.WriteLine($"Invoked Method '{methodName}' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
             }
 
-            StopWatch.Stop($"Invoked Method '{methodName}' returned {result}");
+            //StopWatch.Stop($"Invoked Method '{methodName}' returned {result}");
             return result;
         }
         
         public async Task<SignalRResponse> InvokeAsync<T>(T args1)
         {
-            StopWatch.Start();
+            Stopwatch.Restart();
             var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessageBO>();
             var request = args1.Adapt<StreamFlowMessageBO>();
             
@@ -261,7 +262,10 @@ namespace XFramework.Integration.Services
 
                 Console.WriteLine($"Invoke Method '{request.CommandName}', awaiting response...");
                 var streamFlowMessage = await response;
-                StopWatch.Stop($"Invoked Method '{request.CommandName}'");
+                
+                Stopwatch.Stop();
+                Console.WriteLine($"Invoked Method '{request.CommandName}' in {Stopwatch.ElapsedMilliseconds}ms");
+                
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Accepted,

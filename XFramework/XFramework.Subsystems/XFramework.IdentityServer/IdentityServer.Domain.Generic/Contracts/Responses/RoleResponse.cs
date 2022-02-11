@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Responses;
 
-public class IdentityRoleResponse
+public class RoleResponse
 {
     public Guid? Guid { get; set; }
     public bool IsEnabled { get; set; }

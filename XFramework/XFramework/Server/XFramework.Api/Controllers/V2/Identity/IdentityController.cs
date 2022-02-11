@@ -36,7 +36,7 @@ namespace XFramework.Api.Controllers.V2.Identity
             return new JsonResult(result);
         }
         
-        [Authorize]
+        /*[Authorize]*/
         [HttpPost]
         public async Task<JsonResult> Create([FromBody] CreateUserRequest request)                                                                                                                                                                              
         {

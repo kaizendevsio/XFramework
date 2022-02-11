@@ -21,9 +21,6 @@ if($answer -eq "y"){
    Write-Host =============== Building Server-Side Solutions ===============
    Write-Host
 
-   Write-Host Building Identity Server Solution ...
-   Write-Host
-
    Write-Host Building Release.IdentityServer ...
    dotnet publish "XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.IdentityServer.Published" -c "Release"
 
@@ -38,7 +35,7 @@ if($answer -eq "y"){
 
 
    Write-Host Syncing to Github ...
-   cd "C:\Projects\Published\Release.XnelSystems"
+   Set-Location "C:\Projects\Published\Release.XnelSystems"
    git add *.*
    git commit -m "One Click Deploy"
 
@@ -46,7 +43,7 @@ if($answer -eq "y"){
 
    Write-Host Deployment Completed Successfully.
    Write-Host
-   cd $currentDirectoryPath"\"$currentDirectoryName
+   Set-Location $currentDirectoryPath"\"$currentDirectoryName
    pause
    exit
 }

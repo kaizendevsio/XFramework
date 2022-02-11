@@ -47,9 +47,9 @@ namespace XFramework.Api
                 }
             });
             
-            app.UseHttpsRedirection();
+            //app.UseHttpsRedirection();
 
-            app.UseHsts();
+            //app.UseHsts();
 
             app.UseCors(o => o.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
 
