@@ -30,20 +30,20 @@ namespace XFramework.Integration.Services.Helpers
             {
                 if (phoneNumber.Length != 13)
                 {
-                    throw new ArgumentException("Incorrect Phone number format, format should be +63XXXXXXXXXX or 09XXXXXXXXX");
+                    throw new ArgumentException("Incorrect Phone number format, format should be +XXXXXXXXXXXX or XXXXXXXXXXX");
                 }
             }
             else
             {
                 if (phoneNumber.Length != 11)
                 {
-                    throw new ArgumentException("Incorrect Phone number format, format should be +63XXXXXXXXXX or 09XXXXXXXXX");
+                    throw new ArgumentException("Incorrect Phone number format, format should be +XXXXXXXXXXXX or XXXXXXXXXXX");
                 }
             }
-            if (phoneNumber.Contains('+') != true)
+            /*if (phoneNumber.Contains('+') != true)
             {
                 phoneNumber = $"+63{phoneNumber.Substring(1)}";
-            }
+            }*/
             return phoneNumber;
         }
 

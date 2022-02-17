@@ -6,4 +6,5 @@ public class CheckCredentialExistenceQuery : QueryBaseEntity, IRequest<QueryResp
 {
     public string UserName { get; set; }
     public string Cuid { get; set; }
+    public string PasswordString { get; set; }
 }

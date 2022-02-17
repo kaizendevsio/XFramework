@@ -16,6 +16,18 @@ public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<Ch
         
     public async Task<QueryResponseBO<ExistenceResponse>> Handle(CheckContactExistenceQuery request, CancellationToken cancellationToken)
     {
+        switch (request.ContactType)
+        {
+            case GenericContactType.NotSpecified:
+                break;
+            case GenericContactType.Email:
+                request.Value.ValidateEmailAddress();
+                break;
+            case GenericContactType.Phone:
+                request.Value = request.Value.ValidatePhoneNumber();
+                break;
+        }
+        
         var existing = await _dataLayer.TblIdentityContacts
             .AsNoTracking()
             .Where(i => i.Value == request.Value)
@@ -25,7 +37,7 @@ public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<Ch
         {
             return new ()
             {
-                Message = $"The contact type {(GenericContactType)existing.UcentitiesId} '{request.Value}' already exists",
+                Message = $"The {(GenericContactType)existing.UcentitiesId} '{request.Value}' already exists",
                 HttpStatusCode = HttpStatusCode.Conflict
             };
         }

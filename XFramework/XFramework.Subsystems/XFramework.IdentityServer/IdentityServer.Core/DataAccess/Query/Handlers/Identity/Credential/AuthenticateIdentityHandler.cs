@@ -35,7 +35,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         credential = await ValidatePassword(request, request.AuthorizeBy, credential, cancellationToken);
         if (credential == null)
         {
-            _recordsService.NewAuthorizationLog(AuthenticationState.WrongPassword, cuid);
+            //_recordsService.NewAuthorizationLog(AuthenticationState.WrongPassword, cuid);
             return new()
             {
                 Message = $"Identity Authentication Failed",
@@ -46,9 +46,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         var roleList = await GetRoleList(cancellationToken, credential, cuid);
 
         var token = await _jwtService.GenerateToken(request.Username, cuid, roleList.Select(i => i.RoleEntityId).Adapt<List<RoleEntity>>());
-        _recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
-            
-        
+        //_recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
         
         return new()
         {
@@ -115,7 +113,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(true) & i.UcentitiesId == (long?)GenericContactType.Phone)?.UserCredential;
+                    .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == (long?)GenericContactType.Phone)?.UserCredential;
                 break;
             case AuthorizeBy.Username:
                 result = await _dataLayer.TblIdentityCredentials

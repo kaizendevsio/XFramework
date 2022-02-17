@@ -60,6 +60,24 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
 
+        if (request.Amount == 0)
+        {
+            return new ()
+            {
+                Message = $"Amount is required",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
+        
+        if (request.Amount > 99999999)
+        {
+            return new ()
+            {
+                Message = $"Amount exceeds maximum allowed",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
+        
         var fromUserWallet = await _dataLayer.TblUserWallets
             .Where(i => i.UserAuthId == fromCredentialEntity.Id)
             .Where(i => i.WalletTypeId == fromWalletEntity.Id)
@@ -86,6 +104,14 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
 
+        if (request.Amount > fromUserWallet.Balance)
+        {
+            return new ()
+            {
+                Message = $"Amount exceeds available balance",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
         _dataLayer.TblUserWalletTransactions.Add(new ()
         {
             UserAuthId = initiatorCredentialEntity.Id,

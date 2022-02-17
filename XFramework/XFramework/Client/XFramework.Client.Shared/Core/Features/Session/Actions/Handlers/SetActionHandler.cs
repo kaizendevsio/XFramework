@@ -22,13 +22,14 @@ public partial class SessionState
         
         public override async Task<Unit> Handle(SetAction action, CancellationToken aCancellationToken)
         {
-            //StateHelper.SetProperties(action, CurrentState);
-            CurrentState.SignInRequest = action.LoginRequest ?? CurrentState.SignInRequest;
-            CurrentState.SignUpRequest = action.SignUpRequest ?? CurrentState.SignUpRequest;
-            CurrentState.ForgotPasswordRequest = action.ForgotPasswordRequest ?? CurrentState.ForgotPasswordRequest;
-            CurrentState.SmsVerificationRequest = action.SmsVerificationRequest ?? CurrentState.SmsVerificationRequest;
-            
-            
+            try
+            {
+                StateHelper.SetProperties(action,CurrentState);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
             return Unit.Value;
         }
     }

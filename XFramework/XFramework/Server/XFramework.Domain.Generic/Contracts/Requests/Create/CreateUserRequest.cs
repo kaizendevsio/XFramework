@@ -15,6 +15,7 @@ namespace XFramework.Domain.Generic.Contracts.Requests.Create
         public string UserAlias { get; set; }
         public string UserName { get; set; }
         public string PasswordString { get; set; }
+        public string ConfirmPasswordString { get; set; }
         public Guid? RoleEntity { get; set; }
     }
 }

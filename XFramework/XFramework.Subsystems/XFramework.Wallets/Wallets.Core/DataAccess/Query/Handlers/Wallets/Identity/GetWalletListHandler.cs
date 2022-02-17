@@ -28,6 +28,7 @@ public class GetWalletListHandler : QueryBaseHandler, IRequestHandler<GetWalletL
         }
                     
         var result = await _dataLayer.TblUserWallets
+            .Include(i => i.WalletType)
             .Where(i => i.UserAuthId == credential.Id)
             .AsNoTracking()
             .ToListAsync(cancellationToken: cancellationToken);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text.Json;
+using MessagePack;
 using StreamFlow.Domain.Generic.Enums;
 using XFramework.Domain.Generic.Enums;
 

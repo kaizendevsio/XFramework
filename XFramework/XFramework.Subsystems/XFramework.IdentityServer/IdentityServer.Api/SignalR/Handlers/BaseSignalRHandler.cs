@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
+using MessagePack;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Enums;
@@ -39,7 +40,16 @@ public class BaseSignalRHandler
                         var r = data.AsMediatorCmd<TRequest, TQuery>();
                         var result = await mediator.Send(r).ConfigureAwait(false);
                         Stopwatch.Stop();
-                        Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.GetType().GetProperty("HttpStatusCode")?.GetValue(result)} in {Stopwatch.ElapsedMilliseconds}ms");
+
+                        if (result.GetType().GetProperty("HttpStatusCode")?.GetValue(result).ToString() == $"{HttpStatusCode.InternalServerError}")
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{result.GetType().GetProperty("Message")?.GetValue(result)}] in {Stopwatch.ElapsedMilliseconds}ms");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.GetType().GetProperty("HttpStatusCode")?.GetValue(result)} in {Stopwatch.ElapsedMilliseconds}ms");
+                        }
+                        
                         
                         await RespondToInvoke(connection, telemetry, result);
                     }

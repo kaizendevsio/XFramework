@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using MessagePack;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.SignalR;
@@ -16,7 +17,7 @@ namespace StreamFlow.Stream.Installers
         public void InstallServices(IServiceCollection services, IConfiguration configuration)
         {
             services.AddSignalR(o => o.MaximumReceiveMessageSize = 5242880)
-                .AddMessagePackProtocol();
+                .AddMessagePackProtocol(o => o.SerializerOptions.WithCompression(MessagePackCompression.Lz4BlockArray));
             
             services.AddResponseCompression(opts =>
             {

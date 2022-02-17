@@ -30,6 +30,24 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
             };
         }
 
+        if (string.IsNullOrEmpty(request.PasswordString))
+        {
+            return new ()
+            {
+                Message = $"The password is required",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
+        if (request.PasswordString.Length < 8)
+        {
+            return new ()
+            {
+                Message = $"The password length must be greater than 8 characters",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted

@@ -188,9 +188,11 @@ namespace XFramework.Integration.Services
                 await Connection.StartAsync();
                 StopWatch.Stop("Connected to StreamFlow server");
 
+                var clientId = StreamFlowConfiguration.Anonymous ? Guid.NewGuid() : StreamFlowConfiguration.ClientGuid;
+                
                 await InvokeVoidAsync("Register", new StreamFlowClientBO()
                 {
-                    Guid = StreamFlowConfiguration.ClientGuid,
+                    Guid = clientId,
                     Name = StreamFlowConfiguration.ClientName
                 });
                 _isRegistered = true;

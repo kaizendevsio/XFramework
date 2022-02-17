@@ -15,6 +15,7 @@ namespace XFramework.Domain.Generic.Configurations
         public string Signature { get; set; }
         public int QueueDepth { get; set; }
         public bool QueueMessages { get; set; }
+        public bool Anonymous { get; set; }
         
         
     }

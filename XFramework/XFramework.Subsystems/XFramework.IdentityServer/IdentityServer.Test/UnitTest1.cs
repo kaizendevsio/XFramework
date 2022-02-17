@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityServer.Domain.Generic.Contracts.Requests;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
+using MessagePack;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using StreamFlow.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces.Wrappers;

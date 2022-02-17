@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using MessagePack;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Entity.Contracts.Responses;
