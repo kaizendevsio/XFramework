@@ -31,87 +31,7 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Api/SignalR/Handlers/LegacyGetCredentialListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/.idea/.idea.XFramework.SampleSubsystem/.idea/encodings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/.idea/.idea.XFramework.SampleSubsystem/.idea/indexLayout.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/.idea/.idea.XFramework.SampleSubsystem/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/.idea/.idea.XFramework.SampleSubsystem/.idea/projectSettingsUpdater.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/.idea/.idea.XFramework.SampleSubsystem/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/.idea/.idea.XFramework.SampleSubsystem/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/SampleSubsystem.Api/Controllers/SampleController.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/SampleSubsystem.Api/Program.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/SampleSubsystem.Api/Properties/launchSettings.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/SampleSubsystem.Api/SampleSubsystem.Api.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/SampleSubsystem.Api/WeatherForecast.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/SampleSubsystem.Api/appsettings.Development.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/SampleSubsystem.Api/appsettings.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.SampleSubsystem/XFramework.SampleSubsystem.sln" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/App.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Pages/Counter.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Pages/FetchData.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Pages/Index.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Program.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Properties/launchSettings.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/SampleApp.Web.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Shared/MainLayout.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Shared/MainLayout.razor.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Shared/NavMenu.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Shared/NavMenu.razor.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Shared/SurveyPrompt.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/_Imports.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/app.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/bootstrap/bootstrap.min.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/bootstrap/bootstrap.min.css.map" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/FONT-LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/ICON-LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/font/css/open-iconic-bootstrap.min.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/font/fonts/open-iconic.eot" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/font/fonts/open-iconic.otf" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/font/fonts/open-iconic.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/font/fonts/open-iconic.ttf" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/css/open-iconic/font/fonts/open-iconic.woff" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/favicon.ico" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/icon-192.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/index.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/wwwroot/sample-data/weather.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/desktop.files.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Api/SignalR/Handlers/BaseSignalRHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/CheckCredentialExistenceQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/CheckCredentialExistenceQuery.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Contacts/CheckContactExistenceHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Contacts/CheckContactExistenceHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/AuthenticateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/AuthenticateIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/CheckCredentialExistenceHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/CheckCredentialExistenceHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/CheckCredentialExistenceRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/CheckCredentialExistenceRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Test/IdentityServer.Test.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Test/IdentityServer.Test.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Test/UnitTest1.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Test/UnitTest1.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Domain.Generic/StreamFlow.Domain.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Domain.Generic/StreamFlow.Domain.Generic.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/Installers/StreamInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/Installers/StreamInstaller.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.StreamFlow/StreamFlow.Stream/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/TransferWalletHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/TransferWalletHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetWalletListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/GetWalletListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/WalletResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/WalletResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/SetActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/SetActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/SetAction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/SetAction.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/SessionState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/SessionState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Api/Controllers/V1/Identity/CredentialController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Api/Controllers/V1/Identity/CredentialController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Api/XFramework.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Api/XFramework.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Core/XFramework.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Core/XFramework.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Configurations/StreamFlowConfiguration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Configurations/StreamFlowConfiguration.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/Create/CreateUserRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/Create/CreateUserRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/Helpers/ValidationHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/Helpers/ValidationHelper.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" afterDir="false" />
-    </list>
+    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -129,9 +49,7 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/Pages/Index.razor" root0="SKIP_HIGHLIGHTING" root1="FORCE_HIGHLIGHTING" root2="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/AuthenticationResponse.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/205fae209e134b23998ed2405240e7436800/a2/59b250b5/SessionState.cs" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
@@ -181,25 +99,14 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">
-    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
-    <property name="ASKED_SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
-    <property name="DebuggerViewTab_PTCS_FirstProportionKey" value="0.35048753" />
-    <property name="DebuggerViewTab_PTCS_LastProportionKey" value="0.0" />
-    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
-    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
-    <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="node.js.detected.package.eslint" value="true" />
-    <property name="node.js.detected.package.tslint" value="true" />
-    <property name="node.js.path.for.package.eslint" value="project" />
-    <property name="node.js.path.for.package.tslint" value="project" />
-    <property name="node.js.selected.package.eslint" value="(autodetect)" />
-    <property name="node.js.selected.package.tslint" value="(autodetect)" />
-    <property name="nodejs_package_manager_path" value="npm" />
-    <property name="settings.editor.selected.configurable" value="SolutionBuilderGeneralOptionsPageId" />
-    <property name="vue.rearranger.settings.migration" value="true" />
-  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
   <component name="RunManager" selected=".NET Launch Settings Profile.XFramework.Identity.Web">
     <configuration name="XFramework.Web" type="DotNetProject" factoryName=".NET Project">
       <option name="EXE_PATH" value="" />
@@ -379,6 +286,7 @@
       <workItem from="1644502665696" duration="3755000" />
       <workItem from="1644743545084" duration="3412000" />
       <workItem from="1645097104953" duration="2539000" />
+      <workItem from="1645439871618" duration="231000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
