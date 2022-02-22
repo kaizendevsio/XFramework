@@ -29,6 +29,8 @@ if($answer -eq "y"){
    Write-Host Building Release.Wallets ...
    dotnet build "XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj"
 
+   Write-Host Building XFramework.Integration ...
+   dotnet build "XFramework\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"
 
 
    Write-Host Building Dependencies Completed Successfully.
