@@ -10,6 +10,9 @@ namespace XFramework.Integration.Interfaces.Wrappers
     {
         public Guid? TargetClient { get; set; }
         public HubConnectionState ConnectionState { get; }
+        public Action OnReconnected { get; set; }
+        public Action OnReconnecting { get; set; }
+        public Action OnDisconnected { get; set; }
         public Task<bool> Connect();
         public Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request);
         public Task PushAsync(StreamFlowMessageBO request);

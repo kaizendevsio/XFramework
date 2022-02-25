@@ -5,6 +5,7 @@ namespace XFramework.Integration.Interfaces.Wrappers
 {
     public interface IIdentityServiceWrapper : IXFrameworkService
     {
+        public IMessageBusWrapper MessageBusDriver { get; set; }
         public HubConnectionState ConnectionState { get; }
         
         public Task<QueryResponseBO<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request);
@@ -16,6 +17,7 @@ namespace XFramework.Integration.Interfaces.Wrappers
         public Task<CmdResponseBO> UpdateCredential(UpdateCredentialRequest request);
         public Task<CmdResponseBO> DeleteCredential(DeleteCredentialRequest request);
         public Task<CmdResponseBO> ChangePassword(UpdatePasswordRequest request);
+        public Task<CmdResponseBO> SendOneTimePassword(CheckOneTimePasswordRequest request);
         
         public Task<QueryResponseBO<RoleResponse>> GetRole(GetRoleRequest request);
         public Task<QueryResponseBO<List<RoleResponse>>> GetRoleList(GetRoleListRequest request);

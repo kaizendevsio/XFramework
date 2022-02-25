@@ -14,9 +14,16 @@ namespace XFramework.Integration.Drivers
         public Guid? TargetClient { get; set; }
         public HubConnectionState ConnectionState => SignalRService.Connection.State;
 
+        public Action OnReconnected { get; set; }
+        public Action OnReconnecting { get; set; }
+        public Action OnDisconnected { get; set; }
         public StreamFlowDriverSignalR(ISignalRService signalRService)
         {
             SignalRService = signalRService;
+
+            SignalRService.Connection.Reconnected += async (e) => OnReconnected?.Invoke();
+            SignalRService.Connection.Reconnecting += async (e) => OnReconnecting?.Invoke();
+            SignalRService.Connection.Closed += async (e) => OnDisconnected?.Invoke();
         }
 
         public async Task<bool> Connect()
