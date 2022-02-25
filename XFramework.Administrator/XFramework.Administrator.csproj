@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="6.0.1" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="6.0.1" PrivateAssets="all" />
+        <PackageReference Include="MudBlazor" Version="6.0.6" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Pages\Dashboard\DashboardBase.razor.cs">
+        <DependentUpon>Dashboard.razor</DependentUpon>
+      </Compile>
+      <Compile Update="Pages\Dashboard\SignInBase.razor.cs">
+        <DependentUpon>SignIn.razor</DependentUpon>
+      </Compile>
+      <Compile Update="Pages\Dashboard\SignUpBase.razor.cs">
+        <DependentUpon>SignUp.razor</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
+</Project>
