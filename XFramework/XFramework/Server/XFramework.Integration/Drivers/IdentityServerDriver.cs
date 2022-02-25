@@ -38,6 +38,11 @@
         {
             return await SendVoidAsync<UpdatePasswordRequest, CmdResponseBO>("ChangePassword", request);
         }
+        
+        public async Task<CmdResponseBO> SendOneTimePassword(CheckOneTimePasswordRequest request)
+        {
+            return await SendVoidAsync<CheckOneTimePasswordRequest, CmdResponseBO>("SendOneTimePassword", request);
+        }
 
         public async Task<QueryResponseBO<RoleResponse>> GetRole(GetRoleRequest request)
         {

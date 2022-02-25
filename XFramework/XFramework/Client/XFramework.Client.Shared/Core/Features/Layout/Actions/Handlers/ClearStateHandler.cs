@@ -1,3 +1,5 @@
+using Blazored.LocalStorage;
+
 namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
@@ -6,15 +8,16 @@ public partial class LayoutState
     {
         private XFramework.Client.Shared.Core.Features.Layout.LayoutState CurrentState => Store.GetState<XFramework.Client.Shared.Core.Features.Layout.LayoutState>();
         
-        public ClearStateHandler(ISessionStorageService sessionStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public ClearStateHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
             SessionStorageService = sessionStorageService;
+            LocalStorageService = localStorageService;
             SweetAlertService = sweetAlertService;
             NavigationManager = navigationManager;
             EndPoints = endPoints;
             HttpClient = httpClient;
             BaseHttpClient = baseHttpClient;
-            JsRuntime = jsRuntime; 
+            JsRuntime = jsRuntime;
             Mediator = mediator;
             Store = store;
         }

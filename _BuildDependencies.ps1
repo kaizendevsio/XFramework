@@ -4,7 +4,7 @@ Write-Host
 
 $currentDirectoryName = Split-Path -Path (Get-Location) -Leaf
 $currentDirectoryPath = Split-Path -Path (Get-Location)
-$answer = Read-Host "Build dependencies for" $currentDirectoryName"? (y -Yes / n -No)"
+$answer = Read-Host "Build Dependencies For" $currentDirectoryName"? (y -Yes / n -No)"
 
 if($answer -eq "y"){
    Write-Host XFramework Technologies. MIT License 2021
@@ -29,12 +29,17 @@ if($answer -eq "y"){
    Write-Host Building Release.Wallets ...
    dotnet build "XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj"
 
+   Write-Host Building XFramework.Integration ...
+   dotnet build "XFramework\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"
+
+   Write-Host Building XFramework.Client.Shared ...
+   dotnet build "XFramework\XFramework\Client\XFramework.Client.Shared\XFramework.Client.Shared.csproj"
 
 
    Write-Host Building Dependencies Completed Successfully.
    Write-Host
-   cd $currentDirectoryPath"\"$currentDirectoryName
-   pause
+   Set-Location $currentDirectoryPath"\"$currentDirectoryName
+   
    exit
 }
 else{
@@ -42,6 +47,5 @@ else{
    Write-Host Deployment Aborted
    Write-Host
 
-   pause
 exit
 }

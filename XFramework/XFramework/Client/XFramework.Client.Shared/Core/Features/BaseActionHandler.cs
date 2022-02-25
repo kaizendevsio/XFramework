@@ -1,3 +1,4 @@
+using Blazored.LocalStorage;
 using XFramework.Client.Shared.Core.Features.Configuration;
 using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Cache;
@@ -10,6 +11,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     where TAction : IAction
 {
     protected ISessionStorageService SessionStorageService { get; set; }
+    public ILocalStorageService LocalStorageService { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
     protected NavigationManager NavigationManager { get; set; }
     protected IHttpClient HttpClient { get; set; }
@@ -25,13 +27,15 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     protected LayoutState LayoutState => Store.GetState<LayoutState>();
     protected CacheState CacheState => Store.GetState<CacheState>();
 
-    protected ActionHandler(ISessionStorageService sessionStorageService, SweetAlertService sweetAlertService,
-        NavigationManager navigationManager, EndPointsModel endPointsModel, IHttpClient httpClient,
+    protected ActionHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService,
+        NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient,
         HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store)
     {
         SessionStorageService = sessionStorageService;
+        LocalStorageService = localStorageService;
         SweetAlertService = sweetAlertService;
         NavigationManager = navigationManager;
+        EndPoints = endPoints;
         HttpClient = httpClient;
         BaseHttpClient = baseHttpClient;
         JsRuntime = jsRuntime;

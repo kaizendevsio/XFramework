@@ -1,30 +1,31 @@
-﻿// ReSharper disable once CheckNamespace
+﻿using Blazored.LocalStorage;
+
 namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class SetActionHandler : ActionHandler<SetAction>
+    public class SetActionHandler : ActionHandler<SetState>
     {
         private SessionState CurrentState => Store.GetState<SessionState>();
-        
-        public SetActionHandler(ISessionStorageService sessionStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPointsModel, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, sweetAlertService, navigationManager, endPointsModel, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public SetActionHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
             SessionStorageService = sessionStorageService;
+            LocalStorageService = localStorageService;
             SweetAlertService = sweetAlertService;
             NavigationManager = navigationManager;
-            EndPoints = endPointsModel;
+            EndPoints = endPoints;
             HttpClient = httpClient;
             BaseHttpClient = baseHttpClient;
             JsRuntime = jsRuntime;
             Mediator = mediator;
             Store = store;
         }
-        
-        public override async Task<Unit> Handle(SetAction action, CancellationToken aCancellationToken)
+
+        public override async Task<Unit> Handle(SetState state, CancellationToken aCancellationToken)
         {
             try
             {
-                StateHelper.SetProperties(action,CurrentState);
+                StateHelper.SetProperties(state, CurrentState);
             }
             catch (Exception e)
             {

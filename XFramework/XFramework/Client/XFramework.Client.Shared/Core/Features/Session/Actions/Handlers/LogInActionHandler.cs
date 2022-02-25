@@ -5,17 +5,16 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 
-
 public partial class SessionState
 {
-    public class ForgotPasswordActionHandler : ActionHandler<ForgotPasswordAction>
+    public class LogInActionHandler : ActionHandler<LoginAction>
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
-
         
-        public ForgotPasswordActionHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public LogInActionHandler(IIdentityServiceWrapper identityServiceWrapper, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            IdentityServiceWrapper = identityServiceWrapper;
             SessionStorageService = sessionStorageService;
             LocalStorageService = localStorageService;
             SweetAlertService = sweetAlertService;
@@ -28,11 +27,15 @@ public partial class SessionState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(ForgotPasswordAction action, CancellationToken aCancellationToken)
+        public override async Task<Unit> Handle(LoginAction action, CancellationToken aCancellationToken)
         {
-            var request = CurrentState.ForgotPasswordVm.Adapt<AuthenticateCredentialRequest>();
+            // Map  view model to request object
+            var request = CurrentState.LoginVm.Adapt<AuthenticateCredentialRequest>();
+
+            // Send the request
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
             
+            // Handle if the response is invalid or error
             if (response.HttpStatusCode is not HttpStatusCode.Accepted)
             {
                 // Display message to UI
@@ -58,4 +61,3 @@ public partial class SessionState
         }
     }
 }
-

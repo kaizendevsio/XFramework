@@ -8,8 +8,6 @@
     <projectFile>XFramework/Client/XFramework.Identity.Web/XFramework.Identity.Web.csproj</projectFile>
     <projectFile profileName="SampleApp.Web">XFramework/XFramework/Client/SampleApp.Web/SampleApp.Web.csproj</projectFile>
     <projectFile profileName="IIS Express">XFramework/XFramework/Client/SampleApp.Web/SampleApp.Web.csproj</projectFile>
-    <projectFile profileName="XFramework.Administrator">XFramework.Administrator/XFramework.Administrator.csproj</projectFile>
-    <projectFile profileName="IIS Express">XFramework.Administrator/XFramework.Administrator.csproj</projectFile>
   </component>
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="SELECTIVE" />
@@ -33,47 +31,24 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/App.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/Dashboard.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/DashboardBase.razor.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignIn.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignInBase.razor.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignUp.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignUpBase.razor.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/PageBase.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Program.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Properties/launchSettings.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Shared/MainLayout.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Shared/MainLayout.razor.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Shared/NavMenu.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Shared/NavMenu.razor.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Shared/SurveyPrompt.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/XFramework.Administrator.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/_Imports.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/app.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/bootstrap/bootstrap.min.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/bootstrap/bootstrap.min.css.map" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/FONT-LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/ICON-LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/font/css/open-iconic-bootstrap.min.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.eot" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.otf" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.ttf" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.woff" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/favicon.ico" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/icon-192.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/index.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/wwwroot/sample-data/weather.json" afterDir="false" />
+    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment=" - Added sample action / handler example: login action">
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/CheckOneTimePasswordRequest.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Client.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Client.sln" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IIdentityServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IIdentityServiceWrapper.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ChangesViewManager">
+    <option name="groupingKeys">
+      <option value="directory" />
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -87,6 +62,8 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/e5606f474b884d169955d1b4f7a6dd7517a00/6a/f67d19e7/IIdentityServiceWrapper.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/AuthenticateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/AuthenticationResponse.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
@@ -137,20 +114,12 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
-  }
-}</component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="vue.rearranger.settings.migration" value="true" />
+  </component>
   <component name="RunManager" selected=".NET Launch Settings Profile.XFramework.Identity.Web">
     <configuration name="XFramework.Web" type="DotNetProject" factoryName=".NET Project">
       <option name="EXE_PATH" value="" />
@@ -187,36 +156,6 @@
     </configuration>
     <configuration name="SampleApp.Web: IIS Express" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
       <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/XFramework/XFramework/Client/SampleApp.Web/SampleApp.Web.csproj" />
-      <option name="LAUNCH_PROFILE_TFM" value="net6.0" />
-      <option name="LAUNCH_PROFILE_NAME" value="IIS Express" />
-      <option name="USE_EXTERNAL_CONSOLE" value="0" />
-      <option name="USE_MONO" value="0" />
-      <option name="RUNTIME_ARGUMENTS" value="" />
-      <option name="GENERATE_APPLICATIONHOST_CONFIG" value="1" />
-      <option name="SHOW_IIS_EXPRESS_OUTPUT" value="0" />
-      <option name="SEND_DEBUG_REQUEST" value="1" />
-      <option name="ADDITIONAL_IIS_EXPRESS_ARGUMENTS" value="" />
-      <method v="2">
-        <option name="Build" />
-      </method>
-    </configuration>
-    <configuration name="XFramework.Administrator" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
-      <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/XFramework.Administrator/XFramework.Administrator.csproj" />
-      <option name="LAUNCH_PROFILE_TFM" value="net6.0" />
-      <option name="LAUNCH_PROFILE_NAME" value="XFramework.Administrator" />
-      <option name="USE_EXTERNAL_CONSOLE" value="0" />
-      <option name="USE_MONO" value="0" />
-      <option name="RUNTIME_ARGUMENTS" value="" />
-      <option name="GENERATE_APPLICATIONHOST_CONFIG" value="1" />
-      <option name="SHOW_IIS_EXPRESS_OUTPUT" value="0" />
-      <option name="SEND_DEBUG_REQUEST" value="1" />
-      <option name="ADDITIONAL_IIS_EXPRESS_ARGUMENTS" value="" />
-      <method v="2">
-        <option name="Build" />
-      </method>
-    </configuration>
-    <configuration name="XFramework.Administrator: IIS Express" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
-      <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/XFramework.Administrator/XFramework.Administrator.csproj" />
       <option name="LAUNCH_PROFILE_TFM" value="net6.0" />
       <option name="LAUNCH_PROFILE_NAME" value="IIS Express" />
       <option name="USE_EXTERNAL_CONSOLE" value="0" />
@@ -361,16 +300,10 @@
       <workItem from="1644743545084" duration="3412000" />
       <workItem from="1645097104953" duration="2539000" />
       <workItem from="1645439871618" duration="231000" />
-      <workItem from="1645441144522" duration="859000" />
-      <workItem from="1645507950240" duration="657000" />
-      <workItem from="1645708618264" duration="1592000" />
-      <workItem from="1645710283787" duration="932000" />
-      <workItem from="1645711258390" duration="208000" />
-      <workItem from="1645756327691" duration="2858000" />
-      <workItem from="1645760847996" duration="386000" />
-      <workItem from="1645761275342" duration="262000" />
-      <workItem from="1645761583744" duration="267000" />
-      <workItem from="1645795206207" duration="1876000" />
+      <workItem from="1645506921385" duration="13000" />
+      <workItem from="1645612259060" duration="11000" />
+      <workItem from="1645618316925" duration="2815000" />
+      <workItem from="1645775790581" duration="7035000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -421,12 +354,12 @@
       <option name="project" value="LOCAL" />
       <updated>1609246418910</updated>
     </task>
-    <task id="LOCAL-00008" summary="Added Build Dependencies">
-      <created>1645441232749</created>
+    <task id="LOCAL-00008" summary=" - Added sample action / handler example: login action">
+      <created>1645777204618</created>
       <option name="number" value="00008" />
       <option name="presentableId" value="LOCAL-00008" />
       <option name="project" value="LOCAL" />
-      <updated>1645441232749</updated>
+      <updated>1645777204618</updated>
     </task>
     <option name="localTasksCounter" value="9" />
     <servers />
@@ -454,8 +387,8 @@
     <MESSAGE value="Safety Backup + Mobile Bug Fixes" />
     <MESSAGE value="Updated Xframework.Client" />
     <MESSAGE value="XFramework.Web.csproj Update" />
-    <MESSAGE value="Added Build Dependencies" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added Build Dependencies" />
+    <MESSAGE value=" - Added sample action / handler example: login action" />
+    <option name="LAST_COMMIT_MESSAGE" value=" - Added sample action / handler example: login action" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
