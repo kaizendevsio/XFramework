@@ -1,9 +1,12 @@
-﻿namespace XFramework.Integration.Drivers
+﻿using Microsoft.AspNetCore.SignalR.Client;
+
+namespace XFramework.Integration.Drivers
 {
     public class DriverBase
     {
         protected IConfiguration Configuration { get; set; }
         public IMessageBusWrapper MessageBusDriver { get; set; }
+        public HubConnectionState ConnectionState => MessageBusDriver.ConnectionState;
         public Guid? TargetClient { get; set; }
         
         public async Task<CmdResponseBO> SendVoidAsync<TRequest, TResponse>(string commandName ,TRequest request)

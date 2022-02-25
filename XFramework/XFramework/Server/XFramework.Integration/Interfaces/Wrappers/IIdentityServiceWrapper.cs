@@ -1,8 +1,12 @@
 ﻿
+using Microsoft.AspNetCore.SignalR.Client;
+
 namespace XFramework.Integration.Interfaces.Wrappers
 {
     public interface IIdentityServiceWrapper : IXFrameworkService
     {
+        public HubConnectionState ConnectionState { get; }
+        
         public Task<QueryResponseBO<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request);
         public Task<QueryResponseBO<CredentialResponse>> GetCredential(GetCredentialRequest request);
         public Task<QueryResponseBO<List<CredentialResponse>>> LegacyGetCredentialList(GetCredentialListRequest request);

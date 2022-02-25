@@ -1,4 +1,5 @@
-﻿using StreamFlow.Domain.Generic.BusinessObjects;
+﻿using Microsoft.AspNetCore.SignalR.Client;
+using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Interfaces;
 using XFramework.Integration.Entity.Contracts.Responses;
@@ -8,6 +9,7 @@ namespace XFramework.Integration.Interfaces.Wrappers
     public interface IMessageBusWrapper : IXFrameworkService
     {
         public Guid? TargetClient { get; set; }
+        public HubConnectionState ConnectionState { get; }
         public Task<bool> Connect();
         public Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request);
         public Task PushAsync(StreamFlowMessageBO request);
