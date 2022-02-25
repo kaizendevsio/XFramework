@@ -14,4 +14,7 @@ public partial class SessionState : State<SessionState>
     public CredentialResponse Credential { get; set; }
     public IdentityResponse Identity { get; set; }
     public SignInRequest LoginVm { get; set; }
+    public SignUpRequest RegisterVm { get; set; }
+    public ForgotPasswordRequest ForgotPasswordVm { get; set; }
+
 }
