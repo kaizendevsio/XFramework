@@ -1,12 +1,12 @@
 using Blazored.LocalStorage;
 
-namespace XFramework.Client.Shared.Core.Features.Application;
+namespace XFramework.Client.Shared.Core.Features.Session;
 
-public partial class ApplicationState
+public partial class SessionState
 {
-    public class ClearStateHandler : ActionHandler<ClearStateAction>
+    public class ClearStateHandler : ActionHandler<ClearState>
     {
-        private ApplicationState CurrentState => Store.GetState<XFramework.Client.Shared.Core.Features.Application.ApplicationState>();
+        private XFramework.Client.Shared.Core.Features.Layout.LayoutState CurrentState => Store.GetState<XFramework.Client.Shared.Core.Features.Layout.LayoutState>();
         
         public ClearStateHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
@@ -22,11 +22,11 @@ public partial class ApplicationState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(ClearStateAction action, CancellationToken aCancellationToken)
+        public override async Task<Unit> Handle(ClearState state, CancellationToken aCancellationToken)
         {
             try
             {
-                StateHelper.ClearProperties(action, CurrentState);
+                StateHelper.ClearProperties(state, CurrentState);
             }
             catch (Exception e)
             {

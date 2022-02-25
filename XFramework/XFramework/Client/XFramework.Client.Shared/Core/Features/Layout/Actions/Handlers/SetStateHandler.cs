@@ -1,3 +1,4 @@
+using Blazored.LocalStorage;
 using XFramework.Client.Shared.Entity.Enums;
 
 namespace XFramework.Client.Shared.Core.Features.Layout;
@@ -8,9 +9,10 @@ public partial class LayoutState
     {
         private LayoutState CurrentState => Store.GetState<LayoutState>();
             
-        public SetStateHandler(ISessionStorageService sessionStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public SetStateHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
             SessionStorageService = sessionStorageService;
+            LocalStorageService = localStorageService;
             SweetAlertService = sweetAlertService;
             NavigationManager = navigationManager;
             EndPoints = endPoints;

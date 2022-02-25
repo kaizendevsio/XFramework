@@ -1,3 +1,5 @@
+using Blazored.LocalStorage;
+
 namespace XFramework.Client.Shared.Core.Features.Configuration;
 
 public partial class ConfigurationState
@@ -6,9 +8,10 @@ public partial class ConfigurationState
     {
         private ConfigurationState CurrentState => Store.GetState<ConfigurationState>();
         
-        public ClearStateHandler(ISessionStorageService sessionStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public ClearStateHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
             SessionStorageService = sessionStorageService;
+            LocalStorageService = localStorageService;
             SweetAlertService = sweetAlertService;
             NavigationManager = navigationManager;
             EndPoints = endPoints;
