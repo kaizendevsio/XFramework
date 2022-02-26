@@ -16,12 +16,20 @@ public class CheckIdentityExistenceHandler : QueryBaseHandler ,IRequestHandler<C
         
     public async Task<QueryResponseBO<ExistenceResponse>> Handle(CheckIdentityExistenceQuery request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrEmpty(request.FirstName) && string.IsNullOrEmpty(request.MiddleName) && string.IsNullOrEmpty(request.LastName))
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
+        }
+        
         var existing = _dataLayer.TblIdentityInformations
             .AsNoTracking()
             .Where(i => i.FirstName == request.FirstName)
             .Where(i  => i.MiddleName == request.MiddleName)
             .Where(i => i.LastName == request.LastName)
-            .Where(i => i.Guid != request.Uid)
+            .Where(i => i.Guid != $"{request.Guid}")
             .Any();
             
         if (existing)

@@ -6,5 +6,5 @@ public class CheckCredentialExistenceRequest : RequestBase
 {
     public string UserName { get; set; }
     public Guid? Guid { get; set; }
-    public string PasswordString { get; set; }
+    public string Password { get; set; }
 }

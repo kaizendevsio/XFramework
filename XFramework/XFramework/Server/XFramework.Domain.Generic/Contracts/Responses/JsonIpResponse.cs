@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace XFramework.Client.Shared.Entity.Models.Response;
+namespace XFramework.Domain.Generic.Contracts.Responses;
 
 public class JsonIpResponse
 {

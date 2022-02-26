@@ -18,7 +18,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
         var existing = _dataLayer.TblIdentityCredentials
             .AsNoTracking()
             .Where(i => i.UserName == request.UserName)
-            .Where(i => i.Guid != request.Cuid)
+            .Where(i => i.Guid != $"{request.Guid}")
             .Any();
             
         if (existing)
@@ -30,7 +30,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
             };
         }
 
-        if (string.IsNullOrEmpty(request.PasswordString))
+        if (string.IsNullOrEmpty(request.Password))
         {
             return new ()
             {
@@ -39,7 +39,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
             };
         }
 
-        if (request.PasswordString.Length < 8)
+        if (request.Password.Length < 8)
         {
             return new ()
             {

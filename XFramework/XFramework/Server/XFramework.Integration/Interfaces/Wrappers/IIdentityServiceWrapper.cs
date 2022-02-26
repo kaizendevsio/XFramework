@@ -5,7 +5,6 @@ namespace XFramework.Integration.Interfaces.Wrappers
 {
     public interface IIdentityServiceWrapper : IXFrameworkService
     {
-        public IMessageBusWrapper MessageBusDriver { get; set; }
         public HubConnectionState ConnectionState { get; }
         
         public Task<QueryResponseBO<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request);

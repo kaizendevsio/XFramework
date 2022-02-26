@@ -1,12 +1,9 @@
-﻿using XFramework.Domain.Generic.Contracts.Responses;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity;
 
-public class CheckIdentityExistenceQuery : QueryBaseEntity, IRequest<QueryResponseBO<ExistenceResponse>>
+public class CheckIdentityExistenceQuery : CheckIdentityExistenceRequest, IRequest<QueryResponseBO<ExistenceResponse>>
 {
-    public string FirstName { get; set; }
-    public string MiddleName { get; set; }
-    public string LastName { get; set; }
-        
-    public string Uid { get; set; }
+  
 }

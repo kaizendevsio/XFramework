@@ -10,31 +10,101 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="409723ac-d59d-499a-9f6f-0d22e3f077ee" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Entity/Models/Response/JsonIpResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/App.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Pages/Dashboard/Dashboard.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Pages/Dashboard/DashboardBase.razor.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Pages/Dashboard/SignIn.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Pages/Dashboard/SignInBase.razor.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Pages/Dashboard/SignUp.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Pages/Dashboard/SignUpBase.razor.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Program.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Properties/launchSettings.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Shared/MainLayout.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Shared/MainLayout.razor.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Shared/NavMenu.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Shared/NavMenu.razor.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/Shared/SurveyPrompt.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/XFramework.Administrator.csproj" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/_Imports.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/app.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/bootstrap/bootstrap.min.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/bootstrap/bootstrap.min.css.map" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/FONT-LICENSE" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/ICON-LICENSE" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/font/css/open-iconic-bootstrap.min.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.eot" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.otf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.ttf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.woff" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/favicon.ico" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/icon-192.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/index.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Administrator/wwwroot/sample-data/weather.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/App.razor" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Pages/Dashboard/Dashboard.razor" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Pages/Dashboard/DashboardBase.razor.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Pages/Dashboard/SignIn.razor" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Pages/Dashboard/SignInBase.razor.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Pages/Dashboard/SignUp.razor" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Pages/Dashboard/SignUpBase.razor.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Pages/PageBase.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Program.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Properties/launchSettings.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Shared/MainLayout.razor" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Shared/MainLayout.razor.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Shared/NavMenu.razor" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Shared/NavMenu.razor.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/Shared/SurveyPrompt.razor" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/XFramework.Administrator.csproj" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/_Imports.razor" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/app.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/bootstrap/bootstrap.min.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/bootstrap/bootstrap.min.css.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/FONT-LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/ICON-LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/font/css/open-iconic-bootstrap.min.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.eot" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.otf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.ttf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/css/open-iconic/font/fonts/open-iconic.woff" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/favicon.ico" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/icon-192.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Administrator/wwwroot/sample-data/weather.json" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Actions/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Actions/Handlers/ClearStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Actions/Handlers/SetStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Actions/Handlers/SetStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Cache/Actions/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Cache/Actions/Handlers/ClearStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Cache/Actions/Handlers/SetStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Cache/Actions/Handlers/SetStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Configuration/Actions/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Configuration/Actions/Handlers/ClearStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Configuration/Actions/Handlers/SetStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Configuration/Actions/Handlers/SetStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Configuration/Requests/Handlers/ConfigurationRequestHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Configuration/Requests/Handlers/ConfigurationRequestHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Layout/Actions/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Layout/Actions/Handlers/ClearStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Layout/Actions/Handlers/SetStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Layout/Actions/Handlers/SetStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Layout/Actions/Handlers/UpdateSidebarItemsActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Layout/Actions/Handlers/UpdateSidebarItemsActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/ClearStateHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/CreateCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/CreateCredentialHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Validations/Identity/Authorization/CreateAuthorizeIdentityValidator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Validations/Identity/Authorization/CreateAuthorizeIdentityValidator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/CheckIdentityExistenceQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/CheckIdentityExistenceQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Contacts/CheckContactExistenceQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Contacts/CheckContactExistenceQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Contacts/GetContactQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Contacts/GetContactQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/AuthenticateCredentialQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/AuthenticateCredentialQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/CheckCredentialExistenceQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/CheckCredentialExistenceQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/GetCredentialListQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/GetCredentialListQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/GetCredentialQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/Credentials/GetCredentialQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/GetIdentityQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Entity/Identity/GetIdentityQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/CheckIdentityExistenceHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/CheckIdentityExistenceHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Contacts/CheckContactExistenceHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Contacts/CheckContactExistenceHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/CheckCredentialExistenceHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/CheckCredentialExistenceHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/CheckCredentialExistenceRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/CheckCredentialExistenceRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/CreateCredentialRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/CreateCredentialRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/ForgotPasswordActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/ForgotPasswordActionHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/SetActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/SetActionHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/RegisterActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/RegisterActionHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/SetStateAction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/SetStateAction.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/SessionState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/SessionState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Helpers/HttpClientHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Helpers/HttpClientHelper.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Helpers/IHttpClient.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Helpers/IHttpClient.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/Handlers/GetWalletListActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/Handlers/GetWalletListActionHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/Handlers/TransferWalletActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/Handlers/TransferWalletActionHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Entity/Models/Requests/SignUpRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Entity/Models/Requests/SignUpRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Entity/Models/Response/JsonIpResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/JsonIpResponse.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/RequestServerBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/RequestServerBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IIdentityServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IIdentityServiceWrapper.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -357,6 +427,7 @@
       <workItem from="1645098801633" duration="1264000" />
       <workItem from="1645526533186" duration="185000" />
       <workItem from="1645785176675" duration="1399000" />
+      <workItem from="1645877455486" duration="2511000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure To Support Sub-Systems">
       <created>1616960634242</created>

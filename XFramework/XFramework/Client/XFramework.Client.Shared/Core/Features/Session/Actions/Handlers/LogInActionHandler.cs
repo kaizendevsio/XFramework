@@ -33,7 +33,6 @@ public partial class SessionState
         {
             // Map  view model to request object
             var request = CurrentState.LoginVm.Adapt<AuthenticateCredentialRequest>();
-            //request.RequestServer = await GetRequestServer();
             
             // Send the request
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
@@ -47,18 +46,31 @@ public partial class SessionState
                 // Display error to the console
                 Console.WriteLine($"Error from response: {response.Message}");
                 
-                // If NavigateToOnFailure property is set, navigate to the given URL
+                // If Fail URL property is provided, navigate to the given URL
                 if (!string.IsNullOrEmpty(action.NavigateToOnFailure))
                 {
                     NavigationManager.NavigateTo(action.NavigateToOnFailure);
                 }
             }
             
-            // If NavigateToOnSuccess property is set, navigate to the given URL
+            // Set Session State To Active
+            await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
+            
+            // If Success URL property is provided, navigate to the given URL
             if (!string.IsNullOrEmpty(action.NavigateToOnSuccess))
             {
                 NavigationManager.NavigateTo(action.NavigateToOnSuccess);
             }
+            
+            // Fetch User Identity And Credential
+            var identityResponse = await IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});
+            var credentialResponse = await IdentityServiceWrapper.GetCredential(new() {Guid = response.Response.CredentialGuid});
+            
+            await Mediator.Send(new SetState()
+            {
+                Identity = identityResponse.Response,
+                Credential = credentialResponse.Response
+            });
             
             return Unit.Value;
         }

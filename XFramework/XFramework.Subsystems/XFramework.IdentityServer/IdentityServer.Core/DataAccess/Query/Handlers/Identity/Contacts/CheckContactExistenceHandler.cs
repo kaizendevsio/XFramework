@@ -31,7 +31,7 @@ public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<Ch
         var existing = await _dataLayer.TblIdentityContacts
             .AsNoTracking()
             .Where(i => i.Value == request.Value)
-            .Where(i => i.Id != request.Cid)
+            .Where(i => i.Guid != $"{request.Guid}")
             .FirstOrDefaultAsync(cancellationToken);
         if (existing != null)
         {

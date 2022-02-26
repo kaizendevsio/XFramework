@@ -42,5 +42,6 @@
 
     <ItemGroup>
       <Folder Include="Core\Wrappers" />
+      <Folder Include="Entity\Models\Response" />
     </ItemGroup>
 </Project>
