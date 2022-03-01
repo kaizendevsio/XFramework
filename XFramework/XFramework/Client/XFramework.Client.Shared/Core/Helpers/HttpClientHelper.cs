@@ -8,7 +8,6 @@ public class HttpClientHelper : IHttpClient
     private readonly HttpClient HttpClient;
     private SessionState SessionState => Store.GetState<SessionState>();
     private AuthenticationResponse Authentication { get; set; }
-    public JsonIpResponse ClientIdentity { get; set; }
     public JsonSerializerOptions JsonSerializerOptions { get; set; }
     
     public HttpClientHelper(HttpClient httpClient, IStore store)
