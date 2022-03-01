@@ -4,7 +4,7 @@ using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential;
 
-public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckCredentialExistenceQuery, QueryResponseBO<ExistenceResponse>>
+public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckCredentialExistenceQuery, QueryResponse<ExistenceResponse>>
 {
     private readonly LegacyContext _legacyContext;
 
@@ -13,7 +13,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
         _legacyContext = legacyContext;
         _dataLayer = dataLayer;
     }
-    public async Task<QueryResponseBO<ExistenceResponse>> Handle(CheckCredentialExistenceQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<ExistenceResponse>> Handle(CheckCredentialExistenceQuery request, CancellationToken cancellationToken)
     {
         var existing = _dataLayer.TblIdentityCredentials
             .AsNoTracking()

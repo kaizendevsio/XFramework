@@ -1,7 +1,7 @@
 ﻿
 namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
 {
-    public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateIdentityCmd, CmdResponseBO>
+    public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateIdentityCmd, CmdResponse>
     {
         public IWalletServiceWrapper WalletServiceWrapper { get; }
 
@@ -11,7 +11,7 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
             IdentityServiceWrapper = identityServiceWrapper;
         }
 
-        public async Task<CmdResponseBO> Handle(CreateIdentityCmd request, CancellationToken cancellationToken)
+        public async Task<CmdResponse> Handle(CreateIdentityCmd request, CancellationToken cancellationToken)
         {
             var uuid = Guid.NewGuid();
             var cuid = Guid.NewGuid();
@@ -78,7 +78,7 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
             var response = await IdentityServiceWrapper.CreateIdentity(req);
             if (response.HttpStatusCode != HttpStatusCode.Accepted)
             {
-                return response.Adapt<CmdResponseBO>();
+                return response.Adapt<CmdResponse>();
             }
 
             var req2 = request.Adapt<CreateCredentialRequest>();
@@ -88,19 +88,19 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
             var response2 = await IdentityServiceWrapper.CreateCredential(req2);
             if (response2.HttpStatusCode != HttpStatusCode.Accepted)
             {
-                return response2.Adapt<CmdResponseBO>();
+                return response2.Adapt<CmdResponse>();
             }
 
             var response3 = await IdentityServiceWrapper.CreateContact(phoneContact);
             if (response3.HttpStatusCode != HttpStatusCode.Accepted)
             {
-                return response3.Adapt<CmdResponseBO>();
+                return response3.Adapt<CmdResponse>();
             }
             
             var response4 = await IdentityServiceWrapper.CreateContact(emailContact);
             if (response3.HttpStatusCode != HttpStatusCode.Accepted)
             {
-                return response4.Adapt<CmdResponseBO>();
+                return response4.Adapt<CmdResponse>();
             }
 
             return new()

@@ -2,14 +2,14 @@
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets;
 
-public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetWalletEntityListQuery, QueryResponseBO<List<WalletEntityResponse>>>
+public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetWalletEntityListQuery, QueryResponse<List<WalletEntityResponse>>>
 {
     public GetWalletEntityListHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<QueryResponseBO<List<WalletEntityResponse>>> Handle(GetWalletEntityListQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<List<WalletEntityResponse>>> Handle(GetWalletEntityListQuery request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblApplications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
         if (entity == null)
@@ -28,7 +28,7 @@ public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetW
             .ToListAsync(cancellationToken: cancellationToken);
         if (!result.Any())
         {
-            return new QueryResponseBO<List<WalletEntityResponse>>()
+            return new QueryResponse<List<WalletEntityResponse>>()
             {
                 Message = $"No identity exists",
                 HttpStatusCode = HttpStatusCode.NoContent
@@ -36,7 +36,7 @@ public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetW
         }
 
         var r = result.Adapt<List<WalletEntityResponse>>();
-        return new QueryResponseBO<List<WalletEntityResponse>>()
+        return new QueryResponse<List<WalletEntityResponse>>()
         {
             Response = r
         };

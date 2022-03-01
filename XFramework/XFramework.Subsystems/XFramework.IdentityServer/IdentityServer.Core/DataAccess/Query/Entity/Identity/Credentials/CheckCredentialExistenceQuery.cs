@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 
-public class CheckCredentialExistenceQuery : CheckCredentialExistenceRequest, IRequest<QueryResponseBO<ExistenceResponse>>
+public class CheckCredentialExistenceQuery : CheckCredentialExistenceRequest, IRequest<QueryResponse<ExistenceResponse>>
 {
 
 }

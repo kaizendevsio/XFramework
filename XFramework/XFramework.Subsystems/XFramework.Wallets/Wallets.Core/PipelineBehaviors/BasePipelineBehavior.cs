@@ -76,7 +76,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
 
     private async Task PostHandler(TRequest request)
     {
-        if (_response.GetType() == typeof(CmdResponseBO<TRequest>))
+        if (_response.GetType() == typeof(CmdResponse<TRequest>))
         {
             _response.GetType().GetProperty("Request")?.SetValue(_response, request, null);
         }

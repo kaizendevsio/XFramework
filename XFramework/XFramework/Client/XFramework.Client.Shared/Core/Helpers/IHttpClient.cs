@@ -1,10 +1,8 @@
-﻿using XFramework.Client.Shared.Entity.Models.Response;
-
+﻿
 namespace XFramework.Client.Shared.Core.Helpers;
 
 public interface IHttpClient
 {
-    public JsonIpResponse ClientIdentity { get; set; }
     public Task<QueryResponse<TResponse>> GetJsonAsync<TResponse>(string url, bool useAuthentication = true, decimal version = 2.0m);
     public Task<QueryResponse<TResponse>> GetJsonAsync<TResponse>(string url, Dictionary<string,string> queryParams, bool useAuthentication = true, decimal version = 2.0m);
     public Task<QueryResponse<TResponse>> PostJsonAsync<TResponse, TRequest>(string url, TRequest request, Dictionary<string, string> queryParams = null, bool useAuthentication = false, decimal version = 2.0m);

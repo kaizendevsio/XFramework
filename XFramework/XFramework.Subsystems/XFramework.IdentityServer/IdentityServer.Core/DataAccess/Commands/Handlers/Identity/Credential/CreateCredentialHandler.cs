@@ -1,13 +1,13 @@
 ﻿namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Credential;
 
-public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<CreateCredentialCmd, CmdResponseBO<CreateCredentialCmd>>
+public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<CreateCredentialCmd, CmdResponse<CreateCredentialCmd>>
 {
 
     public CreateCredentialHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
-    public async Task<CmdResponseBO<CreateCredentialCmd>> Handle(CreateCredentialCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<CreateCredentialCmd>> Handle(CreateCredentialCmd request, CancellationToken cancellationToken)
     {
         var application = await GetApplication(request.RequestServer.ApplicationId);
         var identityInfo = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.IdentityGuid}", cancellationToken: cancellationToken);
@@ -15,7 +15,7 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
             
         if (identityInfo == null)
         {
-            return new CmdResponseBO<CreateCredentialCmd>
+            return new CmdResponse<CreateCredentialCmd>
             {
                 Message = $"Identity with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound

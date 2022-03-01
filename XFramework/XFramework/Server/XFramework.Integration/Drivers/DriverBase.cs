@@ -15,7 +15,7 @@ namespace XFramework.Integration.Drivers
         public Guid? ApplicationId { get; set; }
         public Guid? TargetClient { get; set; }
         
-        public async Task<CmdResponseBO> SendVoidAsync<TRequest, TResponse>(string commandName ,TRequest request)
+        public async Task<CmdResponse> SendVoidAsync<TRequest, TResponse>(string commandName ,TRequest request)
         {
             var rs = await GetRequestServer();
             try
@@ -27,7 +27,7 @@ namespace XFramework.Integration.Drivers
                 Console.WriteLine(e);
             }
             
-            var result = await MessageBusDriver.InvokeAsync<CmdResponseBO>(new(request)
+            var result = await MessageBusDriver.InvokeAsync<CmdResponse>(new(request)
             {
                 CommandName = commandName,
                 ExchangeType = MessageExchangeType.Direct,
@@ -35,7 +35,7 @@ namespace XFramework.Integration.Drivers
             });
             return result.Response;
         }
-        public async Task<QueryResponseBO<TResponse>> SendAsync<TRequest, TResponse>(string commandName ,TRequest request)
+        public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(string commandName ,TRequest request)
         {
             var rs = await GetRequestServer();
             try
@@ -47,13 +47,13 @@ namespace XFramework.Integration.Drivers
                 Console.WriteLine(e);
             }
             
-            var result = await MessageBusDriver.InvokeAsync<QueryResponseBO<TResponse>>(new(request)
+            var result = await MessageBusDriver.InvokeAsync<QueryResponse<TResponse>>(new(request)
             {
                 CommandName = commandName,
                 ExchangeType = MessageExchangeType.Direct,
                 Recipient = TargetClient
             });
-            return result.Response.Adapt<QueryResponseBO<TResponse>>();
+            return result.Response.Adapt<QueryResponse<TResponse>>();
         }
         
         public async Task<RequestServerBO> GetRequestServer()

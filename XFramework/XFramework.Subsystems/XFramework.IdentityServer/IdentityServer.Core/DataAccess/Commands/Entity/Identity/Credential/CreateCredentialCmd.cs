@@ -3,7 +3,7 @@ using IdentityServer.Domain.Generic.Enums;
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
 
-public class CreateCredentialCmd : CreateCredentialRequest, IRequest<CmdResponseBO<CreateCredentialCmd>>
+public class CreateCredentialCmd : CreateCredentialRequest, IRequest<CmdResponse<CreateCredentialCmd>>
 {
 
 }

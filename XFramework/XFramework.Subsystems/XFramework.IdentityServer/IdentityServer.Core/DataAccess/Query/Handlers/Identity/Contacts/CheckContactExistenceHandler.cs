@@ -4,7 +4,7 @@ using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Contacts;
 
-public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckContactExistenceQuery, QueryResponseBO<ExistenceResponse>>
+public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckContactExistenceQuery, QueryResponse<ExistenceResponse>>
 {
     private readonly LegacyContext _legacyContext;
 
@@ -14,7 +14,7 @@ public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<Ch
         _dataLayer = dataLayer;
     }
         
-    public async Task<QueryResponseBO<ExistenceResponse>> Handle(CheckContactExistenceQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<ExistenceResponse>> Handle(CheckContactExistenceQuery request, CancellationToken cancellationToken)
     {
         switch (request.ContactType)
         {

@@ -47,4 +47,62 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         Store = store;
     }
     public abstract Task<Unit> Handle(TAction action, CancellationToken aCancellationToken);
+
+    public async Task HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false, string customMessage = "")
+    {
+        if (response.HttpStatusCode is not HttpStatusCode.Accepted)
+        {
+            // Display message to UI
+            switch (silent)
+            {
+                case true:
+                    SweetAlertService.FireAsync("Error", $"There was an error while trying to process your request, please try again later");
+                    break;
+                case false:
+                    SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                            ? $"There was an error while trying to process your request: {response.Message}"
+                            : $"{customMessage}: {response.Message}");
+                    break;
+            }
+
+            // Display error to the console
+            Console.WriteLine($"Error from response: {response.Message}");
+
+            // If Fail URL property is provided, navigate to the given URL
+            if (action.ContainsProperty("NavigateToOnFailure"))
+            {
+                var s = action.GetPropertyValue("NavigateToOnFailure").ToString();
+                NavigationManager.NavigateTo(s);
+            }
+        }
+    }
+    
+    public async Task HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, string customMessage = "", bool silent = false)
+    {
+        if (response.HttpStatusCode is not HttpStatusCode.Accepted)
+        {
+            // Display message to UI
+            switch (silent)
+            {
+                case true:
+                    SweetAlertService.FireAsync("Error", $"There was an error while trying to process your request, please try again later");
+                    break;
+                case false:
+                    SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                        ? $"There was an error while trying to process your request: {response.Message}"
+                        : $"{customMessage}: {response.Message}");
+                    break;
+            }
+
+            // Display error to the console
+            Console.WriteLine($"Error from response: {response.Message}");
+
+            // If Fail URL property is provided, navigate to the given URL
+            if (action.ContainsProperty("NavigateToOnFailure"))
+            {
+                var s = action.GetPropertyValue("NavigateToOnFailure").ToString();
+                NavigationManager.NavigateTo(s);
+            }
+        }
+    }
 }

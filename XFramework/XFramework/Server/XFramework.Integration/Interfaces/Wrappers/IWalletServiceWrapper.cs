@@ -11,28 +11,28 @@ namespace XFramework.Integration.Interfaces.Wrappers
     {
         #region Wallet Entity
 
-        public Task<CmdResponseBO> CreateWalletEntity(CreateWalletEntityRequest request);
-        public Task<QueryResponseBO<WalletEntityResponse>> GetWalletEntity(GetWalletEntityRequest request);
-        public Task<QueryResponseBO<List<WalletEntityResponse>>> GetWalletEntityList(GetWalletEntityListRequest request);
-        public Task<CmdResponseBO> UpdateWalletEntity(UpdateWalletEntityRequest request);
-        public Task<CmdResponseBO> DeleteWalletEntity(DeleteWalletEntityRequest request);
+        public Task<CmdResponse> CreateWalletEntity(CreateWalletEntityRequest request);
+        public Task<QueryResponse<WalletEntityResponse>> GetWalletEntity(GetWalletEntityRequest request);
+        public Task<QueryResponse<List<WalletEntityResponse>>> GetWalletEntityList(GetWalletEntityListRequest request);
+        public Task<CmdResponse> UpdateWalletEntity(UpdateWalletEntityRequest request);
+        public Task<CmdResponse> DeleteWalletEntity(DeleteWalletEntityRequest request);
 
         #endregion
 
 
         #region Wallet
 
-        public Task<CmdResponseBO> CreateWallet(CreateWalletRequest request);
-        public Task<QueryResponseBO<WalletResponse>> GetWallet(GetWalletRequest request);
-        public Task<QueryResponseBO<List<WalletResponse>>> GetWalletList(GetWalletListRequest request);
-        public Task<CmdResponseBO> UpdateWallet(UpdateWalletRequest request);
-        public Task<CmdResponseBO> DeleteWallet(DeleteWalletRequest request);
-        public Task<CmdResponseBO> DecrementWallet(DecrementWalletRequest request);
-        public Task<CmdResponseBO> IncrementWallet(IncrementWalletRequest request);
-        public Task<CmdResponseBO> TransferWallet(TransferWalletRequest request);
+        public Task<CmdResponse> CreateWallet(CreateWalletRequest request);
+        public Task<QueryResponse<WalletResponse>> GetWallet(GetWalletRequest request);
+        public Task<QueryResponse<List<WalletResponse>>> GetWalletList(GetWalletListRequest request);
+        public Task<CmdResponse> UpdateWallet(UpdateWalletRequest request);
+        public Task<CmdResponse> DeleteWallet(DeleteWalletRequest request);
+        public Task<CmdResponse> DecrementWallet(DecrementWalletRequest request);
+        public Task<CmdResponse> IncrementWallet(IncrementWalletRequest request);
+        public Task<CmdResponse> TransferWallet(TransferWalletRequest request);
         
-        public Task<QueryResponseBO<WalletDepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request);
-        public Task<QueryResponseBO<WalletDepositResponse>> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request);
+        public Task<QueryResponse<WalletDepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request);
+        public Task<QueryResponse<WalletDepositResponse>> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request);
 
         #endregion
     }

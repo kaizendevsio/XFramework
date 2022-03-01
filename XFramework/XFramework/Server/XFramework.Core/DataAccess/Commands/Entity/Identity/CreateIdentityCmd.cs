@@ -7,7 +7,7 @@ using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Core.DataAccess.Commands.Entity.Identity
 {
-    public class CreateIdentityCmd : CreateUserRequest, IRequest<CmdResponseBO>
+    public class CreateIdentityCmd : CreateUserRequest, IRequest<CmdResponse>
     {
     }
 }

@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
 
-public class DeleteCredentialCmd : DeleteCredentialRequest, IRequest<CmdResponseBO<DeleteCredentialCmd>>
+public class DeleteCredentialCmd : DeleteCredentialRequest, IRequest<CmdResponse<DeleteCredentialCmd>>
 {
         
 }

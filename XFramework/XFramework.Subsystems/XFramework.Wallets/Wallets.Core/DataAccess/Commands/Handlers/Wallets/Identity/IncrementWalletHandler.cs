@@ -2,14 +2,14 @@
 
 namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets.Identity;
 
-public class IncrementWalletHandler : CommandBaseHandler, IRequestHandler<IncrementWalletCmd, CmdResponseBO<IncrementWalletCmd>>
+public class IncrementWalletHandler : CommandBaseHandler, IRequestHandler<IncrementWalletCmd, CmdResponse<IncrementWalletCmd>>
 {
     public IncrementWalletHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<CmdResponseBO<IncrementWalletCmd>> Handle(IncrementWalletCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<IncrementWalletCmd>> Handle(IncrementWalletCmd request, CancellationToken cancellationToken)
     {
         var credentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (credentialEntity == null)

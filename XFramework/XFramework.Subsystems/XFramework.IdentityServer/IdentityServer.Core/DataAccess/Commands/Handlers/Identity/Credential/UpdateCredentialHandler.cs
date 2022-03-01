@@ -1,13 +1,13 @@
 ﻿
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Credential;
 
-public class UpdateCredentialHandler : CommandBaseHandler, IRequestHandler<UpdateCredentialCmd, CmdResponseBO<UpdateCredentialCmd>>
+public class UpdateCredentialHandler : CommandBaseHandler, IRequestHandler<UpdateCredentialCmd, CmdResponse<UpdateCredentialCmd>>
 {
     public UpdateCredentialHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
-    public async Task<CmdResponseBO<UpdateCredentialCmd>> Handle(UpdateCredentialCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<UpdateCredentialCmd>> Handle(UpdateCredentialCmd request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblIdentityCredentials
             .Where(i => i.IdentityInfo.Guid == request.Guid.ToString())
@@ -16,7 +16,7 @@ public class UpdateCredentialHandler : CommandBaseHandler, IRequestHandler<Updat
 
         if (entity == null)
         {
-            return new CmdResponseBO<UpdateCredentialCmd>
+            return new CmdResponse<UpdateCredentialCmd>
             {
                 Message = $"Identity with data [UID: {request.Guid}, Username: {request.UserName}] does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound

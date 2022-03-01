@@ -31,28 +31,15 @@ public partial class SessionState
 
         public override async Task<Unit> Handle(LoginAction action, CancellationToken aCancellationToken)
         {
-            // Map  view model to request object
+            // Map view model to request object
             var request = CurrentState.LoginVm.Adapt<AuthenticateCredentialRequest>();
             
             // Send the request
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
             
             // Handle if the response is invalid or error
-            if (response.HttpStatusCode is not HttpStatusCode.Accepted)
-            {
-                // Display message to UI
-                SweetAlertService.FireAsync("Error", "There was an error while trying to sign you in. Please Try again later");
-                
-                // Display error to the console
-                Console.WriteLine($"Error from response: {response.Message}");
-                
-                // If Fail URL property is provided, navigate to the given URL
-                if (!string.IsNullOrEmpty(action.NavigateToOnFailure))
-                {
-                    NavigationManager.NavigateTo(action.NavigateToOnFailure);
-                }
-            }
-            
+            await HandleFailure(response, action, "There was an error while trying to sign you in. Please Try again later");
+           
             // Set Session State To Active
             await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
             

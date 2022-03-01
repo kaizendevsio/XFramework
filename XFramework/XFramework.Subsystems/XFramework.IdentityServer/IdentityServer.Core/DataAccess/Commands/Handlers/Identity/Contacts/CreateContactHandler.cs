@@ -2,14 +2,14 @@
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Contacts;
 
-public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateContactCmd,CmdResponseBO<CreateContactCmd>>
+public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateContactCmd,CmdResponse<CreateContactCmd>>
 {
     public CreateContactHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
 
-    public async Task<CmdResponseBO<CreateContactCmd>> Handle(CreateContactCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<CreateContactCmd>> Handle(CreateContactCmd request, CancellationToken cancellationToken)
     {
         var identityCredential = await _dataLayer.TblIdentityCredentials
             .AsNoTracking()

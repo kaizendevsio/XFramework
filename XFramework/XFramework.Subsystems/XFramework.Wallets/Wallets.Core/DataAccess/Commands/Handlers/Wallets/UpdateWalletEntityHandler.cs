@@ -1,13 +1,13 @@
 ﻿namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets;
 
-public class UpdateWalletEntityHandler: CommandBaseHandler, IRequestHandler<UpdateWalletEntityCmd, CmdResponseBO<UpdateWalletEntityCmd>>
+public class UpdateWalletEntityHandler: CommandBaseHandler, IRequestHandler<UpdateWalletEntityCmd, CmdResponse<UpdateWalletEntityCmd>>
 {
     public UpdateWalletEntityHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<CmdResponseBO<UpdateWalletEntityCmd>> Handle(UpdateWalletEntityCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<UpdateWalletEntityCmd>> Handle(UpdateWalletEntityCmd request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}" , cancellationToken);
         if (entity == null)

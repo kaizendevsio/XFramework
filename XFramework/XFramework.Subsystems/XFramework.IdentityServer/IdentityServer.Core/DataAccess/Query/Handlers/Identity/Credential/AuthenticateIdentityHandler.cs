@@ -7,7 +7,7 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential;
 
-public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<AuthenticateCredentialQuery, QueryResponseBO<AuthorizeIdentityResponse>>
+public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<AuthenticateCredentialQuery, QueryResponse<AuthorizeIdentityResponse>>
 {
     public AuthenticateIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService, ILoggerWrapper recordsWrapper)
     {
@@ -19,7 +19,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         _cachingService = cachingService;
     }
 
-    public async Task<QueryResponseBO<AuthorizeIdentityResponse>> Handle(AuthenticateCredentialQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<AuthorizeIdentityResponse>> Handle(AuthenticateCredentialQuery request, CancellationToken cancellationToken)
     {
         var credential = await ValidateAuthorization(request, cancellationToken, request.AuthorizeBy);
         if (credential == null)

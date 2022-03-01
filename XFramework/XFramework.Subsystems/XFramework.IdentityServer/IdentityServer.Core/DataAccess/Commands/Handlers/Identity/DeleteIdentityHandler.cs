@@ -1,18 +1,18 @@
 ﻿namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity;
 
-public class DeleteIdentityHandler : CommandBaseHandler ,IRequestHandler<DeleteIdentityCmd, CmdResponseBO<DeleteIdentityCmd>>
+public class DeleteIdentityHandler : CommandBaseHandler ,IRequestHandler<DeleteIdentityCmd, CmdResponse<DeleteIdentityCmd>>
 {
     public DeleteIdentityHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
-    public async Task<CmdResponseBO<DeleteIdentityCmd>> Handle(DeleteIdentityCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<DeleteIdentityCmd>> Handle(DeleteIdentityCmd request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
 
         if (entity == null)
         {
-            return new CmdResponseBO<DeleteIdentityCmd>
+            return new CmdResponse<DeleteIdentityCmd>
             {
                 Message = $"Identity with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
@@ -21,7 +21,7 @@ public class DeleteIdentityHandler : CommandBaseHandler ,IRequestHandler<DeleteI
 
         if (_dataLayer.TblIdentityCredentials.Any(i => i.IdentityInfoId == entity.Id))
         {
-            return new CmdResponseBO<DeleteIdentityCmd>
+            return new CmdResponse<DeleteIdentityCmd>
             {
                 Message = $"Identity with Guid {request.Guid} has existing credentials and cannot be deleted",
                 HttpStatusCode = HttpStatusCode.Forbidden

@@ -2,14 +2,14 @@
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity;
 
-public class GetWalletHandler : QueryBaseHandler, IRequestHandler<GetWalletQuery, QueryResponseBO<WalletResponse>>
+public class GetWalletHandler : QueryBaseHandler, IRequestHandler<GetWalletQuery, QueryResponse<WalletResponse>>
 {
     public GetWalletHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<QueryResponseBO<WalletResponse>> Handle(GetWalletQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<WalletResponse>> Handle(GetWalletQuery request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblUserWallets.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
         if (entity == null)

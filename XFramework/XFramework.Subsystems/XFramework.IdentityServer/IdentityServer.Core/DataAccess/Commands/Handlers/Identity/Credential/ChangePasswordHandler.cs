@@ -1,16 +1,16 @@
 ﻿namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Credential;
 
-public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangePasswordCmd, CmdResponseBO<ChangePasswordCmd>>
+public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangePasswordCmd, CmdResponse<ChangePasswordCmd>>
 {
     public ChangePasswordHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<CmdResponseBO<ChangePasswordCmd>> Handle(ChangePasswordCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<ChangePasswordCmd>> Handle(ChangePasswordCmd request, CancellationToken cancellationToken)
     {
         if (GetCredential(request, cancellationToken, out var entity, out var handle)) return handle;
-        var hashPasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: request.PasswordString, workFactor:11));
+        var hashPasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: request.Password, workFactor:11));
 
         entity.PasswordByte = hashPasswordByte;
         _dataLayer.Update(entity);
@@ -22,7 +22,7 @@ public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangeP
         };
     }
 
-    private bool GetCredential(ChangePasswordCmd request, CancellationToken cancellationToken, out TblIdentityCredential entity, out CmdResponseBO<ChangePasswordCmd> handle)
+    private bool GetCredential(ChangePasswordCmd request, CancellationToken cancellationToken, out TblIdentityCredential entity, out CmdResponse<ChangePasswordCmd> handle)
     {
             
         entity = _dataLayer.TblIdentityCredentials

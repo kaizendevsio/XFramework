@@ -4,7 +4,7 @@ using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity;
 
-public class CheckIdentityExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckIdentityExistenceQuery, QueryResponseBO<ExistenceResponse>>
+public class CheckIdentityExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckIdentityExistenceQuery, QueryResponse<ExistenceResponse>>
 {
     private readonly LegacyContext _legacyContext;
 
@@ -14,7 +14,7 @@ public class CheckIdentityExistenceHandler : QueryBaseHandler ,IRequestHandler<C
         _dataLayer = dataLayer;
     }
         
-    public async Task<QueryResponseBO<ExistenceResponse>> Handle(CheckIdentityExistenceQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<ExistenceResponse>> Handle(CheckIdentityExistenceQuery request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(request.FirstName) && string.IsNullOrEmpty(request.MiddleName) && string.IsNullOrEmpty(request.LastName))
         {

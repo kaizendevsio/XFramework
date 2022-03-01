@@ -4,7 +4,7 @@ using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Contacts;
 
-public class GetContactListQuery : GetContactListRequest, IRequest<QueryResponseBO<List<ContactResponse>>>
+public class GetContactListQuery : GetContactListRequest, IRequest<QueryResponse<List<ContactResponse>>>
 {
     
 }

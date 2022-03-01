@@ -3,7 +3,7 @@ using IdentityServer.Domain.DataTransferObjects.Legacy;
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Contacts;
 
-public class UpdateContactHandler : CommandBaseHandler, IRequestHandler<UpdateContactCmd,CmdResponseBO<UpdateContactCmd>>
+public class UpdateContactHandler : CommandBaseHandler, IRequestHandler<UpdateContactCmd,CmdResponse<UpdateContactCmd>>
 {
     private readonly LegacyContext _legacyContext;
 
@@ -13,7 +13,7 @@ public class UpdateContactHandler : CommandBaseHandler, IRequestHandler<UpdateCo
         _dataLayer = dataLayer;
     }
         
-    public async Task<CmdResponseBO<UpdateContactCmd>> Handle(UpdateContactCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<UpdateContactCmd>> Handle(UpdateContactCmd request, CancellationToken cancellationToken)
     {
         var credentialEntity = await _dataLayer.TblIdentityCredentials
             .AsNoTracking()

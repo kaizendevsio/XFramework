@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
 
-public class ChangePasswordCmd : UpdatePasswordRequest, IRequest<CmdResponseBO<ChangePasswordCmd>>
+public class ChangePasswordCmd : UpdatePasswordRequest, IRequest<CmdResponse<ChangePasswordCmd>>
 {
     
 }

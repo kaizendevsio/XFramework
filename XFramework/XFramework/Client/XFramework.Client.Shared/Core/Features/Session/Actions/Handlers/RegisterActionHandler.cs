@@ -130,7 +130,7 @@ public partial class SessionState
 
             return false;
         }
-        private bool HandleFailure(CmdResponseBO request, RegisterAction action)
+        private bool HandleFailure(CmdResponse request, RegisterAction action)
         {
             if (request.HttpStatusCode is HttpStatusCode.Accepted) return false;
             SweetAlertService.FireAsync($"An error occured while creating your account: {request.Message}", $"", SweetAlertIcon.Error);
@@ -142,7 +142,7 @@ public partial class SessionState
             }
             return true;
         }
-        private bool HandleFailure(QueryResponseBO<ExistenceResponse> request, RegisterAction action)
+        private bool HandleFailure(QueryResponse<ExistenceResponse> request, RegisterAction action)
         {
             if (request.HttpStatusCode is HttpStatusCode.Accepted) return false;
             SweetAlertService.FireAsync($"An error occured while creating your account: {request.Message}", $"", SweetAlertIcon.Error);

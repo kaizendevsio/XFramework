@@ -4,7 +4,7 @@ using Wallets.Core.DataAccess.Query.Entity.Wallets.Identity;
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity;
 
-public class CreateWalletDepositHandler : QueryBaseHandler, IRequestHandler<CreateWalletDepositQuery, QueryResponseBO<WalletDepositResponse>>
+public class CreateWalletDepositHandler : QueryBaseHandler, IRequestHandler<CreateWalletDepositQuery, QueryResponse<WalletDepositResponse>>
 {
     private readonly IPaymentGatewayWrapper _paymentGatewayWrapper;
 
@@ -14,7 +14,7 @@ public class CreateWalletDepositHandler : QueryBaseHandler, IRequestHandler<Crea
         _dataLayer = dataLayer;
     }
 
-    public async Task<QueryResponseBO<WalletDepositResponse>> Handle(CreateWalletDepositQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<WalletDepositResponse>> Handle(CreateWalletDepositQuery request, CancellationToken cancellationToken)
     {
         var wrapperRequest = request.Adapt<CreatePaymentRequest>();
         wrapperRequest.TransactionGuid = Guid.NewGuid();

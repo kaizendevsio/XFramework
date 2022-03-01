@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity;
 
-public class CheckIdentityExistenceQuery : CheckIdentityExistenceRequest, IRequest<QueryResponseBO<ExistenceResponse>>
+public class CheckIdentityExistenceQuery : CheckIdentityExistenceRequest, IRequest<QueryResponse<ExistenceResponse>>
 {
   
 }

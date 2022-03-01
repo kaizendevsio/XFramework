@@ -1,5 +1,6 @@
 ﻿using Blazored.LocalStorage;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+using IdentityServer.Domain.Generic.Contracts.Requests.Update;
 using Mapster;
 using Microsoft.Extensions.Configuration;
 using XFramework.Integration.Interfaces.Wrappers;
@@ -32,13 +33,17 @@ public partial class SessionState
 
         public override async Task<Unit> Handle(ForgotPasswordAction action, CancellationToken aCancellationToken)
         {
-            var request = CurrentState.ForgotPasswordVm.Adapt<AuthenticateCredentialRequest>();
-            var response = await IdentityServiceWrapper.AuthenticateCredential(request);
+            // Map view model to request object
+            var request = CurrentState.ForgotPasswordVm.Adapt<UpdatePasswordRequest>();
             
+            // Send the request
+            var response = await IdentityServiceWrapper.ChangePassword(request);
+            
+            // Handle if the response is invalid or error
             if (response.HttpStatusCode is not HttpStatusCode.Accepted)
             {
                 // Display message to UI
-                SweetAlertService.FireAsync("Error", "There was an error while trying to sign you in. Please Try again later");
+                SweetAlertService.FireAsync("Error", $"There was an error while trying to send your request {response.Message}");
                 
                 // Display error to the console
                 Console.WriteLine($"Error from response: {response.Message}");

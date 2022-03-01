@@ -2,14 +2,14 @@
 
 namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets.Identity;
 
-public class DeleteWalletHandler  : CommandBaseHandler, IRequestHandler<DeleteWalletCmd, CmdResponseBO<DeleteWalletCmd>>
+public class DeleteWalletHandler  : CommandBaseHandler, IRequestHandler<DeleteWalletCmd, CmdResponse<DeleteWalletCmd>>
 {
     public DeleteWalletHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<CmdResponseBO<DeleteWalletCmd>> Handle(DeleteWalletCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<DeleteWalletCmd>> Handle(DeleteWalletCmd request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblUserWallets.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
         if (entity == null)

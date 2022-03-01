@@ -1,5 +1,5 @@
 ﻿namespace Wallets.Core.DataAccess.Commands.Entity.Wallets.Identity;
 
-public class TransferWalletCmd : TransferWalletRequest, IRequest<CmdResponseBO<TransferWalletCmd>>
+public class TransferWalletCmd : TransferWalletRequest, IRequest<CmdResponse<TransferWalletCmd>>
 {
 }

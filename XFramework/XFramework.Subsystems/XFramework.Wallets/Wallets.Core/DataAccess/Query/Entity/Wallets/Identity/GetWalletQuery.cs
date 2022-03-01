@@ -2,6 +2,6 @@
 
 namespace Wallets.Core.DataAccess.Query.Entity.Wallets.Identity;
 
-public class GetWalletQuery : GetWalletRequest, IRequest<QueryResponseBO<WalletResponse>>
+public class GetWalletQuery : GetWalletRequest, IRequest<QueryResponse<WalletResponse>>
 {
 }

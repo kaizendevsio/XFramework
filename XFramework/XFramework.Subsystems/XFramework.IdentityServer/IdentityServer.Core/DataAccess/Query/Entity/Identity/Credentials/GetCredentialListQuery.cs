@@ -4,7 +4,7 @@ using IdentityServer.Domain.Generic.Enums;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 
-public class GetCredentialListQuery : GetCredentialListRequest, IRequest<QueryResponseBO<List<CredentialResponse>>>
+public class GetCredentialListQuery : GetCredentialListRequest, IRequest<QueryResponse<List<CredentialResponse>>>
 {
 
 }

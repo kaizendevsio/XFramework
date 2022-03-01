@@ -3,14 +3,14 @@ using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Contacts;
 
-public class GetContactListHandler : QueryBaseHandler ,IRequestHandler<GetContactListQuery, QueryResponseBO<List<ContactResponse>>>
+public class GetContactListHandler : QueryBaseHandler ,IRequestHandler<GetContactListQuery, QueryResponse<List<ContactResponse>>>
 {
     public GetContactListHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<QueryResponseBO<List<ContactResponse>>> Handle(GetContactListQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<List<ContactResponse>>> Handle(GetContactListQuery request, CancellationToken cancellationToken)
     {
         var credential = await _dataLayer.TblIdentityCredentials
             .Include(i => i.IdentityInfo)

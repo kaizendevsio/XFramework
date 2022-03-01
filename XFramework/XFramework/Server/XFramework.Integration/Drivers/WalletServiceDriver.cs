@@ -15,86 +15,86 @@ namespace XFramework.Integration.Drivers
             TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:WalletService"));
         }
 
-        public async Task<QueryResponseBO<WalletEntityResponse>> GetWalletEntity(GetWalletEntityRequest request)
+        public async Task<QueryResponse<WalletEntityResponse>> GetWalletEntity(GetWalletEntityRequest request)
         {
             return await SendAsync<GetWalletEntityRequest, WalletEntityResponse>("GetWalletEntity", request);
         }
 
-        public async Task<QueryResponseBO<List<WalletEntityResponse>>> GetWalletEntityList(GetWalletEntityListRequest request)
+        public async Task<QueryResponse<List<WalletEntityResponse>>> GetWalletEntityList(GetWalletEntityListRequest request)
         {
             return await SendAsync<GetWalletEntityListRequest, List<WalletEntityResponse>>("GetWalletEntityList", request);
         }
         
-        public async Task<CmdResponseBO> CreateWalletEntity(CreateWalletEntityRequest request)
+        public async Task<CmdResponse> CreateWalletEntity(CreateWalletEntityRequest request)
         {
-            var result = await SendAsync<CreateWalletEntityRequest, CmdResponseBO>("CreateEntityWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<CreateWalletEntityRequest, CmdResponse>("CreateEntityWallet", request);
+            return result.Adapt<CmdResponse>();
         }
 
-        public async Task<CmdResponseBO> UpdateWalletEntity(UpdateWalletEntityRequest request)
+        public async Task<CmdResponse> UpdateWalletEntity(UpdateWalletEntityRequest request)
         {
-            var result = await SendAsync<UpdateWalletEntityRequest, CmdResponseBO>("UpdateWalletEntity", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<UpdateWalletEntityRequest, CmdResponse>("UpdateWalletEntity", request);
+            return result.Adapt<CmdResponse>();
         }
 
-        public async Task<CmdResponseBO> DeleteWalletEntity(DeleteWalletEntityRequest request)
+        public async Task<CmdResponse> DeleteWalletEntity(DeleteWalletEntityRequest request)
         {
-            var result = await SendAsync<DeleteWalletEntityRequest, CmdResponseBO>("DeleteWalletEntity", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<DeleteWalletEntityRequest, CmdResponse>("DeleteWalletEntity", request);
+            return result.Adapt<CmdResponse>();
         }
 
-        public async Task<QueryResponseBO<WalletResponse>> GetWallet(GetWalletRequest request)
+        public async Task<QueryResponse<WalletResponse>> GetWallet(GetWalletRequest request)
         {
           return await SendAsync<GetWalletRequest, WalletResponse>("GetWallet", request);
         }
 
-        public async Task<QueryResponseBO<List<WalletResponse>>> GetWalletList(GetWalletListRequest request)
+        public async Task<QueryResponse<List<WalletResponse>>> GetWalletList(GetWalletListRequest request)
         {
            return await SendAsync<GetWalletListRequest, List<WalletResponse>>("GetWalletList", request);
         }
 
-        public async Task<CmdResponseBO> CreateWallet(CreateWalletRequest request)
+        public async Task<CmdResponse> CreateWallet(CreateWalletRequest request)
         {
-            var result = await SendAsync<CreateWalletRequest, CmdResponseBO>("CreateWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<CreateWalletRequest, CmdResponse>("CreateWallet", request);
+            return result.Adapt<CmdResponse>();
         }
 
-        public async Task<CmdResponseBO> UpdateWallet(UpdateWalletRequest request)
+        public async Task<CmdResponse> UpdateWallet(UpdateWalletRequest request)
         {
-            var result = await SendAsync<UpdateWalletRequest, CmdResponseBO>("UpdateWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<UpdateWalletRequest, CmdResponse>("UpdateWallet", request);
+            return result.Adapt<CmdResponse>();
         }
 
-        public async Task<CmdResponseBO> DeleteWallet(DeleteWalletRequest request)
+        public async Task<CmdResponse> DeleteWallet(DeleteWalletRequest request)
         {
-            var result = await SendAsync<DeleteWalletRequest, CmdResponseBO>("DeleteWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<DeleteWalletRequest, CmdResponse>("DeleteWallet", request);
+            return result.Adapt<CmdResponse>();
         }
 
-        public async Task<CmdResponseBO> DecrementWallet(DecrementWalletRequest request)
+        public async Task<CmdResponse> DecrementWallet(DecrementWalletRequest request)
         {
-            var result = await SendAsync<DecrementWalletRequest, CmdResponseBO>("DecrementWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<DecrementWalletRequest, CmdResponse>("DecrementWallet", request);
+            return result.Adapt<CmdResponse>();
         }
 
-        public async Task<CmdResponseBO> IncrementWallet(IncrementWalletRequest request)
+        public async Task<CmdResponse> IncrementWallet(IncrementWalletRequest request)
         {
-            var result = await SendAsync<IncrementWalletRequest, CmdResponseBO>("IncrementWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<IncrementWalletRequest, CmdResponse>("IncrementWallet", request);
+            return result.Adapt<CmdResponse>();
         } 
 
-        public async Task<CmdResponseBO> TransferWallet(TransferWalletRequest request)
+        public async Task<CmdResponse> TransferWallet(TransferWalletRequest request)
         {
-            var result = await SendAsync<TransferWalletRequest, CmdResponseBO>("TransferWallet", request);
-            return result.Adapt<CmdResponseBO>();
+            var result = await SendAsync<TransferWalletRequest, CmdResponse>("TransferWallet", request);
+            return result.Adapt<CmdResponse>();
         }
 
-        public async Task<QueryResponseBO<WalletDepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request)
+        public async Task<QueryResponse<WalletDepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request)
         {
             return await SendAsync<CreateWalletDepositRequest, WalletDepositResponse>("CreateWalletDeposit", request);
         }
 
-        public async Task<QueryResponseBO<WalletDepositResponse>> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request)
+        public async Task<QueryResponse<WalletDepositResponse>> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request)
         {
             return await SendAsync<CreateWalletWithdrawalRequest, WalletDepositResponse>("WithdrawalWallet", request);
         }

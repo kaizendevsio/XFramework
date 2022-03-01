@@ -2,14 +2,14 @@
 
 namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets.Identity;
 
-public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<TransferWalletCmd, CmdResponseBO<TransferWalletCmd>>
+public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<TransferWalletCmd, CmdResponse<TransferWalletCmd>>
 {
     public TransferWalletHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<CmdResponseBO<TransferWalletCmd>> Handle(TransferWalletCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<TransferWalletCmd>> Handle(TransferWalletCmd request, CancellationToken cancellationToken)
     {
         var initiatorCredentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (initiatorCredentialEntity == null)

@@ -3,14 +3,14 @@ using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential;
 
-public class GetCredentialHandler : QueryBaseHandler ,IRequestHandler<GetCredentialQuery, QueryResponseBO<CredentialResponse>>
+public class GetCredentialHandler : QueryBaseHandler ,IRequestHandler<GetCredentialQuery, QueryResponse<CredentialResponse>>
 {
     public GetCredentialHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<QueryResponseBO<CredentialResponse>> Handle(GetCredentialQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<CredentialResponse>> Handle(GetCredentialQuery request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.TblIdentityCredentials
             .Include( i => i.IdentityInfo)

@@ -2,14 +2,14 @@
 
 namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets.Identity;
 
-public class CreateWalletHandler  : CommandBaseHandler, IRequestHandler<CreateWalletCmd, CmdResponseBO<CreateWalletCmd>>
+public class CreateWalletHandler  : CommandBaseHandler, IRequestHandler<CreateWalletCmd, CmdResponse<CreateWalletCmd>>
 {
     public CreateWalletHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<CmdResponseBO<CreateWalletCmd>> Handle(CreateWalletCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<CreateWalletCmd>> Handle(CreateWalletCmd request, CancellationToken cancellationToken)
     {
         var credentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (credentialEntity == null)

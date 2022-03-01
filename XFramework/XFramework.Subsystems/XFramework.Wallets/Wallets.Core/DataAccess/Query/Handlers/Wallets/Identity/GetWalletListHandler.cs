@@ -2,7 +2,7 @@
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity;
 
-public class GetWalletListHandler : QueryBaseHandler, IRequestHandler<GetWalletListQuery, QueryResponseBO<List<WalletResponse>>>
+public class GetWalletListHandler : QueryBaseHandler, IRequestHandler<GetWalletListQuery, QueryResponse<List<WalletResponse>>>
 {
     private readonly IDataLayer _dataLayer;
 
@@ -11,7 +11,7 @@ public class GetWalletListHandler : QueryBaseHandler, IRequestHandler<GetWalletL
         _dataLayer = dataLayer;
     }
         
-    public async Task<QueryResponseBO<List<WalletResponse>>> Handle(GetWalletListQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<List<WalletResponse>>> Handle(GetWalletListQuery request, CancellationToken cancellationToken)
     {
         var credential = await _dataLayer.TblIdentityCredentials
             .Include(i => i.IdentityInfo)

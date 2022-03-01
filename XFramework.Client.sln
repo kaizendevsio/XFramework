@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Client.Shared", "XFramework\XFramework\Client\XFramework.Client.Shared\XFramework.Client.Shared.csproj", "{A4284545-760C-4F19-B133-C950C03037DF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Administrator", "XFramework.Administrator\XFramework.Administrator.csproj", "{A0C0DDFC-3787-4F55-AB8F-FAB6982E3589}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Administrator", "XFramework\XFramework\Client\XFramework.Administrator\XFramework.Administrator.csproj", "{A0C0DDFC-3787-4F55-AB8F-FAB6982E3589}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

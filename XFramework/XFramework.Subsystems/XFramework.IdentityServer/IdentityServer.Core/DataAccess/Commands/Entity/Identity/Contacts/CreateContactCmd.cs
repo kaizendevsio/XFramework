@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Contacts;
 
-public class CreateContactCmd : CreateContactRequest, IRequest<CmdResponseBO<CreateContactCmd>>
+public class CreateContactCmd : CreateContactRequest, IRequest<CmdResponse<CreateContactCmd>>
 {
     
 }

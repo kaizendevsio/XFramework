@@ -7,7 +7,7 @@ using XFramework.Integration.Interfaces.Wrappers;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential;
 
-public class GetCredentialListHandler : QueryBaseHandler, IRequestHandler<GetCredentialListQuery, QueryResponseBO<List<CredentialResponse>>>
+public class GetCredentialListHandler : QueryBaseHandler, IRequestHandler<GetCredentialListQuery, QueryResponse<List<CredentialResponse>>>
 {
 
     public GetCredentialListHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService, ILoggerWrapper recordsWrapper)
@@ -16,7 +16,7 @@ public class GetCredentialListHandler : QueryBaseHandler, IRequestHandler<GetCre
         _cachingService = cachingService;
     }
         
-    public async Task<QueryResponseBO<List<CredentialResponse>>> Handle(GetCredentialListQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<List<CredentialResponse>>> Handle(GetCredentialListQuery request, CancellationToken cancellationToken)
     {
         
         var appEntity = await _dataLayer.TblApplications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);

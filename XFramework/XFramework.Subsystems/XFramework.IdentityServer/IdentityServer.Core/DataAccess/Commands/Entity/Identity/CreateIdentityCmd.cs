@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity;
 
-public class CreateIdentityCmd : CreateIdentityRequest, IRequest<CmdResponseBO<CreateIdentityCmd>>
+public class CreateIdentityCmd : CreateIdentityRequest, IRequest<CmdResponse<CreateIdentityCmd>>
 {
     
 }
