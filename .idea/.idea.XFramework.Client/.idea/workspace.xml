@@ -8,6 +8,8 @@
     <projectFile>XFramework/Client/XFramework.Identity.Web/XFramework.Identity.Web.csproj</projectFile>
     <projectFile profileName="SampleApp.Web">XFramework/XFramework/Client/SampleApp.Web/SampleApp.Web.csproj</projectFile>
     <projectFile profileName="IIS Express">XFramework/XFramework/Client/SampleApp.Web/SampleApp.Web.csproj</projectFile>
+    <projectFile profileName="XFramework.Administrator">XFramework.Administrator/XFramework.Administrator.csproj</projectFile>
+    <projectFile profileName="IIS Express">XFramework.Administrator/XFramework.Administrator.csproj</projectFile>
   </component>
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="SELECTIVE" />
@@ -31,14 +33,16 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment=" - Added sample action / handler example: login action">
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/CheckOneTimePasswordRequest.cs" afterDir="false" />
+    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Shared/Models/SignInModel.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Administrator/Shared/Models/SignUpModel.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IIdentityServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IIdentityServiceWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/Dashboard.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/Dashboard.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignIn.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignIn.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignInBase.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignInBase.razor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignUp.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignUp.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignUpBase.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Administrator/Pages/Dashboard/SignUpBase.razor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Administrator/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Administrator/_Imports.razor" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -61,10 +65,18 @@
       <filtered-out-file-type name="COMMIT_BY_MESSAGE" />
     </file-type-list>
   </component>
+  <component name="GithubDefaultAccount">
+    <option name="defaultAccountId" value="5dc22113-13d8-4ce2-aa81-182a7eb8cf67" />
+  </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/e5606f474b884d169955d1b4f7a6dd7517a00/6a/f67d19e7/IIdentityServiceWrapper.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/AuthenticateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/AuthenticationResponse.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/1487bb2149a54f789d65f8031d54e228858200/7d/d6b827fd/Color.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/1487bb2149a54f789d65f8031d54e228858200/aa/dc3eb548/ButtonType.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/1141b92e693e0fd5f733696f57e18a2de33647f18f6464f92a94adf21953b3c/ValidationSummary.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/1dc044aa26dba31bda18662423acea1433cd341616b1968c2bf897d25a308c/EditContext.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/b81a2339753b7e4757c57dd9a1bbf79b7c3890bb11a01ed6360d95c63e8bfbc/DataAnnotationsValidator.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/cff4d35895d3db30db86a0ec21297ac77589b961f6e219dede5a24aff0bb3b8d/ComponentBase.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
@@ -114,12 +126,16 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">
-    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
-    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="vue.rearranger.settings.migration" value="true" />
-  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
   <component name="RunManager" selected=".NET Launch Settings Profile.XFramework.Identity.Web">
     <configuration name="XFramework.Web" type="DotNetProject" factoryName=".NET Project">
       <option name="EXE_PATH" value="" />
@@ -304,6 +320,9 @@
       <workItem from="1645612259060" duration="11000" />
       <workItem from="1645618316925" duration="2815000" />
       <workItem from="1645775790581" duration="7035000" />
+      <workItem from="1646017293300" duration="16357000" />
+      <workItem from="1646043711526" duration="1407000" />
+      <workItem from="1646045161978" duration="3245000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -375,7 +394,34 @@
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="user">
+                    <value>
+                      <list>
+                        <option value="*" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="User">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="*" />
+                </option>
+              </RecentGroup>
+            </list>
           </value>
         </entry>
       </map>

@@ -1,1 +1,30 @@
 ﻿@page "/SignIn"
+@inherits SignInBase
+
+<MudGrid Class="h-100 w-50">
+    <MudItem xs="12" sm="7" Class="align-center text-center d-inline-block mx-auto mt-5">
+        <MudCard Class="py-5 px-5">
+            <div class="mt-5">
+                <h1>
+                    Welcome Back!
+                </h1>
+            </div>
+            <MudCardContent>
+                <MudTextField Label="Email" Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Filled.Email" Class="mt-3" 
+                              @bind-Value="model.Email" For="@(() => model.Email)"/>
+                <MudTextField Label="Password" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.VisibilityOff" OnAdaornmentClick="ShowPassword" Class="mt-3"
+                              @bind-Value="model.Password" For="@(() => model.Password)" InputType="InputType.Password"/>
+                <MudCheckBox @bind-Checked="@model.RememberMe" Label="Remember Me" Size="Size.Small" Color="Color.Primary" Style="text-align: left;"></MudCheckBox>
+            </MudCardContent>
+            <MudCardActions>
+                <div class="rounded-sm mt-5 mx-auto">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Sign In</MudButton>
+                </div>
+            </MudCardActions>
+            <div class="my-5 mx-auto">
+                Don't have an account? <a href="/SignUp" class="btn-outline-primary">Create</a>
+            </div>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+

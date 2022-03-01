@@ -1,1 +1,41 @@
 ﻿@page "/SignUp"
+@inherits SignUpBase
+
+<EditForm Model="model" OnValidSubmit="OnValidSubmit">
+    <DataAnnotationsValidator/>
+    <MudGrid Class="h-100 w-50">
+        <MudItem xs="12" sm="7" Class="d-inline-block mx-auto">
+            <MudCard Class="py-5 px-5 text-center">
+                <div class="mt-5">
+                    <h1>
+                        Sign Up!
+                    </h1>
+                </div>
+                <MudCardContent>
+                    <MudTextField Label="First name" HelperText="Max. 8 characters"
+                                  @bind-Value="model.Username" For="@(() => model.Username)"/>
+                    <MudTextField Label="Email" Class="mt-3"
+                                  @bind-Value="model.Email" For="@(() => model.Email)"/>
+                    <MudTextField Label="Password" HelperText="Choose a strong password" Class="mt-3"
+                                  @bind-Value="model.Password" For="@(() => model.Password)" InputType="InputType.Password"/>
+                    <MudTextField Label="Password" HelperText="Repeat the password" Class="mt-3"
+                                  @bind-Value="model.Password2" For="@(() => model.Password2)" InputType="InputType.Password"/>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mx-auto">Register</MudButton>
+                </MudCardActions>
+                @if (success)
+                {
+                    <MudText Color="Color.Success">Success</MudText>
+                }
+                else
+                {
+                    <MudText Color="@Color.Error">
+                        <ValidationSummary/>
+                    </MudText>
+                }
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</EditForm>
+
