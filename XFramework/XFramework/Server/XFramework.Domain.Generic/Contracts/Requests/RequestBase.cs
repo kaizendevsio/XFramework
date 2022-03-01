@@ -4,6 +4,6 @@ namespace XFramework.Domain.Generic.Contracts.Requests
 {
     public class RequestBase
     {
-        public RequestServerBO RequestServer { get; set; } =  new ();
+        public RequestServerBO RequestServer { get; set; } = new ();
     }
 }

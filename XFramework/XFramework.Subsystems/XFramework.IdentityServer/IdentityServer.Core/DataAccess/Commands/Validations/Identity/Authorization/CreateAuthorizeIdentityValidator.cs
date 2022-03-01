@@ -12,7 +12,7 @@ public class CreateAuthorizeIdentityValidator : CommandBaseValidator<CreateCrede
             .NotEmpty()
             .WithMessage("Username is Required");
             
-        RuleFor(x => x.PasswordString)
+        RuleFor(x => x.Password)
             .NotEmpty()
             .WithMessage("Password is Required");
             

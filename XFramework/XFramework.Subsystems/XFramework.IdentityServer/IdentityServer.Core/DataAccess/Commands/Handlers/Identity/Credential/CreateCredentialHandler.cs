@@ -34,7 +34,7 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        var hashPasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: request.PasswordString, workFactor:11));
+        var hashPasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: request.Password, workFactor:11));
 
         entity.Guid = request.Guid != null ? request.Guid.ToString() : Guid.NewGuid().ToString();
         entity.PasswordByte = hashPasswordByte;

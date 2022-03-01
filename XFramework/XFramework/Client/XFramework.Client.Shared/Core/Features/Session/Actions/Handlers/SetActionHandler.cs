@@ -1,4 +1,5 @@
 ﻿using Blazored.LocalStorage;
+using Microsoft.Extensions.Configuration;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 
@@ -7,8 +8,9 @@ public partial class SessionState
     public class SetActionHandler : ActionHandler<SetState>
     {
         private SessionState CurrentState => Store.GetState<SessionState>();
-        public SetActionHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public SetActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            Configuration = configuration;
             SessionStorageService = sessionStorageService;
             LocalStorageService = localStorageService;
             SweetAlertService = sweetAlertService;
@@ -20,7 +22,6 @@ public partial class SessionState
             Mediator = mediator;
             Store = store;
         }
-
         public override async Task<Unit> Handle(SetState state, CancellationToken aCancellationToken)
         {
             try
@@ -33,5 +34,7 @@ public partial class SessionState
             }
             return Unit.Value;
         }
+
+        
     }
 }

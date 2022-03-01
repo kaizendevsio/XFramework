@@ -1,4 +1,6 @@
 using Blazored.LocalStorage;
+using Microsoft.Extensions.Configuration;
+using TypeSupport.Extensions;
 using XFramework.Client.Shared.Core.Features.Configuration;
 using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Cache;
@@ -10,6 +12,7 @@ namespace XFramework.Client.Shared.Core.Features;
 public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IRequestHandler<TAction, Unit>
     where TAction : IAction
 {
+    public IConfiguration Configuration { get;set; }
     protected ISessionStorageService SessionStorageService { get; set; }
     public ILocalStorageService LocalStorageService { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
@@ -27,10 +30,11 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     protected LayoutState LayoutState => Store.GetState<LayoutState>();
     protected CacheState CacheState => Store.GetState<CacheState>();
 
-    protected ActionHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService,
+    protected ActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService,
         NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient,
         HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store)
     {
+        Configuration = configuration;
         SessionStorageService = sessionStorageService;
         LocalStorageService = localStorageService;
         SweetAlertService = sweetAlertService;

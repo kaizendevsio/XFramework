@@ -1,4 +1,5 @@
 using Blazored.LocalStorage;
+using Microsoft.Extensions.Configuration;
 
 namespace XFramework.Client.Shared.Core.Features.Layout;
 
@@ -6,8 +7,9 @@ public partial class LayoutState
 {
     public class UpdateSidebarItemsActionHandler : ActionHandler<UpdateSidebarItemsAction>
     {
-        public UpdateSidebarItemsActionHandler(ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public UpdateSidebarItemsActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            Configuration = configuration;
             SessionStorageService = sessionStorageService;
             LocalStorageService = localStorageService;
             SweetAlertService = sweetAlertService;
