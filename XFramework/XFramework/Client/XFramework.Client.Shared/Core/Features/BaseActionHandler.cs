@@ -48,7 +48,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     }
     public abstract Task<Unit> Handle(TAction action, CancellationToken aCancellationToken);
 
-    public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, string customMessage = "", bool silent = false)
+    public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
     {
         if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
        
@@ -78,7 +78,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         return true;
     }
     
-    public async Task<bool> HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, string customMessage = "", bool silent = false)
+    public async Task<bool> HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false,  string customMessage = "")
     {
         if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
         
@@ -107,7 +107,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         return false;
     }
     
-    public async Task HandleSuccess<TAction>(CmdResponse response, TAction action, string customMessage = "", bool silent = false)
+    public async Task HandleSuccess<TAction>(CmdResponse response, TAction action, bool silent = false, string customMessage = "")
     {
         // Display message to UI
         switch (silent)
@@ -115,23 +115,21 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
             case true:
                 break;
             case false:
-                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $"There was an error while trying to process your request: {response.Message}"
+                  SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
+                    ? $"Success: {response.Message}"
                     : $"{customMessage}: {response.Message}");
                 break;
         }
         
-        if (response.HttpStatusCode is not HttpStatusCode.Accepted)
+        // If Success URL property is provided, navigate to the given URL
+        if (action.ContainsProperty("NavigateToOnSuccess"))
         {
-            // If Success URL property is provided, navigate to the given URL
-            if (action.ContainsProperty("NavigateToOnSuccess"))
-            {
-                var s = action.GetPropertyValue("NavigateToOnSuccess")?.ToString();
-                NavigationManager.NavigateTo(s);
-            }
+            var s = action.GetPropertyValue("NavigateToOnSuccess")?.ToString();
+            NavigationManager.NavigateTo(s);
         }
+        
     }
-    public async Task HandleSuccess<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, string customMessage = "", bool silent = false)
+    public async Task HandleSuccess<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false, string customMessage = "")
     {
         // Display message to UI
         switch (silent)
@@ -139,19 +137,17 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
             case true:
                 break;
             case false:
-                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $"There was an error while trying to process your request: {response.Message}"
+                SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
+                    ? $"Success: {response.Message}"
                     : $"{customMessage}: {response.Message}");
                 break;
         }
-        if (response.HttpStatusCode is not HttpStatusCode.Accepted)
+      
+        // If Success URL property is provided, navigate to the given URL
+        if (action.ContainsProperty("NavigateToOnSuccess"))
         {
-            // If Success URL property is provided, navigate to the given URL
-            if (action.ContainsProperty("NavigateToOnSuccess"))
-            {
-                var s = action.GetPropertyValue("NavigateToOnSuccess")?.ToString();
-                NavigationManager.NavigateTo(s);
-            }
+            var s = action.GetPropertyValue("NavigateToOnSuccess")?.ToString();
+            NavigationManager.NavigateTo(s);
         }
     }
 }

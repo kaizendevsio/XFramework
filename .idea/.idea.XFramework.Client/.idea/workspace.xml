@@ -33,19 +33,11 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/NavigateBackActionHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/SetNavigationHistoryHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/NavigateBackAction.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/NavigateToPathAction.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Validations/Session/SignInRequestValidator.cs" afterDir="false" />
+    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment=" - Updated HandleFailure on Action Handlers">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/ForgotPasswordActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/ForgotPasswordActionHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/RegisterActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/RegisterActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/SetStateAction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/SetStateAction.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/SessionState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/SessionState.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -431,7 +423,14 @@
       <option name="project" value="LOCAL" />
       <updated>1646124587769</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary=" - Updated HandleFailure on Action Handlers">
+      <created>1646225998142</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1646225998142</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -493,7 +492,8 @@
     <MESSAGE value="StreamFlow Client: Added Request Server Default Parameters" />
     <MESSAGE value="Client: Implemented Sign In Handler&#10;Client: Implemented Register Handler" />
     <MESSAGE value="Safety Backup" />
-    <option name="LAST_COMMIT_MESSAGE" value="Safety Backup" />
+    <MESSAGE value=" - Updated HandleFailure on Action Handlers" />
+    <option name="LAST_COMMIT_MESSAGE" value=" - Updated HandleFailure on Action Handlers" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

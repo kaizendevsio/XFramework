@@ -39,13 +39,13 @@ public partial class SessionState
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
             
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, "There was an error while trying to sign you in. Please Try again later")) return Unit.Value;
+            if(await HandleFailure(response, action, true ,"There was an error while trying to sign you in. Please Try again later")) return Unit.Value;
            
             // Set Session State To Active
             await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
 
             // If Success URL property is provided, navigate to the given URL
-            await HandleSuccess(response, action);
+            await HandleSuccess(response, action, true);
             
             // Fetch User Identity And Credential
             var identityResponse = await IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});

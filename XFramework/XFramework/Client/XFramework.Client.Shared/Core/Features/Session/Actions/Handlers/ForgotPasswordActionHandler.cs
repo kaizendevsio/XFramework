@@ -41,7 +41,7 @@ public partial class SessionState
             var response = await IdentityServiceWrapper.ChangePassword(request);
             
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, "There was an error while trying to sign you in. Please Try again later")) return Unit.Value;
+            if(await HandleFailure(response, action, true, "There was an error while trying to sign you in. Please Try again later")) return Unit.Value;
             
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(response, action);
