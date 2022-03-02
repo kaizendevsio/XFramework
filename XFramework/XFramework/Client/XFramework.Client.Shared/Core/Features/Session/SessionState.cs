@@ -6,8 +6,11 @@ public partial class SessionState : State<SessionState>
 {
     public override void Initialize()
     {
-        
-        
+         NavigationHistoryList = new();
+         LoginVm = new();
+         RegisterVm = new();
+         ForgotPasswordVm = new();
+
     }
     public Domain.Generic.Enums.SessionState State { get; set; }
     public List<ContactResponse> ContactList { get; set; }
@@ -16,5 +19,6 @@ public partial class SessionState : State<SessionState>
     public SignInRequest LoginVm { get; set; }
     public SignUpRequest RegisterVm { get; set; }
     public ForgotPasswordRequest ForgotPasswordVm { get; set; }
+    public List<string> NavigationHistoryList { get; set; }
 
 }

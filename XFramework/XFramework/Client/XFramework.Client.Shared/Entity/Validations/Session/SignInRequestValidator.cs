@@ -1,0 +1,20 @@
+﻿using FluentValidation;
+
+namespace XFramework.Client.Shared.Entity.Validations.Session
+{
+    public class UserVmValidator : AbstractValidator<SignInRequest>
+    {
+        public UserVmValidator()
+        {
+            RuleFor(x => x.Username).NotEmpty()
+                .WithMessage("Username is required");
+            RuleFor(x => x.Password).NotEmpty()
+                .WithMessage("Enter your password")
+                .MinimumLength(8)
+                .WithMessage("Minimum password length is 8 characters");
+
+
+
+        }
+    }
+}

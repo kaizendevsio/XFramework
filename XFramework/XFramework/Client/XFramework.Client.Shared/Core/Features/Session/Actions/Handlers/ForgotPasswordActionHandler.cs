@@ -16,8 +16,9 @@ public partial class SessionState
         public SessionState CurrentState => Store.GetState<SessionState>();
 
         
-        public ForgotPasswordActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public ForgotPasswordActionHandler(IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            IdentityServiceWrapper = identityServiceWrapper;
             Configuration = configuration;
             SessionStorageService = sessionStorageService;
             LocalStorageService = localStorageService;
@@ -40,7 +41,7 @@ public partial class SessionState
             var response = await IdentityServiceWrapper.ChangePassword(request);
             
             // Handle if the response is invalid or error
-            await HandleFailure(response, action, "There was an error while trying to sign you in. Please Try again later");
+            if(await HandleFailure(response, action, "There was an error while trying to sign you in. Please Try again later")) return Unit.Value;
             
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(response, action);
