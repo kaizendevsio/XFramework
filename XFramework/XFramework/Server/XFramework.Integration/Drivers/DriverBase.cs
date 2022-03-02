@@ -37,10 +37,13 @@ namespace XFramework.Integration.Drivers
         }
         public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(string commandName ,TRequest request)
         {
-            var rs = await GetRequestServer();
             try
             {
-                request.SetPropertyValue("RequestServer", rs);
+                if (request.ContainsProperty("RequestServer"))
+                {
+                    var rs = await GetRequestServer();
+                    request.SetPropertyValue("RequestServer", rs);
+                }
             }
             catch (Exception e)
             {

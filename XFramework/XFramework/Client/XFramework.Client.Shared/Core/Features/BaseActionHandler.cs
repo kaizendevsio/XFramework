@@ -47,7 +47,6 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         Store = store;
     }
     public abstract Task<Unit> Handle(TAction action, CancellationToken aCancellationToken);
-
     public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
     {
         if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
@@ -77,7 +76,6 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
 
         return true;
     }
-    
     public async Task<bool> HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false,  string customMessage = "")
     {
         if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
@@ -106,7 +104,6 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         NavigationManager.NavigateTo(s.ToString());
         return false;
     }
-    
     public async Task HandleSuccess<TAction>(CmdResponse response, TAction action, bool silent = false, string customMessage = "")
     {
         // Display message to UI
@@ -122,12 +119,11 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         }
         
         // If Success URL property is provided, navigate to the given URL
-        if (action.ContainsProperty("NavigateToOnSuccess"))
-        {
-            var s = action.GetPropertyValue("NavigateToOnSuccess")?.ToString();
-            NavigationManager.NavigateTo(s);
-        }
-        
+        if (!action.ContainsProperty("NavigateToOnSuccess")) return;
+        var s = action.GetPropertyValue("NavigateToOnSuccess");
+        if (s is null) return;
+        NavigationManager.NavigateTo(s.ToString());
+
     }
     public async Task HandleSuccess<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false, string customMessage = "")
     {
@@ -143,11 +139,15 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
                 break;
         }
       
-        // If Success URL property is provided, navigate to the given URL
-        if (action.ContainsProperty("NavigateToOnSuccess"))
-        {
-            var s = action.GetPropertyValue("NavigateToOnSuccess")?.ToString();
-            NavigationManager.NavigateTo(s);
-        }
+         // If Success URL property is provided, navigate to the given URL
+        if (!action.ContainsProperty("NavigateToOnSuccess")) return;
+        var s = action.GetPropertyValue("NavigateToOnSuccess");
+        if (s is null) return;
+        NavigationManager.NavigateTo(s.ToString());
     }
+    public async Task Persist<TState>(TState state)
+    {
+        await LocalStorageService.SetItemAsync(state.GetType().Name, state);
+    }
+    
 }

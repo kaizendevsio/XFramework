@@ -47,14 +47,17 @@ public partial class SessionState
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(response, action, true);
             
-            // Fetch User Identity And Credential
+            // Fetch User Identity And Credential and Contact List
             var identityResponse = await IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});
             var credentialResponse = await IdentityServiceWrapper.GetCredential(new() {Guid = response.Response.CredentialGuid});
+            var contactListResponse = await IdentityServiceWrapper.GetContactList(new() {CredentialGuid = response.Response.CredentialGuid});
+            
             
             await Mediator.Send(new SetState()
             {
                 Identity = identityResponse.Response,
-                Credential = credentialResponse.Response
+                Credential = credentialResponse.Response,
+                ContactList = contactListResponse.Response
             });
             
             return Unit.Value;
