@@ -40,26 +40,10 @@ public partial class SessionState
             var response = await IdentityServiceWrapper.ChangePassword(request);
             
             // Handle if the response is invalid or error
-            if (response.HttpStatusCode is not HttpStatusCode.Accepted)
-            {
-                // Display message to UI
-                SweetAlertService.FireAsync("Error", $"There was an error while trying to send your request {response.Message}");
-                
-                // Display error to the console
-                Console.WriteLine($"Error from response: {response.Message}");
-                
-                // If NavigateToOnFailure property is set, navigate to the given URL
-                if (!string.IsNullOrEmpty(action.NavigateToOnFailure))
-                {
-                    NavigationManager.NavigateTo(action.NavigateToOnFailure);
-                }
-            }
+            await HandleFailure(response, action, "There was an error while trying to sign you in. Please Try again later");
             
-            // If NavigateToOnSuccess property is set, navigate to the given URL
-            if (!string.IsNullOrEmpty(action.NavigateToOnSuccess))
-            {
-                NavigationManager.NavigateTo(action.NavigateToOnSuccess);
-            }
+            // If Success URL property is provided, navigate to the given URL
+            await HandleSuccess(response, action);
             
             return Unit.Value;
         }

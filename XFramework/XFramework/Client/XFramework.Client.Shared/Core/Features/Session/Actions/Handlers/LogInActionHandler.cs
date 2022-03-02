@@ -42,12 +42,9 @@ public partial class SessionState
            
             // Set Session State To Active
             await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
-            
+
             // If Success URL property is provided, navigate to the given URL
-            if (!string.IsNullOrEmpty(action.NavigateToOnSuccess))
-            {
-                NavigationManager.NavigateTo(action.NavigateToOnSuccess);
-            }
+            await HandleSuccess(response, action);
             
             // Fetch User Identity And Credential
             var identityResponse = await IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});

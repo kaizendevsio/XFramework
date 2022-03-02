@@ -88,10 +88,7 @@ public partial class SessionState
             }
             
             // If Success URL property is provided, navigate to the given URL
-            if (!string.IsNullOrEmpty(action.NavigateToOnSuccess))
-            {
-                NavigationManager.NavigateTo(action.NavigateToOnSuccess);
-            }
+            await HandleSuccess(credential, action);
 
             return Unit.Value;
         }
