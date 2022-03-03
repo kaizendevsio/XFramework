@@ -1,12 +1,10 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 using MudBlazor;
-using XFramework.Administrator.Shared.Models;
 
 namespace XFramework.Administrator.Pages.Dashboard;
 
 public class SignInBase : PageBase
 {
-    public SignInModel model = new SignInModel();
     
     bool isShow;
     InputType PasswordInput = InputType.Password;
@@ -26,8 +24,9 @@ public class SignInBase : PageBase
         }
     }
     
-    public void Submit()
+    public void OnValidSubmit(EditContext context)
     {
-        NavigationManager.NavigateTo("/Dashboard");
+        StateHasChanged();
+        NavigationManager.NavigateTo("/SignIn");
     }
 }

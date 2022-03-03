@@ -2,26 +2,41 @@
 
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
-        <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="BlazorTransitionableRoute" Version="3.1.0" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="6.0.0" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="6.0.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.2" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.2" />
         <PackageReference Include="MudBlazor" Version="6.0.6" />
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Update="Pages\Dashboard\DashboardBase.razor.cs">
-        <DependentUpon>Dashboard.razor</DependentUpon>
-      </Compile>
-      <Compile Update="Pages\Dashboard\SignInBase.razor.cs">
-        <DependentUpon>SignIn.razor</DependentUpon>
-      </Compile>
-      <Compile Update="Pages\Dashboard\SignUpBase.razor.cs">
-        <DependentUpon>SignUp.razor</DependentUpon>
-      </Compile>
+        <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
+        <ProjectReference Include="..\XFramework.Client.Shared\XFramework.Client.Shared.csproj" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net6.0\StreamFlow.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="Wallets.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>C:\Projects\Net Core\XFramework\XFramework\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>C:\Projects\Net Core\XFramework\XFramework\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
+        </Reference>
     </ItemGroup>
 
+
+   
 </Project>
