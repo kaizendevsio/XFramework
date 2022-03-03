@@ -2,12 +2,7 @@
 
 public class DashboardBase : PageBase
 {
-   public bool open = false;
-
-   public void ToggleDrawer()
-   {
-      open = !open;
-   }
+  
    public void ToDashboard()
    {
       NavigationManager.NavigateTo("/Dashboard");
@@ -15,11 +10,11 @@ public class DashboardBase : PageBase
    
    public void ToSignIn()
    {
-      NavigationManager.NavigateTo("/SignIn");
+      NavigationManager.NavigateTo("/Session/SignIn");
    }
    
    public void ToSignUp()
    {
-      NavigationManager.NavigateTo("/SignUp");
+      NavigationManager.NavigateTo("/Session/SignUp");
    }
 }

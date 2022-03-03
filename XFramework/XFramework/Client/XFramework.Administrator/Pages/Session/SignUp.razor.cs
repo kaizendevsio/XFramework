@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 
-namespace XFramework.Administrator.Pages.Dashboard;
+namespace XFramework.Administrator.Pages.Session;
 
 public class SignUpBase : PageBase
 {

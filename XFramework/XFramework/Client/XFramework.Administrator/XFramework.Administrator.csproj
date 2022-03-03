@@ -36,7 +36,5 @@
             <HintPath>C:\Projects\Net Core\XFramework\XFramework\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
         </Reference>
     </ItemGroup>
-
-
    
 </Project>

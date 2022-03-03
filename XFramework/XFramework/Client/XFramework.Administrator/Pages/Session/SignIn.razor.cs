@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 using MudBlazor;
 
-namespace XFramework.Administrator.Pages.Dashboard;
+namespace XFramework.Administrator.Pages.Session;
 
 public class SignInBase : PageBase
 {
