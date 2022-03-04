@@ -17,7 +17,7 @@ namespace XFramework.Integration.Drivers
         
         public async Task<CmdResponse> SendVoidAsync<TRequest, TResponse>(string commandName ,TRequest request)
         {
-            var rs = await GetRequestServer();
+            var rs = await GetRequestServer(request);
             try
             {
                 request.SetPropertyValue("RequestServer", rs);
@@ -41,7 +41,7 @@ namespace XFramework.Integration.Drivers
             {
                 if (request.ContainsProperty("RequestServer"))
                 {
-                    var rs = await GetRequestServer();
+                    var rs = await GetRequestServer(request);
                     request.SetPropertyValue("RequestServer", rs);
                 }
             }
@@ -59,7 +59,7 @@ namespace XFramework.Integration.Drivers
             return result.Response.Adapt<QueryResponse<TResponse>>();
         }
         
-        public async Task<RequestServerBO> GetRequestServer()
+        public async Task<RequestServerBO> GetRequestServer<TRequest>(TRequest request)
         {
             if (string.IsNullOrEmpty(ClientIpAddress))
             {
@@ -74,14 +74,27 @@ namespace XFramework.Integration.Drivers
                 }
             }
 
+            var applicationIdString = string.Empty;
             ApplicationId ??= Guid.Parse(Configuration.GetValue<string>("Application:DefaultUID"));
+            var applicationId = ApplicationId;
+            
+            if (request.ContainsProperty("RequestServer"))
+            {
+                var rs = request.GetPropertyValue("RequestServer");
+                applicationIdString = rs.GetPropertyValue("ApplicationId")?.ToString();
+                if (!string.IsNullOrEmpty(applicationIdString))
+                {
+                    applicationId = Guid.Parse(applicationIdString);
+                }
+            }
+
             ClientName = !string.IsNullOrEmpty(ClientName)
                 ? ClientName
                 : Configuration.GetValue<string>("StreamFlowConfiguration:ClientName");
             
             return new()
             {
-                ApplicationId = ApplicationId,
+                ApplicationId = applicationId,
                 Name = ClientName,
                 IpAddress = ClientIpAddress,
                 RequestId = Guid.NewGuid()

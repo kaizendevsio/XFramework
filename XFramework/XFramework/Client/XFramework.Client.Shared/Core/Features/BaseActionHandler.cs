@@ -50,12 +50,15 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
     {
         if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
-       
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+        
         // Display message to UI
         switch (silent)
         {
             case true:
-                SweetAlertService.FireAsync("Error", $"There was an error while trying to process your request, please try again later");
+                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                    ? $"There was an error while trying to process your request, please try again later"
+                    : $"{customMessage}");
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
@@ -79,12 +82,15 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     public async Task<bool> HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false,  string customMessage = "")
     {
         if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
         // Display message to UI
         switch (silent)
         {
             case true:
-                SweetAlertService.FireAsync("Error", $"There was an error while trying to process your request, please try again later");
+                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                    ? $"There was an error while trying to process your request, please try again later"
+                    : $"{customMessage}");
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)

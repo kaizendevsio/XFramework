@@ -2,6 +2,7 @@
 using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using Mapster;
 using Microsoft.Extensions.Configuration;
+using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
@@ -32,6 +33,9 @@ public partial class SessionState
 
         public override async Task<Unit> Handle(LoginAction action, CancellationToken aCancellationToken)
         {
+            // Inform UI About Busy State
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+            
             // Map view model to request object
             var request = CurrentState.LoginVm.Adapt<AuthenticateCredentialRequest>();
             
@@ -39,7 +43,7 @@ public partial class SessionState
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
             
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, true ,"There was an error while trying to sign you in. Please Try again later")) return Unit.Value;
+            if(await HandleFailure(response, action, true ,"There was an error while trying to sign you in. Please check your credentials and try again")) return Unit.Value;
            
             // Set Session State To Active
             await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
@@ -52,13 +56,16 @@ public partial class SessionState
             var credentialResponse = await IdentityServiceWrapper.GetCredential(new() {Guid = response.Response.CredentialGuid});
             var contactListResponse = await IdentityServiceWrapper.GetContactList(new() {CredentialGuid = response.Response.CredentialGuid});
             
-            
+            // Set State And Update UI
             await Mediator.Send(new SetState()
             {
                 Identity = identityResponse.Response,
                 Credential = credentialResponse.Response,
                 ContactList = contactListResponse.Response
             });
+            
+            // Inform UI About Not Busy State
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
             
             return Unit.Value;
         }

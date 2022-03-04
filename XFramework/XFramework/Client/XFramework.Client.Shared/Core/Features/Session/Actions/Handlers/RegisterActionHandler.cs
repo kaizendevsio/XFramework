@@ -3,6 +3,7 @@ using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
 using Mapster;
 using Microsoft.Extensions.Configuration;
+using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Domain.Generic.Contracts.Responses;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces.Wrappers;
@@ -34,6 +35,9 @@ public partial class SessionState
 
         public override async Task<Unit> Handle(RegisterAction action, CancellationToken aCancellationToken)
         {
+            // Inform UI About Busy State
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+            
             // Check If Any Given Data Are Already Existing
             if (await CheckDuplicateRecords(action)) return Unit.Value;
 
@@ -53,7 +57,7 @@ public partial class SessionState
             identityRequest.Guid = identityGuid;
             
             var identity = await IdentityServiceWrapper.CreateIdentity(identityRequest);
-            if (HandleFailure(identity, action)) return Unit.Value;
+            if (await HandleFailure(identity, action)) return Unit.Value;
             
             // Send Create Credential Request
             var credentialRequest = CurrentState.RegisterVm.Adapt<CreateCredentialRequest>();
@@ -62,7 +66,7 @@ public partial class SessionState
             credentialRequest.RoleEntity = Guid.Parse("fb2ec753-66b2-4259-b65f-1c6402e58209");
             
             var credential = await IdentityServiceWrapper.CreateCredential(credentialRequest);
-            if (HandleFailure(credential, action)) return Unit.Value;
+            if (await HandleFailure(credential, action)) return Unit.Value;
             
             // Send Create Phone Contact Request
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
@@ -73,7 +77,7 @@ public partial class SessionState
                     ContactType = GenericContactType.Phone,
                     Value = CurrentState.RegisterVm.PhoneNumber
                 });
-                if (HandleFailure(phoneContact, action)) return Unit.Value;
+                if (await HandleFailure(phoneContact, action)) return Unit.Value;
             }
             
             // Send Create Email Contact Request
@@ -85,12 +89,15 @@ public partial class SessionState
                     ContactType = GenericContactType.Phone,
                     Value = CurrentState.RegisterVm.EmailAddress
                 });
-                if (HandleFailure(emailContact, action)) return Unit.Value;
+                if (await HandleFailure(emailContact, action)) return Unit.Value;
             }
             
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(credential, action);
 
+            // Inform UI About Not Busy State
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+            
             return Unit.Value;
         }
 
@@ -98,11 +105,11 @@ public partial class SessionState
         {
             // Check Identity Duplicates
             var identityExistence = await IdentityServiceWrapper.CheckIdentityExistence(CurrentState.RegisterVm.Adapt<CheckIdentityExistenceRequest>());
-            if (HandleFailure(identityExistence, action)) return true;
+            if (await HandleFailure(identityExistence, action)) return true;
 
             // Check Credential Duplicates
             var credentialExistence = await IdentityServiceWrapper.CheckCredentialExistence(CurrentState.RegisterVm.Adapt<CheckCredentialExistenceRequest>());
-            if (HandleFailure(credentialExistence, action)) return true;
+            if (await HandleFailure(credentialExistence, action)) return true;
 
             // Check Phone Number Duplicates
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
@@ -112,7 +119,7 @@ public partial class SessionState
                     ContactType = GenericContactType.Phone,
                     Value = CurrentState.RegisterVm.PhoneNumber
                 });
-                if (HandleFailure(phoneExistence, action)) return true;
+                if (await HandleFailure(phoneExistence, action)) return true;
             }
 
             // Check Email Address Duplicates
@@ -123,34 +130,11 @@ public partial class SessionState
                     ContactType = GenericContactType.Email,
                     Value = CurrentState.RegisterVm.EmailAddress
                 });
-                if (HandleFailure(emailExistence, action)) return true;
+                if (await HandleFailure(emailExistence, action)) return true;
             }
 
             return false;
         }
-        private bool HandleFailure(CmdResponse request, RegisterAction action)
-        {
-            if (request.HttpStatusCode is HttpStatusCode.Accepted) return false;
-            SweetAlertService.FireAsync($"An error occured while creating your account: {request.Message}", $"", SweetAlertIcon.Error);
-            
-            // If Fail URL property is provided, navigate to the given URL
-            if (!string.IsNullOrEmpty(action.NavigateToOnFailure))
-            {
-                NavigationManager.NavigateTo(action.NavigateToOnFailure);
-            }
-            return true;
-        }
-        private bool HandleFailure(QueryResponse<ExistenceResponse> request, RegisterAction action)
-        {
-            if (request.HttpStatusCode is HttpStatusCode.Accepted) return false;
-            SweetAlertService.FireAsync($"An error occured while creating your account: {request.Message}", $"", SweetAlertIcon.Error);
-            
-            // If Fail URL property is provided, navigate to the given URL
-            if (!string.IsNullOrEmpty(action.NavigateToOnFailure))
-            {
-                NavigationManager.NavigateTo(action.NavigateToOnFailure);
-            }
-            return true;
-        }
+
     }
 }
