@@ -21,27 +21,27 @@
 
         public async Task<CmdResponse> CreateCredential(CreateCredentialRequest request)
         {
-            return await SendVoidAsync<CreateCredentialRequest, CmdResponse>("CreateCredential", request);
+            return await SendVoidAsync("CreateCredential", request);
         }
 
         public async Task<CmdResponse> UpdateCredential(UpdateCredentialRequest request)
         {
-            return await SendVoidAsync<UpdateCredentialRequest, CmdResponse>("UpdateCredential", request);
+            return await SendVoidAsync("UpdateCredential", request);
         }
 
         public async Task<CmdResponse> DeleteCredential(DeleteCredentialRequest request)
         {
-            return await SendVoidAsync<DeleteCredentialRequest, CmdResponse>("DeleteCredential", request);
+            return await SendVoidAsync("DeleteCredential", request);
         }
 
         public async Task<CmdResponse> ChangePassword(UpdatePasswordRequest request)
         {
-            return await SendVoidAsync<UpdatePasswordRequest, CmdResponse>("ChangePassword", request);
+            return await SendVoidAsync("ChangePassword", request);
         }
         
         public async Task<CmdResponse> SendOneTimePassword(CheckOneTimePasswordRequest request)
         {
-            return await SendVoidAsync<CheckOneTimePasswordRequest, CmdResponse>("SendOneTimePassword", request);
+            return await SendVoidAsync("SendOneTimePassword", request);
         }
 
         public async Task<QueryResponse<RoleResponse>> GetRole(GetRoleRequest request)
@@ -91,17 +91,17 @@
 
         public async Task<CmdResponse> CreateIdentity(CreateIdentityRequest request)
         {
-            return await SendVoidAsync<CreateIdentityRequest, CmdResponse>("CreateIdentity", request);
+            return await SendVoidAsync("CreateIdentity", request);
         }
 
         public async Task<CmdResponse> UpdateIdentity(UpdateIdentityRequest request)
         {
-            return await SendVoidAsync<UpdateIdentityRequest, CmdResponse>("UpdateIdentity", request);
+            return await SendVoidAsync("UpdateIdentity", request);
         }
 
         public async Task<CmdResponse> DeleteIdentity(DeleteIdentityRequest request)
         {
-            return await SendVoidAsync<DeleteIdentityRequest, CmdResponse>("DeleteIdentity", request);
+            return await SendVoidAsync("DeleteIdentity", request);
         }
 
         public async Task<QueryResponse<ContactResponse>> GetContact(GetContactRequest request)
@@ -116,17 +116,17 @@
 
         public async Task<CmdResponse> CreateContact(CreateContactRequest request)
         {
-            return await SendVoidAsync<CreateContactRequest, CmdResponse>("CreateContact", request);
+            return await SendVoidAsync("CreateContact", request);
         }
 
         public async Task<CmdResponse> UpdateContact(UpdateContactRequest request)
         {
-            return await SendVoidAsync<UpdateContactRequest, CmdResponse>("UpdateContact", request);
+            return await SendVoidAsync("UpdateContact", request);
         }
 
         public async Task<CmdResponse> DeleteContact(DeleteContactRequest request)
         {
-            return await SendVoidAsync<DeleteContactRequest, CmdResponse>("DeleteContact", request);
+            return await SendVoidAsync("DeleteContact", request);
         }
 
         public async Task<QueryResponse<ExistenceResponse>> CheckContactExistence(CheckContactExistenceRequest request)

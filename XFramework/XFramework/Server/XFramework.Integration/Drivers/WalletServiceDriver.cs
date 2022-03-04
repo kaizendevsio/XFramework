@@ -27,19 +27,19 @@ namespace XFramework.Integration.Drivers
         
         public async Task<CmdResponse> CreateWalletEntity(CreateWalletEntityRequest request)
         {
-            var result = await SendAsync<CreateWalletEntityRequest, CmdResponse>("CreateEntityWallet", request);
+            var result = await SendVoidAsync("CreateEntityWallet", request);
             return result.Adapt<CmdResponse>();
         }
 
         public async Task<CmdResponse> UpdateWalletEntity(UpdateWalletEntityRequest request)
         {
-            var result = await SendAsync<UpdateWalletEntityRequest, CmdResponse>("UpdateWalletEntity", request);
+            var result = await SendVoidAsync("UpdateWalletEntity", request);
             return result.Adapt<CmdResponse>();
         }
 
         public async Task<CmdResponse> DeleteWalletEntity(DeleteWalletEntityRequest request)
         {
-            var result = await SendAsync<DeleteWalletEntityRequest, CmdResponse>("DeleteWalletEntity", request);
+            var result = await SendVoidAsync("DeleteWalletEntity", request);
             return result.Adapt<CmdResponse>();
         }
 
@@ -55,37 +55,37 @@ namespace XFramework.Integration.Drivers
 
         public async Task<CmdResponse> CreateWallet(CreateWalletRequest request)
         {
-            var result = await SendAsync<CreateWalletRequest, CmdResponse>("CreateWallet", request);
+            var result = await SendVoidAsync("CreateWallet", request);
             return result.Adapt<CmdResponse>();
         }
 
         public async Task<CmdResponse> UpdateWallet(UpdateWalletRequest request)
         {
-            var result = await SendAsync<UpdateWalletRequest, CmdResponse>("UpdateWallet", request);
+            var result = await SendVoidAsync("UpdateWallet", request);
             return result.Adapt<CmdResponse>();
         }
 
         public async Task<CmdResponse> DeleteWallet(DeleteWalletRequest request)
         {
-            var result = await SendAsync<DeleteWalletRequest, CmdResponse>("DeleteWallet", request);
+            var result = await SendVoidAsync("DeleteWallet", request);
             return result.Adapt<CmdResponse>();
         }
 
         public async Task<CmdResponse> DecrementWallet(DecrementWalletRequest request)
         {
-            var result = await SendAsync<DecrementWalletRequest, CmdResponse>("DecrementWallet", request);
+            var result = await SendVoidAsync("DecrementWallet", request);
             return result.Adapt<CmdResponse>();
         }
 
         public async Task<CmdResponse> IncrementWallet(IncrementWalletRequest request)
         {
-            var result = await SendAsync<IncrementWalletRequest, CmdResponse>("IncrementWallet", request);
+            var result = await SendVoidAsync("IncrementWallet", request);
             return result.Adapt<CmdResponse>();
         } 
 
         public async Task<CmdResponse> TransferWallet(TransferWalletRequest request)
         {
-            var result = await SendAsync<TransferWalletRequest, CmdResponse>("TransferWallet", request);
+            var result = await SendVoidAsync("TransferWallet", request);
             return result.Adapt<CmdResponse>();
         }
 

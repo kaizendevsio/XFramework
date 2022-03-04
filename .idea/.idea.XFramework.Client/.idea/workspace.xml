@@ -33,16 +33,15 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment=" - Test Merge">
+    <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment=" - Fix XFramework Integration Driver&#10; - Fixed Wallet State Crash On No Signed In Identity">
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/BusinessObjects/ServiceRequestLogBO.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Interfaces/IXLogger.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Administrator/Shared/Models/SignInModel.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Administrator/Shared/Models/SignUpModel.cs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/LogInActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/RegisterActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Handlers/RegisterActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/Handlers/GetWalletListActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/Handlers/GetWalletListActionHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Enums/LogType.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Enums/LogType.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/IdentityServerDriver.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/WalletServiceDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Drivers/WalletServiceDriver.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -360,7 +359,7 @@
       <workItem from="1646121016364" duration="8908000" />
       <workItem from="1646298102056" duration="526000" />
       <workItem from="1646298666271" duration="5978000" />
-      <workItem from="1646384283946" duration="83000" />
+      <workItem from="1646384283946" duration="1337000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -460,7 +459,14 @@
       <option name="project" value="LOCAL" />
       <updated>1646316258277</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary=" - Fix XFramework Integration Driver&#10; - Fixed Wallet State Crash On No Signed In Identity">
+      <created>1646384432041</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1646384432041</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -513,7 +519,8 @@
     <MESSAGE value=" - Minor Bug Fixes" />
     <MESSAGE value=" - Fixed Admin Project Errors" />
     <MESSAGE value=" - Test Merge" />
-    <option name="LAST_COMMIT_MESSAGE" value=" - Test Merge" />
+    <MESSAGE value=" - Fix XFramework Integration Driver&#10; - Fixed Wallet State Crash On No Signed In Identity" />
+    <option name="LAST_COMMIT_MESSAGE" value=" - Fix XFramework Integration Driver&#10; - Fixed Wallet State Crash On No Signed In Identity" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

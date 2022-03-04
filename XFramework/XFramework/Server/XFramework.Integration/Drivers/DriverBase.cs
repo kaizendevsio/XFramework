@@ -1,7 +1,10 @@
 ﻿using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using TypeSupport.Extensions;
+using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Integration.Drivers
 {
@@ -9,13 +12,14 @@ namespace XFramework.Integration.Drivers
     {
         protected IConfiguration Configuration { get; set; }
         public IMessageBusWrapper MessageBusDriver { get; set; }
+        public IXLogger Logger { get; set; }
         public HubConnectionState ConnectionState => MessageBusDriver.ConnectionState;
         public string ClientIpAddress { get; set; }
         public string ClientName { get; set; }
         public Guid? ApplicationId { get; set; }
         public Guid? TargetClient { get; set; }
         
-        public async Task<CmdResponse> SendVoidAsync<TRequest, TResponse>(string commandName ,TRequest request)
+        public async Task<CmdResponse> SendVoidAsync<TRequest>(string commandName ,TRequest request)
         {
             var rs = await GetRequestServer(request);
             try
@@ -37,11 +41,12 @@ namespace XFramework.Integration.Drivers
         }
         public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(string commandName ,TRequest request)
         {
+            var rs = new RequestServerBO();
             try
             {
                 if (request.ContainsProperty("RequestServer"))
                 {
-                    var rs = await GetRequestServer(request);
+                    rs = await GetRequestServer(request);
                     request.SetPropertyValue("RequestServer", rs);
                 }
             }
@@ -56,9 +61,17 @@ namespace XFramework.Integration.Drivers
                 ExchangeType = MessageExchangeType.Direct,
                 Recipient = TargetClient
             });
+
+            Task.Run(async () =>
+            {
+                if (Logger is not null)
+                {
+                    var serviceRequestLog = new ServiceRequestLog<TRequest, QueryResponse<TResponse>>(){Request = request, Response = result.Response};
+                    await Logger.Log("Service Request", JsonSerializer.Serialize(serviceRequestLog), this, rs.RequestId , LogLevel.Trace, LogType.SystemMaintenance);
+                }
+            });
             return result.Response.Adapt<QueryResponse<TResponse>>();
         }
-        
         public async Task<RequestServerBO> GetRequestServer<TRequest>(TRequest request)
         {
             if (string.IsNullOrEmpty(ClientIpAddress))
@@ -74,30 +87,50 @@ namespace XFramework.Integration.Drivers
                 }
             }
 
-            var applicationIdString = string.Empty;
             ApplicationId ??= Guid.Parse(Configuration.GetValue<string>("Application:DefaultUID"));
-            var applicationId = ApplicationId;
-            
-            if (request.ContainsProperty("RequestServer"))
-            {
-                var rs = request.GetPropertyValue("RequestServer");
-                applicationIdString = rs.GetPropertyValue("ApplicationId")?.ToString();
-                if (!string.IsNullOrEmpty(applicationIdString))
-                {
-                    applicationId = Guid.Parse(applicationIdString);
-                }
-            }
-
             ClientName = !string.IsNullOrEmpty(ClientName)
                 ? ClientName
                 : Configuration.GetValue<string>("StreamFlowConfiguration:ClientName");
             
+            var applicationId = ApplicationId;
+            var requestId = Guid.NewGuid();
+            /*var applicationIdString = string.Empty;
+            var requestIdString = string.Empty;
+            var ipAddressString = string.Empty;
+            var clientNameString = string.Empty;*/
+            var ipAddress = string.Empty;
+            var deviceAgent = string.Empty;
+            var clientName = string.Empty;
+            
+            if (request.ContainsProperty("RequestServer"))
+            {
+                var requestServer = request.GetPropertyValue("RequestServer").Adapt<RequestServerBO>();
+                //var requestServer = JsonSerializer.Deserialize<RequestServerBO>(JsonSerializer.Serialize(rs));
+                
+                /*applicationIdString = rs.GetPropertyValue("ApplicationId")?.ToString();
+                requestIdString = rs.GetPropertyValue("RequestId")?.ToString();
+                deviceAgent = rs.GetPropertyValue("DeviceAgent")?.ToString();
+                ipAddressString = rs.GetPropertyValue("IpAddress")?.ToString();
+                clientNameString = rs.GetPropertyValue("Name")?.ToString();*/
+
+                applicationId = requestServer?.ApplicationId ?? applicationId;
+                requestId = requestServer?.RequestId ?? requestId;
+
+                clientName = !string.IsNullOrEmpty(requestServer?.Name)
+                    ? requestServer.Name
+                    : ClientName;
+                ipAddress = !string.IsNullOrEmpty(requestServer?.IpAddress)
+                    ? requestServer.IpAddress
+                    : ClientIpAddress;
+            }
+
             return new()
             {
+                DeviceAgent = deviceAgent,
                 ApplicationId = applicationId,
-                Name = ClientName,
-                IpAddress = ClientIpAddress,
-                RequestId = Guid.NewGuid()
+                Name = clientName,
+                IpAddress = ipAddress,
+                RequestId = requestId
             };
         }
     }
