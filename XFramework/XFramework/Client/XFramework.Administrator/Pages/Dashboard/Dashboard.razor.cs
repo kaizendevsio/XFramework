@@ -1,4 +1,4 @@
-﻿namespace XFramework.Administrator.Pages.Dashboard;
+namespace XFramework.Administrator.Pages.Dashboard;
 
 public class DashboardBase : PageBase
 {
@@ -16,5 +16,22 @@ public class DashboardBase : PageBase
    public void ToSignUp()
    {
       NavigationManager.NavigateTo("/Session/SignUp");
+   }
+   public void ToProfile()
+   {
+      NavigationManager.NavigateTo("/Profile");
+   }
+   
+   public void ToWallet()
+   {
+      NavigationManager.NavigateTo("/Wallet");
+   }
+   public void ToUser()
+   {
+      NavigationManager.NavigateTo("/User");
+   }
+   public void ToAdminSettings()
+   {
+      NavigationManager.NavigateTo("/AdminSettings");
    }
 }

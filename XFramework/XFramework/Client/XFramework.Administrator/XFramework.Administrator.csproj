@@ -37,4 +37,9 @@
         </Reference>
     </ItemGroup>
    
+
+    <ItemGroup>
+      <ProjectReference Include="..\XFramework.Client.Shared\XFramework.Client.Shared.csproj" />
+    </ItemGroup>
+
 </Project>
