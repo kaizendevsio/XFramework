@@ -9,6 +9,7 @@ namespace XFramework.Integration.Interfaces.Wrappers
         
         public Task<QueryResponse<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request);
         public Task<QueryResponse<CredentialResponse>> GetCredential(GetCredentialRequest request);
+        public Task<QueryResponse<CredentialResponse>> GetCredentialByContact(GetCredentialByContactRequest request);
         public Task<QueryResponse<List<CredentialResponse>>> LegacyGetCredentialList(GetCredentialListRequest request);
         public Task<QueryResponse<List<CredentialResponse>>> GetCredentialList(GetCredentialListRequest request);
         public Task<QueryResponse<ExistenceResponse>> CheckCredentialExistence(CheckCredentialExistenceRequest request);

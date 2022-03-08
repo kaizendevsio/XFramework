@@ -44,8 +44,7 @@ public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangeP
             {
                 handle = new()
                 {
-                    Message =
-                        $"Identity with data [PhoneNumber: {request.PhoneNumber}] exists on multiple identities and is therefore ambiguous",
+                    Message = $"Identity with data [PhoneNumber: {request.PhoneNumber}] exists on multiple identities and is therefore ambiguous",
                     HttpStatusCode = HttpStatusCode.Conflict
                 };
                 return true;

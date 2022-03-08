@@ -36,6 +36,8 @@ if($answer -eq "y"){
 
    Write-Host Syncing to Github ...
    Set-Location "C:\Projects\Published\Release.XnelSystems"
+
+   git branch
    git add *.*
    git commit -m "One Click Deploy"
 

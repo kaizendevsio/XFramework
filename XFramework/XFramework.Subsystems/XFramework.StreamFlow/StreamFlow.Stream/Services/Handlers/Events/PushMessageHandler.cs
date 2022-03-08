@@ -20,7 +20,7 @@ using XFramework.Domain.Generic.Configurations;
 
 namespace StreamFlow.Stream.Services.Handlers.Events
 {
-    public class PushMessageHandler : CommandBaseHandler, IRequestHandler<PushMessageCmd, CmdResponseBO<PushMessageCmd>>
+    public class PushMessageHandler : CommandBaseHandler, IRequestHandler<PushMessageCmd, CmdResponse<PushMessageCmd>>
     {
         public PushMessageHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
         {
@@ -29,7 +29,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             _cachingService = cachingService;
         }
         
-        public async Task<CmdResponseBO<PushMessageCmd>> Handle(PushMessageCmd request, CancellationToken cancellationToken)
+        public async Task<CmdResponse<PushMessageCmd>> Handle(PushMessageCmd request, CancellationToken cancellationToken)
         {
             // Check if Client is Registered
             var client = _cachingService.Clients.FirstOrDefault(x => x.StreamId == request.Context.ConnectionId);

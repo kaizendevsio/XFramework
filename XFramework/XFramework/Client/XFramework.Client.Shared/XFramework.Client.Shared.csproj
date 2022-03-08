@@ -41,6 +41,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Core\Features\Chat\Handlers" />
+      <Folder Include="Core\Features\Cryptocurrency\Handlers" />
+      <Folder Include="Core\Features\NewsFeed\Actions" />
+      <Folder Include="Core\Features\NewsFeed\Handlers" />
       <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Response" />
     </ItemGroup>

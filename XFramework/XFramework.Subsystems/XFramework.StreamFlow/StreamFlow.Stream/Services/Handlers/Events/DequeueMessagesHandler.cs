@@ -17,7 +17,7 @@ using XFramework.Domain.Generic.Configurations;
 namespace StreamFlow.Stream.Services.Handlers.Events
 {
     public class DequeueMessagesHandler : CommandBaseHandler,
-        IRequestHandler<DequeueMessagesCmd, CmdResponseBO<DequeueMessagesCmd>>
+        IRequestHandler<DequeueMessagesCmd, CmdResponse<DequeueMessagesCmd>>
     {
         public DequeueMessagesHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext,
             StreamFlowConfiguration streamFlowConfiguration, IMediator mediator)
@@ -28,7 +28,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             _streamFlowConfiguration = streamFlowConfiguration;
         }
 
-        public async Task<CmdResponseBO<DequeueMessagesCmd>> Handle(DequeueMessagesCmd request, CancellationToken cancellationToken)
+        public async Task<CmdResponse<DequeueMessagesCmd>> Handle(DequeueMessagesCmd request, CancellationToken cancellationToken)
         {
             var queuedMessages = _cachingService.QueuedMessages.Where(i => i.Recipient == request.Client.Guid).ToList();
             if (queuedMessages.Any())

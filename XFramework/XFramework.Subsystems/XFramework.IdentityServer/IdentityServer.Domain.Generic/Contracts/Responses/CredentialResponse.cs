@@ -13,7 +13,7 @@ public class CredentialResponse
     public long ApplicationId { get; set; }
     public string Token { get; set; }
 
-    public virtual IdentityResponse Identity { get; set; }
+    public virtual IdentityResponse IdentityInfo { get; set; }
     public virtual List<RoleResponse> TblIdentityRoles { get; set; }
     public virtual List<ContactResponse> TblIdentityContacts { get; set; }
 }

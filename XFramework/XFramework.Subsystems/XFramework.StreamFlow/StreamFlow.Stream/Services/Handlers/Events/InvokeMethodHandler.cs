@@ -19,7 +19,7 @@ using XFramework.Integration.Interfaces;
 
 namespace StreamFlow.Stream.Services.Handlers.Events
 {
-    public class InvokeMethodHandler : CommandBaseHandler, IRequestHandler<InvokeMethodQuery, QueryResponseBO<StreamFlowInvokeResponse>>
+    public class InvokeMethodHandler : CommandBaseHandler, IRequestHandler<InvokeMethodQuery, QueryResponse<StreamFlowInvokeResponse>>
     {
         public InvokeMethodHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration, IHelperService helperService)
         {
@@ -28,7 +28,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             _hubContext = hubContext;
             _streamFlowConfiguration = streamFlowConfiguration;
         }
-        public async Task<QueryResponseBO<StreamFlowInvokeResponse>> Handle(InvokeMethodQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponse<StreamFlowInvokeResponse>> Handle(InvokeMethodQuery request, CancellationToken cancellationToken)
         {
             // Check if Client is Registered
             var client = _cachingService.Clients.FirstOrDefault(x => x.StreamId == request.Context.ConnectionId);
@@ -80,7 +80,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     HttpStatusCode = HttpStatusCode.Accepted,
                     Response = new ()
                     {
-                        HttpStatusCode = response.Adapt<CmdResponseBO>().HttpStatusCode,
+                        HttpStatusCode = response.Adapt<CmdResponse>().HttpStatusCode,
                         Response = response.Data
                     }
                 };
