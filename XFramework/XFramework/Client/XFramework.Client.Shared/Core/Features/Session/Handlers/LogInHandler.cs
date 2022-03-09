@@ -11,7 +11,6 @@ public partial class SessionState
 {
     public class LogInHandler : ActionHandler<Login>
     {
-        public IConfiguration Configuration { get; }
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
         
@@ -35,7 +34,7 @@ public partial class SessionState
         {
             // Inform UI About Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
-            
+
             // Map view model to request object
             var request = CurrentState.LoginVm.Adapt<AuthenticateCredentialRequest>();
             

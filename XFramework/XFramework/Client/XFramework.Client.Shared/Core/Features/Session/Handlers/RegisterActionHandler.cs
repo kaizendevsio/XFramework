@@ -38,6 +38,7 @@ public partial class SessionState
             // Inform UI About Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
             
+            
             // Check If Any Given Data Are Already Existing
             if (await CheckDuplicateRecords(action)) return Unit.Value;
 
@@ -90,6 +91,30 @@ public partial class SessionState
                     Value = CurrentState.RegisterVm.EmailAddress
                 });
                 if (await HandleFailure(emailContact, action)) return Unit.Value;
+            }
+
+            // If AutoLogin property is true, automatically log the identity in
+            if (action.AutoLogin)
+            {
+                var username = string.Empty;
+                if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
+                {
+                    username = CurrentState.RegisterVm.PhoneNumber;
+                }
+                if (!string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress))
+                {
+                    username = CurrentState.RegisterVm.EmailAddress;
+                }
+                if (!string.IsNullOrEmpty(CurrentState.RegisterVm.UserName))
+                {
+                    username = CurrentState.RegisterVm.UserName;
+                }
+
+                SessionState.LoginVm.Username = username; 
+                SessionState.LoginVm.Password = CurrentState.RegisterVm.Password; 
+                await Mediator.Send(new Login() {NavigateToOnSuccess = action.NavigateToOnSuccess});
+            
+                return Unit.Value;
             }
             
             // If Success URL property is provided, navigate to the given URL

@@ -34,7 +34,27 @@ public partial class ApplicationState
             {
                 Console.WriteLine(e);
             }
+
+            HandleProgressStatus();
             return Unit.Value;
+        }
+
+        private async Task HandleProgressStatus()
+        {
+            if (CurrentState.IsBusy)
+            {
+                SweetAlertService.FireAsync(new()
+                {
+                    Title = CurrentState.ProgressTitle,
+                    Text = CurrentState.ProgressMessage,
+                    Html = "<img src='assets/img/loader.svg' width='96px' />",
+                    ShowConfirmButton = false,
+                });
+            }
+            else
+            {
+                SweetAlertService.CloseAsync();
+            }
         }
     }
 }
