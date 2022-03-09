@@ -1,5 +1,5 @@
-﻿@page "/Roles"
-@inherits RolesBase
+﻿@page "/Wallets"
+@inherits WalletsBase
 
 <MudTable Items="@Elements" Hover="@hover" ReadOnly="ronly" RowEditPreview="BackupItem" Filter="new Func<Element,bool>(FilterFunc)" RowEditCancel="ResetItemToOriginalValues"
                                                     RowEditCommit="ItemHasBeenCommitted">
@@ -62,4 +62,3 @@
 <MudSwitch @bind-Checked="dense" Color="Color.Secondary">Dense</MudSwitch>
 <MudSwitch @bind-Checked="pagination" Color="Color.Secondary">Hide/Show Pagination</MudSwitch>
 <MudSwitch @bind-Checked="bordered" Color="Color.Warning">Bordered</MudSwitch>
-

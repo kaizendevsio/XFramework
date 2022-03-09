@@ -23,6 +23,9 @@
         <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
         </Reference>
+        <Reference Include="MudBlazor.Examples.Data, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+          <HintPath>..\..\..\..\..\..\..\Users\J\Downloads\MudBlazor-dev\MudBlazor-dev\src\MudBlazor.Examples.Data\bin\Debug\net6.0\MudBlazor.Examples.Data.dll</HintPath>
+        </Reference>
         <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net6.0\StreamFlow.Domain.Generic.dll</HintPath>
         </Reference>

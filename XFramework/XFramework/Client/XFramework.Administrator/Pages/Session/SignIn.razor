@@ -1,0 +1,23 @@
+@page "/Session/SignIn"
+@inherits SignInBase
+
+<EditForm Model="SessionState.LoginVm" OnValidSubmit="OnValidSubmit">
+    <DataAnnotationsValidator/>
+    <MudTextField Label="Email" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Filled.Email" Class="mt-3"
+                  @bind-Value="SessionState.LoginVm.Username" For="@(() => SessionState.LoginVm.Username)"/>
+    <MudTextField Label="Password" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.VisibilityOff" OnAdaornmentClick="ShowPassword" Class="mt-3"
+                  @bind-Value="SessionState.LoginVm.Password" For="@(() => SessionState.LoginVm.Password)" InputType="InputType.Password"/>
+    <div class="row">
+        <div class="col">
+            <MudCheckBox @bind-Checked="@SessionState.LoginVm.Remember" Label="Remember Me" Size="Size.Small" Color="Color.Primary" class="float-end"></MudCheckBox>
+        </div>
+    </div>
+    <MudCardActions>
+        <div class="rounded-sm mt-5 mx-auto">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Submit" Size="Size.Large">Sign In</MudButton>
+        </div>
+    </MudCardActions>
+    <div class="my-5 mx-auto">
+        Don't have an account? <a href="/Session/SignUp" class="btn-outline-primary">Create</a>
+    </div>
+</EditForm>

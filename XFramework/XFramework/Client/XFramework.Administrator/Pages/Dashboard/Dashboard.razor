@@ -8,13 +8,15 @@
                 <MudText Typo="Typo.h6">XFramework</MudText>
             </MudDrawerHeader>
             <MudNavMenu>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Dashboard" IconColor="Color.Inherit" OnClick="ToDashboard">Dashboard</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Login" IconColor="Color.Inherit" OnClick="ToSignIn">Sign In</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AppRegistration" IconColor="Color.Inherit" OnClick="ToSignUp">Registration</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.SupervisedUserCircle" IconColor="Color.Inherit" OnClick="ToProfile">Profile</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AccountBalanceWallet" IconColor="Color.Inherit" OnClick="ToWallet">Wallet</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.VerifiedUser" IconColor="Color.Inherit" OnClick="ToUser">User</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Settings" IconColor="Color.Inherit" OnClick="ToAdminSettings">Admin Settings</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Dashboard" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Dashboard");})">Dashboard</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Login" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Session/SignIn");})">Sign In</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AppRegistration" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Session/SignUp");})">Registration</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.SupervisedUserCircle" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Profile");})">Profile</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AccountBalanceWallet" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Wallets");})">Wallets</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AccountBalanceWallet" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/WalletTypes");})">Wallet Types</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.VerifiedUser" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Users");})">Users</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.SupervisedUserCircle" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Roles");})">Roles</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Settings" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/AdminSettings");})">Admin Settings</MudNavLink>
             </MudNavMenu>
         </MudDrawer>
         <div class="d-flex justify-center align-center mud-height-full">

@@ -1,11 +1,5 @@
-﻿using Blazored.SessionStorage;
-using BlazorState;
-using CurrieTechnologies.Razor.SweetAlert2;
-using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
-using XFramework.Client.Shared.Core.Features.Session;
-using XFramework.Client.Shared.Core.Helpers;
-using XFramework.Client.Shared.Entity.Models.Components;
+﻿using System.Net.Http.Json;
+using MudBlazor.Examples.Data.Models;
 
 namespace XFramework.Administrator.Pages;
 
@@ -17,6 +11,21 @@ public class PageBase : BlazorStateComponent
    [Inject] public SweetAlertService SweetAlertService { get; set; }
    [Inject] public IJSRuntime JsRuntime { get; set; }
    [Inject] public EndPointsModel EndPoints { get; set; }
+   [Inject] public HttpClient httpClient { get; set; }
 
    public SessionState SessionState => GetState<SessionState>();
+
+   public async Task NavigateTo(string url)
+   {
+      NavigationManager.NavigateTo(url);
+   }
+   
+   public IEnumerable<Element> Elements = new List<Element>();
+
+   protected override async Task OnInitializedAsync()
+   {
+      Elements = await httpClient.GetFromJsonAsync<List<Element>>("webapi/periodictable");
+   } 
+   
+   
 }

@@ -1,12 +1,11 @@
-﻿using System.Net.Http.Json;
-using MudBlazor;
+﻿using MudBlazor;
 using MudBlazor.Examples.Data.Models;
 
 namespace XFramework.Administrator.Pages.Dashboard;
 
-public class RolesBase : PageBase
+public class WalletTypesBase : PageBase
 {
-    public bool dense = false;
+     public bool dense = false;
     public bool hover = true;
     public string searchString1 = "";
     public bool sort = true;
@@ -71,6 +70,4 @@ public class RolesBase : PageBase
         Expandable = false,
         Selector = (e) => e.Group
     };
-
 }
-
