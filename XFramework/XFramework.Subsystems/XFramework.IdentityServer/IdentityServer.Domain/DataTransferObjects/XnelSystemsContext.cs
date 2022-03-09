@@ -553,9 +553,7 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasColumnName("ID")
                     .HasIdentityOptions(null, null, null, 2147483647L);
 
-                entity.Property(e => e.FirstName)
-                    .IsRequired()
-                    .HasMaxLength(100);
+                entity.Property(e => e.FirstName).HasMaxLength(100);
 
                 entity.Property(e => e.Guid)
                     .IsRequired()
@@ -566,9 +564,7 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.Property(e => e.IdentityName).HasMaxLength(100);
 
-                entity.Property(e => e.LastName)
-                    .IsRequired()
-                    .HasMaxLength(100);
+                entity.Property(e => e.LastName).HasMaxLength(100);
 
                 entity.Property(e => e.MiddleName).HasMaxLength(100);
             });

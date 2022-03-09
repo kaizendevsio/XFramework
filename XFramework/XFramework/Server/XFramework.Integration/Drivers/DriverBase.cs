@@ -29,6 +29,7 @@ namespace XFramework.Integration.Drivers
             catch (Exception e)
             {
                 Console.WriteLine(e);
+                throw;
             }
             
             var result = await MessageBusDriver.InvokeAsync<CmdResponse>(new(request)
@@ -53,6 +54,7 @@ namespace XFramework.Integration.Drivers
             catch (Exception e)
             {
                 Console.WriteLine(e);
+                throw;
             }
             
             var result = await MessageBusDriver.InvokeAsync<QueryResponse<TResponse>>(new(request)
@@ -83,7 +85,8 @@ namespace XFramework.Integration.Drivers
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e);
+                    Console.WriteLine(e.Message);
+                    throw;
                 }
             }
 
@@ -94,10 +97,6 @@ namespace XFramework.Integration.Drivers
             
             var applicationId = ApplicationId;
             var requestId = Guid.NewGuid();
-            /*var applicationIdString = string.Empty;
-            var requestIdString = string.Empty;
-            var ipAddressString = string.Empty;
-            var clientNameString = string.Empty;*/
             var ipAddress = string.Empty;
             var deviceAgent = string.Empty;
             var clientName = string.Empty;
@@ -105,13 +104,6 @@ namespace XFramework.Integration.Drivers
             if (request.ContainsProperty("RequestServer"))
             {
                 var requestServer = request.GetPropertyValue("RequestServer").Adapt<RequestServerBO>();
-                //var requestServer = JsonSerializer.Deserialize<RequestServerBO>(JsonSerializer.Serialize(rs));
-                
-                /*applicationIdString = rs.GetPropertyValue("ApplicationId")?.ToString();
-                requestIdString = rs.GetPropertyValue("RequestId")?.ToString();
-                deviceAgent = rs.GetPropertyValue("DeviceAgent")?.ToString();
-                ipAddressString = rs.GetPropertyValue("IpAddress")?.ToString();
-                clientNameString = rs.GetPropertyValue("Name")?.ToString();*/
 
                 applicationId = requestServer?.ApplicationId ?? applicationId;
                 requestId = requestServer?.RequestId ?? requestId;

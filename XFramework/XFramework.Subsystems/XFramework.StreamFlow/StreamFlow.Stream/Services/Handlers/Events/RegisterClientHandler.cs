@@ -14,7 +14,7 @@ using XFramework.Domain.Generic.Configurations;
 
 namespace StreamFlow.Stream.Services.Handlers.Events
 {
-    public class RegisterClientHandler : CommandBaseHandler, IRequestHandler<RegisterClientCmd, CmdResponseBO<RegisterClientCmd>>
+    public class RegisterClientHandler : CommandBaseHandler, IRequestHandler<RegisterClientCmd, CmdResponse<RegisterClientCmd>>
     {
         public RegisterClientHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
         {
@@ -23,7 +23,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             _streamFlowConfiguration = streamFlowConfiguration;
         }
         
-        public async Task<CmdResponseBO<RegisterClientCmd>> Handle(RegisterClientCmd request, CancellationToken cancellationToken)
+        public async Task<CmdResponse<RegisterClientCmd>> Handle(RegisterClientCmd request, CancellationToken cancellationToken)
         {
             _cachingService.Clients.Add(new()
             {

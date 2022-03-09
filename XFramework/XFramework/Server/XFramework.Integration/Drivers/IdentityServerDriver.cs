@@ -19,6 +19,11 @@
             return await SendAsync<GetCredentialRequest, CredentialResponse>("GetCredential", request);
         }
 
+        public async Task<QueryResponse<CredentialResponse>> GetCredentialByContact(GetCredentialByContactRequest request)
+        {
+            return await SendAsync<GetCredentialByContactRequest, CredentialResponse>("GetCredentialByContact", request);
+        }
+
         public async Task<CmdResponse> CreateCredential(CreateCredentialRequest request)
         {
             return await SendVoidAsync("CreateCredential", request);

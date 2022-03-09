@@ -15,6 +15,14 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
     }
     public async Task<QueryResponse<ExistenceResponse>> Handle(CheckCredentialExistenceQuery request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrEmpty(request.UserName))
+        {
+            return new ()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
+        }
+        
         var existing = _dataLayer.TblIdentityCredentials
             .AsNoTracking()
             .Where(i => i.UserName == request.UserName)

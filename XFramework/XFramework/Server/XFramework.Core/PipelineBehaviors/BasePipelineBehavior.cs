@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentValidation;
 using MediatR;
+using TypeSupport.Extensions;
 using XFramework.Core.Interfaces;
 using XFramework.Domain.Generic.BusinessObjects;
 
@@ -78,19 +79,38 @@ namespace XFramework.Core.PipelineBehaviors
         {
             if (_response.GetType() == typeof(CmdResponse<TRequest>))
             {
-                _response.GetType().GetProperty("Request")?.SetValue(_response, request, null);
+                if (_response.ContainsProperty("Request"))
+                {
+                    _response.SetPropertyValue("Request", request);
+                }
             }
 
-            if (_response.GetType().GetProperty("Message")?.GetValue(_response) == null)
+            if (_response.ContainsProperty("Message"))
             {
-                _response.GetType().GetProperty("Message")?.SetValue(_response, HttpStatusCode.Accepted.ToString(), null);
+                if (_response.GetPropertyValue("Message") == null)
+                {
+                    _response.SetPropertyValue("Message", $"{HttpStatusCode.Accepted}");
+                }
+            }
+        
+            if (_response.ContainsProperty("HttpStatusCode"))
+            {
+                if (_response.GetPropertyValue("HttpStatusCode")?.ToString() == "0")
+                {
+                    _response.SetPropertyValue("HttpStatusCode", HttpStatusCode.Accepted);
+                }
             }
 
-            if (_response.GetType().GetProperty("HttpStatusCode")?.GetValue(_response)?.ToString() == "0")
+            if (_response.ContainsProperty("IsSuccess"))
             {
-                _response.GetType().GetProperty("HttpStatusCode")?.SetValue(_response, HttpStatusCode.Accepted, null);
+                if (_response.ContainsProperty("HttpStatusCode"))
+                {
+                    if (_response.GetPropertyValue("HttpStatusCode")?.ToString() == $"{HttpStatusCode.Accepted}")
+                    {
+                        _response.SetPropertyValue("IsSuccess", true);
+                    }
+                }
             }
-            
             
             await Task.FromResult(_response);
         }

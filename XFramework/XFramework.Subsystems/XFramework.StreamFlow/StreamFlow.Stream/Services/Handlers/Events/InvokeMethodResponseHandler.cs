@@ -16,7 +16,7 @@ using XFramework.Domain.Generic.Configurations;
 
 namespace StreamFlow.Stream.Services.Handlers.Events
 {
-    public class InvokeMethodResponseHandler : CommandBaseHandler, IRequestHandler<InvokeMethodResponseCmd, CmdResponseBO<InvokeMethodResponseCmd>>
+    public class InvokeMethodResponseHandler : CommandBaseHandler, IRequestHandler<InvokeMethodResponseCmd, CmdResponse<InvokeMethodResponseCmd>>
     {
         public InvokeMethodResponseHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
         {
@@ -26,7 +26,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
         }
 
 
-        public async Task<CmdResponseBO<InvokeMethodResponseCmd>> Handle(InvokeMethodResponseCmd request, CancellationToken cancellationToken)
+        public async Task<CmdResponse<InvokeMethodResponseCmd>> Handle(InvokeMethodResponseCmd request, CancellationToken cancellationToken)
         {
             // Check if Client is Registered
             var client = _cachingService.Clients.FirstOrDefault(x => x.StreamId == request.Context.ConnectionId);
