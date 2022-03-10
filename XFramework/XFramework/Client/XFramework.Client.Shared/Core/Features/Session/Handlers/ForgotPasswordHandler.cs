@@ -10,7 +10,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class ForgotPasswordHandler : ActionHandler<ForgotPassword>
+    protected class ForgotPasswordHandler : ActionHandler<ForgotPassword>
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();

@@ -9,7 +9,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class LogInHandler : ActionHandler<Login>
+    protected class LogInHandler : ActionHandler<Login>
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();

@@ -19,13 +19,71 @@ public class PageBase : BlazorStateComponent
    {
       NavigationManager.NavigateTo(url);
    }
-   
-   public IEnumerable<Element> Elements = new List<Element>();
 
-   protected override async Task OnInitializedAsync()
-   {
-      Elements = await httpClient.GetFromJsonAsync<List<Element>>("webapi/periodictable");
-   } 
-   
-   
+   public List<Element> Elements { get; set; } = new (){
+      new Element
+      {
+         Group = "Group",
+         Position = 1,
+         Name = "aaa",
+         Number = 1,
+         Sign = "asas",
+         Molar = 0,
+         Electrons = null
+      },
+      new Element
+      {
+         Group = "Group",
+         Position = 1,
+         Name = "aaa",
+         Number = 1,
+         Sign = "asas",
+         Molar = 0,
+         Electrons = null
+      },
+      new Element
+      {
+         Group = "Group",
+         Position = 1,
+         Name = "aaa",
+         Number = 1,
+         Sign = "asas",
+         Molar = 0,
+         Electrons = null
+      },
+      new Element
+      {
+         Group = "Group",
+         Position = 1,
+         Name = "aaa",
+         Number = 1,
+         Sign = "asas",
+         Molar = 0,
+         Electrons = null
+      },
+      new Element
+      {
+         Group = "Group",
+         Position = 1,
+         Name = "aaa",
+         Number = 1,
+         Sign = "asas",
+         Molar = 0,
+         Electrons = null
+      },
+      new Element
+      {
+         Group = "Group",
+         Position = 1,
+         Name = "aaa",
+         Number = 1,
+         Sign = "asas",
+         Molar = 0,
+         Electrons = null
+      },
+      
+   };
+
+
+
 }

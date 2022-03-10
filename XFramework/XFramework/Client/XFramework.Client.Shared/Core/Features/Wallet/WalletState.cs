@@ -10,5 +10,5 @@ public partial class WalletState : State<WalletState>
     }
     
     public List<WalletResponse> WalletList { get; set; }
-    
+    public Action InvokeRefresh { get; set; }
 }
