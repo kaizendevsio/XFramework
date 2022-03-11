@@ -3,9 +3,9 @@ using MudBlazor.Examples.Data.Models;
 
 namespace XFramework.Administrator.Pages.Dashboard;
 
-public class ProfileBase : PageBase
+public class EnterprisesBase : PageBase
 {
-   public bool dense = false;
+     public bool dense = false;
     public bool hover = true;
     public string searchString1 = "";
     public bool sort = true;

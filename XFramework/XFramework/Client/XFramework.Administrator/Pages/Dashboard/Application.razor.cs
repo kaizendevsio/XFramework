@@ -3,9 +3,9 @@ using MudBlazor.Examples.Data.Models;
 
 namespace XFramework.Administrator.Pages.Dashboard;
 
-public class ProfileBase : PageBase
+public class ApplicationBase : PageBase
 {
-   public bool dense = false;
+    public bool dense = false;
     public bool hover = true;
     public string searchString1 = "";
     public bool sort = true;
@@ -15,7 +15,7 @@ public class ProfileBase : PageBase
     public bool bordered = false;
     private string searchString = "";
     
-    private Element elementBeforeEdit;
+    private CategoryTypes.Element elementBeforeEdit;
     private List<string> editEvents = new();
     
     private void AddEditionEvent(string message)
@@ -28,29 +28,29 @@ public class ProfileBase : PageBase
     {
         elementBeforeEdit = new()
         {
-            Sign = ((Element)element).Sign,
-            Name = ((Element)element).Name,
-            Molar = ((Element)element).Molar,
-            Position = ((Element)element).Position
+            Sign = ((CategoryTypes.Element)element).Sign,
+            Name = ((CategoryTypes.Element)element).Name,
+            Molar = ((CategoryTypes.Element)element).Molar,
+            Position = ((CategoryTypes.Element)element).Position
         };
-        AddEditionEvent($"RowEditPreview event: made a backup of Element {((Element)element).Name}");
+        AddEditionEvent($"RowEditPreview event: made a backup of Element {((CategoryTypes.Element)element).Name}");
     }
     
     public void ItemHasBeenCommitted(object element)
     {
-        AddEditionEvent($"RowEditCommit event: Changes to Element {((Element)element).Name} committed");
+        AddEditionEvent($"RowEditCommit event: Changes to Element {((CategoryTypes.Element)element).Name} committed");
     }
 
     public void ResetItemToOriginalValues(object element)
     {
-        ((Element)element).Sign = elementBeforeEdit.Sign;
-        ((Element)element).Name = elementBeforeEdit.Name;
-        ((Element)element).Molar = elementBeforeEdit.Molar;
-        ((Element)element).Position = elementBeforeEdit.Position;
-        AddEditionEvent($"RowEditCancel event: Editing of Element {((Element)element).Name} cancelled");
+        ((CategoryTypes.Element)element).Sign = elementBeforeEdit.Sign;
+        ((CategoryTypes.Element)element).Name = elementBeforeEdit.Name;
+        ((CategoryTypes.Element)element).Molar = elementBeforeEdit.Molar;
+        ((CategoryTypes.Element)element).Position = elementBeforeEdit.Position;
+        AddEditionEvent($"RowEditCancel event: Editing of Element {((CategoryTypes.Element)element).Name} cancelled");
     }
 
-    public bool FilterFunc(Element element)
+    public bool FilterFunc(CategoryTypes.Element element)
     {
         if (string.IsNullOrWhiteSpace(searchString))
             return true;
@@ -63,7 +63,7 @@ public class ProfileBase : PageBase
         return false;
     } 
     
-    public TableGroupDefinition<Element> _groupDefinition = new()
+    public TableGroupDefinition<CategoryTypes.Element> _groupDefinition = new()
     {
         GroupName = "Group",
         Indentation = false,

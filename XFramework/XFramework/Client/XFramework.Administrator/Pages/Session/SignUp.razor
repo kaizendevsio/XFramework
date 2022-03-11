@@ -1,6 +1,7 @@
 @page "/Session/SignUp"
 @inherits SignUpBase
 
+<MudPaper Class="d-block mx-auto w-100 h-100 px-5 py-5">
 <EditForm Model="SessionState.RegisterVm" OnValidSubmit="OnValidSubmit">
     <DataAnnotationsValidator/>
     <MudTextField Label="First name" HelperText="Max. 8 characters"
@@ -21,3 +22,4 @@
         Already have an account? <a href="/Session/SignIn" class="btn-outline-primary">Login Instead</a>
     </div>
 </EditForm>
+</MudPaper>

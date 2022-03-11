@@ -1,0 +1,19 @@
+﻿<MudGrid Class="h-100 w-100">
+    <MudItem xs="12" sm="7" lg="6" Class="align-center text-center mx-auto d-block mt-5">
+        <MudCard Class="py-5 px-5">
+            <div class="mt-5">
+                <h1>
+                    @HeaderContent
+                </h1>
+            </div>
+            <MudCardContent>
+                @Body
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code
+{
+    [Parameter] public RenderFragment HeaderContent { get; set; }
+}

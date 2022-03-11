@@ -47,5 +47,6 @@
       <Folder Include="Core\Features\NewsFeed\Handlers" />
       <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Response" />
+      <Folder Include="Entity\Models\SampleModels" />
     </ItemGroup>
 </Project>

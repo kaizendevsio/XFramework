@@ -1,6 +1,7 @@
 ﻿@page "/Roles"
 @inherits RolesBase
 
+<h1 class="text-center">Roles List</h1>
 <MudTable Items="@Elements" Hover="@hover" ReadOnly="ronly" RowEditPreview="BackupItem" Filter="new Func<Element,bool>(FilterFunc)" RowEditCancel="ResetItemToOriginalValues"
                                                     RowEditCommit="ItemHasBeenCommitted">
     <ToolBarContent>
