@@ -17,7 +17,10 @@ namespace IdentityServer.Domain.DataTransferObjects
         public long Code { get; set; }
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+        public string Guid { get; set; }
+        public long? CountryId { get; set; }
 
+        public virtual TblAddressCountry Country { get; set; }
         public virtual ICollection<TblAddressProvince> TblAddressProvinces { get; set; }
         public virtual ICollection<TblIdentityAddress> TblIdentityAddresses { get; set; }
     }

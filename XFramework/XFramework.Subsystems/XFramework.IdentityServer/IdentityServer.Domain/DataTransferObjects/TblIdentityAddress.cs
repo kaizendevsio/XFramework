@@ -24,6 +24,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public bool? DefaultAddress { get; set; }
         public long? Province { get; set; }
         public long? Country { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblIdentityAddressEntity AddressEntities { get; set; }
         public virtual TblAddressBarangay BarangayNavigation { get; set; }

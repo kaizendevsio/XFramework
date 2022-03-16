@@ -30,7 +30,7 @@ public class LoggerService : ILoggerWrapper
             Message = message,
             Name = name,
             Type = (short?) logType,
-            Uuid = requestServer.RequestId.ToString()
+            Guid = requestServer.RequestId.ToString()
         };
 
         _dataLayer.TblLogs.Add(log);

@@ -12,5 +12,6 @@ namespace IdentityServer.Domain.DataTransferObjects
         public DateTime? ModifiedAt { get; set; }
         public long? ModifiedBy { get; set; }
         public bool IsDeleted { get; set; }
+        public string Guid { get; set; }
     }
 }

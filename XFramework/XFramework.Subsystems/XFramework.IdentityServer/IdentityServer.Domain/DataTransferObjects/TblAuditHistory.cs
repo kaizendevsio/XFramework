@@ -12,5 +12,6 @@ namespace IdentityServer.Domain.DataTransferObjects
         public string OldValues { get; set; }
         public string NewValues { get; set; }
         public string QueryAction { get; set; }
+        public string Guid { get; set; }
     }
 }

@@ -3,6 +3,7 @@ using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using Mapster;
 using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Core.Features.Application;
+using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
@@ -62,7 +63,13 @@ public partial class SessionState
                 Credential = credentialResponse.Response,
                 ContactList = contactListResponse.Response
             });
-            
+
+            // Initialize Wallets If Specified
+            if (action.InitializeWallets)
+            {
+                await Mediator.Send(new WalletState.GetWalletList());
+            }
+
             // Inform UI About Not Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
             

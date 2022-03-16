@@ -15,7 +15,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public short? Type { get; set; }
         public string Name { get; set; }
         public bool? Seen { get; set; }
-        public string Uuid { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblApplication Application { get; set; }
     }

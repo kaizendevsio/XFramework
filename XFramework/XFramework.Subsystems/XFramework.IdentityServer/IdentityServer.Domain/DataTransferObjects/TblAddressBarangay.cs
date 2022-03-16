@@ -18,6 +18,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public int? ProvCode { get; set; }
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblAddressCity CityCodeNavigation { get; set; }
         public virtual ICollection<TblIdentityAddress> TblIdentityAddresses { get; set; }
