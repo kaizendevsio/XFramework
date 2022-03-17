@@ -11,6 +11,23 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
     
     public async Task<CmdResponse<TransferWalletCmd>> Handle(TransferWalletCmd request, CancellationToken cancellationToken)
     {
+        
+        switch (request.Amount)
+        {
+            case <= 0:
+                return new ()
+                {
+                    Message = $"Amount is required",
+                    HttpStatusCode = HttpStatusCode.BadRequest
+                };
+            case > 99999999:
+                return new ()
+                {
+                    Message = $"Amount exceeds maximum allowed",
+                    HttpStatusCode = HttpStatusCode.BadRequest
+                };
+        }
+
         var initiatorCredentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (initiatorCredentialEntity == null)
         {
@@ -21,7 +38,10 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
         
-        var fromCredentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.FromCredentialGuid}", cancellationToken);
+        var fromCredentialEntity = await _dataLayer.TblIdentityCredentials
+            .Include(i => i.TblUserWallets)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.FromCredentialGuid}", cancellationToken);
         if (fromCredentialEntity == null)
         {
             return new ()
@@ -31,7 +51,10 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
         
-        var toCredentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.ToCredentialGuid}", cancellationToken);
+        var toCredentialEntity = await _dataLayer.TblIdentityCredentials
+            .Include(i => i.TblUserWallets)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.ToCredentialGuid}", cancellationToken);
         if (toCredentialEntity == null)
         {
             return new ()
@@ -60,28 +83,9 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
 
-        if (request.Amount == 0)
-        {
-            return new ()
-            {
-                Message = $"Amount is required",
-                HttpStatusCode = HttpStatusCode.BadRequest
-            };
-        }
-        
-        if (request.Amount > 99999999)
-        {
-            return new ()
-            {
-                Message = $"Amount exceeds maximum allowed",
-                HttpStatusCode = HttpStatusCode.BadRequest
-            };
-        }
-        
-        var fromUserWallet = await _dataLayer.TblUserWallets
-            .Where(i => i.UserAuthId == fromCredentialEntity.Id)
+        var fromUserWallet = fromCredentialEntity.TblUserWallets
             .Where(i => i.WalletTypeId == fromWalletEntity.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefault();
         if (fromUserWallet == null)
         {
             return new ()
@@ -91,10 +95,9 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
             
-        var toUserWallet = await _dataLayer.TblUserWallets
-            .Where(i => i.UserAuthId == toCredentialEntity.Id)
+        var toUserWallet = toCredentialEntity.TblUserWallets
             .Where(i => i.WalletTypeId == toWalletEntity.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefault();
         if (toUserWallet == null)
         {
             return new ()
@@ -114,10 +117,10 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
         }
         _dataLayer.TblUserWalletTransactions.Add(new ()
         {
-            UserAuthId = initiatorCredentialEntity.Id,
+            UserAuth = initiatorCredentialEntity,
             Amount = request.Amount,
-            SourceUserWalletId = fromUserWallet.Id,
-            TargetUserWalletId = toUserWallet.Id,
+            SourceUserWallet = fromUserWallet,
+            TargetUserWallet = toUserWallet,
             RunningBalance = fromUserWallet.Balance + request.Amount,
             PreviousBalance = fromUserWallet.Balance,
             Remarks = request.Remarks

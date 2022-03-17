@@ -155,5 +155,13 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     {
         await LocalStorageService.SetItemAsync(state.GetType().Name, state);
     }
+    public async Task ReportTask(string title, bool? isBusy = null)
+    {
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
+    }
+    public async Task ReportProgress(string message)
+    {
+        await Mediator.Send(new ApplicationState.SetState() {ProgressMessage = message});
+    }
     
 }

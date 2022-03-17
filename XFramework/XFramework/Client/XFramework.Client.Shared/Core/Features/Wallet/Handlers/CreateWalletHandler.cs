@@ -32,21 +32,34 @@ public partial class WalletState
         public override async Task<Unit> Handle(CreateWallet action, CancellationToken aCancellationToken)
         {
             // Inform UI About Busy State
-            await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+            if (!action.Silent)
+            {
+                ReportTask("Creating Wallet..", true);
+            }
 
+            // Check if CredentialGuid is provided
+            if (SessionState.State is not Domain.Generic.Enums.SessionState.Active && action.CredentialGuid is null)
+            {
+                SweetAlertService.FireAsync("Error", "Could not create wallet, credentials not provided");
+                return Unit.Value;
+            }
+            
             // Map view model to request object
             var request = action.Adapt<CreateWalletRequest>();
-            request.CredentialGuid = SessionState.Credential.Guid;
+            request.CredentialGuid = SessionState.State is Domain.Generic.Enums.SessionState.Active ? SessionState.Credential.Guid : action.CredentialGuid;
             
             // Send the request
             var response = await WalletServiceWrapper.CreateWallet(request);
             
-            // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, true ,"There was an error while trying to create your wallet. Please check your internet connection and try again")) return Unit.Value;
+            if (!action.Silent)
+            {
+                // Handle if the response is invalid or error
+                if (await HandleFailure(response, action, true, "There was an error while trying to create your wallet. Please check your internet connection and try again")) return Unit.Value;
 
-            // If Success URL property is provided, navigate to the given URL
-            await HandleSuccess(response, action, true);
-            
+                // If Success URL property is provided, navigate to the given URL
+                await HandleSuccess(response, action, true);
+            }
+
             // Set State And Update UI
             if (action.ReloadWalletList)
             {
@@ -54,8 +67,11 @@ public partial class WalletState
             }
             
             // Inform UI About Not Busy State
-            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-            
+            if (!action.Silent)
+            {
+                ReportTask("Done", false);
+            }
+
             return Unit.Value;
 
         }

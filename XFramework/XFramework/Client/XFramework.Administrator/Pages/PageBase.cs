@@ -19,7 +19,6 @@ public class PageBase : BlazorStateComponent
    {
       NavigationManager.NavigateTo(url);
    }
-   public IEnumerable<Element> Elements = new List<Element>();
 
    public List<Element> Elements { get; set; } = new (){
       new Element

@@ -6,6 +6,8 @@ public partial class WalletState
     {
         public bool ReloadWalletList { get; set; }
         public Guid WalletEntityGuid { get; set; }
-        public long Balance { get; set; } = 0;
+        public decimal Balance { get; set; } = 0;
+        public Guid? CredentialGuid { get; set; }
+        public bool Silent { get; set; }
     }
 }

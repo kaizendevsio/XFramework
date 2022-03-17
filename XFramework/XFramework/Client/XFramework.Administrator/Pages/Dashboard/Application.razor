@@ -2,8 +2,7 @@
 @inherits ApplicationBase
 
 <h1 class="text-center">Application List</h1>
-<MudTable Items="@Elements" Hover="@hover" ReadOnly="ronly" RowEditPreview="BackupItem" Filter="new Func<Element,bool>(FilterFunc)" RowEditCancel="ResetItemToOriginalValues"
-                                                    RowEditCommit="ItemHasBeenCommitted">
+<MudTable Items="@Elements" Hover="@hover" ReadOnly="ronly">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Periodic Elements</MudText>
         <MudSpacer />
@@ -11,10 +10,6 @@
     </ToolBarContent>
     <ColGroup>
         @if (multiSelect)
-        {
-            <col style="width: 60px;"/>
-        }
-        @if (_groupDefinition.Expandable)
         {
             <col style="width: 60px;"/>
         }

@@ -8,6 +8,7 @@ namespace XFramework.Integration.Services
     public class HelperService : IHelperService
     {
         public HttpHelper Http { get; }
+        const string Chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz1234567890";
 
         public HelperService(IConfiguration configuration)
         {
@@ -39,7 +40,9 @@ namespace XFramework.Integration.Services
 
         public string GenerateRandomString(int size)
         {
-            throw new NotImplementedException();
+            var random = new Random();
+            return new string(Enumerable.Repeat(Chars, size)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
         public string GenerateReferenceString()

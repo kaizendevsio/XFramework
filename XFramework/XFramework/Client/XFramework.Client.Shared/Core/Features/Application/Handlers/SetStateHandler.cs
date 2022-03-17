@@ -28,6 +28,7 @@ public partial class ApplicationState
         {
             try
             {
+                await HandleProgressStatus(action);
                 StateHelper.SetProperties(action,CurrentState);
             }
             catch (Exception e)
@@ -35,25 +36,44 @@ public partial class ApplicationState
                 Console.WriteLine(e);
             }
 
-            HandleProgressStatus();
             return Unit.Value;
         }
 
-        private async Task HandleProgressStatus()
+        private async Task HandleProgressStatus(SetState action)
         {
-            if (CurrentState.IsBusy)
+            if (!string.IsNullOrEmpty(action.ProgressTitle))
             {
-                SweetAlertService.FireAsync(new()
+                SweetAlertService.UpdateAsync(new()
                 {
-                    Title = CurrentState.ProgressTitle,
-                    Text = CurrentState.ProgressMessage,
-                    Html = "<img src='assets/img/loader.svg' width='96px' />",
-                    ShowConfirmButton = false,
+                    Title = action.ProgressTitle,
+                    Html = $"<img src='assets/img/loader.svg' width='96px' />",
                 });
             }
-            else
+            if (!string.IsNullOrEmpty(action.ProgressMessage))
             {
-                SweetAlertService.CloseAsync();
+                SweetAlertService.UpdateAsync(new()
+                {
+                    Title = CurrentState.ProgressTitle,
+                    Html = $"<img src='assets/img/loader.svg' width='96px' /> <p>{action.ProgressMessage}</p>",
+                });
+            }
+            
+            switch (action.IsBusy)
+            {
+                case null:
+                    return;
+                case true:
+                    SweetAlertService.FireAsync(new()
+                    {
+                        Title = CurrentState.ProgressTitle,
+                        Text = CurrentState.ProgressMessage,
+                        Html = $"<img src='assets/img/loader.svg' width='96px' />",
+                        ShowConfirmButton = false,
+                    });
+                    break;
+                case false:
+                    SweetAlertService.CloseAsync();
+                    break;
             }
         }
     }

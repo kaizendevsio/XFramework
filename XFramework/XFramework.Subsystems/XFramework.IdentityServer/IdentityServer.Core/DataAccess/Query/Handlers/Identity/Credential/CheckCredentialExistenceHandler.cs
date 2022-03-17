@@ -1,4 +1,5 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
+﻿using System.Text.RegularExpressions;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 using IdentityServer.Domain.DataTransferObjects.Legacy;
 using XFramework.Domain.Generic.Contracts.Responses;
 
@@ -15,6 +16,36 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
     }
     public async Task<QueryResponse<ExistenceResponse>> Handle(CheckCredentialExistenceQuery request, CancellationToken cancellationToken)
     {
+        
+        if (string.IsNullOrEmpty(request.Password))
+        {
+            return new ()
+            {
+                Message = $"The password is required",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
+        if (request.Password.Length < 8)
+        {
+            return new ()
+            {
+                Message = $"The password length must be greater than 8 characters",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
+        
+        // Validate Password
+        var passwordIsStrong = Regex.Match(request.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$").Success;
+        if (!passwordIsStrong)
+        {
+            return new ()
+            {
+                Message = $"The password is weak. Please include at least one of the following: 1 upper case, 1 lower case, a number and a special character",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
+
         if (string.IsNullOrEmpty(request.UserName))
         {
             return new ()
@@ -37,24 +68,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
                 HttpStatusCode = HttpStatusCode.Conflict
             };
         }
-
-        if (string.IsNullOrEmpty(request.Password))
-        {
-            return new ()
-            {
-                Message = $"The password is required",
-                HttpStatusCode = HttpStatusCode.BadRequest
-            };
-        }
-
-        if (request.Password.Length < 8)
-        {
-            return new ()
-            {
-                Message = $"The password length must be greater than 8 characters",
-                HttpStatusCode = HttpStatusCode.BadRequest
-            };
-        }
+      
 
         return new()
         {
