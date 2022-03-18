@@ -91,7 +91,7 @@ public partial class SessionState
                 var emailContact = await IdentityServiceWrapper.CreateContact(new()
                 {
                     CredentialGuid = credentialGuid,
-                    ContactType = GenericContactType.Phone,
+                    ContactType = GenericContactType.Email,
                     Value = CurrentState.RegisterVm.EmailAddress
                 });
                 if (await HandleFailure(emailContact, action)) return Unit.Value;
