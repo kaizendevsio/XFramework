@@ -2,61 +2,49 @@
 @inherits RolesBase
 
 <h1 class="text-center">Roles List</h1>
-<MudTable Items="@Elements" Hover="@hover" ReadOnly="ronly" RowEditPreview="BackupItem" Filter="new Func<Element,bool>(FilterFunc)" RowEditCancel="ResetItemToOriginalValues"
-                                                    RowEditCommit="ItemHasBeenCommitted">
-    <ToolBarContent>
-        <MudText Typo="Typo.h6">Periodic Elements</MudText>
-        <MudSpacer />
-        <MudTextField @bind-Value="searchString1" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
-    </ToolBarContent>
-    <ColGroup>
-        @if (multiSelect)
-        {
-            <col style="width: 60px;"/>
-        }
-        @if (_groupDefinition.Expandable)
-        {
-            <col style="width: 60px;"/>
-        }
-        <col/>
-        <col/>
-        <col/>
-        <col/>
-        <col/>
-    </ColGroup>
-    <HeaderContent>
-        <MudTh>Nr</MudTh>
-        <MudTh>Sign</MudTh>
-        <MudTh>Name</MudTh>
-        <MudTh>Position</MudTh>
-        <MudTh>Molar mass</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="Nr">@context.Number</MudTd>
-        <MudTd DataLabel="Sign">@context.Sign</MudTd>
-        <MudTd DataLabel="Name">@context.Name</MudTd>
-        <MudTd DataLabel="Position">@context.Position</MudTd>
-        <MudTd DataLabel="Molar mass">@context.Molar</MudTd>
-    </RowTemplate>
-    <RowEditingTemplate>
-        <MudTd DataLabel="Nr">@context.Number</MudTd>
-        <MudTd DataLabel="Sign">
-            <MudTextField @bind-Value="@context.Sign" Required/>
-        </MudTd>
-        <MudTd DataLabel="Name">
-            <MudTextField @bind-Value="@context.Name" Required/>
-        </MudTd>
-        <MudTd DataLabel="Position">
-            <MudNumericField @bind-Value="@context.Position" Required Min="1"/>
-        </MudTd>
-        <MudTd DataLabel="Molar mass">
-            <MudTextField @bind-Value="@context.Molar" Required/>
-        </MudTd>
-    </RowEditingTemplate>
-    <PagerContent>
-        <MudTablePager/>
-    </PagerContent>
-</MudTable>
+<table class="table">
+  <thead>
+    <tr>
+      <th>Id</th>
+      <th>First Name</th>
+      <th>Last Name</th>
+      <th>Birthday</th>
+      <th>Address</th>
+    </tr>
+  </thead>
+  <tbody>
+  <td>
+    @for (int id = 0; id < 10; id++)
+    {
+      <tr>@id</tr>
+    }
+  </td>
+  <td>
+   @foreach (var first in Model)
+   {
+     <tr>@first.FirstName</tr>
+   }
+  </td> 
+  <td>
+    @foreach (var last in Model)
+    {
+      <tr>@last.LastName</tr>
+    }
+  </td>
+  <td>
+    @foreach (var birthday in Model)
+    {
+      <tr>@birthday.DateOfBirth</tr>
+    }
+  </td>
+  <td>
+   @foreach (var address in Model)
+   {
+     <tr>@address.DateOfBirth</tr>
+   }
+  </td>
+  </tbody>
+</table>
 
 <MudSwitch @bind-Checked="sort" Color="Color.Info">Sort</MudSwitch>
 <MudSwitch @bind-Checked="multiSelect" Color="Color.Primary">MultiSelect</MudSwitch>

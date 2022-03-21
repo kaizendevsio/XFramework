@@ -34,41 +34,27 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/_Imports.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/DashboardLayout.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/SidebarLayout.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/wwwroot/webapi/Elements.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Models/SampleModels.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/XFramework.Administrator.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/XFramework.Administrator.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/ForgotPasswordHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/ForgotPasswordHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogInHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogInHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/SetStateAction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/SetStateAction.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/WalletState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/WalletState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Helpers/StateHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Helpers/StateHelper.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/AdminSettings.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/AdminSettings.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Dashboard.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Dashboard.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/_Imports.razor" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/SignIn.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/SignIn.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/SignUp.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/SignUp.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/_Imports.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/BaseLayout.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/BaseLayout.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/_Imports.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/SidebarLayout.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/SidebarLayout.razor" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/_Imports.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Models/SampleModels/SampleModels.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -106,6 +92,13 @@
   <component name="GithubDefaultAccount">
     <option name="defaultAccountId" value="5dc22113-13d8-4ce2-aa81-182a7eb8cf67" />
   </component>
+  <component name="GithubProjectSettings">
+    <option name="branchProtectionPatterns">
+      <list>
+        <option value="Master" />
+      </list>
+    </option>
+  </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/ContactResponse.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/CreateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
@@ -115,12 +108,8 @@
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/AuthenticateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/CheckCredentialExistenceRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/8913d2d2e4e449a99878f6b6fa953ef2ae00/e3/69e4c44f/BlazorStateComponent.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/CredentialResponse.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/4204dfd78b9d4fb89f3a39c1665612431a000/d5/57708689/IWalletServiceWrapper.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/AuthenticateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/AuthenticationResponse.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/CreateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../MudBlazor/src/MudBlazor.Examples.Data/Models/Element.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Update/UpdatePasswordRequest.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
@@ -419,6 +408,12 @@
       <workItem from="1646747117966" duration="15392000" />
       <workItem from="1646816848114" duration="8523000" />
       <workItem from="1646880651947" duration="2681000" />
+      <workItem from="1647239095203" duration="1231000" />
+      <workItem from="1647240857649" duration="615000" />
+      <workItem from="1647243446860" duration="157000" />
+      <workItem from="1647243626833" duration="2000" />
+      <workItem from="1647839499130" duration="249000" />
+      <workItem from="1647848898232" duration="7833000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -532,14 +527,6 @@
       <option name="project" value="LOCAL" />
       <updated>1646751049007</updated>
     </task>
-    <task id="LOCAL-00017" summary="Create Roles List Page&#10;Create Users List Page&#10;Create Wallets List Page&#10;Create Wallet Type List Page">
-      <created>1646810716591</created>
-      <option name="number" value="00017" />
-      <option name="presentableId" value="LOCAL-00017" />
-      <option name="project" value="LOCAL" />
-      <updated>1646810716591</updated>
-    </task>
-    <option name="localTasksCounter" value="18" />
     <task id="LOCAL-00017" summary=" - Updated Session Features">
       <created>1646805710800</created>
       <option name="number" value="00017" />
@@ -547,7 +534,14 @@
       <option name="project" value="LOCAL" />
       <updated>1646805710800</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="Create Application Page&#10;Create Enterprises Page&#10;Create Sidebar Layout">
+      <created>1647000646748</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1647000646748</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -615,7 +609,8 @@
     <MESSAGE value="Create Roles List Page&#10;Create Users List Page&#10;Create Wallets List Page&#10;Create Wallet Type List Page" />
     <MESSAGE value=" - Removed 'Action' Word From States&#10; - Cleaned State Folder Structure" />
     <MESSAGE value=" - Updated Session Features" />
-    <option name="LAST_COMMIT_MESSAGE" value=" - Updated Session Features" />
+    <MESSAGE value="Create Application Page&#10;Create Enterprises Page&#10;Create Sidebar Layout" />
+    <option name="LAST_COMMIT_MESSAGE" value="Create Application Page&#10;Create Enterprises Page&#10;Create Sidebar Layout" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
