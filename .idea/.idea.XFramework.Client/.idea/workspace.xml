@@ -34,41 +34,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/_Imports.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/DashboardLayout.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/SidebarLayout.razor" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/wwwroot/webapi/Elements.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Actions/BootUp.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Handlers/BootUpHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Logout.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogoutHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Properties/NotificationButtonProp.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/XFramework.Administrator.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/XFramework.Administrator.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/ForgotPasswordHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/ForgotPasswordHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogInHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogInHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/SetStateAction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/SetStateAction.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/WalletState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/WalletState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Helpers/StateHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Helpers/StateHelper.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/AdminSettings.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/AdminSettings.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Dashboard.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Dashboard.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/SignIn.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/SignIn.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/SignUp.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/SignUp.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Session/_Imports.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/BaseLayout.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/BaseLayout.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Layouts/_Imports.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/_Imports.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Models/SampleModels/SampleModels.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Handlers/ClearStateHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Properties/ToolbarProp.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Properties/ToolbarProp.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -90,7 +65,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="Master" />
+        <entry key="$PROJECT_DIR$" value="Development" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -107,20 +82,26 @@
     <option name="defaultAccountId" value="5dc22113-13d8-4ce2-aa81-182a7eb8cf67" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/ContactResponse.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/CreateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/AuthenticationResponse.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/CreateIdentityRequest.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/2fba5b68bc2a4ff79eefd252df2e28246a00/7b/c8d00be1/SessionState.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/AuthenticateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/CheckCredentialExistenceRequest.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/c9b71a491bb04a158ccf489e4a0f616218800/1b/7afb005a/IIdentityServiceWrapper.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/e5606f474b884d169955d1b4f7a6dd7517a00/6a/f67d19e7/IIdentityServiceWrapper.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/CreateIdentityRequest.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/ContactResponse.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/0f506bf407a14919802603704232f88912c00/de/34dc9085/SweetAlertService.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/52bf17544c0740ba8bfd3a9305f1490619400/8f/089fc201/IIdentityServiceWrapper.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/0b6943c42ca14f7f9b15569896fc8baf1a200/32/81932a56/IWalletServiceWrapper.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/CredentialResponse.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/4204dfd78b9d4fb89f3a39c1665612431a000/d5/57708689/IWalletServiceWrapper.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Check/AuthenticateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Api/Options/SwaggerOptionsConfiguration.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/AuthenticationResponse.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/CreateCredentialRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../MudBlazor/src/MudBlazor.Examples.Data/Models/Element.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/WalletResponse.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Contacts/CreateContactHandler.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Update/UpdatePasswordRequest.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
@@ -419,6 +400,9 @@
       <workItem from="1646747117966" duration="15392000" />
       <workItem from="1646816848114" duration="8523000" />
       <workItem from="1646880651947" duration="2681000" />
+      <workItem from="1647757452444" duration="2102000" />
+      <workItem from="1647794591678" duration="3157000" />
+      <workItem from="1647910989959" duration="1195000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -532,14 +516,6 @@
       <option name="project" value="LOCAL" />
       <updated>1646751049007</updated>
     </task>
-    <task id="LOCAL-00017" summary="Create Roles List Page&#10;Create Users List Page&#10;Create Wallets List Page&#10;Create Wallet Type List Page">
-      <created>1646810716591</created>
-      <option name="number" value="00017" />
-      <option name="presentableId" value="LOCAL-00017" />
-      <option name="project" value="LOCAL" />
-      <updated>1646810716591</updated>
-    </task>
-    <option name="localTasksCounter" value="18" />
     <task id="LOCAL-00017" summary=" - Updated Session Features">
       <created>1646805710800</created>
       <option name="number" value="00017" />
@@ -547,7 +523,14 @@
       <option name="project" value="LOCAL" />
       <updated>1646805710800</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary=" - Correct Registration Via Email">
+      <created>1647602442681</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1647602442681</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -615,7 +598,8 @@
     <MESSAGE value="Create Roles List Page&#10;Create Users List Page&#10;Create Wallets List Page&#10;Create Wallet Type List Page" />
     <MESSAGE value=" - Removed 'Action' Word From States&#10; - Cleaned State Folder Structure" />
     <MESSAGE value=" - Updated Session Features" />
-    <option name="LAST_COMMIT_MESSAGE" value=" - Updated Session Features" />
+    <MESSAGE value=" - Correct Registration Via Email" />
+    <option name="LAST_COMMIT_MESSAGE" value=" - Correct Registration Via Email" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

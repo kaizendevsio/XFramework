@@ -179,7 +179,7 @@ namespace XFramework.Integration.Services
             var retry = 0;
 
             RetryConnection:
-            if (Connection.State is HubConnectionState.Connected or HubConnectionState.Reconnecting) return true;
+            if (Connection.State is not HubConnectionState.Disconnected) return true;
 
             try
             {
@@ -217,12 +217,18 @@ namespace XFramework.Integration.Services
             
             try
             {
-                if (Connection.State == HubConnectionState.Reconnecting || (_isRegistered == false & methodName != "Register"))
+                if (Connection.State == HubConnectionState.Reconnecting)
                 {
                     Console.WriteLine($"Invoked Method '{methodName}' is queued, waiting for connection to be re-established");
                     _queueList.Add(new(methodName, args1));
                     return HttpStatusCode.Processing;
                 }
+                
+                if (_isRegistered == false && methodName != "Register")
+                {
+                    await EnsureConnection();
+                }
+                
                 result = await Connection.InvokeAsync<HttpStatusCode>(methodName, args1);
             }
             catch (Exception e)
@@ -253,6 +259,8 @@ namespace XFramework.Integration.Services
                 
                 var response = methodCallCompletionSource.Task.ConfigureAwait(false);
                 
+                ReSendRequest:
+                
                 var signalRResponse = await InvokeVoidAsync("Push", args1);
                 if (signalRResponse is HttpStatusCode.ServiceUnavailable or HttpStatusCode.NotFound)
                 {
@@ -262,6 +270,11 @@ namespace XFramework.Integration.Services
                     };
                 }
 
+                new Timer(new ((e) =>
+                {
+                    methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
+                }), null, 100, 0);
+                
                 Console.WriteLine($"Invoke Method '{request.CommandName}', awaiting response...");
                 var streamFlowMessage = await response;
                 

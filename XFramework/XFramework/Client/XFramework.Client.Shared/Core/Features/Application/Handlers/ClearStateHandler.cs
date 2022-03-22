@@ -7,7 +7,7 @@ public partial class ApplicationState
 {
     public class ClearStateHandler : ActionHandler<ClearState>
     {
-        private ApplicationState CurrentState => Store.GetState<XFramework.Client.Shared.Core.Features.Application.ApplicationState>();
+        private ApplicationState CurrentState => Store.GetState<ApplicationState>();
         
         public ClearStateHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
