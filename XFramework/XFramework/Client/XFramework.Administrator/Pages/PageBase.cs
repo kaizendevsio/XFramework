@@ -1,5 +1,5 @@
-﻿using System.Net.Http.Json;
-using MudBlazor.Examples.Data.Models;
+﻿using XFramework.Administrator.Pages.Dashboard;
+using XFramework.Client.Shared.Entity.Models;
 
 namespace XFramework.Administrator.Pages;
 
@@ -14,76 +14,11 @@ public class PageBase : BlazorStateComponent
    [Inject] public HttpClient httpClient { get; set; }
 
    public SessionState SessionState => GetState<SessionState>();
-
+   public List<SampleModels> Model { get; set; } = new();
    public async Task NavigateTo(string url)
    {
       NavigationManager.NavigateTo(url);
    }
 
-   public List<Element> Elements { get; set; } = new (){
-      new Element
-      {
-         Group = "Group",
-         Position = 1,
-         Name = "aaa",
-         Number = 1,
-         Sign = "asas",
-         Molar = 0,
-         Electrons = null
-      },
-      new Element
-      {
-         Group = "Group",
-         Position = 1,
-         Name = "aaa",
-         Number = 1,
-         Sign = "asas",
-         Molar = 0,
-         Electrons = null
-      },
-      new Element
-      {
-         Group = "Group",
-         Position = 1,
-         Name = "aaa",
-         Number = 1,
-         Sign = "asas",
-         Molar = 0,
-         Electrons = null
-      },
-      new Element
-      {
-         Group = "Group",
-         Position = 1,
-         Name = "aaa",
-         Number = 1,
-         Sign = "asas",
-         Molar = 0,
-         Electrons = null
-      },
-      new Element
-      {
-         Group = "Group",
-         Position = 1,
-         Name = "aaa",
-         Number = 1,
-         Sign = "asas",
-         Molar = 0,
-         Electrons = null
-      },
-      new Element
-      {
-         Group = "Group",
-         Position = 1,
-         Name = "aaa",
-         Number = 1,
-         Sign = "asas",
-         Molar = 0,
-         Electrons = null
-      },
-      
-   };
-
-
-
+  
 }
