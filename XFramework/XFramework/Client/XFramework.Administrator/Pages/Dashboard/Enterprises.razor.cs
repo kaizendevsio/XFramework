@@ -1,11 +1,13 @@
-﻿namespace XFramework.Administrator.Pages.Dashboard;
+﻿using MudBlazor;
+
+namespace XFramework.Administrator.Pages.Dashboard;
 
 public class EnterprisesBase : PageBase
 {
-    public bool dense = false;
-    public bool sort = true;
-    public bool multiSelect = true;
-    public bool pagination;
-    public bool bordered = false;
-    private string searchString = "";
+    DialogOptions maxWidth = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    
+    private void OpenDialog(DialogOptions options)
+    {
+        Dialog.Show<DialogUsageExample_Dialog>("Custom Options Dialog", options);
+    }
 }

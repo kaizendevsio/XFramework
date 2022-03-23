@@ -4,13 +4,12 @@
 <h1 class="text-center">Wallet Types List</h1>
 <table class="table">
   <thead>
-    <tr>
-      <th>Id</th>
-      <th>First Name</th>
-      <th>Last Name</th>
-      <th>Birthday</th>
-      <th>Address</th>
-    </tr>
+  <tr>
+    <th>First Name</th>
+    <th>Last Name</th>
+    <th>Birthday</th>
+    <th>Address</th>
+  </tr>
   </thead>
   <tbody>
   @foreach (var item in Model)
@@ -25,8 +24,3 @@
   </tbody>
 </table>
 
-<MudSwitch @bind-Checked="sort" Color="Color.Info">Sort</MudSwitch>
-<MudSwitch @bind-Checked="multiSelect" Color="Color.Primary">MultiSelect</MudSwitch>
-<MudSwitch @bind-Checked="dense" Color="Color.Secondary">Dense</MudSwitch>
-<MudSwitch @bind-Checked="pagination" Color="Color.Secondary">Hide/Show Pagination</MudSwitch>
-<MudSwitch @bind-Checked="bordered" Color="Color.Warning">Bordered</MudSwitch>

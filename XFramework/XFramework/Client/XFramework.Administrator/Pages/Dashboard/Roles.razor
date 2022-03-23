@@ -5,7 +5,6 @@
 <table class="table">
   <thead>
     <tr>
-      <th>Id</th>
       <th>First Name</th>
       <th>Last Name</th>
       <th>Birthday</th>
@@ -13,42 +12,15 @@
     </tr>
   </thead>
   <tbody>
-  <td>
-    @for (int id = 0; id < 10; id++)
-    {
-      <tr>@id</tr>
-    }
-  </td>
-  <td>
-   @foreach (var first in Model)
+   @foreach (var item in Model)
    {
-     <tr>@first.FirstName</tr>
+     <tr>
+       <td>@item.FirstName</td>
+       <td>@item.LastName</td>
+       <td>@item.DateOfBirth</td>
+       <td>@item.Address</td>
+     </tr>
    }
-  </td> 
-  <td>
-    @foreach (var last in Model)
-    {
-      <tr>@last.LastName</tr>
-    }
-  </td>
-  <td>
-    @foreach (var birthday in Model)
-    {
-      <tr>@birthday.DateOfBirth</tr>
-    }
-  </td>
-  <td>
-   @foreach (var address in Model)
-   {
-     <tr>@address.DateOfBirth</tr>
-   }
-  </td>
-  </tbody>
+   </tbody>
 </table>
-
-<MudSwitch @bind-Checked="sort" Color="Color.Info">Sort</MudSwitch>
-<MudSwitch @bind-Checked="multiSelect" Color="Color.Primary">MultiSelect</MudSwitch>
-<MudSwitch @bind-Checked="dense" Color="Color.Secondary">Dense</MudSwitch>
-<MudSwitch @bind-Checked="pagination" Color="Color.Secondary">Hide/Show Pagination</MudSwitch>
-<MudSwitch @bind-Checked="bordered" Color="Color.Warning">Bordered</MudSwitch>
 
