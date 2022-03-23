@@ -273,7 +273,7 @@ namespace XFramework.Integration.Services
                 new Timer(new ((e) =>
                 {
                     methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
-                }), null, 100, 0);
+                }), null, 30_000, 0);
                 
                 Console.WriteLine($"Invoke Method '{request.CommandName}', awaiting response...");
                 var streamFlowMessage = await response;
