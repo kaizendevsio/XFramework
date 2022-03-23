@@ -44,6 +44,7 @@
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Handlers/ClearStateHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Properties/ToolbarProp.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Entity/Properties/ToolbarProp.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -403,6 +404,16 @@
       <workItem from="1647757452444" duration="2102000" />
       <workItem from="1647794591678" duration="3157000" />
       <workItem from="1647910989959" duration="1195000" />
+      <workItem from="1647239095203" duration="1231000" />
+      <workItem from="1647240857649" duration="615000" />
+      <workItem from="1647243446860" duration="157000" />
+      <workItem from="1647243626833" duration="2000" />
+      <workItem from="1647839499130" duration="249000" />
+      <workItem from="1647848898232" duration="7833000" />
+      <workItem from="1647858888880" duration="121000" />
+      <workItem from="1647859381442" duration="317000" />
+      <workItem from="1647911588073" duration="208000" />
+      <workItem from="1648021350430" duration="33000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
@@ -530,7 +541,14 @@
       <option name="project" value="LOCAL" />
       <updated>1647602442681</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="Sample Tables">
+      <created>1647858934644</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1647858934644</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -600,6 +618,9 @@
     <MESSAGE value=" - Updated Session Features" />
     <MESSAGE value=" - Correct Registration Via Email" />
     <option name="LAST_COMMIT_MESSAGE" value=" - Correct Registration Via Email" />
+    <MESSAGE value="Create Application Page&#10;Create Enterprises Page&#10;Create Sidebar Layout" />
+    <MESSAGE value="Sample Tables" />
+    <option name="LAST_COMMIT_MESSAGE" value="Sample Tables" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

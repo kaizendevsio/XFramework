@@ -13,36 +13,21 @@
     </tr>
   </thead>
   <tbody>
-  <td>
-    @for (int id = 0; id < 10; id++)
-    {
+    <td>
+  @for (int id = 0; id < 10; id++)
+  {
       <tr>@id</tr>
-    }
-  </td>
-  <td>
-   @foreach (var first in Model)
-   {
-     <tr>@first.FirstName</tr>
-   }
-  </td> 
-  <td>
-    @foreach (var last in Model)
-    {
-      <tr>@last.LastName</tr>
-    }
-  </td>
-  <td>
-    @foreach (var birthday in Model)
-    {
-      <tr>@birthday.DateOfBirth</tr>
-    }
-  </td>
-  <td>
-   @foreach (var address in Model)
-   {
-     <tr>@address.DateOfBirth</tr>
-   }
-  </td>
+  }
+    </td>
+  @foreach (var item in Model)
+  {
+    <tr>
+      <td>@item.FirstName</td>
+      <td>@item.LastName</td>
+      <td>@item.DateOfBirth</td>
+      <td>@item.Address</td>
+    </tr>
+  }
   </tbody>
 </table>
 
