@@ -36,8 +36,8 @@
     <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/CheckCredentialExistenceHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/CheckCredentialExistenceHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -541,7 +541,14 @@
       <option name="project" value="LOCAL" />
       <updated>1647858934644</updated>
     </task>
-    <option name="localTasksCounter" value="20" />
+    <task id="LOCAL-00020" summary=" - Bug Fixes">
+      <created>1648024882309</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1648024882309</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -612,7 +619,8 @@
     <MESSAGE value=" - Correct Registration Via Email" />
     <MESSAGE value="Create Application Page&#10;Create Enterprises Page&#10;Create Sidebar Layout" />
     <MESSAGE value="Sample Tables" />
-    <option name="LAST_COMMIT_MESSAGE" value="Sample Tables" />
+    <MESSAGE value=" - Bug Fixes" />
+    <option name="LAST_COMMIT_MESSAGE" value=" - Bug Fixes" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
