@@ -26,8 +26,13 @@ public partial class SessionState
 
         public override async Task<Unit> Handle(Logout action, CancellationToken aCancellationToken)
         {
-            await SessionStorageService.ClearAsync();
-            await LocalStorageService.ClearAsync();
+            //await SessionStorageService.ClearAsync();
+            await SessionStorageService.RemoveItemAsync("SessionState");
+            await SessionStorageService.RemoveItemAsync("WalletState");
+            
+            await LocalStorageService.RemoveItemAsync("SessionState");
+            await LocalStorageService.RemoveItemAsync("WalletState");
+            
             Store.Reset();
             if (string.IsNullOrEmpty(action.NavigateTo))
             {
