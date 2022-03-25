@@ -42,14 +42,18 @@ public partial class SessionState
 
                 await Mediator.Send(new ClearState()
                 {
-                    State = new(),
                     ContactList = new(),
                     Credential = new(),
-                    Identity = new(),
+                    Identity = new()
+                });
+                await Mediator.Send(new SetState()
+                {
+                    State = Domain.Generic.Enums.SessionState.Inactive,
                     LoginVm = new(),
                     RegisterVm = new(),
                     ForgotPasswordVm = new()
                 });
+                
                 await Mediator.Send(new WalletState.ClearState
                 {
                     WalletList = new()
