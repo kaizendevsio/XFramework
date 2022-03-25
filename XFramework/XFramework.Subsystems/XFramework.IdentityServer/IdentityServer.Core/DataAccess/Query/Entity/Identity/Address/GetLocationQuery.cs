@@ -3,7 +3,7 @@ using IdentityServer.Domain.Generic.Contracts.Responses.Address;
 
 namespace IdentityServer.Core.DataAccess.Query.Entity.Identity.Address;
 
-public class GetAddressQuery : GetAddressRequest, IRequest<QueryResponse<IdentityAddressResponse>>
+public class GetLocationQuery : GetLocationRequest, IRequest<QueryResponse<IdentityLocationResponse>>
 {
     
 }

@@ -1,6 +1,6 @@
 namespace IdentityServer.Domain.Generic.Contracts.Responses.Address;
 
-public class IdentityAddressEntityResponse
+public class IdentityLocationResponse
 {
     public string Name { get; set; }
     public string Guid { get; set; }
