@@ -40,7 +40,7 @@ public partial class SessionState
                 await LocalStorageService.RemoveItemAsync("SessionState");
                 await LocalStorageService.RemoveItemAsync("WalletState");
 
-                await Mediator.Send(new ClearState
+                await Mediator.Send(new SetState()
                 {
                     State = new(),
                     ContactList = new(),
@@ -51,7 +51,7 @@ public partial class SessionState
                     ForgotPasswordVm = new(),
                     NavigationHistoryList = new()
                 });
-                await Mediator.Send(new WalletState.ClearState
+                await Mediator.Send(new WalletState.SetState
                 {
                     WalletList = new()
                 });
