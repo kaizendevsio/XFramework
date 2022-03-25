@@ -1,5 +1,6 @@
 ﻿using Blazored.LocalStorage;
 using Microsoft.Extensions.Configuration;
+using XFramework.Client.Shared.Core.Features.Wallet;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 
@@ -26,14 +27,36 @@ public partial class SessionState
 
         public override async Task<Unit> Handle(Logout action, CancellationToken aCancellationToken)
         {
-            //await SessionStorageService.ClearAsync();
-            await SessionStorageService.RemoveItemAsync("SessionState");
-            await SessionStorageService.RemoveItemAsync("WalletState");
+            if (action.ResetAllStates)
+            {
+                await SessionStorageService.ClearAsync();
+                Store.Reset();
+            }
+            else
+            {
+                await SessionStorageService.RemoveItemAsync("SessionState");
+                await SessionStorageService.RemoveItemAsync("WalletState");
+                
+                await LocalStorageService.RemoveItemAsync("SessionState");
+                await LocalStorageService.RemoveItemAsync("WalletState");
+
+                await Mediator.Send(new ClearState
+                {
+                    State = new(),
+                    ContactList = new(),
+                    Credential = new(),
+                    Identity = new(),
+                    LoginVm = new(),
+                    RegisterVm = new(),
+                    ForgotPasswordVm = new(),
+                    NavigationHistoryList = new()
+                });
+                await Mediator.Send(new WalletState.ClearState
+                {
+                    WalletList = new()
+                });
+            }
             
-            await LocalStorageService.RemoveItemAsync("SessionState");
-            await LocalStorageService.RemoveItemAsync("WalletState");
-            
-            Store.Reset();
             if (string.IsNullOrEmpty(action.NavigateTo))
             {
                 action.NavigateTo = "/";

@@ -1,13 +1,13 @@
 using Blazored.LocalStorage;
 using Microsoft.Extensions.Configuration;
 
-namespace XFramework.Client.Shared.Core.Features.Session;
+namespace XFramework.Client.Shared.Core.Features.Wallet;
 
-public partial class SessionState
+public partial class WalletState
 {
     public class ClearStateHandler : ActionHandler<ClearState>
     {
-        private SessionState CurrentState => Store.GetState<SessionState>();
+        private WalletState CurrentState => Store.GetState<WalletState>();
         
         public ClearStateHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {

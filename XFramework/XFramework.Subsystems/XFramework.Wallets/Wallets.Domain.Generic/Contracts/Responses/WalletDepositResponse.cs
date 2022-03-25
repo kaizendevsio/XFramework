@@ -6,6 +6,7 @@ public class WalletDepositResponse
 {
     public string GatewayName { get; set; }
     public string Result { get; set; }
+    public object Transaction { get; set; }
     public decimal Amount { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal ServiceFee { get; set; }
