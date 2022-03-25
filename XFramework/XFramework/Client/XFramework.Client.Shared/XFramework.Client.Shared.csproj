@@ -42,8 +42,8 @@
     <ItemGroup>
       <Folder Include="Core\Features\Messaging\Handlers" />
       <Folder Include="Core\Features\Cryptocurrency\Handlers" />
-      <Folder Include="Core\Features\SocialMedia\Actions" />
-      <Folder Include="Core\Features\SocialMedia\Handlers" />
+      <Folder Include="Core\Features\Community\Actions" />
+      <Folder Include="Core\Features\Community\Handlers" />
       <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Response" />
     </ItemGroup>

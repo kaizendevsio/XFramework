@@ -29,6 +29,7 @@ public partial class CacheState
             try
             {
                 StateHelper.SetProperties(action, CurrentState);
+                Persist(CurrentState);
             }
             catch (Exception e)
             {
