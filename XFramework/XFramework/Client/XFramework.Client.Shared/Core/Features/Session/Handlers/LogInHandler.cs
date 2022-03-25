@@ -63,6 +63,14 @@ public partial class SessionState
                 Credential = credentialResponse.Response,
                 ContactList = contactListResponse.Response
             });
+            
+            // Reset Session Forms
+            await Mediator.Send(new SetState()
+            {
+                LoginVm = new(),
+                RegisterVm = new(),
+                ForgotPasswordVm = new()
+            });
 
             // Initialize Wallets If Specified
             if (action.InitializeWallets)
