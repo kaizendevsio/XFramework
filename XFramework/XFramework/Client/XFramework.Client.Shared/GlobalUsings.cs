@@ -24,3 +24,5 @@ global using System.Net.Http.Headers;
 global using System.Text;
 global using MudBlazor;
 global using XFramework.Client.Shared.Core.Features.Session;
+global using Blazor.IndexedDB.Framework;
+global using XFramework.Client.Shared.Core.Services;

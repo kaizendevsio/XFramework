@@ -10,8 +10,9 @@ public partial class SessionState
     {
         public SessionState CurrentState => Store.GetState<SessionState>();
         
-        public LogoutHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public LogoutHandler(IndexedDbService indexedDbService , IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            IndexedDbService = indexedDbService;
             Configuration = configuration;
             SessionStorageService = sessionStorageService;
             LocalStorageService = localStorageService;
@@ -29,16 +30,14 @@ public partial class SessionState
         {
             if (action.ResetAllStates)
             {
-                await SessionStorageService.ClearAsync();
+                IndexedDbService.Database.StateCache.Clear();
+                await IndexedDbService.Database.SaveChanges();
                 Store.Reset();
             }
             else
             {
-                await SessionStorageService.RemoveItemAsync("SessionState");
-                await SessionStorageService.RemoveItemAsync("WalletState");
-                
-                await LocalStorageService.RemoveItemAsync("SessionState");
-                await LocalStorageService.RemoveItemAsync("WalletState");
+                await IndexedDbService.RemoveItem("SessionState");
+                await IndexedDbService.RemoveItem("WalletState");
 
                 await Mediator.Send(new ClearState()
                 {

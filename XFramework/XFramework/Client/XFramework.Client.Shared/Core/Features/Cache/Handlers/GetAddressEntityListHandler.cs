@@ -6,7 +6,7 @@ namespace XFramework.Client.Shared.Core.Features.Cache;
 
 public partial class CacheState
 {
-    public class GetAddressEntityListHandler : ActionHandler<GetAddressEntityList>
+    protected class GetAddressEntityListHandler : ActionHandler<GetAddressEntityList>
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public CacheState CurrentState => Store.GetState<CacheState>();

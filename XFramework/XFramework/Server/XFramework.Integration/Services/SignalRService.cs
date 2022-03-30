@@ -15,23 +15,28 @@ namespace XFramework.Integration.Services;
 
 public class SignalRService : ISignalRService
 {
-
     protected readonly IConfiguration _configuration;
     private readonly IMediator _mediator;
-    protected  bool _isRegistered;
-    protected  List<(string, object)> _queueList = new();
+    protected bool _isRegistered;
+    protected bool _isRegistering;
+    protected List<(string, object)> _queueList = new();
+    protected TaskCompletionSource TaskCompletionSource { get; set; } = new();
+
     public HubConnection Connection { get; set; }
     public StopWatchHelper StopWatch { get; set; } = new();
     public Stopwatch Stopwatch { get; set; } = new();
     private StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
-    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; } = new();
+
+    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; } =
+        new();
+
     public SignalRService(StreamFlowConfiguration configuration)
     {
         StreamFlowConfiguration = configuration;
 
         Connection = new HubConnectionBuilder()
             .WithUrl(StreamFlowConfiguration.ServerUrls.First())
-            .WithAutomaticReconnect(new []
+            .WithAutomaticReconnect(new[]
             {
                 TimeSpan.FromSeconds(2),
                 TimeSpan.FromSeconds(5),
@@ -69,11 +74,8 @@ public class SignalRService : ISignalRService
     private void HandleEvents()
     {
         Connection.On<string, string>("Ping",
-            (intent, message) =>
-            {
-                Console.WriteLine($"Message Received ({DateTime.Now}): [{intent}] {message}");
-            });
-            
+            (intent, message) => { Console.WriteLine($"Message Received ({DateTime.Now}): [{intent}] {message}"); });
+
         Handle(_mediator);
         HandleInvokeResponseEvent();
         HandleTelemetryCallEvent();
@@ -85,15 +87,15 @@ public class SignalRService : ISignalRService
     private void HandleInvokeResponseEvent()
     {
         Console.WriteLine($"InvokeResponseHandler Initialized");
-        Connection.On<string,string,string>("InvokeResponseHandler",
-            async (data,message,telemetryString) =>
+        Connection.On<string, string, string>("InvokeResponseHandler",
+            async (data, message, telemetryString) =>
             {
                 StopWatch.Start();
                 try
                 {
                     var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
                     //Console.WriteLine($"Received InvokeResponseEvent: {telemetry.ClientGuid}");
-                        
+
                     if (PendingMethodCalls.TryRemove(telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
                     {
                         var result = new StreamFlowMessageBO()
@@ -109,12 +111,11 @@ public class SignalRService : ISignalRService
                 }
                 catch (Exception e)
                 {
-                    StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception {e.Message}"); 
+                    StopWatch.Stop($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception {e.Message}");
                 }
-                 
             });
     }
-        
+
     private void HandleClosedEvent()
     {
         Connection.Closed += async connectionId =>
@@ -127,7 +128,7 @@ public class SignalRService : ISignalRService
     private void HandleTelemetryCallEvent()
     {
         Connection.On<string, string>("TelemetryCall",
-            (data,message) => { Console.WriteLine($"Telemetry Call ({DateTime.Now}): {message}"); });
+            (data, message) => { Console.WriteLine($"Telemetry Call ({DateTime.Now}): {message}"); });
     }
 
     private void HandleReconnectedEvent()
@@ -156,7 +157,6 @@ public class SignalRService : ISignalRService
 
                 Console.WriteLine($"Dequeued {_queueList.Count} item(s) from cache");
                 _queueList.Clear();
-
             });
         };
     }
@@ -179,23 +179,44 @@ public class SignalRService : ISignalRService
         var retry = 0;
 
         RetryConnection:
-        if (Connection.State is not HubConnectionState.Disconnected) return true;
+        if (Connection.State is not HubConnectionState.Disconnected)
+        {
+            if (_isRegistered) return true;
+        }
+
+        ;
 
         try
         {
             retry++;
-            StopWatch.Start("Connecting to StreamFlow server..");
-            await Connection.StartAsync();
-            StopWatch.Stop("Connected to StreamFlow server");
+            if (Connection.State is HubConnectionState.Disconnected)
+            {
+                StopWatch.Start("Connecting to StreamFlow server..");
+                await Connection.StartAsync();
+                StopWatch.Stop("Connected to StreamFlow server");
+            }
 
+            if (_isRegistering)
+            {
+                Console.WriteLine("Request Postponed, Awaiting Registration..");
+                await TaskCompletionSource.Task;
+                Console.WriteLine("Request Postponed, Awaiting Registration..");
+                return true;
+            }
+
+            ;
+
+            Console.WriteLine("Registering Connection..");
+            _isRegistering = true;
             var clientId = StreamFlowConfiguration.Anonymous ? Guid.NewGuid() : StreamFlowConfiguration.ClientGuid;
-                
             await InvokeVoidAsync("Register", new StreamFlowClientBO()
             {
                 Guid = clientId,
                 Name = StreamFlowConfiguration.ClientName
             });
             _isRegistered = true;
+            Console.WriteLine("Connection Registered");
+            TaskCompletionSource.SetResult();
 
             return true;
         }
@@ -211,44 +232,47 @@ public class SignalRService : ISignalRService
 
     public async Task<HttpStatusCode> InvokeVoidAsync<T>(string methodName, T args1)
     {
-        await EnsureConnection();
         var result = HttpStatusCode.Created;
         StopWatch.Start();
-            
+
         try
         {
             if (Connection.State == HubConnectionState.Reconnecting)
             {
-                Console.WriteLine($"Invoked Method '{methodName}' is queued, waiting for connection to be re-established");
+                Console.WriteLine(
+                    $"Invoked Method '{methodName}' is queued, waiting for connection to be re-established");
                 _queueList.Add(new(methodName, args1));
                 return HttpStatusCode.Processing;
             }
-                
-            if (_isRegistered == false && methodName != "Register")
+
+            if ((_isRegistered == false && methodName != "Register") ||
+                (Connection.State is not HubConnectionState.Connected && methodName != "Register"))
             {
+                Console.WriteLine($"Method Name: {methodName}");
                 await EnsureConnection();
             }
-                
+
             result = await Connection.InvokeAsync<HttpStatusCode>(methodName, args1);
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Invoked Method '{methodName}' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
+            Console.WriteLine(
+                $"Invoked Method '{methodName}' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
         }
 
         //StopWatch.Stop($"Invoked Method '{methodName}' returned {result}");
         return result;
     }
-        
+
     public async Task<SignalRResponse> InvokeAsync<T>(T args1)
     {
         Stopwatch.Restart();
         var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessageBO>();
         var request = args1.Adapt<StreamFlowMessageBO>();
-            
+
         try
         {
-            if (!PendingMethodCalls.TryAdd(request.RequestGuid,methodCallCompletionSource))
+            if (!PendingMethodCalls.TryAdd(request.RequestGuid, methodCallCompletionSource))
             {
                 return new()
                 {
@@ -256,42 +280,43 @@ public class SignalRService : ISignalRService
                     Message = $"Error while invoking method '{request.CommandName}' on {request.Recipient}"
                 };
             }
-                
+
             var response = methodCallCompletionSource.Task.ConfigureAwait(false);
-                
+
             ReSendRequest:
-                
+
             var signalRResponse = await InvokeVoidAsync("Push", args1);
             if (signalRResponse is HttpStatusCode.ServiceUnavailable or HttpStatusCode.NotFound)
             {
-                return new ()
+                return new()
                 {
                     HttpStatusCode = signalRResponse
                 };
             }
 
-            new Timer(new ((e) =>
-            {
-                methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
-            }), null, 30_000, 0);
-                
+            new Timer(
+                new((e) =>
+                {
+                    methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
+                }), null, 30_000, 0);
+
             Console.WriteLine($"Invoke Method '{request.CommandName}', awaiting response...");
             var streamFlowMessage = await response;
-                
+
             Stopwatch.Stop();
             Console.WriteLine($"Invoked Method '{request.CommandName}' in {Stopwatch.ElapsedMilliseconds}ms");
-                
+
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
                 Response = streamFlowMessage.Data,
                 Message = streamFlowMessage.Message
             };
-
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Invoked Method 'push' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
+            Console.WriteLine(
+                $"Invoked Method 'push' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
             return new()
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError,
@@ -299,6 +324,4 @@ public class SignalRService : ISignalRService
             };
         }
     }
-        
-      
 }

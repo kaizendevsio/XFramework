@@ -9,8 +9,9 @@ public partial class ApplicationState
     {
         private ApplicationState CurrentState => Store.GetState<ApplicationState>();
             
-        public SetStateHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public SetStateHandler(IndexedDbService indexedDbService, IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            IndexedDbService = indexedDbService;
             Configuration = configuration;
             SessionStorageService = sessionStorageService;
             LocalStorageService = localStorageService;
@@ -30,6 +31,7 @@ public partial class ApplicationState
             {
                 await HandleProgressStatus(action);
                 StateHelper.SetProperties(action,CurrentState);
+                Persist(CurrentState);
             }
             catch (Exception e)
             {
