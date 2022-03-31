@@ -1,18 +1,12 @@
-﻿using MudBlazor;
-using XFramework.Administrator.Shared.Modals;
-
+﻿
 namespace XFramework.Administrator.Pages.Dashboard;
 
 public class EnterprisesBase : PageBase
 {
     DialogOptions maxWidth = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true };
     
-    public void CreateModal(DialogOptions options)
+    public void OpenDialog(DialogOptions options)
     {
-        DialogService.Show<CreateModal>();
-    } 
-    public void UpdateModal(DialogOptions options)
-    {
-        DialogService.Show<UpdateModal>();
+        //Dialog.Show<DialogUsageExample_Dialog>("Custom Options Dialog", options);
     }
 }

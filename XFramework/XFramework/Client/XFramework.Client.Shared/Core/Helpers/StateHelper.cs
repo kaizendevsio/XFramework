@@ -6,12 +6,14 @@ public static class StateHelper
 {
     public static void SetProperties<TAction, TState>(TAction action, TState state)
     {
-        foreach (var stateProp in action.GetProperties(PropertyOptions.HasSetter))
+        if (action is null) return;
+        
+        foreach (var actionProp in action.GetProperties(PropertyOptions.HasSetter))
         {
-            var currentState = state.GetPropertyValue(stateProp.Name);
-            var actionValue = action.GetPropertyValue(stateProp.Name);
+            var currentState = state.GetPropertyValue(actionProp.Name);
+            var actionValue = action.GetPropertyValue(actionProp.Name);
             var finalValue = actionValue ?? currentState;
-            state.SetPropertyValue(stateProp.Name, finalValue);
+            state.SetPropertyValue(actionProp.Name, finalValue);
         }
 
         if (!state.ContainsProperty("InvokeRefresh")) return;
@@ -22,6 +24,8 @@ public static class StateHelper
     
     public static void ClearProperties<TAction, TState>(TAction action, TState state)
     {
+        if (action is null) return;
+        
         foreach (var actionProp in action.GetType().GetProperties())
         {
             var currentStateProps = state.GetType().GetProperties().Where(i => i.Name == actionProp.Name);
@@ -39,5 +43,17 @@ public static class StateHelper
 
             prop.SetValue(state, finalValue);
         }
+    }
+
+    public static void RestoreState<TAction, TState>(IMediator mediator ,IndexedDbService indexedDbService , TAction action, TState state)
+    {
+        var s = indexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == $"{state.GetType().Name}")?.Value;
+        if (s is null)
+        {
+            mediator.Send(Activator.CreateInstance<TAction>());
+            return;
+        }
+
+        SetProperties(JsonSerializer.Deserialize<TAction>(s), state);
     }
 }
