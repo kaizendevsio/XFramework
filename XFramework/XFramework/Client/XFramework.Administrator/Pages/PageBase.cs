@@ -1,4 +1,5 @@
-﻿using XFramework.Administrator.Pages.Dashboard;
+﻿using MudBlazor;
+using XFramework.Administrator.Pages.Dashboard;
 using XFramework.Client.Shared.Entity.Models;
 
 namespace XFramework.Administrator.Pages;
@@ -12,6 +13,7 @@ public class PageBase : BlazorStateComponent
    [Inject] public IJSRuntime JsRuntime { get; set; }
    [Inject] public EndPointsModel EndPoints { get; set; }
    [Inject] public HttpClient httpClient { get; set; }
+   [Inject] public IDialogService DialogService { get; set; }
 
    public SessionState SessionState => GetState<SessionState>();
    public List<SampleModels> Model { get; set; } = new(){new(){Id = 1},new(){Id = 2},new(){Id = 3}};

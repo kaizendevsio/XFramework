@@ -34,23 +34,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5aa26998-def9-45bf-afe5-6d5c2fde116c" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Components/ModalComponents.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Modals/CreateModal.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Modals/DeleteModal.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Modals/UpdateModal.razor" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Client/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Application.razor.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Enterprises.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Profile.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Roles.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Users.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/WalletTypes.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/Wallets.razor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/Dashboard/_Imports.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Pages/PageBase.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/BaseLayout.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/BaseLayout.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/XFramework.Administrator.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/XFramework.Administrator.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Client.Shared/Components/ModalComponents.razor" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework/XFramework/Client/XFramework.Administrator/Shared/Modals/ExampleModal.razor" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -423,6 +416,9 @@
       <workItem from="1648026734216" duration="2248000" />
       <workItem from="1648029431853" duration="2309000" />
       <workItem from="1648032761633" duration="1230000" />
+      <workItem from="1648632551931" duration="4984000" />
+      <workItem from="1648702582154" duration="1356000" />
+      <workItem from="1648704045799" duration="656000" />
     </task>
     <task id="LOCAL-00001" summary="Safety Backup + Mobile Bug Fixes">
       <created>1604612647432</created>
