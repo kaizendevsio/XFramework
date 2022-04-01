@@ -1,8 +1,5 @@
 ﻿<MudDialog>
     <DialogContent>
-    <div class="text-center">
-    <h2>Create</h2>
-</div>
         <form>
             <div>
                 <div class="py-3">
@@ -35,8 +32,10 @@
 
 
 @code {
-    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
 
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; }
+    
     void Submit() => MudDialog.Close(DialogResult.Ok(true));
     void Cancel() => MudDialog.Cancel();
 }

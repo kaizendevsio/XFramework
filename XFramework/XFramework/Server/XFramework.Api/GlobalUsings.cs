@@ -17,3 +17,4 @@ global using IdentityServer.Domain.Generic.Contracts.Requests.Update;
 global using XFramework.Domain.Generic.Interfaces;
 global using Microsoft.AspNetCore.Authorization;
 global using Microsoft.AspNetCore.Mvc;
+global using Microsoft.AspNetCore.OData.Query;

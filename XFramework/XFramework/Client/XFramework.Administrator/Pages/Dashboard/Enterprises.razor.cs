@@ -4,14 +4,14 @@ namespace XFramework.Administrator.Pages.Dashboard;
 
 public class EnterprisesBase : PageBase
 {
-    DialogOptions maxWidth = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    DialogOptions dialogOptions = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true };
     
     public void CreateModal(DialogOptions options)
     {
-        DialogService.Show<CreateModal>();
+        DialogService.Show<CreateModal>("Create Title",dialogOptions);
     } 
     public void UpdateModal(DialogOptions options)
     {
-        DialogService.Show<UpdateModal>();
+        DialogService.Show<UpdateModal>(string.Empty,dialogOptions);
     }
 }

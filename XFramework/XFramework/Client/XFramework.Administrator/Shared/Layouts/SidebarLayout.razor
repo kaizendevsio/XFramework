@@ -6,8 +6,6 @@
             </MudDrawerHeader>
             <MudNavMenu>
                 <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Dashboard" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Dashboard");})">Dashboard</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Login" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Session/SignIn");})">Sign In</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AppRegistration" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Session/SignUp");})">Registration</MudNavLink>
                 <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.SupervisedUserCircle" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Profile"); })">Profile</MudNavLink>
                 <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AccountBalanceWallet" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Wallets"); })">Wallets</MudNavLink>
                 <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AccountBalanceWallet" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/WalletTypes"); })">Wallet Types</MudNavLink>
@@ -19,15 +17,11 @@
             </MudNavMenu>
         </MudDrawer>
         <MudCardContent>
-            @Body
+            <MudContainer Fixed="@true" Class="pt-3">
+                <MudText Typo="Typo.h2"><strong>@LayoutState.View.Title</strong></MudText>
+                @*<MudText Typo="Typo.h5">@LayoutState.View.Toolbar.Title.</MudText>*@
+                @Body
+            </MudContainer>
         </MudCardContent>
     </MudDrawerContainer>
 </MudPaper>
-
-@code
-{
-    public async Task NavigateTo(string url)
-    {
-        NavigationManager.NavigateTo(url);
-    }
-}
