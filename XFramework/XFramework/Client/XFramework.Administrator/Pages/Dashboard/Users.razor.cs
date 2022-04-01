@@ -1,4 +1,5 @@
 ﻿using Bogus;
+using XFramework.Administrator.Shared.Modals;
 using XFramework.Client.Shared.Entity.Models;
 
 namespace XFramework.Administrator.Pages.Dashboard;
@@ -31,4 +32,11 @@ public class UsersBase : PageBase
     Model = model.GenerateBetween(1, 25);
     StateHasChanged();
   }
+  
+  DialogOptions dialogOptions = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true };
+    
+  public void CreateModal(DialogOptions options)
+  {
+    DialogService.Show<CreateModal>("Create Title",dialogOptions);
+  } 
 }
