@@ -16,12 +16,15 @@ namespace XFramework.Api.Controllers.V2.Identity
             _mediator = mediator;
         }
         
+        [EnableQuery]
         [HttpGet("GetByContact")]
         public async Task<JsonResult> Get(string contactValue)
         {
             var result = await _identityServiceWrapper.GetCredentialByContact(new () { ContactValue = contactValue });
             return new JsonResult(result);
         }
+        
+        [EnableQuery]
         [HttpGet]
         public async Task<JsonResult> Get(Guid guid)
         {
@@ -29,6 +32,7 @@ namespace XFramework.Api.Controllers.V2.Identity
             return new JsonResult(result);
         }
         
+        [EnableQuery]
         [HttpGet("List")]
         public async Task<JsonResult> List(Guid? applicationGuid)
         {

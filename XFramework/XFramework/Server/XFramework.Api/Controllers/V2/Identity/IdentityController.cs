@@ -20,6 +20,7 @@ namespace XFramework.Api.Controllers.V2.Identity
             _mediator = mediator;
         }
 
+        [EnableQuery]
         [Authorize]
         [HttpGet]
         public async Task<JsonResult> Get(Guid guid)

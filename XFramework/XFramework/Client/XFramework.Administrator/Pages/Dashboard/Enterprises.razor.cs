@@ -1,12 +1,17 @@
-﻿
+﻿using XFramework.Administrator.Shared.Modals;
+
 namespace XFramework.Administrator.Pages.Dashboard;
 
 public class EnterprisesBase : PageBase
 {
-    DialogOptions maxWidth = new DialogOptions() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    DialogOptions dialogOptions = new DialogOptions() { MaxWidth = MaxWidth.Small, FullWidth = true };
     
-    public void OpenDialog(DialogOptions options)
+    public void CreateModal(DialogOptions options)
     {
-        //Dialog.Show<DialogUsageExample_Dialog>("Custom Options Dialog", options);
+        DialogService.Show<CreateModal>("Create Title",dialogOptions);
+    } 
+    public void UpdateModal(DialogOptions options)
+    {
+        DialogService.Show<UpdateModal>(string.Empty,dialogOptions);
     }
 }

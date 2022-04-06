@@ -25,6 +25,7 @@ namespace XFramework.Api.Controllers.V2.Wallets
             return new JsonResult(result);
         }
 
+        [EnableQuery]
         [HttpGet]
         public async Task<JsonResult> Get(Guid? guid)
         {
@@ -33,6 +34,7 @@ namespace XFramework.Api.Controllers.V2.Wallets
             return new JsonResult(result);
         }
 
+        [EnableQuery]
         [HttpGet("List")]
         public async Task<JsonResult> List(Guid? applicationGuid)
         {

@@ -1,6 +1,8 @@
 ﻿using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OData;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using XFramework.Api.Options;
@@ -55,7 +57,10 @@ namespace XFramework.Api.Installers
                     };
                 });
             
-            services.AddControllers();
+            services.AddControllers().AddOData(o => o.EnableQueryFeatures()).AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+            });
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
             
             // Swagger

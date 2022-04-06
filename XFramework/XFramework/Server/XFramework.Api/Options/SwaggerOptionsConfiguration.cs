@@ -44,6 +44,8 @@ public class SwaggerOptionsConfiguration: IConfigureNamedOptions<SwaggerGenOptio
                 },new List<string>()
             }
         });
+        
+        options.OperationFilter<ODataOperationOptions>();
     }
 
     public void Configure(string name, SwaggerGenOptions options)

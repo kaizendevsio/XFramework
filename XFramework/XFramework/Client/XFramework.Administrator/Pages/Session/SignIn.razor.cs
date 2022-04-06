@@ -27,6 +27,6 @@ public class SignInBase : PageBase
     public void OnValidSubmit(EditContext context)
     {
         StateHasChanged();
-        NavigationManager.NavigateTo("/SignIn");
+        NavigationManager.NavigateTo("/Dashboard");
     }
 }
