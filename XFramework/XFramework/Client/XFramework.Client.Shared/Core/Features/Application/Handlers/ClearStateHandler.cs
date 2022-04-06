@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Application;
 
 public partial class ApplicationState
 {
-    public class ClearStateHandler : ActionHandler<ClearState>
+    protected class ClearStateHandler : ActionHandler<ClearState>
     {
         private ApplicationState CurrentState => Store.GetState<ApplicationState>();
         

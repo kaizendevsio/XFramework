@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
 {
-    public class UpdateSidebarItemsHandler : ActionHandler<UpdateSidebarItems>
+    protected class UpdateSidebarItemsHandler : ActionHandler<UpdateSidebarItems>
     {
         public UpdateSidebarItemsHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {

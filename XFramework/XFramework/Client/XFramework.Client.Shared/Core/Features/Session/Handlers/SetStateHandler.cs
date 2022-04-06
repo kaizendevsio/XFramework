@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class SetStateHandler : ActionHandler<SetState>
+    protected class SetStateHandler : ActionHandler<SetState>
     {
         private SessionState CurrentState => Store.GetState<SessionState>();
         public SetStateHandler(IndexedDbService indexedDbService, IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)

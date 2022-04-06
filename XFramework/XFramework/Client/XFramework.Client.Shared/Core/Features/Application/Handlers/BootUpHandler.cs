@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Application;
 
 public partial class ApplicationState
 {
-    public class BootUpHandler : ActionHandler<BootUp>
+    protected class BootUpHandler : ActionHandler<BootUp>
     {
         private ApplicationState CurrentState => Store.GetState<ApplicationState>();
         

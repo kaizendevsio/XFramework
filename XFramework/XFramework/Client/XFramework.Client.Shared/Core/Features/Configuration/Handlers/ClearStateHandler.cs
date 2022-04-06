@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Configuration;
 
 public partial class ConfigurationState
 {
-    public class ClearStateHandler : ActionHandler<ClearState>
+    protected class ClearStateHandler : ActionHandler<ClearState>
     {
         private ConfigurationState CurrentState => Store.GetState<ConfigurationState>();
         

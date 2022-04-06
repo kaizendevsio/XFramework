@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class ClearStateHandler : ActionHandler<ClearState>
+    protected class ClearStateHandler : ActionHandler<ClearState>
     {
         private WalletState CurrentState => Store.GetState<WalletState>();
         

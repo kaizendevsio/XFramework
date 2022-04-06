@@ -9,7 +9,7 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class CreateWalletHandler : ActionHandler<CreateWallet>
+    protected class CreateWalletHandler : ActionHandler<CreateWallet>
     {
         public IWalletServiceWrapper WalletServiceWrapper { get; }
         public SessionState WalletState => Store.GetState<SessionState>();

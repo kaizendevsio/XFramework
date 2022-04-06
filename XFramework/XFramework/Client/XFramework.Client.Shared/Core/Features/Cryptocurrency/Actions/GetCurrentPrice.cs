@@ -1,6 +1,8 @@
-﻿namespace XFramework.Client.Shared.Core.Features.Cryptocurrency.Actions;
+﻿namespace XFramework.Client.Shared.Core.Features.Cryptocurrency;
 
-public class GetCurrentPrice
+public partial class NewsfeedState
 {
-    
+    public class GetCurrentPrice : IAction
+    {
+    }
 }

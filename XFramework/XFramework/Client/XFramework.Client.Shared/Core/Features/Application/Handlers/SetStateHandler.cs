@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Application;
 
 public partial class ApplicationState
 {
-    public class SetStateHandler : ActionHandler<SetState>
+    protected class SetStateHandler : ActionHandler<SetState>
     {
         private ApplicationState CurrentState => Store.GetState<ApplicationState>();
             

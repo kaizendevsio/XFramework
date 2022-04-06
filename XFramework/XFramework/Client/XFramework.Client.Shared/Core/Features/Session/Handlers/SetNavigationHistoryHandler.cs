@@ -15,7 +15,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 public partial class SessionState
 {
 
-    public class SetNavigationHistoryHandler : ActionHandler<NavigateToPath>
+    protected class SetNavigationHistoryHandler : ActionHandler<NavigateToPath>
     {
         
         public SessionState SessionState => Store.GetState<SessionState>();

@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class ClearStateHandler : ActionHandler<ClearState>
+    protected class ClearStateHandler : ActionHandler<ClearState>
     {
         private SessionState CurrentState => Store.GetState<SessionState>();
         

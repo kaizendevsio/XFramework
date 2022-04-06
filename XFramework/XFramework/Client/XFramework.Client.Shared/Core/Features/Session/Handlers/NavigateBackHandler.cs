@@ -15,7 +15,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class NavigateBackHandler : ActionHandler<NavigateBack>
+    protected class NavigateBackHandler : ActionHandler<NavigateBack>
     {
         
         public SessionState SessionState => Store.GetState<SessionState>();

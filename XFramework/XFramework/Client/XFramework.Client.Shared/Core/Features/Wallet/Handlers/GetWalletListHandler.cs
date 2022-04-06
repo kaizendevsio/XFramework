@@ -6,7 +6,7 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class GetWalletListHandler : ActionHandler<GetWalletList>
+    protected class GetWalletListHandler : ActionHandler<GetWalletList>
     {
         public IWalletServiceWrapper WalletServiceWrapper { get; }
 

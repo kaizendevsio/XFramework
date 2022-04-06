@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Cache;
 
 public partial class CacheState
 {
-    public class SetStateHandler : ActionHandler<SetState>
+    protected class SetStateHandler : ActionHandler<SetState>
     {
         private CacheState CurrentState => Store.GetState<CacheState>();
         

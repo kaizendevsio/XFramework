@@ -6,7 +6,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class LogoutHandler : ActionHandler<Logout>
+    protected class LogoutHandler : ActionHandler<Logout>
     {
         public SessionState CurrentState => Store.GetState<SessionState>();
         

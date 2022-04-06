@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Configuration;
 
 public partial class ConfigurationState
 {
-    public class SetStateHandler : ActionHandler<SetState>
+    protected class SetStateHandler : ActionHandler<SetState>
     {
         private ConfigurationState CurrentState => Store.GetState<ConfigurationState>();
             

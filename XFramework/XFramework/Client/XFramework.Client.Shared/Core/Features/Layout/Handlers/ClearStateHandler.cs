@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
 {
-    public class ClearStateHandler : ActionHandler<ClearState>
+    protected class ClearStateHandler : ActionHandler<ClearState>
     {
         private XFramework.Client.Shared.Core.Features.Layout.LayoutState CurrentState => Store.GetState<XFramework.Client.Shared.Core.Features.Layout.LayoutState>();
         
