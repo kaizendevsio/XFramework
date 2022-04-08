@@ -15,6 +15,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public long? SessionEntityId { get; set; }
         public long? UserCredentialId { get; set; }
         public string SessionData { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblSessionEntity SessionEntity { get; set; }
         public virtual TblIdentityCredential UserCredential { get; set; }

@@ -6,6 +6,9 @@ using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Cache;
 using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Session;
+using XFramework.Client.Shared.Core.Features.Wallet;
+using XFramework.Client.Shared.Core.Services;
+using XFramework.Integration.Security;
 
 namespace XFramework.Client.Shared.Core.Features;
 
@@ -13,6 +16,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     where TAction : IAction
 {
     public IConfiguration Configuration { get;set; }
+    public IndexedDbService IndexedDbService { get; set; }
     protected ISessionStorageService SessionStorageService { get; set; }
     public ILocalStorageService LocalStorageService { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
@@ -29,6 +33,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     protected SessionState SessionState => Store.GetState<SessionState>();
     protected LayoutState LayoutState => Store.GetState<LayoutState>();
     protected CacheState CacheState => Store.GetState<CacheState>();
+    protected WalletState WalletState => Store.GetState<WalletState>();
 
     protected ActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService,
         NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient,
@@ -50,12 +55,15 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
     {
         if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
-       
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+        
         // Display message to UI
         switch (silent)
         {
             case true:
-                SweetAlertService.FireAsync("Error", $"There was an error while trying to process your request, please try again later");
+                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                    ? $"There was an error while trying to process your request, please try again later"
+                    : $"{customMessage}");
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
@@ -79,12 +87,15 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     public async Task<bool> HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false,  string customMessage = "")
     {
         if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
         // Display message to UI
         switch (silent)
         {
             case true:
-                SweetAlertService.FireAsync("Error", $"There was an error while trying to process your request, please try again later");
+                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                    ? $"There was an error while trying to process your request, please try again later"
+                    : $"{customMessage}");
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
@@ -147,7 +158,51 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     }
     public async Task Persist<TState>(TState state)
     {
-        await LocalStorageService.SetItemAsync(state.GetType().Name, state);
+        if (IndexedDbService is null) Console.WriteLine("IndexedDbService is not initialized!");
+        if (IndexedDbService.Database is null)
+        {
+            if (IndexedDbService.IsInitializing)
+            {
+                await IndexedDbService.TaskCompletionSource.Task;
+                goto ResumeTask;
+            }
+            await IndexedDbService.InitializeDb();
+        };
+        
+        ResumeTask:
+        var stateName = state.GetType().Name;
+        var stateEntry = IndexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == stateName);
+        var stateValue = JsonSerializer.Serialize(state);
+
+        if (stateEntry is null)
+        {
+            //IndexedDbService.Database.StateCache.Clear();
+            await IndexedDbService.InitializeDb();
+            IndexedDbService.Database.StateCache.Add(new()
+            {
+                Key = stateName,
+                Value = stateValue
+                //Signature = stateValue.ToMd5()
+            });
+            Console.WriteLine($"'{stateName}' State Added To Indexed DB ");
+        }
+        else
+        {
+            stateEntry.Value = stateValue;
+            //stateEntry.Signature = stateValue.ToMd5();
+            Console.WriteLine($"'{stateName}' State Updated To Indexed DB ");
+        }
+        
+        await IndexedDbService.Database.SaveChanges();
+        await IndexedDbService.InitializeDb();
+    }
+    public async Task ReportTask(string title, bool? isBusy = null)
+    {
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
+    }
+    public async Task ReportProgress(string message)
+    {
+        await Mediator.Send(new ApplicationState.SetState() {ProgressMessage = message});
     }
     
 }

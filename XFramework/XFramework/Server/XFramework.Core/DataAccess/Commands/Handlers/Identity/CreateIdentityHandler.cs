@@ -1,4 +1,6 @@
 ﻿
+using System.Text.Json;
+
 namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
 {
     public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateIdentityCmd, CmdResponse>

@@ -19,6 +19,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public long? DefaultExpiry { get; set; }
         public short? Priority { get; set; }
         public bool? IsDeleted { get; set; }
+        public string Guid { get; set; }
 
         public virtual ICollection<TblIdentityVerification> TblIdentityVerifications { get; set; }
     }

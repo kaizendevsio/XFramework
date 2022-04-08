@@ -2,5 +2,5 @@
 
 public class SmsVerificationRequest
 {
-    public string SmsVerifyRequest { get; set; }
+    public string OtpCode { get; set; }
 }

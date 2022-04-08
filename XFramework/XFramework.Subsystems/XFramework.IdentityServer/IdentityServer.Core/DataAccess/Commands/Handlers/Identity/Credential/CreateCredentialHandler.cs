@@ -22,6 +22,11 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
             };
         }
 
+        if (string.IsNullOrEmpty(request.UserName))
+        {
+            goto SkipDuplicateCheck;
+        }
+        
         var anyCredential = _dataLayer.TblIdentityCredentials
             .AsNoTracking()
             .Any(i => i.UserName == request.UserName);
@@ -34,6 +39,8 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
+        
+        SkipDuplicateCheck:
         var hashPasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: request.Password, workFactor:11));
 
         entity.Guid = request.Guid != null ? request.Guid.ToString() : Guid.NewGuid().ToString();

@@ -18,6 +18,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public short? AuthStatus { get; set; }
         public string LoginSource { get; set; }
         public string DeviceName { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblIdentityCredential IdentityCredentials { get; set; }
     }

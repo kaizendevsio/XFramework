@@ -20,3 +20,6 @@ global using Blazored.LocalStorage;
 global using Microsoft.AspNetCore.Components.Web;
 global using XFramework.Administrator;
 global using XFramework.Client.Shared.Core.Features;
+global using MudBlazor;
+global using Blazor.IndexedDB.Framework;
+global using XFramework.Client.Shared.Core.Services;

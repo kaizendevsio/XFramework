@@ -6,7 +6,7 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Stream.Services.Entity.Events
 {
-    public class InvokeMethodQuery : CommandBaseEntity, IRequest<QueryResponseBO<StreamFlowInvokeResponse>>
+    public class InvokeMethodQuery : CommandBaseEntity, IRequest<QueryResponse<StreamFlowInvokeResponse>>
     {
         public InvokeMethodQuery()
         {

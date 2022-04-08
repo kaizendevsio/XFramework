@@ -1,21 +1,2 @@
 ﻿@page "/Dashboard"
 @inherits DashboardBase
-
-<MudPaper Height="100vh">
-    <MudDrawerContainer Class="mud-height-full">
-        <MudDrawer Open="true" Elevation="0" Variant="@DrawerVariant.Persistent" Color="Color.Primary">
-            <MudDrawerHeader>
-                <MudText Typo="Typo.h6">XFramework</MudText>
-            </MudDrawerHeader>
-            <MudNavMenu>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Dashboard" IconColor="Color.Inherit" OnClick="@ToDashboard">Dashboard</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.LocalLibrary" IconColor="Color.Inherit" OnClick="ToSignIn">Sign In</MudNavLink>
-                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.People" IconColor="Color.Inherit" OnClick="ToSignUp">Sign Up</MudNavLink>
-            </MudNavMenu>
-        </MudDrawer>
-        <div class="d-flex justify-center align-center mud-height-full">
-            <h1>Hello World</h1>
-        </div>
-    </MudDrawerContainer>
-</MudPaper>
-

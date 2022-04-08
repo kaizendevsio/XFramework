@@ -1,4 +1,5 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
+﻿using System.Text.RegularExpressions;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 using IdentityServer.Domain.DataTransferObjects.Legacy;
 using XFramework.Domain.Generic.Contracts.Responses;
 
@@ -15,21 +16,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
     }
     public async Task<QueryResponse<ExistenceResponse>> Handle(CheckCredentialExistenceQuery request, CancellationToken cancellationToken)
     {
-        var existing = _dataLayer.TblIdentityCredentials
-            .AsNoTracking()
-            .Where(i => i.UserName == request.UserName)
-            .Where(i => i.Guid != $"{request.Guid}")
-            .Any();
-            
-        if (existing)
-        {
-            return new ()
-            {
-                Message = $"The identity with username '{request.UserName}' already exists",
-                HttpStatusCode = HttpStatusCode.Conflict
-            };
-        }
-
+        
         if (string.IsNullOrEmpty(request.Password))
         {
             return new ()
@@ -47,6 +34,41 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
                 HttpStatusCode = HttpStatusCode.BadRequest
             };
         }
+        
+        // Validate Password
+        /*var passwordIsStrong = Regex.Match(request.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$").Success;
+        if (!passwordIsStrong)
+        {
+            return new ()
+            {
+                Message = $"The password is weak. Please include at least one of the following: 1 upper case, 1 lower case, a number and a special character",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }*/
+
+        if (string.IsNullOrEmpty(request.UserName))
+        {
+            return new ()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted
+            };
+        }
+        
+        var existing = _dataLayer.TblIdentityCredentials
+            .AsNoTracking()
+            .Where(i => i.UserName == request.UserName)
+            .Where(i => i.Guid != $"{request.Guid}")
+            .Any();
+            
+        if (existing)
+        {
+            return new ()
+            {
+                Message = $"The identity with username '{request.UserName}' already exists",
+                HttpStatusCode = HttpStatusCode.Conflict
+            };
+        }
+      
 
         return new()
         {

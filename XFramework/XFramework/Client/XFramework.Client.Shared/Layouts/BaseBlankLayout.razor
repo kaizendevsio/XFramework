@@ -21,9 +21,9 @@ else
         {
             new Timer(new TimerCallback(async (e) =>
             {
-                await Mediator.Send(new ApplicationState.RestoreStatesAction()).ContinueWith(t => { _stateRestored = true; StateHasChanged(); });
+                await Mediator.Send(new ApplicationState.RestoreStates()).ContinueWith(t => { _stateRestored = true; StateHasChanged(); });
             })
-            , null, 10, 10);
+            , null, 10, 0);
         }
     }
 }

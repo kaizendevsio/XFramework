@@ -7,6 +7,7 @@ namespace IdentityServer.Domain.DataTransferObjects
     {
         public TblAddressCountry()
         {
+            TblAddressRegions = new HashSet<TblAddressRegion>();
             TblIdentityAddresses = new HashSet<TblIdentityAddress>();
         }
 
@@ -23,8 +24,10 @@ namespace IdentityServer.Domain.DataTransferObjects
         public string Language { get; set; }
         public string PhoneCountryCode { get; set; }
         public long? CurrencyId { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblCurrencyEntity Currency { get; set; }
+        public virtual ICollection<TblAddressRegion> TblAddressRegions { get; set; }
         public virtual ICollection<TblIdentityAddress> TblIdentityAddresses { get; set; }
     }
 }

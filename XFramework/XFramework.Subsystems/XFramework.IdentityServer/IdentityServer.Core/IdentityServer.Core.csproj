@@ -7,12 +7,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Folder Include="DataAccess\Commands\Entity\Address" />
       <Folder Include="DataAccess\Commands\Entity\Application" />
       <Folder Include="DataAccess\Commands\Entity\Events" />
       <Folder Include="DataAccess\Commands\Handlers\Application" />
       <Folder Include="DataAccess\Commands\Handlers\Events" />
       <Folder Include="DataAccess\Query\Entity\Events" />
       <Folder Include="DataAccess\Query\Handlers\Events" />
+       <PackageReference Include="TypeSupport" Version="1.1.12" />
     </ItemGroup>
 
     <ItemGroup>

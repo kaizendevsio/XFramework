@@ -18,6 +18,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public DateTimeOffset? StatusUpdatedOn { get; set; }
         public string Token { get; set; }
         public DateTime? Expiry { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblIdentityCredential IdentityCred { get; set; }
         public virtual TblIdentityVerificationEntity VerificationType { get; set; }

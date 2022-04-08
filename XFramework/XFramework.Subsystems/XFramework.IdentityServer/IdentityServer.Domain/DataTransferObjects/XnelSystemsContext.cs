@@ -65,9 +65,17 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasIndex(e => e.Code, "addresses_refbrgy_code_uindex")
                     .IsUnique();
 
+                entity.HasIndex(e => e.Guid, "tbl_addressbarangay_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .ValueGeneratedNever()
                     .HasColumnName("id");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.HasOne(d => d.CityCodeNavigation)
                     .WithMany(p => p.TblAddressBarangays)
@@ -83,9 +91,17 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasIndex(e => e.Code, "tbl_addresscity_code_uindex")
                     .IsUnique();
 
+                entity.HasIndex(e => e.Guid, "tbl_addresscity_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .ValueGeneratedNever()
                     .HasColumnName("id");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.HasOne(d => d.ProvCodeNavigation)
                     .WithMany(p => p.TblAddressCities)
@@ -99,12 +115,20 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_AddressCountry", "GeoLocation");
 
+                entity.HasIndex(e => e.Guid, "tbl_addresscountry_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
 
                 entity.Property(e => e.CurrencyId).HasColumnName("CurrencyID");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.IsoCode2).HasMaxLength(2);
 
@@ -129,9 +153,17 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasIndex(e => e.Code, "tbl_addressprovince_code_uindex")
                     .IsUnique();
 
+                entity.HasIndex(e => e.Guid, "tbl_addressprovince_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .ValueGeneratedNever()
                     .HasColumnName("id");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.HasOne(d => d.RegCodeNavigation)
                     .WithMany(p => p.TblAddressProvinces)
@@ -148,9 +180,24 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasIndex(e => e.Code, "tbl_addressregions_code_uindex")
                     .IsUnique();
 
+                entity.HasIndex(e => e.Guid, "tbl_addressregions_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .ValueGeneratedNever()
                     .HasColumnName("id");
+
+                entity.Property(e => e.CountryId).HasColumnName("CountryID");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.HasOne(d => d.Country)
+                    .WithMany(p => p.TblAddressRegions)
+                    .HasForeignKey(d => d.CountryId)
+                    .HasConstraintName("tbl_addressregions_tbl_addresscountry_id_fk");
             });
 
             modelBuilder.Entity<TblApplication>(entity =>
@@ -188,20 +235,36 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_AuditFields", "Audit");
 
+                entity.HasIndex(e => e.Guid, "tbl_auditfields_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
             });
 
             modelBuilder.Entity<TblAuditHistory>(entity =>
             {
                 entity.ToTable("tbl_AuditHistory", "Audit");
 
+                entity.HasIndex(e => e.Guid, "tbl_audithistory_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.KeyValues).HasColumnType("character varying");
 
@@ -220,12 +283,20 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.HasIndex(e => e.IdentityCredentialsId, "IX_tbl_IdentityAuthorizationLogs_IdentityCredentialsID");
 
+                entity.HasIndex(e => e.Guid, "tbl_authorizationlogs_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
 
                 entity.Property(e => e.DeviceName).HasMaxLength(50);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.IdentityCredentialsId).HasColumnName("IdentityCredentialsID");
 
@@ -246,11 +317,19 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_Configurations", "Registry");
 
+                entity.HasIndex(e => e.Guid, "tbl_configurations_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .HasDefaultValueSql("nextval('\"Registry\".\"tbl_Configuration_ID_seq\"'::regclass)");
 
                 entity.Property(e => e.ApplicationId).HasColumnName("ApplicationID");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Key)
                     .IsRequired()
@@ -276,9 +355,17 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_ConfigurationGroup", "Registry");
 
+                entity.HasIndex(e => e.Guid, "tbl_configurationgroup_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id).HasColumnName("ID");
 
                 entity.Property(e => e.Description).HasMaxLength(1000);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasMaxLength(100);
             });
@@ -360,11 +447,19 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasIndex(e => e.Id, "tbl_favoriteentities_\"id\"_uindex")
                     .IsUnique();
 
+                entity.HasIndex(e => e.Guid, "tbl_favoriteentities_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id).HasColumnName("ID");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.Property(e => e.Description).HasMaxLength(500);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
 
@@ -381,6 +476,9 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.HasIndex(e => e.IdentityInfoId, "IX_tbl_IdentityAddresses_UserInfoID");
 
+                entity.HasIndex(e => e.Guid, "tbl_identityaddresses_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
@@ -389,6 +487,11 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.Property(e => e.AddressEntitiesId).HasColumnName("AddressEntitiesID");
 
                 entity.Property(e => e.Building).HasMaxLength(500);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.IdentityInfoId).HasColumnName("IdentityInfoID");
 
@@ -440,10 +543,18 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_IdentityAddressEntities", "Identity");
 
+                entity.HasIndex(e => e.Guid, "tbl_identityaddressentities_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasMaxLength(500);
             });
@@ -490,10 +601,18 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_IdentityContactEntities", "Identity");
 
+                entity.HasIndex(e => e.Guid, "tbl_identitycontactentities_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
             });
@@ -553,9 +672,7 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasColumnName("ID")
                     .HasIdentityOptions(null, null, null, 2147483647L);
 
-                entity.Property(e => e.FirstName)
-                    .IsRequired()
-                    .HasMaxLength(100);
+                entity.Property(e => e.FirstName).HasMaxLength(100);
 
                 entity.Property(e => e.Guid)
                     .IsRequired()
@@ -566,9 +683,7 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.Property(e => e.IdentityName).HasMaxLength(100);
 
-                entity.Property(e => e.LastName)
-                    .IsRequired()
-                    .HasMaxLength(100);
+                entity.Property(e => e.LastName).HasMaxLength(100);
 
                 entity.Property(e => e.MiddleName).HasMaxLength(100);
             });
@@ -639,10 +754,18 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.HasIndex(e => e.VerificationTypeId, "IX_tbl_IdentityVerifications_VerificationTypeID");
 
+                entity.HasIndex(e => e.Guid, "tbl_identityverifications_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.IdentityCredId).HasColumnName("IdentityCredID");
 
@@ -669,10 +792,18 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_IdentityVerificationEntities", "Identity");
 
+                entity.HasIndex(e => e.Guid, "tbl_identityverificationentities_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasMaxLength(100);
             });
@@ -690,6 +821,10 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.Property(e => e.ApplicationId).HasColumnName("ApplicationID");
 
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
                 entity.Property(e => e.Initiator).HasColumnType("character varying");
 
                 entity.Property(e => e.Message).HasColumnType("character varying");
@@ -697,10 +832,6 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
                 entity.Property(e => e.Seen).HasDefaultValueSql("false");
-
-                entity.Property(e => e.Uuid)
-                    .HasColumnType("character varying")
-                    .HasColumnName("UUID");
 
                 entity.HasOne(d => d.Application)
                     .WithMany(p => p.TblLogs)
@@ -717,10 +848,18 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.HasIndex(e => e.UserCredentialId, "IX_tbl_SessionData_UserCredentialID");
 
+                entity.HasIndex(e => e.Guid, "tbl_sessiondata_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.SessionData).HasMaxLength(2000);
 
@@ -745,10 +884,18 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("tbl_SessionEntities", "Identity");
 
+                entity.HasIndex(e => e.Guid, "tbl_sessionentities_guid_uindex")
+                    .IsUnique();
+
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
                     .UseIdentityAlwaysColumn()
                     .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
             });

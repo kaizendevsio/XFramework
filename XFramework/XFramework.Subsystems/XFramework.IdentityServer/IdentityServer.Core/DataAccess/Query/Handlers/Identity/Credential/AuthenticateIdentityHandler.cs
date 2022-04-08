@@ -44,8 +44,11 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         }
 
         var roleList = await GetRoleList(cancellationToken, credential, cuid);
-
-        var token = await _jwtService.GenerateToken(request.Username, cuid, roleList.Select(i => i.RoleEntityId).Adapt<List<RoleEntity>>());
+        var token = new JwtTokenBO();
+        if (request.GenerateToken)
+        {
+            token = await _jwtService.GenerateToken(request.Username, cuid, roleList.Select(i => i.RoleEntityId).Adapt<List<RoleEntity>>());
+        }
         //_recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
         
         return new()

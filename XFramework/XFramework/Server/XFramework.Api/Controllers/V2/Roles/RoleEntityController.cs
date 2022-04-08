@@ -16,6 +16,7 @@ namespace XFramework.Api.Controllers.V2.Roles
             _identityServiceWrapper = identityServiceWrapper;
         }
         
+        [EnableQuery]
         [HttpGet]
         public async Task<JsonResult> Get(Guid guid)
         {
@@ -23,6 +24,7 @@ namespace XFramework.Api.Controllers.V2.Roles
             return new JsonResult(result);
         }
         
+        [EnableQuery]
         [HttpPost("List")]
         public async Task<JsonResult> GeList(Guid? applicationGuid)
         {

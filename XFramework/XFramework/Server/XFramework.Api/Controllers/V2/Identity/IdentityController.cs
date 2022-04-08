@@ -20,6 +20,7 @@ namespace XFramework.Api.Controllers.V2.Identity
             _mediator = mediator;
         }
 
+        [EnableQuery]
         [Authorize]
         [HttpGet]
         public async Task<JsonResult> Get(Guid guid)
@@ -36,7 +37,7 @@ namespace XFramework.Api.Controllers.V2.Identity
             return new JsonResult(result);
         }
         
-        /*[Authorize]*/
+        [Authorize]
         [HttpPost]
         public async Task<JsonResult> Create([FromBody] CreateUserRequest request)                                                                                                                                                                              
         {
@@ -65,6 +66,7 @@ namespace XFramework.Api.Controllers.V2.Identity
         [HttpPost("Authenticate")]
         public async Task<JsonResult> Authenticate([FromBody] AuthenticateCredentialRequest request)
         {
+            request.GenerateToken = true;
             var result = await _identityServiceWrapper.AuthenticateCredential(request);
             return new JsonResult(result);
         }

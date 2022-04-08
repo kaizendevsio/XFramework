@@ -11,7 +11,7 @@ namespace XFramework.Core.DataAccess.Commands.Validations.User
                 .NotEmpty();
             RuleFor(x => x.UserName)
                 .NotEmpty();
-            RuleFor(x => x.PasswordString)
+            RuleFor(x => x.Password)
                 .NotEmpty();
             RuleFor(x => x.FirstName)
                 .NotEmpty();

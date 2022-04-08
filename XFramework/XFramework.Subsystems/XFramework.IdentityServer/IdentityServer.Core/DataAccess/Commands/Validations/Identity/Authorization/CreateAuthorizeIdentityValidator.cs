@@ -8,9 +8,9 @@ public class CreateAuthorizeIdentityValidator : CommandBaseValidator<CreateCrede
     {
         RuleFor(x => x.RequestServer).SetValidator(RequestServerValidator);
             
-        RuleFor(x => x.UserName)
+        /*RuleFor(x => x.UserName)
             .NotEmpty()
-            .WithMessage("Username is Required");
+            .WithMessage("Username is Required");*/
             
         RuleFor(x => x.Password)
             .NotEmpty()

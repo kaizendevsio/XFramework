@@ -14,6 +14,7 @@ namespace IdentityServer.Domain.DataTransferObjects
         public bool IsDeleted { get; set; }
         public long? GroupId { get; set; }
         public string Unit { get; set; }
+        public string Guid { get; set; }
 
         public virtual TblApplication Application { get; set; }
         public virtual TblConfigurationGroup Group { get; set; }

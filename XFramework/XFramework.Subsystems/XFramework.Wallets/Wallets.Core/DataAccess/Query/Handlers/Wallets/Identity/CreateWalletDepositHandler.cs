@@ -24,7 +24,7 @@ public class CreateWalletDepositHandler : QueryBaseHandler, IRequestHandler<Crea
         {
             return new()
             {
-                Message = $"Credential with Guid {request.CredentialGuid} does not exist",
+                Message = $"Credential with Guid '{request.CredentialGuid}' does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -34,14 +34,14 @@ public class CreateWalletDepositHandler : QueryBaseHandler, IRequestHandler<Crea
         {
             return new()
             {
-                Message = $"Wallet entity with code {request.WalletEntityGuid} does not exist",
+                Message = $"Wallet entity with code '{request.WalletEntityGuid}' does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
+        
         wrapperRequest.WalletTypeId = entity.Id;
         var result = await _paymentGatewayWrapper.CreateTransaction(wrapperRequest).ConfigureAwait(false);
 
-        return new();
-        //return result;
+        return result;
     }
 }
