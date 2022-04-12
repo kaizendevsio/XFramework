@@ -86,7 +86,7 @@ public partial class SessionState
                             {
                                 await Mediator.Send(new WalletState.GetWalletList());
                             });
-                        }, null, (int) action.AutoRefreshWalletsInterval.TotalMilliseconds, (int) action.AutoRefreshWalletsInterval.TotalMilliseconds);
+                        }, null, 0, (int) action.AutoRefreshWalletsInterval.TotalMilliseconds);
                     }
                 }
                 catch (Exception e)
