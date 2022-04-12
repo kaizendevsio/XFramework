@@ -80,13 +80,13 @@ public partial class SessionState
                     await Mediator.Send(new WalletState.GetWalletList());
                     if (action.AutoRefreshWallets)
                     {
-                        new Timer(_ =>
+                       WalletState.Timer = new Timer(_ =>
                         {
                             Task.Run(async () =>
                             {
                                 await Mediator.Send(new WalletState.GetWalletList());
                             });
-                        }, null, 0, (int) action.AutoRefreshWalletsInterval.TotalMilliseconds);
+                        }, null, action.AutoRefreshWalletsInterval, action.AutoRefreshWalletsInterval);
                     }
                 }
                 catch (Exception e)

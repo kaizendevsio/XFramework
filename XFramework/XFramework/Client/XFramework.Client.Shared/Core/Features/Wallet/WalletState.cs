@@ -13,4 +13,5 @@ public partial class WalletState : State<WalletState>
     public SendWalletRequest SendWalletVm { get; set; }
     
     public Action InvokeRefresh { get; set; }
+    public Timer Timer { get; set; }
 }
