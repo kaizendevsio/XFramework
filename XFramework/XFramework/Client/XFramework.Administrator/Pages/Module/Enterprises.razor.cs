@@ -1,6 +1,6 @@
 ﻿using XFramework.Administrator.Shared.Modals;
 
-namespace XFramework.Administrator.Pages.Dashboard;
+namespace XFramework.Administrator.Pages.Module;
 
 public class EnterprisesBase : PageBase
 {

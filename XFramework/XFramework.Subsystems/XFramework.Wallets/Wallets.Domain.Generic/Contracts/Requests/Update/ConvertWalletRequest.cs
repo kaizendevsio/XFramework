@@ -2,7 +2,7 @@
 
 namespace Wallets.Domain.Generic.Contracts.Requests.Update;
 
-public class TransferWalletRequest : RequestBase
+public class ConvertWalletRequest : TransactionRequestBase
 {
     public Guid? CredentialGuid { get; set; }
     public Guid? FromWalletEntityGuid { get; set; }

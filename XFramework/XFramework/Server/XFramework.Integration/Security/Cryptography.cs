@@ -14,18 +14,18 @@ public static class Cryptography
 
     public static string ToSha256(this string stringData)
     {
-        var shaM = new SHA256Managed();
-        var passwordByte = Encoding.ASCII.GetBytes(stringData);
-        var bytes = shaM.ComputeHash(passwordByte);
+        var sha256 = SHA256Managed.Create();
+        var passwordByte = Encoding.UTF8.GetBytes(stringData);
+        var bytes = sha256.ComputeHash(passwordByte);
 
         return GetStringFromHash(bytes);
     }
 
     public static string ToSha512(this string stringData)
     {
-        var shaM = new SHA512Managed();
-        var passwordByte = Encoding.ASCII.GetBytes(stringData);
-        var bytes = shaM.ComputeHash(passwordByte);
+        var sha512 = SHA512Managed.Create();
+        var passwordByte = Encoding.UTF8.GetBytes(stringData);
+        var bytes = sha512.ComputeHash(passwordByte);
 
         return GetStringFromHash(bytes);
     }

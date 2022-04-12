@@ -1,4 +1,4 @@
-﻿namespace XFramework.Client.Shared.Entity.Models.Requests;
+﻿namespace XFramework.Client.Shared.Entity.Models.Requests.Session;
 
 public class SignUpRequest
 {

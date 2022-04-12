@@ -22,7 +22,6 @@ public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetW
         }
         
         var result = await _dataLayer.TblWalletEntities
-            .Take(1000)
             .AsNoTracking()
             .Where(i => i.ApplicationId == entity.Id)
             .ToListAsync(cancellationToken: cancellationToken);
@@ -30,7 +29,7 @@ public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetW
         {
             return new QueryResponse<List<WalletEntityResponse>>()
             {
-                Message = $"No identity exists",
+                Message = $"No wallet entities exists",
                 HttpStatusCode = HttpStatusCode.NoContent
             };
         }
@@ -38,6 +37,7 @@ public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetW
         var r = result.Adapt<List<WalletEntityResponse>>();
         return new QueryResponse<List<WalletEntityResponse>>()
         {
+            HttpStatusCode = HttpStatusCode.Accepted,
             Response = r
         };
     }

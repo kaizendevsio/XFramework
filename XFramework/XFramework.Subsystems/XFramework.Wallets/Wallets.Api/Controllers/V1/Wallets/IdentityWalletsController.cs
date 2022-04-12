@@ -72,7 +72,7 @@ public class IdentityWalletsController : XFrameworkControllerBase
     }
 
     [HttpPost("Transfer")]
-    public async Task<JsonResult> Transfer([FromBody] TransferWalletCmd request)
+    public async Task<JsonResult> Transfer([FromBody] ConvertWalletCmd request)
     {
         var result = await _mediator.Send(request);
         return new JsonResult(result);

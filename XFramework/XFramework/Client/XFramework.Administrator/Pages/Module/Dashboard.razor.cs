@@ -1,4 +1,4 @@
-namespace XFramework.Administrator.Pages.Dashboard;
+namespace XFramework.Administrator.Pages.Module;
 
 public class DashboardBase : PageBase
 {

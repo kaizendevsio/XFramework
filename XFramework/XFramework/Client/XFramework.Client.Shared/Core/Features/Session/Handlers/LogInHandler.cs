@@ -75,7 +75,15 @@ public partial class SessionState
             // Initialize Wallets If Specified
             if (action.InitializeWallets)
             {
-                await Mediator.Send(new WalletState.GetWalletList());
+                try
+                {
+                    await Mediator.Send(new WalletState.GetWalletList());
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    throw;
+                }
             }
 
             // Inform UI About Not Busy State

@@ -2,7 +2,7 @@
 using XFramework.Administrator.Shared.Modals;
 using XFramework.Client.Shared.Entity.Models;
 
-namespace XFramework.Administrator.Pages.Dashboard;
+namespace XFramework.Administrator.Pages.Module;
 
 public class UsersBase : PageBase
 {

@@ -1,20 +1,15 @@
 ﻿using Wallets.Core.DataAccess.Commands.Entity.Wallets.Identity;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets.Identity;
 
-public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<TransferWalletCmd, CmdResponse<TransferWalletCmd>>
+public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertWalletCmd, CmdResponse<ConvertWalletCmd>>
 {
-    private readonly IIdentityServiceWrapper _identityServiceWrapper;
-
-    public TransferWalletHandler(IIdentityServiceWrapper identityServiceWrapper ,IDataLayer dataLayer, IMediator mediator)
+    public ConvertWalletHandler(IDataLayer dataLayer)
     {
-        _identityServiceWrapper = identityServiceWrapper;
-        _mediator = mediator;
         _dataLayer = dataLayer;
     }
     
-    public async Task<CmdResponse<TransferWalletCmd>> Handle(TransferWalletCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<ConvertWalletCmd>> Handle(ConvertWalletCmd request, CancellationToken cancellationToken)
     {
         switch (request.Amount)
         {
@@ -31,12 +26,9 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
                     HttpStatusCode = HttpStatusCode.BadRequest
                 };
         }
-        
-        var fromCredential = await _dataLayer.TblIdentityCredentials
-            .Include(i => i.TblUserWallets)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
-        if (fromCredential == null)
+
+        var initiatorCredential = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
+        if (initiatorCredential == null)
         {
             return new ()
             {
@@ -45,62 +37,71 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
         
-        // Check Recipient Type
-        var toCredential = new TblIdentityCredential();
-        toCredential = Guid.TryParse(request.Recipient, out var credentialGuid)
-            ? await _dataLayer.TblIdentityCredentials
-                .Include(i => i.TblUserWallets)
-                .AsSplitQuery()
-                .FirstOrDefaultAsync(i => i.Guid == $"{request.Recipient}", cancellationToken)
-            : await _dataLayer.TblIdentityCredentials
-                .Include(i => i.TblUserWallets)
-                .AsSplitQuery()
-                .FirstOrDefaultAsync(i => i.UserName == $"{request.Recipient}", cancellationToken);
-        
-        if (toCredential == null)
-        {
-            // Try To Get Credential From Contact
-            var credentialByContact = await _identityServiceWrapper.GetCredentialByContact(new() {ContactValue = request.Recipient});
-            if (credentialByContact.HttpStatusCode is not HttpStatusCode.Accepted)
-            {
-                return new ()
-                {
-                    Message = $"Credential {request.Recipient} does not exist",
-                    HttpStatusCode = HttpStatusCode.NotFound
-                }; 
-            }
-        }
-        
-        var walletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
-        if (walletEntity == null)
+        var fromCredential = await _dataLayer.TblIdentityCredentials
+            .Include(i => i.TblUserWallets)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.FromCredentialGuid}", cancellationToken);
+        if (fromCredential == null)
         {
             return new ()
             {
-                Message = $"Wallet entity with Guid {request.WalletEntityGuid} does not exist",
+                Message = $"Credential with Guid {request.FromCredentialGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var toCredential = await _dataLayer.TblIdentityCredentials
+            .Include(i => i.TblUserWallets)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.ToCredentialGuid}", cancellationToken);
+        if (toCredential == null)
+        {
+            return new ()
+            {
+                Message = $"Credential with Guid {request.ToCredentialGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+            
+        var fromWalletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.FromWalletEntityGuid}", cancellationToken);
+        if (fromWalletEntity == null)
+        {
+            return new ()
+            {
+                Message = $"Wallet entity with Guid {request.FromWalletEntityGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        var toWalletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.ToWalletEntityGuid}", cancellationToken);
+        if (toWalletEntity == null)
+        {
+            return new ()
+            {
+                Message = $"Wallet entity with Guid {request.ToWalletEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
         var fromUserWallet = fromCredential.TblUserWallets
-            .Where(i => i.WalletTypeId == walletEntity.Id)
+            .Where(i => i.WalletTypeId == fromWalletEntity.Id)
             .FirstOrDefault();
         if (fromUserWallet == null)
         {
             return new ()
             {
-                Message = $"Credential with guid '{fromCredential.Guid}' does not have wallet with wallet entity guid '{request.WalletEntityGuid}'",
+                Message = $"Wallet with entity Guid {request.FromWalletEntityGuid} and credential Guid {request.FromCredentialGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
             
         var toUserWallet = toCredential.TblUserWallets
-            .Where(i => i.WalletTypeId == walletEntity.Id)
+            .Where(i => i.WalletTypeId == toWalletEntity.Id)
             .FirstOrDefault();
         if (toUserWallet == null)
         {
             return new ()
             {
-                Message = $"Credential with guid '{toCredential.Guid}' does not have wallet with wallet entity guid '{request.WalletEntityGuid}'",
+                Message = $"Wallet with entity Guid {request.ToWalletEntityGuid} and credential Guid {request.ToCredentialGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -115,7 +116,7 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
         }
         _dataLayer.TblUserWalletTransactions.Add(new ()
         {
-            UserAuth = fromCredential,
+            UserAuth = initiatorCredential,
             Amount = request.Amount,
             SourceUserWallet = fromUserWallet,
             TargetUserWallet = toUserWallet,
@@ -136,5 +137,6 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = $"You transferred {request.Amount} to Wallet Guid:{toUserWallet.Guid}"
         };
+        
     }
 }

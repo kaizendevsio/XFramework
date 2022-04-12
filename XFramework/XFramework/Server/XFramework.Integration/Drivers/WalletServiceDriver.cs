@@ -89,6 +89,12 @@ public class WalletServiceDriver : DriverBase, IWalletServiceWrapper
         return result.Adapt<CmdResponse>();
     }
 
+    public async Task<CmdResponse> ConvertWallet(ConvertWalletRequest request)
+    {
+        var result = await SendVoidAsync("ConvertWallet", request);
+        return result.Adapt<CmdResponse>();
+    }
+
     public async Task<QueryResponse<WalletDepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request)
     {
         return await SendAsync<CreateWalletDepositRequest, WalletDepositResponse>("CreateWalletDeposit", request);

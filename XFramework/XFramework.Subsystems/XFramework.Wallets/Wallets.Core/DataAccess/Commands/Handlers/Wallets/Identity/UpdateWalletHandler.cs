@@ -4,8 +4,9 @@ namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets.Identity;
 
 public class UpdateWalletHandler : CommandBaseHandler, IRequestHandler<UpdateWalletCmd, CmdResponse<UpdateWalletCmd>>
 {
-    public UpdateWalletHandler(IDataLayer dataLayer)
+    public UpdateWalletHandler(IDataLayer dataLayer, IMediator mediator)
     {
+        _mediator = mediator;
         _dataLayer = dataLayer;
     }
         
@@ -37,11 +38,24 @@ public class UpdateWalletHandler : CommandBaseHandler, IRequestHandler<UpdateWal
             .FirstOrDefaultAsync(cancellationToken);
         if (entity == null)
         {
-            return new ()
+            await _mediator.Send(new CreateWalletCmd
+            {
+                RequestServer = request.RequestServer,
+                ClientReference = request.ClientReference,
+                CredentialGuid = request.CredentialGuid,
+                WalletEntityGuid = request.WalletEntityGuid,
+                Balance = 0
+            }, CancellationToken.None);
+            
+            entity = await _dataLayer.TblUserWallets
+                .Where(i => i.UserAuthId == credentialEntity.Id)
+                .Where(i => i.WalletTypeId == walletEntity.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            /*return new ()
             {
                 Message = $"Credential Guid: {request.CredentialGuid} with Wallet Guid: {request.WalletEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
-            };
+            };*/
         }
             
         entity = request.Adapt(entity);

@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateCredentialRequest : RequestBase
+public class CreateCredentialRequest : TransactionRequestBase
 {
     public string UserAlias { get; set; }
     public string UserName { get; set; }

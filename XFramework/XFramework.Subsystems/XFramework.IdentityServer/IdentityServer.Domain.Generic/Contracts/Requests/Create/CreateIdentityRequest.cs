@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateIdentityRequest : RequestBase
+public class CreateIdentityRequest : TransactionRequestBase
 {
     public string FirstName { get; set; }
     public string MiddleName { get; set; }
