@@ -26,3 +26,4 @@ global using MudBlazor;
 global using XFramework.Client.Shared.Core.Features.Session;
 global using Blazor.IndexedDB.Framework;
 global using XFramework.Client.Shared.Core.Services;
+global using System.Text.Json.Serialization;

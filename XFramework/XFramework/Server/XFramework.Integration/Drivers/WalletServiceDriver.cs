@@ -6,7 +6,7 @@ using Wallets.Domain.Generic.Contracts.Responses;
 
 namespace XFramework.Integration.Drivers;
 
-public class WalletServiceDriver : DriverBase, IWalletServiceWrapper
+public class WalletServiceDriver : DriverBase, IWalletServiceWrapper, IClientWalletServiceWrapper
 {
     public WalletServiceDriver(IMessageBusWrapper messageBusDriver, IConfiguration configuration)
     {
