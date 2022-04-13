@@ -39,4 +39,6 @@ public class UsersBase : PageBase
   {
     DialogService.Show<CreateModal>("Create Title",dialogOptions);
   } 
+  
+  
 }

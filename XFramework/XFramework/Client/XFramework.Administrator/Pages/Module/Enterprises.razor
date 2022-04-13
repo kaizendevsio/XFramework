@@ -10,6 +10,7 @@
       <th>Phone</th>
       <th>DOB</th>
       <th>Status</th>
+      <th></th>
     </tr>
   </thead>
   <tbody>
@@ -21,6 +22,10 @@
        <td>@item.Phone</td>
        <td>@item.DateOfBirth</td>
        <td>@item.Status</td>
+       <td>
+         <MudButton Color="Color.Primary" @onclick="@((e) => EditModal(new()))">Edit</MudButton>
+         <MudButton Color="Color.Error" @onclick="@((e) => DeleteModal(new()))">Delete</MudButton>
+       </td>
      </tr>
    }
    </tbody>
@@ -28,6 +33,5 @@
 
 
 <MudButton OnClick="@((e) => CreateModal(new()))">Open Create Modal</MudButton>
-<MudButton OnClick="@((e) => UpdateModal(new()))">Open Update Modal</MudButton>
 
 
