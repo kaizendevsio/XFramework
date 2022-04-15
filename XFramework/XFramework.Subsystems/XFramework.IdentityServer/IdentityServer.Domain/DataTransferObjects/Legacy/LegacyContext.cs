@@ -48,7 +48,7 @@ public partial class LegacyContext : DbContext
                     case "IsEnabled":
                         property.CurrentValue ??= true;
                         break;
-                    case "CreatedOn":
+                    case "CreatedAt":
                         if (entry.State == EntityState.Added)
                         {
                             property.CurrentValue = DateTime.Now;
@@ -60,7 +60,7 @@ public partial class LegacyContext : DbContext
                             property.CurrentValue = DateTime.Now;
                         }
                         break;
-                    case "ModifiedOn":
+                    case "ModifiedAt":
                         property.CurrentValue = DateTime.Now;
                         break;
                     case "ModifiedAt":
