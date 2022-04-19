@@ -10,16 +10,146 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="409723ac-d59d-499a-9f6f-0d22e3f077ee" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/../XFramework.Apps/XFramework.RBS/RBS.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework.Apps/XFramework.RBS/RBS.Core/DataAccess/DataLayer.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Community/.idea/encodings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community.sln" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/.idea/.idea.XFramework.Community/.idea/encodings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/.idea/.idea.XFramework.Community/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/.idea/.idea.XFramework.Community/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Controllers/StartupController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Controllers/V1/Application/ApplicationController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Controllers/XFrameworkControllerBase.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/GlobalUsings.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/HostedService/SampleService.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Installers/ApiInstaller.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Installers/ConfigExtensions.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Installers/DbInstaller.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Installers/ExternalDependencyInstaller.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Installers/HostedServiceInstaller.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Installers/IInstaller.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Installers/InstallerExtensions.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Installers/ServicesInstaller.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Options/JwtOptions.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Options/SwaggerOptions.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/Handlers/BaseSignalRHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/Handlers/Content/CreateContentHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/Handlers/Content/DeleteContentHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/Handlers/Content/GetContentHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/Handlers/Content/GetContentListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/Handlers/Content/UpdateContentHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/Handlers/Identity/CreateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/Handlers/Identity/UpdateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/ISignalREventHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/SignalR/SignalRWrapper.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Startup.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Entity/CommandBaseEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Entity/Content/CreateContentCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Entity/Content/DeleteContentCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Entity/Content/UpdateContentCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Entity/Identity/CreateIdentityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Entity/Identity/UpdateIdentityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Handlers/CommandBaseHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Handlers/Content/CreateContentHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Handlers/Content/DeleteContentHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Handlers/Content/UpdateContentHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Handlers/Identity/UpdateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Validations/CommandBaseValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Validations/Content/CreateContentCmdValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Validations/Content/UpdateContentCmdValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Validations/Identity/CreateIdentityCmdValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Commands/Validations/Identity/UpdateIdentityCmdValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/DataLayer.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Query/Entity/Content/GetContentListQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Query/Entity/Content/GetContentQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Query/Entity/QueryBaseEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Query/Handlers/Content/GetContentListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Query/Validations/QueryBaseValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/GlobalUsings.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Interfaces/ICachingService.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Interfaces/IDataLayer.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Services/CachingService.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Services/LoggerService.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Validations/Common/RequestServerBOValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Requests/Create/CreateContentRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Requests/Create/CreateIdentityRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Requests/Delete/DeleteContentRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Requests/Get/GetContentListRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Requests/Get/GetContentRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Requests/Update/UpdateContentRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Requests/Update/UpdateIdentityRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Responses/Content/CommunityContentEntityResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Responses/Content/CommunityContentFileResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Responses/Content/CommunityContentReactionResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Responses/Content/CommunityContentResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Responses/Content/CommunityIdentityResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Enums/CommunityIdentityStatus.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/BusinessObjects/AuditEntryBO.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/AddressBarangay.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/AddressCity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/AddressCountry.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/AddressProvince.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/AddressRegion.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/Application.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/AuditField.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/AuditHistory.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/AuthorizationLog.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityConnection.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityConnectionEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityContent.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityContentEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityContentFile.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityContentReaction.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityContentReactionEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityIdentity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CommunityIdentityEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/CurrencyEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/Enterprise.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/ExchangeRate.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityAddress.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityAddressEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityContact.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityContactEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityCredential.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityFavorite.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityInformation.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityRole.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityRoleEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityRoleEntityGroup.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityVerification.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/IdentityVerificationEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/Log.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/RegistryConfiguration.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/RegistryConfigurationGroup.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/RegistryFavoriteEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/SessionDatum.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/SessionEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/DataTransferObjects/XnelSystemsContext.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Integration/Community.Integration.csproj" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Integration/Drivers/CommunityServiceDriver.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Community/Community.Integration/Interfaces/ICommunityServiceWrapper.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Coins/Server/Coins.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Coins/Server/Coins.Core/DataAccess/DataLayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/.idea/.idea.XFramework.Community/.idea/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Community/.idea/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/Community.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Community.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/Controllers/WeatherForecastController.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/Program.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Program.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/Properties/launchSettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Properties/launchSettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/WeatherForecast.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Core/Class1.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Core/Community.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Community.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Class1.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Community.Domain.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Community.Domain.Generic.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Domain/Class1.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Domain/Community.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/Community.Domain.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Contacts/CreateContactHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Contacts/CreateContactHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/Legacy/LegacyContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain/DataTransferObjects/Legacy/LegacyContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/DataLayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Records/Records.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Records/Records.Core/DataAccess/DataLayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/DataAccess/DataLayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/DataLayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/DataLayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.RBS/.idea/.idea.XFramework.RBS/.idea/projectSettingsUpdater.xml" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/.idea/.idea.XFramework.Community/.idea/projectSettingsUpdater.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.RBS/.idea/.idea.XFramework.RBS/.idea/workspace.xml" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -356,6 +486,8 @@
       <workItem from="1649493980926" duration="1274000" />
       <workItem from="1649507889373" duration="33000" />
       <workItem from="1649871461090" duration="741000" />
+      <workItem from="1650110781631" duration="2000" />
+      <workItem from="1650122644667" duration="6977000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure To Support Sub-Systems">
       <created>1616960634242</created>

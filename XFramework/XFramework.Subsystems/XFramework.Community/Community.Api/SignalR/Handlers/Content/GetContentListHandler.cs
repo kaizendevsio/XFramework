@@ -1,0 +1,14 @@
+﻿using Community.Core.DataAccess.Commands.Entity.Content;
+using Community.Core.DataAccess.Query.Entity.Content;
+using Community.Domain.Generic.Contracts.Requests.Delete;
+using Community.Domain.Generic.Contracts.Requests.Get;
+
+namespace Community.Api.SignalR.Handlers.Content;
+
+public class GetContentListHandler : BaseSignalRHandler, ISignalREventHandler
+{
+    public void Handle(HubConnection connection, IMediator mediator)
+    {
+        HandleRequest<GetContentListRequest, GetContentListQuery>(connection, mediator);
+    }
+}

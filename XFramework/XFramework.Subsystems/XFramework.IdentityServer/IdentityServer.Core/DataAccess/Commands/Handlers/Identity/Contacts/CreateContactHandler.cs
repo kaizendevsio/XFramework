@@ -14,13 +14,12 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
         var identityCredential = await _dataLayer.TblIdentityCredentials
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-        var entity = request.Adapt<TblIdentityCredential>();
-            
+       
         if (identityCredential == null)
         {
             return new ()
             {
-                Message = $"Identity with Guid {request.Guid} does not exist",
+                Message = $"Credential with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
