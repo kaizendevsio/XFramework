@@ -10,8 +10,8 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
     public async Task<CmdResponse<CreateCredentialCmd>> Handle(CreateCredentialCmd request, CancellationToken cancellationToken)
     {
         var application = await GetApplication(request.RequestServer.ApplicationId);
-        var identityInfo = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.IdentityGuid}", cancellationToken: cancellationToken);
-        var entity = request.Adapt<TblIdentityCredential>();
+        var identityInfo = await _dataLayer.IdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.IdentityGuid}", cancellationToken: cancellationToken);
+        var entity = request.Adapt<IdentityCredential>();
             
         if (identityInfo == null)
         {
@@ -27,7 +27,7 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
             goto SkipDuplicateCheck;
         }
         
-        var anyCredential = _dataLayer.TblIdentityCredentials
+        var anyCredential = _dataLayer.IdentityCredentials
             .AsNoTracking()
             .Any(i => i.UserName == request.UserName);
             
@@ -48,9 +48,9 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
         entity.IdentityInfoId = identityInfo.Id;
         entity.ApplicationId = application.Id;
 
-        await _dataLayer.TblIdentityCredentials.AddAsync(entity, cancellationToken);
+        await _dataLayer.IdentityCredentials.AddAsync(entity, cancellationToken);
             
-        var roleEntity = await _dataLayer.TblIdentityRoleEntities
+        var roleEntity = await _dataLayer.IdentityRoleEntities
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.RoleEntity}", cancellationToken: cancellationToken);
 
@@ -63,13 +63,13 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
             };
         }
 
-        var role = new TblIdentityRole()
+        var role = new IdentityRole()
         {
             UserCred = entity,
             RoleEntityId = roleEntity.Id
         };
 
-        await _dataLayer.TblIdentityRoles.AddAsync(role, cancellationToken);
+        await _dataLayer.IdentityRoles.AddAsync(role, cancellationToken);
         await _dataLayer.SaveChangesAsync(cancellationToken);
 
         return new ()

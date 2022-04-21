@@ -8,7 +8,7 @@ public class DeleteIdentityHandler : CommandBaseHandler ,IRequestHandler<DeleteI
     }
     public async Task<CmdResponse<DeleteIdentityCmd>> Handle(DeleteIdentityCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
+        var entity = await _dataLayer.IdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
 
         if (entity == null)
         {
@@ -19,7 +19,7 @@ public class DeleteIdentityHandler : CommandBaseHandler ,IRequestHandler<DeleteI
             };
         }
 
-        if (_dataLayer.TblIdentityCredentials.Any(i => i.IdentityInfoId == entity.Id))
+        if (_dataLayer.IdentityCredentials.Any(i => i.IdentityInfoId == entity.Id))
         {
             return new CmdResponse<DeleteIdentityCmd>
             {

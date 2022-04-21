@@ -3,6 +3,7 @@ using Community.Domain.Generic.Contracts.Requests.Delete;
 using Community.Domain.Generic.Contracts.Requests.Get;
 using Community.Domain.Generic.Contracts.Requests.Update;
 using Community.Domain.Generic.Contracts.Responses.Content;
+using Community.Domain.Generic.Contracts.Responses.Identity;
 using Community.Integration.Interfaces;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -30,6 +31,11 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
         return await SendAsync<GetContentListRequest, List<CommunityContentResponse>>("GetContentList", request);
     }
 
+    public async Task<QueryResponse<List<CommunityIdentityResponse>>> GetIdentityList(GetIdentityListRequest request)
+    {
+        return await SendAsync<GetIdentityListRequest, List<CommunityIdentityResponse>>("GetIdentityList", request);
+    }
+
     public async Task<CmdResponse> CreateIdentity(CreateIdentityRequest request)
     {
         return await SendVoidAsync("CreateIdentity", request);
@@ -54,4 +60,19 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
     {
         return await SendVoidAsync("DeleteContent", request);
     }
-}
+
+    public async Task<CmdResponse> CreateReaction(CreateReactionRequest request)
+    {
+        return await SendVoidAsync("CreateReaction", request);
+    }
+
+    public async Task<CmdResponse> UpdateReaction(UpdateReactionRequest request)
+    {
+        return await SendVoidAsync("UpdateReaction", request);
+    }
+
+    public async Task<CmdResponse> DeleteReaction(DeleteReactionRequest request)
+    {
+        return await SendVoidAsync("DeleteReaction", request);
+    }
+}   

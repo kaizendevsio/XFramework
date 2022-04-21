@@ -22,10 +22,10 @@ public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangeP
         };
     }
 
-    private bool GetCredential(ChangePasswordCmd request, CancellationToken cancellationToken, out TblIdentityCredential entity, out CmdResponse<ChangePasswordCmd> handle)
+    private bool GetCredential(ChangePasswordCmd request, CancellationToken cancellationToken, out IdentityCredential entity, out CmdResponse<ChangePasswordCmd> handle)
     {
             
-        entity = _dataLayer.TblIdentityCredentials
+        entity = _dataLayer.IdentityCredentials
             .Where(i => i.Guid == $"{request.CredentialGuid}" || i.UserName == request.UserName)
             .FirstOrDefault();
 
@@ -33,7 +33,7 @@ public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangeP
             handle = new();
             return false;
         }
-        var entityList1 = _dataLayer.TblIdentityContacts
+        var entityList1 = _dataLayer.IdentityContacts
             .Include(i => i.UserCredential)
             .Where(i => i.Value == request.PhoneNumber.ValidatePhoneNumber(false) && i.UcentitiesId == (long?)GenericContactType.Phone)
             .Select(i => i.UserCredential)
@@ -58,7 +58,7 @@ public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangeP
         }
 
         request.Email.ValidateEmailAddress();
-        var entityList2 = _dataLayer.TblIdentityContacts
+        var entityList2 = _dataLayer.IdentityContacts
             .Include(i => i.UserCredential)
             .Where(i => i.Value == request.Email && i.UcentitiesId == (long?)GenericContactType.Email)
             .Select(i => i.UserCredential)

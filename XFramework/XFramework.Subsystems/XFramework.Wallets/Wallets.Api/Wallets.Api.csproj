@@ -20,14 +20,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Reference Include="LoadManna.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\LoadManna\LoadManna\LoadManna\Server\LoadManna.Server\LoadManna.Integration\bin\Debug\net6.0\LoadManna.Integration.dll</HintPath>
-      </Reference>
       <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net6.0\StreamFlow.Domain.Generic.dll</HintPath>
-      </Reference>
-      <Reference Include="Subscriptions.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\LoadManna\LoadManna\LoadManna.Subsystems\LoadManna.Subscriptions\Subscriptions.Domain.Generic\bin\Debug\net6.0\Subscriptions.Domain.Generic.dll</HintPath>
       </Reference>
       <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>

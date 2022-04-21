@@ -1,17 +1,12 @@
-﻿using System.Text.RegularExpressions;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
-using IdentityServer.Domain.DataTransferObjects.Legacy;
+﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential;
 
 public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckCredentialExistenceQuery, QueryResponse<ExistenceResponse>>
 {
-    private readonly LegacyContext _legacyContext;
-
-    public CheckCredentialExistenceHandler(IDataLayer dataLayer, LegacyContext legacyContext)
+    public CheckCredentialExistenceHandler(IDataLayer dataLayer)
     {
-        _legacyContext = legacyContext;
         _dataLayer = dataLayer;
     }
     public async Task<QueryResponse<ExistenceResponse>> Handle(CheckCredentialExistenceQuery request, CancellationToken cancellationToken)
@@ -54,7 +49,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
             };
         }
         
-        var existing = _dataLayer.TblIdentityCredentials
+        var existing = _dataLayer.IdentityCredentials
             .AsNoTracking()
             .Where(i => i.UserName == request.UserName)
             .Where(i => i.Guid != $"{request.Guid}")

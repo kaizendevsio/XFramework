@@ -403,6 +403,11 @@ namespace Community.Domain.DataTransferObjects
 
                 entity.Property(e => e.Title).HasColumnType("character varying");
 
+                entity.HasOne(d => d.CommunityGroup)
+                    .WithMany(p => p.CommunityContentCommunityGroups)
+                    .HasForeignKey(d => d.CommunityGroupId)
+                    .HasConstraintName("communitycontent_communityidentity_id_fk");
+
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.CommunityContents)
                     .HasForeignKey(d => d.EntityId)
@@ -416,7 +421,7 @@ namespace Community.Domain.DataTransferObjects
                     .HasConstraintName("socialmediacontent_socialmediacontent_id_fk");
 
                 entity.HasOne(d => d.SocialMediaIdentity)
-                    .WithMany(p => p.CommunityContents)
+                    .WithMany(p => p.CommunityContentSocialMediaIdentities)
                     .HasForeignKey(d => d.SocialMediaIdentityId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("socialmediacontent_socialmediaidentity_id_fk");
@@ -547,6 +552,8 @@ namespace Community.Domain.DataTransferObjects
                     .HasColumnName("ID")
                     .HasDefaultValueSql("nextval('\"Community\".\"SocialIdentity_ID_seq\"'::regclass)");
 
+                entity.Property(e => e.Alias).HasColumnType("character varying");
+
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Guid)
@@ -563,6 +570,8 @@ namespace Community.Domain.DataTransferObjects
 
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
+                entity.Property(e => e.Tagline).HasColumnType("character varying");
+
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.CommunityIdentities)
                     .HasForeignKey(d => d.EntityId)
@@ -572,7 +581,6 @@ namespace Community.Domain.DataTransferObjects
                 entity.HasOne(d => d.IdentityCredential)
                     .WithMany(p => p.CommunityIdentities)
                     .HasForeignKey(d => d.IdentityCredentialId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("socialidentity_identitycredential_id_fk");
             });
 

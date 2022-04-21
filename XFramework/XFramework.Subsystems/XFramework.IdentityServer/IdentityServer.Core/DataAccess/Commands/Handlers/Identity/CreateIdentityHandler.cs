@@ -8,13 +8,13 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
     }
     public async Task<CmdResponse<CreateIdentityCmd>> Handle(CreateIdentityCmd request, CancellationToken cancellationToken)
     {
-        var entity = request.Adapt<TblIdentityInformation>();
+        var entity = request.Adapt<IdentityInformation>();
         entity.Guid = string.IsNullOrEmpty(entity.Guid) 
             ? Guid.NewGuid().ToString() 
             : $"{request.Guid}";
         entity.BirthDate = DateOnly.FromDateTime(request.Dob);
             
-        await _dataLayer.TblIdentityInformations.AddAsync(entity, cancellationToken);
+        await _dataLayer.IdentityInformations.AddAsync(entity, cancellationToken);
         await _dataLayer.SaveChangesAsync(cancellationToken);
 
         return new ()

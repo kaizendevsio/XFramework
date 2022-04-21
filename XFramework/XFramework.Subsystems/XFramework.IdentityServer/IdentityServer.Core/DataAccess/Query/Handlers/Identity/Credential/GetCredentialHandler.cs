@@ -12,7 +12,7 @@ public class GetCredentialHandler : QueryBaseHandler ,IRequestHandler<GetCredent
     
     public async Task<QueryResponse<CredentialResponse>> Handle(GetCredentialQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityCredentials
+        var entity = await _dataLayer.IdentityCredentials
             .Include( i => i.IdentityInfo)
             .AsNoTracking()
             .AsSplitQuery()

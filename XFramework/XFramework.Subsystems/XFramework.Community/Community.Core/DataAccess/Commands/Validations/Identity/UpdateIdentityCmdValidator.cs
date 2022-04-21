@@ -9,7 +9,7 @@ public class UpdateIdentityCmdValidator : AbstractValidator<UpdateIdentityCmd>
     {
         RuleFor(i => i.CredentialGuid)
             .NotEmpty();
-        RuleFor(i => i.CommunityEntityGuid)
+        RuleFor(i => i.CommunityIdentityEntityGuid)
             .NotEmpty();
         RuleFor(i => i.Guid)
             .NotEmpty();

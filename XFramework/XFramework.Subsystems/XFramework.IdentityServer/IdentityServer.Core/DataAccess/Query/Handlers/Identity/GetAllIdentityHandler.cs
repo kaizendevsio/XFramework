@@ -11,7 +11,7 @@ public class GetAllIdentityHandler : QueryBaseHandler, IRequestHandler<GetAllIde
     }
     public async Task<QueryResponse<List<IdentityResponse>>> Handle(GetAllIdentityQuery request, CancellationToken cancellationToken)
     {
-        var result = await _dataLayer.TblIdentityInformations
+        var result = await _dataLayer.IdentityInformations
             .Take(1000)
             .AsNoTracking()
             .ToListAsync(cancellationToken: cancellationToken);

@@ -34,7 +34,7 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
         {
             return new ()
             {
-                Message = $"Community identity entity with guid {request.CredentialGuid} does not exist",
+                Message = $"Community identity entity with guid {request.CommunityEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
                 IsSuccess = false
             };
@@ -43,7 +43,9 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
         var entity = new CommunityIdentity
         {
             IdentityCredential = credential,
-            HandleName = null,
+            HandleName = request.HandleName,
+            Tagline = request.Tagline,
+            Alias = request.Alias,
             Status = (int) CommunityIdentityStatus.Active,
             LastActive = DateTime.Now,
             Entity = communityIdentityEntity

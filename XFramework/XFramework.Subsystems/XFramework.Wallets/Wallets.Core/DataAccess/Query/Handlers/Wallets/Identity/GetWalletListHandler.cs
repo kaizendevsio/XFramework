@@ -13,7 +13,7 @@ public class GetWalletListHandler : QueryBaseHandler, IRequestHandler<GetWalletL
         
     public async Task<QueryResponse<List<WalletResponse>>> Handle(GetWalletListQuery request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.TblIdentityCredentials
+        var credential = await _dataLayer.IdentityCredentials
             .Include(i => i.IdentityInfo)
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
@@ -27,9 +27,9 @@ public class GetWalletListHandler : QueryBaseHandler, IRequestHandler<GetWalletL
             };
         }
                     
-        var result = await _dataLayer.TblUserWallets
-            .Include(i => i.WalletType)
-            .Where(i => i.UserAuthId == credential.Id)
+        var result = await _dataLayer.Wallets
+            .Include(i => i.WalletEntity)
+            .Where(i => i.IdentityCredentialId == credential.Id)
             .AsNoTracking()
             .ToListAsync(cancellationToken: cancellationToken);
         if (!result.Any())

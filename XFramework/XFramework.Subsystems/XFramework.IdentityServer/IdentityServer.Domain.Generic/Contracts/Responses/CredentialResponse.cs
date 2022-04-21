@@ -14,6 +14,6 @@ public class CredentialResponse
     public string Token { get; set; }
 
     public virtual IdentityResponse IdentityInfo { get; set; }
-    public virtual List<RoleResponse> TblIdentityRoles { get; set; }
-    public virtual List<ContactResponse> TblIdentityContacts { get; set; }
+    public virtual List<RoleResponse> IdentityRoles { get; set; }
+    public virtual List<ContactResponse> IdentityContacts { get; set; }
 }

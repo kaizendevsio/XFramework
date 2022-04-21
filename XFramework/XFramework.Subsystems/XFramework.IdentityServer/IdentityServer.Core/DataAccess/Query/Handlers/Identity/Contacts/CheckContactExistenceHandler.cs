@@ -1,16 +1,12 @@
 ﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Contacts;
-using IdentityServer.Domain.DataTransferObjects.Legacy;
 using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Contacts;
 
 public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckContactExistenceQuery, QueryResponse<ExistenceResponse>>
 {
-    private readonly LegacyContext _legacyContext;
-
-    public CheckContactExistenceHandler(IDataLayer dataLayer, LegacyContext legacyContext)
+    public CheckContactExistenceHandler(IDataLayer dataLayer)
     {
-        _legacyContext = legacyContext;
         _dataLayer = dataLayer;
     }
         
@@ -28,7 +24,7 @@ public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<Ch
                 break;
         }
         
-        var existing = await _dataLayer.TblIdentityContacts
+        var existing = await _dataLayer.IdentityContacts
             .AsNoTracking()
             .Where(i => i.Value == request.Value)
             .Where(i => i.Guid != $"{request.Guid}")

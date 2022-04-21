@@ -12,8 +12,7 @@ public class CreateContentHandler : CommandBaseHandler, IRequestHandler<CreateCo
     
     public async Task<CmdResponse> Handle(CreateContentCmd request, CancellationToken cancellationToken)
     {
-        var communityIdentity = await _dataLayer.CommunityIdentities
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityIdentityGuid}", cancellationToken: cancellationToken);
+        var communityIdentity = await _dataLayer.CommunityIdentities.FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityIdentityGuid}", cancellationToken: cancellationToken);
         if (communityIdentity == null)
         {
             return new ()
@@ -24,8 +23,7 @@ public class CreateContentHandler : CommandBaseHandler, IRequestHandler<CreateCo
             };
         }
         
-        var contentEntity = await _dataLayer.CommunityContentEntities
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.ContentEntityGuid}", cancellationToken: cancellationToken);
+        var contentEntity = await _dataLayer.CommunityContentEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.ContentEntityGuid}", cancellationToken: cancellationToken);
         if (contentEntity == null)
         {
             return new ()
@@ -52,6 +50,21 @@ public class CreateContentHandler : CommandBaseHandler, IRequestHandler<CreateCo
             }
         }
 
+        CommunityIdentity? communityGroupIdentity = null;
+        if (request.CommunityGroupGuid is not null)
+        {
+            communityGroupIdentity = await _dataLayer.CommunityIdentities.FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityGroupGuid}", cancellationToken: cancellationToken);
+            if (communityGroupIdentity == null)
+            {
+                return new ()
+                {
+                    Message = $"Group with guid {request.CommunityGroupGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound,
+                    IsSuccess = false
+                };
+            }
+        }
+        
         var newContent = request.Adapt<CommunityContent>();
         newContent.Entity = contentEntity;
         newContent.SocialMediaIdentity = communityIdentity;
@@ -63,6 +76,10 @@ public class CreateContentHandler : CommandBaseHandler, IRequestHandler<CreateCo
         if (request.Guid is not null)
         {
             newContent.Guid = $"{request.Guid}";
+        }
+        if (request.CommunityGroupGuid is not null)
+        {
+            newContent.CommunityGroup = communityGroupIdentity;
         }
 
         _dataLayer.CommunityContents.Add(newContent);

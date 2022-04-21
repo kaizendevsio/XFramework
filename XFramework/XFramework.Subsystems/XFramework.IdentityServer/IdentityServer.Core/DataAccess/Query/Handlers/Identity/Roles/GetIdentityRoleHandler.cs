@@ -12,7 +12,7 @@ public class GetIdentityRoleHandler : QueryBaseHandler, IRequestHandler<GetRoleQ
     
     public async Task<QueryResponse<RoleResponse>> Handle(GetRoleQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityCredentials
+        var entity = await _dataLayer.IdentityCredentials
             .Include( i => i.IdentityInfo)
             .AsNoTracking()
             .AsSplitQuery()

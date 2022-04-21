@@ -11,7 +11,7 @@ public class DeleteContactHandler : CommandBaseHandler, IRequestHandler<DeleteCo
         
     public async Task<CmdResponse<DeleteContactCmd>> Handle(DeleteContactCmd request, CancellationToken cancellationToken)
     {
-        var credentialEntity = await _dataLayer.TblIdentityCredentials
+        var credentialEntity = await _dataLayer.IdentityCredentials
             .AsNoTracking()
             .Where(i => i.Guid == $"{request.Guid}")
             .FirstOrDefaultAsync(cancellationToken);
@@ -25,7 +25,7 @@ public class DeleteContactHandler : CommandBaseHandler, IRequestHandler<DeleteCo
             };
         }
             
-        var contactEntity = await _dataLayer.TblIdentityContactEntities
+        var contactEntity = await _dataLayer.IdentityContactEntities
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Id == (long)request.ContactType ,cancellationToken);
         if (contactEntity == null)
@@ -37,7 +37,7 @@ public class DeleteContactHandler : CommandBaseHandler, IRequestHandler<DeleteCo
             };
         }
             
-        var entity = await _dataLayer.TblIdentityContacts
+        var entity = await _dataLayer.IdentityContacts
             .Where(i => i.UserCredentialId == credentialEntity.Id)
             .Where(i => i.UcentitiesId == contactEntity.Id)
             .Where(i => i.Guid == $"{request.Guid}")
@@ -55,7 +55,7 @@ public class DeleteContactHandler : CommandBaseHandler, IRequestHandler<DeleteCo
         entity.IsDeleted = true;
         entity.IsEnabled = false;
             
-        _dataLayer.TblIdentityContacts.Update(entity);
+        _dataLayer.IdentityContacts.Update(entity);
         await _dataLayer.SaveChangesAsync(cancellationToken);
 
         return new()

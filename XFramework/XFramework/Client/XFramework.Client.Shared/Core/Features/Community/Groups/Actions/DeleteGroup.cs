@@ -1,8 +1,9 @@
-﻿namespace XFramework.Client.Shared.Core.Features.Groups;
+﻿namespace XFramework.Client.Shared.Core.Features.Community;
 
-public partial class GroupState
+public partial class CommunityState
 {
     public class DeleteGroup : IAction
     {
+        public Guid? Guid { get; set; }
     }
 }

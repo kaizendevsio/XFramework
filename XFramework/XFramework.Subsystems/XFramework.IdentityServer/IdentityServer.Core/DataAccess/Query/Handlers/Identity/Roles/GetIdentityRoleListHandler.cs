@@ -14,7 +14,7 @@ public class GetIdentityRoleListHandler : QueryBaseHandler, IRequestHandler<GetR
     {
         var application = await GetApplication(request.RequestServer.ApplicationId);
         
-        var result = await _dataLayer.TblIdentityRoles
+        var result = await _dataLayer.IdentityRoles
             .Where(i => i.UserCred.ApplicationId == application.Id)
             .Take(1000)
             .AsNoTracking()

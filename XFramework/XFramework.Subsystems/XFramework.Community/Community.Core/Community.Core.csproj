@@ -32,8 +32,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Query\Entity\Identity" />
-      <Folder Include="DataAccess\Query\Handlers\Identity" />
       <Folder Include="DataAccess\Query\Validations\Identity" />
     </ItemGroup>
 

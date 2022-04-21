@@ -12,7 +12,7 @@ public class UpdateWalletHandler : CommandBaseHandler, IRequestHandler<UpdateWal
         
     public async Task<CmdResponse<UpdateWalletCmd>> Handle(UpdateWalletCmd request, CancellationToken cancellationToken)
     {
-        var credentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
+        var credentialEntity = await _dataLayer.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (credentialEntity == null)
         {
             return new ()
@@ -22,7 +22,7 @@ public class UpdateWalletHandler : CommandBaseHandler, IRequestHandler<UpdateWal
             };
         }
         
-        var walletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
+        var walletEntity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
         if (walletEntity == null)
         {
             return new ()
@@ -32,9 +32,9 @@ public class UpdateWalletHandler : CommandBaseHandler, IRequestHandler<UpdateWal
             };
         }
         
-        var entity = await _dataLayer.TblUserWallets
-            .Where(i => i.UserAuthId == credentialEntity.Id)
-            .Where(i => i.WalletTypeId == walletEntity.Id)
+        var entity = await _dataLayer.Wallets
+            .Where(i => i.IdentityCredentialId == credentialEntity.Id)
+            .Where(i => i.WalletEntityId == walletEntity.Id)
             .FirstOrDefaultAsync(cancellationToken);
         if (entity == null)
         {
@@ -47,9 +47,9 @@ public class UpdateWalletHandler : CommandBaseHandler, IRequestHandler<UpdateWal
                 Balance = 0
             }, CancellationToken.None);
             
-            entity = await _dataLayer.TblUserWallets
-                .Where(i => i.UserAuthId == credentialEntity.Id)
-                .Where(i => i.WalletTypeId == walletEntity.Id)
+            entity = await _dataLayer.Wallets
+                .Where(i => i.IdentityCredentialId == credentialEntity.Id)
+                .Where(i => i.WalletEntityId == walletEntity.Id)
                 .FirstOrDefaultAsync(cancellationToken);
             /*return new ()
             {

@@ -24,9 +24,9 @@ public class AuditEntryBO
 
     public bool HasTemporaryProperties => TemporaryProperties.Any();
 
-    public TblAuditHistory ToAudit()
+    public AuditHistory ToAudit()
     {
-        var audit = new TblAuditHistory();
+        var audit = new AuditHistory();
         audit.TableName = TableName;
         audit.CreatedAt = DateTime.UtcNow;
         audit.KeyValues = JsonSerializer.Serialize(KeyValues);

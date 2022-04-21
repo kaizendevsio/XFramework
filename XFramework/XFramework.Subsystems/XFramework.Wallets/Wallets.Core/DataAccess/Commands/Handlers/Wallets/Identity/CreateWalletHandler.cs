@@ -11,7 +11,7 @@ public class CreateWalletHandler  : CommandBaseHandler, IRequestHandler<CreateWa
         
     public async Task<CmdResponse<CreateWalletCmd>> Handle(CreateWalletCmd request, CancellationToken cancellationToken)
     {
-        var credentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
+        var credentialEntity = await _dataLayer.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (credentialEntity == null)
         {
             return new ()
@@ -21,7 +21,7 @@ public class CreateWalletHandler  : CommandBaseHandler, IRequestHandler<CreateWa
             };
         }
         
-        var walletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
+        var walletEntity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
         if (walletEntity == null)
         {
             return new ()
@@ -31,11 +31,11 @@ public class CreateWalletHandler  : CommandBaseHandler, IRequestHandler<CreateWa
             };
         }
 
-        var entity = request.Adapt<TblUserWallet>();
-        entity.UserAuth = credentialEntity;
-        entity.WalletType = walletEntity;
+        var entity = request.Adapt<Wallet>();
+        entity.IdentityCredential = credentialEntity;
+        entity.WalletEntity = walletEntity;
         
-        _dataLayer.TblUserWallets.Add(entity);
+        _dataLayer.Wallets.Add(entity);
         await _dataLayer.SaveChangesAsync(cancellationToken);
 
         return new()

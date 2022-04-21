@@ -19,11 +19,11 @@ public class GetAddressEntityListHandler : QueryBaseHandler, IRequestHandler<Get
                 Response = _cachingService.AddressCountryResponseList.Adapt<List<AddressCountryResponse>>()
             };
         
-        var entity = await _dataLayer.TblAddressCountries
-            .Include(i => i.TblAddressRegions)
-            .ThenInclude(i => i.TblAddressProvinces)
-            .ThenInclude(i => i.TblAddressCities)
-            .ThenInclude(i => i.TblAddressBarangays)
+        var entity = await _dataLayer.AddressCountries
+            .Include(i => i.AddressRegions)
+            .ThenInclude(i => i.AddressProvinces)
+            .ThenInclude(i => i.AddressCities)
+            .ThenInclude(i => i.AddressBarangays)
             .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);

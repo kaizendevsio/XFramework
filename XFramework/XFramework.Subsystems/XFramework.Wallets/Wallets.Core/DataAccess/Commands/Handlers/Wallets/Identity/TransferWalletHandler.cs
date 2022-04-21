@@ -32,8 +32,8 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
                 };
         }
         
-        var fromCredential = await _dataLayer.TblIdentityCredentials
-            .Include(i => i.TblUserWallets)
+        var fromCredential = await _dataLayer.IdentityCredentials
+            .Include(i => i.Wallets)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (fromCredential == null)
@@ -46,14 +46,14 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
         }
         
         // Check Recipient Type
-        var toCredential = new TblIdentityCredential();
+        var toCredential = new IdentityCredential();
         toCredential = Guid.TryParse(request.Recipient, out var credentialGuid)
-            ? await _dataLayer.TblIdentityCredentials
-                .Include(i => i.TblUserWallets)
+            ? await _dataLayer.IdentityCredentials
+                .Include(i => i.Wallets)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(i => i.Guid == $"{request.Recipient}", cancellationToken)
-            : await _dataLayer.TblIdentityCredentials
-                .Include(i => i.TblUserWallets)
+            : await _dataLayer.IdentityCredentials
+                .Include(i => i.Wallets)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(i => i.UserName == $"{request.Recipient}", cancellationToken);
         
@@ -71,7 +71,7 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             }
         }
         
-        var walletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
+        var walletEntity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
         if (walletEntity == null)
         {
             return new ()
@@ -81,8 +81,8 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
 
-        var fromUserWallet = fromCredential.TblUserWallets
-            .Where(i => i.WalletTypeId == walletEntity.Id)
+        var fromUserWallet = fromCredential.Wallets
+            .Where(i => i.WalletEntityId == walletEntity.Id)
             .FirstOrDefault();
         if (fromUserWallet == null)
         {
@@ -93,8 +93,8 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             };
         }
             
-        var toUserWallet = toCredential.TblUserWallets
-            .Where(i => i.WalletTypeId == walletEntity.Id)
+        var toUserWallet = toCredential.Wallets
+            .Where(i => i.WalletEntityId == walletEntity.Id)
             .FirstOrDefault();
         if (toUserWallet == null)
         {
@@ -113,9 +113,9 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
                 HttpStatusCode = HttpStatusCode.BadRequest
             };
         }
-        _dataLayer.TblUserWalletTransactions.Add(new ()
+        _dataLayer.WalletTransactions.Add(new ()
         {
-            UserAuth = fromCredential,
+            IdentityCredential = fromCredential,
             Amount = request.Amount,
             SourceUserWallet = fromUserWallet,
             TargetUserWallet = toUserWallet,

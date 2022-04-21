@@ -1,7 +1,5 @@
 ﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
-using IdentityServer.Domain.DataTransferObjects.Legacy;
 using IdentityServer.Domain.Generic.Contracts.Responses;
-using IdentityServer.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
@@ -19,7 +17,7 @@ public class GetCredentialListHandler : QueryBaseHandler, IRequestHandler<GetCre
     public async Task<QueryResponse<List<CredentialResponse>>> Handle(GetCredentialListQuery request, CancellationToken cancellationToken)
     {
         
-        var appEntity = await _dataLayer.TblApplications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
+        var appEntity = await _dataLayer.Applications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
         if (appEntity == null)
         {
             return new ()
@@ -29,7 +27,7 @@ public class GetCredentialListHandler : QueryBaseHandler, IRequestHandler<GetCre
             };
         }
         
-        var result = await _dataLayer.TblIdentityCredentials
+        var result = await _dataLayer.IdentityCredentials
             .Where(i => i.ApplicationId == appEntity.Id)
             .AsNoTracking()
             .ToListAsync(cancellationToken: cancellationToken);

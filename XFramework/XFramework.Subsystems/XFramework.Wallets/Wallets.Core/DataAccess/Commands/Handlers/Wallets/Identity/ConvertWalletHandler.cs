@@ -27,7 +27,7 @@ public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertW
                 };
         }
 
-        var initiatorCredential = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
+        var initiatorCredential = await _dataLayer.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (initiatorCredential == null)
         {
             return new ()
@@ -37,8 +37,8 @@ public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertW
             };
         }
         
-        var fromCredential = await _dataLayer.TblIdentityCredentials
-            .Include(i => i.TblUserWallets)
+        var fromCredential = await _dataLayer.IdentityCredentials
+            .Include(i => i.Wallets)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.FromCredentialGuid}", cancellationToken);
         if (fromCredential == null)
@@ -50,8 +50,8 @@ public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertW
             };
         }
         
-        var toCredential = await _dataLayer.TblIdentityCredentials
-            .Include(i => i.TblUserWallets)
+        var toCredential = await _dataLayer.IdentityCredentials
+            .Include(i => i.Wallets)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.ToCredentialGuid}", cancellationToken);
         if (toCredential == null)
@@ -63,7 +63,7 @@ public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertW
             };
         }
             
-        var fromWalletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.FromWalletEntityGuid}", cancellationToken);
+        var fromWalletEntity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.FromWalletEntityGuid}", cancellationToken);
         if (fromWalletEntity == null)
         {
             return new ()
@@ -72,7 +72,7 @@ public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertW
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        var toWalletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.ToWalletEntityGuid}", cancellationToken);
+        var toWalletEntity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.ToWalletEntityGuid}", cancellationToken);
         if (toWalletEntity == null)
         {
             return new ()
@@ -82,8 +82,8 @@ public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertW
             };
         }
 
-        var fromUserWallet = fromCredential.TblUserWallets
-            .Where(i => i.WalletTypeId == fromWalletEntity.Id)
+        var fromUserWallet = fromCredential.Wallets
+            .Where(i => i.WalletEntityId == fromWalletEntity.Id)
             .FirstOrDefault();
         if (fromUserWallet == null)
         {
@@ -94,8 +94,8 @@ public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertW
             };
         }
             
-        var toUserWallet = toCredential.TblUserWallets
-            .Where(i => i.WalletTypeId == toWalletEntity.Id)
+        var toUserWallet = toCredential.Wallets
+            .Where(i => i.WalletEntityId == toWalletEntity.Id)
             .FirstOrDefault();
         if (toUserWallet == null)
         {
@@ -114,9 +114,9 @@ public class ConvertWalletHandler : CommandBaseHandler, IRequestHandler<ConvertW
                 HttpStatusCode = HttpStatusCode.BadRequest
             };
         }
-        _dataLayer.TblUserWalletTransactions.Add(new ()
+        _dataLayer.WalletTransactions.Add(new ()
         {
-            UserAuth = initiatorCredential,
+            IdentityCredential = initiatorCredential,
             Amount = request.Amount,
             SourceUserWallet = fromUserWallet,
             TargetUserWallet = toUserWallet,

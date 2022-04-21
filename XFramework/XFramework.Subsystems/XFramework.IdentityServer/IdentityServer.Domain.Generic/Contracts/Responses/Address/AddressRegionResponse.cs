@@ -10,5 +10,5 @@ public class AddressRegionResponse
     public string Guid { get; set; }
     public long? CountryId { get; set; }
     
-    public List<AddressProvinceResponse> TblAddressProvinces { get; set; }
+    public List<AddressProvinceResponse> AddressProvinces { get; set; }
 }

@@ -8,7 +8,7 @@ public class DeleteCredentialHandler : CommandBaseHandler, IRequestHandler<Delet
     }
     public async Task<CmdResponse<DeleteCredentialCmd>> Handle(DeleteCredentialCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        var entity = await _dataLayer.IdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
             
         if (entity == null)
         {
@@ -19,7 +19,7 @@ public class DeleteCredentialHandler : CommandBaseHandler, IRequestHandler<Delet
             };
         }
             
-        var result = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.UserName == request.Username, cancellationToken: cancellationToken);
+        var result = await _dataLayer.IdentityCredentials.FirstOrDefaultAsync(i => i.UserName == request.Username, cancellationToken: cancellationToken);
 
         _dataLayer.Remove(result);
         await _dataLayer.SaveChangesAsync(cancellationToken);

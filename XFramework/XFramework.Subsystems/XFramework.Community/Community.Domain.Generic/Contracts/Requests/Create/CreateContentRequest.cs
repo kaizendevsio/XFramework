@@ -9,5 +9,6 @@ public class CreateContentRequest : RequestBase
     public Guid? CommunityIdentityGuid { get; set; }
     public Guid? ContentEntityGuid { get; set; }
     public Guid? ParentContentGuid { get; set; }
+    public Guid? CommunityGroupGuid { get; set; }
     public Guid? Guid { get; set; }
 }

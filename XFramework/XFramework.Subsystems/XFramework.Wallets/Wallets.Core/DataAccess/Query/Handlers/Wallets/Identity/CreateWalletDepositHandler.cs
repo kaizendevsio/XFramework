@@ -1,25 +1,25 @@
-﻿using LoadManna.Integration.Interfaces.Wrappers;
-using PaymentGateways.Domain.Generic.Contracts.Requests;
+﻿/*using LoadManna.Integration.Interfaces.Wrappers;
+using PaymentGateways.Domain.Generic.Contracts.Requests;*/
 using Wallets.Core.DataAccess.Query.Entity.Wallets.Identity;
 
 namespace Wallets.Core.DataAccess.Query.Handlers.Wallets.Identity;
 
 public class CreateWalletDepositHandler : QueryBaseHandler, IRequestHandler<CreateWalletDepositQuery, QueryResponse<WalletDepositResponse>>
 {
-    private readonly IPaymentGatewayWrapper _paymentGatewayWrapper;
+    /*private readonly IPaymentGatewayWrapper _paymentGatewayWrapper;*/
 
-    public CreateWalletDepositHandler(IDataLayer dataLayer, IPaymentGatewayWrapper paymentGatewayWrapper)
+    /*public CreateWalletDepositHandler(IDataLayer dataLayer, IPaymentGatewayWrapper paymentGatewayWrapper)
     {
         _paymentGatewayWrapper = paymentGatewayWrapper;
         _dataLayer = dataLayer;
-    }
+    }*/
 
     public async Task<QueryResponse<WalletDepositResponse>> Handle(CreateWalletDepositQuery request, CancellationToken cancellationToken)
     {
-        var wrapperRequest = request.Adapt<CreatePaymentRequest>();
+        /*var wrapperRequest = request.Adapt<CreatePaymentRequest>();
         wrapperRequest.TransactionGuid = Guid.NewGuid();
             
-        var identityEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
+        var identityEntity = await _dataLayer.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (identityEntity == null)
         {
             return new()
@@ -29,7 +29,7 @@ public class CreateWalletDepositHandler : QueryBaseHandler, IRequestHandler<Crea
             };
         }
             
-        var entity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken: cancellationToken);
+        var entity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken: cancellationToken);
         if (entity == null)
         {
             return new()
@@ -42,6 +42,8 @@ public class CreateWalletDepositHandler : QueryBaseHandler, IRequestHandler<Crea
         wrapperRequest.WalletTypeId = entity.Id;
         var result = await _paymentGatewayWrapper.CreateTransaction(wrapperRequest).ConfigureAwait(false);
 
-        return result;
+        return result;*/
+
+        return new();
     }
 }

@@ -11,7 +11,7 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
 
     public async Task<CmdResponse<CreateContactCmd>> Handle(CreateContactCmd request, CancellationToken cancellationToken)
     {
-        var identityCredential = await _dataLayer.TblIdentityCredentials
+        var identityCredential = await _dataLayer.IdentityCredentials
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
        
@@ -24,7 +24,7 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
             };
         }
 
-        var contactEntity = await _dataLayer.TblIdentityContactEntities
+        var contactEntity = await _dataLayer.IdentityContactEntities
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Id == (long)request.ContactType ,cancellationToken);
         if (contactEntity == null)
@@ -36,7 +36,7 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
             };
         }
             
-        var existingContact = _dataLayer.TblIdentityContacts.Any(i => i.Value == request.Value);
+        var existingContact = _dataLayer.IdentityContacts.Any(i => i.Value == request.Value);
         if (existingContact)
         {
             return new ()
@@ -58,14 +58,14 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
                 break;
         }
             
-        var contact = new TblIdentityContact()
+        var contact = new IdentityContact()
         {
             UserCredentialId = identityCredential.Id,
             UcentitiesId = contactEntity.Id,
             Value = request.Value
         };
 
-        _dataLayer.TblIdentityContacts.Add(contact);
+        _dataLayer.IdentityContacts.Add(contact);
         await _dataLayer.SaveChangesAsync(cancellationToken);
             
         return new ()

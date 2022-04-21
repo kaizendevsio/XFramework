@@ -10,5 +10,5 @@ public class AddressProvinceResponse
     public DateTime? UpdatedAt { get; set; }
     public string Guid { get; set; }
     
-    public List<AddressCityResponse> TblAddressCities { get; set; }
+    public List<AddressCityResponse> AddressCities { get; set; }
 }

@@ -12,37 +12,7 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
     
     public async Task<CmdResponse> Handle(UpdateIdentityCmd request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.IdentityCredentials
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-     
-        if (credential == null)
-        {
-            return new ()
-            {
-                Message = $"Credential with guid {request.CredentialGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
-            };
-        }
-        
-        var communityIdentityEntity = await _dataLayer.CommunityIdentityEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityEntityGuid}", cancellationToken: cancellationToken);
-     
-        if (communityIdentityEntity == null)
-        {
-            return new ()
-            {
-                Message = $"Community Identity Entity with guid {request.CredentialGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
-            };
-        }
-        
-        var communityIdentity = await _dataLayer.CommunityIdentities
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-     
+        var communityIdentity = await _dataLayer.CommunityIdentities.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
         if (communityIdentity == null)
         {
             return new ()
@@ -53,6 +23,53 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
             };
         }
         
+        var credential = new IdentityCredential();
+        if (request.CredentialGuid is not null)
+        {
+            credential = await _dataLayer.IdentityCredentials
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
+         
+            if (credential == null)
+            {
+                return new ()
+                {
+                    Message = $"Credential with guid {request.CredentialGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound,
+                    IsSuccess = false
+                };
+            }
+        }
+
+        var communityIdentityEntity = new CommunityIdentityEntity();
+        if (request.CommunityIdentityEntityGuid is not null)
+        {
+            communityIdentityEntity = await _dataLayer.CommunityIdentityEntities
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityIdentityEntityGuid}", cancellationToken: cancellationToken);
+         
+            if (communityIdentityEntity == null)
+            {
+                return new ()
+                {
+                    Message = $"Community Identity Entity with guid {request.CredentialGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound,
+                    IsSuccess = false
+                };
+            }
+        }
+
+
+        communityIdentity = request.Adapt(communityIdentity);
+        if (request.CommunityIdentityEntityGuid is not null)
+        {
+            communityIdentity.Entity = communityIdentityEntity;
+        }
+        if (request.CredentialGuid is not null)
+        {
+            communityIdentity.IdentityCredential = credential;
+        }
+
         _dataLayer.CommunityIdentities.Update(communityIdentity);
         await _dataLayer.SaveChangesAsync(CancellationToken.None);
 

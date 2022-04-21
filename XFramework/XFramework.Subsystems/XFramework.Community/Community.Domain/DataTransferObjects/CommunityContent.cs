@@ -23,7 +23,9 @@ namespace Community.Domain.DataTransferObjects
         public long EntityId { get; set; }
         public long ParentContentId { get; set; }
         public string Guid { get; set; } = null!;
+        public long? CommunityGroupId { get; set; }
 
+        public virtual CommunityIdentity? CommunityGroup { get; set; }
         public virtual CommunityContentEntity Entity { get; set; } = null!;
         public virtual CommunityContent ParentContent { get; set; } = null!;
         public virtual CommunityIdentity SocialMediaIdentity { get; set; } = null!;

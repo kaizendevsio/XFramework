@@ -1,5 +1,6 @@
 ﻿using Community.Core.DataAccess.Query.Entity.Content;
 using Community.Domain.Generic.Contracts.Responses.Content;
+using Community.Domain.Generic.Contracts.Responses.Identity;
 
 namespace Community.Core.DataAccess.Query.Handlers.Content;
 
@@ -43,6 +44,9 @@ public class GetContentListHandler : QueryBaseHandler, IRequestHandler<GetConten
             .Include(i => i.CommunityContentReactions)
             .Include(i => i.Entity)
             .Where(i => i.Guid == $"{request.ContentEntityGuid}")
+            .Where(i => i.CreatedAt > request.GreaterThan)
+            .Where(i => i.IsDeleted == false)
+            .Where(i => i.IsEnabled == true)
             .AsSplitQuery()
             .AsNoTracking()
             .Select(i => new CommunityContentResponse

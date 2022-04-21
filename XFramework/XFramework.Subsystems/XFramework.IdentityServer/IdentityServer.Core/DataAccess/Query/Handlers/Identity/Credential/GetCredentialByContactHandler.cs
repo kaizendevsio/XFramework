@@ -12,14 +12,14 @@ public class GetCredentialByContactHandler : QueryBaseHandler ,IRequestHandler<G
     
     public async Task<QueryResponse<CredentialResponse>> Handle(GetCredentialByContactQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityCredentials
+        var entity = await _dataLayer.IdentityCredentials
             .Include( i => i.IdentityInfo)
-            .Include( i => i.TblIdentityRoles)
-            .Include( i => i.TblIdentityContacts)
+            .Include( i => i.IdentityRoles)
+            .Include( i => i.IdentityContacts)
             .ThenInclude( i => i.Ucentities)
             .AsNoTracking()
             .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.TblIdentityContacts.Any(o => o.Value == request.ContactValue), cancellationToken);
+            .FirstOrDefaultAsync(i => i.IdentityContacts.Any(o => o.Value == request.ContactValue), cancellationToken);
            
         if (entity == null)
         {

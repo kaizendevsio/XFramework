@@ -11,7 +11,7 @@ public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetW
         
     public async Task<QueryResponse<List<WalletEntityResponse>>> Handle(GetWalletEntityListQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblApplications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
+        var entity = await _dataLayer.Applications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
         if (entity == null)
         {
             return new ()
@@ -21,7 +21,7 @@ public class GetWalletEntityListHandler : QueryBaseHandler, IRequestHandler<GetW
             };
         }
         
-        var result = await _dataLayer.TblWalletEntities
+        var result = await _dataLayer.WalletEntities
             .AsNoTracking()
             .Where(i => i.ApplicationId == entity.Id)
             .ToListAsync(cancellationToken: cancellationToken);

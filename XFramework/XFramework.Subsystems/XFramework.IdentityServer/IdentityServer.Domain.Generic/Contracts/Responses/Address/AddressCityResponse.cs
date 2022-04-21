@@ -11,5 +11,5 @@ public class AddressCityResponse
     public DateTime? UpdatedAt { get; set; }
     public string Guid { get; set; }
     
-    public List<AddressBarangayResponse> TblAddressBarangays { get; set; }
+    public List<AddressBarangayResponse> AddressBarangays { get; set; }
 }

@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
+﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
@@ -66,9 +65,9 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         };
     }
 
-    private async Task<List<TblIdentityRole>> GetRoleList(CancellationToken cancellationToken, TblIdentityCredential credential, Guid cuid)
+    private async Task<List<IdentityRole>> GetRoleList(CancellationToken cancellationToken, IdentityCredential credential, Guid cuid)
     {
-        var roleList = await _dataLayer.TblIdentityRoles
+        var roleList = await _dataLayer.IdentityRoles
             .AsNoTracking()
             .Where(i => i.UserCredId == credential.Id)
             .ToListAsync(cancellationToken: cancellationToken);
@@ -82,9 +81,9 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         return roleList;
     }
 
-    private async Task<TblIdentityCredential> ValidateAuthorization(AuthenticateCredentialQuery request, CancellationToken cancellationToken, AuthorizeBy authorizeBy)
+    private async Task<IdentityCredential> ValidateAuthorization(AuthenticateCredentialQuery request, CancellationToken cancellationToken, AuthorizeBy authorizeBy)
     {
-        TblIdentityCredential result;
+        IdentityCredential result;
             
         reAuth:
         switch (authorizeBy)
@@ -92,7 +91,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
             case AuthorizeBy.Default:
                 var application = await GetApplication(request.RequestServer.ApplicationId);
                 
-                var getDefaults = await _dataLayer.TblConfigurations
+                var getDefaults = await _dataLayer.RegistryConfigurations
                     .AsNoTracking()
                     .FirstOrDefaultAsync(i => i.ApplicationId == application.Id & i.Key == "DefaultAuthorizeBy", cancellationToken: cancellationToken);
                 if (getDefaults is null)
@@ -102,24 +101,24 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                 authorizeBy = (AuthorizeBy) int.Parse(getDefaults.Value);
                 goto reAuth;
             case AuthorizeBy.UsernameEmailPhone:
-                result = await _dataLayer.TblIdentityCredentials
+                result = await _dataLayer.IdentityCredentials
                     .Include(i => i.IdentityInfo)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(i => i.UserName == request.Username,
                         cancellationToken: cancellationToken);
-                result ??= _dataLayer.TblIdentityContacts
+                result ??= _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
                     .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == (long?)GenericContactType.Email)?.UserCredential;
-                result ??= _dataLayer.TblIdentityContacts
+                result ??= _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
                     .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == (long?)GenericContactType.Phone)?.UserCredential;
                 break;
             case AuthorizeBy.Username:
-                result = await _dataLayer.TblIdentityCredentials
+                result = await _dataLayer.IdentityCredentials
                     .Include(i => i.IdentityInfo)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(i => i.UserName == request.Username,
@@ -127,21 +126,21 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                 break;
             case AuthorizeBy.Email:
                 request.Username.ValidateEmailAddress();
-                result = _dataLayer.TblIdentityContacts
+                result = _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
                     .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 1)?.UserCredential;
                 break;
             case AuthorizeBy.Phone:
-                result = _dataLayer.TblIdentityContacts
+                result = _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
                     .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(false) & i.UcentitiesId == 2)?.UserCredential;
                 break;
             case AuthorizeBy.Token:
-                result = await _dataLayer.TblIdentityCredentials
+                result = await _dataLayer.IdentityCredentials
                     .Include(i => i.IdentityInfo)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(i => i.UserName == request.Username,
@@ -154,7 +153,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         return result;
     }
 
-    private async Task<TblIdentityCredential> ValidatePassword(AuthenticateCredentialQuery request, AuthorizeBy authorizeBy, TblIdentityCredential credential, CancellationToken cancellationToken)
+    private async Task<IdentityCredential> ValidatePassword(AuthenticateCredentialQuery request, AuthorizeBy authorizeBy, IdentityCredential credential, CancellationToken cancellationToken)
     {
         if (authorizeBy == AuthorizeBy.Token) return credential;
 
@@ -162,7 +161,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         return !BCrypt.Net.BCrypt.Verify(request.Password, hashPassword) ? null : credential;
     }
 
-    private async Task CacheQuery(TblIdentityCredential result, string token)
+    private async Task CacheQuery(IdentityCredential result, string token)
     {
         // Add token to caching server
         var identitySession = _cachingService.IdentitySessions.FirstOrDefault(i => i.Guid == Guid.Parse(result.IdentityInfo.Guid));
