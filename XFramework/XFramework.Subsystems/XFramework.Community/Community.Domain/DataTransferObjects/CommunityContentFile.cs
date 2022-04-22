@@ -15,5 +15,6 @@ namespace Community.Domain.DataTransferObjects
         public string Guid { get; set; } = null!;
 
         public virtual CommunityContent Content { get; set; } = null!;
+        public virtual StorageFile Storage { get; set; } = null!;
     }
 }

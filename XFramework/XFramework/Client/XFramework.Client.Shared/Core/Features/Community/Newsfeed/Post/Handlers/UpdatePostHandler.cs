@@ -38,7 +38,7 @@ public partial class CommunityState
                 Title = CurrentState.CurrentCommunityContent.Title,
                 Text = CurrentState.CurrentCommunityContent.Text,
                 SocialMediaIdentityGuid = System.Guid.Parse(CurrentState.Identity.Guid),
-                Guid = Guid.Parse(CurrentState.CurrentCommunityContent.Guid)
+                Guid = CurrentState.CurrentCommunityContent.Guid
             });
 
             await HandleFailure(result, action);

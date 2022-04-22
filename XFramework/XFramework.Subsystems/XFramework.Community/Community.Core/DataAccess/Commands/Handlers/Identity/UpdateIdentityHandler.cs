@@ -17,7 +17,7 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
         {
             return new ()
             {
-                Message = $"Community identity with guid {request.CredentialGuid} does not exist",
+                Message = $"Community identity with guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
                 IsSuccess = false
             };
@@ -52,7 +52,7 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
             {
                 return new ()
                 {
-                    Message = $"Community Identity Entity with guid {request.CredentialGuid} does not exist",
+                    Message = $"Community Identity Entity with guid {request.CommunityIdentityEntityGuid} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound,
                     IsSuccess = false
                 };

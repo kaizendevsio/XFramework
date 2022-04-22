@@ -8,5 +8,5 @@ public class CommunityContentFileResponse
     public bool IsDeleted { get; set; }
     public long ContentId { get; set; }
     public long StorageId { get; set; }
-    public string Guid { get; set; } = null!;
+    public string Guid { get; set; }
 }

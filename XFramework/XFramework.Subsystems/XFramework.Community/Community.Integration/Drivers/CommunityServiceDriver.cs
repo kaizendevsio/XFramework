@@ -2,6 +2,7 @@
 using Community.Domain.Generic.Contracts.Requests.Delete;
 using Community.Domain.Generic.Contracts.Requests.Get;
 using Community.Domain.Generic.Contracts.Requests.Update;
+using Community.Domain.Generic.Contracts.Responses.Connection;
 using Community.Domain.Generic.Contracts.Responses.Content;
 using Community.Domain.Generic.Contracts.Responses.Identity;
 using Community.Integration.Interfaces;
@@ -74,5 +75,20 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
     public async Task<CmdResponse> DeleteReaction(DeleteReactionRequest request)
     {
         return await SendVoidAsync("DeleteReaction", request);
+    }
+
+    public async Task<QueryResponse<List<CommunityConnectionResponse>>> GetConnectionList(GetConnectionListRequest request)
+    {
+        return await SendAsync<GetConnectionListRequest, List<CommunityConnectionResponse>>("GetConnectionList", request);
+    }
+
+    public async Task<CmdResponse> CreateConnection(CreateConnectionRequest request)
+    {
+        return await SendVoidAsync("CreateConnection", request);
+    }
+
+    public async Task<CmdResponse> DeleteConnection(DeleteConnectionRequest request)
+    {
+        return await SendVoidAsync("DeleteConnection", request);
     }
 }   

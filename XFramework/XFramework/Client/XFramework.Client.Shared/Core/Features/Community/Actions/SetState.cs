@@ -8,10 +8,12 @@ public partial class CommunityState
 {
     public class SetState : IAction
     {
+        public List<CommunityContentResponse> ProfileWallContentList { get; set; }
         public List<CommunityContentResponse> CommunityContentList { get; set; }
         public CommunityContentResponse CurrentCommunityContent { get; set; }
         public List<CommunityIdentityResponse> CommunityGroupList { get; set; }
         public CommunityIdentityResponse Identity { get; set; }
+        public CommunityIdentityResponse CurrentCommunityIdentity { get; set; }
         public CommunityIdentityResponse CurrentCommunityGroup { get; set; }
     }
 }

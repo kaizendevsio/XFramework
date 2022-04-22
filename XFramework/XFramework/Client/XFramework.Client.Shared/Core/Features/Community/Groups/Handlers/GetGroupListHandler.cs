@@ -41,10 +41,11 @@ public partial class CommunityState
                     : action.Limit,
                 CommunityIdentityEntityGuid = Guid.Parse("9f9e535f-357a-46c4-934a-2cf4382e2397")
             });
-            await Mediator.Send(new SetState(){CommunityGroupList = result.Response});
             
             await HandleFailure(result, action);
-            await HandleSuccess(result, action);
+            
+            if(result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
+            await Mediator.Send(new SetState(){CommunityGroupList = result.Response});
             return Unit.Value;
         }
     }

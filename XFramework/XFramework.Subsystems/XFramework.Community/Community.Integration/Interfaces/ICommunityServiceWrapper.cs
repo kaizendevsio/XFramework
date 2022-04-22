@@ -2,6 +2,7 @@
 using Community.Domain.Generic.Contracts.Requests.Delete;
 using Community.Domain.Generic.Contracts.Requests.Get;
 using Community.Domain.Generic.Contracts.Requests.Update;
+using Community.Domain.Generic.Contracts.Responses.Connection;
 using Community.Domain.Generic.Contracts.Responses.Content;
 using Community.Domain.Generic.Contracts.Responses.Identity;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -28,4 +29,8 @@ public interface ICommunityServiceWrapper : IXFrameworkService
     public Task<CmdResponse> CreateReaction(CreateReactionRequest request);
     public Task<CmdResponse> UpdateReaction(UpdateReactionRequest request);
     public Task<CmdResponse> DeleteReaction(DeleteReactionRequest request);
+    
+    public Task<QueryResponse<List<CommunityConnectionResponse>>> GetConnectionList(GetConnectionListRequest request);
+    public Task<CmdResponse> CreateConnection(CreateConnectionRequest request);
+    public Task<CmdResponse> DeleteConnection(DeleteConnectionRequest request);
 }

@@ -34,6 +34,8 @@ namespace Community.Domain.DataTransferObjects
         public virtual DbSet<CommunityContentReactionEntity> CommunityContentReactionEntities { get; set; } = null!;
         public virtual DbSet<CommunityIdentity> CommunityIdentities { get; set; } = null!;
         public virtual DbSet<CommunityIdentityEntity> CommunityIdentityEntities { get; set; } = null!;
+        public virtual DbSet<CommunityIdentityFile> CommunityIdentityFiles { get; set; } = null!;
+        public virtual DbSet<CommunityIdentityFileEntity> CommunityIdentityFileEntities { get; set; } = null!;
         public virtual DbSet<CurrencyEntity> CurrencyEntities { get; set; } = null!;
         public virtual DbSet<Enterprise> Enterprises { get; set; } = null!;
         public virtual DbSet<ExchangeRate> ExchangeRates { get; set; } = null!;
@@ -55,6 +57,8 @@ namespace Community.Domain.DataTransferObjects
         public virtual DbSet<RegistryFavoriteEntity> RegistryFavoriteEntities { get; set; } = null!;
         public virtual DbSet<SessionDatum> SessionData { get; set; } = null!;
         public virtual DbSet<SessionEntity> SessionEntities { get; set; } = null!;
+        public virtual DbSet<StorageFile> StorageFiles { get; set; } = null!;
+        public virtual DbSet<StorageFileEntity> StorageFileEntities { get; set; } = null!;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -475,6 +479,12 @@ namespace Community.Domain.DataTransferObjects
                     .HasForeignKey(d => d.ContentId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("socialmediacontentfiles_socialmediacontent_id_fk");
+
+                entity.HasOne(d => d.Storage)
+                    .WithMany(p => p.CommunityContentFiles)
+                    .HasForeignKey(d => d.StorageId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("socialmediacontentfiles_storagefile_id_fk");
             });
 
             modelBuilder.Entity<CommunityContentReaction>(entity =>
@@ -587,6 +597,72 @@ namespace Community.Domain.DataTransferObjects
             modelBuilder.Entity<CommunityIdentityEntity>(entity =>
             {
                 entity.ToTable("CommunityIdentityEntity", "Community");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<CommunityIdentityFile>(entity =>
+            {
+                entity.ToTable("CommunityIdentityFile", "Community");
+
+                entity.HasIndex(e => e.Guid, "communityidentityfiles_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasDefaultValueSql("nextval('\"Community\".\"CommunityIdentityFiles_ID_seq\"'::regclass)");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.HasOne(d => d.Entity)
+                    .WithMany(p => p.CommunityIdentityFiles)
+                    .HasForeignKey(d => d.EntityId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("communityidentityfile_communityidentityfileentity_id_fk");
+
+                entity.HasOne(d => d.Identity)
+                    .WithMany(p => p.CommunityIdentityFiles)
+                    .HasForeignKey(d => d.IdentityId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("communityidentityfiles_communityidentity_id_fk");
+
+                entity.HasOne(d => d.Storage)
+                    .WithMany(p => p.CommunityIdentityFiles)
+                    .HasForeignKey(d => d.StorageId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("communityidentityfiles_storagefile_id_fk");
+            });
+
+            modelBuilder.Entity<CommunityIdentityFileEntity>(entity =>
+            {
+                entity.ToTable("CommunityIdentityFileEntity", "Community");
+
+                entity.HasIndex(e => e.Guid, "communityidentityfileentity_guid_uindex")
+                    .IsUnique();
 
                 entity.Property(e => e.Id).HasColumnName("ID");
 
@@ -1251,6 +1327,54 @@ namespace Community.Domain.DataTransferObjects
                 entity.Property(e => e.Guid)
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<StorageFile>(entity =>
+            {
+                entity.ToTable("StorageFile", "Storage");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.ContentPath).HasColumnType("character varying");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.HasOne(d => d.Entity)
+                    .WithMany(p => p.StorageFiles)
+                    .HasForeignKey(d => d.EntityId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("storagefile_storagefileentity_id_fk");
+            });
+
+            modelBuilder.Entity<StorageFileEntity>(entity =>
+            {
+                entity.ToTable("StorageFileEntity", "Storage");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
             });

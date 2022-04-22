@@ -1,6 +1,8 @@
-﻿namespace Community.Domain.Generic.Contracts.Requests.Delete;
+﻿using XFramework.Domain.Generic.Contracts.Requests;
 
-public class DeleteContentRequest
+namespace Community.Domain.Generic.Contracts.Requests.Delete;
+
+public class DeleteContentRequest : RequestBase
 {
     public Guid? Guid { get; set; }
 }

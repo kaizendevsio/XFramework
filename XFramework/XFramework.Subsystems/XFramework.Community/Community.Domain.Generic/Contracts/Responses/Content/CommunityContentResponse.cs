@@ -8,16 +8,16 @@ public class CommunityContentResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public string? Avatar { get; set; }
     public string? Title { get; set; }
     public string? Text { get; set; }
-    public long SocialMediaIdentityGuid { get; set; }
+    public Guid? SocialMediaIdentityGuid { get; set; }
     public long EntityId { get; set; }
     public long ParentContentId { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid Guid { get; set; }
 
     public CommunityIdentityResponse? CommunityIdentity { get; set; }
-    public CommunityContentEntityResponse? ContentEntity { get; set; }
-    public List<CommunityContentFileResponse>? CommunityContentFiles { get; set; }
-    public List<CommunityContentReactionResponse>? CommunityContentReactions { get; set; }
+    public CommunityContentEntityResponse? Entity { get; set; }
+    public List<CommunityContentFileResponse>? Files { get; set; }
+    public List<CommunityContentResponse>? Comments { get; set; }
+    public List<CommunityContentReactionResponse>? Reactions { get; set; }
 }

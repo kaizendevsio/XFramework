@@ -12,6 +12,7 @@ namespace Community.Domain.DataTransferObjects
             CommunityContentCommunityGroups = new HashSet<CommunityContent>();
             CommunityContentReactions = new HashSet<CommunityContentReaction>();
             CommunityContentSocialMediaIdentities = new HashSet<CommunityContent>();
+            CommunityIdentityFiles = new HashSet<CommunityIdentityFile>();
         }
 
         public long Id { get; set; }
@@ -35,5 +36,6 @@ namespace Community.Domain.DataTransferObjects
         public virtual ICollection<CommunityContent> CommunityContentCommunityGroups { get; set; }
         public virtual ICollection<CommunityContentReaction> CommunityContentReactions { get; set; }
         public virtual ICollection<CommunityContent> CommunityContentSocialMediaIdentities { get; set; }
+        public virtual ICollection<CommunityIdentityFile> CommunityIdentityFiles { get; set; }
     }
 }

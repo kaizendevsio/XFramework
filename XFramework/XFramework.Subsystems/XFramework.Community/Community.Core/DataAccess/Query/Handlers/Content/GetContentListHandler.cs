@@ -40,27 +40,64 @@ public class GetContentListHandler : QueryBaseHandler, IRequestHandler<GetConten
         var communityContents = await _dataLayer.CommunityContents
             .Include(i => i.ParentContent)
             .Include(i => i.SocialMediaIdentity)
+            .ThenInclude(i => i.IdentityCredential)
+            .Include(i => i.SocialMediaIdentity)
+            .ThenInclude(i => i.CommunityIdentityFiles)
+            .ThenInclude(i => i.Entity)
             .Include(i => i.CommunityContentFiles)
             .Include(i => i.CommunityContentReactions)
+            .ThenInclude(i => i.Entity)
             .Include(i => i.Entity)
+            .Include(i => i.InverseParentContent)
+            .ThenInclude(i => i.Entity)
             .Where(i => i.Guid == $"{request.ContentEntityGuid}")
             .Where(i => i.CreatedAt > request.GreaterThan)
             .Where(i => i.IsDeleted == false)
             .Where(i => i.IsEnabled == true)
+            .Take(request.Limit)
             .AsSplitQuery()
             .AsNoTracking()
             .Select(i => new CommunityContentResponse
             {
                 Title = i.Title,
                 Text = i.Text,
-                SocialMediaIdentityGuid = i.SocialMediaIdentity.Id,
+                SocialMediaIdentityGuid = Guid.Parse(i.SocialMediaIdentity.Guid),
                 EntityId = i.EntityId,
                 ParentContentId = i.ParentContentId,
-                Guid = i.Guid,
-                CommunityIdentity = i.SocialMediaIdentity.Adapt<CommunityIdentityResponse>(),
-                ContentEntity = i.Entity.Adapt<CommunityContentEntityResponse>(),
-                CommunityContentFiles = i.CommunityContentFiles.Adapt<List<CommunityContentFileResponse>>(),
-                CommunityContentReactions = i.CommunityContentReactions.Adapt<List<CommunityContentReactionResponse>>()
+                Guid = Guid.Parse(i.Guid),
+                CommunityIdentity = new()
+                {
+                    Tagline = i.SocialMediaIdentity.Tagline,
+                    Alias = i.SocialMediaIdentity.Alias,
+                    HandleName = i.SocialMediaIdentity.HandleName,
+                    Status = i.SocialMediaIdentity.Status,
+                    LastActive = i.SocialMediaIdentity.LastActive,
+                    Guid = i.SocialMediaIdentity.Guid,
+                    EntityGuid = Guid.Parse(i.SocialMediaIdentity.Entity.Guid),
+                    IdentityCredentialGuid = Guid.Parse(i.SocialMediaIdentity.IdentityCredential.Guid),
+                    Avatar = i.SocialMediaIdentity.CommunityIdentityFiles.Where(o => o.Entity.Guid == "996dd417-170c-4ac9-b565-62caf4ab5ccf").MaxBy(o => o.CreatedAt)!.Adapt<CommunityIdentityFileResponse>()
+                },
+                Entity = i.Entity.Adapt<CommunityContentEntityResponse>(),
+                Files = i.CommunityContentFiles.Adapt<List<CommunityContentFileResponse>>(),
+                Comments = i.InverseParentContent.Where(o => o.Entity.Guid == "78a49ca4-248a-4f05-86d0-80b8a772eec8").Select(o => new CommunityContentResponse
+                {
+                    CreatedAt = o.CreatedAt,
+                    ModifiedAt = o.ModifiedAt,
+                    IsEnabled = o.IsEnabled,
+                    IsDeleted = o.IsDeleted,
+                    Title = o.Text,
+                    Text = o.Title
+                }).ToList(),
+                Reactions = i.CommunityContentReactions.Select(o => new CommunityContentReactionResponse
+                {
+                    CreatedAt = o.CreatedAt,
+                    ModifiedAt = o.ModifiedAt,
+                    IsEnabled = o.IsEnabled,
+                    IsDeleted = o.IsDeleted,
+                    Guid = Guid.Parse(o.Guid),
+                    CommunityIdentity = o.SocialMediaIdentity.Adapt<CommunityIdentityResponse>(),
+                    Entity = o.Entity.Adapt<CommunityContentReactionEntityResponse>()
+                }).ToList()
             })
             .ToListAsync(CancellationToken.None);
 

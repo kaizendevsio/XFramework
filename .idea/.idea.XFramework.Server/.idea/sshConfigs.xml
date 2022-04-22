@@ -14,6 +14,12 @@
       <sshConfig host="20.187.70.80" id="5822ad91-baa2-4f94-acd1-cf995806aee0" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-production.pem" port="22" customName="XnelSystems-WalletsServer-Production" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
         <option name="customName" value="XnelSystems-WalletsServer-Production" />
       </sshConfig>
+      <sshConfig host="20.187.74.137" id="c446afdb-f8b4-42dd-8c5a-d026fc499e09" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-production.pem" port="22" customName="XnelSystems-CommunityServer-Production" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
+        <option name="customName" value="XnelSystems-CommunityServer-Production" />
+      </sshConfig>
+      <sshConfig connectionConfig="{&quot;serverAliveInterval&quot;:10}" host="20.205.42.91" id="cee8fc29-edaf-492f-a302-f970dd751fe6" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-production.pem" port="22" customName="XnelSystems-MessagingServer-Production" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
+        <option name="customName" value="XnelSystems-MessagingServer-Production" />
+      </sshConfig>
     </configs>
   </component>
 </project>
