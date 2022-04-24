@@ -1,5 +1,6 @@
 ﻿using Community.Core.DataAccess.Query.Entity.Connection;
 using Community.Domain.Generic.Contracts.Responses.Connection;
+using Community.Domain.Generic.Contracts.Responses.Identity;
 
 namespace Community.Core.DataAccess.Query.Handlers.Connection;
 
@@ -48,8 +49,8 @@ public class GetConnectionListHandler : QueryBaseHandler, IRequestHandler<GetCon
                 ModifiedAt = i.ModifiedAt,
                 IsEnabled = i.IsEnabled,
                 IsDeleted = i.IsDeleted,
-                SourceCommunityIdentityGuid = Guid.Parse(i.SourceSocialMediaIdentity.Guid),
-                TargetCommunityIdentityGuid = Guid.Parse(i.TargetSocialMediaIdentity.Guid),
+                SourceCommunityIdentity = i.SourceSocialMediaIdentity.Adapt<CommunityIdentityResponse>(),
+                TargetCommunityIdentity = i.TargetSocialMediaIdentity.Adapt<CommunityIdentityResponse>(),
                 Guid = Guid.Parse(i.Guid),
                 Entity = i.Entity.Adapt<CommunityConnectionEntityResponse>()
             })

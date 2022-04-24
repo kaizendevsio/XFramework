@@ -47,7 +47,8 @@ public partial class CommunityState
             await HandleFailure(result, action);
             
             if(result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
-            CurrentState.CurrentCommunityGroup.ConnectionList = result.Response;
+            CurrentState.CurrentCommunityGroup.ConnectionList ??= new();
+            CurrentState.CurrentCommunityGroup.ConnectionList?.AddRange(result.Response);
             
             await Mediator.Send(new SetState(){CurrentCommunityGroup = CurrentState.CurrentCommunityGroup});
             return Unit.Value;

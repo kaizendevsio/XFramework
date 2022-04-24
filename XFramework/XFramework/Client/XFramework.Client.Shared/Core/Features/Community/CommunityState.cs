@@ -10,8 +10,9 @@ public partial class CommunityState : State<CommunityState>
         
     }
 
+    public DateTime LastPull { get; set; } = DateTime.Now;
     public List<CommunityContentResponse> ProfileWallContentList { get; set; } = new();
-    public List<CommunityContentResponse> CommunityContentList { get; set; } = new();
+    public List<CommunityContentResponse> NewsFeedContentList { get; set; } = new();
     public List<CommunityIdentityResponse> CommunityGroupList { get; set; } = new();
     public CommunityContentResponse CurrentCommunityContent { get; set; } = new();
     public CommunityIdentityResponse Identity { get; set; } = new();

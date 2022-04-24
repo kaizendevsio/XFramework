@@ -31,17 +31,15 @@ public class Startup
         var swaggerOptions = new SwaggerOptions();
         Configuration.GetSection(nameof(SwaggerOptions)).Bind(swaggerOptions);
 
-        app.UseSwagger(options =>
-        {
-            options.RouteTemplate = swaggerOptions.JsonRoute;
-        });
+        app.UseSwagger(options => { options.RouteTemplate = swaggerOptions.JsonRoute; });
 
-        app.UseSwaggerUI(c => c.SwaggerEndpoint($"v{swaggerOptions.Version}{swaggerOptions.UiEndpoint}", swaggerOptions.Description));
+        app.UseSwaggerUI(c =>
+            c.SwaggerEndpoint($"v{swaggerOptions.Version}{swaggerOptions.UiEndpoint}", swaggerOptions.Description));
 
         /*app.UseHttpsRedirection();
 
         app.UseHsts();*/
-            
+
         app.UseCors(o => o.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
 
         app.UseRouting();
@@ -51,7 +49,7 @@ public class Startup
         app.UseAuthorization();
 
         app.InstallEndpointConfigInAssembly(env);
-            
+
         app.WarmUpServices(Services, ServiceLifetime.Singleton);
     }
 }

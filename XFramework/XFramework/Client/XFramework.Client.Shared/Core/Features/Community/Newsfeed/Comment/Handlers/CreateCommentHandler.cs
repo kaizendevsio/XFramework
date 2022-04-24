@@ -46,10 +46,10 @@ public partial class CommunityState
             });
 
             if(updatedContent.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
-            var contentResponse = CurrentState.CommunityContentList.FirstOrDefault(i => i.Guid == action.ContentGuid);
+            var contentResponse = CurrentState.NewsFeedContentList.FirstOrDefault(i => i.Guid == action.ContentGuid);
             contentResponse = updatedContent.Response;
 
-            await Mediator.Send(new SetState() {CommunityContentList = CurrentState.CommunityContentList});
+            await Mediator.Send(new SetState() {NewsFeedContentList = CurrentState.NewsFeedContentList});
             return Unit.Value;
         }
     }

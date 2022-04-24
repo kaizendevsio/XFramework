@@ -47,8 +47,7 @@ public partial class CommunityState
             
             if(result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
             CurrentState.CurrentCommunityIdentity.ConnectionList ??= new();
-            CurrentState.CurrentCommunityIdentity.ConnectionList?.RemoveAll(i => i.Entity?.Guid == "b53ac35a-c815-4a11-ad74-364d1b6cf84b");
-            CurrentState.CurrentCommunityIdentity.ConnectionList.AddRange(result.Response);
+            CurrentState.CurrentCommunityIdentity.ConnectionList?.AddRange(result.Response);
             
             await Mediator.Send(new SetState(){CurrentCommunityIdentity = CurrentState.CurrentCommunityIdentity});
             return Unit.Value;
