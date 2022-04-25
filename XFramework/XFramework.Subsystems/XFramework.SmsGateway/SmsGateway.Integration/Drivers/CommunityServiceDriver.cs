@@ -1,4 +1,4 @@
-﻿using SmsGateway.Domain.Generic.Contracts.Requests.Create;
+﻿/*using SmsGateway.Domain.Generic.Contracts.Requests.Create;
 using SmsGateway.Domain.Generic.Contracts.Requests.Delete;
 using SmsGateway.Domain.Generic.Contracts.Requests.Get;
 using SmsGateway.Domain.Generic.Contracts.Requests.Update;
@@ -91,4 +91,4 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
     {
         return await SendVoidAsync("DeleteConnection", request);
     }
-}   
+}   */

@@ -2,242 +2,24 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="99c28dae-ce50-43c6-917e-e985e0084817" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/.name" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/encodings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/indexLayout.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/projectSettingsUpdater.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/GlobalUsings.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/HostedService/SampleService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Installers/ApiInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Installers/ConfigExtensions.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Installers/DbInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Installers/ExternalDependencyInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Installers/HostedServiceInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Installers/IInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Installers/InstallerExtensions.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Installers/ServicesInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Options/JwtOptions.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Options/SwaggerOptions.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/SignalR/Handlers/BaseSignalRHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/SignalR/ISignalREventHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/SignalR/SignalRWrapper.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Startup.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Commands/Entity/CommandBaseEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Commands/Entity/Message/CreateDirectMessageCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Commands/Entity/Message/CreateMessageCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Commands/Handlers/CommandBaseHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Commands/Handlers/Message/CreateDirectMessageHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Commands/Validations/CommandBaseValidator.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/DataLayer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Query/Entity/QueryBaseEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/DataAccess/Query/Validations/QueryBaseValidator.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/GlobalUsings.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Interfaces/ICachingService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Interfaces/IDataLayer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Services/CachingService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Services/LoggerService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Validations/Common/RequestServerBOValidator.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/BusinessObjects/AuditEntryBO.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/AddressBarangay.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/AddressCity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/AddressCountry.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/AddressProvince.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/AddressRegion.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/Application.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/AuditField.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/AuditHistory.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/AuthorizationLog.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/CurrencyEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/Enterprise.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/ExchangeRate.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityAddress.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityAddressEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityContact.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityContactEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityCredential.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityFavorite.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityInformation.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityRole.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityRoleEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityRoleEntityGroup.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityVerification.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/IdentityVerificationEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/Log.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/Message.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageDelivery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageDeliveryEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageFile.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageReaction.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageReactionEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageThread.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageThreadEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageThreadMember.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageThreadMemberGroup.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageThreadMemberRole.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/MessageType.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/RegistryConfiguration.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/RegistryConfigurationGroup.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/RegistryFavoriteEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/SessionDatum.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/SessionEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/StorageFile.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/StorageFileEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/DataTransferObjects/XnelSystemsContext.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domin.Generic/Contracts/Requests/Create/CreateDirectMessageRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domin.Generic/Contracts/Requests/Create/CreateMessageRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domin.Generic/Contracts/Requests/Create/CreateMessageThreadRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Integration/Drivers/CommunityServiceDriver.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Integration/Interfaces/ICommunityServiceWrapper.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Integration/Messaging.Integration.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway.sln" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/.idea/.idea.XFramework.SmsGateway/.idea/encodings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/.idea/.idea.XFramework.SmsGateway/.idea/indexLayout.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/.idea/.idea.XFramework.SmsGateway/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/.idea/.idea.XFramework.SmsGateway/.idea/projectSettingsUpdater.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/.idea/.idea.XFramework.SmsGateway/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/GlobalUsings.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/HostedService/SampleService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Installers/ApiInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Installers/ConfigExtensions.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Installers/DbInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Installers/ExternalDependencyInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Installers/HostedServiceInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Installers/IInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Installers/InstallerExtensions.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Installers/ServicesInstaller.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Options/JwtOptions.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Options/SwaggerOptions.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Program.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Properties/launchSettings.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SignalR/Handlers/BaseSignalRHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SignalR/ISignalREventHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SignalR/SignalRWrapper.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Startup.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Development.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Entity/CommandBaseEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Entity/Sms/CreateSmsMessageCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Handlers/CommandBaseHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Handlers/Sms/CreateSmsMessageHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Validations/CommandBaseValidator.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/DataLayer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Query/Entity/QueryBaseEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Query/Validations/QueryBaseValidator.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/GlobalUsings.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/Interfaces/ICachingService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/Interfaces/IDataLayer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/Services/CachingService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/Services/LoggerService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/SmsGateway.Core.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/Validations/Common/RequestServerBOValidator.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/Validations/Sms/CreateSmsMessageCmdValidator.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/Contracts/Requests/Create/CreateSmsMessageRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/Contracts/Responses/Sms/MessageDirectResponse.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/SmsGateway.Domain.Generic.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/BusinessObjects/AuditEntryBO.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/AddressBarangay.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/AddressCity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/AddressCountry.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/AddressProvince.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/AddressRegion.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/Application.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/AuditField.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/AuditHistory.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/AuthorizationLog.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/CurrencyEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/Enterprise.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/ExchangeRate.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityAddress.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityAddressEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityContact.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityContactEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityCredential.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityFavorite.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityInformation.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityRole.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityRoleEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityRoleEntityGroup.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityVerification.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/IdentityVerificationEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/Log.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/Message.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageDelivery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageDeliveryEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageDirect.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageFile.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageReaction.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageReactionEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageThread.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageThreadEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageThreadMember.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageThreadMemberGroup.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageThreadMemberRole.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/MessageType.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/RegistryConfiguration.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/RegistryConfigurationGroup.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/RegistryFavoriteEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/SessionDatum.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/SessionEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/StorageFile.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/StorageFileEntity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/DataTransferObjects/XnelSystemsContext.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain/SmsGateway.Domain.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/Drivers/CommunityServiceDriver.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/Interfaces/ICommunityServiceWrapper.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/SmsGateway.Integration.csproj" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Friends/Actions/GetFriendRequestList.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Friends/Handlers/GetFriendRequestListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Groups/Actions/GetGroupMemberRequestList.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Groups/Actions/GetGroupPostList.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Groups/Handlers/GetGroupMemberRequestListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Groups/Handlers/GetGroupPostListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Users/Actions/CreateIdentity.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Users/Handlers/CreateIdentityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Controllers/StartupController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Controllers/V1/SmsGatewayNodeController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Controllers/XFrameworkControllerBase.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/Contracts/Responses/Sms/SmsNodeResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/Enums/SmsStatus.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/Startup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Startup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Query/Handlers/Connection/GetConnectionListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/DataAccess/Query/Handlers/Connection/GetConnectionListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Responses/Connection/CommunityConnectionResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain.Generic/Contracts/Responses/Connection/CommunityConnectionResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging.sln" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Controllers/WeatherForecastController.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Program.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Program.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/WeatherForecast.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Class1.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/Class1.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/Messaging.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/Messaging.Domain.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domin.Generic/Class1.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domin.Generic/Messaging.Domin.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domin.Generic/Messaging.Domin.Generic.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Actions/ClearState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/_Actions/ClearState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Actions/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/_Actions/SetState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/CommunityState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/CommunityState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Friends/Handlers/GetFriendListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Friends/Handlers/GetFriendListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Groups/Handlers/GetGroupMemberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Groups/Handlers/GetGroupMemberListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/_Handlers/ClearStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Handlers/SetStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/_Handlers/SetStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Comment/Handlers/CreateCommentHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Comment/Handlers/CreateCommentHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Comment/Handlers/UpdateCommentHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Comment/Handlers/UpdateCommentHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Post/Handlers/GetPostListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Post/Handlers/GetPostListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Reaction/Handlers/CreateReactionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Reaction/Handlers/CreateReactionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Reaction/Handlers/UpdateReactionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Newsfeed/Reaction/Handlers/UpdateReactionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../_OneClickDeploy.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/../../_OneClickDeploy.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Properties/launchSettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/Properties/launchSettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Handlers/Sms/CreateSmsMessageHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Handlers/Sms/CreateSmsMessageHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/Services/CachingService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/Services/CachingService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/Contracts/Requests/Create/CreateSmsMessageRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/Contracts/Requests/Create/CreateSmsMessageRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/Contracts/Responses/Sms/MessageDirectResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/Contracts/Responses/Sms/MessageDirectResponse.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/SmsGateway.Domain.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Domain.Generic/SmsGateway.Domain.Generic.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/Drivers/CommunityServiceDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/Drivers/CommunityServiceDriver.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/Interfaces/ICommunityServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/Interfaces/ICommunityServiceWrapper.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -272,7 +54,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1650646358052</updated>
-      <workItem from="1650646361227" duration="11346000" />
+      <workItem from="1650646361227" duration="13133000" />
     </task>
     <servers />
   </component>

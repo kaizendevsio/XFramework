@@ -1,4 +1,4 @@
-﻿using SmsGateway.Domain.Generic.Contracts.Requests.Create;
+﻿/*using SmsGateway.Domain.Generic.Contracts.Requests.Create;
 using SmsGateway.Domain.Generic.Contracts.Requests.Delete;
 using SmsGateway.Domain.Generic.Contracts.Requests.Get;
 using SmsGateway.Domain.Generic.Contracts.Requests.Update;
@@ -33,4 +33,4 @@ public interface ICommunityServiceWrapper : IXFrameworkService
     public Task<QueryResponse<List<CommunityConnectionResponse>>> GetConnectionList(GetConnectionListRequest request);
     public Task<CmdResponse> CreateConnection(CreateConnectionRequest request);
     public Task<CmdResponse> DeleteConnection(DeleteConnectionRequest request);
-}
+}*/

@@ -16,7 +16,7 @@ public class MessageDirectResponse
     public string Subject { get; set; } = null!;
     public string Message { get; set; } = null!;
     public string Guid { get; set; } = null!;
-    public short Status { get; set; }
+    public int Status { get; set; }
     
     public virtual MessageDirectResponse? ParentMessage { get; set; }
 

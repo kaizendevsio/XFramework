@@ -1,4 +1,5 @@
-﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
+﻿using System.Text.RegularExpressions;
+using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
 using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential;
@@ -31,7 +32,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
         }
         
         // Validate Password
-        /*var passwordIsStrong = Regex.Match(request.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$").Success;
+        var passwordIsStrong = Regex.Match(request.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$").Success;
         if (!passwordIsStrong)
         {
             return new ()
@@ -39,7 +40,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
                 Message = $"The password is weak. Please include at least one of the following: 1 upper case, 1 lower case, a number and a special character",
                 HttpStatusCode = HttpStatusCode.BadRequest
             };
-        }*/
+        }
 
         if (string.IsNullOrEmpty(request.UserName))
         {

@@ -39,6 +39,9 @@ if ($answer -eq "y") {
    Write-Host Building Release.Messaging ...
    dotnet publish "XFramework\XFramework.Subsystems\XFramework.Messaging\Messaging.Api\Messaging.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.Messaging.Published" -c "Release"
 
+   Write-Host Building Release.SmsGateway ...
+   dotnet publish "XFramework\XFramework.Subsystems\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.SmsGateway.Published" -c "Release"
+
    Write-Host Syncing to Github ...
    Set-Location "C:\Projects\Published\Release.XnelSystems"
 

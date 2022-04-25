@@ -13,9 +13,6 @@ namespace XFramework.Client.Shared.Entity.Validations.Session
                 .WithMessage("Enter your password")
                 .MinimumLength(8)
                 .WithMessage("Minimum password length is 8 characters");
-
-
-
         }
     }
 }
