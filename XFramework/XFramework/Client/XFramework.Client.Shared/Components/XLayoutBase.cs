@@ -17,6 +17,7 @@ public class XLayoutBase : BlazorStateLayoutComponent
     
     
     public LayoutState LayoutState => GetState<LayoutState>();
+    public SessionState SessionState => GetState<SessionState>();
     
     public async Task NavigateTo(string path)
     {
