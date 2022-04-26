@@ -11,7 +11,7 @@ public class UpdateReactionHandler : CommandBaseHandler, IRequestHandler<DeleteR
     
     public async Task<CmdResponse> Handle(DeleteReactionCmd request, CancellationToken cancellationToken)
     {
-        var communityContentReaction = await _dataLayer.CommunityContentReactions.AsNoTracking().FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        var communityContentReaction = await _dataLayer.CommunityContentReactions.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
         if (communityContentReaction == null)
         {
             return new ()

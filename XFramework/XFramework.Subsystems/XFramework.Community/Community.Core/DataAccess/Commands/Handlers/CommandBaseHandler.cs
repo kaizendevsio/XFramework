@@ -8,7 +8,7 @@ public class CommandBaseHandler
     {
         if (guid is null) return null;
         var entity = await _dataLayer.Applications
-            .AsNoTracking()
+            
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{guid}");
         if (entity is null)

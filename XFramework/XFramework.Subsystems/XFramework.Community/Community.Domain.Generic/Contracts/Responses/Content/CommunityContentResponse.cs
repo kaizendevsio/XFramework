@@ -12,7 +12,7 @@ public class CommunityContentResponse
     public string? Text { get; set; }
     public Guid? SocialMediaIdentityGuid { get; set; }
     public long EntityId { get; set; }
-    public long ParentContentId { get; set; }
+    public Guid? ParentContentGuid { get; set; }
     public Guid Guid { get; set; }
 
     public CommunityIdentityResponse? CommunityIdentity { get; set; }

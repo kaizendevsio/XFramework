@@ -37,6 +37,11 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
         return await SendAsync<GetIdentityListRequest, List<CommunityIdentityResponse>>("GetIdentityList", request);
     }
 
+    public async Task<QueryResponse<CommunityIdentityResponse>> GetIdentity(GetIdentityRequest request)
+    {
+        return await SendAsync<GetIdentityRequest, CommunityIdentityResponse>("GetIdentity", request);
+    }
+
     public async Task<CmdResponse> CreateIdentity(CreateIdentityRequest request)
     {
         return await SendVoidAsync("CreateIdentity", request);

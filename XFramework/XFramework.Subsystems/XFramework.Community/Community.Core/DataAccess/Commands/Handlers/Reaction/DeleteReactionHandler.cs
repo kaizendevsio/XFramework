@@ -11,7 +11,7 @@ public class DeleteReactionHandler : CommandBaseHandler, IRequestHandler<UpdateR
     
     public async Task<CmdResponse> Handle(UpdateReactionCmd request, CancellationToken cancellationToken)
     {
-        var communityContentReaction = await _dataLayer.CommunityContentReactions.AsNoTracking().FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        var communityContentReaction = await _dataLayer.CommunityContentReactions.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
         if (communityContentReaction == null)
         {
             return new ()
@@ -22,7 +22,7 @@ public class DeleteReactionHandler : CommandBaseHandler, IRequestHandler<UpdateR
             };
         }
         
-        var reactionEntity = await _dataLayer.CommunityContentReactionEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Guid == $"{request.ReactionEntityGuid}", cancellationToken: cancellationToken);
+        var reactionEntity = await _dataLayer.CommunityContentReactionEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.ReactionEntityGuid}", cancellationToken: cancellationToken);
         if (reactionEntity == null)
         {
             return new ()

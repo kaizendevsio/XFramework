@@ -9,8 +9,6 @@ public class SignUpRequestValidator : AbstractValidator<SignUpRequest>
     {
         RuleFor(x => x.FirstName)
             .NotEmpty();
-        RuleFor(x => x.MiddleName)
-            .NotEmpty();
         RuleFor(x => x.LastName)
             .NotEmpty();
         RuleFor(x => x.UserName)

@@ -15,7 +15,7 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
         var credential = await _dataLayer.IdentityCredentials
             .Include(i => i.IdentityInfo)
             .AsSplitQuery()
-            .AsNoTracking()
+            
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
      
         if (credential == null)
@@ -29,7 +29,6 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
         }
         
         var communityIdentityEntity = await _dataLayer.CommunityIdentityEntities
-            .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityEntityGuid}", cancellationToken: cancellationToken);
      
         if (communityIdentityEntity == null)
@@ -53,7 +52,7 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
             Tagline = request.Tagline,
             Alias = request.Alias,
             Status = (int) CommunityIdentityStatus.Active,
-            LastActive = DateTime.Now,
+            LastActive = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc),
             Entity = communityIdentityEntity,
             CommunityIdentityFiles = new List<CommunityIdentityFile>()
             {

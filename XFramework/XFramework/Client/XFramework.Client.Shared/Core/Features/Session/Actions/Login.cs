@@ -2,7 +2,7 @@
 
 public partial class SessionState
 {
-    public class Login : IAction
+    public class Login : IRequest<CmdResponse>
     {
         public string NavigateToOnSuccess { get; set; }
         public string NavigateToOnFailure { get; set; }

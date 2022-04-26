@@ -6,12 +6,12 @@ namespace XFramework.Client.Shared.Core.Features.Community;
 
 public partial class CommunityState
 {
-    public class CreatePostHandler : ActionHandler<CreatePost>
+    public class GetIdentityHandler : ActionHandler<GetIdentity, CmdResponse>
     {
         public ICommunityServiceWrapper CommunityServiceWrapper { get; }
-
         private CommunityState CurrentState => Store.GetState<CommunityState>();
-        public CreatePostHandler(ICommunityServiceWrapper communityServiceWrapper, IConfiguration configuration, ISessionStorageService sessionStorageService,
+
+        public GetIdentityHandler(ICommunityServiceWrapper communityServiceWrapper, IConfiguration configuration, ISessionStorageService sessionStorageService,
             ILocalStorageService localStorageService, SweetAlertService sweetAlertService,
             NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient,
             HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration,
@@ -32,26 +32,39 @@ public partial class CommunityState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(CreatePost action, CancellationToken aCancellationToken)
+        public override async Task<CmdResponse> Handle(GetIdentity action, CancellationToken aCancellationToken)
         {
-            Console.WriteLine(CurrentState.Identity.Guid);
-            var result = await CommunityServiceWrapper.CreateContent(new()
+            var result = await CommunityServiceWrapper.GetIdentity(new()
             {
-                Title = CurrentState.CurrentCommunityContent.Title,
-                Text = CurrentState.CurrentCommunityContent.Text,
-                ContentEntityGuid = Guid.Parse("57ef6c58-07d0-4c6a-aa1c-dd5f6812eb61"),
-                CommunityIdentityGuid = Guid.Parse(CurrentState.Identity.Guid),
-                CommunityGroupGuid = string.IsNullOrEmpty(CurrentState.CurrentCommunityGroup.Guid) ? null : Guid.Parse(CurrentState.CurrentCommunityGroup.Guid)
+                CredentialGuid = action.CredentialGuid,
+                CommunityIdentityGuid = action.CommunityIdentityGuid
             });
 
-            await HandleFailure(result, action);
-            if (result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
+            if (await HandleFailure(result, action))
+            {
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    IsSuccess = false
+                };
+            };
 
-            CurrentState.CurrentCommunityContent = new();
+            if (action.CredentialGuid is not null)
+            {
+                await Mediator.Send(new SetState() {Identity = result.Response});
+            }
             
-            await Mediator.Send(new SetState(){CurrentCommunityContent = CurrentState.CurrentCommunityContent});
-            await Mediator.Send(new GetPostList());
-            return Unit.Value;
+            if (action.CommunityIdentityGuid is not null)
+            {
+                await Mediator.Send(new SetState() {CurrentCommunityIdentity = result.Response});
+            }
+            
+            await HandleSuccess(result, action, true);
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted,
+                IsSuccess = true
+            };
         }
     }
 }

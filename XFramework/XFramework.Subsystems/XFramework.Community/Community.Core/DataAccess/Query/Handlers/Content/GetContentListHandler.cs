@@ -50,20 +50,23 @@ public class GetContentListHandler : QueryBaseHandler, IRequestHandler<GetConten
             .Include(i => i.Entity)
             .Include(i => i.InverseParentContent)
             .ThenInclude(i => i.Entity)
-            .Where(i => i.Guid == $"{request.ContentEntityGuid}")
+            .Where(i => i.Entity.Guid == $"{request.ContentEntityGuid}")
             .Where(i => i.CreatedAt > request.GreaterThan)
             .Where(i => i.IsDeleted == false)
             .Where(i => i.IsEnabled == true)
+            .OrderByDescending(i => i.CreatedAt)
             .Take(request.Limit)
             .AsSplitQuery()
             .AsNoTracking()
             .Select(i => new CommunityContentResponse
             {
+                CreatedAt = i.CreatedAt,
+                ModifiedAt = i.ModifiedAt,
                 Title = i.Title,
                 Text = i.Text,
                 SocialMediaIdentityGuid = Guid.Parse(i.SocialMediaIdentity.Guid),
                 EntityId = i.EntityId,
-                ParentContentId = i.ParentContentId,
+                ParentContentGuid = i.ParentContent == null ? null : Guid.Parse(i.ParentContent.Guid),
                 Guid = Guid.Parse(i.Guid),
                 CommunityIdentity = new()
                 {
@@ -74,8 +77,7 @@ public class GetContentListHandler : QueryBaseHandler, IRequestHandler<GetConten
                     LastActive = i.SocialMediaIdentity.LastActive,
                     Guid = i.SocialMediaIdentity.Guid,
                     EntityGuid = Guid.Parse(i.SocialMediaIdentity.Entity.Guid),
-                    IdentityCredentialGuid = Guid.Parse(i.SocialMediaIdentity.IdentityCredential.Guid),
-                    Avatar = i.SocialMediaIdentity.CommunityIdentityFiles.Where(o => o.Entity.Guid == "996dd417-170c-4ac9-b565-62caf4ab5ccf").MaxBy(o => o.CreatedAt)!.Adapt<CommunityIdentityFileResponse>()
+                    IdentityCredentialGuid = Guid.Parse(i.SocialMediaIdentity.IdentityCredential.Guid)
                 },
                 Entity = i.Entity.Adapt<CommunityContentEntityResponse>(),
                 Files = i.CommunityContentFiles.Adapt<List<CommunityContentFileResponse>>(),

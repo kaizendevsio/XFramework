@@ -31,7 +31,7 @@ public partial class CommunityState
             var result = await CommunityServiceWrapper.GetContentList(new()
             {
                 Limit = 50,
-                GreaterThan = CurrentState.LastPull,
+                GreaterThan = DateTime.MinValue,
                 ContentEntityGuid = Guid.Parse("57ef6c58-07d0-4c6a-aa1c-dd5f6812eb61"),
                 CommunityIdentityGuid = System.Guid.Parse(CurrentState.Identity.Guid)
             });
@@ -39,7 +39,8 @@ public partial class CommunityState
             await HandleFailure(result, action);
             if (result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
             
-            CurrentState.NewsFeedContentList.AddRange(result.Response);
+            //CurrentState.NewsFeedContentList.AddRange(result.Response);
+            CurrentState.NewsFeedContentList = result.Response;
             await Mediator.Send(new SetState() {NewsFeedContentList = CurrentState.NewsFeedContentList, LastPull = DateTime.Now});
             return Unit.Value;
         }

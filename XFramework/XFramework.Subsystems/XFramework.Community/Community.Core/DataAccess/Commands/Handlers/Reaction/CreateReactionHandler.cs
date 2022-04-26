@@ -11,7 +11,7 @@ public class CreateReactionHandler : CommandBaseHandler, IRequestHandler<CreateR
     
     public async Task<CmdResponse> Handle(CreateReactionCmd request, CancellationToken cancellationToken)
     {
-        var communityIdentity = await _dataLayer.CommunityIdentities.AsNoTracking().FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityIdentityGuid}", cancellationToken: cancellationToken);
+        var communityIdentity = await _dataLayer.CommunityIdentities.FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityIdentityGuid}", cancellationToken: cancellationToken);
         if (communityIdentity == null)
         {
             return new ()
@@ -22,7 +22,7 @@ public class CreateReactionHandler : CommandBaseHandler, IRequestHandler<CreateR
             };
         }
         
-        var content = await _dataLayer.CommunityContents.AsNoTracking().FirstOrDefaultAsync(i => i.Guid == $"{request.ContentGuid}", cancellationToken: cancellationToken);
+        var content = await _dataLayer.CommunityContents.FirstOrDefaultAsync(i => i.Guid == $"{request.ContentGuid}", cancellationToken: cancellationToken);
         if (content == null)
         {
             return new ()
@@ -33,7 +33,7 @@ public class CreateReactionHandler : CommandBaseHandler, IRequestHandler<CreateR
             };
         }
         
-        var reactionEntity = await _dataLayer.CommunityContentReactionEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Guid == $"{request.ReactionEntityGuid}", cancellationToken: cancellationToken);
+        var reactionEntity = await _dataLayer.CommunityContentReactionEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.ReactionEntityGuid}", cancellationToken: cancellationToken);
         if (reactionEntity == null)
         {
             return new ()

@@ -21,13 +21,13 @@ namespace Community.Domain.DataTransferObjects
         public string? Text { get; set; }
         public long SocialMediaIdentityId { get; set; }
         public long EntityId { get; set; }
-        public long ParentContentId { get; set; }
+        public long? ParentContentId { get; set; }
         public string Guid { get; set; } = null!;
         public long? CommunityGroupId { get; set; }
 
         public virtual CommunityIdentity? CommunityGroup { get; set; }
         public virtual CommunityContentEntity Entity { get; set; } = null!;
-        public virtual CommunityContent ParentContent { get; set; } = null!;
+        public virtual CommunityContent? ParentContent { get; set; }
         public virtual CommunityIdentity SocialMediaIdentity { get; set; } = null!;
         public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; set; }
         public virtual ICollection<CommunityContentReaction> CommunityContentReactions { get; set; }

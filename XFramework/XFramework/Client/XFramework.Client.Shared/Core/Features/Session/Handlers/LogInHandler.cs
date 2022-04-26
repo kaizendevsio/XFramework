@@ -10,7 +10,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    protected class LogInHandler : ActionHandler<Login>
+    protected class LogInHandler : ActionHandler<Login, CmdResponse>
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
@@ -31,7 +31,7 @@ public partial class SessionState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(Login action, CancellationToken aCancellationToken)
+        public override async Task<CmdResponse> Handle(Login action, CancellationToken aCancellationToken)
         {
             // Inform UI About Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
@@ -43,7 +43,11 @@ public partial class SessionState
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
             
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, true ,"There was an error while trying to sign you in. Please check your credentials and try again")) return Unit.Value;
+            if(await HandleFailure(response, action, true ,"There was an error while trying to sign you in. Please check your credentials and try again")) return new()
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                IsSuccess = false
+            };
            
             // Set Session State To Active
             await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
@@ -99,7 +103,11 @@ public partial class SessionState
             // Inform UI About Not Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
             
-            return Unit.Value;
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted,
+                IsSuccess = true
+            };
         }
     }
 }

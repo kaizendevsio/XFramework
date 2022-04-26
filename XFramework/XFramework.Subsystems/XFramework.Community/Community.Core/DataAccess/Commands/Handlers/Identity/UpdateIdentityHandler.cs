@@ -27,7 +27,6 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
         if (request.CredentialGuid is not null)
         {
             credential = await _dataLayer.IdentityCredentials
-                .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
          
             if (credential == null)
@@ -45,7 +44,6 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
         if (request.CommunityIdentityEntityGuid is not null)
         {
             communityIdentityEntity = await _dataLayer.CommunityIdentityEntities
-                .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Guid == $"{request.CommunityIdentityEntityGuid}", cancellationToken: cancellationToken);
          
             if (communityIdentityEntity == null)

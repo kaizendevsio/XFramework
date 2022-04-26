@@ -421,7 +421,6 @@ namespace Community.Domain.DataTransferObjects
                 entity.HasOne(d => d.ParentContent)
                     .WithMany(p => p.InverseParentContent)
                     .HasForeignKey(d => d.ParentContentId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("socialmediacontent_socialmediacontent_id_fk");
 
                 entity.HasOne(d => d.SocialMediaIdentity)

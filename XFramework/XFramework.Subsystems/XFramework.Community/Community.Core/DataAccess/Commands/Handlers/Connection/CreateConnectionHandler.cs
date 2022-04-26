@@ -7,7 +7,7 @@ public class CreateConnectionHandler : CommandBaseHandler, IRequestHandler<Creat
     public async Task<CmdResponse> Handle(CreateConnectionCmd request, CancellationToken cancellationToken)
     {
         var sourceIdentity = await _dataLayer.CommunityIdentities
-            .AsNoTracking()
+            
             .Where(i => i.Guid == $"{request.SourceCommunityIdentityGuid}")
             .FirstOrDefaultAsync(CancellationToken.None);
      
@@ -22,7 +22,7 @@ public class CreateConnectionHandler : CommandBaseHandler, IRequestHandler<Creat
         }
         
         var targetIdentity = await _dataLayer.CommunityIdentities
-            .AsNoTracking()
+            
             .Where(i => i.Guid == $"{request.TargetCommunityIdentityGuid}")
             .FirstOrDefaultAsync(CancellationToken.None);
      
@@ -37,7 +37,7 @@ public class CreateConnectionHandler : CommandBaseHandler, IRequestHandler<Creat
         }
         
         var connectionEntity = await _dataLayer.CommunityConnectionEntities
-            .AsNoTracking()
+            
             .Where(i => i.Guid == $"{request.CommunityConnectionEntityGuid}")
             .FirstOrDefaultAsync(CancellationToken.None);
      

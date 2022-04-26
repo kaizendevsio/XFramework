@@ -35,6 +35,12 @@
   </ItemGroup>
 
  <ItemGroup>
+   <Reference Include="Community.Domain.Generic">
+     <HintPath>..\..\..\XFramework.Subsystems\XFramework.Community\Community.Domain.Generic\bin\Debug\net6.0\Community.Domain.Generic.dll</HintPath>
+   </Reference>
+   <Reference Include="Community.Integration">
+     <HintPath>..\..\..\XFramework.Subsystems\XFramework.Community\Community.Integration\bin\Debug\net6.0\Community.Integration.dll</HintPath>
+   </Reference>
    <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
      <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
    </Reference>

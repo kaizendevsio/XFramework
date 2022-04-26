@@ -13,7 +13,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    protected class RegisterActionHandler : ActionHandler<Register>
+    protected class RegisterActionHandler : ActionHandler<Register, CmdResponse>
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
@@ -34,19 +34,27 @@ public partial class SessionState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(Register action, CancellationToken aCancellationToken)
+        public override async Task<CmdResponse> Handle(Register action, CancellationToken aCancellationToken)
         {
             // Inform UI About Busy State
             await ReportTask("Creating Account..", true);
 
             // Check If Any Given Data Are Already Existing
-            if (await CheckDuplicateRecords(action)) return Unit.Value;
+            if (await CheckDuplicateRecords(action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.NotAcceptable,
+                IsSuccess = false
+            };
 
             // Check If Passwords Are Correct
             if (!CurrentState.RegisterVm.Password.Equals(CurrentState.RegisterVm.PasswordConfirmation))
             {
                 SweetAlertService.FireAsync("Password does not match",$"", SweetAlertIcon.Error);
-                return Unit.Value;
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.BadRequest,
+                    IsSuccess = false
+                };
             }
             
             // Create Guids
@@ -59,7 +67,11 @@ public partial class SessionState
             identityRequest.Guid = identityGuid;
             
             var identity = await IdentityServiceWrapper.CreateIdentity(identityRequest);
-            if (await HandleFailure(identity, action)) return Unit.Value;
+            if (await HandleFailure(identity, action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                IsSuccess = false
+            };;
             
             // Send Create Credential Request
             await ReportProgress("Creating credential..");
@@ -69,7 +81,11 @@ public partial class SessionState
             credentialRequest.RoleEntity = Guid.Parse("fb2ec753-66b2-4259-b65f-1c6402e58209");
             
             var credential = await IdentityServiceWrapper.CreateCredential(credentialRequest);
-            if (await HandleFailure(credential, action)) return Unit.Value;
+            if (await HandleFailure(credential, action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                IsSuccess = false
+            };
             
             // Send Create Phone Contact Request
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
@@ -81,7 +97,11 @@ public partial class SessionState
                     ContactType = GenericContactType.Phone,
                     Value = CurrentState.RegisterVm.PhoneNumber
                 });
-                if (await HandleFailure(phoneContact, action)) return Unit.Value;
+                if (await HandleFailure(phoneContact, action)) return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    IsSuccess = false
+                };
             }
             
             // Send Create Email Contact Request
@@ -94,7 +114,11 @@ public partial class SessionState
                     ContactType = GenericContactType.Email,
                     Value = CurrentState.RegisterVm.EmailAddress
                 });
-                if (await HandleFailure(emailContact, action)) return Unit.Value;
+                if (await HandleFailure(emailContact, action)) return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    IsSuccess = false
+                };
             }
 
             // If WalletList property is provided, automatically create wallets
@@ -126,7 +150,11 @@ public partial class SessionState
                 SessionState.LoginVm.Password = CurrentState.RegisterVm.Password; 
                 await Mediator.Send(new Login() {NavigateToOnSuccess = action.NavigateToOnSuccess});
             
-                return Unit.Value;
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.Accepted,
+                    IsSuccess = true
+                };
             }
             
             // If Success URL property is provided, navigate to the given URL
@@ -135,7 +163,11 @@ public partial class SessionState
             // Inform UI About Not Busy State
             ReportTask("Done", false);
             
-            return Unit.Value;
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted,
+                IsSuccess = true
+            };;
         }
 
         private async Task CreateWallets(List<(Guid?, decimal)> walletList, Guid credentialGuid)
