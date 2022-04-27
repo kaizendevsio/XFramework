@@ -7,8 +7,6 @@ public class DataLayer : XnelSystemsContext, IDataLayer
     public DataLayer(DbContextOptions<XnelSystemsContext> options)
         : base(options)
     {
-        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-        AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
     }
 
     public void RollBack()

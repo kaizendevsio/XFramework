@@ -38,13 +38,13 @@ public partial class CommunityState
             await HandleFailure(result, action);
             if (result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
             
-            var updatedContent = await CommunityServiceWrapper.GetContent(new()
+            /*var updatedContent = await CommunityServiceWrapper.GetContent(new()
             {
                 Guid = action.ContentGuid
             });
 
             if(updatedContent.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
-            /*var contentResponse = CurrentState.NewsFeedContentList.FirstOrDefault(i => i.Guid == action.ContentGuid);
+            var contentResponse = CurrentState.NewsFeedContentList.FirstOrDefault(i => i.Guid == action.ContentGuid);
             contentResponse = updatedContent.Response;
 
             await Mediator.Send(new SetState() {NewsFeedContentList = CurrentState.NewsFeedContentList});*/

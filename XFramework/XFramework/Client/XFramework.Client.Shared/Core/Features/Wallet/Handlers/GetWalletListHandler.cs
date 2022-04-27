@@ -8,9 +8,9 @@ public partial class WalletState
 {
     protected class GetWalletListHandler : ActionHandler<GetWalletList>
     {
-        public IClientWalletServiceWrapper WalletServiceWrapper { get; }
+        public IWalletServiceWrapper WalletServiceWrapper { get; }
 
-        public GetWalletListHandler(IClientWalletServiceWrapper walletServiceWrapper, IConfiguration configuration,
+        public GetWalletListHandler(IWalletServiceWrapper walletServiceWrapper, IConfiguration configuration,
             ISessionStorageService sessionStorageService, ILocalStorageService localStorageService,
             SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints,
             IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) :

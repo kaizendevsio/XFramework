@@ -4,10 +4,12 @@ using TypeSupport.Extensions;
 using XFramework.Client.Shared.Core.Features.Configuration;
 using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Cache;
+using XFramework.Client.Shared.Core.Features.Community;
 using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Session;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Client.Shared.Core.Services;
+using XFramework.Client.Shared.Entity.Enums;
 using XFramework.Integration.Security;
 
 namespace XFramework.Client.Shared.Core.Features;
@@ -34,6 +36,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     protected LayoutState LayoutState => Store.GetState<LayoutState>();
     protected CacheState CacheState => Store.GetState<CacheState>();
     protected WalletState WalletState => Store.GetState<WalletState>();
+    protected CommunityState CommunityState => Store.GetState<CommunityState>();
 
     protected ActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService,
         NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient,
@@ -156,45 +159,70 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         if (s is null) return;
         NavigationManager.NavigateTo(s.ToString());
     }
-    public async Task Persist<TState>(TState state)
+    public async Task Persist<TState>(TState state, PersistStateBy persistStateBy = PersistStateBy.SessionStorage)
     {
-        if (IndexedDbService is null) Console.WriteLine("IndexedDbService is not initialized!");
-        if (IndexedDbService.Database is null)
+        switch (persistStateBy)
         {
-            if (IndexedDbService.IsInitializing)
-            {
-                await IndexedDbService.TaskCompletionSource.Task;
-                goto ResumeTask;
-            }
-            await IndexedDbService.InitializeDb();
-        };
-        
-        ResumeTask:
-        var stateName = state.GetType().Name;
-        var stateEntry = IndexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == stateName);
-        var stateValue = JsonSerializer.Serialize(state);
+            case PersistStateBy.NotSpecified:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.LocalStorage:
+                await LocalStorageService.SetItemAsync(state.GetType().Name, state);
+                break;
+            case PersistStateBy.SessionStorage:
+                await SessionStorageService.SetItemAsync(state.GetType().Name, state);
+                break;
+            case PersistStateBy.IndexDb:
+                #region Implementation
 
-        if (stateEntry is null)
-        {
-            //IndexedDbService.Database.StateCache.Clear();
-            await IndexedDbService.InitializeDb();
-            IndexedDbService.Database.StateCache.Add(new()
-            {
-                Key = stateName,
-                Value = stateValue
-                //Signature = stateValue.ToMd5()
-            });
-            Console.WriteLine($"'{stateName}' State Added To Indexed DB ");
-        }
-        else
-        {
-            stateEntry.Value = stateValue;
-            //stateEntry.Signature = stateValue.ToMd5();
-            Console.WriteLine($"'{stateName}' State Updated To Indexed DB ");
-        }
+                if (IndexedDbService is null) Console.WriteLine("IndexedDbService is not initialized!");
+                if (IndexedDbService.Database is null)
+                {
+                    if (IndexedDbService.IsInitializing)
+                    {
+                        await IndexedDbService.TaskCompletionSource.Task;
+                        goto ResumeTask;
+                    }
+                    await IndexedDbService.InitializeDb();
+                };
         
-        await IndexedDbService.Database.SaveChanges();
-        await IndexedDbService.InitializeDb();
+                ResumeTask:
+                var stateName = state.GetType().Name;
+                var stateEntry = IndexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == stateName);
+                var stateValue = JsonSerializer.Serialize(state);
+
+                if (stateEntry is null)
+                {
+                    //IndexedDbService.Database.StateCache.Clear();
+                    await IndexedDbService.InitializeDb();
+                    IndexedDbService.Database.StateCache.Add(new()
+                    {
+                        Key = stateName,
+                        Value = stateValue
+                        //Signature = stateValue.ToMd5()
+                    });
+                    Console.WriteLine($"'{stateName}' State Added To Indexed DB ");
+                }
+                else
+                {
+                    stateEntry.Value = stateValue;
+                    //stateEntry.Signature = stateValue.ToMd5();
+                    Console.WriteLine($"'{stateName}' State Updated To Indexed DB ");
+                }
+        
+                await IndexedDbService.Database.SaveChanges();
+                await IndexedDbService.InitializeDb();
+
+                #endregion
+                break;
+            case PersistStateBy.CloudStore:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.GoogleDrive:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.OneDrive:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            default:
+                throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null);
+        }
     }
     public async Task ReportTask(string title, bool? isBusy = null)
     {
@@ -212,7 +240,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
 {
     public IConfiguration Configuration { get;set; }
     public IndexedDbService IndexedDbService { get; set; }
-    protected ISessionStorageService SessionStorageService { get; set; }
+    public ISessionStorageService SessionStorageService { get; set; }
     public ILocalStorageService LocalStorageService { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
     protected NavigationManager NavigationManager { get; set; }
@@ -351,45 +379,70 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
         if (s is null) return;
         NavigationManager.NavigateTo(s.ToString());
     }
-    public async Task Persist<TState>(TState state)
+    public async Task Persist<TState>(TState state, PersistStateBy persistStateBy = PersistStateBy.SessionStorage)
     {
-        if (IndexedDbService is null) Console.WriteLine("IndexedDbService is not initialized!");
-        if (IndexedDbService.Database is null)
+        switch (persistStateBy)
         {
-            if (IndexedDbService.IsInitializing)
-            {
-                await IndexedDbService.TaskCompletionSource.Task;
-                goto ResumeTask;
-            }
-            await IndexedDbService.InitializeDb();
-        };
-        
-        ResumeTask:
-        var stateName = state.GetType().Name;
-        var stateEntry = IndexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == stateName);
-        var stateValue = JsonSerializer.Serialize(state);
+            case PersistStateBy.NotSpecified:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.LocalStorage:
+                await LocalStorageService.SetItemAsync(state.GetType().Name, state);
+                break;
+            case PersistStateBy.SessionStorage:
+                await SessionStorageService.SetItemAsync(state.GetType().Name, state);
+                break;
+            case PersistStateBy.IndexDb:
+                #region Implementation
 
-        if (stateEntry is null)
-        {
-            //IndexedDbService.Database.StateCache.Clear();
-            await IndexedDbService.InitializeDb();
-            IndexedDbService.Database.StateCache.Add(new()
-            {
-                Key = stateName,
-                Value = stateValue
-                //Signature = stateValue.ToMd5()
-            });
-            Console.WriteLine($"'{stateName}' State Added To Indexed DB ");
-        }
-        else
-        {
-            stateEntry.Value = stateValue;
-            //stateEntry.Signature = stateValue.ToMd5();
-            Console.WriteLine($"'{stateName}' State Updated To Indexed DB ");
-        }
+                if (IndexedDbService is null) Console.WriteLine("IndexedDbService is not initialized!");
+                if (IndexedDbService.Database is null)
+                {
+                    if (IndexedDbService.IsInitializing)
+                    {
+                        await IndexedDbService.TaskCompletionSource.Task;
+                        goto ResumeTask;
+                    }
+                    await IndexedDbService.InitializeDb();
+                };
         
-        await IndexedDbService.Database.SaveChanges();
-        await IndexedDbService.InitializeDb();
+                ResumeTask:
+                var stateName = state.GetType().Name;
+                var stateEntry = IndexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == stateName);
+                var stateValue = JsonSerializer.Serialize(state);
+
+                if (stateEntry is null)
+                {
+                    //IndexedDbService.Database.StateCache.Clear();
+                    await IndexedDbService.InitializeDb();
+                    IndexedDbService.Database.StateCache.Add(new()
+                    {
+                        Key = stateName,
+                        Value = stateValue
+                        //Signature = stateValue.ToMd5()
+                    });
+                    Console.WriteLine($"'{stateName}' State Added To Indexed DB ");
+                }
+                else
+                {
+                    stateEntry.Value = stateValue;
+                    //stateEntry.Signature = stateValue.ToMd5();
+                    Console.WriteLine($"'{stateName}' State Updated To Indexed DB ");
+                }
+        
+                await IndexedDbService.Database.SaveChanges();
+                await IndexedDbService.InitializeDb();
+
+                #endregion
+                break;
+            case PersistStateBy.CloudStore:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.GoogleDrive:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.OneDrive:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            default:
+                throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null);
+        }
     }
     public async Task ReportTask(string title, bool? isBusy = null)
     {

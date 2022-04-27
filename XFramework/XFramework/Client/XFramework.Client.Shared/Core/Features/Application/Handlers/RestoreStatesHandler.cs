@@ -1,5 +1,6 @@
 using Blazored.LocalStorage;
 using Microsoft.Extensions.Configuration;
+using XFramework.Client.Shared.Core.Features.Community;
 using XFramework.Client.Shared.Core.Features.Wallet;
 
 namespace XFramework.Client.Shared.Core.Features.Application;
@@ -32,9 +33,10 @@ public partial class ApplicationState
             { 
                 await IndexedDbService.InitializeDb();
                 
-                StateHelper.RestoreState(Mediator, IndexedDbService,new ApplicationState.SetState() , ApplicationState);
-                StateHelper.RestoreState(Mediator,IndexedDbService ,new SessionState.SetState() , SessionState);
-                StateHelper.RestoreState(Mediator,IndexedDbService ,new WalletState.SetState() , WalletState);
+                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService, new ApplicationState.SetState() , ApplicationState);
+                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new SessionState.SetState() , SessionState);
+                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new WalletState.SetState() , WalletState);
+                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new CommunityState.SetState() , CommunityState);
             }
             catch (Exception e)
             {

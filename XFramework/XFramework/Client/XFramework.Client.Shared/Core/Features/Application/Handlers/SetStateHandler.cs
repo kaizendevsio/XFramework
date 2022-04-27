@@ -48,7 +48,7 @@ public partial class ApplicationState
                 SweetAlertService.UpdateAsync(new()
                 {
                     Title = action.ProgressTitle,
-                    Html = $"<img src='assets/img/loader.svg' width='96px' />",
+                    Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
                 });
             }
             if (!string.IsNullOrEmpty(action.ProgressMessage))
@@ -56,7 +56,7 @@ public partial class ApplicationState
                 SweetAlertService.UpdateAsync(new()
                 {
                     Title = CurrentState.ProgressTitle,
-                    Html = $"<img src='assets/img/loader.svg' width='96px' /> <p>{action.ProgressMessage}</p>",
+                    Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div> <p>{action.ProgressMessage}</p>",
                 });
             }
             
@@ -69,7 +69,7 @@ public partial class ApplicationState
                     {
                         Title = CurrentState.ProgressTitle,
                         Text = CurrentState.ProgressMessage,
-                        Html = $"<img src='assets/img/loader.svg' width='96px' />",
+                        Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
                         ShowConfirmButton = false,
                     });
                     break;

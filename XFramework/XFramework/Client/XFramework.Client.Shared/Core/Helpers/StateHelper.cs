@@ -1,4 +1,6 @@
-﻿using TypeSupport.Extensions;
+﻿using Blazored.LocalStorage;
+using TypeSupport.Extensions;
+using XFramework.Client.Shared.Entity.Enums;
 
 namespace XFramework.Client.Shared.Core.Helpers;
 
@@ -45,9 +47,33 @@ public static class StateHelper
         }
     }
 
-    public static void RestoreState<TAction, TState>(IMediator mediator ,IndexedDbService indexedDbService , TAction action, TState state)
+    public static async Task RestoreState<TAction, TState>(IMediator mediator, IndexedDbService indexedDbService, ISessionStorageService sessionStorageService, 
+        ILocalStorageService localStorageService, TAction action, TState state, PersistStateBy persistStateBy = PersistStateBy.SessionStorage)
     {
-        var s = indexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == $"{state.GetType().Name}")?.Value;
+        var s = string.Empty;
+        switch (persistStateBy)
+        {
+            case PersistStateBy.NotSpecified:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.LocalStorage:
+                s = await localStorageService.GetItemAsStringAsync($"{nameof(TState)}", CancellationToken.None);
+                break;
+            case PersistStateBy.SessionStorage:
+                s = await sessionStorageService.GetItemAsStringAsync($"{nameof(TState)}", CancellationToken.None);
+                break;
+            case PersistStateBy.IndexDb:
+                s = indexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == $"{state.GetType().Name}")?.Value;
+                break;
+            case PersistStateBy.CloudStore:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.GoogleDrive:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            case PersistStateBy.OneDrive:
+                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            default:
+                throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null);
+        }
+        
         if (s is null)
         {
             mediator.Send(Activator.CreateInstance<TAction>());

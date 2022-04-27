@@ -7,7 +7,7 @@ public class SignUpRequest
     public string LastName { get; set; }
     public string IdentityName { get; set; }
     public string IdentityDescription { get; set; }
-    public DateTime Dob { get; set; }
+    public DateTime? Dob { get; set; }
     public short Gender { get; set; }
     public short CivilStatus { get; set; }
     public string UserName { get; set; }

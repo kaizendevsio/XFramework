@@ -24,7 +24,7 @@ namespace Community.Domain.DataTransferObjects
         public string? LastName { get; set; }
         public string? IdentityName { get; set; }
         public string? IdentityDescription { get; set; }
-        public DateOnly BirthDate { get; set; }
+        public DateTime BirthDate { get; set; }
         public short Gender { get; set; }
         public bool IsVerified { get; set; }
         public short? CivilStatus { get; set; }

@@ -51,8 +51,4 @@
       <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Responses" />
     </ItemGroup>
-
-    <ItemGroup>
-      <Compile Remove="Entity\Validations\Session\SignUpRequestValidator.cs" />
-    </ItemGroup>
 </Project>

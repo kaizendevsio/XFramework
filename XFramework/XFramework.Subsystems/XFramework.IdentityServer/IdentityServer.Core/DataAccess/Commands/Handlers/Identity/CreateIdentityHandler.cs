@@ -12,7 +12,7 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
         entity.Guid = string.IsNullOrEmpty(entity.Guid) 
             ? Guid.NewGuid().ToString() 
             : $"{request.Guid}";
-        entity.BirthDate = DateOnly.FromDateTime(request.Dob);
+        entity.BirthDate = request.Dob is null ? DateOnly.MinValue.AddDays(1) : DateOnly.FromDateTime(request.Dob.Value);
             
         await _dataLayer.IdentityInformations.AddAsync(entity, cancellationToken);
         await _dataLayer.SaveChangesAsync(cancellationToken);

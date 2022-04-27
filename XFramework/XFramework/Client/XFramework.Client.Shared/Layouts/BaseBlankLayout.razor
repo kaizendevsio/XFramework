@@ -1,29 +1,43 @@
-
-@if (_stateRestored)
-{
-    @Body
-}
-else
-{
-    @*<div class="text-center" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%)">
-        <img class="" src="assets/images/favicon.png" alt="" width="150px">
-    </div>*@
-    
-    <p class="mt-4 text-uppercase position-absolute text-muted w-100 text-center" style="bottom: 20px">Initializing..</p>
-}
-
-@code
-{
-    bool _stateRestored;
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+<CascadingValue Value="this">
+    @if (_stateRestored)
     {
-        if (firstRender)
+        @Body
+    }
+    else
+    {
+        <div style="background-color: @SplashBackground; width: 100vw; height: 100vh">
+            <div class="text-center" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%)">
+                <img class="" src="@SplashLogo" alt="" width="150px">
+            </div>
+        </div>
+       
+        <div class="text-center" style="position: absolute; top: 65%; left: 50%; transform: translate(-50%,-50%); width: 70%">
+            <div class="loadingio-spinner-ellipsis-hm5jphe6my"><div class="ldio-o8ctnog1lcq">
+                <div></div><div></div><div></div><div></div><div></div>
+            </div></div>
+        </div>
+        
+        @*<p class="mt-4 text-uppercase position-absolute text-muted w-100 text-center" style="bottom: 20px">Initializing..</p>*@
+    }
+    
+    @code
+    {
+        public string SplashSpinner { get; set; } = "assets/img/loader.svg";
+        public string SplashLogo { get; set; } = "assets/img/logo.svg";
+        public string SplashBackground { get; set; } = "white";
+        
+        bool _stateRestored;
+        protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            new Timer(new TimerCallback(async (e) =>
+            if (firstRender)
             {
-                await Mediator.Send(new ApplicationState.RestoreStates()).ContinueWith(t => { _stateRestored = true; StateHasChanged(); });
-            })
-            , null, 10, 0);
+                new Timer(new TimerCallback(async (e) =>
+                {
+                    await Mediator.Send(new ApplicationState.RestoreStates()).ContinueWith(t => { _stateRestored = true; StateHasChanged(); });
+                })
+                , null, 10, 0);
+            }
         }
     }
-}
+</CascadingValue>
+
