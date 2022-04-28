@@ -7,6 +7,7 @@ namespace Messaging.Domain.DataTransferObjects
     {
         public MessageType()
         {
+            MessageDirects = new HashSet<MessageDirect>();
             MessageThreadEntities = new HashSet<MessageThreadEntity>();
         }
 
@@ -19,6 +20,7 @@ namespace Messaging.Domain.DataTransferObjects
         public short Priority { get; set; }
         public string Guid { get; set; } = null!;
 
+        public virtual ICollection<MessageDirect> MessageDirects { get; set; }
         public virtual ICollection<MessageThreadEntity> MessageThreadEntities { get; set; }
     }
 }

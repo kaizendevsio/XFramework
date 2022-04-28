@@ -51,6 +51,7 @@ public interface IDataLayer
     public DbSet<Message> Messages { get; set; }
     public DbSet<MessageDelivery> MessageDeliveries { get; set; }
     public DbSet<MessageDeliveryEntity> MessageDeliveryEntities { get; set; }
+    public DbSet<MessageDirect> MessageDirects { get; set; }
     public DbSet<MessageFile> MessageFiles { get; set; }
     public DbSet<MessageReaction> MessageReactions { get; set; }
     public DbSet<MessageReactionEntity> MessageReactionEntities { get; set; }

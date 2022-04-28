@@ -1,0 +1,12 @@
+﻿using Messaging.Core.DataAccess.Commands.Entity.Message;
+using Messaging.Domin.Generic.Contracts.Requests.Create;
+
+namespace Messaging.Api.SignalR.Handlers.Message;
+
+public class CreateDirectMessageHandler : BaseSignalRHandler, ISignalREventHandler
+{
+    public void Handle(HubConnection connection, IMediator mediator)
+    {
+        HandleRequest<CreateDirectMessageRequest, CreateDirectMessageCmd>(connection, mediator);
+    }
+}

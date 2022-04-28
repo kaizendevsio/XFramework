@@ -14,5 +14,6 @@
 
     <ItemGroup>
       <Folder Include="BusinessObjects" />
+      <Folder Include="Contracts\Requests\Delete" />
     </ItemGroup>
 </Project>

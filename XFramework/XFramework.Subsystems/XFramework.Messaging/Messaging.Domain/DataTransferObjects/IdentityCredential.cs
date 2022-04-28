@@ -12,6 +12,8 @@ namespace Messaging.Domain.DataTransferObjects
             IdentityFavorites = new HashSet<IdentityFavorite>();
             IdentityRoles = new HashSet<IdentityRole>();
             IdentityVerifications = new HashSet<IdentityVerification>();
+            MessageDirectRecipientNavigations = new HashSet<MessageDirect>();
+            MessageDirectSenderNavigations = new HashSet<MessageDirect>();
             MessageThreadMembers = new HashSet<MessageThreadMember>();
             SessionData = new HashSet<SessionDatum>();
         }
@@ -39,6 +41,8 @@ namespace Messaging.Domain.DataTransferObjects
         public virtual ICollection<IdentityFavorite> IdentityFavorites { get; set; }
         public virtual ICollection<IdentityRole> IdentityRoles { get; set; }
         public virtual ICollection<IdentityVerification> IdentityVerifications { get; set; }
+        public virtual ICollection<MessageDirect> MessageDirectRecipientNavigations { get; set; }
+        public virtual ICollection<MessageDirect> MessageDirectSenderNavigations { get; set; }
         public virtual ICollection<MessageThreadMember> MessageThreadMembers { get; set; }
         public virtual ICollection<SessionDatum> SessionData { get; set; }
     }

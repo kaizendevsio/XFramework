@@ -23,7 +23,7 @@ public class CreateSmsMessageHandler : CommandBaseHandler, IRequestHandler<Creat
             Intent = request.Intent,
             Subject = request.Subject,
             Message = request.Message,
-            Guid = $"{Guid.NewGuid()}",
+            Guid = $"{request.ClientReference}",
             Status = (int) (request.IsScheduled ? SmsStatus.Scheduled : SmsStatus.Queued)
         });
 

@@ -44,6 +44,7 @@ namespace Messaging.Domain.DataTransferObjects
         public virtual DbSet<Message> Messages { get; set; } = null!;
         public virtual DbSet<MessageDelivery> MessageDeliveries { get; set; } = null!;
         public virtual DbSet<MessageDeliveryEntity> MessageDeliveryEntities { get; set; } = null!;
+        public virtual DbSet<MessageDirect> MessageDirects { get; set; } = null!;
         public virtual DbSet<MessageFile> MessageFiles { get; set; } = null!;
         public virtual DbSet<MessageReaction> MessageReactions { get; set; } = null!;
         public virtual DbSet<MessageReactionEntity> MessageReactionEntities { get; set; } = null!;
@@ -919,6 +920,60 @@ namespace Messaging.Domain.DataTransferObjects
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<MessageDirect>(entity =>
+            {
+                entity.ToTable("MessageDirect", "Messaging");
+
+                entity.HasIndex(e => e.Guid, "messagedirect_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.Intent).HasColumnType("character varying");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.Message).HasColumnType("character varying");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Recipient).HasColumnType("character varying");
+
+                entity.Property(e => e.Sender).HasColumnType("character varying");
+
+                entity.Property(e => e.Subject).HasColumnType("character varying");
+
+                entity.HasOne(d => d.ParentMessage)
+                    .WithMany(p => p.InverseParentMessage)
+                    .HasForeignKey(d => d.ParentMessageId)
+                    .HasConstraintName("messagedirect_messagedirect_id_fk");
+
+                entity.HasOne(d => d.RecipientNavigation)
+                    .WithMany(p => p.MessageDirectRecipientNavigations)
+                    .HasForeignKey(d => d.RecipientId)
+                    .HasConstraintName("messagedirect_identitycredential_2_id_fk");
+
+                entity.HasOne(d => d.SenderNavigation)
+                    .WithMany(p => p.MessageDirectSenderNavigations)
+                    .HasForeignKey(d => d.SenderId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("messagedirect_identitycredential_id_fk");
+
+                entity.HasOne(d => d.Type)
+                    .WithMany(p => p.MessageDirects)
+                    .HasForeignKey(d => d.TypeId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("messagedirect_messagetype_id_fk");
             });
 
             modelBuilder.Entity<MessageFile>(entity =>

@@ -18,6 +18,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="SmsGateway.Domain.Generic">
+          <HintPath>..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\bin\Debug\net6.0\SmsGateway.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="SmsGateway.Integration">
+          <HintPath>..\..\XFramework.SmsGateway\SmsGateway.Integration\bin\Debug\net6.0\SmsGateway.Integration.dll</HintPath>
+        </Reference>
         <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net6.0\StreamFlow.Domain.dll</HintPath>
         </Reference>
