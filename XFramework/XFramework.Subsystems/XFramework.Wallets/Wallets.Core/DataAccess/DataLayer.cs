@@ -69,22 +69,28 @@ public class DataLayer : XnelSystemsContext, IDataLayer
                 switch (property.Metadata.Name)
                 {
                     case "IsEnabled":
-                        property.CurrentValue = true;
+                        property.CurrentValue ??= true;
                         break;
                     case "CreatedAt":
                         if (entry.State == EntityState.Added)
                         {
-                            property.CurrentValue = DateTime.Now;
+                            property.CurrentValue = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc);
                         }
                         break;
                     case "ModifiedAt":
-                        property.CurrentValue = DateTime.Now;
+                        property.CurrentValue = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc);
                         break;
                     case "IsDeleted":
                         property.CurrentValue ??= false;
                         break;
                     case "CreatedBy":
-                        property.CurrentValue ??= (long?)0m;
+                        property.CurrentValue ??= (long?) 0m;
+                        break;
+                    case "Guid":
+                        if (string.IsNullOrEmpty($"{property.CurrentValue}"))
+                        {
+                            property.CurrentValue = $"{Guid.NewGuid()}";
+                        }
                         break;
                     default:
                         break;
