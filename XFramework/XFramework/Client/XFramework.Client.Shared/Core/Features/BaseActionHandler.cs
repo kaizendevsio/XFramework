@@ -159,8 +159,11 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         if (s is null) return;
         NavigationManager.NavigateTo(s.ToString());
     }
-    public async Task Persist<TState>(TState state, PersistStateBy persistStateBy = PersistStateBy.SessionStorage)
+    public async Task Persist<TState>(TState state)
     {
+        var statePersistenceFromAppSettings = Configuration.GetValue<string>("Application:Persistence:State:Driver");
+        var persistStateBy = (PersistStateBy)Enum.Parse(typeof(PersistStateBy), statePersistenceFromAppSettings);
+        
         switch (persistStateBy)
         {
             case PersistStateBy.NotSpecified:
@@ -379,8 +382,12 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
         if (s is null) return;
         NavigationManager.NavigateTo(s.ToString());
     }
-    public async Task Persist<TState>(TState state, PersistStateBy persistStateBy = PersistStateBy.SessionStorage)
+
+    public async Task Persist<TState>(TState state)
     {
+        var statePersistenceFromAppSettings = Configuration.GetValue<string>("Application:Persistence:State:Driver");
+        var persistStateBy = (PersistStateBy)Enum.Parse(typeof(PersistStateBy), statePersistenceFromAppSettings);
+        
         switch (persistStateBy)
         {
             case PersistStateBy.NotSpecified:

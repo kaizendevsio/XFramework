@@ -2,6 +2,7 @@ using Blazored.LocalStorage;
 using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Core.Features.Community;
 using XFramework.Client.Shared.Core.Features.Wallet;
+using XFramework.Client.Shared.Entity.Enums;
 
 namespace XFramework.Client.Shared.Core.Features.Application;
 
@@ -31,12 +32,18 @@ public partial class ApplicationState
         {
             try
             { 
-                await IndexedDbService.InitializeDb();
+                var statePersistenceFromAppSettings = Configuration.GetValue<string>("Application:Persistence:State:Driver");
+                var persistStateBy = (PersistStateBy)Enum.Parse(typeof(PersistStateBy), statePersistenceFromAppSettings);
+
+                if (persistStateBy is PersistStateBy.IndexDb)
+                {
+                    await IndexedDbService.InitializeDb();
+                }
                 
-                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService, new ApplicationState.SetState() , ApplicationState);
-                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new SessionState.SetState() , SessionState);
-                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new WalletState.SetState() , WalletState);
-                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new CommunityState.SetState() , CommunityState);
+                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService, new ApplicationState.SetState() , ApplicationState, persistStateBy);
+                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new SessionState.SetState() , SessionState, persistStateBy);
+                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new WalletState.SetState() , WalletState, persistStateBy);
+                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new CommunityState.SetState() , CommunityState, persistStateBy);
             }
             catch (Exception e)
             {
