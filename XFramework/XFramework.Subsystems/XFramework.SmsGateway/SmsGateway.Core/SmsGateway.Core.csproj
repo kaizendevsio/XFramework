@@ -18,6 +18,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="Messaging.Domin.Generic">
+          <HintPath>..\..\XFramework.Messaging\Messaging.Domin.Generic\bin\Debug\net6.0\Messaging.Domin.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="Messaging.Integration">
+          <HintPath>..\..\XFramework.Messaging\Messaging.Integration\bin\Debug\net6.0\Messaging.Integration.dll</HintPath>
+        </Reference>
         <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
         </Reference>

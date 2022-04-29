@@ -19,6 +19,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="Messaging.Domin.Generic">
+          <HintPath>..\..\XFramework.Messaging\Messaging.Domin.Generic\bin\Debug\net6.0\Messaging.Domin.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="Messaging.Integration">
+          <HintPath>..\..\XFramework.Messaging\Messaging.Integration\bin\Debug\net6.0\Messaging.Integration.dll</HintPath>
+        </Reference>
         <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net6.0\StreamFlow.Domain.dll</HintPath>
         </Reference>

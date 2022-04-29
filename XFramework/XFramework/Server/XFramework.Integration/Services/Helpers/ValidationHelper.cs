@@ -9,7 +9,7 @@ public static class ValidationHelper
         if (convertOnly)
         {
             if (phoneNumber.Any(char.IsLetter)) return phoneNumber;
-            if (phoneNumber.Contains('+') != true)
+            if (!phoneNumber.Contains('+'))
             {
                 phoneNumber = $"+63{phoneNumber.Substring(1)}";
             }

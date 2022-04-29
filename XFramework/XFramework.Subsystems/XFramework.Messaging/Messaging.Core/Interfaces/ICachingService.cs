@@ -4,5 +4,5 @@ namespace Messaging.Core.Interfaces;
 
 public interface ICachingService : IXFrameworkService
 {
-    public List<IdentitySessionBO> IdentitySessions { get; set; }
+    public List<MessageDirect> QueuedMessageList { get; set; }
 }

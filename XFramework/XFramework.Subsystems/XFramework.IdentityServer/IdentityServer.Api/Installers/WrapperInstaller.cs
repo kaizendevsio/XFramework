@@ -1,10 +1,12 @@
-﻿using Community.Api.SignalR;
-using Community.Core.Services;
+﻿using IdentityServer.Api.SignalR;
+using IdentityServer.Core.Services;
+using Messaging.Integration.Drivers;
+using Messaging.Integration.Interfaces;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
-namespace Community.Api.Installers;
+namespace IdentityServer.Api.Installers;
 
 public class WrapperInstaller : IInstaller
 {
@@ -13,5 +15,6 @@ public class WrapperInstaller : IInstaller
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
         services.AddTransient<ILoggerWrapper, LoggerService>();
         services.AddSingleton<ISignalRService, SignalRWrapper>();
+        services.AddSingleton<IMessagingServiceWrapper, MessagingServiceDriver>();
     }
 }

@@ -14,10 +14,7 @@ public class ServicesInstaller : IInstaller
     {
         services.AddSingleton<ICachingService, CachingService>();
         services.AddSingleton<IHelperService, HelperService>();
-        services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
-        services.AddTransient<ILoggerWrapper, LoggerService>();
         services.AddSingleton<IJwtService, JwtService>();
-        services.AddSingleton<ISignalRService, SignalRWrapper>();
           
     }
 }

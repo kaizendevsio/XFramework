@@ -4,9 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using SmsGateway.Core.DataAccess.Commands.Entity.Sms;
 using SmsGateway.Core.Interfaces;
 using SmsGateway.Domain.Generic.Contracts.Responses.Sms;
-using SmsGateway.Domain.Generic.Enums;
 
 namespace SmsGateway.Api.Controllers.V1
 {
@@ -39,9 +39,7 @@ namespace SmsGateway.Api.Controllers.V1
         [HttpPatch("MessageSent")]
         public async Task<IActionResult> MessageSent(Guid? guid)
         {
-            var item = _cachingService.PendingMessageList.SingleOrDefault(i => i.Guid == $"{guid}");
-            _cachingService.PendingMessageList.Remove(item);
-
+            Task.Run(async () => await _mediator.Send(new ConfirmSmsMessageSentCmd()));
             return Accepted();
         }
     }

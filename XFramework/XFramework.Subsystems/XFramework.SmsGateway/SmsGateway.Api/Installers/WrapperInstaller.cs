@@ -1,10 +1,15 @@
-﻿using Community.Api.SignalR;
-using Community.Core.Services;
+﻿/*using LoadManna.Integration.Drivers;
+using LoadManna.Integration.Interfaces.Wrappers;*/
+
+using Messaging.Integration.Drivers;
+using Messaging.Integration.Interfaces;
+using SmsGateway.Api.SignalR;
+using SmsGateway.Core.Services;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
-namespace Community.Api.Installers;
+namespace SmsGateway.Api.Installers;
 
 public class WrapperInstaller : IInstaller
 {
@@ -13,5 +18,6 @@ public class WrapperInstaller : IInstaller
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
         services.AddTransient<ILoggerWrapper, LoggerService>();
         services.AddSingleton<ISignalRService, SignalRWrapper>();
+        services.AddSingleton<IMessagingNodeServiceWrapper, MessagingNodeServiceDriver>();
     }
 }

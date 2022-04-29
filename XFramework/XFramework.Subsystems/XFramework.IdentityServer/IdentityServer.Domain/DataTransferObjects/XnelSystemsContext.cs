@@ -67,7 +67,7 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasIndex(e => e.Code, "addresses_refbrgy_code_uindex")
                     .IsUnique();
 
-                entity.HasIndex(e => e.Guid, "_addressbarangay_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_addressbarangay_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -83,17 +83,17 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.AddressBarangays)
                     .HasPrincipalKey(p => p.Code)
                     .HasForeignKey(d => d.CityCode)
-                    .HasConstraintName("_addressbarangay__addresscity_code_fk");
+                    .HasConstraintName("tbl_addressbarangay_tbl_addresscity_code_fk");
             });
 
             modelBuilder.Entity<AddressCity>(entity =>
             {
                 entity.ToTable("AddressCity", "GeoLocation");
 
-                entity.HasIndex(e => e.Code, "_addresscity_code_uindex")
+                entity.HasIndex(e => e.Code, "tbl_addresscity_code_uindex")
                     .IsUnique();
 
-                entity.HasIndex(e => e.Guid, "_addresscity_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_addresscity_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -110,14 +110,14 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasPrincipalKey(p => p.Code)
                     .HasForeignKey(d => d.ProvCode)
                     .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("_addresscity__addressprovince_code_fk");
+                    .HasConstraintName("tbl_addresscity_tbl_addressprovince_code_fk");
             });
 
             modelBuilder.Entity<AddressCountry>(entity =>
             {
                 entity.ToTable("AddressCountry", "GeoLocation");
 
-                entity.HasIndex(e => e.Guid, "_addresscountry_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_addresscountry_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -152,10 +152,10 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("AddressProvince", "GeoLocation");
 
-                entity.HasIndex(e => e.Code, "_addressprovince_code_uindex")
+                entity.HasIndex(e => e.Code, "tbl_addressprovince_code_uindex")
                     .IsUnique();
 
-                entity.HasIndex(e => e.Guid, "_addressprovince_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_addressprovince_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -172,17 +172,17 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasPrincipalKey(p => p.Code)
                     .HasForeignKey(d => d.RegCode)
                     .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("_addressprovince__addressregions_code_fk");
+                    .HasConstraintName("tbl_addressprovince_tbl_addressregions_code_fk");
             });
 
             modelBuilder.Entity<AddressRegion>(entity =>
             {
                 entity.ToTable("AddressRegion", "GeoLocation");
 
-                entity.HasIndex(e => e.Code, "_addressregions_code_uindex")
+                entity.HasIndex(e => e.Code, "tbl_addressregions_code_uindex")
                     .IsUnique();
 
-                entity.HasIndex(e => e.Guid, "_addressregions_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_addressregions_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -199,7 +199,7 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasOne(d => d.Country)
                     .WithMany(p => p.AddressRegions)
                     .HasForeignKey(d => d.CountryId)
-                    .HasConstraintName("_addressregions__addresscountry_id_fk");
+                    .HasConstraintName("tbl_addressregions_tbl_addresscountry_id_fk");
             });
 
             modelBuilder.Entity<Application>(entity =>
@@ -230,14 +230,14 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.Applications)
                     .HasForeignKey(d => d.EnterpriseId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("_applications__enterprises_id_fk");
+                    .HasConstraintName("tbl_applications_tbl_enterprises_id_fk");
             });
 
             modelBuilder.Entity<AuditField>(entity =>
             {
                 entity.ToTable("AuditField", "Audit");
 
-                entity.HasIndex(e => e.Guid, "_auditfields_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_auditfields_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -255,7 +255,7 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("AuditHistory", "Audit");
 
-                entity.HasIndex(e => e.Guid, "_audithistory_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_audithistory_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -283,9 +283,9 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("AuthorizationLog", "Audit");
 
-                entity.HasIndex(e => e.IdentityCredentialsId, "IX__IdentityAuthorizationLogs_IdentityCredentialsID");
+                entity.HasIndex(e => e.IdentityCredentialsId, "IX_tbl_IdentityAuthorizationLogs_IdentityCredentialsID");
 
-                entity.HasIndex(e => e.Guid, "_authorizationlogs_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_authorizationlogs_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -314,7 +314,7 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.AuthorizationLogs)
                     .HasForeignKey(d => d.IdentityCredentialsId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_userauthhistory_fk");
+                    .HasConstraintName("tbl_userauthhistory_fk");
             });
 
             modelBuilder.Entity<CurrencyEntity>(entity =>
@@ -323,7 +323,7 @@ namespace IdentityServer.Domain.DataTransferObjects
 
                 entity.Property(e => e.Id)
                     .HasColumnName("id")
-                    .HasDefaultValueSql("nextval('\"Finance\".\"_Currency_id_seq\"'::regclass)");
+                    .HasDefaultValueSql("nextval('\"Finance\".\"tbl_Currency_id_seq\"'::regclass)");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
@@ -399,11 +399,11 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("IdentityAddress", "Identity");
 
-                entity.HasIndex(e => e.AddressEntitiesId, "IX__IdentityAddresses_AddressEntitiesID");
+                entity.HasIndex(e => e.AddressEntitiesId, "IX_tbl_IdentityAddresses_AddressEntitiesID");
 
-                entity.HasIndex(e => e.IdentityInfoId, "IX__IdentityAddresses_UserInfoID");
+                entity.HasIndex(e => e.IdentityInfoId, "IX_tbl_IdentityAddresses_UserInfoID");
 
-                entity.HasIndex(e => e.Guid, "_identityaddresses_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_identityaddresses_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -437,17 +437,17 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasOne(d => d.BarangayNavigation)
                     .WithMany(p => p.IdentityAddresses)
                     .HasForeignKey(d => d.Barangay)
-                    .HasConstraintName("_identityaddresses__id_fk_brgy");
+                    .HasConstraintName("tbl_identityaddresses__id_fk_brgy");
 
                 entity.HasOne(d => d.CityNavigation)
                     .WithMany(p => p.IdentityAddresses)
                     .HasForeignKey(d => d.City)
-                    .HasConstraintName("_identityaddresses__id_fk_city");
+                    .HasConstraintName("tbl_identityaddresses__id_fk_city");
 
                 entity.HasOne(d => d.CountryNavigation)
                     .WithMany(p => p.IdentityAddresses)
                     .HasForeignKey(d => d.Country)
-                    .HasConstraintName("_identityaddresses__addresscountry__fk");
+                    .HasConstraintName("tbl_identityaddresses_tbl_addresscountry__fk");
 
                 entity.HasOne(d => d.IdentityInfo)
                     .WithMany(p => p.IdentityAddresses)
@@ -458,19 +458,19 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasOne(d => d.ProvinceNavigation)
                     .WithMany(p => p.IdentityAddresses)
                     .HasForeignKey(d => d.Province)
-                    .HasConstraintName("_identityaddresses__id_fk_province");
+                    .HasConstraintName("tbl_identityaddresses__id_fk_province");
 
                 entity.HasOne(d => d.RegionNavigation)
                     .WithMany(p => p.IdentityAddresses)
                     .HasForeignKey(d => d.Region)
-                    .HasConstraintName("_identityaddresses__id_fk");
+                    .HasConstraintName("tbl_identityaddresses__id_fk");
             });
 
             modelBuilder.Entity<IdentityAddressEntity>(entity =>
             {
                 entity.ToTable("IdentityAddressEntity", "Identity");
 
-                entity.HasIndex(e => e.Guid, "_identityaddressentities_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_identityaddressentities_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -490,9 +490,9 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("IdentityContact", "Identity");
 
-                entity.HasIndex(e => e.UcentitiesId, "IX__IdentityContacts_UCEntitiesID");
+                entity.HasIndex(e => e.UcentitiesId, "IX_tbl_IdentityContacts_UCEntitiesID");
 
-                entity.HasIndex(e => e.UserCredentialId, "_identitycontacts_usercredentialid_index");
+                entity.HasIndex(e => e.UserCredentialId, "tbl_identitycontacts_usercredentialid_index");
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
@@ -521,14 +521,14 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasOne(d => d.UserCredential)
                     .WithMany(p => p.IdentityContacts)
                     .HasForeignKey(d => d.UserCredentialId)
-                    .HasConstraintName("_identitycontacts___fk");
+                    .HasConstraintName("tbl_identitycontacts___fk");
             });
 
             modelBuilder.Entity<IdentityContactEntity>(entity =>
             {
                 entity.ToTable("IdentityContactEntity", "Identity");
 
-                entity.HasIndex(e => e.Guid, "_identitycontactentities_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_identitycontactentities_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -548,12 +548,12 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("IdentityCredential", "Identity");
 
-                entity.HasIndex(e => e.IdentityInfoId, "IX__IdentityCredentials_IdentityInfoID");
+                entity.HasIndex(e => e.IdentityInfoId, "IX_tbl_IdentityCredentials_IdentityInfoID");
 
-                entity.HasIndex(e => e.Guid, "_identitycredentials_cuid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_identitycredentials_cuid_uindex")
                     .IsUnique();
 
-                entity.HasIndex(e => e.UserName, "_identitycredentials_un")
+                entity.HasIndex(e => e.UserName, "tbl_identitycredentials_un")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -579,28 +579,28 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.IdentityCredentials)
                     .HasForeignKey(d => d.ApplicationId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("_identitycredentials___fk");
+                    .HasConstraintName("tbl_identitycredentials___fk");
 
                 entity.HasOne(d => d.IdentityInfo)
                     .WithMany(p => p.IdentityCredentials)
                     .HasForeignKey(d => d.IdentityInfoId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_identitycredentials_fk");
+                    .HasConstraintName("tbl_identitycredentials_fk");
             });
 
             modelBuilder.Entity<IdentityFavorite>(entity =>
             {
                 entity.ToTable("IdentityFavorite", "Identity");
 
-                entity.HasIndex(e => e.Id, "_userfavorites_\"id\"_uindex")
+                entity.HasIndex(e => e.Id, "tbl_userfavorites_\"id\"_uindex")
                     .IsUnique();
 
-                entity.HasIndex(e => e.Guid, "_userfavorites_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_userfavorites_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
-                    .HasDefaultValueSql("nextval('\"Identity\".\"_IdentityFavorites_ID_seq\"'::regclass)");
+                    .HasDefaultValueSql("nextval('\"Identity\".\"tbl_IdentityFavorites_ID_seq\"'::regclass)");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
@@ -622,19 +622,19 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.HasOne(d => d.FavoriteEntity)
                     .WithMany(p => p.IdentityFavorites)
                     .HasForeignKey(d => d.FavoriteEntityId)
-                    .HasConstraintName("_userfavorites__favoriteentities_id_fk");
+                    .HasConstraintName("tbl_userfavorites_tbl_favoriteentities_id_fk");
 
                 entity.HasOne(d => d.IdentityCredential)
                     .WithMany(p => p.IdentityFavorites)
                     .HasForeignKey(d => d.IdentityCredentialId)
-                    .HasConstraintName("_userfavorites__identitycredentials_id_fk");
+                    .HasConstraintName("tbl_userfavorites_tbl_identitycredentials_id_fk");
             });
 
             modelBuilder.Entity<IdentityInformation>(entity =>
             {
                 entity.ToTable("IdentityInformation", "Identity");
 
-                entity.HasIndex(e => e.Guid, "_userinfo_un")
+                entity.HasIndex(e => e.Guid, "tbl_userinfo_un")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -661,9 +661,9 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("IdentityRole", "Identity");
 
-                entity.HasIndex(e => e.RoleEntityId, "IX__IdentityRoles_RoleEntityID");
+                entity.HasIndex(e => e.RoleEntityId, "IX_tbl_IdentityRoles_RoleEntityID");
 
-                entity.HasIndex(e => e.UserCredId, "IX__IdentityRoles_UserCredID");
+                entity.HasIndex(e => e.UserCredId, "IX_tbl_IdentityRoles_UserCredID");
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
@@ -682,13 +682,13 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.IdentityRoles)
                     .HasForeignKey(d => d.RoleEntityId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_identityroles_fk_1");
+                    .HasConstraintName("tbl_identityroles_fk_1");
 
                 entity.HasOne(d => d.UserCred)
                     .WithMany(p => p.IdentityRoles)
                     .HasForeignKey(d => d.UserCredId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_identityroles_fk");
+                    .HasConstraintName("tbl_identityroles_fk");
             });
 
             modelBuilder.Entity<IdentityRoleEntity>(entity =>
@@ -712,7 +712,7 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.IdentityRoleEntities)
                     .HasForeignKey(d => d.ApplicationId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("_identityroleentities__applications_id_fk");
+                    .HasConstraintName("tbl_identityroleentities_tbl_applications_id_fk");
 
                 entity.HasOne(d => d.Group)
                     .WithMany(p => p.IdentityRoleEntities)
@@ -752,11 +752,11 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("IdentityVerification", "Identity");
 
-                entity.HasIndex(e => e.IdentityCredId, "IX__IdentityVerifications_IdentityCredID");
+                entity.HasIndex(e => e.IdentityCredId, "IX_tbl_IdentityVerifications_IdentityCredID");
 
-                entity.HasIndex(e => e.VerificationTypeId, "IX__IdentityVerifications_VerificationTypeID");
+                entity.HasIndex(e => e.VerificationTypeId, "IX_tbl_IdentityVerifications_VerificationTypeID");
 
-                entity.HasIndex(e => e.Guid, "_identityverifications_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_identityverifications_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -781,20 +781,20 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.IdentityVerifications)
                     .HasForeignKey(d => d.IdentityCredId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_UserVerifications_AuthID");
+                    .HasConstraintName("tbl_UserVerifications_AuthID");
 
                 entity.HasOne(d => d.VerificationType)
                     .WithMany(p => p.IdentityVerifications)
                     .HasForeignKey(d => d.VerificationTypeId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_UserVerifications_VerificationTypeID");
+                    .HasConstraintName("tbl_UserVerifications_VerificationTypeID");
             });
 
             modelBuilder.Entity<IdentityVerificationEntity>(entity =>
             {
                 entity.ToTable("IdentityVerificationEntity", "Identity");
 
-                entity.HasIndex(e => e.Guid, "_identityverificationentities_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_identityverificationentities_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -814,7 +814,7 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("Log", "Audit");
 
-                entity.HasIndex(e => e.ApplicationId, "IX__ApplicationLogs_AppID");
+                entity.HasIndex(e => e.ApplicationId, "IX_tbl_ApplicationLogs_AppID");
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
@@ -839,19 +839,19 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.Logs)
                     .HasForeignKey(d => d.ApplicationId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_applogs_appid_fk");
+                    .HasConstraintName("tbl_applogs_appid_fk");
             });
 
             modelBuilder.Entity<RegistryConfiguration>(entity =>
             {
                 entity.ToTable("RegistryConfiguration", "Registry");
 
-                entity.HasIndex(e => e.Guid, "_configurations_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_configurations_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
-                    .HasDefaultValueSql("nextval('\"Registry\".\"_Configuration_ID_seq\"'::regclass)");
+                    .HasDefaultValueSql("nextval('\"Registry\".\"tbl_Configuration_ID_seq\"'::regclass)");
 
                 entity.Property(e => e.ApplicationId).HasColumnName("ApplicationID");
 
@@ -872,24 +872,24 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.RegistryConfigurations)
                     .HasForeignKey(d => d.ApplicationId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("_applicationconfiguration__application_id_fk");
+                    .HasConstraintName("tbl_applicationconfiguration_tbl_application_id_fk");
 
                 entity.HasOne(d => d.Group)
                     .WithMany(p => p.RegistryConfigurations)
                     .HasForeignKey(d => d.GroupId)
-                    .HasConstraintName("_configurations__configurationgroup_id_fk");
+                    .HasConstraintName("tbl_configurations_tbl_configurationgroup_id_fk");
             });
 
             modelBuilder.Entity<RegistryConfigurationGroup>(entity =>
             {
                 entity.ToTable("RegistryConfigurationGroup", "Registry");
 
-                entity.HasIndex(e => e.Guid, "_configurationgroup_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_configurationgroup_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
-                    .HasDefaultValueSql("nextval('\"Registry\".\"_ConfigurationGroup_ID_seq\"'::regclass)");
+                    .HasDefaultValueSql("nextval('\"Registry\".\"tbl_ConfigurationGroup_ID_seq\"'::regclass)");
 
                 entity.Property(e => e.Description).HasMaxLength(1000);
 
@@ -905,15 +905,15 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("RegistryFavoriteEntity", "Registry");
 
-                entity.HasIndex(e => e.Id, "_favoriteentities_\"id\"_uindex")
+                entity.HasIndex(e => e.Id, "tbl_favoriteentities_\"id\"_uindex")
                     .IsUnique();
 
-                entity.HasIndex(e => e.Guid, "_favoriteentities_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_favoriteentities_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
                     .HasColumnName("ID")
-                    .HasDefaultValueSql("nextval('\"Registry\".\"_FavoriteEntities_ID_seq\"'::regclass)");
+                    .HasDefaultValueSql("nextval('\"Registry\".\"tbl_FavoriteEntities_ID_seq\"'::regclass)");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -935,11 +935,11 @@ namespace IdentityServer.Domain.DataTransferObjects
             {
                 entity.ToTable("SessionData", "Identity");
 
-                entity.HasIndex(e => e.SessionEntityId, "IX__SessionData_SessionEntityID");
+                entity.HasIndex(e => e.SessionEntityId, "IX_tbl_SessionData_SessionEntityID");
 
-                entity.HasIndex(e => e.UserCredentialId, "IX__SessionData_UserCredentialID");
+                entity.HasIndex(e => e.UserCredentialId, "IX_tbl_SessionData_UserCredentialID");
 
-                entity.HasIndex(e => e.Guid, "_sessiondata_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_sessiondata_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)
@@ -962,20 +962,20 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.SessionData)
                     .HasForeignKey(d => d.SessionEntityId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_sessiondata_fk");
+                    .HasConstraintName("tbl_sessiondata_fk");
 
                 entity.HasOne(d => d.UserCredential)
                     .WithMany(p => p.SessionData)
                     .HasForeignKey(d => d.UserCredentialId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("_sessiondata_fk_1");
+                    .HasConstraintName("tbl_sessiondata_fk_1");
             });
 
             modelBuilder.Entity<SessionEntity>(entity =>
             {
                 entity.ToTable("SessionEntity", "Identity");
 
-                entity.HasIndex(e => e.Guid, "_sessionentities_guid_uindex")
+                entity.HasIndex(e => e.Guid, "tbl_sessionentities_guid_uindex")
                     .IsUnique();
 
                 entity.Property(e => e.Id)

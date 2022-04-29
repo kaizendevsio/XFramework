@@ -1,5 +1,5 @@
-﻿using SmsGateway.Domain.Generic.Contracts.Responses.Sms;
-using SmsGateway.Domain.Generic.Enums;
+﻿using Messaging.Domin.Generic.Enums;
+using SmsGateway.Domain.Generic.Contracts.Responses.Sms;
 
 namespace SmsGateway.Core.Services;
 
@@ -7,17 +7,7 @@ public class CachingService : ICachingService
 {
     public CachingService()
     {
-        PendingMessageList = new()
-        {
-            new()
-            {
-                Recipient = "09171132288",
-                Intent = "OTP",
-                Message = "Test",
-                Status = (int) SmsStatus.Queued,
-                ParentMessage = null
-            }
-        };
+        PendingMessageList = new();
         ScheduledMessageList = new();
     }
 

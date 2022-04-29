@@ -1,4 +1,5 @@
 ﻿using Messaging.Core.DataAccess.Commands.Entity.Message;
+using Messaging.Domin.Generic.Enums;
 using SmsGateway.Domain.Generic.Contracts.Requests.Create;
 using SmsGateway.Integration.Interfaces;
 
@@ -7,10 +8,12 @@ namespace Messaging.Core.DataAccess.Commands.Handlers.Message;
 public class CreateDirectMessageHandler : CommandBaseHandler ,IRequestHandler<CreateDirectMessageCmd, CmdResponse>
 {
     private readonly ISmsGatewayServiceWrapper _smsGatewayServiceWrapper;
+    private readonly ICachingService _cachingService;
 
-    public CreateDirectMessageHandler(IDataLayer dataLayer, ISmsGatewayServiceWrapper smsGatewayServiceWrapper)
+    public CreateDirectMessageHandler(IDataLayer dataLayer, ISmsGatewayServiceWrapper smsGatewayServiceWrapper, ICachingService cachingService)
     {
         _smsGatewayServiceWrapper = smsGatewayServiceWrapper;
+        _cachingService = cachingService;
         _dataLayer = dataLayer;
     }
     public async Task<CmdResponse> Handle(CreateDirectMessageCmd request, CancellationToken cancellationToken)
@@ -26,33 +29,12 @@ public class CreateDirectMessageHandler : CommandBaseHandler ,IRequestHandler<Cr
             };
         }
 
-        
-        
-        
-        //_dataLayer.IdentityContacts.FirstOrDefaultAsync(i => i.Value == )
-        
-        
         var clientReference = Guid.NewGuid();
+        request.Sender = request.Sender.ValidatePhoneNumber();
+        request.Recipient = request.Recipient.ValidatePhoneNumber();
+        
         var createSmsMessageRequest = request.Adapt<CreateSmsMessageRequest>();
         createSmsMessageRequest.ClientReference = $"{clientReference}";
-
-        _dataLayer.MessageDirects.Add(new()
-        {
-            Sender = 0,
-            RecipientId = null,
-            Sender = null,
-            Recipient = null,
-            Intent = null,
-            Subject = null,
-            Message = null,
-            Guid = null,
-            Status = 0,
-            ParentMessage = null,
-            RecipientNavigation = null,
-            SenderNavigation = null,
-            Type = messageType,
-            InverseParentMessage = null
-        });
         
         switch (messageType.Guid)
         {
@@ -63,6 +45,55 @@ public class CreateDirectMessageHandler : CommandBaseHandler ,IRequestHandler<Cr
                 break;
         }
         
+        _cachingService.QueuedMessageList.Add(new()
+        {
+            CreatedAt = DateTime.Now,
+            ModifiedAt = DateTime.Now,
+            IsDeleted = false,
+            Message = createSmsMessageRequest.Message,
+            Guid = createSmsMessageRequest.ClientReference,
+            Status = (short) MessageStatus.Queued
+        });
+        
+        MessageDirect? parentMessage = null;
+        if (request.ParentMessageGuid is not null)
+        {
+            parentMessage = await _dataLayer.MessageDirects.SingleOrDefaultAsync(i => i.Guid == $"{request.ParentMessageGuid}", CancellationToken.None);
+        }        
+        
+        var senderIdentityContact = await  _dataLayer.IdentityContacts
+            .Include(i => i.UserCredential)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(i => i.Value == request.Sender, CancellationToken.None);
+
+        var senderIdentityCredential = senderIdentityContact?.UserCredential;
+        
+        var recipientIdentityContact = await  _dataLayer.IdentityContacts
+            .Include(i => i.UserCredential)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(i => i.Value == request.Recipient, CancellationToken.None);
+
+        var recipientIdentityCredential = recipientIdentityContact?.UserCredential;
+
+        _dataLayer.MessageDirects.Add(new()
+        {
+            Sender = request.Sender,
+            Recipient = request.Recipient,
+            Intent = request.Intent,
+            Subject = request.Subject,
+            Message = request.Message,
+            Guid = $"{clientReference}",
+            Status = (short) MessageStatus.Queued,
+            ParentMessage = parentMessage,
+            RecipientNavigation = recipientIdentityCredential,
+            SenderNavigation = senderIdentityCredential,
+            Type = messageType
+        });
+        await _dataLayer.SaveChangesAsync(CancellationToken.None);
+
+        var c = _cachingService.QueuedMessageList.Find(i => i.Guid == $"{createSmsMessageRequest.ClientReference}");
+        c.Status = (short) MessageStatus.Sent;
+
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,

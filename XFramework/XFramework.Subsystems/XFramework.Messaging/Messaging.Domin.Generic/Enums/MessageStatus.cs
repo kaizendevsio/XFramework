@@ -1,6 +1,6 @@
-﻿namespace SmsGateway.Domain.Generic.Enums;
+﻿namespace Messaging.Domin.Generic.Enums;
 
-public enum SmsStatus
+public enum MessageStatus
 {
     NotSpecified = 0,
     Queued = 1,

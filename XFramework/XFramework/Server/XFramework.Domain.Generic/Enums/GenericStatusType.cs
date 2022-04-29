@@ -11,6 +11,7 @@ namespace XFramework.Domain.Generic.Enums
         Error = 3,
         AccessDenied = 4,
         Disabled = 5,
-        Canceled = 6
+        Canceled = 6,
+        Pending = 7
     }
 }

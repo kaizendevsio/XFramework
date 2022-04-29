@@ -4,8 +4,8 @@ public class CachingService : ICachingService
 {
     public CachingService()
     {
-        IdentitySessions = new List<IdentitySessionBO>();
+        QueuedMessageList = new();
     }
-
-    public List<IdentitySessionBO> IdentitySessions { get; set; }
+    
+    public List<MessageDirect> QueuedMessageList { get; set; }
 }

@@ -9,4 +9,5 @@ public class CreateContactRequest : TransactionRequestBase
     public string Value { get; set; }
     public Guid? CredentialGuid { get; set; }
     public Guid? Guid { get; set; }
+    public bool? SendOtp { get; set; }
 }

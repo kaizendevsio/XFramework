@@ -17,6 +17,5 @@
       <Folder Include="Contracts\Requests\Delete" />
       <Folder Include="Contracts\Requests\Get" />
       <Folder Include="Contracts\Responses" />
-      <Folder Include="Enums" />
     </ItemGroup>
 </Project>
