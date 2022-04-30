@@ -26,7 +26,7 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
         {
             return new ()
             {
-                Message = $"Credential with Guid {request.Guid} does not exist",
+                Message = $"Credential with Guid {request.CredentialGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }

@@ -95,7 +95,8 @@ public partial class SessionState
                 {
                     CredentialGuid = credentialGuid,
                     ContactType = GenericContactType.Phone,
-                    Value = CurrentState.RegisterVm.PhoneNumber
+                    Value = CurrentState.RegisterVm.PhoneNumber,
+                    SendOtp = true
                 });
                 if (await HandleFailure(phoneContact, action)) return new()
                 {
