@@ -641,6 +641,8 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasColumnName("ID")
                     .HasIdentityOptions(null, null, null, 2147483647L);
 
+                entity.Property(e => e.ApplicationId).HasColumnName("ApplicationID");
+
                 entity.Property(e => e.FirstName).HasMaxLength(100);
 
                 entity.Property(e => e.Guid)
@@ -655,6 +657,12 @@ namespace IdentityServer.Domain.DataTransferObjects
                 entity.Property(e => e.LastName).HasMaxLength(100);
 
                 entity.Property(e => e.MiddleName).HasMaxLength(100);
+
+                entity.HasOne(d => d.Application)
+                    .WithMany(p => p.IdentityInformations)
+                    .HasForeignKey(d => d.ApplicationId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("identityinformation_application_id_fk");
             });
 
             modelBuilder.Entity<IdentityRole>(entity =>

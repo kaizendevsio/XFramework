@@ -28,7 +28,9 @@ namespace IdentityServer.Domain.DataTransferObjects
         public short Gender { get; set; }
         public bool IsVerified { get; set; }
         public short? CivilStatus { get; set; }
+        public long ApplicationId { get; set; }
 
+        public virtual Application Application { get; set; }
         public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; }
         public virtual ICollection<IdentityCredential> IdentityCredentials { get; set; }
     }

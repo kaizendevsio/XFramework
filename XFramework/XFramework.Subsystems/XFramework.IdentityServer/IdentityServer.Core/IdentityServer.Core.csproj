@@ -13,9 +13,7 @@
       <Folder Include="DataAccess\Commands\Handlers\Application" />
       <Folder Include="DataAccess\Commands\Handlers\Events" />
       <Folder Include="DataAccess\Query\Entity\Events" />
-      <Folder Include="DataAccess\Query\Entity\Identity\Verifications" />
       <Folder Include="DataAccess\Query\Handlers\Events" />
-      <Folder Include="DataAccess\Query\Handlers\Identity\Verifications" />
     </ItemGroup>
 
     <ItemGroup>

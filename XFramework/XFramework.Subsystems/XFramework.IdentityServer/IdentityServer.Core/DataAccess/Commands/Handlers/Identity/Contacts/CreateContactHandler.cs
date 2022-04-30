@@ -83,53 +83,59 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
             };
         }
 
-        var messageTemplate = await _dataLayer.RegistryConfigurations
-            .Where(i => i.ApplicationId == identityCredential.ApplicationId)
-            .Where(i => i.Group.Name == "MessagingService_Otp")
-            .FirstOrDefaultAsync(CancellationToken.None);
-
-        if (messageTemplate is null)
+        switch (request.ContactType)
         {
-            return new()
+            case GenericContactType.Phone:
             {
-                HttpStatusCode = HttpStatusCode.Conflict,
-                IsSuccess = true,
-                Message = "Unable to send message: OTP message template could not be found"
-            };
+                var messageTemplate = await _dataLayer.RegistryConfigurations
+                    .Where(i => i.ApplicationId == identityCredential.ApplicationId)
+                    .Where(i => i.Group.Name == "MessagingService_Otp")
+                    .FirstOrDefaultAsync(CancellationToken.None);
+
+                if (messageTemplate is null)
+                {
+                    return new()
+                    {
+                        HttpStatusCode = HttpStatusCode.Conflict,
+                        IsSuccess = true,
+                        Message = "Unable to send message: OTP message template could not be found"
+                    };
+                }
+
+                var otp = _helperService.GenerateRandomNumber(111111, 999999);
+                var message = messageTemplate.Value.Replace("|Value|", $"{otp}");
+
+                var verificationEntity =
+                    await _dataLayer.IdentityVerificationEntities.FirstOrDefaultAsync(i => i.Name == "SMS",
+                        CancellationToken.None);
+
+                _dataLayer.IdentityVerifications.Add(new()
+                {
+                    Status = (short?) GenericStatusType.Pending,
+                    StatusUpdatedOn = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc),
+                    Token = $"{otp}",
+                    Expiry = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime().AddMinutes((double) verificationEntity.DefaultExpiry), DateTimeKind.Utc),
+                    IdentityCred = identityCredential,
+                    VerificationType = verificationEntity
+                });
+
+                Task.Run(async () =>
+                {
+                    await _messagingServiceWrapper.CreateDirectMessage(new()
+                    {
+                        MessageType = Guid.Parse("f4fca110-790d-41d7-a0be-b5c699c9a9db"),
+                        Sender = "+630000000000",
+                        Recipient = contact.Value,
+                        Subject = "One Time Password",
+                        Intent = "OTP",
+                        Message = message,
+                        IsScheduled = false
+                    });
+                });
+                break;
+            }
         }
 
-        var otp = _helperService.GenerateRandomNumber(111111, 999999);
-        var message = messageTemplate.Value.Replace("|Value|", $"{otp}");
-
-        var verificationEntity =
-            await _dataLayer.IdentityVerificationEntities.FirstOrDefaultAsync(i => i.Name == "SMS",
-                CancellationToken.None);
-
-        _dataLayer.IdentityVerifications.Add(new()
-        {
-            Status = (short?) GenericStatusType.Pending,
-            StatusUpdatedOn = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc),
-            Token = $"{otp}",
-            Expiry = DateTime.SpecifyKind(
-                DateTime.Now.ToUniversalTime().AddMinutes((double) verificationEntity.DefaultExpiry), DateTimeKind.Utc),
-            IdentityCred = identityCredential,
-            VerificationType = verificationEntity
-        });
-
-        Task.Run(async () =>
-        {
-            await _messagingServiceWrapper.CreateDirectMessage(new()
-            {
-                MessageType = Guid.Parse("f4fca110-790d-41d7-a0be-b5c699c9a9db"),
-                Sender = "+630000000000",
-                Recipient = contact.Value,
-                Subject = "One Time Password",
-                Intent = "OTP",
-                Message = message,
-                IsScheduled = false
-            });
-        });
-        
         return new ()
         {
             HttpStatusCode = HttpStatusCode.Accepted

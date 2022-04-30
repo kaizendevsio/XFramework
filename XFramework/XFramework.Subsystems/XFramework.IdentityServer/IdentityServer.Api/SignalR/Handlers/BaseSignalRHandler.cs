@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
-using MessagePack;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Enums;

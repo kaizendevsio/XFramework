@@ -26,6 +26,9 @@
         <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>..\..\..\..\XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
         </Reference>
+        <Reference Include="IdentityServer.Integration">
+          <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\bin\Debug\net6.0\IdentityServer.Integration.dll</HintPath>
+        </Reference>
         <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>..\..\..\..\XFramework\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net6.0\StreamFlow.Domain.Generic.dll</HintPath>
         </Reference>

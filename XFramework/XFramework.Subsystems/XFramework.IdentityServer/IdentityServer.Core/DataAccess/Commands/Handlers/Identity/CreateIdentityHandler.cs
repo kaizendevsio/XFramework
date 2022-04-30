@@ -8,11 +8,14 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
     }
     public async Task<CmdResponse<CreateIdentityCmd>> Handle(CreateIdentityCmd request, CancellationToken cancellationToken)
     {
+        var application = await GetApplication(request.RequestServer.ApplicationId);
+        
         var entity = request.Adapt<IdentityInformation>();
         entity.Guid = string.IsNullOrEmpty(entity.Guid) 
             ? Guid.NewGuid().ToString() 
             : $"{request.Guid}";
         entity.BirthDate = request.Dob is null ? null : DateOnly.FromDateTime(request.Dob.Value);
+        entity.Application = application;
             
         await _dataLayer.IdentityInformations.AddAsync(entity, cancellationToken);
         await _dataLayer.SaveChangesAsync(cancellationToken);

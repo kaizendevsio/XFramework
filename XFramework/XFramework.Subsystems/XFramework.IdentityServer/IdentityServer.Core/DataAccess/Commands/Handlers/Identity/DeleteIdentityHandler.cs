@@ -9,7 +9,6 @@ public class DeleteIdentityHandler : CommandBaseHandler ,IRequestHandler<DeleteI
     public async Task<CmdResponse<DeleteIdentityCmd>> Handle(DeleteIdentityCmd request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.IdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
-
         if (entity == null)
         {
             return new CmdResponse<DeleteIdentityCmd>

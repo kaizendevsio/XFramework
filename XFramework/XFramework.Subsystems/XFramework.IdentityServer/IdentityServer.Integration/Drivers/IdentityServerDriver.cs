@@ -1,7 +1,22 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create;
+using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
+using IdentityServer.Domain.Generic.Contracts.Requests.Get;
+using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Update;
+using IdentityServer.Domain.Generic.Contracts.Requests.Update.Verification;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
+using Microsoft.Extensions.Configuration;
+using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Domain.Generic.Contracts.Responses;
+using XFramework.Integration.Drivers;
+using XFramework.Integration.Interfaces.Wrappers;
+using IdentityServer.Integration.Interfaces;
 
-namespace XFramework.Integration.Drivers;
+namespace IdentityServer.Integration.Drivers;
 
 public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
 {
@@ -155,6 +170,16 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     public async Task<QueryResponse<List<IdentityLocationResponse>>> GetLocationList(GetLocationListRequest request)
     {
         return await SendAsync<GetLocationListRequest, List<IdentityLocationResponse>>("GetLocationList", request);
+    }
+
+    public async Task<QueryResponse<IdentityVerificationSummaryResponse>> CheckVerification(CheckVerificationRequest request)
+    {
+        return await SendAsync<CheckVerificationRequest, IdentityVerificationSummaryResponse>("CheckVerification", request);
+    }
+
+    public async Task<CmdResponse> UpdateVerification(UpdateVerificationRequest request)
+    {
+        return await SendVoidAsync("UpdateVerification", request);
     }
 
     public async Task<QueryResponse<ExistenceResponse>> CheckContactExistence(CheckContactExistenceRequest request)
