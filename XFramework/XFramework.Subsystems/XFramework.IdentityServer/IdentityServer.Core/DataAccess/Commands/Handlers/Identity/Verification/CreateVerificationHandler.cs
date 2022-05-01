@@ -87,20 +87,19 @@ public class CreateVerificationHandler : CommandBaseHandler, IRequestHandler<Cre
                     IdentityCred = identityCredential,
                     VerificationType = verificationType
                 });
-
-                Task.Run(async () =>
+                
+                await _messagingServiceWrapper.CreateDirectMessage(new()
                 {
-                    await _messagingServiceWrapper.CreateDirectMessage(new()
-                    {
-                        MessageType = Guid.Parse("f4fca110-790d-41d7-a0be-b5c699c9a9db"),
-                        Sender = "+630000000000",
-                        Recipient = contact,
-                        Subject = "One Time Password",
-                        Intent = "OTP",
-                        Message = message,
-                        IsScheduled = false
-                    });
+                    MessageType = Guid.Parse("f4fca110-790d-41d7-a0be-b5c699c9a9db"),
+                    Sender = "+630000000000",
+                    Recipient = contact,
+                    Subject = "One Time Password",
+                    Intent = "OTP",
+                    Message = message,
+                    IsScheduled = false
                 });
+                
+                await _dataLayer.SaveChangesAsync(CancellationToken.None);
                 break;
         }
 

@@ -1,5 +1,6 @@
 ﻿using Blazored.LocalStorage;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
 using Mapster;
 using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Core.Features.Application;
@@ -49,8 +50,9 @@ public partial class SessionState
                 IsSuccess = false
             };
 
+            var checkVerification = new QueryResponse<IdentityVerificationSummaryResponse>(); 
             if (action.SkipVerification) goto skipVerification;            
-            var checkVerification = await IdentityServiceWrapper.CheckVerification(new()
+            checkVerification = await IdentityServiceWrapper.CheckVerification(new()
             {
                 CredentialGuid = response.Response.CredentialGuid,
                 VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
@@ -100,7 +102,10 @@ public partial class SessionState
             }
             else
             {
-                NavigationManager.NavigateTo(action.NavigateToOnVerificationRequired);
+                if (!checkVerification.Response.IsVerified)
+                {
+                    NavigationManager.NavigateTo(action.NavigateToOnVerificationRequired);
+                }
             }
 
             // Reset Session Forms

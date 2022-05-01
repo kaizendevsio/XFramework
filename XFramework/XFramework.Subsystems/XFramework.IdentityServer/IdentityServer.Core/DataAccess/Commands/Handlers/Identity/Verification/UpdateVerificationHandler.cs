@@ -12,7 +12,10 @@ public class UpdateVerificationHandler : CommandBaseHandler, IRequestHandler<Upd
     
     public async Task<CmdResponse> Handle(UpdateVerificationCmd request, CancellationToken cancellationToken)
     {
-        var verification = await _dataLayer.IdentityVerifications.FirstOrDefaultAsync(i => i.Token == $"{request.VerificationCode}", CancellationToken.None);
+        var verification = await _dataLayer.IdentityVerifications
+            .Where(i => i.Status == (int?) GenericStatusType.Pending)
+            .Where(i => i.Token == $"{request.VerificationCode}")
+            .FirstOrDefaultAsync(CancellationToken.None);
         if (verification == null)
         {
             return new ()
