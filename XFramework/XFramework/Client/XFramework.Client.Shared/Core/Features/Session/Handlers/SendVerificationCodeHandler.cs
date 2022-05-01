@@ -30,7 +30,7 @@ public partial class SessionState
         {
             var response = await IdentityServiceWrapper.UpdateVerification(new()
             {
-                VerificationCode = action.VerificationCode
+                VerificationCode = CurrentState.SmsVerificationVm.OtpCode
             });
             
             if(await HandleFailure(response, action, true ,"Your otp code is incorrect. Please try again")) return new()
