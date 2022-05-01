@@ -12,17 +12,17 @@ public class UpdateVerificationHandler : CommandBaseHandler, IRequestHandler<Upd
     
     public async Task<CmdResponse> Handle(UpdateVerificationCmd request, CancellationToken cancellationToken)
     {
-        var verification = await _dataLayer.IdentityVerifications.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
+        var verification = await _dataLayer.IdentityVerifications.FirstOrDefaultAsync(i => i.Token == $"{request.VerificationCode}", CancellationToken.None);
         if (verification == null)
         {
             return new ()
             {
-                Message = $"Verification with Guid {request.Guid} does not exist",
+                Message = $"Verification with token {request.VerificationCode} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
-        verification.Status = (short?) request.Status;
+        verification.Status = (short?) GenericStatusType.Approved;
         _dataLayer.IdentityVerifications.Update(verification);
         await _dataLayer.SaveChangesAsync(CancellationToken.None);
 

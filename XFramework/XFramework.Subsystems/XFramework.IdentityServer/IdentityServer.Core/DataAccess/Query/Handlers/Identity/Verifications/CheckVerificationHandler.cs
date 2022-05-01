@@ -46,7 +46,8 @@ public class CheckVerificationHandler : QueryBaseHandler, IRequestHandler<CheckV
             .Where(i => i.VerificationTypeId == verificationType.Id)
             .Where(i => i.Status == (short?) GenericStatusType.Pending)
             .Where(i => i.Expiry > DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc))
-            .LastOrDefaultAsync(CancellationToken.None);
+            .OrderByDescending(i => i.CreatedAt)
+            .FirstOrDefaultAsync(CancellationToken.None);
         
         if (lastVerification == null)
         {

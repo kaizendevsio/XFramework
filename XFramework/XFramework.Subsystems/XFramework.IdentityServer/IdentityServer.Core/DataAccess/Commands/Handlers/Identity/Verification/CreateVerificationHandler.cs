@@ -33,6 +33,7 @@ public class CreateVerificationHandler : CommandBaseHandler, IRequestHandler<Cre
         
         var identityCredential = await _dataLayer.IdentityCredentials
             .Include(i => i.IdentityContacts)
+            .ThenInclude(i => i.Ucentities)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
        
