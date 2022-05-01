@@ -1,6 +1,7 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
@@ -175,6 +176,11 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     public async Task<QueryResponse<IdentityVerificationSummaryResponse>> CheckVerification(CheckVerificationRequest request)
     {
         return await SendAsync<CheckVerificationRequest, IdentityVerificationSummaryResponse>("CheckVerification", request);
+    }
+
+    public async Task<CmdResponse> CreateVerification(CreateVerificationRequest request)
+    {
+        return await SendVoidAsync("CreateVerification", request);
     }
 
     public async Task<CmdResponse> UpdateVerification(UpdateVerificationRequest request)

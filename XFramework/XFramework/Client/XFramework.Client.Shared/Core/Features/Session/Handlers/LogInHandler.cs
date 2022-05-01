@@ -48,12 +48,37 @@ public partial class SessionState
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 IsSuccess = false
             };
-           
+
+            if (action.SkipVerification) goto skipVerification;            
+            var checkVerification = await IdentityServiceWrapper.CheckVerification(new()
+            {
+                CredentialGuid = response.Response.CredentialGuid,
+                VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
+            });
+
+            if (checkVerification.HttpStatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Accepted))
+            {
+                if(await HandleFailure(checkVerification, action, true ,"There was an error while trying to sign you in: Account verification failure. Please try again")) return new()
+                {
+                    HttpStatusCode = HttpStatusCode.BadRequest,
+                    IsSuccess = false
+                };
+            }
+
+            if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
+            {
+                await IdentityServiceWrapper.CreateVerification(new()
+                {
+                    CredentialGuid = response.Response.CredentialGuid,
+                    VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
+                });
+                
+            }
+
+            skipVerification:
+
             // Set Session State To Active
             await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
-
-            // If Success URL property is provided, navigate to the given URL
-            await HandleSuccess(response, action, true);
             
             // Fetch User Identity And Credential and Contact List
             var identityResponse = await IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});
@@ -67,7 +92,17 @@ public partial class SessionState
                 Credential = credentialResponse.Response,
                 ContactList = contactListResponse.Response
             });
-            
+
+            if (action.SkipVerification)
+            {
+                // If Success URL property is provided, navigate to the given URL
+                await HandleSuccess(response, action, true);
+            }
+            else
+            {
+                NavigationManager.NavigateTo(action.NavigateToOnVerificationRequired);
+            }
+
             // Reset Session Forms
             await Mediator.Send(new SetState()
             {

@@ -1,6 +1,4 @@
-﻿using XFramework.Domain.Generic.BusinessObjects;
-
-namespace PaymentGateways.Core.DataAccess.Commands.Entity
+﻿namespace PaymentGateways.Core.DataAccess.Commands.Entity
 {
     public class CommandBaseEntity
     {

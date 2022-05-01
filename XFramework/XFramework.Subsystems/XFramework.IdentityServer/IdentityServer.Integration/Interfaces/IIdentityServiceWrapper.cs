@@ -1,6 +1,7 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
@@ -56,5 +57,6 @@ public interface IIdentityServiceWrapper : IXFrameworkService
     public Task<QueryResponse<List<IdentityLocationResponse>>> GetLocationList(GetLocationListRequest request);
     
     public Task<QueryResponse<IdentityVerificationSummaryResponse>> CheckVerification(CheckVerificationRequest request);
+    public Task<CmdResponse> CreateVerification(CreateVerificationRequest request);
     public Task<CmdResponse> UpdateVerification(UpdateVerificationRequest request);
 }

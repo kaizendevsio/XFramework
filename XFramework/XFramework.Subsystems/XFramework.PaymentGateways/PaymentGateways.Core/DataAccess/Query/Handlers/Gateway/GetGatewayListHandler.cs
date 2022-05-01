@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using PaymentGateways.Core.DataAccess.Query.Entity.Gateway;
 using PaymentGateways.Core.Interfaces;
 using PaymentGateways.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.BusinessObjects;
 
 namespace PaymentGateways.Core.DataAccess.Query.Handlers.Gateway
 {

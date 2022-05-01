@@ -1,6 +1,4 @@
-﻿using XFramework.Domain.Generic.BusinessObjects;
-
-namespace PaymentGateways.Core.DataAccess.Query.Entity
+﻿namespace PaymentGateways.Core.DataAccess.Query.Entity
 {
     public class QueryBaseEntity
     {

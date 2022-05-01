@@ -10,10 +10,9 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     private readonly IDataLayer _dataLayer;
     private TResponse _response;
 
-    public BasePipelineBehavior(IEnumerable<IValidator<TRequest>> validators, IDataLayer dataLayer)
+    public BasePipelineBehavior(IEnumerable<IValidator<TRequest>> validators)
     {
         _validators = validators;
-        _dataLayer = dataLayer;
     }
 
     public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
@@ -24,22 +23,15 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
             await PreValidation(request);
             // Post Validation
             
-            // Create data layer transaction
-            await using var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
-                
             // Pre Handler
             _response = await next();
             // Post Handler
 
-            // Commit data layer transaction
-            await transaction.CommitAsync(cancellationToken);
             await PostHandler(request);                
-
             return _response;
         }
         catch (Exception e)
         {
-            _dataLayer.RollBack();
             var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
                 
             responseInstance?.GetType().GetProperty("Message")?

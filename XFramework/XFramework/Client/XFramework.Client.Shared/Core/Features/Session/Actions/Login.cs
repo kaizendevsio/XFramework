@@ -6,7 +6,8 @@ public partial class SessionState
     {
         public string NavigateToOnSuccess { get; set; }
         public string NavigateToOnFailure { get; set; }
-        public string NavigateToOnVerificationRequeired { get; set; }
+        public string NavigateToOnVerificationRequired { get; set; }
+        public bool SkipVerification { get; set; }
         public bool InitializeWallets { get; set; }
         public bool AutoRefreshWallets { get; set; }
         public TimeSpan AutoRefreshWalletsInterval { get; set; }
