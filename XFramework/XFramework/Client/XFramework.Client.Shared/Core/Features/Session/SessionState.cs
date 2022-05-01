@@ -11,7 +11,7 @@ public partial class SessionState : State<SessionState>
          LoginVm = new();
          RegisterVm = new();
          ForgotPasswordVm = new();
-
+         SmsVerificationVm = new();
     }
     public Domain.Generic.Enums.SessionState State { get; set; }
     public List<ContactResponse> ContactList { get; set; }
