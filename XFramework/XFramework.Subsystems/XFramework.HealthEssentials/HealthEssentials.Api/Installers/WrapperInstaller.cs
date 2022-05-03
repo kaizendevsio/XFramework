@@ -15,7 +15,6 @@ public class WrapperInstaller : IInstaller
     public void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
-        services.AddTransient<ILoggerWrapper, LoggerService>();
         services.AddSingleton<ISignalRService, SignalRWrapper>();
         services.AddSingleton<ISmsGatewayServiceWrapper, SmsGatewayServiceDriver>();
     }

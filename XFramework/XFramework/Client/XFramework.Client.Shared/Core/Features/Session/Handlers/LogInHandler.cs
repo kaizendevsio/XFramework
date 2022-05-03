@@ -51,32 +51,32 @@ public partial class SessionState
             };
             
             var checkVerification = new QueryResponse<IdentityVerificationSummaryResponse>();
-            
-            if (action.SkipVerification) goto skipVerification;            
-            checkVerification = await IdentityServiceWrapper.CheckVerification(new()
+            if (!action.SkipVerification)
             {
-                CredentialGuid = response.Response.CredentialGuid,
-                VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
-            });
-
-            if (checkVerification.HttpStatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Accepted))
-            {
-                if(await HandleFailure(checkVerification, action, true ,"There was an error while trying to sign you in: Account verification failure. Please try again")) return new()
-                {
-                    HttpStatusCode = HttpStatusCode.BadRequest,
-                    IsSuccess = false
-                };
-            }
-
-            if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
-            {
-                await IdentityServiceWrapper.CreateVerification(new()
+                checkVerification = await IdentityServiceWrapper.CheckVerification(new()
                 {
                     CredentialGuid = response.Response.CredentialGuid,
                     VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
                 });
-            }
-            skipVerification:
+
+                if (checkVerification.HttpStatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Accepted))
+                {
+                    if(await HandleFailure(checkVerification, action, true ,"There was an error while trying to sign you in: Account verification failure. Please try again")) return new()
+                    {
+                        HttpStatusCode = HttpStatusCode.BadRequest,
+                        IsSuccess = false
+                    };
+                }
+
+                if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
+                {
+                    await IdentityServiceWrapper.CreateVerification(new()
+                    {
+                        CredentialGuid = response.Response.CredentialGuid,
+                        VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
+                    });
+                }
+            }         
 
             // Set Session State To Active
             await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
@@ -101,7 +101,7 @@ public partial class SessionState
             }
             else
             {
-                if (!checkVerification.Response.IsVerified)
+                if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
                 {
                     NavigationManager.NavigateTo(action.NavigateToOnVerificationRequired);
                 }

@@ -1,4 +1,8 @@
-﻿namespace HealthEssentials.Api.Installers;
+﻿using HealthEssentials.Core.DataAccess;
+using HealthEssentials.Core.Interfaces;
+using HealthEssentials.Domain.DataTransferObjects;
+
+namespace HealthEssentials.Api.Installers;
 
 public class DbInstaller : IInstaller
 {

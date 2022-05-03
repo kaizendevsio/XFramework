@@ -1,5 +1,7 @@
 ﻿using System.Reflection;
 using FluentValidation;
+using HealthEssentials.Core.DataAccess.Commands.Handlers;
+using HealthEssentials.Core.PipelineBehaviors;
 
 namespace HealthEssentials.Api.Installers;
 

@@ -1,4 +1,6 @@
-﻿using XFramework.Integration.Interfaces;
+﻿using HealthEssentials.Core.Interfaces;
+using HealthEssentials.Core.Services;
+using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services;
 
 namespace HealthEssentials.Api.Installers;
