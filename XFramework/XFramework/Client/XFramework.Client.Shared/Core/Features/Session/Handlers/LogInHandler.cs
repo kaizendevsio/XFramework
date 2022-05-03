@@ -49,8 +49,9 @@ public partial class SessionState
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 IsSuccess = false
             };
-
-            var checkVerification = new QueryResponse<IdentityVerificationSummaryResponse>(); 
+            
+            var checkVerification = new QueryResponse<IdentityVerificationSummaryResponse>();
+            
             if (action.SkipVerification) goto skipVerification;            
             checkVerification = await IdentityServiceWrapper.CheckVerification(new()
             {
@@ -74,9 +75,7 @@ public partial class SessionState
                     CredentialGuid = response.Response.CredentialGuid,
                     VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
                 });
-                
             }
-
             skipVerification:
 
             // Set Session State To Active
@@ -105,6 +104,11 @@ public partial class SessionState
                 if (!checkVerification.Response.IsVerified)
                 {
                     NavigationManager.NavigateTo(action.NavigateToOnVerificationRequired);
+                }
+                else
+                {
+                    // If Success URL property is provided, navigate to the given URL
+                    await HandleSuccess(response, action, true);
                 }
             }
 
