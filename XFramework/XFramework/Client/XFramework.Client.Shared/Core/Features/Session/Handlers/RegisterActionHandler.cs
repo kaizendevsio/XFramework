@@ -206,7 +206,8 @@ public partial class SessionState
                 var phoneExistence = await IdentityServiceWrapper.CheckContactExistence(new()
                 {
                     ContactType = GenericContactType.Phone,
-                    Value = CurrentState.RegisterVm.PhoneNumber
+                    Value = CurrentState.RegisterVm.PhoneNumber,
+                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
                 });
                 if (await HandleFailure(phoneExistence, action)) return true;
             }
@@ -218,7 +219,8 @@ public partial class SessionState
                 var emailExistence = await IdentityServiceWrapper.CheckContactExistence(new()
                 {
                     ContactType = GenericContactType.Email,
-                    Value = CurrentState.RegisterVm.EmailAddress
+                    Value = CurrentState.RegisterVm.EmailAddress,
+                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
                 });
                 if (await HandleFailure(emailExistence, action)) return true;
             }
