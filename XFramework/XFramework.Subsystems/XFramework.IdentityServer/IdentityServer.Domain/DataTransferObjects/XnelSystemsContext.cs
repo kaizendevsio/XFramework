@@ -515,7 +515,7 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .WithMany(p => p.IdentityContacts)
                     .HasForeignKey(d => d.EntityId)
                     .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("EntityId");
+                    .HasConstraintName("UCEntitiesID");
 
                 entity.HasOne(d => d.Group)
                     .WithMany(p => p.IdentityContacts)

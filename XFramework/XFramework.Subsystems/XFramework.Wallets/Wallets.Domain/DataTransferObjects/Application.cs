@@ -8,6 +8,7 @@ namespace Wallets.Domain.DataTransferObjects
         public Application()
         {
             IdentityCredentials = new HashSet<IdentityCredential>();
+            IdentityInformations = new HashSet<IdentityInformation>();
             IdentityRoleEntities = new HashSet<IdentityRoleEntity>();
             Logs = new HashSet<Log>();
             RegistryConfigurations = new HashSet<RegistryConfiguration>();
@@ -28,6 +29,7 @@ namespace Wallets.Domain.DataTransferObjects
 
         public virtual Enterprise Enterprise { get; set; }
         public virtual ICollection<IdentityCredential> IdentityCredentials { get; set; }
+        public virtual ICollection<IdentityInformation> IdentityInformations { get; set; }
         public virtual ICollection<IdentityRoleEntity> IdentityRoleEntities { get; set; }
         public virtual ICollection<Log> Logs { get; set; }
         public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; set; }

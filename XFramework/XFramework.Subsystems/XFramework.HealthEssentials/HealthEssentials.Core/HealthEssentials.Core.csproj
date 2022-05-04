@@ -34,6 +34,7 @@
 
     <ItemGroup>
       <Folder Include="DataAccess\Commands\Validations" />
+      <Folder Include="DataAccess\Query\Handlers\Patient" />
       <Folder Include="Validations" />
     </ItemGroup>
 
