@@ -96,7 +96,8 @@ public partial class SessionState
                     CredentialGuid = credentialGuid,
                     ContactType = GenericContactType.Phone,
                     Value = CurrentState.RegisterVm.PhoneNumber,
-                    SendOtp = true
+                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
+                    SendOtp = action.AutoLogin ? true : false
                 });
                 if (await HandleFailure(phoneContact, action)) return new()
                 {
@@ -113,7 +114,8 @@ public partial class SessionState
                 {
                     CredentialGuid = credentialGuid,
                     ContactType = GenericContactType.Email,
-                    Value = CurrentState.RegisterVm.EmailAddress
+                    Value = CurrentState.RegisterVm.EmailAddress,
+                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767")
                 });
                 if (await HandleFailure(emailContact, action)) return new()
                 {

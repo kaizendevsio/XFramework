@@ -28,7 +28,7 @@ public class GetContactListHandler : QueryBaseHandler ,IRequestHandler<GetContac
         
         var entity = await _dataLayer.IdentityContacts
             .Where(i => i.UserCredentialId == credential.Id)
-            .Include( i => i.Ucentities)
+            .Include( i => i.Entity)
             .AsNoTracking()
             .AsSplitQuery()
             .ToListAsync(cancellationToken);

@@ -33,7 +33,7 @@ public class CreateVerificationHandler : CommandBaseHandler, IRequestHandler<Cre
         
         var identityCredential = await _dataLayer.IdentityCredentials
             .Include(i => i.IdentityContacts)
-            .ThenInclude(i => i.Ucentities)
+            .ThenInclude(i => i.Entity)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
        
@@ -66,7 +66,7 @@ public class CreateVerificationHandler : CommandBaseHandler, IRequestHandler<Cre
 
                 var otp = _helperService.GenerateRandomNumber(111111, 999999);
                 var message = messageTemplate.Value.Replace("|Value|", $"{otp}");
-                var contact = identityCredential.IdentityContacts?.FirstOrDefault(i => i.Ucentities.Name == "Phone")?.Value;
+                var contact = identityCredential.IdentityContacts?.FirstOrDefault(i => i.Entity.Name == "Phone")?.Value;
 
                 if (string.IsNullOrEmpty(contact))
                 {

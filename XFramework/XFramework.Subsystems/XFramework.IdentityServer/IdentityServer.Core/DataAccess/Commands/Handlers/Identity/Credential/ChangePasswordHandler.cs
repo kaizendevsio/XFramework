@@ -35,7 +35,7 @@ public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangeP
         }
         var entityList1 = _dataLayer.IdentityContacts
             .Include(i => i.UserCredential)
-            .Where(i => i.Value == request.PhoneNumber.ValidatePhoneNumber(false) && i.UcentitiesId == (long?)GenericContactType.Phone)
+            .Where(i => i.Value == request.PhoneNumber.ValidatePhoneNumber(false) && i.EntityId == (long?)GenericContactType.Phone)
             .Select(i => i.UserCredential)
             .ToList();
 
@@ -60,7 +60,7 @@ public class ChangePasswordHandler : CommandBaseHandler, IRequestHandler<ChangeP
         request.Email.ValidateEmailAddress();
         var entityList2 = _dataLayer.IdentityContacts
             .Include(i => i.UserCredential)
-            .Where(i => i.Value == request.Email && i.UcentitiesId == (long?)GenericContactType.Email)
+            .Where(i => i.Value == request.Email && i.EntityId == (long?)GenericContactType.Email)
             .Select(i => i.UserCredential)
             .ToList();
 

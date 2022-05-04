@@ -16,7 +16,7 @@ public class GetCredentialByContactHandler : QueryBaseHandler ,IRequestHandler<G
             .Include( i => i.IdentityInfo)
             .Include( i => i.IdentityRoles)
             .Include( i => i.IdentityContacts)
-            .ThenInclude( i => i.Ucentities)
+            .ThenInclude( i => i.Entity)
             .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.IdentityContacts.Any(o => o.Value == request.ContactValue), cancellationToken);

@@ -94,6 +94,8 @@ public partial class SessionState
                 ContactList = contactListResponse.Response
             });
 
+            Console.WriteLine(JsonSerializer.Serialize(checkVerification));
+            
             if (action.SkipVerification)
             {
                 // If Success URL property is provided, navigate to the given URL

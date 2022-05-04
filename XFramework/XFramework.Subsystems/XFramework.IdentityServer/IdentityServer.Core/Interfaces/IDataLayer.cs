@@ -24,7 +24,7 @@ public interface IDataLayer
 
     public void RollBack();
     public List<AuditEntryBO> OnBeforeSaveChanges();
-        
+
     public DbSet<AddressBarangay> AddressBarangays { get; set; }
     public DbSet<AddressCity> AddressCities { get; set; }
     public DbSet<AddressCountry> AddressCountries { get; set; }
@@ -34,7 +34,6 @@ public interface IDataLayer
     public DbSet<AuditField> AuditFields { get; set; }
     public DbSet<AuditHistory> AuditHistories { get; set; }
     public DbSet<AuthorizationLog> AuthorizationLogs { get; set; }
-    public DbSet<RegistryConfiguration> RegistryConfigurations { get; set; }
     public DbSet<CurrencyEntity> CurrencyEntities { get; set; }
     public DbSet<Enterprise> Enterprises { get; set; }
     public DbSet<ExchangeRate> ExchangeRates { get; set; }
@@ -42,13 +41,19 @@ public interface IDataLayer
     public DbSet<IdentityAddressEntity> IdentityAddressEntities { get; set; }
     public DbSet<IdentityContact> IdentityContacts { get; set; }
     public DbSet<IdentityContactEntity> IdentityContactEntities { get; set; }
+    public DbSet<IdentityContactGroup> IdentityContactGroups { get; set; }
     public DbSet<IdentityCredential> IdentityCredentials { get; set; }
+    public DbSet<IdentityFavorite> IdentityFavorites { get; set; }
     public DbSet<IdentityInformation> IdentityInformations { get; set; }
     public DbSet<IdentityRole> IdentityRoles { get; set; }
     public DbSet<IdentityRoleEntity> IdentityRoleEntities { get; set; }
+    public DbSet<IdentityRoleEntityGroup> IdentityRoleEntityGroups { get; set; }
     public DbSet<IdentityVerification> IdentityVerifications { get; set; }
     public DbSet<IdentityVerificationEntity> IdentityVerificationEntities { get; set; }
     public DbSet<Log> Logs { get; set; }
+    public DbSet<RegistryConfiguration> RegistryConfigurations { get; set; }
+    public DbSet<RegistryConfigurationGroup> RegistryConfigurationGroups { get; set; }
+    public DbSet<RegistryFavoriteEntity> RegistryFavoriteEntities { get; set; }
     public DbSet<SessionDatum> SessionData { get; set; }
     public DbSet<SessionEntity> SessionEntities { get; set; }
 }

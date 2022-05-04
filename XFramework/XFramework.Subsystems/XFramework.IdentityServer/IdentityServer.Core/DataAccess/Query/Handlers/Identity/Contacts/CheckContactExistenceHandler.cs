@@ -33,7 +33,17 @@ public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<Ch
         {
             return new ()
             {
-                Message = $"The {(GenericContactType)existing.UcentitiesId} '{request.Value}' already exists",
+                Message = $"The {(GenericContactType)existing.EntityId} '{request.Value}' already exists",
+                HttpStatusCode = HttpStatusCode.Conflict
+            };
+        }
+        
+        var contactGroup = await _dataLayer.IdentityContactGroups.FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", CancellationToken.None);
+        if (contactGroup is null)
+        {
+            return new ()
+            {
+                Message = $"The contact group with guid '{request.GroupGuid}' does not exist",
                 HttpStatusCode = HttpStatusCode.Conflict
             };
         }

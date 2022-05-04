@@ -39,7 +39,7 @@ public class DeleteContactHandler : CommandBaseHandler, IRequestHandler<DeleteCo
             
         var entity = await _dataLayer.IdentityContacts
             .Where(i => i.UserCredentialId == credentialEntity.Id)
-            .Where(i => i.UcentitiesId == contactEntity.Id)
+            .Where(i => i.EntityId == contactEntity.Id)
             .Where(i => i.Guid == $"{request.Guid}")
             .FirstOrDefaultAsync(cancellationToken);
 

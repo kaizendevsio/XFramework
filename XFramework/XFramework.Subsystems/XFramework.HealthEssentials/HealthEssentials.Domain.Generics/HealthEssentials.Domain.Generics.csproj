@@ -14,8 +14,11 @@
 
     <ItemGroup>
         <Folder Include="BusinessObjects" />
+        <Folder Include="Contracts\Requests\Create" />
         <Folder Include="Contracts\Requests\Delete" />
         <Folder Include="Contracts\Requests\Get" />
+        <Folder Include="Contracts\Requests\Update" />
+        <Folder Include="Contracts\Requests\Verify" />
         <Folder Include="Contracts\Responses" />
     </ItemGroup>
     

@@ -53,6 +53,16 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
             };
         }
 
+        var contactGroup = await _dataLayer.IdentityContactGroups.FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", CancellationToken.None);
+        if (contactGroup is null)
+        {
+            return new ()
+            {
+                Message = $"The contact group with guid '{request.GroupGuid}' does not exist",
+                HttpStatusCode = HttpStatusCode.Conflict
+            };
+        }
+        
         switch (request.ContactType)
         {
             case GenericContactType.NotSpecified:
@@ -68,8 +78,9 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
         var contact = new IdentityContact()
         {
             UserCredentialId = identityCredential.Id,
-            UcentitiesId = contactEntity.Id,
-            Value = request.Value
+            EntityId = contactEntity.Id,
+            Value = request.Value,
+            GroupId = contactGroup.Id
         };
 
         _dataLayer.IdentityContacts.Add(contact);

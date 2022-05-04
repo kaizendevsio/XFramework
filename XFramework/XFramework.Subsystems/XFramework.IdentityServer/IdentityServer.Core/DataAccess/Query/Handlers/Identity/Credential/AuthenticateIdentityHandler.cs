@@ -110,12 +110,12 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == (long?)GenericContactType.Email)?.UserCredential;
+                    .FirstOrDefault(i => i.Value == request.Username & i.EntityId == (long?)GenericContactType.Email)?.UserCredential;
                 result ??= _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == (long?)GenericContactType.Phone)?.UserCredential;
+                    .FirstOrDefault(i => i.Value == request.Username & i.EntityId == (long?)GenericContactType.Phone)?.UserCredential;
                 break;
             case AuthorizeBy.Username:
                 result = await _dataLayer.IdentityCredentials
@@ -130,14 +130,14 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username & i.UcentitiesId == 1)?.UserCredential;
+                    .FirstOrDefault(i => i.Value == request.Username & i.EntityId == 1)?.UserCredential;
                 break;
             case AuthorizeBy.Phone:
                 result = _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(false) & i.UcentitiesId == 2)?.UserCredential;
+                    .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(false) & i.EntityId == 2)?.UserCredential;
                 break;
             case AuthorizeBy.Token:
                 result = await _dataLayer.IdentityCredentials
