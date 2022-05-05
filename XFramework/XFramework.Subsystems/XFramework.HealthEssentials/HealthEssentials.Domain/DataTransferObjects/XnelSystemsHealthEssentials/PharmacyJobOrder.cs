@@ -30,8 +30,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public DateTime? CompletedAt { get; set; }
         public string? PrescriptionNote { get; set; }
         public string Guid { get; set; } = null!;
+        public long ScheduleId { get; set; }
 
         public virtual PharmacyLocation PharmacyLocation { get; set; } = null!;
+        public virtual Schedule Schedule { get; set; } = null!;
         public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; set; }
         public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; set; }
     }

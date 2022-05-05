@@ -1,10 +1,10 @@
-﻿namespace XFramework.Client.Shared.Core.Features.Wallet;
+﻿using XFramework.Client.Shared.Entity.Models.Requests.Common;
+
+namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class GetWalletList : IAction
+    public class GetWalletList : NavigableRequest, IAction
     {
-        public string NavigateToOnSuccess { get; set; }
-        public string NavigateToOnFailure { get; set; }
     }
 }

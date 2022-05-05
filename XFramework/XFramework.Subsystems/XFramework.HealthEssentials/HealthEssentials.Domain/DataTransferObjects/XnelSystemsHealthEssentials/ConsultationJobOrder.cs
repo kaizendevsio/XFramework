@@ -33,10 +33,15 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public decimal? DiscountType { get; set; }
         public DateTime? StartedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
-        public string? PrescriptionNote { get; set; }
+        public string? Prescription { get; set; }
         public string Guid { get; set; } = null!;
+        public long ScheduleId { get; set; }
+        public string? Diagnosis { get; set; }
+        public string? Treatment { get; set; }
+        public string? Symptoms { get; set; }
 
         public virtual Consultation Consultation { get; set; } = null!;
+        public virtual Schedule Schedule { get; set; } = null!;
         public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; set; }
         public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; set; }
         public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; set; }

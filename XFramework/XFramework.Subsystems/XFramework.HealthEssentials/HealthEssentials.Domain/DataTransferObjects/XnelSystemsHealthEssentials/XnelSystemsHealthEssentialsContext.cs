@@ -20,6 +20,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public virtual DbSet<AilmentEntity> AilmentEntities { get; set; } = null!;
         public virtual DbSet<AilmentEntityGroup> AilmentEntityGroups { get; set; } = null!;
         public virtual DbSet<AilmentTag> AilmentTags { get; set; } = null!;
+        public virtual DbSet<Availability> Availabilities { get; set; } = null!;
         public virtual DbSet<Consultation> Consultations { get; set; } = null!;
         public virtual DbSet<ConsultationEntity> ConsultationEntities { get; set; } = null!;
         public virtual DbSet<ConsultationEntityGroup> ConsultationEntityGroups { get; set; } = null!;
@@ -258,6 +259,44 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasConstraintName("ailmenttag_tag_id_fk");
             });
 
+            modelBuilder.Entity<Availability>(entity =>
+            {
+                entity.ToTable("Availability", "Schedule");
+
+                entity.HasIndex(e => e.Guid, "availability_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Description).HasColumnType("character varying");
+
+                entity.Property(e => e.EntityId).HasColumnName("EntityID");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsAvailable)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
+
+                entity.HasOne(d => d.Entity)
+                    .WithMany(p => p.Availabilities)
+                    .HasForeignKey(d => d.EntityId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("schedule_scheduleentity_id_fk");
+            });
+
             modelBuilder.Entity<Consultation>(entity =>
             {
                 entity.ToTable("Consultation", "Consultation");
@@ -361,6 +400,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
+                entity.Property(e => e.Diagnosis).HasColumnType("character varying");
+
                 entity.Property(e => e.Guid)
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
@@ -371,17 +412,27 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
-                entity.Property(e => e.PrescriptionNote).HasColumnType("character varying");
+                entity.Property(e => e.Prescription).HasColumnType("character varying");
 
                 entity.Property(e => e.ReferenceNumber).HasColumnType("character varying");
 
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
+
+                entity.Property(e => e.Symptoms).HasColumnType("character varying");
+
+                entity.Property(e => e.Treatment).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Consultation)
                     .WithMany(p => p.ConsultationJobOrders)
                     .HasForeignKey(d => d.ConsultationId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("consultationjoborder_consultation_id_fk");
+
+                entity.HasOne(d => d.Schedule)
+                    .WithMany(p => p.ConsultationJobOrders)
+                    .HasForeignKey(d => d.ScheduleId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("consultationjoborder_schedule_id_fk");
             });
 
             modelBuilder.Entity<ConsultationJobOrderLaboratory>(entity =>
@@ -533,6 +584,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
+                entity.Property(e => e.Name).HasColumnType("character varying");
+
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Entity)
@@ -561,7 +614,13 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .IsRequired()
                     .HasDefaultValueSql("true");
 
+                entity.Property(e => e.MaxDiscount).HasDefaultValueSql("0");
+
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Price).HasDefaultValueSql("0");
+
+                entity.Property(e => e.Quantity).HasDefaultValueSql("1");
 
                 entity.HasOne(d => d.Consultation)
                     .WithMany(p => p.DoctorConsultations)
@@ -712,6 +771,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
+                entity.Property(e => e.Email).HasColumnType("character varying");
+
                 entity.Property(e => e.EntityId).HasColumnName("EntityID");
 
                 entity.Property(e => e.Guid)
@@ -722,11 +783,17 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .IsRequired()
                     .HasDefaultValueSql("true");
 
+                entity.Property(e => e.Logo).HasColumnType("character varying");
+
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
+                entity.Property(e => e.Phone).HasColumnType("character varying");
+
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
+
+                entity.Property(e => e.Website).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.Hospitals)
@@ -1089,6 +1156,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
+                entity.Property(e => e.Email).HasColumnType("character varying");
+
                 entity.Property(e => e.EntityId).HasColumnName("EntityID");
 
                 entity.Property(e => e.Guid)
@@ -1099,11 +1168,17 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .IsRequired()
                     .HasDefaultValueSql("true");
 
+                entity.Property(e => e.Logo).HasColumnType("character varying");
+
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
+                entity.Property(e => e.Phone).HasColumnType("character varying");
+
                 entity.Property(e => e.ShortName).HasColumnType("character varying");
+
+                entity.Property(e => e.Website).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.Laboratories)
@@ -1204,6 +1279,12 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasForeignKey(d => d.LaboratoryLocationId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("laboratoryjoborder_laboratorylocation_id_fk");
+
+                entity.HasOne(d => d.Schedule)
+                    .WithMany(p => p.LaboratoryJobOrders)
+                    .HasForeignKey(d => d.ScheduleId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("laboratoryjoborder_schedule_id_fk");
             });
 
             modelBuilder.Entity<LaboratoryJobOrderDetail>(entity =>
@@ -1401,6 +1482,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasDefaultValueSql("true");
 
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
 
                 entity.Property(e => e.Value).HasColumnType("character varying");
 
@@ -1603,6 +1686,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
+                entity.Property(e => e.Email).HasColumnType("character varying");
+
                 entity.Property(e => e.EntityId).HasColumnName("EntityID");
 
                 entity.Property(e => e.Guid)
@@ -1613,11 +1698,17 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .IsRequired()
                     .HasDefaultValueSql("true");
 
+                entity.Property(e => e.Logo).HasColumnType("character varying");
+
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
+                entity.Property(e => e.Phone).HasColumnType("character varying");
+
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
+
+                entity.Property(e => e.Website).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.Logistics)
@@ -1678,6 +1769,12 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasForeignKey(d => d.RiderId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("logisticjoborder_logisticrider_id_fk");
+
+                entity.HasOne(d => d.Schedule)
+                    .WithMany(p => p.LogisticJobOrders)
+                    .HasForeignKey(d => d.ScheduleId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("logisticjoborder_schedule_id_fk");
             });
 
             modelBuilder.Entity<LogisticJobOrderDetail>(entity =>
@@ -1768,8 +1865,6 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Id).HasColumnName("ID");
 
-                entity.Property(e => e.Alias).HasColumnType("character varying");
-
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
@@ -1783,6 +1878,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasDefaultValueSql("true");
 
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
 
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
             });
@@ -2478,6 +2575,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
+                entity.Property(e => e.Email).HasColumnType("character varying");
+
                 entity.Property(e => e.Guid)
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
@@ -2486,13 +2585,19 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .IsRequired()
                     .HasDefaultValueSql("true");
 
+                entity.Property(e => e.Logo).HasColumnType("character varying");
+
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
+                entity.Property(e => e.Phone).HasColumnType("character varying");
+
                 entity.Property(e => e.ShortName).HasColumnType("character varying");
 
                 entity.Property(e => e.Slogan).HasColumnType("character varying");
+
+                entity.Property(e => e.Website).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.Pharmacies)
@@ -2557,6 +2662,12 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasForeignKey(d => d.PharmacyLocationId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pharmacyjoborder_pharmacylocation_id_fk");
+
+                entity.HasOne(d => d.Schedule)
+                    .WithMany(p => p.PharmacyJobOrders)
+                    .HasForeignKey(d => d.ScheduleId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("pharmacyjoborder_schedule_id_fk");
             });
 
             modelBuilder.Entity<PharmacyJobOrderConsultationJobOrder>(entity =>
@@ -2698,6 +2809,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasDefaultValueSql("true");
 
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
 
                 entity.Property(e => e.Value).HasColumnType("character varying");
 

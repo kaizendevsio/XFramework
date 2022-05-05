@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Logistic;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Verify.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Logistic;
 

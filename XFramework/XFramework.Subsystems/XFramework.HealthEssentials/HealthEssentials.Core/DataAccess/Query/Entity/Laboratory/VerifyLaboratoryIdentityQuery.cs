@@ -1,6 +1,4 @@
-﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Verify.Laboratory;
-using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
-using XFramework.Domain.Generic.Contracts.Requests;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 
 namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
 

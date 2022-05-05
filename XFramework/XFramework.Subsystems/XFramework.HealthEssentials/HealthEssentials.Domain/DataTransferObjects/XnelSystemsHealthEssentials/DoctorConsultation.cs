@@ -13,6 +13,9 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public long DoctorId { get; set; }
         public long? ConsultationId { get; set; }
         public string Guid { get; set; } = null!;
+        public decimal? Price { get; set; }
+        public decimal? MaxDiscount { get; set; }
+        public int Quantity { get; set; }
 
         public virtual Consultation? Consultation { get; set; }
         public virtual Doctor Doctor { get; set; } = null!;

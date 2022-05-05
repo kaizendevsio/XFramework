@@ -15,6 +15,7 @@ public partial class SessionState
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
+        public bool VerificationRequired { get; set; }
         
         public LogInHandler(IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
@@ -94,8 +95,6 @@ public partial class SessionState
                 ContactList = contactListResponse.Response
             });
 
-            Console.WriteLine(JsonSerializer.Serialize(checkVerification));
-            
             if (action.SkipVerification)
             {
                 // If Success URL property is provided, navigate to the given URL
@@ -105,7 +104,8 @@ public partial class SessionState
             {
                 if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
                 {
-                    NavigationManager.NavigateTo(action.NavigateToOnVerificationRequired);
+                    VerificationRequired = true;
+                    NavigateTo(action.NavigateToOnVerificationRequired);
                 }
                 else
                 {
@@ -151,7 +151,7 @@ public partial class SessionState
             
             return new()
             {
-                HttpStatusCode = HttpStatusCode.Accepted,
+                HttpStatusCode = VerificationRequired ? HttpStatusCode.PreconditionRequired : HttpStatusCode.Accepted,
                 IsSuccess = true
             };
         }

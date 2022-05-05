@@ -32,6 +32,7 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public virtual DbSet<IdentityAddressEntity> IdentityAddressEntities { get; set; } = null!;
         public virtual DbSet<IdentityContact> IdentityContacts { get; set; } = null!;
         public virtual DbSet<IdentityContactEntity> IdentityContactEntities { get; set; } = null!;
+        public virtual DbSet<IdentityContactGroup> IdentityContactGroups { get; set; } = null!;
         public virtual DbSet<IdentityCredential> IdentityCredentials { get; set; } = null!;
         public virtual DbSet<IdentityFavorite> IdentityFavorites { get; set; } = null!;
         public virtual DbSet<IdentityInformation> IdentityInformations { get; set; } = null!;
@@ -493,7 +494,7 @@ namespace HealthEssentials.Domain.DataTransferObjects
             {
                 entity.ToTable("IdentityContact", "Identity");
 
-                entity.HasIndex(e => e.UcentitiesId, "IX_tbl_IdentityContacts_UCEntitiesID");
+                entity.HasIndex(e => e.EntityId, "IX_tbl_IdentityContacts_UCEntitiesID");
 
                 entity.HasIndex(e => e.UserCredentialId, "tbl_identitycontacts_usercredentialid_index");
 
@@ -506,17 +507,21 @@ namespace HealthEssentials.Domain.DataTransferObjects
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
 
-                entity.Property(e => e.UcentitiesId).HasColumnName("UCEntitiesID");
-
                 entity.Property(e => e.UserCredentialId).HasColumnName("UserCredentialID");
 
                 entity.Property(e => e.Value).HasColumnType("character varying");
 
-                entity.HasOne(d => d.Ucentities)
+                entity.HasOne(d => d.Entity)
                     .WithMany(p => p.IdentityContacts)
-                    .HasForeignKey(d => d.UcentitiesId)
+                    .HasForeignKey(d => d.EntityId)
                     .OnDelete(DeleteBehavior.Restrict)
                     .HasConstraintName("UCEntitiesID");
+
+                entity.HasOne(d => d.Group)
+                    .WithMany(p => p.IdentityContacts)
+                    .HasForeignKey(d => d.GroupId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("identitycontact_identitycontactgroup__fk");
 
                 entity.HasOne(d => d.UserCredential)
                     .WithMany(p => p.IdentityContacts)
@@ -539,6 +544,30 @@ namespace HealthEssentials.Domain.DataTransferObjects
                 entity.Property(e => e.Guid)
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<IdentityContactGroup>(entity =>
+            {
+                entity.ToTable("IdentityContactGroup", "Identity");
+
+                entity.HasIndex(e => e.Guid, "identitycontactgroup_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
             });

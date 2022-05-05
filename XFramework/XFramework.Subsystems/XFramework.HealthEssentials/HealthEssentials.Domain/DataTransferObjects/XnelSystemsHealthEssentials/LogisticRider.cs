@@ -18,7 +18,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public bool? IsEnabled { get; set; }
         public bool IsDeleted { get; set; }
         public long CredentialId { get; set; }
-        public string? Alias { get; set; }
+        public string? Name { get; set; }
         public string? Description { get; set; }
         public string? Remarks { get; set; }
         public short? Status { get; set; }

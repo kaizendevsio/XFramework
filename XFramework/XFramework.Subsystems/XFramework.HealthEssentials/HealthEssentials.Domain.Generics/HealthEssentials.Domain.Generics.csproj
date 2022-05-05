@@ -7,6 +7,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Reference Include="IdentityServer.Domain.Generic">
+          <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
+        </Reference>
         <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
         </Reference>
@@ -14,10 +17,6 @@
 
     <ItemGroup>
         <Folder Include="BusinessObjects" />
-        <Folder Include="Contracts\Requests\Create" />
-        <Folder Include="Contracts\Requests\Delete" />
-        <Folder Include="Contracts\Requests\Get" />
-        <Folder Include="Contracts\Requests\Update" />
     </ItemGroup>
     
 </Project>

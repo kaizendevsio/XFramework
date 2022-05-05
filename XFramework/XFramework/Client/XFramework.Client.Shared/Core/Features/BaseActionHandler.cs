@@ -235,6 +235,10 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     {
         await Mediator.Send(new ApplicationState.SetState() {ProgressMessage = message});
     }
+    public async Task NavigateTo(string path)
+    {
+        await Mediator.Send(new SessionState.NavigateToPath() {NavigationPath = path});
+    }
     
 }
 
@@ -458,6 +462,11 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     public async Task ReportProgress(string message)
     {
         await Mediator.Send(new ApplicationState.SetState() {ProgressMessage = message});
+    }
+    
+    public async Task NavigateTo(string path)
+    {
+        await Mediator.Send(new SessionState.NavigateToPath() {NavigationPath = path});
     }
     
 }

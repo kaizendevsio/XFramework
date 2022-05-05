@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Verify.Laboratory;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Laboratory;
 

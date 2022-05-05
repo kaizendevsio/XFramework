@@ -19,8 +19,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public long RiderId { get; set; }
         public string Guid { get; set; } = null!;
         public short Status { get; set; }
+        public long ScheduleId { get; set; }
 
         public virtual LogisticRider Rider { get; set; } = null!;
+        public virtual Schedule Schedule { get; set; } = null!;
         public virtual ICollection<LogisticJobOrderDetail> LogisticJobOrderDetails { get; set; }
         public virtual ICollection<LogisticJobOrderLocation> LogisticJobOrderLocations { get; set; }
     }

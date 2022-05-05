@@ -7,6 +7,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
     {
         public Schedule()
         {
+            ConsultationJobOrders = new HashSet<ConsultationJobOrder>();
+            LaboratoryJobOrders = new HashSet<LaboratoryJobOrder>();
+            LogisticJobOrders = new HashSet<LogisticJobOrder>();
+            PharmacyJobOrders = new HashSet<PharmacyJobOrder>();
             ScheduleTags = new HashSet<ScheduleTag>();
         }
 
@@ -28,6 +32,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
         public virtual ScheduleEntity Entity { get; set; } = null!;
         public virtual SchedulePriority Priority { get; set; } = null!;
+        public virtual ICollection<ConsultationJobOrder> ConsultationJobOrders { get; set; }
+        public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; }
+        public virtual ICollection<LogisticJobOrder> LogisticJobOrders { get; set; }
+        public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; set; }
         public virtual ICollection<ScheduleTag> ScheduleTags { get; set; }
     }
 }

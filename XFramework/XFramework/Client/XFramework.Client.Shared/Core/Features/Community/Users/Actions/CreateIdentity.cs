@@ -1,12 +1,11 @@
-﻿namespace XFramework.Client.Shared.Core.Features.Community;
+﻿using XFramework.Client.Shared.Entity.Models.Requests.Common;
+
+namespace XFramework.Client.Shared.Core.Features.Community;
 
 public partial class CommunityState
 {
-    public class CreateIdentity : IRequest<CmdResponse>
+    public class CreateIdentity : NavigableRequest, IRequest<CmdResponse>
     {
-        
-        public string NavigateToOnSuccess { get; set; }
-        public string NavigateToOnFailure { get; set; }
         public Guid? CredentialGuid { get; set; }
         public string Alias { get; set; }
         public string HandleName { get; set; }

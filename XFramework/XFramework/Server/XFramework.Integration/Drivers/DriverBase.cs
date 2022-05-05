@@ -40,6 +40,27 @@ public class DriverBase
         });
         return result.Response;
     }
+    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(string commandName ,TRequest request)
+    {
+        var rs = await GetRequestServer(request);
+        try
+        {
+            request.SetPropertyValue("RequestServer", rs);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+            
+        var result = await MessageBusDriver.InvokeAsync<CmdResponse<TRequest>>(new(request)
+        {
+            CommandName = commandName,
+            ExchangeType = MessageExchangeType.Direct,
+            Recipient = TargetClient
+        });
+        return result.Response;
+    }
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(string commandName ,TRequest request)
     {
         var rs = new RequestServerBO();

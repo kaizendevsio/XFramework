@@ -7,6 +7,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
     {
         public ScheduleEntity()
         {
+            Availabilities = new HashSet<Availability>();
             Schedules = new HashSet<Schedule>();
         }
 
@@ -22,6 +23,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public int? SortOrder { get; set; }
 
         public virtual ScheduleEntityGroup Group { get; set; } = null!;
+        public virtual ICollection<Availability> Availabilities { get; set; }
         public virtual ICollection<Schedule> Schedules { get; set; }
     }
 }

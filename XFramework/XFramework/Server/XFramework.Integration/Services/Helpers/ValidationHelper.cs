@@ -40,10 +40,10 @@ public static class ValidationHelper
                 throw new ArgumentException("Incorrect Phone number format, format should be +XXXXXXXXXXXX or XXXXXXXXXXX");
             }
         }
-        /*if (phoneNumber.Contains('+') != true)
+        if (!phoneNumber.Contains('+'))
         {
             phoneNumber = $"+63{phoneNumber.Substring(1)}";
-        }*/
+        }
         return phoneNumber;
     }
 

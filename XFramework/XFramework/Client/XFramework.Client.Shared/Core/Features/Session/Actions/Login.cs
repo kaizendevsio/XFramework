@@ -1,12 +1,11 @@
-﻿namespace XFramework.Client.Shared.Core.Features.Session;
+﻿using XFramework.Client.Shared.Entity.Models.Requests.Common;
+
+namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class Login : IRequest<CmdResponse>
+    public class Login : NavigableRequest, IRequest<CmdResponse>
     {
-        public string NavigateToOnSuccess { get; set; }
-        public string NavigateToOnFailure { get; set; }
-        public string NavigateToOnVerificationRequired { get; set; }
         public bool SkipVerification { get; set; }
         public bool InitializeWallets { get; set; }
         public bool AutoRefreshWallets { get; set; }
