@@ -28,6 +28,11 @@ if ($answer -eq "y") {
    Get-ChildItem -Path "XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\obj" -Exclude ".git" | Remove-Item -Recurse -Force
    dotnet build "XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj"
 
+   Write-Host Building XFramework.HealthEssentials.Integration ...
+   Get-ChildItem -Path "XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Integration\bin" -Exclude ".git" | Remove-Item -Recurse -Force
+   Get-ChildItem -Path "XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Integration\obj" -Exclude ".git" | Remove-Item -Recurse -Force
+   dotnet build "XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Integration\HealthEssentials.Integration.csproj"
+
 
    Write-Host Build Completed Successfully.
    Write-Host
