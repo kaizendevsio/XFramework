@@ -5,24 +5,14 @@
     <projectFile profileName="IIS Express">XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj</projectFile>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/GetDoctorListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorListQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/GetDoctorListRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Doctor/DoctorResponse.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Pharmacy/PharmacyLocationResponse.cs" afterDir="false" />
+    <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment=" - Safety Backup">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorIdentityHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/CreatePharmacyHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/CreatePharmacyHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/GetPharmacyListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/GetPharmacyListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/CreateDoctorIdentityRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/CreateDoctorIdentityRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Pharmacy/PharmacyResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Pharmacy/PharmacyResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/Doctor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/Doctor.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/XnelSystemsHealthEssentialsContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/XnelSystemsHealthEssentialsContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceDriver.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Interfaces/IHealthEssentialsServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Interfaces/IHealthEssentialsServiceWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Address/Actions/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Address/Actions/SetState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Address/AddressState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Address/AddressState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/SetStateAction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/SetStateAction.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/WalletState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/WalletState.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,6 +25,7 @@
     </option>
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/Address/CreateAddressRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Enums/GenericStatusType.cs" root0="SKIP_HIGHLIGHTING" />
@@ -105,7 +96,7 @@
       <updated>1651551357432</updated>
       <workItem from="1651551360112" duration="8788000" />
       <workItem from="1651644810448" duration="1988000" />
-      <workItem from="1651684220712" duration="50123000" />
+      <workItem from="1651684220712" duration="51321000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>
@@ -114,7 +105,14 @@
       <option name="project" value="LOCAL" />
       <updated>1651756781460</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary=" - Safety Backup">
+      <created>1651827741770</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1651827741770</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -137,7 +135,8 @@
     <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
     <MESSAGE value=" - HealthEssentials SubSystem Updates" />
-    <option name="LAST_COMMIT_MESSAGE" value=" - HealthEssentials SubSystem Updates" />
+    <MESSAGE value=" - Safety Backup" />
+    <option name="LAST_COMMIT_MESSAGE" value=" - Safety Backup" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
