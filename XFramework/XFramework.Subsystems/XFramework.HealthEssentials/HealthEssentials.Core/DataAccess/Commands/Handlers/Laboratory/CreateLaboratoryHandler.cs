@@ -16,6 +16,7 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
     {
         var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Laboratory>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        entity.EntityId = 1;
         
         await _dataLayer.HealthEssentialsContext.Laboratories.AddAsync(entity, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
