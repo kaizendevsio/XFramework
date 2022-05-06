@@ -2,6 +2,7 @@ namespace IdentityServer.Domain.Generic.Contracts.Requests.Create.Address;
 
 public class CreateAddressRequest
 {
+    public string Name { get; set; }
     public Guid? IdentityInfoGuid { get; set; }
     public string UnitNumber { get; set; }
     public string Street { get; set; }

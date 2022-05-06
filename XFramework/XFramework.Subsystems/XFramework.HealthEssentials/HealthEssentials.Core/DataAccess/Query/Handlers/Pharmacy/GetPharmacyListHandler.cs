@@ -16,6 +16,7 @@ public class GetPharmacyListHandler : QueryBaseHandler, IRequestHandler<GetPharm
     {
         var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
             .AsNoTracking()
+            .Include(i => i.PharmacyLocations)
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .Take(request.PageSize)
             .OrderBy(i => i.Name)

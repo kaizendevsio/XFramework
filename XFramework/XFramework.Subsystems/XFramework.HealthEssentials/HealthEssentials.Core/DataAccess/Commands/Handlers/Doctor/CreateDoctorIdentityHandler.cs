@@ -76,7 +76,6 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
         var emailContactType = await _dataLayer.XnelSystemsContext.IdentityContactEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "Email", cancellationToken: CancellationToken.None);
         var phoneContactType = await _dataLayer.XnelSystemsContext.IdentityContactEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "Phone", cancellationToken: CancellationToken.None);
 
-        
         var workEmail = new IdentityContact
         {
             EntityId = emailContactType.Id,
@@ -101,6 +100,10 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
             Description = request.Description,
             Guid = $"{Guid.NewGuid()}",
             Name = request.ProfessionalName,
+            ExperienceYears = null,
+            Clinic = request.Clinic,
+            ClinicAddress = request.ClinicAddress,
+            BaseFee = request.BaseFee,
             Entity = specialty
         };
         
