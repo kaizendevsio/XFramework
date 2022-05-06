@@ -3,10 +3,10 @@ using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
 
 namespace IdentityServer.Api.SignalR.Handlers;
 
-public class GetAddressEntityListHandler : BaseSignalRHandler, ISignalREventHandler
+public class GetCountryListHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<GetAddressEntityListRequest, GetAddressEntityListQuery>(connection, mediator);
+        HandleRequest<GetCountryListRequest, GetCountryListQuery>(connection, mediator);
     }
 }

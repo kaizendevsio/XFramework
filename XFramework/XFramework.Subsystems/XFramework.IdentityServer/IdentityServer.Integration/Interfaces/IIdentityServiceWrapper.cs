@@ -52,7 +52,11 @@ public interface IIdentityServiceWrapper : IXFrameworkService
     public Task<CmdResponse> DeleteContact(DeleteContactRequest request);
     
     public Task<QueryResponse<AddressCountryResponse>> GetAddressEntity(GetAddressEntityRequest request);
-    public Task<QueryResponse<List<AddressCountryResponse>>> GetAddressEntityList(GetAddressEntityListRequest request);
+    public Task<QueryResponse<List<AddressCountryResponse>>> GetCountryList(GetCountryListRequest request);
+    public Task<QueryResponse<List<AddressRegionResponse>>> GetRegionList(GetRegionListRequest request);
+    public Task<QueryResponse<List<AddressProvinceResponse>>> GetProvinceList(GetProvinceListRequest request);
+    public Task<QueryResponse<List<AddressCityResponse>>> GetCityList(GetCityListRequest request);
+    public Task<QueryResponse<List<AddressBarangayResponse>>> GetBarangayList(GetBarangayListRequest request);
     public Task<QueryResponse<IdentityLocationResponse>> GetLocation(GetLocationRequest request);
     public Task<QueryResponse<List<IdentityLocationResponse>>> GetLocationList(GetLocationListRequest request);
     

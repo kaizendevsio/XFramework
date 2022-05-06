@@ -158,9 +158,34 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
         return await SendAsync<GetAddressEntityRequest, AddressCountryResponse>("GetAddressEntity", request);
     }
 
-    public async Task<QueryResponse<List<AddressCountryResponse>>> GetAddressEntityList(GetAddressEntityListRequest request)
+    public async Task<QueryResponse<List<AddressCountryResponse>>> GetCountryList(GetCountryListRequest request)
     {
-        return await SendAsync<GetAddressEntityListRequest, List<AddressCountryResponse>>("GetAddressEntityList", request);
+        return await SendAsync<GetCountryListRequest, List<AddressCountryResponse>>("GetCountryList", request);
+    }
+
+    public async Task<QueryResponse<List<AddressRegionResponse>>> GetRegionList(GetRegionListRequest request)
+    {
+        return await SendAsync<GetRegionListRequest, List<AddressRegionResponse>>("GetRegionList", request);
+    }
+
+    public async Task<QueryResponse<List<AddressProvinceResponse>>> GetProvinceList(GetProvinceListRequest request)
+    {
+        return await SendAsync<GetProvinceListRequest, List<AddressProvinceResponse>>("GetProvinceList", request);
+    }
+
+    public async Task<QueryResponse<List<AddressCityResponse>>> GetCityList(GetCityListRequest request)
+    {
+        return await SendAsync<GetCityListRequest, List<AddressCityResponse>>("GetCityList", request);
+    }
+
+    public async Task<QueryResponse<List<AddressBarangayResponse>>> GetBarangayList(GetBarangayListRequest request)
+    {
+        return await SendAsync<GetBarangayListRequest, List<AddressBarangayResponse>>("GetBarangayList", request);
+    }
+
+    public async Task<QueryResponse<List<AddressCountryResponse>>> GetAddressEntityList(GetCountryListRequest request)
+    {
+        return await SendAsync<GetCountryListRequest, List<AddressCountryResponse>>("GetAddressEntityList", request);
     }
 
     public async Task<QueryResponse<IdentityLocationResponse>> GetLocation(GetLocationRequest request)

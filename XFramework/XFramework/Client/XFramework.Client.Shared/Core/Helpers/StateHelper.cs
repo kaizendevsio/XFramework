@@ -53,15 +53,14 @@ public static class StateHelper
         var s = persistStateBy switch
         {
             PersistStateBy.NotSpecified => throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented"),
-            PersistStateBy.LocalStorage => await localStorageService.GetItemAsStringAsync($"{nameof(TState)}", CancellationToken.None),
-            PersistStateBy.SessionStorage => await sessionStorageService.GetItemAsStringAsync($"{nameof(TState)}", CancellationToken.None),
-            PersistStateBy.IndexDb => indexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == $"{state.GetType().Name}")?.Value,
+            PersistStateBy.LocalStorage => await localStorageService.GetItemAsStringAsync(state.GetType().Name, CancellationToken.None),
+            PersistStateBy.SessionStorage => await sessionStorageService.GetItemAsStringAsync(state.GetType().Name, CancellationToken.None),
+            PersistStateBy.IndexDb => indexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == state.GetType().Name)?.Value,
             PersistStateBy.CloudStore => throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented"),
             PersistStateBy.GoogleDrive => throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented"),
             PersistStateBy.OneDrive => throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented"),
             _ => throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null)
         };
-
         if (s is null)
         {
             mediator.Send(Activator.CreateInstance<TAction>());

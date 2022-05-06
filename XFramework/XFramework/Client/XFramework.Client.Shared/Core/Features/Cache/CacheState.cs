@@ -8,5 +8,4 @@ public partial class CacheState : State<CacheState>
     {
     }
 
-    public List<AddressCountryResponse> AddressEntityList { get; set; }
 }

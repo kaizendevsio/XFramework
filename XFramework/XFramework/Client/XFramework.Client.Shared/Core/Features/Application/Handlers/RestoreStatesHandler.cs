@@ -39,7 +39,7 @@ public partial class ApplicationState
                 {
                     await IndexedDbService.InitializeDb();
                 }
-                
+
                 StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService, new ApplicationState.SetState() , ApplicationState, persistStateBy);
                 StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new SessionState.SetState() , SessionState, persistStateBy);
                 StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new WalletState.SetState() , WalletState, persistStateBy);

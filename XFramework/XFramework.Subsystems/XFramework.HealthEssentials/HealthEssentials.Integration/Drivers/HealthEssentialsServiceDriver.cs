@@ -5,6 +5,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Integration.Interfaces;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -126,5 +130,25 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<CmdResponse<CreatePharmacyIdentityRequest>> CreatePharmacyIdentity(CreatePharmacyIdentityRequest request)
     {
         return await SendAsync("CreatePharmacyIdentity", request);
+    }
+
+    public async Task<QueryResponse<List<ConsultationResponse>>> GetConsultationList(GetConsultationListRequest request)
+    {
+        return await SendAsync<GetConsultationListRequest, List<ConsultationResponse>>("GetConsultationList", request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryResponse>>> GetLaboratoryList(GetLaboratoryListRequest request)
+    {
+        return await SendAsync<GetLaboratoryListRequest, List<LaboratoryResponse>>("GetLaboratoryList", request);
+    }
+
+    public async Task<QueryResponse<List<LogisticResponse>>> GetLogisticList(GetLogisticListRequest request)
+    {
+        return await SendAsync<GetLogisticListRequest, List<LogisticResponse>>("GetLogisticList", request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request)
+    {
+        return await SendAsync<GetPharmacyListRequest, List<PharmacyResponse>>("GetPharmacyList", request);
     }
 }   
