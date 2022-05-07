@@ -30,9 +30,7 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
             };
         }
 
-        var specialty = await _dataLayer.HealthEssentialsContext.DoctorEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Name == $"{request.Specialty}", cancellationToken: cancellationToken);
+        /*var specialty = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(i => i.Name == $"{request.Specialty}", cancellationToken: cancellationToken);
        
         if (specialty is null)
         {
@@ -42,7 +40,7 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
                 GroupId = 1
             }, CancellationToken.None);
             specialty = specialtyEntry.Entity;
-        }
+        }*/
 
         if (request.Address is not null)
         {
@@ -104,7 +102,7 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
             Clinic = request.Clinic,
             ClinicAddress = request.ClinicAddress,
             BaseFee = request.BaseFee,
-            Entity = specialty
+            EntityId = 1
         };
         
         await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workEmail, CancellationToken.None);

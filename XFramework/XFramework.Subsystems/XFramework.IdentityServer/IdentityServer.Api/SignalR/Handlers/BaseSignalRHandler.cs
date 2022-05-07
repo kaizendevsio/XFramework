@@ -3,11 +3,13 @@ using System.Text.Json;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Enums;
+using TypeSupport.Extensions;
 
 namespace IdentityServer.Api.SignalR.Handlers;
 
 public class BaseSignalRHandler
 {
+    public Guid? Guid { get; set; }
     public Stopwatch Stopwatch { get; set; } = new();
 
     public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, StreamFlowTelemetryBO telemetry, TResult data)
@@ -26,38 +28,41 @@ public class BaseSignalRHandler
     protected virtual void HandleRequest<TRequest, TQuery>(HubConnection connection, IMediator mediator)
     {
         Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On<string, string, string>(GetType().Name.Replace("Handler", string.Empty),
-            async (data, message, telemetryString) =>
+        connection.On(HandlerName(), Handler<TRequest, TQuery>(connection, mediator));
+    }
+
+    private string HandlerName()
+    {
+        return GetType().Name.Replace("Handler", string.Empty);
+    }
+
+    private Func<string, string, string, Task> Handler<TRequest, TQuery>(HubConnection connection, IMediator mediator)
+    {
+        return async (data, message, telemetryString) =>
+        {
+            Task.Run(async () =>
             {
-                Task.Run(async () =>
+                Stopwatch.Restart();
+                try
                 {
-                    Stopwatch.Restart();
-                    try
-                    {
-                        var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
+                    var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
+                    
+                    var r = data.AsMediatorCmd<TRequest, TQuery>();
+                    var result = await mediator.Send(r).ConfigureAwait(false);
+                    Stopwatch.Stop();
 
-                        var r = data.AsMediatorCmd<TRequest, TQuery>();
-                        var result = await mediator.Send(r).ConfigureAwait(false);
-                        Stopwatch.Stop();
+                    Console.WriteLine(result.GetPropertyValue("HttpStatusCode").ToString() == $"{HttpStatusCode.InternalServerError}"
+                            ? $"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{result.GetType().GetProperty("Message")?.GetValue(result)}] in {Stopwatch.ElapsedMilliseconds}ms"
+                            : $"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.GetType().GetProperty("HttpStatusCode")?.GetValue(result)} in {Stopwatch.ElapsedMilliseconds}ms");
 
-                        if (result.GetType().GetProperty("HttpStatusCode")?.GetValue(result).ToString() == $"{HttpStatusCode.InternalServerError}")
-                        {
-                            Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{result.GetType().GetProperty("Message")?.GetValue(result)}] in {Stopwatch.ElapsedMilliseconds}ms");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.GetType().GetProperty("HttpStatusCode")?.GetValue(result)} in {Stopwatch.ElapsedMilliseconds}ms");
-                        }
-                        
-                        
-                        await RespondToInvoke(connection, telemetry, result);
-                    }
-                    catch (Exception e)
-                    {
-                        Stopwatch.Stop();
-                        Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}] in {Stopwatch.ElapsedMilliseconds}ms");
-                    }
-                });
+                    await RespondToInvoke(connection, telemetry, result);
+                }
+                catch (Exception e)
+                {
+                    Stopwatch.Stop();
+                    Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}] in {Stopwatch.ElapsedMilliseconds}ms");
+                }
             });
+        };
     }
 }

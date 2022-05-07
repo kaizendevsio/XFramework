@@ -7,13 +7,16 @@ namespace HealthEssentials.Domain.DataTransferObjects
 {
     public partial class XnelSystemsContext : DbContext
     {
+        public Guid? InitialGuid { get; set; }
         public XnelSystemsContext()
         {
+            
         }
 
         public XnelSystemsContext(DbContextOptions<XnelSystemsContext> options)
             : base(options)
         {
+            InitialGuid = Guid.NewGuid();
         }
 
         public virtual DbSet<AddressBarangay> AddressBarangays { get; set; } = null!;
