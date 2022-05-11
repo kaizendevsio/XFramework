@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using BinaryPack;
 using MediatR;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.DataAccess.Commands.Handlers;
@@ -12,6 +13,7 @@ using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.BusinessObjects;
 using StreamFlow.Domain.Enums;
 using StreamFlow.Domain.Generic.BusinessObjects;
+using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Enums;
 using StreamFlow.Stream.Hubs.V1;
 using StreamFlow.Stream.Services.Entity.Events;
@@ -56,19 +58,54 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                 ConsumerGuid = request.MessageQueue.ConsumerGuid
             };
 
+            var contract = new StreamFlowContract()
+            {
+                Data = request.MessageQueue.Data,
+                Message = request.MessageQueue.Message,
+                Telemetry = telemetry
+            };
+            
             // Execute Sending Message
             switch (request.MessageQueue.ExchangeType)
             {
                 case MessageExchangeType.FanOut:
-                    await _hubContext.Clients.All.SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, JsonSerializer.Serialize(telemetry), cancellationToken: cancellationToken);
+                    await _hubContext.Clients.All.SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
                     break;
                 case MessageExchangeType.Direct:
-                    var c = _cachingService.Clients.FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
+                    var currentClient = new StreamFlowClientBO();
 
-                    if (c != null)
+                    var availableClients = _cachingService.Clients.Where(x => x.Guid == request.MessageQueue.Recipient).ToList();
+                    var count = availableClients.Count;
+                    
+                    if (count > 1)
                     {
-                        Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {c.Name}");
-                        await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, JsonSerializer.Serialize(telemetry), cancellationToken);
+                        var cachedClient = _cachingService.LatestClients.FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
+                        if (cachedClient is null)
+                        {
+                            currentClient = availableClients.First();
+                            _cachingService.LatestClients.Add(currentClient);
+                        }
+                        else
+                        {
+                            var cachedClientIndex = _cachingService.Clients.IndexOf(cachedClient);
+                            currentClient = count >= (cachedClientIndex + 1) 
+                                ? availableClients.First() 
+                                : availableClients.ElementAt(cachedClientIndex + 1);
+                            
+                            _cachingService.LatestClients.Remove(cachedClient);
+                            _cachingService.LatestClients.Add(currentClient);
+                        }
+                    }
+                    else
+                    {
+                        currentClient = availableClients.FirstOrDefault();
+                    }
+
+                    if (currentClient != null)
+                    {
+                        Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {currentClient.Name}");
+                        var ba = BinaryConverter.Serialize(contract);
+                        await _hubContext.Clients.Client(currentClient.StreamId).SendAsync(request.MessageQueue.CommandName, ba, cancellationToken);
                         break;
                     }
 
@@ -98,7 +135,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                    
                     break;
                 case MessageExchangeType.Topic:
-                    await _hubContext.Clients.Group(request.MessageQueue.Recipient.ToString()).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, JsonSerializer.Serialize(telemetry), cancellationToken: cancellationToken);
+                    await _hubContext.Clients.Group(request.MessageQueue.Recipient.ToString()).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

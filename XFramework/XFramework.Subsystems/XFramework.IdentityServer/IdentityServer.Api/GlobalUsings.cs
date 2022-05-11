@@ -19,3 +19,4 @@ global using IdentityServer.Domain.Generic.Contracts.Requests;
 global using IdentityServer.Domain.Generic.Contracts.Requests.Get;
 global using IdentityServer.Core.DataAccess.Query.Entity.Identity.Roles;
 global using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
+global using XFramework.Integration.Drivers;

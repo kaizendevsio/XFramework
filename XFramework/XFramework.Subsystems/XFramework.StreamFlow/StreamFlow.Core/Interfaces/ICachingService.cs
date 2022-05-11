@@ -10,9 +10,11 @@ namespace StreamFlow.Core.Interfaces
 {
     public interface ICachingService
     {
+        public List<StreamFlowClientBO> LatestClients { get; set; }
         public List<StreamFlowClientBO> Clients { get; set; }
         public List<StreamFlowClientBO> AbsoluteClients { get; set; }
         public List<StreamFlowMessageBO> QueuedMessages { get; set; }
         public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; }
+        
     }
 }
