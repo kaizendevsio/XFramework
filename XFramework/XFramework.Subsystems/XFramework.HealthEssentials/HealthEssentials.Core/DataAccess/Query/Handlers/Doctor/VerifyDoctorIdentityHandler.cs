@@ -10,8 +10,10 @@ public class VerifyDoctorIdentityHandler : QueryBaseHandler, IRequestHandler<Ver
     public VerifyDoctorIdentityHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
+        MediatRGuid = Guid.NewGuid();
     }
-    
+
+    public Guid? MediatRGuid { get; set; }
     public async Task<QueryResponse<IdentityValidationResponse>> Handle(VerifyDoctorIdentityQuery request, CancellationToken cancellationToken)
     {
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials

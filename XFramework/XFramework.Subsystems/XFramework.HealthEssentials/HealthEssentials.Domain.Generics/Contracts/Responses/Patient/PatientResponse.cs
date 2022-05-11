@@ -1,6 +1,6 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
+using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 
-namespace HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 
 public class PatientResponse
 {

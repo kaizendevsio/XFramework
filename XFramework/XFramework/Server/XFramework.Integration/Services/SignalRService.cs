@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
+using BinaryPack;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,8 +28,7 @@ public class SignalRService : ISignalRService
     public Stopwatch Stopwatch { get; set; } = new();
     private StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
 
-    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; } =
-        new();
+    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; } = new();
 
     public SignalRService(StreamFlowConfiguration configuration)
     {
@@ -73,8 +73,7 @@ public class SignalRService : ISignalRService
 
     private void HandleEvents()
     {
-        Connection.On<string, string>("Ping",
-            (intent, message) => { Console.WriteLine($"Message Received ({DateTime.Now}): [{intent}] {message}"); });
+        Connection.On<string, string>("Ping", (intent, message) => { Console.WriteLine($"Message Received ({DateTime.Now}): [{intent}] {message}"); });
 
         Handle(_mediator);
         HandleInvokeResponseEvent();
@@ -87,23 +86,21 @@ public class SignalRService : ISignalRService
     private void HandleInvokeResponseEvent()
     {
         Console.WriteLine($"InvokeResponseHandler Initialized");
-        Connection.On<string, string, string>("InvokeResponseHandler",
-            async (data, message, telemetryString) =>
+        Connection.On<byte[]>("InvokeResponseHandler",
+            async (response) =>
             {
                 StopWatch.Start();
                 try
                 {
-                    var telemetry = JsonSerializer.Deserialize<StreamFlowTelemetryBO>(telemetryString);
-                    //Console.WriteLine($"Received InvokeResponseEvent: {telemetry.ClientGuid}");
-
-                    if (PendingMethodCalls.TryRemove(telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
+                    var responseObj = BinaryConverter.Deserialize<StreamFlowContract>(response);
+                    if (PendingMethodCalls.TryRemove(responseObj.Telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
                     {
                         var result = new StreamFlowMessageBO()
                         {
-                            ConsumerGuid = telemetry.ConsumerGuid,
-                            RequestGuid = telemetry.RequestGuid,
-                            Data = data,
-                            Message = message
+                            ConsumerGuid = responseObj.Telemetry.ConsumerGuid,
+                            RequestGuid = responseObj.Telemetry.RequestGuid,
+                            Data = responseObj.Data,
+                            Message = responseObj.Message
                         };
                         await Task.Run(() => methodCallCompletionSource.SetResult(result));
                     }
@@ -127,8 +124,7 @@ public class SignalRService : ISignalRService
 
     private void HandleTelemetryCallEvent()
     {
-        Connection.On<string, string>("TelemetryCall",
-            (data, message) => { Console.WriteLine($"Telemetry Call ({DateTime.Now}): {message}"); });
+        Connection.On<string, string>("TelemetryCall", (data, message) => { Console.WriteLine($"Telemetry Call ({DateTime.Now}): {message}"); });
     }
 
     private void HandleReconnectedEvent()
@@ -239,8 +235,7 @@ public class SignalRService : ISignalRService
         {
             if (Connection.State == HubConnectionState.Reconnecting)
             {
-                Console.WriteLine(
-                    $"Invoked Method '{methodName}' is queued, waiting for connection to be re-established");
+                Console.WriteLine($"Invoked Method '{methodName}' is queued, waiting for connection to be re-established");
                 _queueList.Add(new(methodName, args1));
                 return HttpStatusCode.Processing;
             }
@@ -294,8 +289,7 @@ public class SignalRService : ISignalRService
                 };
             }
 
-            new Timer(
-                new((e) =>
+            new Timer(new((e) =>
                 {
                     methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
                 }), null, 30_000, 0);

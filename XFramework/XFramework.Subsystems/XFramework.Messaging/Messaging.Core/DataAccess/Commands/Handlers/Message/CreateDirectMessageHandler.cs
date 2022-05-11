@@ -91,8 +91,8 @@ public class CreateDirectMessageHandler : CommandBaseHandler ,IRequestHandler<Cr
         });
         await _dataLayer.SaveChangesAsync(CancellationToken.None);
 
-        var c = _cachingService.QueuedMessageList.Find(i => i.Guid == $"{createSmsMessageRequest.ClientReference}");
-        c.Status = (short) MessageStatus.Sent;
+        /*var c = _cachingService.QueuedMessageList.Find(i => i.Guid == $"{createSmsMessageRequest.ClientReference}");
+        c.Status = (short) MessageStatus.Sent;*/
 
         return new()
         {

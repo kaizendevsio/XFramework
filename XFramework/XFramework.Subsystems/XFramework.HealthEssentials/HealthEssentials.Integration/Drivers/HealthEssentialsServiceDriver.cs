@@ -6,8 +6,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Integration.Interfaces;
 using Microsoft.Extensions.Configuration;
@@ -132,6 +134,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync("CreatePharmacyIdentity", request);
     }
 
+    public async Task<CmdResponse<CreateConsultationPaymentRequest>> CreateConsultationPayment(CreateConsultationPaymentRequest request)
+    {
+        return await SendAsync("CreateConsultationPayment", request);
+    }
+
     public async Task<QueryResponse<List<ConsultationResponse>>> GetConsultationList(GetConsultationListRequest request)
     {
         return await SendAsync<GetConsultationListRequest, List<ConsultationResponse>>("GetConsultationList", request);
@@ -150,5 +157,15 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request)
     {
         return await SendAsync<GetPharmacyListRequest, List<PharmacyResponse>>("GetPharmacyList", request);
+    }
+
+    public async Task<QueryResponse<List<DoctorResponse>>> GetDoctorList(GetDoctorListRequest request)
+    {
+        return await SendAsync<GetDoctorListRequest, List<DoctorResponse>>("GetDoctorList", request);
+    }
+
+    public async Task<QueryResponse<PatientResponse>> GetPatientIdentity(GetPatientIdentityRequest request)
+    {
+        return await SendAsync<GetPatientIdentityRequest, PatientResponse>("GetPatientIdentity", request);
     }
 }   

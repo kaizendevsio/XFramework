@@ -1,8 +1,10 @@
 ﻿using System.Text.Json;
+using BinaryPack;
 using MessagePack;
 using Microsoft.AspNetCore.SignalR.Client;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
+using TypeSupport.Extensions;
 using XFramework.Integration.Entity.Contracts.Responses;
 using XFramework.Integration.Interfaces;
 
@@ -31,20 +33,16 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return await SignalRService.EnsureConnection();
     }
 
-    public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request)
+    public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request) where TResponse : new()
     {
-        //request.Recipient ??= TargetClient;
         var signalRResponse = await SignalRService.InvokeAsync(request);
         var tResponse = Activator.CreateInstance<TResponse>();
             
         switch (signalRResponse.HttpStatusCode)
         {
             case HttpStatusCode.Processing:
-                    
-                tResponse.GetType().GetProperty("Message")?
-                    .SetValue(tResponse, $"Request is queued, waiting for connection to be re-established", null);
-                tResponse.GetType().GetProperty("HttpStatusCode")?
-                    .SetValue(tResponse, HttpStatusCode.Processing, null);
+                tResponse.SetPropertyValue("Message", "Request is queued, waiting for connection to be re-established");
+                tResponse.SetPropertyValue("HttpStatusCode", (int)HttpStatusCode.Processing);
                 
                 return new(){
                     HttpStatusCode = HttpStatusCode.Processing,
@@ -52,11 +50,9 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 };
             case HttpStatusCode.NotFound:
             {
-                tResponse.GetType().GetProperty("Message")?
-                    .SetValue(tResponse, $"Service is currently offline", null);
-                tResponse.GetType().GetProperty("HttpStatusCode")?
-                    .SetValue(tResponse, HttpStatusCode.NotFound, null);
-                
+                tResponse.SetPropertyValue("Message", "Service is currently offline");
+                tResponse.SetPropertyValue("HttpStatusCode", (int)HttpStatusCode.NotFound);
+
                 return new(){
                     HttpStatusCode = HttpStatusCode.NotFound,
                     Response = tResponse
@@ -65,7 +61,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             default:
                 return new(){
                     HttpStatusCode = HttpStatusCode.Accepted,
-                    Response = JsonSerializer.Deserialize<TResponse>(signalRResponse.Response)
+                    Response = BinaryConverter.Deserialize<TResponse>(signalRResponse.Response)
                 };
         }
     }

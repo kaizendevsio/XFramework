@@ -6,8 +6,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -46,10 +48,13 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     
     public Task<CmdResponse<CreatePharmacyRequest>> CreatePharmacy(CreatePharmacyRequest request);
     public Task<CmdResponse<CreatePharmacyIdentityRequest>> CreatePharmacyIdentity(CreatePharmacyIdentityRequest request);
+    public Task<CmdResponse<CreateConsultationPaymentRequest>> CreateConsultationPayment(CreateConsultationPaymentRequest request);
     
     public Task<QueryResponse<List<ConsultationResponse>>> GetConsultationList(GetConsultationListRequest request);
     public Task<QueryResponse<List<LaboratoryResponse>>> GetLaboratoryList(GetLaboratoryListRequest request);
     public Task<QueryResponse<List<LogisticResponse>>> GetLogisticList(GetLogisticListRequest request);
     public Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request);
+    public Task<QueryResponse<List<DoctorResponse>>> GetDoctorList(GetDoctorListRequest request);
+    public Task<QueryResponse<PatientResponse>> GetPatientIdentity(GetPatientIdentityRequest request);
     
 }

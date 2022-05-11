@@ -22,6 +22,9 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="Wallets.Domain.Generic">
+            <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
+        </Reference>
         <Reference Include="SmsGateway.Domain.Generic">
             <HintPath>..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\bin\Debug\net6.0\SmsGateway.Domain.Generic.dll</HintPath>
         </Reference>

@@ -17,5 +17,9 @@ public partial class AddressState
         public AddressProvinceResponse SelectedProvince { get; set; }
         public AddressCityResponse SelectedCity { get; set; }
         public AddressBarangayResponse SelectedBarangay { get; set; }
+        public string CurrentAddressName { get; set; }
+        public string CurrentUnitNumber { get; set; }
+
+
     }
 }

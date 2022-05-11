@@ -30,9 +30,7 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
             };
         }
 
-        var specialty = await _dataLayer.HealthEssentialsContext.DoctorEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Name == $"{request.Specialty}", cancellationToken: cancellationToken);
+        /*var specialty = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(i => i.Name == $"{request.Specialty}", cancellationToken: cancellationToken);
        
         if (specialty is null)
         {
@@ -42,7 +40,7 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
                 GroupId = 1
             }, CancellationToken.None);
             specialty = specialtyEntry.Entity;
-        }
+        }*/
 
         if (request.Address is not null)
         {
@@ -76,7 +74,6 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
         var emailContactType = await _dataLayer.XnelSystemsContext.IdentityContactEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "Email", cancellationToken: CancellationToken.None);
         var phoneContactType = await _dataLayer.XnelSystemsContext.IdentityContactEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "Phone", cancellationToken: CancellationToken.None);
 
-        
         var workEmail = new IdentityContact
         {
             EntityId = emailContactType.Id,
@@ -101,7 +98,11 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
             Description = request.Description,
             Guid = $"{Guid.NewGuid()}",
             Name = request.ProfessionalName,
-            Entity = specialty
+            ExperienceYears = null,
+            Clinic = request.Clinic,
+            ClinicAddress = request.ClinicAddress,
+            BaseFee = request.BaseFee,
+            EntityId = 1
         };
         
         await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workEmail, CancellationToken.None);

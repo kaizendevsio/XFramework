@@ -27,6 +27,9 @@
         <Reference Include="SmsGateway.Integration">
             <HintPath>..\..\XFramework.SmsGateway\SmsGateway.Integration\bin\Debug\net6.0\SmsGateway.Integration.dll</HintPath>
         </Reference>
+        <Reference Include="Wallets.Domain.Generic">
+          <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
+        </Reference>
         <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
             <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
         </Reference>

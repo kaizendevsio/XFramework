@@ -46,7 +46,7 @@ public class UnitTest1
         {
             for (var i = 0; i < 1; i++)
             {
-                await StreamFlowWrapper.PushAsync(new(new CreateIdentityRequest())
+                /*await StreamFlowWrapper.PushAsync(new(new CreateIdentityRequest())
                 {
                     Message = "Hello fucking world",
                     ExchangeType = MessageExchangeType.Direct,
@@ -57,7 +57,7 @@ public class UnitTest1
                         Fucker = "hehehe",
                         Re = 123.43
                     })
-                });
+                });*/
                     
                 Thread.Sleep(1000); 
             }

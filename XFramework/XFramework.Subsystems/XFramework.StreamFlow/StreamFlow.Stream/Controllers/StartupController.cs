@@ -2,6 +2,7 @@
 using System;
 using System.Reflection;
 using System.Runtime.Versioning;
+using BinaryPack;
 using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
 

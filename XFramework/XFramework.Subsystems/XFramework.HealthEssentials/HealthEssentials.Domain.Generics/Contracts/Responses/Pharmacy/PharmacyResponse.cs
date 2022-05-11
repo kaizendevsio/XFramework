@@ -18,5 +18,7 @@ public class PharmacyResponse
     public string? Website { get; set; }
     public string? Logo { get; set; }
     
+    public virtual List<PharmacyLocationResponse> PharmacyLocations { get; set; }
+    
     public PharmacyEntityResponse Entity { get; set; } = null!;
 }

@@ -11,6 +11,10 @@ public class CreateDoctorIdentityRequest : RequestBase
     public string? PhoneNumber { get; set; }
     public string? Description { get; set; }
     public string? Specialty { get; set; }
+    public int? ExperienceYears { get; set; }
+    public string? Clinic { get; set; }
+    public string? ClinicAddress { get; set; }
+    public decimal? BaseFee { get; set; }
 
     public CreateAddressRequest? Address { get; set; }
 }

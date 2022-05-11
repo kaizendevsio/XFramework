@@ -60,6 +60,7 @@ public class CreatePatientIdentityHandler : CommandBaseHandler, IRequestHandler<
         var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Patient>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.EntityId = 1;
+        entity.CredentialId = credential.Id;
         
         _dataLayer.HealthEssentialsContext.Patients.Add(entity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
