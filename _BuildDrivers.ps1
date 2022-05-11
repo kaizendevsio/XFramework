@@ -17,6 +17,10 @@ if ($answer -eq "y") {
    Write-Host =============== Building Domain Generics ===============
    Write-Host
  
+   Write-Host Building XFramework.SmsGateway.Integration ...
+   Get-ChildItem -Path "XFramework\XFramework.Subsystems\XFramework.SmsGateway\SmsGateway.Integration\bin" -Exclude ".git" | Remove-Item -Recurse -Force
+   Get-ChildItem -Path "XFramework\XFramework.Subsystems\XFramework.SmsGateway\SmsGateway.Integration\obj" -Exclude ".git" | Remove-Item -Recurse -Force
+   dotnet build "XFramework\XFramework.Subsystems\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj"
 
    Write-Host Building XFramework.Community.Integration ...
    Get-ChildItem -Path "XFramework\XFramework.Subsystems\XFramework.Community\Community.Integration\bin" -Exclude ".git" | Remove-Item -Recurse -Force

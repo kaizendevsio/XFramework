@@ -17,6 +17,11 @@
 
     <ItemGroup>
         <Folder Include="BusinessObjects" />
+        <Folder Include="Contracts\Responses\XnelSystemsHealthEssentialsContext" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj" />
     </ItemGroup>
     
 </Project>

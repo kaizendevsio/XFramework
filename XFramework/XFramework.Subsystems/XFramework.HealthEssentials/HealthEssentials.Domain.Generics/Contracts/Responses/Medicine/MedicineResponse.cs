@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 
-public class PharmacyResponse
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
+
+public class MedicineResponse
 {
     public DateTime CreatedAt { get; set; }
     public DateTime ModifiedAt { get; set; }
@@ -9,14 +11,10 @@ public class PharmacyResponse
     public long EntityId { get; set; }
     public string? Name { get; set; }
     public string? ShortName { get; set; }
-    public string? Slogan { get; set; }
+    public string? ScientificName { get; set; }
     public string? Description { get; set; }
     public string? ChemicalComponent { get; set; }
     public string Guid { get; set; } = null!;
-    public string? Phone { get; set; }
-    public string? Email { get; set; }
-    public string? Website { get; set; }
-    public string? Logo { get; set; }
     
-    public PharmacyEntityResponse Entity { get; set; } = null!;
+    public MedicineEntity Entity { get; set; } = null!;
 }
