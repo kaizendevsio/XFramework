@@ -1,7 +1,6 @@
 ﻿using HealthEssentials.Api.SignalR;
 using SmsGateway.Integration.Drivers;
 using SmsGateway.Integration.Interfaces;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
