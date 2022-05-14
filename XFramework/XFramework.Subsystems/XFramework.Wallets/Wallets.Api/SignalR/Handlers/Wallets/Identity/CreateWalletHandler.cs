@@ -7,6 +7,6 @@ public class CreateWalletHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateWalletRequest, CreateWalletCmd>(connection, mediator);
+        HandleRequestCmd<CreateWalletRequest, CreateWalletCmd>(connection, mediator);
     }
 }

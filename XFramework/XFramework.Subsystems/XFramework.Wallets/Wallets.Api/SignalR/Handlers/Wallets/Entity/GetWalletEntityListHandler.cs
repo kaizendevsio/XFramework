@@ -7,6 +7,6 @@ public class GetWalletEntityListHandler  : BaseSignalRHandler, ISignalREventHand
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<GetWalletEntityListRequest, GetWalletEntityListQuery>(connection, mediator);
+        HandleRequestQuery<GetWalletEntityListRequest, GetWalletEntityListQuery, List<WalletEntityResponse>>(connection, mediator);
     }
 }

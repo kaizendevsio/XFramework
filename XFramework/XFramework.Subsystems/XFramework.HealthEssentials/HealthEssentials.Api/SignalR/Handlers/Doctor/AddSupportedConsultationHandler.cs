@@ -8,6 +8,6 @@ public class AddSupportedConsultationHandler : BaseSignalRHandler, ISignalREvent
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<AddSupportedConsultationRequest, AddSupportedConsultationCmd>(connection, mediator);
+        HandleRequestCmd<AddSupportedConsultationRequest, AddSupportedConsultationCmd>(connection, mediator);
     }
 }

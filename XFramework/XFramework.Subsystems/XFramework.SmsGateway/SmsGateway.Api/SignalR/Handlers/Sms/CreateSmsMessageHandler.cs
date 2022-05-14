@@ -7,6 +7,6 @@ public class CreateSmsMessageHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateSmsMessageRequest, CreateSmsMessageCmd>(connection, mediator);
+        HandleRequestCmd<CreateSmsMessageRequest, CreateSmsMessageCmd>(connection, mediator);
     }
 }

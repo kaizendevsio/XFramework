@@ -7,6 +7,6 @@ public class ConvertWalletHandler  : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<ConvertWalletRequest, ConvertWalletCmd>(connection, mediator);
+        HandleRequestCmd<ConvertWalletRequest, ConvertWalletCmd>(connection, mediator);
     }
 }

@@ -7,6 +7,6 @@ public class CreateDirectMessageHandler : BaseSignalRHandler, ISignalREventHandl
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateDirectMessageRequest, CreateDirectMessageCmd>(connection, mediator);
+        HandleVoidRequestCmd<CreateDirectMessageRequest, CreateDirectMessageCmd>(connection, mediator);
     }
 }

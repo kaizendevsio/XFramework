@@ -1,5 +1,6 @@
 ﻿using Community.Core.DataAccess.Query.Entity.Identity;
 using Community.Domain.Generic.Contracts.Requests.Get;
+using Community.Domain.Generic.Contracts.Responses.Identity;
 
 namespace Community.Api.SignalR.Handlers.Identity;
 
@@ -7,6 +8,6 @@ public class GetIdentityHandlerHandler : BaseSignalRHandler, ISignalREventHandle
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<GetIdentityRequest, GetIdentityQuery>(connection, mediator);
+        HandleRequestQuery<GetIdentityRequest, GetIdentityQuery, CommunityIdentityResponse>(connection, mediator);
     }
 }

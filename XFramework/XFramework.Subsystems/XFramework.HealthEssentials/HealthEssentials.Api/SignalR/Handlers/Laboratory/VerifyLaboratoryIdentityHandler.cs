@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Laboratory;
 
@@ -7,6 +8,6 @@ public class VerifyLaboratoryIdentityHandler : BaseSignalRHandler, ISignalREvent
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<VerifyLaboratoryIdentityRequest, VerifyLaboratoryIdentityQuery>(connection, mediator);
+        HandleRequestQuery<VerifyLaboratoryIdentityRequest, VerifyLaboratoryIdentityQuery, IdentityValidationResponse>(connection, mediator);
     }
 }

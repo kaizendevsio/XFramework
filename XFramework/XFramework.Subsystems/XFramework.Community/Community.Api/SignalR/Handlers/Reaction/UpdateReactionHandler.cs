@@ -7,6 +7,6 @@ public class UpdateReactionHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<UpdateReactionRequest, UpdateReactionCmd>(connection, mediator);
+        HandleVoidRequestCmd<UpdateReactionRequest, UpdateReactionCmd>(connection, mediator);
     }
 }

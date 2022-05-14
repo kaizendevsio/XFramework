@@ -8,6 +8,6 @@ public class CreateLaboratoryServiceHandler : BaseSignalRHandler, ISignalREventH
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateLaboratoryServiceRequest, CreateLaboratoryServiceCmd>(connection, mediator);
+        HandleRequestCmd<CreateLaboratoryServiceRequest, CreateLaboratoryServiceCmd>(connection, mediator);
     }
 }

@@ -7,6 +7,6 @@ public class GetConnectionListHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<DeleteConnectionRequest, DeleteConnectionCmd>(connection, mediator);
+        HandleVoidRequestCmd<DeleteConnectionRequest, DeleteConnectionCmd>(connection, mediator);
     }
 }

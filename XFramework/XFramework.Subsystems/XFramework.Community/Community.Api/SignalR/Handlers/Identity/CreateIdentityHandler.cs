@@ -7,6 +7,6 @@ public class CreateIdentityHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateIdentityRequest, CreateIdentityCmd>(connection, mediator);
+        HandleVoidRequestCmd<CreateIdentityRequest, CreateIdentityCmd>(connection, mediator);
     }
 }

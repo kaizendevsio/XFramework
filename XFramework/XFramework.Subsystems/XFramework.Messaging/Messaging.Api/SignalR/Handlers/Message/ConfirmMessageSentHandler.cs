@@ -8,6 +8,6 @@ public class ConfirmMessageSentHandler : BaseSignalRHandler, ISignalREventHandle
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<ConfirmMessageSentRequest, ConfirmMessageSentCmd>(connection, mediator);
+        HandleVoidRequestCmd<ConfirmMessageSentRequest, ConfirmMessageSentCmd>(connection, mediator);
     }
 }

@@ -7,6 +7,6 @@ public class UpdateIdentityHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<UpdateIdentityRequest, UpdateIdentityCmd>(connection, mediator);
+        HandleVoidRequestCmd<UpdateIdentityRequest, UpdateIdentityCmd>(connection, mediator);
     }
 }

@@ -7,6 +7,6 @@ public class DeleteWalletHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<DeleteWalletRequest, DeleteWalletCmd>(connection, mediator);
+        HandleRequestCmd<DeleteWalletRequest, DeleteWalletCmd>(connection, mediator);
     }
 }

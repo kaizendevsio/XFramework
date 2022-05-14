@@ -7,6 +7,6 @@ public class DecrementWalletHandler  : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<DecrementWalletRequest, DecrementWalletCmd>(connection, mediator);
+        HandleRequestCmd<DecrementWalletRequest, DecrementWalletCmd>(connection, mediator);
     }
 }

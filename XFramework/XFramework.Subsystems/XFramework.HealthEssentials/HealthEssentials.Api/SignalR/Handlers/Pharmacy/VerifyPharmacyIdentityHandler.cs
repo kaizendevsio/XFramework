@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Pharmacy;
 
@@ -7,6 +8,6 @@ public class VerifyPharmacyIdentityHandler : BaseSignalRHandler, ISignalREventHa
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<VerifyPharmacyIdentityRequest, VerifyPharmacyIdentityQuery>(connection, mediator);
+        HandleRequestQuery<VerifyPharmacyIdentityRequest, VerifyPharmacyIdentityQuery, IdentityValidationResponse>(connection, mediator);
     }
 }

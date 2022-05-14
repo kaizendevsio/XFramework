@@ -7,6 +7,6 @@ public class DeleteReactionHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<DeleteReactionRequest, DeleteReactionCmd>(connection, mediator);
+        HandleVoidRequestCmd<DeleteReactionRequest, DeleteReactionCmd>(connection, mediator);
     }
 }

@@ -7,6 +7,6 @@ public class CreateContentHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateContentRequest, CreateContentCmd>(connection, mediator);
+        HandleVoidRequestCmd<CreateContentRequest, CreateContentCmd>(connection, mediator);
     }
 }

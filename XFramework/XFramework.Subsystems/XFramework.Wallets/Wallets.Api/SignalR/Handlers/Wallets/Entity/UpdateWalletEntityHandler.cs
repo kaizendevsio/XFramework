@@ -7,6 +7,6 @@ public class UpdateWalletEntityHandler  : BaseSignalRHandler, ISignalREventHandl
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<UpdateWalletEntityRequest, UpdateWalletEntityCmd>(connection, mediator);
+        HandleRequestCmd<UpdateWalletEntityRequest, UpdateWalletEntityCmd>(connection, mediator);
     }
 }

@@ -8,6 +8,6 @@ public class CreateLogisticRiderHandleHandler : BaseSignalRHandler, ISignalREven
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateLogisticRiderHandleRequest, CreateLogisticRiderHandleCmd>(connection, mediator);
+        HandleRequestCmd<CreateLogisticRiderHandleRequest, CreateLogisticRiderHandleCmd>(connection, mediator);
     }
 }
