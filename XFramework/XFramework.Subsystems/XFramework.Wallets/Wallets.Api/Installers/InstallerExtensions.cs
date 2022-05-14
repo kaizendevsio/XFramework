@@ -1,9 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Linq;
-
-namespace Wallets.Api.Installers;
+﻿namespace Wallets.Api.Installers;
 
 public static class InstallerExtensions
 {

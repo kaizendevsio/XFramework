@@ -1,7 +1,6 @@
 ﻿using SmsGateway.Api.SignalR;
 using SmsGateway.Core.Interfaces;
 using SmsGateway.Core.Services;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 using XFramework.Integration.Services;

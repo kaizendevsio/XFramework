@@ -6,6 +6,6 @@ public class GetContactListHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<GetContactListRequest, GetContactListQuery>(connection, mediator);
+        HandleRequestQuery<GetContactListRequest, GetContactListQuery, List<ContactResponse>>(connection, mediator);
     }
 }

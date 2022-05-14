@@ -1,6 +1,4 @@
-﻿using MediatR;
-using Microsoft.AspNetCore.SignalR.Client;
-using Wallets.Core.DataAccess.Commands.Entity.Wallets;
+﻿using Wallets.Core.DataAccess.Commands.Entity.Wallets;
 using Wallets.Domain.Generic.Contracts.Requests.Update;
 
 namespace Wallets.Api.SignalR.Handlers.Wallets.Entity;

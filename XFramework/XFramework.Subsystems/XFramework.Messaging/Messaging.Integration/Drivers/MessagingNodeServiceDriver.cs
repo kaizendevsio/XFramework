@@ -18,6 +18,6 @@ public class MessagingNodeServiceDriver : DriverBase, IMessagingNodeServiceWrapp
     
     public async Task<CmdResponse> ConfirmMessageSent(ConfirmMessageSentRequest request)
     {
-        return await SendVoidAsync("ConfirmMessageSent", request);
+        return await SendVoidAsync(request);
     }
 }

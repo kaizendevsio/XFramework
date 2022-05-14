@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using BinaryPack;
+using MediatR;
 
 namespace XFramework.Integration.Services.Helpers;
 
@@ -10,9 +11,9 @@ public static class StreamFlowHelper
         return entity.GetType().Name.Replace("Request", string.Empty);
     }
         
-    public static TCmd AsMediatorCmd<TRequest, TCmd>(this byte[] entity) where TRequest : new()
+    public static TQuery AsMediatorCmd<TRequest, TQuery, TResponse>(this byte[] entity) where TRequest : new() where TQuery : IRequest<TResponse>
     {
-        return BinaryConverter.Deserialize<TRequest>(entity).Adapt<TCmd>();
+        return BinaryConverter.Deserialize<TRequest>(entity).Adapt<TQuery>();
     }
 
 }

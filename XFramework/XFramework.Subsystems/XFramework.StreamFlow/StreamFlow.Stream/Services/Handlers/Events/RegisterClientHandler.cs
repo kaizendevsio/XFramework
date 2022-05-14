@@ -25,12 +25,17 @@ namespace StreamFlow.Stream.Services.Handlers.Events
         
         public async Task<CmdResponse<RegisterClientCmd>> Handle(RegisterClientCmd request, CancellationToken cancellationToken)
         {
-            _cachingService.Clients.Add(new()
+            Again:
+            var y = _cachingService.Clients.TryAdd(_cachingService.Clients.Count, new()
             {
                 StreamId = request.Context.ConnectionId,
                 Guid = request.Client.Guid,
                 Name = request.Client.Name
             });
+            if (!y)
+            {
+                goto Again;
+            }
             RememberClient(request);
 
             Console.WriteLine($"Connection Registered with ID {request.Context.ConnectionId} : {request.Client.Guid} [{request.Context.Features.Get<IHttpTransportFeature>()?.TransportType.ToString()}] : {request.Client.Name}");
@@ -42,9 +47,9 @@ namespace StreamFlow.Stream.Services.Handlers.Events
         }
         private async Task RememberClient(RegisterClientCmd request)
         {
-            if (_cachingService.AbsoluteClients.All(i => i.Guid != request.Client.Guid))
+            if (_cachingService.AbsoluteClients.All(i => i.Value.Guid != request.Client.Guid))
             {
-                _cachingService.AbsoluteClients.Add(new()
+                _cachingService.AbsoluteClients.TryAdd(_cachingService.AbsoluteClients.Count , new()
                 {
                     StreamId = request.Context.ConnectionId,
                     Guid = request.Client.Guid,
@@ -53,8 +58,8 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             }
             else
             {
-                var client = _cachingService.AbsoluteClients.FirstOrDefault(i => i.Guid != request.Client.Guid);
-                client.StreamId = request.Context.ConnectionId;
+                var client = _cachingService.AbsoluteClients.FirstOrDefault(i => i.Value.Guid != request.Client.Guid);
+                client.Value.StreamId = request.Context.ConnectionId;
             }
         }
     }

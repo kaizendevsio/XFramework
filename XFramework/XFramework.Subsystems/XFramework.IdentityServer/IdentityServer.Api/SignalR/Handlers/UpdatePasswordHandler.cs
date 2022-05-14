@@ -2,10 +2,10 @@
 
 namespace IdentityServer.Api.SignalR.Handlers;
 
-public class ChangePasswordHandler : BaseSignalRHandler, ISignalREventHandler
+public class UpdatePasswordHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<UpdatePasswordRequest, ChangePasswordCmd>(connection, mediator);
+        HandleRequestCmd<UpdatePasswordRequest, ChangePasswordCmd>(connection, mediator);
     }
 }

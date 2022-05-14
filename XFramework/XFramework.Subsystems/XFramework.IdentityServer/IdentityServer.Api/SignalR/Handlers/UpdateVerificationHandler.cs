@@ -8,6 +8,6 @@ public class UpdateVerificationHandler : BaseSignalRHandler, ISignalREventHandle
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<UpdateVerificationRequest, UpdateVerificationCmd>(connection, mediator);
+        HandleVoidRequestCmd<UpdateVerificationRequest, UpdateVerificationCmd>(connection, mediator);
     }
 }

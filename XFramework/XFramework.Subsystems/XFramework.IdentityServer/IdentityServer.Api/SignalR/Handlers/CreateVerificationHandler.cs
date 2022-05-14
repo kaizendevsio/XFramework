@@ -7,6 +7,6 @@ public class CreateVerificationHandler : BaseSignalRHandler, ISignalREventHandle
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateVerificationRequest, CreateVerificationCmd>(connection, mediator);
+        HandleVoidRequestCmd<CreateVerificationRequest, CreateVerificationCmd>(connection, mediator);
     }
 }

@@ -6,6 +6,6 @@ public class DeleteIdentityHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<DeleteIdentityRequest, DeleteIdentityCmd>(connection, mediator);
+        HandleVoidRequestCmd<DeleteIdentityRequest, DeleteIdentityCmd>(connection, mediator);
     }
 }

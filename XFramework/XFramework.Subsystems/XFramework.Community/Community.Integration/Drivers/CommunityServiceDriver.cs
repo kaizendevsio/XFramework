@@ -24,76 +24,76 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
     
     public async Task<QueryResponse<CommunityContentResponse>> GetContent(GetContentRequest request)
     {
-        return await SendAsync<GetContentRequest, CommunityContentResponse>("GetContent", request);
+        return await SendAsync<GetContentRequest, CommunityContentResponse>(request);
     }
 
     public async Task<QueryResponse<List<CommunityContentResponse>>> GetContentList(GetContentListRequest request)
     {
-        return await SendAsync<GetContentListRequest, List<CommunityContentResponse>>("GetContentList", request);
+        return await SendAsync<GetContentListRequest, List<CommunityContentResponse>>(request);
     }
 
     public async Task<QueryResponse<List<CommunityIdentityResponse>>> GetIdentityList(GetIdentityListRequest request)
     {
-        return await SendAsync<GetIdentityListRequest, List<CommunityIdentityResponse>>("GetIdentityList", request);
+        return await SendAsync<GetIdentityListRequest, List<CommunityIdentityResponse>>(request);
     }
 
     public async Task<QueryResponse<CommunityIdentityResponse>> GetIdentity(GetIdentityRequest request)
     {
-        return await SendAsync<GetIdentityRequest, CommunityIdentityResponse>("GetIdentity", request);
+        return await SendAsync<GetIdentityRequest, CommunityIdentityResponse>(request);
     }
 
     public async Task<CmdResponse> CreateIdentity(CreateIdentityRequest request)
     {
-        return await SendVoidAsync("CreateIdentity", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> UpdateIdentity(UpdateIdentityRequest request)
     {
-        return await SendVoidAsync("UpdateIdentity", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> CreateContent(CreateContentRequest request)
     {
-        return await SendVoidAsync("CreateContent", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> UpdateContent(UpdateContentRequest request)
     {
-        return await SendVoidAsync("UpdateContent", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> DeleteContent(DeleteContentRequest request)
     {
-        return await SendVoidAsync("DeleteContent", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> CreateReaction(CreateReactionRequest request)
     {
-        return await SendVoidAsync("CreateReaction", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> UpdateReaction(UpdateReactionRequest request)
     {
-        return await SendVoidAsync("UpdateReaction", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> DeleteReaction(DeleteReactionRequest request)
     {
-        return await SendVoidAsync("DeleteReaction", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<QueryResponse<List<CommunityConnectionResponse>>> GetConnectionList(GetConnectionListRequest request)
     {
-        return await SendAsync<GetConnectionListRequest, List<CommunityConnectionResponse>>("GetConnectionList", request);
+        return await SendAsync<GetConnectionListRequest, List<CommunityConnectionResponse>>(request);
     }
 
     public async Task<CmdResponse> CreateConnection(CreateConnectionRequest request)
     {
-        return await SendVoidAsync("CreateConnection", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> DeleteConnection(DeleteConnectionRequest request)
     {
-        return await SendVoidAsync("DeleteConnection", request);
+        return await SendVoidAsync(request);
     }
 }   

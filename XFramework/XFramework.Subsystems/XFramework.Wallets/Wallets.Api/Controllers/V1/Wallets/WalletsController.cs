@@ -1,9 +1,6 @@
-﻿using System.Threading.Tasks;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Wallets.Core.DataAccess.Commands.Entity.Wallets;
 using Wallets.Core.DataAccess.Query.Entity.Wallets;
-using XFramework.Domain.Generic.BusinessObjects;
 
 namespace Wallets.Api.Controllers.V1.Wallets;
 

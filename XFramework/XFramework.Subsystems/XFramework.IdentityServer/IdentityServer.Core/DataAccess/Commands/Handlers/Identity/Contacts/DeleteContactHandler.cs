@@ -2,14 +2,14 @@
 
 namespace IdentityServer.Core.DataAccess.Commands.Handlers.Identity.Contacts;
 
-public class DeleteContactHandler : CommandBaseHandler, IRequestHandler<DeleteContactCmd,CmdResponse<DeleteContactCmd>>
+public class DeleteContactHandler : CommandBaseHandler, IRequestHandler<DeleteContactCmd,CmdResponse>
 {
     public DeleteContactHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
         
-    public async Task<CmdResponse<DeleteContactCmd>> Handle(DeleteContactCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse> Handle(DeleteContactCmd request, CancellationToken cancellationToken)
     {
         var credentialEntity = await _dataLayer.IdentityCredentials
             .AsNoTracking()

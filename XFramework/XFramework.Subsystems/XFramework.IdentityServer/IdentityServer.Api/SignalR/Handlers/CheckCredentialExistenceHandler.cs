@@ -1,11 +1,9 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
-
-namespace IdentityServer.Api.SignalR.Handlers;
+﻿namespace IdentityServer.Api.SignalR.Handlers;
 
 public class CheckCredentialExistenceHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CheckCredentialExistenceRequest, CheckCredentialExistenceQuery>(connection, mediator);
+        HandleRequestQuery<CheckCredentialExistenceRequest, CheckCredentialExistenceQuery, ExistenceResponse>(connection, mediator);
     }
 }

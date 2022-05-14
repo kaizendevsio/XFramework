@@ -1,6 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Wallets.Core.DataAccess;
 using Wallets.Core.Interfaces;
 using Wallets.Domain.DataTransferObjects;

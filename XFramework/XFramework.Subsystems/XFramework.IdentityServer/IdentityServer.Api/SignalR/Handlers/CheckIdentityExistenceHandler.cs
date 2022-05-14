@@ -1,5 +1,4 @@
 ﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity;
-using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 
 namespace IdentityServer.Api.SignalR.Handlers;
 
@@ -7,6 +6,6 @@ public class CheckIdentityExistenceHandler : BaseSignalRHandler, ISignalREventHa
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CheckIdentityExistenceRequest, CheckIdentityExistenceQuery>(connection, mediator);
+        HandleRequestQuery<CheckIdentityExistenceRequest, CheckIdentityExistenceQuery, ExistenceResponse>(connection, mediator);
     }
 }

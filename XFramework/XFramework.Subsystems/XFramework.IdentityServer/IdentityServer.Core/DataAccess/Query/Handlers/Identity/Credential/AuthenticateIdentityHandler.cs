@@ -8,19 +8,19 @@ namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity.Credential;
 
 public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<AuthenticateCredentialQuery, QueryResponse<AuthorizeIdentityResponse>>
 {
-    public AuthenticateIdentityHandler(IDataLayer dataLayer, ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService, ILoggerWrapper recordsWrapper)
+    public AuthenticateIdentityHandler(ICachingService cachingService, IHelperService helperService, JwtOptionsBO jwtOptionsBo, IJwtService jwtService, ILoggerWrapper recordsWrapper)
     {
         _recordsService = recordsWrapper;
         _jwtService = jwtService;
         _jwtOptions = jwtOptionsBo;
         _helperService = helperService;
-        _dataLayer = dataLayer;
+        //_dataLayer = dataLayer;
         _cachingService = cachingService;
     }
 
     public async Task<QueryResponse<AuthorizeIdentityResponse>> Handle(AuthenticateCredentialQuery request, CancellationToken cancellationToken)
     {
-        var credential = await ValidateAuthorization(request, cancellationToken, request.AuthorizeBy);
+        /*var credential = await ValidateAuthorization(request, cancellationToken, request.AuthorizeBy);
         if (credential == null)
         {
             return new()
@@ -62,6 +62,14 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                 CredentialGuid = Guid.Parse(credential.Guid),
                 RoleList = roleList.Adapt<List<RoleResponse>>() 
             }
+        };*/
+
+        return new()
+        {
+            ResponseId = Guid.NewGuid(),
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "OK",
+            IsSuccess = true,
         };
     }
 

@@ -6,5 +6,5 @@ public class StreamFlowContract
 {
     public byte[] Data { get; set; }
     public string Message { get; set; }
-    public StreamFlowTelemetryBO Telemetry { get; set; }
+    public byte[] Telemetry { get; set; }
 }

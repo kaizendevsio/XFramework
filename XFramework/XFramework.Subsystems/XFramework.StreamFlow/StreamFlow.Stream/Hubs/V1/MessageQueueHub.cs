@@ -24,12 +24,15 @@ namespace StreamFlow.Stream.Hubs.V1
             await base.OnConnectedAsync();
         }
 
-        public override async Task OnDisconnectedAsync(Exception? exception)
+        public override async Task OnDisconnectedAsync(Exception exception)
         {
-            var client = _cachingService.Clients.FirstOrDefault(i => i.StreamId == Context.ConnectionId);
-            _cachingService.Clients.Remove(client);
+            var client = _cachingService.Clients.FirstOrDefault(i => i.Value.StreamId == Context.ConnectionId);
+            var cachedClient = _cachingService.LatestClients.FirstOrDefault(x => x.Value.StreamId == Context.ConnectionId);
+            _cachingService.Clients.TryRemove(client);
+            _cachingService.LatestClients.TryRemove(cachedClient);
+
             await base.OnDisconnectedAsync(exception);
-            Console.WriteLine($"Connection Lost and Unregistered with ID {Context.ConnectionId} : {client?.Guid} : {client?.Name}");
+            Console.WriteLine($"Connection Lost and Unregistered with ID {Context.ConnectionId} : {client.Value.Guid} : {client.Value.Name}");
         }
 
         public StreamFlowInvokeResponse Invoke(StreamFlowMessageBO request)

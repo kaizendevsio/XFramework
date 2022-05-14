@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using StreamFlow.Domain.Generic.Contracts.Requests;
 using TypeSupport.Extensions;
 using XFramework.Domain.Generic.Enums;
 
@@ -19,7 +20,30 @@ public class DriverBase
     public Guid? ApplicationId { get; set; }
     public Guid? TargetClient { get; set; }
         
-    public async Task<CmdResponse> SendVoidAsync<TRequest>(string commandName ,TRequest request)
+    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request) where TRequest : new()
+    {
+        var rs = await GetRequestServer(request);
+        try
+        {
+            request.SetPropertyValue("RequestServer", rs);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+
+        var r = new StreamFlowMessageBO
+        {
+            ExchangeType = MessageExchangeType.Direct,
+            Recipient = TargetClient
+        };
+        r.SetData(request);
+        
+        var result = await MessageBusDriver.InvokeAsync<CmdResponse>(r);
+        return result.Response;
+    }
+    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request) where TRequest : new()
     {
         var rs = await GetRequestServer(request);
         try
@@ -32,36 +56,17 @@ public class DriverBase
             throw;
         }
             
-        var result = await MessageBusDriver.InvokeAsync<CmdResponse>(new(request)
+        var r = new StreamFlowMessageBO
         {
-            CommandName = commandName,
             ExchangeType = MessageExchangeType.Direct,
             Recipient = TargetClient
-        });
+        };
+        r.SetData(request);
+        
+        var result = await MessageBusDriver.InvokeAsync<CmdResponse<TRequest>>(r);
         return result.Response;
     }
-    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(string commandName ,TRequest request)
-    {
-        var rs = await GetRequestServer(request);
-        try
-        {
-            request.SetPropertyValue("RequestServer", rs);
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e);
-            throw;
-        }
-            
-        var result = await MessageBusDriver.InvokeAsync<CmdResponse<TRequest>>(new(request)
-        {
-            CommandName = commandName,
-            ExchangeType = MessageExchangeType.Direct,
-            Recipient = TargetClient
-        });
-        return result.Response;
-    }
-    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(string commandName ,TRequest request)
+    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) where TRequest : new()
     {
         var rs = new RequestServerBO();
         try
@@ -77,22 +82,23 @@ public class DriverBase
             Console.WriteLine(e);
             throw;
         }
-            
-        var result = await MessageBusDriver.InvokeAsync<QueryResponse<TResponse>>(new(request)
+        
+        var r = new StreamFlowMessageBO
         {
-            CommandName = commandName,
             ExchangeType = MessageExchangeType.Direct,
             Recipient = TargetClient
-        });
-
-        Task.Run(async () =>
+        };
+        r.SetData(request);
+        
+        var result = await MessageBusDriver.InvokeAsync<QueryResponse<TResponse>>(r);
+        /*Task.Run(async () =>
         {
             if (Logger is not null)
             {
                 var serviceRequestLog = new ServiceRequestLog<TRequest, QueryResponse<TResponse>>(){Request = request, Response = result.Response};
                 await Logger.Log("Service Request", JsonSerializer.Serialize(serviceRequestLog), this, rs.RequestId , LogLevel.Trace, LogType.SystemMaintenance);
             }
-        });
+        });*/
         return result.Response.Adapt<QueryResponse<TResponse>>();
     }
     public async Task<RequestServerBO> GetRequestServer<TRequest>(TRequest request)

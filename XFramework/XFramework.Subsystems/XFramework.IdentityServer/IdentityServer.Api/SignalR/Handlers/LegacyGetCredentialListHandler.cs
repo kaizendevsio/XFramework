@@ -4,6 +4,6 @@ public class LegacyGetCredentialListHandler : BaseSignalRHandler, ISignalREventH
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<GetCredentialListRequest, GetCredentialListQuery>(connection, mediator);
+        HandleRequestQuery<GetCredentialListRequest, GetCredentialListQuery, List<CredentialResponse>>(connection, mediator);
     }
 }

@@ -7,6 +7,6 @@ public class CreateContactHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateContactRequest, CreateContactCmd>(connection, mediator);
+        HandleRequestCmd<CreateContactRequest, CreateContactCmd>(connection, mediator);
     }
 }

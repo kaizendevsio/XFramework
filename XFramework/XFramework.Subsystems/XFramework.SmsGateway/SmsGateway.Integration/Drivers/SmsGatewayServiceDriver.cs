@@ -21,17 +21,17 @@ public class SmsGatewayServiceDriver : DriverBase, ISmsGatewayServiceWrapper
 
     public async Task<CmdResponse> CreateSmsMessage(CreateSmsMessageRequest request)
     {
-        return await SendVoidAsync("CreateSmsMessage", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<QueryResponse<List<MessageDirectResponse>>> GetPendingSmsMessageList(GetPendingSmsMessageListRequest request)
     {
-        return await SendAsync<GetPendingSmsMessageListRequest, List<MessageDirectResponse>>("GetPendingSmsMessageList", request);
+        return await SendAsync<GetPendingSmsMessageListRequest, List<MessageDirectResponse>>(request);
     }
 
     public async Task<QueryResponse<List<MessageDirectResponse>>> GetScheduledSmsMessageList(GetScheduledSmsMessageListRequest request)
     {
-        return await SendAsync<GetScheduledSmsMessageListRequest, List<MessageDirectResponse>>("GetScheduledSmsMessageList", request);
+        return await SendAsync<GetScheduledSmsMessageListRequest, List<MessageDirectResponse>>(request);
 
     }
 }   

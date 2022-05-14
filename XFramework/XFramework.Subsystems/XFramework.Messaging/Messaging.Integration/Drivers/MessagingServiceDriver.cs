@@ -18,6 +18,6 @@ public class MessagingServiceDriver : DriverBase, IMessagingServiceWrapper
 
     public async Task<CmdResponse> CreateDirectMessage(CreateDirectMessageRequest request)
     {
-        return await SendVoidAsync("CreateDirectMessage", request);
+        return await SendVoidAsync(request);
     }
 }   

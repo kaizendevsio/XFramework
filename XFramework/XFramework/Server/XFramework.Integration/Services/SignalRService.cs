@@ -86,21 +86,21 @@ public class SignalRService : ISignalRService
     private void HandleInvokeResponseEvent()
     {
         Console.WriteLine($"InvokeResponseHandler Initialized");
-        Connection.On<byte[]>("InvokeResponseHandler",
+        Connection.On<StreamFlowContract>("InvokeResponseHandler",
             async (response) =>
             {
                 StopWatch.Start();
                 try
                 {
-                    var responseObj = BinaryConverter.Deserialize<StreamFlowContract>(response);
-                    if (PendingMethodCalls.TryRemove(responseObj.Telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
+                    var telemetry = BinaryConverter.Deserialize<StreamFlowTelemetryBO>(response.Telemetry);
+                    if (PendingMethodCalls.TryRemove(telemetry.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
                     {
                         var result = new StreamFlowMessageBO()
                         {
-                            ConsumerGuid = responseObj.Telemetry.ConsumerGuid,
-                            RequestGuid = responseObj.Telemetry.RequestGuid,
-                            Data = responseObj.Data,
-                            Message = responseObj.Message
+                            ConsumerGuid = telemetry.ConsumerGuid,
+                            RequestGuid = telemetry.RequestGuid,
+                            Data = response.Data,
+                            Message = response.Message
                         };
                         await Task.Run(() => methodCallCompletionSource.SetResult(result));
                     }

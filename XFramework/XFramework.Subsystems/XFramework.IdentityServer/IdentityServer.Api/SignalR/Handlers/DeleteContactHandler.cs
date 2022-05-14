@@ -7,6 +7,6 @@ public class DeleteContactHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<DeleteContactRequest, DeleteContactCmd>(connection, mediator);
+        HandleVoidRequestCmd<DeleteContactRequest, DeleteContactCmd>(connection, mediator);
     }
 }

@@ -31,141 +31,141 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyDoctorIdentity(VerifyDoctorIdentityRequest request)
     {
-        return await SendAsync<VerifyDoctorIdentityRequest, IdentityValidationResponse>("VerifyDoctorIdentity", request);
+        return await SendAsync<VerifyDoctorIdentityRequest, IdentityValidationResponse>(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPharmacyIdentity(VerifyPharmacyIdentityRequest request)
     {
-        return await SendAsync<VerifyPharmacyIdentityRequest, IdentityValidationResponse>("VerifyPharmacyIdentity", request);
+        return await SendAsync<VerifyPharmacyIdentityRequest, IdentityValidationResponse>(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatientIdentity(VerifyPatientIdentityRequest request)
     {
-        return await SendAsync<VerifyPatientIdentityRequest, IdentityValidationResponse>("VerifyPatientIdentity", request);
+        return await SendAsync<VerifyPatientIdentityRequest, IdentityValidationResponse>(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request)
     {
-        return await SendAsync<VerifyLogisticIdentityRequest, IdentityValidationResponse>("VerifyLogisticIdentity", request);
+        return await SendAsync<VerifyLogisticIdentityRequest, IdentityValidationResponse>(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyLaboratoryIdentity(VerifyLaboratoryIdentityRequest request)
     {
-        return await SendAsync<VerifyLaboratoryIdentityRequest, IdentityValidationResponse>("VerifyLaboratoryIdentity", request);
+        return await SendAsync<VerifyLaboratoryIdentityRequest, IdentityValidationResponse>(request);
     }
 
     public async Task<CmdResponse<CreateConsultationRequest>> CreateConsultationEntity(CreateConsultationRequest request)
     {
-        return await SendAsync("CreateConsultation", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateConsultationTypeGroupRequest>> CreateConsultationTypeGroup(CreateConsultationTypeGroupRequest request)
     {
-        return await SendAsync("CreateConsultationTypeGroup", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateConsultationTypeRequest>> CreateConsultationType(CreateConsultationTypeRequest request)
     {
-        return await SendAsync("CreateConsultationType", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<AddSupportedConsultationRequest>> AddSupportedConsultation(AddSupportedConsultationRequest request)
     {
-        return await SendAsync("AddSupportedConsultation", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateDoctorIdentityRequest>> CreateDoctorIdentity(CreateDoctorIdentityRequest request)
     {
-        return await SendAsync("CreateDoctorIdentity", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateLaboratoryRequest>> CreateLaboratory(CreateLaboratoryRequest request)
     {
-        return await SendAsync("CreateLaboratory", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateLaboratoryIdentityRequest>> CreateLaboratoryIdentity(CreateLaboratoryIdentityRequest request)
     {
-        return await SendAsync("CreateLaboratoryIdentity", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateLaboratoryServiceRequest>> CreateLaboratoryService(CreateLaboratoryServiceRequest request)
     {
-        return await SendAsync("CreateLaboratoryService", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateLaboratoryServiceTypeGroupRequest>> CreateLaboratoryServiceTypeGroup(CreateLaboratoryServiceTypeGroupRequest request)
     {
-        return await SendAsync("CreateLaboratoryServiceTypeGroup", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateLaboratoryServiceTypeRequest>> CreateLaboratoryServiceType(CreateLaboratoryServiceTypeRequest request)
     {
-        return await SendAsync("CreateLaboratoryServiceType", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateLogisticRequest>> CreateLogistic(CreateLogisticRequest request)
     {
-        return await SendAsync("CreateLogistic", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateLogisticRiderHandleRequest>> CreateLogisticRiderHandle(CreateLogisticRiderHandleRequest request)
     {
-        return await SendAsync("CreateLogisticRiderHandle", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateLogisticRiderRequest>> CreateLogisticRider(CreateLogisticRiderRequest request)
     {
-        return await SendAsync("CreateLogisticRider", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreatePatientIdentityRequest>> CreatePatientIdentity(CreatePatientIdentityRequest request)
     {
-        return await SendAsync("CreatePatientIdentity", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreatePharmacyRequest>> CreatePharmacy(CreatePharmacyRequest request)
     {
-        return await SendAsync("CreatePharmacy", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreatePharmacyIdentityRequest>> CreatePharmacyIdentity(CreatePharmacyIdentityRequest request)
     {
-        return await SendAsync("CreatePharmacyIdentity", request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateConsultationPaymentRequest>> CreateConsultationPayment(CreateConsultationPaymentRequest request)
     {
-        return await SendAsync("CreateConsultationPayment", request);
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<List<ConsultationResponse>>> GetConsultationList(GetConsultationListRequest request)
     {
-        return await SendAsync<GetConsultationListRequest, List<ConsultationResponse>>("GetConsultationList", request);
+        return await SendAsync<GetConsultationListRequest, List<ConsultationResponse>>(request);
     }
 
     public async Task<QueryResponse<List<LaboratoryResponse>>> GetLaboratoryList(GetLaboratoryListRequest request)
     {
-        return await SendAsync<GetLaboratoryListRequest, List<LaboratoryResponse>>("GetLaboratoryList", request);
+        return await SendAsync<GetLaboratoryListRequest, List<LaboratoryResponse>>(request);
     }
 
     public async Task<QueryResponse<List<LogisticResponse>>> GetLogisticList(GetLogisticListRequest request)
     {
-        return await SendAsync<GetLogisticListRequest, List<LogisticResponse>>("GetLogisticList", request);
+        return await SendAsync<GetLogisticListRequest, List<LogisticResponse>>(request);
     }
 
     public async Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request)
     {
-        return await SendAsync<GetPharmacyListRequest, List<PharmacyResponse>>("GetPharmacyList", request);
+        return await SendAsync<GetPharmacyListRequest, List<PharmacyResponse>>(request);
     }
 
     public async Task<QueryResponse<List<DoctorResponse>>> GetDoctorList(GetDoctorListRequest request)
     {
-        return await SendAsync<GetDoctorListRequest, List<DoctorResponse>>("GetDoctorList", request);
+        return await SendAsync<GetDoctorListRequest, List<DoctorResponse>>(request);
     }
 
     public async Task<QueryResponse<PatientResponse>> GetPatientIdentity(GetPatientIdentityRequest request)
     {
-        return await SendAsync<GetPatientIdentityRequest, PatientResponse>("GetPatientIdentity", request);
+        return await SendAsync<GetPatientIdentityRequest, PatientResponse>(request);
     }
 }   

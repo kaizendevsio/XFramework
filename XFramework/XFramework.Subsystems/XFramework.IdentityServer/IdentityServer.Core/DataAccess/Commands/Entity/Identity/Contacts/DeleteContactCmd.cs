@@ -2,7 +2,7 @@
 
 namespace IdentityServer.Core.DataAccess.Commands.Entity.Identity.Contacts;
 
-public class DeleteContactCmd : DeleteContactRequest, IRequest<CmdResponse<DeleteContactCmd>>
+public class DeleteContactCmd : DeleteContactRequest, IRequest<CmdResponse>
 {
 
 }

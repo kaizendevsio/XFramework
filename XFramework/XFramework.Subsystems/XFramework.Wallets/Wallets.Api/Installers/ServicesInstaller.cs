@@ -1,12 +1,6 @@
-﻿using MediatR;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Wallets.Api.SignalR;
-using Wallets.Core.Interfaces;
+﻿using Wallets.Core.Interfaces;
 using Wallets.Core.Services;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
-using XFramework.Integration.Interfaces.Wrappers;
 using XFramework.Integration.Services;
 
 namespace Wallets.Api.Installers;

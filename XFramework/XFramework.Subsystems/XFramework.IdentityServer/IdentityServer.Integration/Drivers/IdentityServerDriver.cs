@@ -30,191 +30,191 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
 
     public async Task<QueryResponse<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request)
     {
-        return await SendAsync<AuthenticateCredentialRequest, AuthorizeIdentityResponse>("Authenticate", request);
+        return await SendAsync<AuthenticateCredentialRequest, AuthorizeIdentityResponse>(request);
     }
 
     public async Task<QueryResponse<CredentialResponse>> GetCredential(GetCredentialRequest request)
     {
-        return await SendAsync<GetCredentialRequest, CredentialResponse>("GetCredential", request);
+        return await SendAsync<GetCredentialRequest, CredentialResponse>(request);
     }
 
     public async Task<QueryResponse<CredentialResponse>> GetCredentialByContact(GetCredentialByContactRequest request)
     {
-        return await SendAsync<GetCredentialByContactRequest, CredentialResponse>("GetCredentialByContact", request);
+        return await SendAsync<GetCredentialByContactRequest, CredentialResponse>(request);
     }
 
     public async Task<CmdResponse> CreateCredential(CreateCredentialRequest request)
     {
-        return await SendVoidAsync("CreateCredential", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> UpdateCredential(UpdateCredentialRequest request)
     {
-        return await SendVoidAsync("UpdateCredential", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> DeleteCredential(DeleteCredentialRequest request)
     {
-        return await SendVoidAsync("DeleteCredential", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> ChangePassword(UpdatePasswordRequest request)
     {
-        return await SendVoidAsync("ChangePassword", request);
+        return await SendVoidAsync(request);
     }
         
     public async Task<CmdResponse> SendOneTimePassword(CheckOneTimePasswordRequest request)
     {
-        return await SendVoidAsync("SendOneTimePassword", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<QueryResponse<RoleResponse>> GetRole(GetRoleRequest request)
     {
-        return await SendAsync<GetRoleRequest, RoleResponse>("GetRole", request);
+        return await SendAsync<GetRoleRequest, RoleResponse>(request);
     }
 
     public async Task<QueryResponse<ExistenceResponse>> CheckCredentialExistence(CheckCredentialExistenceRequest request)
     {
-        return await SendAsync<CheckCredentialExistenceRequest, ExistenceResponse>("CheckCredentialExistence", request);
+        return await SendAsync<CheckCredentialExistenceRequest, ExistenceResponse>(request);
     }
 
     public async Task<QueryResponse<ExistenceResponse>> CheckIdentityExistence(CheckIdentityExistenceRequest request)
     {
-        return await SendAsync<CheckIdentityExistenceRequest, ExistenceResponse>("CheckIdentityExistence", request);
+        return await SendAsync<CheckIdentityExistenceRequest, ExistenceResponse>(request);
     }
 
     public async Task<QueryResponse<IdentityResponse>> GetIdentity(GetIdentityRequest request)
     {
-        return await SendAsync<GetIdentityRequest, IdentityResponse>("GetIdentity", request);
+        return await SendAsync<GetIdentityRequest, IdentityResponse>(request);
     }
 
     public async Task<QueryResponse<List<CredentialResponse>>> LegacyGetCredentialList(GetCredentialListRequest request)
     {
-        return await SendAsync<GetCredentialListRequest, List<CredentialResponse>>("LegacyGetCredentialList", request);
+        return await SendAsync<GetCredentialListRequest, List<CredentialResponse>>(request);
     }
 
     public async Task<QueryResponse<List<CredentialResponse>>> GetCredentialList(GetCredentialListRequest request)
     {
-        return await SendAsync<GetCredentialListRequest, List<CredentialResponse>>("GetCredentialList", request);
+        return await SendAsync<GetCredentialListRequest, List<CredentialResponse>>(request);
     }
 
     public async Task<QueryResponse<List<RoleResponse>>> GetRoleList(GetRoleListRequest request)
     {
-        return await SendAsync<GetRoleListRequest, List<RoleResponse>>("GetRoleList", request);
+        return await SendAsync<GetRoleListRequest, List<RoleResponse>>(request);
     }
 
     public async Task<QueryResponse<RoleEntityResponse>> GetRoleEntity(GetRoleEntityRequest request)
     {
-        return await SendAsync<GetRoleEntityRequest, RoleEntityResponse>("GetRoleEntity", request);
+        return await SendAsync<GetRoleEntityRequest, RoleEntityResponse>(request);
     }
 
     public async Task<QueryResponse<List<RoleEntityResponse>>> GetRoleEntityList(GetRoleEntityListRequest request)
     {
-        return await SendAsync<GetRoleEntityListRequest, List<RoleEntityResponse>>("GetRoleEntityList", request);
+        return await SendAsync<GetRoleEntityListRequest, List<RoleEntityResponse>>(request);
     }
 
     public async Task<CmdResponse> CreateIdentity(CreateIdentityRequest request)
     {
-        return await SendVoidAsync("CreateIdentity", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> UpdateIdentity(UpdateIdentityRequest request)
     {
-        return await SendVoidAsync("UpdateIdentity", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> DeleteIdentity(DeleteIdentityRequest request)
     {
-        return await SendVoidAsync("DeleteIdentity", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<QueryResponse<ContactResponse>> GetContact(GetContactRequest request)
     {
-        return await SendAsync<GetContactRequest, ContactResponse>("GetContact", request);
+        return await SendAsync<GetContactRequest, ContactResponse>(request);
     }
 
     public async Task<QueryResponse<List<ContactResponse>>> GetContactList(GetContactListRequest request)
     {
-        return await SendAsync<GetContactListRequest, List<ContactResponse>>("GetContactList", request);
+        return await SendAsync<GetContactListRequest, List<ContactResponse>>(request);
     }
 
     public async Task<CmdResponse> CreateContact(CreateContactRequest request)
     {
-        return await SendVoidAsync("CreateContact", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> UpdateContact(UpdateContactRequest request)
     {
-        return await SendVoidAsync("UpdateContact", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> DeleteContact(DeleteContactRequest request)
     {
-        return await SendVoidAsync("DeleteContact", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<QueryResponse<AddressCountryResponse>> GetAddressEntity(GetAddressEntityRequest request)
     {
-        return await SendAsync<GetAddressEntityRequest, AddressCountryResponse>("GetAddressEntity", request);
+        return await SendAsync<GetAddressEntityRequest, AddressCountryResponse>(request);
     }
 
     public async Task<QueryResponse<List<AddressCountryResponse>>> GetCountryList(GetCountryListRequest request)
     {
-        return await SendAsync<GetCountryListRequest, List<AddressCountryResponse>>("GetCountryList", request);
+        return await SendAsync<GetCountryListRequest, List<AddressCountryResponse>>(request);
     }
 
     public async Task<QueryResponse<List<AddressRegionResponse>>> GetRegionList(GetRegionListRequest request)
     {
-        return await SendAsync<GetRegionListRequest, List<AddressRegionResponse>>("GetRegionList", request);
+        return await SendAsync<GetRegionListRequest, List<AddressRegionResponse>>(request);
     }
 
     public async Task<QueryResponse<List<AddressProvinceResponse>>> GetProvinceList(GetProvinceListRequest request)
     {
-        return await SendAsync<GetProvinceListRequest, List<AddressProvinceResponse>>("GetProvinceList", request);
+        return await SendAsync<GetProvinceListRequest, List<AddressProvinceResponse>>(request);
     }
 
     public async Task<QueryResponse<List<AddressCityResponse>>> GetCityList(GetCityListRequest request)
     {
-        return await SendAsync<GetCityListRequest, List<AddressCityResponse>>("GetCityList", request);
+        return await SendAsync<GetCityListRequest, List<AddressCityResponse>>(request);
     }
 
     public async Task<QueryResponse<List<AddressBarangayResponse>>> GetBarangayList(GetBarangayListRequest request)
     {
-        return await SendAsync<GetBarangayListRequest, List<AddressBarangayResponse>>("GetBarangayList", request);
+        return await SendAsync<GetBarangayListRequest, List<AddressBarangayResponse>>(request);
     }
 
     public async Task<QueryResponse<List<AddressCountryResponse>>> GetAddressEntityList(GetCountryListRequest request)
     {
-        return await SendAsync<GetCountryListRequest, List<AddressCountryResponse>>("GetAddressEntityList", request);
+        return await SendAsync<GetCountryListRequest, List<AddressCountryResponse>>(request);
     }
 
     public async Task<QueryResponse<IdentityLocationResponse>> GetLocation(GetLocationRequest request)
     {
-        return await SendAsync<GetLocationRequest, IdentityLocationResponse>("GetLocation", request);
+        return await SendAsync<GetLocationRequest, IdentityLocationResponse>(request);
     }
 
     public async Task<QueryResponse<List<IdentityLocationResponse>>> GetLocationList(GetLocationListRequest request)
     {
-        return await SendAsync<GetLocationListRequest, List<IdentityLocationResponse>>("GetLocationList", request);
+        return await SendAsync<GetLocationListRequest, List<IdentityLocationResponse>>(request);
     }
 
     public async Task<QueryResponse<IdentityVerificationSummaryResponse>> CheckVerification(CheckVerificationRequest request)
     {
-        return await SendAsync<CheckVerificationRequest, IdentityVerificationSummaryResponse>("CheckVerification", request);
+        return await SendAsync<CheckVerificationRequest, IdentityVerificationSummaryResponse>(request);
     }
 
     public async Task<CmdResponse> CreateVerification(CreateVerificationRequest request)
     {
-        return await SendVoidAsync("CreateVerification", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<CmdResponse> UpdateVerification(UpdateVerificationRequest request)
     {
-        return await SendVoidAsync("UpdateVerification", request);
+        return await SendVoidAsync(request);
     }
 
     public async Task<QueryResponse<ExistenceResponse>> CheckContactExistence(CheckContactExistenceRequest request)
     {
-        return await SendAsync<CheckContactExistenceRequest, ExistenceResponse>("CheckContactExistence", request);
+        return await SendAsync<CheckContactExistenceRequest, ExistenceResponse>(request);
     }
 }

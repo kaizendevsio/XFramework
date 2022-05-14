@@ -10,3 +10,4 @@ global using System.Text;
 global using XFramework.Domain.Generic.Enums;
 global using XFramework.Integration.Services.Helpers;
 global using Microsoft.AspNetCore.SignalR.Client;
+global using XFramework.Integration.Drivers;
