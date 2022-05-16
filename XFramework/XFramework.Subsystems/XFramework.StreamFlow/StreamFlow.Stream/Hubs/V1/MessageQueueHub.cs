@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using BinaryPack;
 using MediatR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Generic.BusinessObjects;
@@ -28,8 +29,8 @@ namespace StreamFlow.Stream.Hubs.V1
         {
             var client = _cachingService.Clients.FirstOrDefault(i => i.Value.StreamId == Context.ConnectionId);
             var cachedClient = _cachingService.LatestClients.FirstOrDefault(x => x.Value.StreamId == Context.ConnectionId);
-            _cachingService.Clients.TryRemove(client);
-            _cachingService.LatestClients.TryRemove(cachedClient);
+            _cachingService.Clients.Remove(client.Key, out _);
+            _cachingService.LatestClients.Remove(cachedClient.Key, out _);
 
             await base.OnDisconnectedAsync(exception);
             Console.WriteLine($"Connection Lost and Unregistered with ID {Context.ConnectionId} : {client.Value.Guid} : {client.Value.Name}");

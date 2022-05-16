@@ -1,5 +1,4 @@
-﻿using BinaryPack;
-using MediatR;
+﻿using MediatR;
 using XFramework.Core.DataAccess.Commands.Entity.Identity;
 using XFramework.Domain.Generic.Contracts.Requests.Create;
 
@@ -68,9 +67,6 @@ namespace XFramework.Api.Controllers.V2.Identity
         public async Task<JsonResult> Authenticate([FromBody] AuthenticateCredentialRequest request)
         {
             request.GenerateToken = true;
-            var t = BinaryConverter.Serialize(request);
-            var y = BinaryConverter.Deserialize<AuthenticateCredentialRequest>(t);
-            
             var result = await _identityServiceWrapper.AuthenticateCredential(request);
             return new JsonResult(result);
         }

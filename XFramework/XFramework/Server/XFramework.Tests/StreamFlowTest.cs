@@ -36,7 +36,7 @@ public class StreamFlowTest
                 
                 var finalContent = new StringContent(content);
                 finalContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-                var response = await context.Client.PostAsync("https://localhost:55007/Api/v2/Identity/Authenticate", finalContent, context.CancellationToken);
+                var response = await context.Client.PostAsync("https://localhost:65007/Api/v2/Identity/Authenticate", finalContent, context.CancellationToken);
 
                 return response.IsSuccessStatusCode
                     ? Response.Ok(statusCode: (int) response.StatusCode)
@@ -49,7 +49,7 @@ public class StreamFlowTest
             .WithWarmUpDuration(TimeSpan.FromSeconds(5))
             .WithLoadSimulations(new[]
             {
-                Simulation.InjectPerSec(rate: 500, during: TimeSpan.FromSeconds(30))
+                Simulation.InjectPerSec(rate: 50, during: TimeSpan.FromSeconds(30))
                 //Simulation.KeepConstant(copies: 10, during: TimeSpan.FromSeconds(30))
             });
 

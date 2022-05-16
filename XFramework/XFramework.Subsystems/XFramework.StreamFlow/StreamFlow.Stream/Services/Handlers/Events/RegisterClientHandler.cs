@@ -16,17 +16,19 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 {
     public class RegisterClientHandler : CommandBaseHandler, IRequestHandler<RegisterClientCmd, CmdResponse<RegisterClientCmd>>
     {
+        private Random _rnd;
         public RegisterClientHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
         {
             _cachingService = cachingService;
             _hubContext = hubContext;
             _streamFlowConfiguration = streamFlowConfiguration;
+            _rnd = new Random();
         }
         
         public async Task<CmdResponse<RegisterClientCmd>> Handle(RegisterClientCmd request, CancellationToken cancellationToken)
         {
             Again:
-            var y = _cachingService.Clients.TryAdd(_cachingService.Clients.Count, new()
+            var y = _cachingService.Clients.TryAdd(_rnd.Next(100000000,999999999), new()
             {
                 StreamId = request.Context.ConnectionId,
                 Guid = request.Client.Guid,

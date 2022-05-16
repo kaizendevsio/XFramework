@@ -12,5 +12,6 @@ public class ServicesInstaller : IInstaller
         services.AddSingleton<ICachingService, CachingService>();
         services.AddSingleton<IHelperService, HelperService>();
         services.AddSingleton<IJwtService, JwtService>();
+        services.AddSingleton<ProcessMonitorService>();
     }
 }

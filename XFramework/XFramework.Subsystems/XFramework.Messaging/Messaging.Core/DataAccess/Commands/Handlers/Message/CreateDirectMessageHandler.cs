@@ -28,7 +28,7 @@ public class CreateDirectMessageHandler : CommandBaseHandler ,IRequestHandler<Cr
                 IsSuccess = false
             };
         }
-
+        
         var clientReference = Guid.NewGuid();
         request.Sender = request.Sender.ValidatePhoneNumber();
         request.Recipient = request.Recipient.ValidatePhoneNumber();

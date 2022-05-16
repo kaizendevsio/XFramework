@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Domain.Generic.Configurations
 {

@@ -14,6 +14,7 @@ namespace StreamFlow.Stream.Installers
             services.AddSingleton<ICachingService, CachingService>();
             services.AddSingleton<IHelperService, HelperService>();
             services.AddSingleton<IJwtService, JwtService>();
+            services.AddSingleton<ProcessMonitorService>();
         }
     }
 }

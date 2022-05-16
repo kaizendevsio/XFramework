@@ -3,14 +3,14 @@ using SmsGateway.Core.DataAccess.Commands.Entity.Sms;
 
 namespace SmsGateway.Core.DataAccess.Commands.Handlers.Sms;
 
-public class CreateSmsMessageHandler : CommandBaseHandler, IRequestHandler<CreateSmsMessageCmd, CmdResponse<CreateSmsMessageCmd>>
+public class CreateSmsMessageHandler : CommandBaseHandler, IRequestHandler<CreateSmsMessageCmd, CmdResponse>
 {
     public CreateSmsMessageHandler(ICachingService cachingService)
     {
         _cachingService = cachingService;
     }
 
-    public async Task<CmdResponse<CreateSmsMessageCmd>> Handle(CreateSmsMessageCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse> Handle(CreateSmsMessageCmd request, CancellationToken cancellationToken)
     {
         _cachingService.PendingMessageList.Add(new()
         {
@@ -25,7 +25,6 @@ public class CreateSmsMessageHandler : CommandBaseHandler, IRequestHandler<Creat
             Guid = $"{request.ClientReference}",
             Status = (int) (request.IsScheduled ? MessageStatus.Scheduled : MessageStatus.Queued)
         });
-
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,

@@ -62,7 +62,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             {
                 Data = request.MessageQueue.Data,
                 Message = request.MessageQueue.Message,
-                Telemetry = BinaryConverter.Serialize(telemetry)
+                Telemetry = telemetry
             };
             
             // Execute Sending Message
@@ -119,7 +119,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
                     if (currentClient != null)
                     {
-                        //Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {currentClient.Name}");
+                        Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {currentClient.Name}");
                         await _hubContext.Clients.Client(currentClient.StreamId).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken);
                         break;
                     }

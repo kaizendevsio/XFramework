@@ -6,6 +6,6 @@ namespace StreamFlow.Domain.Generic.Contracts.Responses
     {
         public HttpStatusCode HttpStatusCode { get; set; }
         public string Message { get; set; }
-        public byte[] Response { get; set; }   
+        public string Response { get; set; }   
     }
 }

@@ -17,11 +17,11 @@ namespace StreamFlow.Domain.Generic.Contracts.Requests
         public void SetData<T>(T request) where T : new()
         {
             CommandName = request.GetType().Name.Replace("Request", string.Empty);
-            Data = BinaryConverter.Serialize(request);
+            Data = JsonSerializer.Serialize(request);
         }
         
         public string CommandName { get; set; }
-        public byte[] Data { get; set; }
+        public string Data { get; set; }
         public string Message { get; set; }
         public Guid? Recipient { get; set; }
         public Guid RequestGuid { get; set; } = Guid.NewGuid();

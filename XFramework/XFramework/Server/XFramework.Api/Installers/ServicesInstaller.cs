@@ -13,6 +13,7 @@ namespace XFramework.Api.Installers
             services.AddSingleton<IHelperService, HelperService>();
             services.AddSingleton<IJwtService, JwtService>();
             services.AddSingleton<ISignalRService, SignalRService>();
+            services.AddSingleton<ProcessMonitorService>();
         }
     }
 }

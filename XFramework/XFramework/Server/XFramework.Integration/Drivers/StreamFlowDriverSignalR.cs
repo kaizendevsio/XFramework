@@ -1,10 +1,10 @@
 ﻿using System.Text.Json;
-using BinaryPack;
 using MessagePack;
 using Microsoft.AspNetCore.SignalR.Client;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using TypeSupport.Extensions;
+using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Entity.Contracts.Responses;
 using XFramework.Integration.Interfaces;
 
@@ -12,7 +12,7 @@ namespace XFramework.Integration.Drivers;
 
 public class StreamFlowDriverSignalR : IMessageBusWrapper
 {
-    private ISignalRService SignalRService { get; set; }
+    public ISignalRService SignalRService { get; set; }
     public Guid? TargetClient { get; set; }
     public HubConnectionState ConnectionState => SignalRService.Connection.State;
 
@@ -33,7 +33,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return await SignalRService.EnsureConnection();
     }
 
-    public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request) where TResponse : new()
+    public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request)
     {
         var signalRResponse = await SignalRService.InvokeAsync(request);
         var tResponse = Activator.CreateInstance<TResponse>();
@@ -61,25 +61,27 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             default:
                 return new(){
                     HttpStatusCode = HttpStatusCode.Accepted,
-                    Response = BinaryConverter.Deserialize<TResponse>(signalRResponse.Response)
+                    Response = JsonSerializer.Deserialize<TResponse>(signalRResponse.Response)
                 };
-        }
+                break;
+            }
+        return new();
     }
 
     public async Task PushAsync(StreamFlowMessageBO request)
     {
-        request.Recipient ??= TargetClient;
+        //request.Recipient ??= TargetClient;
         await SignalRService.InvokeVoidAsync("Push", request);
     }
 
-    public async Task Subscribe(StreamFlowClientBO request)
+    /*public async Task Subscribe(StreamFlowClientBO request)
     {
         await SignalRService.InvokeVoidAsync("Subscribe", request);
     }
         
     public async Task Unsubscribe(StreamFlowClientBO request)
     {
-        await SignalRService.InvokeVoidAsync("Unsubscribe", request);
-    }
+        await SignalRService.InvokeVoidAsync("Unsubscribe", BinaryConverter.Serialize(request));
+    }*/
 
 }
