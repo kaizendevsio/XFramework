@@ -56,5 +56,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request);
     public Task<QueryResponse<List<DoctorResponse>>> GetDoctorList(GetDoctorListRequest request);
     public Task<QueryResponse<PatientResponse>> GetPatientIdentity(GetPatientIdentityRequest request);
+    public Task<QueryResponse<DoctorResponse>> GetDoctorIdentity(GetDoctorIdentityRequest request);
+    public Task<QueryResponse<List<DoctorConsultationResponse>>> GetSupportedConsultationList(GetSupportedConsultationListRequest request);
     
 }

@@ -1,8 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Doctor;
-using HealthEssentials.Core.Interfaces;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
-using Mapster;
-using Microsoft.EntityFrameworkCore;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Doctor;
 

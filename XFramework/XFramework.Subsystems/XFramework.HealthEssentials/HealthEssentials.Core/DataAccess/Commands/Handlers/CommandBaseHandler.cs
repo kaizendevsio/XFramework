@@ -1,6 +1,4 @@
-﻿using HealthEssentials.Core.Interfaces;
-
-namespace HealthEssentials.Core.DataAccess.Commands.Handlers
+﻿namespace HealthEssentials.Core.DataAccess.Commands.Handlers
 {
     public class CommandBaseHandler
     {

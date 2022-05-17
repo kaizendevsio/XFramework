@@ -1,6 +1,4 @@
-﻿using HealthEssentials.Core.Interfaces;
-
-namespace HealthEssentials.Core.DataAccess.Query.Handlers
+﻿namespace HealthEssentials.Core.DataAccess.Query.Handlers
 {
     public class QueryBaseHandler
     {

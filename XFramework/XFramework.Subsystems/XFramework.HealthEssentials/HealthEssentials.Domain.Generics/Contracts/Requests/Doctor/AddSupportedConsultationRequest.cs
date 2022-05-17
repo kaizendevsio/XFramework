@@ -5,7 +5,7 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 public class AddSupportedConsultationRequest : RequestBase
 {
     public Guid? ConsultationGuid { get; set; }
-    public Guid? MemberGuid { get; set; }
+    public Guid? DoctorGuid { get; set; }
     
     public decimal Price { get; set; }
     public decimal MaxDiscount { get; set; }

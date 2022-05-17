@@ -1,8 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Doctor;
 using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
-using HealthEssentials.Core.Interfaces;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
-using Microsoft.EntityFrameworkCore;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
 

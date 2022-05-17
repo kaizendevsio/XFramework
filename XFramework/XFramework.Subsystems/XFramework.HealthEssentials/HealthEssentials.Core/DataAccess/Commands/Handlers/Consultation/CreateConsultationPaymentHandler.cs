@@ -1,6 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
-using HealthEssentials.Core.Interfaces;
-using Microsoft.EntityFrameworkCore;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;

@@ -1,8 +1,6 @@
-﻿using HealthEssentials.Core.Interfaces;
-using HealthEssentials.Domain.BusinessObjects;
+﻿using HealthEssentials.Domain.BusinessObjects;
 using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace HealthEssentials.Core.DataAccess

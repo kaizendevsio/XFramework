@@ -1,8 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
-using HealthEssentials.Core.Interfaces;
 using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
-using Microsoft.EntityFrameworkCore;
 using XFramework.Integration.Services.Helpers;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;

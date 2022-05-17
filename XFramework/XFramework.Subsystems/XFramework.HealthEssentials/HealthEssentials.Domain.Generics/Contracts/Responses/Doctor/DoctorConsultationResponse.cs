@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 
 public class DoctorConsultationResponse
 {
@@ -13,5 +15,5 @@ public class DoctorConsultationResponse
     public decimal? MaxDiscount { get; set; }
     public int Quantity { get; set; }
     
-    /*public Consultation? Consultation { get; set; }*/
+    public ConsultationResponse? Consultation { get; set; }
 }

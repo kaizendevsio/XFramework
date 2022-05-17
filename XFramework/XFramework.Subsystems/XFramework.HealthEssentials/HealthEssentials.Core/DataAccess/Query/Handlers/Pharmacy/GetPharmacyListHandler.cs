@@ -1,7 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Pharmacy;
-using HealthEssentials.Core.Interfaces;
-using Mapster;
-using Microsoft.EntityFrameworkCore;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Pharmacy;
 

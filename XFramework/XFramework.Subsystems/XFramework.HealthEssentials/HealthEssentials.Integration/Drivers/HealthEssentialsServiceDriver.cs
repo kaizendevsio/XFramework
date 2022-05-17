@@ -168,4 +168,14 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     {
         return await SendAsync<GetPatientIdentityRequest, PatientResponse>(request);
     }
+
+    public async Task<QueryResponse<DoctorResponse>> GetDoctorIdentity(GetDoctorIdentityRequest request)
+    {
+        return await SendAsync<GetDoctorIdentityRequest, DoctorResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<DoctorConsultationResponse>>> GetSupportedConsultationList(GetSupportedConsultationListRequest request)
+    {
+        return await SendAsync<GetSupportedConsultationListRequest, List<DoctorConsultationResponse>>(request);
+    }
 }   

@@ -40,7 +40,7 @@ public partial class CommunityState
                 CommunityIdentityGuid = action.CommunityIdentityGuid
             });
 
-            if (await HandleFailure(result, action))
+            if (await HandleFailure(result, action, true))
             {
                 return new()
                 {

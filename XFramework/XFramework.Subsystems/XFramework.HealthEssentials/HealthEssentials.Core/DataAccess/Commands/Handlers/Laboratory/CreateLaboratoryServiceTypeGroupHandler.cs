@@ -1,8 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
-using HealthEssentials.Core.Interfaces;
-using Mapster;
-using Microsoft.EntityFrameworkCore;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 

@@ -1,10 +1,7 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Doctor;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
-using HealthEssentials.Core.Interfaces;
 using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
-using Mapster;
-using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Services.Helpers;
 

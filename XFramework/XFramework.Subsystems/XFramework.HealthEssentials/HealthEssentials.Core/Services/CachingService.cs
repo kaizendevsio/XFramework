@@ -1,6 +1,4 @@
-﻿using HealthEssentials.Core.Interfaces;
-
-namespace HealthEssentials.Core.Services
+﻿namespace HealthEssentials.Core.Services
 {
     public class CachingService : ICachingService
     {

@@ -1,7 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Pharmacy;
-using HealthEssentials.Core.Interfaces;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
-using Microsoft.EntityFrameworkCore;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Pharmacy;
 

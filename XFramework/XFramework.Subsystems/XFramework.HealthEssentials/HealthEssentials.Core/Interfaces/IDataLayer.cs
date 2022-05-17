@@ -2,7 +2,6 @@
 using HealthEssentials.Domain.BusinessObjects;
 using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;

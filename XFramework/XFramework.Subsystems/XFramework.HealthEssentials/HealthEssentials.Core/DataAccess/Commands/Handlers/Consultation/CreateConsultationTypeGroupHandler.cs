@@ -1,7 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
-using HealthEssentials.Core.Interfaces;
-using Mapster;
-using Microsoft.EntityFrameworkCore;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 

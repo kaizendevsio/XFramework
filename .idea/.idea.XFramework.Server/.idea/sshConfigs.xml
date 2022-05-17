@@ -11,7 +11,7 @@
       <sshConfig host="20.239.182.151" id="8e8d6e47-0b26-48fe-997d-c9dd9fd76549" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-production.pem" port="22" customName="XnelSystems-StreamFlowServer-Production" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
         <option name="customName" value="XnelSystems-StreamFlowServer-Production" />
       </sshConfig>
-      <sshConfig host="20.239.194.18" id="5822ad91-baa2-4f94-acd1-cf995806aee0" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-production.pem" port="22" customName="XnelSystems-WalletsServer-Production" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
+      <sshConfig connectionConfig="{&quot;serverAliveInterval&quot;:10}" host="20.239.194.18" id="5822ad91-baa2-4f94-acd1-cf995806aee0" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-production.pem" port="22" customName="XnelSystems-WalletsServer-Production" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
         <option name="customName" value="XnelSystems-WalletsServer-Production" />
       </sshConfig>
       <sshConfig host="20.239.198.21" id="c446afdb-f8b4-42dd-8c5a-d026fc499e09" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-production.pem" port="22" customName="XnelSystems-CommunityServer-Production" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
