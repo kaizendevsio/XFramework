@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 
@@ -13,5 +13,5 @@ public class MetaDataEntityResponse
     public long GroupId { get; set; }
     public int? SortOrder { get; set; }
 
-    public MetaDataEntityGroup Group { get; set; } = null!;
+    public MetaDataEntityGroupResponse Group { get; set; } = null!;
 }

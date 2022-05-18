@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Vendor;
 
@@ -14,5 +14,5 @@ public class VendorResponse
     public bool? IsGenericProvider { get; set; }
     public string Guid { get; set; } = null!;
 
-    public VendorEntity Entity { get; set; } = null!;
+    public VendorEntityResponse Entity { get; set; } = null!;
 }

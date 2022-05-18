@@ -1,4 +1,6 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
+
+using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 
@@ -12,5 +14,5 @@ public class PatientLaboratoryResponse
     public long? LaboratoryJobOrderId { get; set; }
     public string Guid { get; set; } = null!;
 
-    public LaboratoryJobOrder? LaboratoryJobOrder { get; set; }
+    public LaboratoryJobOrderResponse? LaboratoryJobOrder { get; set; }
 }

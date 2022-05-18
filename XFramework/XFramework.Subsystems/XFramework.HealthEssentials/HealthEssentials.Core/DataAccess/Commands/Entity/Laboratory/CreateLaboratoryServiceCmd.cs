@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
+﻿using CreateLaboratoryServiceRequest = HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.CreateLaboratoryServiceRequest;
+
+namespace HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
 
 public class CreateLaboratoryServiceCmd : CreateLaboratoryServiceRequest, IRequest<CmdResponse<CreateLaboratoryServiceCmd>>
 {

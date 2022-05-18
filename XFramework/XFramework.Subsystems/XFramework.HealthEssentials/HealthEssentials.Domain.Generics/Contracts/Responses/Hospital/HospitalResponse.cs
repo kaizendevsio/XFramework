@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Hospital;
 
@@ -18,5 +18,5 @@ public class HospitalResponse
     public string? Website { get; set; }
     public string? Logo { get; set; }
     
-    public HospitalEntity Entity { get; set; } = null!;
+    public HospitalEntityResponse Entity { get; set; } = null!;
 }

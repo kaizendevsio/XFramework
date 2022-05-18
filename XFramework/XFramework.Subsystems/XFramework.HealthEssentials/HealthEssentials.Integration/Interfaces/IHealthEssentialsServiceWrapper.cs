@@ -14,6 +14,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Interfaces;
+using CreateLaboratoryServiceRequest = HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.CreateLaboratoryServiceRequest;
 
 namespace HealthEssentials.Integration.Interfaces;
 

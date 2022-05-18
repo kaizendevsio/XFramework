@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
@@ -24,5 +24,5 @@ public class PharmacyJobOrderResponse
     public string Guid { get; set; } = null!;
     public long ScheduleId { get; set; }
 
-    public PharmacyLocation PharmacyLocation { get; set; } = null!;
+    public PharmacyLocationResponse PharmacyLocation { get; set; } = null!;
 }

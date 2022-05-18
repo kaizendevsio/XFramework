@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 
@@ -19,5 +19,5 @@ public class ScheduleResponse
     public DateTime? CompletedAt { get; set; }
     public string Guid { get; set; } = null!;
 
-    public ScheduleEntity Entity { get; set; } = null!;
+    public ScheduleEntityResponse Entity { get; set; } = null!;
 }

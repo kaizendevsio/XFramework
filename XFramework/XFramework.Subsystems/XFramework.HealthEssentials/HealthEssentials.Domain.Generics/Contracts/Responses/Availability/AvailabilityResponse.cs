@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Availability;
 
@@ -19,5 +19,5 @@ public class AvailabilityResponse
     public bool? IsAvailable { get; set; }
     public string Guid { get; set; } = null!;
     
-    public ScheduleEntity Entity { get; set; } = null!;
+    public ScheduleEntityResponse Entity { get; set; } = null!;
 }

@@ -1,4 +1,6 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
+
+using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
@@ -14,5 +16,5 @@ public class PharmacyJobOrderConsultationJobOrderResponse
     public short? Status { get; set; }
     public string Guid { get; set; } = null!;
 
-    public ConsultationJobOrder? ConsultationJobOrder { get; set; }
+    public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
 }

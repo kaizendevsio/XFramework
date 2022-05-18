@@ -1,5 +1,5 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+
 
 
 public class DoctorResponse

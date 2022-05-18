@@ -1,4 +1,6 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
+
+using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 
@@ -12,5 +14,5 @@ public class DoctorConsultationJobOrderResponse
     public long? ConsultationJobOrderId { get; set; }
     public string Guid { get; set; } = null!;
     
-    public ConsultationJobOrder? ConsultationJobOrder { get; set; }
+    public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
 }

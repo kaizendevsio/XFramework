@@ -16,6 +16,7 @@ using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces.Wrappers;
+using CreateLaboratoryServiceRequest = HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.CreateLaboratoryServiceRequest;
 
 namespace HealthEssentials.Integration.Drivers;
 

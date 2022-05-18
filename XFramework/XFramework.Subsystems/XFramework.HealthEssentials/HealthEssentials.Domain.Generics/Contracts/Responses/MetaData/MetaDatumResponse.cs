@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 
@@ -13,5 +13,5 @@ public class MetaDatumResponse
     public string? Value { get; set; }
     public string Guid { get; set; } = null!;
     
-    public MetaDataEntity Entity { get; set; } = null!;
+    public MetaDataEntityResponse Entity { get; set; } = null!;
 }

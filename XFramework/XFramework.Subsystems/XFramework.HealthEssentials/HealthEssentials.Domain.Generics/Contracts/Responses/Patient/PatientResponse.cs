@@ -1,5 +1,5 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+
 
 
 public class PatientResponse
@@ -14,5 +14,5 @@ public class PatientResponse
     public string? Remarks { get; set; }
     public string Guid { get; set; } = null!;
 
-    public PatientEntity Entity { get; set; } = null!;
+    public PatientEntityResponse Entity { get; set; } = null!;
 }

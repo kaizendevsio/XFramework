@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 
@@ -20,5 +20,5 @@ public class LogisticJobOrderDetailResponse
     public long DiscountType { get; set; }
     public string LocationGuid { get; set; } = null!;
     
-    public LogisticJobOrder LogisticJobOrder { get; set; } = null!;
+    public LogisticJobOrderResponse LogisticJobOrder { get; set; } = null!;
 }

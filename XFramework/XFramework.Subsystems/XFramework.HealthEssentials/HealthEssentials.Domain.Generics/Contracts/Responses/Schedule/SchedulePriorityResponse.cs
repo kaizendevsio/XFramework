@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 
@@ -18,5 +18,5 @@ public class SchedulePriorityResponse
     public DateTime? CompletedAt { get; set; }
     public string Guid { get; set; } = null!;
 
-    public SchedulePriorityEntity Entity { get; set; } = null!;
+    public SchedulePriorityEntityResponse Entity { get; set; } = null!;
 }

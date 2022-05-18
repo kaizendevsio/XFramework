@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
@@ -14,5 +14,5 @@ public class ConsultationEntityResponse
     public long GroupId { get; set; }
     public int? SortOrder { get; set; }
     
-    public ConsultationEntityGroup Group { get; set; } = null!;
+    public ConsultationEntityGroupResponse Group { get; set; } = null!;
 }

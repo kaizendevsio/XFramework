@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
@@ -17,5 +17,5 @@ public class ConsultationJobOrderMedicineResponse
     public short? Status { get; set; }
     public string Guid { get; set; } = null!;
     
-    public ConsultationJobOrder ConsultationJobOrder { get; set; } = null!;
+    public ConsultationJobOrderResponse ConsultationJobOrder { get; set; } = null!;
 }

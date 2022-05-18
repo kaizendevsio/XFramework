@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 
@@ -14,5 +14,5 @@ public class ScheduleEntityResponse
     public long GroupId { get; set; }
     public int? SortOrder { get; set; }
 
-    public ScheduleEntityGroup Group { get; set; } = null!;
+    public ScheduleEntityGroupResponse Group { get; set; } = null!;
 }

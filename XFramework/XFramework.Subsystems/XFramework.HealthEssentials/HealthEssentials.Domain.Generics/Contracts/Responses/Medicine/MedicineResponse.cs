@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
 
@@ -16,5 +16,5 @@ public class MedicineResponse
     public string? ChemicalComponent { get; set; }
     public string Guid { get; set; } = null!;
     
-    public MedicineEntity Entity { get; set; } = null!;
+    public MedicineEntityResponse Entity { get; set; } = null!;
 }

@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Tag;
 
@@ -14,5 +14,5 @@ public class TagEntityResponse
     public long GroupId { get; set; }
     public int? SortOrder { get; set; }
 
-    public TagEntityGroup Group { get; set; } = null!;
+    public TagEntityGroupResponse Group { get; set; } = null!;
 }

@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
 
@@ -14,5 +14,5 @@ public class UnitResponse
     public string? Description { get; set; }
     public string Guid { get; set; } = null!;
 
-    public UnitEntity Entity { get; set; } = null!;
+    public UnitEntityResponse Entity { get; set; } = null!;
 }

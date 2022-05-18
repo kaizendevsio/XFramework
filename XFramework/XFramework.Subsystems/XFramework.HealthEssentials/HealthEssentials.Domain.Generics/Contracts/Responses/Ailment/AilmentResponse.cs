@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 
@@ -15,5 +15,5 @@ public class AilmentResponse
     public string? Description { get; set; }
     public string Guid { get; set; } = null!;
     
-    public AilmentEntity Entity { get; set; } = null!;
+    public AilmentEntityResponse Entity { get; set; } = null!;
 }
