@@ -23,11 +23,12 @@ public class CheckContactExistenceHandler : QueryBaseHandler ,IRequestHandler<Ch
                 request.Value = request.Value.ValidatePhoneNumber();
                 break;
         }
-        
+        var application = await GetApplication(request.RequestServer.ApplicationId);
         var existing = await _dataLayer.IdentityContacts
             .AsNoTracking()
             .Where(i => i.Value == request.Value)
             .Where(i => i.Guid != $"{request.Guid}")
+            .Where(i => i.UserCredential.ApplicationId == application.Id)
             .FirstOrDefaultAsync(cancellationToken);
         if (existing != null)
         {

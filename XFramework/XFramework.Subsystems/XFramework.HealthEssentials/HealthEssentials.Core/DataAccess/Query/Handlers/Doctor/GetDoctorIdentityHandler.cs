@@ -9,10 +9,8 @@ public class GetDoctorIdentityHandler : QueryBaseHandler, IRequestHandler<GetDoc
     public GetDoctorIdentityHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
-        MediatRGuid = Guid.NewGuid();
     }
 
-    public Guid? MediatRGuid { get; set; }
     public async Task<QueryResponse<DoctorResponse>> Handle(GetDoctorIdentityQuery request, CancellationToken cancellationToken)
     {
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials

@@ -12,7 +12,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
     }
     public async Task<QueryResponse<ExistenceResponse>> Handle(CheckCredentialExistenceQuery request, CancellationToken cancellationToken)
     {
-        
+        var application = await GetApplication(request.RequestServer.ApplicationId);
         if (string.IsNullOrEmpty(request.Password))
         {
             return new ()
@@ -54,6 +54,7 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
             .AsNoTracking()
             .Where(i => i.UserName == request.UserName)
             .Where(i => i.Guid != $"{request.Guid}")
+            .Where(i => i.ApplicationId == application.Id)
             .Any();
             
         if (existing)

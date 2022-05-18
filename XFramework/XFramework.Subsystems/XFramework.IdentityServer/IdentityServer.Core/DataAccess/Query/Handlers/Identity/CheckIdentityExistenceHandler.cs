@@ -19,13 +19,15 @@ public class CheckIdentityExistenceHandler : QueryBaseHandler ,IRequestHandler<C
                 HttpStatusCode = HttpStatusCode.Accepted
             };
         }
-        
+     
+        var application = await GetApplication(request.RequestServer.ApplicationId);
         var existing = _dataLayer.IdentityInformations
             .AsNoTracking()
             .Where(i => i.FirstName == request.FirstName)
             .Where(i  => i.MiddleName == request.MiddleName)
             .Where(i => i.LastName == request.LastName)
             .Where(i => i.Guid != $"{request.Guid}")
+            .Where(i => i.ApplicationId != application.Id)
             .Any();
             
         if (existing)

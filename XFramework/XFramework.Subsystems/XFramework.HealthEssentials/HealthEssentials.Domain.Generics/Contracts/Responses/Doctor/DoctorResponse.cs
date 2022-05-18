@@ -19,5 +19,5 @@ public class DoctorResponse
     public string? ClinicAddress { get; set; }
     public decimal? BaseFee { get; set; }
     
-    public DoctorEntity Entity { get; set; } = null!;
+    public DoctorEntityResponse Entity { get; set; } = null!;
 }

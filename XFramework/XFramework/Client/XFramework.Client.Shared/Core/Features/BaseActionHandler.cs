@@ -66,12 +66,12 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
             case true:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request, please try again later"
-                    : $"{customMessage}");
+                    : $"{customMessage}", SweetAlertIcon.Error);
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
                 break;
         }
 
@@ -98,12 +98,12 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
             case true:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request, please try again later"
-                    : $"{customMessage}");
+                    : $"{customMessage}", SweetAlertIcon.Error);
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
                 break;
         }
 
@@ -128,7 +128,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
             case false:
                   SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
                     ? $"Success: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}" , SweetAlertIcon.Success);
                 break;
         }
         
@@ -149,7 +149,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
             case false:
                 SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
                     ? $"Success: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}" , SweetAlertIcon.Success);
                 break;
         }
       
@@ -293,12 +293,12 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
             case true:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request, please try again later"
-                    : $"{customMessage}");
+                    : $"{customMessage}", SweetAlertIcon.Error);
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
                 break;
         }
 
@@ -325,12 +325,12 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
             case true:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request, please try again later"
-                    : $"{customMessage}");
+                    : $"{customMessage}", SweetAlertIcon.Error);
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
                 break;
         }
 
@@ -355,7 +355,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
             case false:
                   SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
                     ? $"Success: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}", SweetAlertIcon.Success);
                 break;
         }
         
@@ -376,7 +376,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
             case false:
                 SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
                     ? $"Success: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}", SweetAlertIcon.Success);
                 break;
         }
       
