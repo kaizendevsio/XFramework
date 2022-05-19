@@ -90,9 +90,5 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #region Common
     
     #endregion
-        
-   
-    
-    
     
 }

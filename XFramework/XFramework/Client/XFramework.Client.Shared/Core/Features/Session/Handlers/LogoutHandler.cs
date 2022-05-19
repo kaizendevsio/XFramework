@@ -30,8 +30,8 @@ public partial class SessionState
         {
             if (action.ResetAllStates)
             {
-                IndexedDbService.Database.StateCache.Clear();
-                await IndexedDbService.Database.SaveChanges();
+                //IndexedDbService.Database.StateCache.Clear();
+                //await IndexedDbService.Database.SaveChanges();
                 Store.Reset();
             }
             else
