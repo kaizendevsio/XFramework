@@ -9,19 +9,21 @@ public class SignUpRequestValidator : AbstractValidator<SignUpRequest>
     {
         RuleFor(x => x.FirstName)
             .NotEmpty();
-        RuleFor(x => x.LastName)
+       RuleFor(x => x.LastName)
             .NotEmpty();
         RuleFor(x => x.UserName)
             .NotEmpty();
         RuleFor(x => x.PhoneNumber)
             .NotEmpty();
-        RuleFor(x => x.Password).NotEmpty()
+        RuleFor(x => x.Password)
+            .NotEmpty()
             .MinimumLength(8)
             .WithMessage("Minimum password length is 8 characters")
             .Matches(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$")
-            .WithMessage("Password is weak");
+            .WithMessage("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character");
         RuleFor(i => i.PasswordConfirmation)
-            .Matches(i => i.Password)
-            .WithMessage("Password does not match");
+            .NotEmpty()
+            .Equal(i => i.Password)
+            .WithMessage("Passwords does not match");
     }
 }

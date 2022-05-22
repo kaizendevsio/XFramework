@@ -1,6 +1,7 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get;
@@ -63,4 +64,5 @@ public interface IIdentityServiceWrapper : IXFrameworkService
     public Task<QueryResponse<IdentityVerificationSummaryResponse>> CheckVerification(CheckVerificationRequest request);
     public Task<CmdResponse> CreateVerification(CreateVerificationRequest request);
     public Task<CmdResponse> UpdateVerification(UpdateVerificationRequest request);
+    public Task<CmdResponse> CreateAffiliateSubscription(CreateAffiliateSubscriptionRequest request);
 }

@@ -36,6 +36,8 @@ public partial class SessionState
 
         public override async Task<CmdResponse> Handle(Register action, CancellationToken aCancellationToken)
         {
+            IsSilent = action.IsSilent;
+            
             // Inform UI About Busy State
             await ReportTask("Creating Account..", true);
 
@@ -164,7 +166,7 @@ public partial class SessionState
             await HandleSuccess(credential, action);
 
             // Inform UI About Not Busy State
-            ReportTask("Done", false);
+            ReportTask("", false);
             
             return new()
             {

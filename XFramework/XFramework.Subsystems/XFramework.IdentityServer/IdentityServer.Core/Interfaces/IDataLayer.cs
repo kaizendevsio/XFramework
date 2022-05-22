@@ -8,19 +8,19 @@ namespace IdentityServer.Core.Interfaces;
 public interface IDataLayer
 {
     public DatabaseFacade Database { get; }
-    public  EntityEntry<TEntity> Entry<TEntity>([NotNull] TEntity entity) where TEntity : class;
-    public  EntityEntry Remove([NotNullAttribute] object entity);
-    public  EntityEntry<TEntity> Remove<TEntity>([NotNullAttribute] TEntity entity) where TEntity : class;
-    public  void RemoveRange([NotNullAttribute] IEnumerable<object> entities);
-    public  void RemoveRange([NotNullAttribute] params object[] entities);
-    public  int SaveChanges(bool acceptAllChangesOnSuccess);
-    public  int SaveChanges();
-    public  Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
-    public  DbSet<TEntity> Set<TEntity>() where TEntity : class;
-    public  EntityEntry Update([NotNullAttribute] object entity);
-    public  EntityEntry<TEntity> Update<TEntity>([NotNullAttribute] TEntity entity) where TEntity : class;
-    public  void UpdateRange([NotNullAttribute] IEnumerable<object> entities);
-    public  void UpdateRange([NotNullAttribute] params object[] entities);
+    public EntityEntry<TEntity> Entry<TEntity>([NotNull] TEntity entity) where TEntity : class;
+    public EntityEntry Remove([NotNullAttribute] object entity);
+    public EntityEntry<TEntity> Remove<TEntity>([NotNullAttribute] TEntity entity) where TEntity : class;
+    public void RemoveRange([NotNullAttribute] IEnumerable<object> entities);
+    public void RemoveRange([NotNullAttribute] params object[] entities);
+    public int SaveChanges(bool acceptAllChangesOnSuccess);
+    public int SaveChanges();
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+    public DbSet<TEntity> Set<TEntity>() where TEntity : class;
+    public EntityEntry Update([NotNullAttribute] object entity);
+    public EntityEntry<TEntity> Update<TEntity>([NotNullAttribute] TEntity entity) where TEntity : class;
+    public void UpdateRange([NotNullAttribute] IEnumerable<object> entities);
+    public void UpdateRange([NotNullAttribute] params object[] entities);
 
     public void RollBack();
     public List<AuditEntryBO> OnBeforeSaveChanges();
@@ -34,6 +34,10 @@ public interface IDataLayer
     public DbSet<AuditField> AuditFields { get; set; }
     public DbSet<AuditHistory> AuditHistories { get; set; }
     public DbSet<AuthorizationLog> AuthorizationLogs { get; set; }
+    public DbSet<BinaryList> BinaryLists { get; set; }
+    public DbSet<BinaryListMultiplex> BinaryListMultiplices { get; set; }
+    public DbSet<BinaryMap> BinaryMaps { get; set; }
+    public DbSet<CommissionDeductionRequest> CommissionDeductionRequests { get; set; }
     public DbSet<CurrencyEntity> CurrencyEntities { get; set; }
     public DbSet<Enterprise> Enterprises { get; set; }
     public DbSet<ExchangeRate> ExchangeRates { get; set; }
@@ -56,4 +60,6 @@ public interface IDataLayer
     public DbSet<RegistryFavoriteEntity> RegistryFavoriteEntities { get; set; }
     public DbSet<SessionDatum> SessionData { get; set; }
     public DbSet<SessionEntity> SessionEntities { get; set; }
+    public DbSet<Subscription> Subscriptions { get; set; }
+    public DbSet<SubscriptionEntity> SubscriptionEntities { get; set; }
 }

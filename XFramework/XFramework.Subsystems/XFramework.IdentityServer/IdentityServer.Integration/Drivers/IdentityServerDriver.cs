@@ -1,6 +1,7 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get;
@@ -209,6 +210,11 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     }
 
     public async Task<CmdResponse> UpdateVerification(UpdateVerificationRequest request)
+    {
+        return await SendVoidAsync(request);
+    }
+
+    public async Task<CmdResponse> CreateAffiliateSubscription(CreateAffiliateSubscriptionRequest request)
     {
         return await SendVoidAsync(request);
     }

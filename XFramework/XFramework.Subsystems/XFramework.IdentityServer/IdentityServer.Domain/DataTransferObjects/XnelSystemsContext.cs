@@ -25,6 +25,10 @@ namespace IdentityServer.Domain.DataTransferObjects
         public virtual DbSet<AuditField> AuditFields { get; set; }
         public virtual DbSet<AuditHistory> AuditHistories { get; set; }
         public virtual DbSet<AuthorizationLog> AuthorizationLogs { get; set; }
+        public virtual DbSet<BinaryList> BinaryLists { get; set; }
+        public virtual DbSet<BinaryListMultiplex> BinaryListMultiplices { get; set; }
+        public virtual DbSet<BinaryMap> BinaryMaps { get; set; }
+        public virtual DbSet<CommissionDeductionRequest> CommissionDeductionRequests { get; set; }
         public virtual DbSet<CurrencyEntity> CurrencyEntities { get; set; }
         public virtual DbSet<Enterprise> Enterprises { get; set; }
         public virtual DbSet<ExchangeRate> ExchangeRates { get; set; }
@@ -47,6 +51,8 @@ namespace IdentityServer.Domain.DataTransferObjects
         public virtual DbSet<RegistryFavoriteEntity> RegistryFavoriteEntities { get; set; }
         public virtual DbSet<SessionDatum> SessionData { get; set; }
         public virtual DbSet<SessionEntity> SessionEntities { get; set; }
+        public virtual DbSet<Subscription> Subscriptions { get; set; }
+        public virtual DbSet<SubscriptionEntity> SubscriptionEntities { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -316,6 +322,139 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasForeignKey(d => d.IdentityCredentialsId)
                     .OnDelete(DeleteBehavior.Restrict)
                     .HasConstraintName("tbl_userauthhistory_fk");
+            });
+
+            modelBuilder.Entity<BinaryList>(entity =>
+            {
+                entity.ToTable("BinaryList", "Affiliate");
+
+                entity.HasIndex(e => e.Guid, "tbl_userbinarylist_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.SourceUserMapId).HasColumnName("SourceUserMapID");
+
+                entity.Property(e => e.TargetUserMapId).HasColumnName("TargetUserMapID");
+
+                entity.HasOne(d => d.SourceUserMap)
+                    .WithMany(p => p.BinaryListSourceUserMaps)
+                    .HasForeignKey(d => d.SourceUserMapId)
+                    .HasConstraintName("tbl_userbinarylist_tbl_usermap_id_fk_2");
+
+                entity.HasOne(d => d.TargetUserMap)
+                    .WithMany(p => p.BinaryListTargetUserMaps)
+                    .HasForeignKey(d => d.TargetUserMapId)
+                    .HasConstraintName("tbl_userbinarylist_tbl_usermap_id_fk");
+            });
+
+            modelBuilder.Entity<BinaryListMultiplex>(entity =>
+            {
+                entity.ToTable("BinaryListMultiplex", "Affiliate");
+
+                entity.HasIndex(e => e.Guid, "tbl_userbinarylistmultiplex_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.HasOne(d => d.BinaryMap)
+                    .WithMany(p => p.BinaryListMultiplices)
+                    .HasForeignKey(d => d.BinaryMapId)
+                    .HasConstraintName("tbl_userbinarylistmultiplex_tbl_usermap_id_fk");
+            });
+
+            modelBuilder.Entity<BinaryMap>(entity =>
+            {
+                entity.ToTable("BinaryMap", "Affiliate");
+
+                entity.HasIndex(e => e.Alias, "tbl_usermap_alias_uindex")
+                    .IsUnique();
+
+                entity.HasIndex(e => e.Guid, "tbl_usermap_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Alias).HasColumnType("character varying");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.HasOne(d => d.SponsorUser)
+                    .WithMany(p => p.InverseSponsorUser)
+                    .HasForeignKey(d => d.SponsorUserId)
+                    .HasConstraintName("SponsorUserId");
+
+                entity.HasOne(d => d.UplineUser)
+                    .WithMany(p => p.InverseUplineUser)
+                    .HasForeignKey(d => d.UplineUserId)
+                    .HasConstraintName("uplineuserbpid");
+            });
+
+            modelBuilder.Entity<CommissionDeductionRequest>(entity =>
+            {
+                entity.ToTable("CommissionDeductionRequest", "Affiliate");
+
+                entity.HasIndex(e => e.Id, "tbl_usercommissiondeductionrequest_\"id\"_uindex")
+                    .IsUnique();
+
+                entity.HasIndex(e => e.Guid, "tbl_usercommissiondeductionrequest_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Balance).HasPrecision(18, 10);
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.DeductionCharge).HasPrecision(18, 10);
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.PrincipalAmount).HasPrecision(18, 10);
             });
 
             modelBuilder.Entity<CurrencyEntity>(entity =>
@@ -1029,6 +1168,75 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<Subscription>(entity =>
+            {
+                entity.ToTable("Subscription", "Affiliate");
+
+                entity.HasIndex(e => e.Guid, "subscription_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.CredentialId).HasColumnName("CredentialID");
+
+                entity.Property(e => e.EntityId).HasColumnName("EntityID");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Value).HasColumnType("character varying");
+
+                entity.HasOne(d => d.Credential)
+                    .WithMany(p => p.Subscriptions)
+                    .HasForeignKey(d => d.CredentialId)
+                    .HasConstraintName("subscription_identitycredential_id_fk");
+
+                entity.HasOne(d => d.Entity)
+                    .WithMany(p => p.Subscriptions)
+                    .HasForeignKey(d => d.EntityId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("subscription_subscriptionentity_id_fk");
+            });
+
+            modelBuilder.Entity<SubscriptionEntity>(entity =>
+            {
+                entity.ToTable("SubscriptionEntity", "Affiliate");
+
+                entity.HasIndex(e => e.Guid, "subscriptionentity_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Description).HasColumnType("character varying");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasColumnType("character varying");
             });
 
             OnModelCreatingPartial(modelBuilder);

@@ -13,6 +13,7 @@ namespace IdentityServer.Domain.DataTransferObjects
             IdentityRoles = new HashSet<IdentityRole>();
             IdentityVerifications = new HashSet<IdentityVerification>();
             SessionData = new HashSet<SessionDatum>();
+            Subscriptions = new HashSet<Subscription>();
         }
 
         public long Id { get; set; }
@@ -39,5 +40,6 @@ namespace IdentityServer.Domain.DataTransferObjects
         public virtual ICollection<IdentityRole> IdentityRoles { get; set; }
         public virtual ICollection<IdentityVerification> IdentityVerifications { get; set; }
         public virtual ICollection<SessionDatum> SessionData { get; set; }
+        public virtual ICollection<Subscription> Subscriptions { get; set; }
     }
 }

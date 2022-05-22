@@ -11,6 +11,7 @@ public class CreatePharmacyRequest : RequestBase
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? Logo { get; set; }
-    
+
+    public List<CreatePharmacyTagRequest> TagList { get; set; }
     public CreateAddressRequest? Address { get; set; }
 }

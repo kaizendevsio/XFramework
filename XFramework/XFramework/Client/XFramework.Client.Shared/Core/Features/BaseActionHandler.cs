@@ -29,6 +29,8 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     protected IMediator Mediator { get; set; }
     protected EndPointsModel EndPoints { get; set; }
     protected IStore Store { get; set; }
+    public bool IsSilent { get; set; }
+
     
     protected ConfigurationState ConfigurationState => Store.GetState<ConfigurationState>();
     protected ApplicationState ApplicationState => Store.GetState<ApplicationState>();
@@ -229,7 +231,10 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     }
     public async Task ReportTask(string title, bool? isBusy = null)
     {
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
+        if (!IsSilent)
+        {
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
+        }
     }
     public async Task ReportProgress(string message)
     {
@@ -257,6 +262,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     protected IMediator Mediator { get; set; }
     protected EndPointsModel EndPoints { get; set; }
     protected IStore Store { get; set; }
+    public bool IsSilent { get; set; }
     
     protected ConfigurationState ConfigurationState => Store.GetState<ConfigurationState>();
     protected ApplicationState ApplicationState => Store.GetState<ApplicationState>();
@@ -457,7 +463,10 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     }
     public async Task ReportTask(string title, bool? isBusy = null)
     {
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
+        if (!IsSilent)
+        {
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
+        }
     }
     public async Task ReportProgress(string message)
     {

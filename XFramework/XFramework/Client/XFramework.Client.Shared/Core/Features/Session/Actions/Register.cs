@@ -7,5 +7,6 @@ public partial class SessionState
     {
         public bool AutoLogin { get; set; } = true;
         public List<(Guid?, decimal)> WalletList { get; set; }
+        public bool IsSilent { get; set; }
     }
 }
