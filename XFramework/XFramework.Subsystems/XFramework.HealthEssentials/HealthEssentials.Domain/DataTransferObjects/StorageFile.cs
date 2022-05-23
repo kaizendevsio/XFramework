@@ -18,8 +18,14 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public string ContentPath { get; set; } = null!;
         public long EntityId { get; set; }
         public string Guid { get; set; } = null!;
+        public string? IdentifierGuid { get; set; }
+        public decimal? FileSize { get; set; }
+        public DateTime? ExpireAt { get; set; }
+        public long? StorageFileIdentifierId { get; set; }
+        public string? Hash { get; set; }
 
         public virtual StorageFileEntity Entity { get; set; } = null!;
+        public virtual StorageFileIdentifier? StorageFileIdentifier { get; set; }
         public virtual ICollection<MessageFile> MessageFiles { get; set; }
     }
 }

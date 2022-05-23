@@ -51,6 +51,10 @@ namespace IdentityServer.Domain.DataTransferObjects
         public virtual DbSet<RegistryFavoriteEntity> RegistryFavoriteEntities { get; set; }
         public virtual DbSet<SessionDatum> SessionData { get; set; }
         public virtual DbSet<SessionEntity> SessionEntities { get; set; }
+        public virtual DbSet<StorageFile> StorageFiles { get; set; }
+        public virtual DbSet<StorageFileEntity> StorageFileEntities { get; set; }
+        public virtual DbSet<StorageFileIdentifier> StorageFileIdentifiers { get; set; }
+        public virtual DbSet<StorageFileIdentifierGroup> StorageFileIdentifierGroups { get; set; }
         public virtual DbSet<Subscription> Subscriptions { get; set; }
         public virtual DbSet<SubscriptionEntity> SubscriptionEntities { get; set; }
 
@@ -1168,6 +1172,129 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<StorageFile>(entity =>
+            {
+                entity.ToTable("StorageFile", "Storage");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.ContentPath)
+                    .IsRequired()
+                    .HasColumnType("character varying");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IdentifierGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.HasOne(d => d.Entity)
+                    .WithMany(p => p.StorageFiles)
+                    .HasForeignKey(d => d.EntityId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("storagefile_storagefileentity_id_fk");
+
+                entity.HasOne(d => d.StorageFileIdentifier)
+                    .WithMany(p => p.StorageFiles)
+                    .HasForeignKey(d => d.StorageFileIdentifierId)
+                    .HasConstraintName("storagefile_storagefileidentifier_id_fk");
+            });
+
+            modelBuilder.Entity<StorageFileEntity>(entity =>
+            {
+                entity.ToTable("StorageFileEntity", "Storage");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<StorageFileIdentifier>(entity =>
+            {
+                entity.ToTable("StorageFileIdentifier", "Storage");
+
+                entity.HasIndex(e => e.Guid, "storagefileidentifier_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Description).HasColumnType("character varying");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasColumnType("character varying");
+
+                entity.HasOne(d => d.Group)
+                    .WithMany(p => p.StorageFileIdentifiers)
+                    .HasForeignKey(d => d.GroupId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("storagefileidentifier_storagefileidentifiergroup_id_fk");
+            });
+
+            modelBuilder.Entity<StorageFileIdentifierGroup>(entity =>
+            {
+                entity.ToTable("StorageFileIdentifierGroup", "Storage");
+
+                entity.HasIndex(e => e.Guid, "storagefileidentifiergroup_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .IsRequired()
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasColumnType("character varying");
             });
 
             modelBuilder.Entity<Subscription>(entity =>

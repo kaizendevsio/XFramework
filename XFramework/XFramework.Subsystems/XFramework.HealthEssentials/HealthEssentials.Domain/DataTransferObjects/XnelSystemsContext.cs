@@ -7,16 +7,13 @@ namespace HealthEssentials.Domain.DataTransferObjects
 {
     public partial class XnelSystemsContext : DbContext
     {
-        public Guid? InitialGuid { get; set; }
         public XnelSystemsContext()
         {
-            
         }
 
         public XnelSystemsContext(DbContextOptions<XnelSystemsContext> options)
             : base(options)
         {
-            InitialGuid = Guid.NewGuid();
         }
 
         public virtual DbSet<AddressBarangay> AddressBarangays { get; set; } = null!;
@@ -65,6 +62,8 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public virtual DbSet<SessionEntity> SessionEntities { get; set; } = null!;
         public virtual DbSet<StorageFile> StorageFiles { get; set; } = null!;
         public virtual DbSet<StorageFileEntity> StorageFileEntities { get; set; } = null!;
+        public virtual DbSet<StorageFileIdentifier> StorageFileIdentifiers { get; set; } = null!;
+        public virtual DbSet<StorageFileIdentifierGroup> StorageFileIdentifierGroups { get; set; } = null!;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -1434,6 +1433,10 @@ namespace HealthEssentials.Domain.DataTransferObjects
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
 
+                entity.Property(e => e.Hash).HasColumnType("character varying");
+
+                entity.Property(e => e.IdentifierGuid).HasColumnType("character varying");
+
                 entity.Property(e => e.IsEnabled)
                     .IsRequired()
                     .HasDefaultValueSql("true");
@@ -1445,11 +1448,72 @@ namespace HealthEssentials.Domain.DataTransferObjects
                     .HasForeignKey(d => d.EntityId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("storagefile_storagefileentity_id_fk");
+
+                entity.HasOne(d => d.StorageFileIdentifier)
+                    .WithMany(p => p.StorageFiles)
+                    .HasForeignKey(d => d.StorageFileIdentifierId)
+                    .HasConstraintName("storagefile_storagefileidentifier_id_fk");
             });
 
             modelBuilder.Entity<StorageFileEntity>(entity =>
             {
                 entity.ToTable("StorageFileEntity", "Storage");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<StorageFileIdentifier>(entity =>
+            {
+                entity.ToTable("StorageFileIdentifier", "Storage");
+
+                entity.HasIndex(e => e.Guid, "storagefileidentifier_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Description).HasColumnType("character varying");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsEnabled)
+                    .IsRequired()
+                    .HasDefaultValueSql("true");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
+
+                entity.HasOne(d => d.Group)
+                    .WithMany(p => p.StorageFileIdentifiers)
+                    .HasForeignKey(d => d.GroupId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("storagefileidentifier_storagefileidentifiergroup_id_fk");
+            });
+
+            modelBuilder.Entity<StorageFileIdentifierGroup>(entity =>
+            {
+                entity.ToTable("StorageFileIdentifierGroup", "Storage");
+
+                entity.HasIndex(e => e.Guid, "storagefileidentifiergroup_guid_uindex")
+                    .IsUnique();
 
                 entity.Property(e => e.Id).HasColumnName("ID");
 

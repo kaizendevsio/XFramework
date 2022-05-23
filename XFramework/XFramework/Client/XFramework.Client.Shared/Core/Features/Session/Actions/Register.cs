@@ -6,6 +6,7 @@ public partial class SessionState
     public class Register : NavigableRequest, IRequest<CmdResponse>
     {
         public bool AutoLogin { get; set; } = true;
+        public bool SkipVerification { get; set; }
         public List<(Guid?, decimal)> WalletList { get; set; }
         public bool IsSilent { get; set; }
     }

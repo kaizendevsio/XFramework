@@ -99,7 +99,7 @@ public partial class SessionState
                     ContactType = GenericContactType.Phone,
                     Value = CurrentState.RegisterVm.PhoneNumber,
                     GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
-                    SendOtp = action.AutoLogin ? true : false
+                    SendOtp = !action.SkipVerification
                 });
                 if (await HandleFailure(phoneContact, action)) return new()
                 {
@@ -153,7 +153,7 @@ public partial class SessionState
 
                 SessionState.LoginVm.Username = username; 
                 SessionState.LoginVm.Password = CurrentState.RegisterVm.Password; 
-                await Mediator.Send(new Login() {NavigateToOnSuccess = action.NavigateToOnSuccess});
+                await Mediator.Send(new Login() {NavigateToOnSuccess = action.NavigateToOnSuccess, SkipVerification = action.SkipVerification});
             
                 return new()
                 {

@@ -70,7 +70,7 @@ public class CreatePharmacyIdentityHandler : CommandBaseHandler, IRequestHandler
             }
         }
 
-        var contactGroup = await _dataLayer.XnelSystemsContext.IdentityContactGroups.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "WORK_PHARMACY", cancellationToken: CancellationToken.None);
+        /*var contactGroup = await _dataLayer.XnelSystemsContext.IdentityContactGroups.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "WORK_PHARMACY", cancellationToken: CancellationToken.None);
         var emailContactType = await _dataLayer.XnelSystemsContext.IdentityContactEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "Email", cancellationToken: CancellationToken.None);
         var phoneContactType = await _dataLayer.XnelSystemsContext.IdentityContactEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "Phone", cancellationToken: CancellationToken.None);
 
@@ -91,7 +91,7 @@ public class CreatePharmacyIdentityHandler : CommandBaseHandler, IRequestHandler
             UserCredentialId = credential.Id,
             Guid = $"{Guid.NewGuid()}",
             GroupId = contactGroup.Id,
-        };
+        };*/
         
 
         var entity = new PharmacyMember
@@ -102,11 +102,11 @@ public class CreatePharmacyIdentityHandler : CommandBaseHandler, IRequestHandler
             Name = request.ProfessionalName,
         };
 
-        await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workEmail, CancellationToken.None);
-        await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workPhone, CancellationToken.None);
-        
+        /*await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workEmail, CancellationToken.None);
+        await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workPhone, CancellationToken.None);*/
         await _dataLayer.HealthEssentialsContext.PharmacyMembers.AddAsync(entity, CancellationToken.None);
 
+        await _dataLayer.XnelSystemsContext.SaveChangesAsync(CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()

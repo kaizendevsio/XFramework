@@ -12,6 +12,7 @@ public class CreatePharmacyRequest : RequestBase
     public string? Website { get; set; }
     public string? Logo { get; set; }
 
+    public List<FileUploadRequest> FileList { get; set; }
     public List<CreatePharmacyTagRequest> TagList { get; set; }
     public CreateAddressRequest? Address { get; set; }
 }

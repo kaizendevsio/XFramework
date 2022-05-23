@@ -60,6 +60,10 @@ public interface IDataLayer
     public DbSet<RegistryFavoriteEntity> RegistryFavoriteEntities { get; set; }
     public DbSet<SessionDatum> SessionData { get; set; }
     public DbSet<SessionEntity> SessionEntities { get; set; }
+    public DbSet<StorageFile> StorageFiles { get; set; }
+    public DbSet<StorageFileEntity> StorageFileEntities { get; set; }
+    public DbSet<StorageFileIdentifier> StorageFileIdentifiers { get; set; }
+    public DbSet<StorageFileIdentifierGroup> StorageFileIdentifierGroups { get; set; }
     public DbSet<Subscription> Subscriptions { get; set; }
     public DbSet<SubscriptionEntity> SubscriptionEntities { get; set; }
 }

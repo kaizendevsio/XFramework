@@ -1,12 +1,17 @@
-﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
+﻿using Azure.Storage.Blobs;
+using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
+using XFramework.Integration.Interfaces;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
 
 public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreatePharmacyCmd, CmdResponse<CreatePharmacyCmd>>
 {
-    public CreatePharmacyHandler(IDataLayer dataLayer)
+    private readonly IHelperService _helperService;
+
+    public CreatePharmacyHandler(IDataLayer dataLayer, IHelperService helperService)
     {
+        _helperService = helperService;
         _dataLayer = dataLayer;
     }
     
@@ -39,11 +44,47 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         }
         
         _dataLayer.HealthEssentialsContext.Pharmacies.Add(entity);
+        
+        var tags = await _dataLayer.HealthEssentialsContext.Tags.Where(i => i.EntityId == 1).ToListAsync(CancellationToken.None);
+        foreach (var item in request.TagList)
+        {
+            var tag = tags.FirstOrDefault(i => i.Name == item.Tag.ToString());
+            await _dataLayer.HealthEssentialsContext.PharmacyTags.AddAsync(new()
+            {
+                Pharmacy = entity,
+                TagId = tag?.Id,
+                Value = item.IsEnabled.ToString()
+            }, CancellationToken.None);
+        }
+        
+        // Upload Files to azure blob storage
+
+        var connectionConfig =  await _dataLayer.XnelSystemsContext.RegistryConfigurationGroups
+            .Include(i => i.RegistryConfigurations)
+            .FirstOrDefaultAsync(i => i.Name == "AzureBlobStorage", CancellationToken.None);
+
+        var storageFileIdentifiers = await _dataLayer.XnelSystemsContext.StorageFileIdentifiers.ToListAsync(CancellationToken.None);
+        var blobServiceClient = new BlobServiceClient(connectionConfig.RegistryConfigurations.FirstOrDefault(i => i.Key == "ConnectionString").Value);
+
+        foreach (var fileUploadRequest in request.FileList)
+        {
+            var filePath = $"{entity.Guid}-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
+            var r = await blobServiceClient.GetBlobContainerClient("files-kyc").UploadBlobAsync(filePath, BinaryData.FromBytes(fileUploadRequest.FileBytes), CancellationToken.None);
+            await _dataLayer.XnelSystemsContext.StorageFiles.AddAsync(new()
+            {
+                ContentPath = $"/files-kyc/{filePath}",
+                IdentifierGuid = entity.Guid,
+                StorageFileIdentifierId = storageFileIdentifiers.FirstOrDefault(i => i.Guid == $"{fileUploadRequest.Entity}")?.Id,
+                EntityId = 1
+            });
+        }
+        
+        await _dataLayer.XnelSystemsContext.SaveChangesAsync(CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Logistic with Guid {entity.Guid} created successfully",
+            Message = "Successfully created pharmacy",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()

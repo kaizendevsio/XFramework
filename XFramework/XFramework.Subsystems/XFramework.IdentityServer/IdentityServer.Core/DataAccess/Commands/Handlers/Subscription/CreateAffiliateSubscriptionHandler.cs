@@ -44,16 +44,19 @@ public class CreateAffiliateSubscriptionHandler : CommandBaseHandler, IRequestHa
                 IsSuccess = false
             };
         }*/
-        
-        var subscription = new Domain.DataTransferObjects.Subscription
+
+        if (!subscriptions)
         {
-            Guid = Guid.NewGuid().ToString(),
-            EntityId = entity.Id,
-            Value = request.Value,
-            Status = (short?) AffiliateSubscriptionStatus.Active
-        };
-        _dataLayer.Subscriptions.Add(subscription);
-        await _dataLayer.SaveChangesAsync(CancellationToken.None);
+            var subscription = new Domain.DataTransferObjects.Subscription
+            {
+                Guid = Guid.NewGuid().ToString(),
+                EntityId = entity.Id,
+                Value = request.Value,
+                Status = (short?) AffiliateSubscriptionStatus.Active
+            };
+            _dataLayer.Subscriptions.Add(subscription);
+            await _dataLayer.SaveChangesAsync(CancellationToken.None);
+        }
 
         switch (entity.Name)
         {
