@@ -14,8 +14,8 @@ public class GetConsultationListHandler : QueryBaseHandler, IRequestHandler<GetC
         var consultation = await _dataLayer.HealthEssentialsContext.Consultations
             .AsNoTracking()
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
-            .Take(request.PageSize)
             .OrderBy(i => i.Name)
+            .Take(request.PageSize)
             .ToListAsync(CancellationToken.None);
 
         if (!consultation.Any())

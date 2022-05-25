@@ -68,7 +68,7 @@ public class CreateLaboratoryIdentityHandler : CommandBaseHandler, IRequestHandl
             }
         }
 
-        var contactGroup = await _dataLayer.XnelSystemsContext.IdentityContactGroups.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "WORK_LABORATORY", cancellationToken: CancellationToken.None);
+        /*var contactGroup = await _dataLayer.XnelSystemsContext.IdentityContactGroups.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "WORK_LABORATORY", cancellationToken: CancellationToken.None);
         var emailContactType = await _dataLayer.XnelSystemsContext.IdentityContactEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "Email", cancellationToken: CancellationToken.None);
         var phoneContactType = await _dataLayer.XnelSystemsContext.IdentityContactEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Name == "Phone", cancellationToken: CancellationToken.None);
 
@@ -89,7 +89,7 @@ public class CreateLaboratoryIdentityHandler : CommandBaseHandler, IRequestHandl
             UserCredentialId = credential.Id,
             Guid = $"{Guid.NewGuid()}",
             GroupId = contactGroup.Id,
-        };
+        };*/
         
         var entity = new LaboratoryMember
         {
@@ -98,9 +98,9 @@ public class CreateLaboratoryIdentityHandler : CommandBaseHandler, IRequestHandl
             Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}",
             Name = request.ProfessionalName
         };
-        
-        await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workEmail, CancellationToken.None);
-        await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workPhone, CancellationToken.None);
+
+        /*await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workEmail, CancellationToken.None);
+        await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workPhone, CancellationToken.None);*/
         
         await _dataLayer.HealthEssentialsContext.LaboratoryMembers.AddAsync(entity, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

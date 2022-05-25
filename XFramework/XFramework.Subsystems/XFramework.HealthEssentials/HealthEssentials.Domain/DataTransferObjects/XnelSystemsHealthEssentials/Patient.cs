@@ -7,6 +7,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
     {
         public Patient()
         {
+            LaboratoryJobOrders = new HashSet<LaboratoryJobOrder>();
             PatientAilments = new HashSet<PatientAilment>();
             PatientConsultations = new HashSet<PatientConsultation>();
             PatientLaboratories = new HashSet<PatientLaboratory>();
@@ -26,6 +27,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string Guid { get; set; } = null!;
 
         public virtual PatientEntity Entity { get; set; } = null!;
+        public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; }
         public virtual ICollection<PatientAilment> PatientAilments { get; set; }
         public virtual ICollection<PatientConsultation> PatientConsultations { get; set; }
         public virtual ICollection<PatientLaboratory> PatientLaboratories { get; set; }

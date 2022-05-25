@@ -58,7 +58,6 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         }
         
         // Upload Files to azure blob storage
-
         var connectionConfig =  await _dataLayer.XnelSystemsContext.RegistryConfigurationGroups
             .Include(i => i.RegistryConfigurations)
             .FirstOrDefaultAsync(i => i.Name == "AzureBlobStorage", CancellationToken.None);
@@ -68,7 +67,7 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
 
         foreach (var fileUploadRequest in request.FileList)
         {
-            var filePath = $"{entity.Guid}-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
+            var filePath = $"{entity.Guid}-pharmacy-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
             var r = await blobServiceClient.GetBlobContainerClient("files-kyc").UploadBlobAsync(filePath, BinaryData.FromBytes(fileUploadRequest.FileBytes), CancellationToken.None);
             await _dataLayer.XnelSystemsContext.StorageFiles.AddAsync(new()
             {

@@ -32,7 +32,6 @@ namespace XFramework.Api.Controllers
                 },
                 Status = "Running"
             };
-
             return apiStatus;
         }
     }

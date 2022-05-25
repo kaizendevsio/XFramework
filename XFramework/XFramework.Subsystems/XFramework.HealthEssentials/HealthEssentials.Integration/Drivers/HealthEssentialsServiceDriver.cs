@@ -55,6 +55,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync<VerifyLaboratoryIdentityRequest, IdentityValidationResponse>(request);
     }
 
+    public async Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> GetLaboratoryServiceList(GetLaboratoryServiceListRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceListRequest, List<LaboratoryServiceEntityResponse>>(request);
+    }
+
     public async Task<CmdResponse<CreateConsultationRequest>> CreateConsultationEntity(CreateConsultationRequest request)
     {
         return await SendAsync(request);

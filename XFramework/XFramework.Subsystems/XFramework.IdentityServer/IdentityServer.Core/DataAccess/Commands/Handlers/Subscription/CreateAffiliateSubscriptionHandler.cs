@@ -32,6 +32,16 @@ public class CreateAffiliateSubscriptionHandler : CommandBaseHandler, IRequestHa
             };
         }
 
+        var identityContact = await _dataLayer.IdentityContacts.AnyAsync(i => i.Value == request.Value, CancellationToken.None);
+        if (identityContact)
+        {
+            return new(){
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = "Contact is already registered",
+                IsSuccess = false
+            };
+        }
+
         var subscriptions = _dataLayer.Subscriptions
             .AsNoTracking()
             .Where(i => i.Value == request.Value)

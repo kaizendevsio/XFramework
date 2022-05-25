@@ -590,7 +590,15 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
+                entity.Property(e => e.PhilHealthNumber).HasColumnType("character varying");
+
+                entity.Property(e => e.PrcNumber).HasColumnType("character varying");
+
+                entity.Property(e => e.PtrNumber).HasColumnType("character varying");
+
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
+
+                entity.Property(e => e.TinNumber).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.Doctors)
@@ -1272,6 +1280,11 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
 
+                entity.HasOne(d => d.ConsultationJobOrder)
+                    .WithMany(p => p.LaboratoryJobOrders)
+                    .HasForeignKey(d => d.ConsultationJobOrderId)
+                    .HasConstraintName("laboratoryjoborder_consultationjoborder_id_fk");
+
                 entity.HasOne(d => d.Laboratory)
                     .WithMany(p => p.LaboratoryJobOrders)
                     .HasForeignKey(d => d.LaboratoryId)
@@ -1283,6 +1296,11 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasForeignKey(d => d.LaboratoryLocationId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("laboratoryjoborder_laboratorylocation_id_fk");
+
+                entity.HasOne(d => d.Patient)
+                    .WithMany(p => p.LaboratoryJobOrders)
+                    .HasForeignKey(d => d.PatientId)
+                    .HasConstraintName("laboratoryjoborder_patient_id_fk");
 
                 entity.HasOne(d => d.Schedule)
                     .WithMany(p => p.LaboratoryJobOrders)

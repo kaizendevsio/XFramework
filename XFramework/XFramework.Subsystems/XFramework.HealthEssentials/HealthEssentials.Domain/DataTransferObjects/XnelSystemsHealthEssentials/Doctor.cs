@@ -27,6 +27,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string? Clinic { get; set; }
         public string? ClinicAddress { get; set; }
         public decimal? BaseFee { get; set; }
+        public string? PrcNumber { get; set; }
+        public string? PtrNumber { get; set; }
+        public string? PhilHealthNumber { get; set; }
+        public string? TinNumber { get; set; }
 
         public virtual DoctorEntity Entity { get; set; } = null!;
         public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; set; }

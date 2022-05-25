@@ -32,9 +32,13 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public DateTime? CompletedAt { get; set; }
         public string Guid { get; set; } = null!;
         public long ScheduleId { get; set; }
+        public long? ConsultationJobOrderId { get; set; }
+        public long? PatientId { get; set; }
 
+        public virtual ConsultationJobOrder? ConsultationJobOrder { get; set; }
         public virtual Laboratory Laboratory { get; set; } = null!;
         public virtual LaboratoryLocation LaboratoryLocation { get; set; } = null!;
+        public virtual Patient? Patient { get; set; }
         public virtual Schedule Schedule { get; set; } = null!;
         public virtual ICollection<LaboratoryJobOrderDetail> LaboratoryJobOrderDetails { get; set; }
         public virtual ICollection<LaboratoryJobOrderResult> LaboratoryJobOrderResults { get; set; }

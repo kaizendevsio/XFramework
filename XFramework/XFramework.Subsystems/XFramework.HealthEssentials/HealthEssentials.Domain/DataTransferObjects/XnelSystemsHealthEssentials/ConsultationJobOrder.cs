@@ -10,6 +10,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
             ConsultationJobOrderLaboratories = new HashSet<ConsultationJobOrderLaboratory>();
             ConsultationJobOrderMedicines = new HashSet<ConsultationJobOrderMedicine>();
             DoctorConsultationJobOrders = new HashSet<DoctorConsultationJobOrder>();
+            LaboratoryJobOrders = new HashSet<LaboratoryJobOrder>();
             PatientAilmentDetails = new HashSet<PatientAilmentDetail>();
             PatientConsultations = new HashSet<PatientConsultation>();
             PatientReminders = new HashSet<PatientReminder>();
@@ -45,6 +46,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; set; }
         public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; set; }
         public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; set; }
+        public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; }
         public virtual ICollection<PatientAilmentDetail> PatientAilmentDetails { get; set; }
         public virtual ICollection<PatientConsultation> PatientConsultations { get; set; }
         public virtual ICollection<PatientReminder> PatientReminders { get; set; }
