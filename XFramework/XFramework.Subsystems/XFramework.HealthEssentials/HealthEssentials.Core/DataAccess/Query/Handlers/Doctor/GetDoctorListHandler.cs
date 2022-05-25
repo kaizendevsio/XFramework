@@ -17,9 +17,24 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
             .Include(i => i.Entity)
             .ThenInclude(i => i.Group)
-            .Take(request.PageSize)
             .OrderBy(i => i.Name)
+            .Take(request.PageSize)
             .ToListAsync(CancellationToken.None);
+        
+        var mappedDoctors = doctor.Adapt<List<DoctorResponse>>();
+        
+        foreach (var item in mappedDoctors)
+        {
+           var a = await _dataLayer.XnelSystemsContext.IdentityCredentials
+                .Include(i => i.IdentityContacts)
+                .ThenInclude(i => i.Entity)
+                .FirstOrDefaultAsync(i => i.Id == item.CredentialId, CancellationToken.None);
+
+           item.EmailAddress = a?.IdentityContacts.FirstOrDefault(i => i.Entity.Name == "Email").Value;
+           item.PhoneNumber = a?.IdentityContacts.FirstOrDefault(i => i.Entity.Name == "Phone").Value;
+        }
+
+        ;
 
         if (!doctor.Any())
         {
@@ -36,7 +51,7 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Doctor Found",
             IsSuccess = true,
-            Response = doctor.Adapt<List<DoctorResponse>>()
+            Response = mappedDoctors
         };
     }
 }

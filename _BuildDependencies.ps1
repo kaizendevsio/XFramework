@@ -43,7 +43,9 @@ if ($answer -eq "y") {
 
    Write-Host Building XFramework.Client.Shared ...
    dotnet build "XFramework\XFramework\Client\XFramework.Client.Shared\XFramework.Client.Shared.csproj"
-
+   
+   Write-Host Building XFramework.Server.Domain.Generic ...
+   dotnet build "XFramework\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj"
 
    Write-Host Building Dependencies Completed Successfully.
    Write-Host

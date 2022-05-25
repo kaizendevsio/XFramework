@@ -1,7 +1,5 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 
-
-
 public class DoctorResponse
 {
     public DateTime CreatedAt { get; set; }
@@ -18,6 +16,8 @@ public class DoctorResponse
     public string? Clinic { get; set; }
     public string? ClinicAddress { get; set; }
     public decimal? BaseFee { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string? EmailAddress { get; set; }
     
     public DoctorEntityResponse Entity { get; set; } = null!;
 }
