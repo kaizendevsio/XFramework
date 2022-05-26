@@ -66,7 +66,8 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
         var role = new IdentityRole()
         {
             UserCred = entity,
-            RoleEntityId = roleEntity.Id
+            RoleEntityId = roleEntity.Id,
+            IsEnabled = true
         };
 
         await _dataLayer.IdentityRoles.AddAsync(role, cancellationToken);

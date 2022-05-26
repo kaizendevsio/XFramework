@@ -115,7 +115,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username & i.EntityId == (long?)GenericContactType.Phone)?.UserCredential;
+                    .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(true) & i.EntityId == (long?)GenericContactType.Phone)?.UserCredential;
                 break;
             case AuthorizeBy.Username:
                 result = await _dataLayer.IdentityCredentials

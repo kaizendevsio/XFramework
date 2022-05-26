@@ -71,10 +71,13 @@ public partial class SessionState
 
                 if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
                 {
-                    await IdentityServiceWrapper.CreateVerification(new()
+                    VerificationRequired = true;
+                    await Mediator.Send(new InitiateVerificationCode
                     {
                         CredentialGuid = response.Response.CredentialGuid,
-                        VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
+                        NavigateToOnSuccess = action.NavigateToOnSuccess,
+                        NavigateToOnFailure = action.NavigateToOnFailure,
+                        NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired
                     });
                 }
             }         
@@ -95,23 +98,10 @@ public partial class SessionState
                 ContactList = contactListResponse.Response
             });
 
-            if (action.SkipVerification)
+            if (action.SkipVerification || (checkVerification.HttpStatusCode is not HttpStatusCode.NotFound && checkVerification.Response.IsVerified))
             {
                 // If Success URL property is provided, navigate to the given URL
                 await HandleSuccess(response, action, true);
-            }
-            else
-            {
-                if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
-                {
-                    VerificationRequired = true;
-                    NavigateTo(action.NavigateToOnVerificationRequired);
-                }
-                else
-                {
-                    // If Success URL property is provided, navigate to the given URL
-                    await HandleSuccess(response, action, true);
-                }
             }
 
             // Reset Session Forms

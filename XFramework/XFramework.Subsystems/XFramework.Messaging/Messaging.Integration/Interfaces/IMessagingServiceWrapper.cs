@@ -10,4 +10,5 @@ public interface IMessagingServiceWrapper : IXFrameworkService
     public HubConnectionState ConnectionState { get; }
     
     public Task<CmdResponse> CreateDirectMessage(CreateDirectMessageRequest request);
+    public Task<CmdResponse> CreateVerificationMessage(CreateVerificationMessageRequest request);
 }

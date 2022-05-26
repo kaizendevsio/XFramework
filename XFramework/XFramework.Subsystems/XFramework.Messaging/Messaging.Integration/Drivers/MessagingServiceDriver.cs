@@ -20,4 +20,9 @@ public class MessagingServiceDriver : DriverBase, IMessagingServiceWrapper
     {
         return await SendVoidAsync(request);
     }
+
+    public async Task<CmdResponse> CreateVerificationMessage(CreateVerificationMessageRequest request)
+    {
+        return await SendVoidAsync(request);
+    }
 }   

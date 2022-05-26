@@ -22,6 +22,9 @@
     
     @code
     {
+        [Inject]
+        public IIdentityServiceWrapper IdentityServiceWrapper { get; set; }
+        
         public string SplashSpinner { get; set; } = "assets/img/loader.svg";
         public string SplashLogo { get; set; } = "assets/img/logo.svg";
         public string SplashBackground { get; set; } = "white";

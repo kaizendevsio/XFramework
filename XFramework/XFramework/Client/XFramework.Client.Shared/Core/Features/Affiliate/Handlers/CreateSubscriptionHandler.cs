@@ -41,10 +41,6 @@ public partial class AffiliateState
         public override async Task<CmdResponse> Handle(CreateSubscription action, CancellationToken aCancellationToken)
         {
             await Mediator.Send(new ApplicationState.SetState(){IsBusy = true});
-            
-            CurrentState.AffiliateSubscriptionVm.VerificationToken = $"{HelperService.GenerateRandomNumber(111111, 999999)}";
-            SessionState.RegisterVm.IsSwiftRegistration = true;
-            
             switch (action.ContactType)
             {
                 case GenericContactType.Email:
@@ -68,9 +64,20 @@ public partial class AffiliateState
                 };
             }
 
+            await Mediator.Send(new SessionState.InitiateVerificationCode
+            {
+                LocalVerification = true,
+                LocalToken = $"{HelperService.GenerateRandomNumber(111111, 999999)}",
+                ContactType = GenericContactType.Phone,
+                Contact = CurrentState.AffiliateSubscriptionVm.Value,
+                NavigateToOnSuccess = action.NavigateToOnSuccess,
+                NavigateToOnFailure = action.NavigateToOnFailure,
+                NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired
+            });
+            
             await Mediator.Send(new SessionState.SetState() {RegisterVm = SessionState.RegisterVm});
             await Mediator.Send(new ApplicationState.SetState(){IsBusy = false});
-            await HandleSuccess(response, action, true);
+            //await HandleSuccess(response, action, true);
             return new()
             {
                 IsSuccess = true,

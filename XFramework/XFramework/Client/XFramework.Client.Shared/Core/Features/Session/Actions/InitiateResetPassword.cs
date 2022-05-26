@@ -4,7 +4,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class SendVerificationCode : NavigableRequest ,IRequest<CmdResponse>
+    public class InitiateResetPassword : NavigableRequest, IRequest<CmdResponse>
     {
     }
 }

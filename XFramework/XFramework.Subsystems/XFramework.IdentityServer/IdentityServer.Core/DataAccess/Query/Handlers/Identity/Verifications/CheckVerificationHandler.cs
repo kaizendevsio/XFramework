@@ -12,6 +12,23 @@ public class CheckVerificationHandler : QueryBaseHandler, IRequestHandler<CheckV
     
     public async Task<QueryResponse<IdentityVerificationSummaryResponse>> Handle(CheckVerificationQuery request, CancellationToken cancellationToken)
     {
+        var application = await GetApplication(request.RequestServer.ApplicationId);
+        
+        var identityCredential = await _dataLayer.IdentityCredentials
+            .Include(i => i.IdentityContacts)
+            .ThenInclude(i => i.Entity)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}" && i.ApplicationId == application.Id, cancellationToken: cancellationToken);
+       
+        if (identityCredential == null)
+        {
+            return new ()
+            {
+                Message = $"Credential with Guid {request.CredentialGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
         var verificationType = await _dataLayer.IdentityVerificationEntities.AsNoTracking().FirstOrDefaultAsync(i => i.Guid == $"{request.VerificationTypeGuid}", CancellationToken.None);
         if (verificationType == null)
         {
@@ -25,6 +42,7 @@ public class CheckVerificationHandler : QueryBaseHandler, IRequestHandler<CheckV
 
         var anyVerification = _dataLayer.IdentityVerifications
             .Where(i => i.VerificationTypeId == verificationType.Id)
+            .Where(i => i.IdentityCredId == identityCredential.Id)
             .Where(i => i.Status == (short?) GenericStatusType.Approved)
             .Where(i => i.Expiry > DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc))
             .Any();
@@ -44,6 +62,7 @@ public class CheckVerificationHandler : QueryBaseHandler, IRequestHandler<CheckV
 
         var lastVerification = await _dataLayer.IdentityVerifications
             .Where(i => i.VerificationTypeId == verificationType.Id)
+            .Where(i => i.IdentityCredId == identityCredential.Id)
             .Where(i => i.Status == (short?) GenericStatusType.Pending)
             .Where(i => i.Expiry > DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc))
             .OrderByDescending(i => i.CreatedAt)
