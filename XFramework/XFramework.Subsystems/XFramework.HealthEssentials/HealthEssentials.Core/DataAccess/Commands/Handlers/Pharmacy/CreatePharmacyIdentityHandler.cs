@@ -100,6 +100,7 @@ public class CreatePharmacyIdentityHandler : CommandBaseHandler, IRequestHandler
             PharmacyId = pharmacy.Id,
             Guid = $"{Guid.NewGuid()}",
             Name = request.ProfessionalName,
+            Status = (int) GenericStatusType.Pending
         };
 
         /*await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workEmail, CancellationToken.None);

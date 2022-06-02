@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
 
-public class GetPharmacyListRequest : QueryableRequest
+public class UpdatePharmacyRequest : RequestBase
 {
     public GenericStatusType Status { get; set; }
 }

@@ -24,6 +24,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string? Email { get; set; }
         public string? Website { get; set; }
         public string? Logo { get; set; }
+        public int Status { get; set; }
 
         public virtual LogisticEntity Entity { get; set; } = null!;
         public virtual ICollection<LogisticRiderHandle> LogisticRiderHandles { get; set; }

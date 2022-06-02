@@ -40,12 +40,13 @@ public partial class SessionState
 
             // Map view model to request object
             var request = CurrentState.LoginVm.Adapt<AuthenticateCredentialRequest>();
+            request.Role = action.Role;
             
             // Send the request
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
             
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, true ,"There was an error while trying to sign you in. Please check your credentials and try again")) return new()
+            if(await HandleFailure(response, action, false ,$"There was an error while trying to sign you in")) return new()
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 IsSuccess = false

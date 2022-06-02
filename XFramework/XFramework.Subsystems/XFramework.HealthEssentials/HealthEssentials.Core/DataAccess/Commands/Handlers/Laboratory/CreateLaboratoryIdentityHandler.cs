@@ -1,6 +1,7 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
 using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Services.Helpers;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
@@ -96,7 +97,8 @@ public class CreateLaboratoryIdentityHandler : CommandBaseHandler, IRequestHandl
             CredentialId = credential.Id,
             LaboratoryId = laboratory.Id,
             Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}",
-            Name = request.ProfessionalName
+            Name = request.ProfessionalName,
+            Status = (int) GenericStatusType.Pending
         };
 
         /*await _dataLayer.XnelSystemsContext.IdentityContacts.AddAsync(workEmail, CancellationToken.None);

@@ -14,6 +14,7 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
         var Laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
             .AsNoTracking()
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
             .ToListAsync(CancellationToken.None);

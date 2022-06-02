@@ -97,6 +97,7 @@ public class CreateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Cr
         entity.CredentialId = credential.Id;
         entity.Name = request.ProfessionalName;
         entity.Description = request.Description;
+        entity.Status = (int) GenericStatusType.Pending;
 
         var riderHandle = new LogisticRiderHandle
         {

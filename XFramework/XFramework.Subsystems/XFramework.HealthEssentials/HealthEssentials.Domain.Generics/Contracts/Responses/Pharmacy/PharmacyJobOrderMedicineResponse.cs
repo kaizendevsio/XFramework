@@ -1,6 +1,4 @@
-﻿using XFramework.Domain.Generic.Enums;
-
-namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
 public class PharmacyJobOrderMedicineResponse
 {

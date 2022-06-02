@@ -1,6 +1,7 @@
 ﻿using Azure.Storage.Blobs;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
+using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
@@ -20,7 +21,8 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Pharmacy>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.EntityId = 1;
-        
+        entity.Status = (int) GenericStatusType.Pending;
+
         if (request.Address is not null)
         {
             var country = await _dataLayer.XnelSystemsContext.AddressCountries.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.CountryGuid}", cancellationToken: cancellationToken);
@@ -40,6 +42,7 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
                 Province = province.Id,
                 Country = country.Id,
                 Pharmacy = entity,
+                Status = (int) GenericStatusType.Pending
             }, CancellationToken.None);
         }
         

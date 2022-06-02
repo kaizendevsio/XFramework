@@ -1,6 +1,5 @@
 ﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using XFramework.Domain.Generic.Contracts.Requests;
-using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 

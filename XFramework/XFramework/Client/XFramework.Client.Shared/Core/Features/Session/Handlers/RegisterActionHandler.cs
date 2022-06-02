@@ -37,6 +37,7 @@ public partial class SessionState
         public override async Task<CmdResponse> Handle(Register action, CancellationToken aCancellationToken)
         {
             IsSilent = action.IsSilent;
+            CurrentState.RegisterVm.RoleList ??= action.RoleList;
             
             // Inform UI About Busy State
             await ReportTask("Creating Account..", true);
@@ -80,7 +81,6 @@ public partial class SessionState
             var credentialRequest = CurrentState.RegisterVm.Adapt<CreateCredentialRequest>();
             credentialRequest.Guid = credentialGuid;
             credentialRequest.IdentityGuid = identityGuid;
-            credentialRequest.RoleEntity = Guid.Parse("fb2ec753-66b2-4259-b65f-1c6402e58209");
             
             var credential = await IdentityServiceWrapper.CreateCredential(credentialRequest);
             if (await HandleFailure(credential, action)) return new()
@@ -153,7 +153,12 @@ public partial class SessionState
 
                 SessionState.LoginVm.Username = username; 
                 SessionState.LoginVm.Password = CurrentState.RegisterVm.Password; 
-                await Mediator.Send(new Login() {NavigateToOnSuccess = action.NavigateToOnSuccess, SkipVerification = action.SkipVerification});
+                await Mediator.Send(new Login()
+                {
+                    NavigateToOnSuccess = action.NavigateToOnSuccess,
+                    SkipVerification = action.SkipVerification,
+                    Role = action.RoleList.First()
+                });
             
                 return new()
                 {

@@ -1,6 +1,7 @@
 ﻿using Azure.Storage.Blobs;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
@@ -20,7 +21,8 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
         var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Laboratory>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.EntityId = 1;
-    
+        entity.Status = (int) GenericStatusType.Pending;
+
         var country = await _dataLayer.XnelSystemsContext.AddressCountries.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.CountryGuid}", cancellationToken: cancellationToken);
         var region = await _dataLayer.XnelSystemsContext.AddressRegions.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.RegionGuid}", cancellationToken: cancellationToken);
         var province = await _dataLayer.XnelSystemsContext.AddressProvinces.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.ProvinceGuid}", cancellationToken: cancellationToken);
@@ -37,7 +39,8 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
             MainAddress = true,
             Province = province.Id,
             Country = country.Id,
-            Laboratory = entity
+            Laboratory = entity,
+            Status = (int) GenericStatusType.Pending
         };
         await _dataLayer.HealthEssentialsContext.Laboratories.AddAsync(entity, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.LaboratoryLocations.AddAsync(location, CancellationToken.None);

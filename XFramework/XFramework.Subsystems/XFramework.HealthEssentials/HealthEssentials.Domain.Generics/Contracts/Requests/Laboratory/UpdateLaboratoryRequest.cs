@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 
-public class GetLaboratoryListRequest : QueryableRequest
+public class UpdateLaboratoryRequest : RequestBase
 {
     public GenericStatusType Status { get; set; }
 }

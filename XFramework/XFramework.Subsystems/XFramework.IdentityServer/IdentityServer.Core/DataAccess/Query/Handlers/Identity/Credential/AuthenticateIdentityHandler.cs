@@ -20,12 +20,22 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
 
     public async Task<QueryResponse<AuthorizeIdentityResponse>> Handle(AuthenticateCredentialQuery request, CancellationToken cancellationToken)
     {
+        var application = await GetApplication(request.RequestServer.ApplicationId);
+        if (request.Role is null)
+        {
+            return new QueryResponse<AuthorizeIdentityResponse>
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = "Role is required"
+            };
+        }
+        
         var credential = await ValidateAuthorization(request, cancellationToken, request.AuthorizeBy);
         if (credential == null)
         {
             return new()
             {
-                Message = $"Identity does not exist",
+                Message = $"User or identity does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -37,12 +47,21 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
             //_recordsService.NewAuthorizationLog(AuthenticationState.WrongPassword, cuid);
             return new()
             {
-                Message = $"Identity Authentication Failed",
+                Message = $"Wrong password",
                 HttpStatusCode = HttpStatusCode.BadRequest
             };
         }
 
         var roleList = await GetRoleList(cancellationToken, credential, cuid);
+        if (!roleList.Any(i => i.RoleEntity.Guid == $"{request.Role}"))
+        {
+            return new()
+            {
+                Message = $"You do not have permission to access this resource",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
         var token = new JwtTokenBO();
         if (request.GenerateToken)
         {
@@ -69,6 +88,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
     {
         var roleList = await _dataLayer.IdentityRoles
             .AsNoTracking()
+            .Include(i => i.RoleEntity)
             .Where(i => i.UserCredId == credential.Id)
             .ToListAsync(cancellationToken: cancellationToken);
 
@@ -85,11 +105,12 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
     {
         IdentityCredential result;
             
+        var application = await GetApplication(request.RequestServer.ApplicationId);
+        
         reAuth:
         switch (authorizeBy)
         {
             case AuthorizeBy.Default:
-                var application = await GetApplication(request.RequestServer.ApplicationId);
                 
                 var getDefaults = await _dataLayer.RegistryConfigurations
                     .AsNoTracking()
@@ -104,24 +125,24 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                 result = await _dataLayer.IdentityCredentials
                     .Include(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(i => i.UserName == request.Username,
+                    .FirstOrDefaultAsync(i => i.ApplicationId == application.Id & i.UserName == request.Username,
                         cancellationToken: cancellationToken);
                 result ??= _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username & i.EntityId == (long?)GenericContactType.Email)?.UserCredential;
+                    .FirstOrDefault(i => i.UserCredential.ApplicationId == application.Id & i.Value == request.Username & i.EntityId == (long?)GenericContactType.Email)?.UserCredential;
                 result ??= _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(true) & i.EntityId == (long?)GenericContactType.Phone)?.UserCredential;
+                    .FirstOrDefault(i => i.UserCredential.ApplicationId == application.Id & i.Value == request.Username.ValidatePhoneNumber(true) & i.EntityId == (long?)GenericContactType.Phone)?.UserCredential;
                 break;
             case AuthorizeBy.Username:
                 result = await _dataLayer.IdentityCredentials
                     .Include(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(i => i.UserName == request.Username,
+                    .FirstOrDefaultAsync(i => i.ApplicationId == application.Id & i.UserName == request.Username,
                         cancellationToken: cancellationToken);
                 break;
             case AuthorizeBy.Email:
@@ -130,14 +151,14 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username & i.EntityId == 1)?.UserCredential;
+                    .FirstOrDefault(i => i.UserCredential.ApplicationId == application.Id & i.Value == request.Username & i.EntityId == 1)?.UserCredential;
                 break;
             case AuthorizeBy.Phone:
                 result = _dataLayer.IdentityContacts
                     .Include(i => i.UserCredential)
                     .ThenInclude(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefault(i => i.Value == request.Username.ValidatePhoneNumber(false) & i.EntityId == 2)?.UserCredential;
+                    .FirstOrDefault(i => i.UserCredential.ApplicationId == application.Id & i.Value == request.Username.ValidatePhoneNumber(false) & i.EntityId == 2)?.UserCredential;
                 break;
             case AuthorizeBy.Token:
                 result = await _dataLayer.IdentityCredentials

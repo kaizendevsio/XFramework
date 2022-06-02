@@ -30,6 +30,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public long? Province { get; set; }
         public long? Country { get; set; }
         public string Guid { get; set; } = null!;
+        public int? Status { get; set; }
 
         public virtual Pharmacy Pharmacy { get; set; } = null!;
         public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; set; }

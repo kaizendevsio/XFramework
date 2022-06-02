@@ -10,5 +10,6 @@ public partial class SessionState
         public bool InitializeWallets { get; set; }
         public bool AutoRefreshWallets { get; set; }
         public TimeSpan AutoRefreshWalletsInterval { get; set; }
+        public Guid? Role { get; set; }
     }
 }

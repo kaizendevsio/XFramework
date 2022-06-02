@@ -1,4 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Logistic;
 
@@ -13,7 +14,8 @@ public class CreateLogisticHandler : CommandBaseHandler, IRequestHandler<CreateL
     {
         var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Logistic>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        
+        entity.Status = (int) GenericStatusType.Pending;
+
         _dataLayer.HealthEssentialsContext.Logistics.Add(entity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 

@@ -1,6 +1,5 @@
 ﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using XFramework.Domain.Generic.Contracts.Requests;
-using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
 

@@ -9,5 +9,6 @@ public partial class SessionState
         public bool SkipVerification { get; set; }
         public List<(Guid?, decimal)> WalletList { get; set; }
         public bool IsSilent { get; set; }
+        public List<Guid?> RoleList { get; set; }
     }
 }

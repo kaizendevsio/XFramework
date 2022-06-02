@@ -2,6 +2,7 @@
 using HealthEssentials.Core.DataAccess.Commands.Entity.Doctor;
 using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services.Helpers;
 
@@ -87,6 +88,7 @@ public class CreateDoctorIdentityHandler : CommandBaseHandler, IRequestHandler<C
         doctor.Name = request.ProfessionalName;
         doctor.Guid = $"{Guid.NewGuid()}";
         doctor.EntityId = 1;
+        doctor.Status = (int) GenericStatusType.Pending;
 
         foreach (var consultationGuid in request.SupportedConsultationList)
         {

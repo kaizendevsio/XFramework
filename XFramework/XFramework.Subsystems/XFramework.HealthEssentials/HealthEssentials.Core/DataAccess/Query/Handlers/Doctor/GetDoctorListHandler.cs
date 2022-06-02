@@ -15,6 +15,7 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
         var doctor = await _dataLayer.HealthEssentialsContext.Doctors
             .AsNoTracking()
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Where(i => i.Status == (int) request.Status)
             .Include(i => i.Entity)
             .ThenInclude(i => i.Group)
             .OrderBy(i => i.Name)

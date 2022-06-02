@@ -16,6 +16,7 @@ public class GetPharmacyListHandler : QueryBaseHandler, IRequestHandler<GetPharm
             .Include(i => i.PharmacyLocations)
             .Include(i => i.Entity)
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
+            .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
             .ToListAsync(CancellationToken.None);

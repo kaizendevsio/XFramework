@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 
-public class GetDoctorListRequest : QueryableRequest
+public class UpdateDoctorIdentityRequest : RequestBase
 {
     public GenericStatusType Status { get; set; }
 }

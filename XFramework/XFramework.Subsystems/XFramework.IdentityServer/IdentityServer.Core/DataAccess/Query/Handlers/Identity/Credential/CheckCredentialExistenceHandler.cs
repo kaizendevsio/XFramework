@@ -30,7 +30,32 @@ public class CheckCredentialExistenceHandler : QueryBaseHandler ,IRequestHandler
                 HttpStatusCode = HttpStatusCode.BadRequest
             };
         }
+
+        if (request.RoleList is null || !request.RoleList.Any())
+        {
+            return new ()
+            {
+                Message = $"The role list is required",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
         
+        foreach (var item in request.RoleList)
+        {
+            var roleEntity = await _dataLayer.IdentityRoleEntities
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Guid == $"{item}" && i.ApplicationId == application.Id, CancellationToken.None);
+
+            if (roleEntity == null)
+            {
+                return new ()
+                {
+                    Message = $"Role with Guid '{item}' does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+        }
+
         // Validate Password
         var passwordIsStrong = Regex.Match(request.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$").Success;
         if (!passwordIsStrong)

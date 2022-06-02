@@ -1436,6 +1436,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
+                entity.Property(e => e.Status).HasDefaultValueSql("0");
+
                 entity.Property(e => e.Street).HasMaxLength(500);
 
                 entity.Property(e => e.Subdivision).HasMaxLength(500);
@@ -2797,6 +2799,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
+
+                entity.Property(e => e.Status).HasDefaultValueSql("0");
 
                 entity.Property(e => e.Street).HasMaxLength(500);
 

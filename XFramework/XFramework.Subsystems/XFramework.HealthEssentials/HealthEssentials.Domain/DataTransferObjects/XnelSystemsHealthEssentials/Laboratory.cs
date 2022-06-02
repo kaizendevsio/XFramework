@@ -29,6 +29,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string? Email { get; set; }
         public string? Website { get; set; }
         public string? Logo { get; set; }
+        public int Status { get; set; }
 
         public virtual LaboratoryEntity Entity { get; set; } = null!;
         public virtual ICollection<HospitalLaboratory> HospitalLaboratories { get; set; }

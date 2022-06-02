@@ -50,27 +50,39 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
 
         await _dataLayer.IdentityCredentials.AddAsync(entity, cancellationToken);
             
-        var roleEntity = await _dataLayer.IdentityRoleEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.RoleEntity}", cancellationToken: cancellationToken);
-
-        if (roleEntity == null)
+        if (request.RoleList is null || !request.RoleList.Any())
         {
             return new ()
             {
-                Message = $"Role with Guid '{request.RoleEntity}' does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
+                Message = $"The role list is required",
+                HttpStatusCode = HttpStatusCode.BadRequest
             };
         }
-
-        var role = new IdentityRole()
+        
+        foreach (var item in request.RoleList)
         {
-            UserCred = entity,
-            RoleEntityId = roleEntity.Id,
-            IsEnabled = true
-        };
+            var roleEntity = await _dataLayer.IdentityRoleEntities
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Guid == $"{item}" && i.ApplicationId == application.Id, CancellationToken.None);
 
-        await _dataLayer.IdentityRoles.AddAsync(role, cancellationToken);
+            if (roleEntity == null)
+            {
+                return new ()
+                {
+                    Message = $"Role with Guid '{item}' does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            
+            await _dataLayer.IdentityRoles.AddAsync(new IdentityRole()
+            {
+                UserCred = entity,
+                RoleEntityId = roleEntity.Id,
+                IsEnabled = true
+            }, CancellationToken.None);
+        }
+
+      
         await _dataLayer.SaveChangesAsync(cancellationToken);
 
         return new ()
