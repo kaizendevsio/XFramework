@@ -8,7 +8,40 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d37d412-dd63-4bc1-9000-5a758e6c9722" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/CurrencyEntity/CurrencyEntityController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Controllers/V1/ExchangeRate/ExchangeRateController.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/CurrencyEntity/CreateCurrencyEntityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/CurrencyEntity/DeleteCurrencyEntityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/CurrencyEntity/UpdateCurrencyEntityCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/ExchangeRate/CreateExchangeRateCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/ExchangeRate/DeleteExchangeRateCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/ExchangeRate/UpdateExchangeRateCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/CurrencyEntity/CreateCurrencyEntityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/CurrencyEntity/DeleteCurrencyEntityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/CurrencyEntity/UpdateCurrencyEntityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/ExchangeRate/CreateExchangeRateHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/ExchangeRate/DeleteExchangeRateHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/ExchangeRate/UpdateExchangeRateHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/CurrencyEntity/GetCurrencyEntityQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/ExchangeRate/GetExchangeRateQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/CurrencyEntity/GetCurrencyEntityHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/ExchangeRate/GetExchangeRateHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Create/CreateCurrencyEntityRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Create/CreateExchangeRateRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Delete/DeleteCurrencyEntityRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Delete/DeleteExchangeRateRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Get/GetCurrencyEntityRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Get/GetExchangeRateRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Update/UpdateCurrencyEntityRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Requests/Update/UpdateExchangeRateRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/CurrencyEntityResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/ExchangeRateResponse.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/DeleteWalletEntityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/DeleteWalletEntityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/DeleteWalletHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/DeleteWalletHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetWalletEntityListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/GetWalletEntityListHandler.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,7 +67,9 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/TransactionRequestBase.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
@@ -220,6 +255,10 @@
       <workItem from="1652586104158" duration="1011000" />
       <workItem from="1652641683923" duration="637000" />
       <workItem from="1652960206832" duration="1204000" />
+      <workItem from="1654164908960" duration="3471000" />
+      <workItem from="1654221416854" duration="10391000" />
+      <workItem from="1654249331778" duration="976000" />
+      <workItem from="1654250544187" duration="7871000" />
     </task>
     <task id="LOCAL-00001" summary="Initial Template">
       <created>1621423842771</created>
