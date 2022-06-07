@@ -20,6 +20,7 @@ public class DeleteWalletEntityHandler : CommandBaseHandler, IRequestHandler<Del
         }
 
         entity.IsDeleted = true;
+        entity.IsEnabled = false;
         _dataLayer.Update(entity);
         await _dataLayer.SaveChangesAsync(cancellationToken);
 
