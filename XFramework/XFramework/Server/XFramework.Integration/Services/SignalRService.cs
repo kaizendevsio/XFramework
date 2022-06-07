@@ -117,6 +117,7 @@ public class SignalRService : ISignalRService
         Connection.Closed += async connectionId =>
         {
             Console.WriteLine("Connection to StreamFlow server closed");
+            _isRegistered = false;
             await EnsureConnection();
         };
     }
@@ -178,9 +179,7 @@ public class SignalRService : ISignalRService
         if (Connection.State is not HubConnectionState.Disconnected)
         {
             if (_isRegistered) return true;
-        }
-
-        ;
+        } ;
 
         try
         {

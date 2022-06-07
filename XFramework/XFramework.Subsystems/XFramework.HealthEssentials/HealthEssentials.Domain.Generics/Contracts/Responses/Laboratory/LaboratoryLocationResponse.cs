@@ -2,5 +2,23 @@
 
 public class LaboratoryLocationResponse
 {
-    
+    public DateTime CreatedAt { get; set; }
+    public DateTime ModifiedAt { get; set; }
+    public bool? IsEnabled { get; set; }
+    public bool IsDeleted { get; set; }
+    public long LaboratoryId { get; set; }
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public string? UnitNumber { get; set; }
+    public string? Street { get; set; }
+    public string? Building { get; set; }
+    public string? Barangay { get; set; }
+    public string? City { get; set; }
+    public string? Subdivision { get; set; }
+    public string? Region { get; set; }
+    public bool? MainAddress { get; set; }
+    public string? Province { get; set; }
+    public string? Country { get; set; }
+    public string Guid { get; set; } = null!;
+    public int? Status { get; set; }
 }

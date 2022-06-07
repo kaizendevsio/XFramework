@@ -37,7 +37,7 @@ public class CreateAffiliateSubscriptionHandler : CommandBaseHandler, IRequestHa
         {
             return new(){
                 HttpStatusCode = HttpStatusCode.BadRequest,
-                Message = "Contact is already registered",
+                Message = "This contact is already registered. Please login to your account instead.",
                 IsSuccess = false
             };
         }

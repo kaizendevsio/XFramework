@@ -1,4 +1,5 @@
 ﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using XFramework.Domain.Generic.Enums;
@@ -71,7 +72,10 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
         foreach (var fileUploadRequest in request.FileList)
         {
             var filePath = $"{entity.Guid}-laboratory-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
-            var r = await blobServiceClient.GetBlobContainerClient("files-kyc").UploadBlobAsync(filePath, BinaryData.FromBytes(fileUploadRequest.FileBytes), CancellationToken.None);
+            var client = blobServiceClient.GetBlobContainerClient("files-kyc");
+            var blob = client.GetBlobClient(filePath);
+            await blob.UploadAsync(BinaryData.FromBytes(fileUploadRequest.FileBytes), new BlobUploadOptions {HttpHeaders = new() {ContentType = fileUploadRequest.ContentType}}, CancellationToken.None);
+            
             await _dataLayer.XnelSystemsContext.StorageFiles.AddAsync(new()
             {
                 ContentPath = $"/files-kyc/{filePath}",

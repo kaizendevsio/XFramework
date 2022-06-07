@@ -1,4 +1,7 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+using HealthEssentials.Domain.DataTransferObjects;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
 
@@ -11,7 +14,7 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
 
     public async Task<QueryResponse<List<LaboratoryResponse>>> Handle(GetLaboratoryListQuery request, CancellationToken cancellationToken)
     {
-        var Laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
+        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
             .AsNoTracking()
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
@@ -19,7 +22,7 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
             .Take(request.PageSize)
             .ToListAsync(CancellationToken.None);
 
-        if (!Laboratory.Any())
+        if (!laboratory.Any())
         {
             return new()
             {
@@ -29,12 +32,13 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
             };
         }
         
+        var response = laboratory.Adapt<List<LaboratoryResponse>>();
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory Found",
             IsSuccess = true,
-            Response = Laboratory.Adapt<List<LaboratoryResponse>>()
+            Response = response
         };
     }
 }

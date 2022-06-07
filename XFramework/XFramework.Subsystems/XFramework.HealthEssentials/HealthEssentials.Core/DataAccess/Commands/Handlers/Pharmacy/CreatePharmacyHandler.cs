@@ -1,4 +1,5 @@
 ﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
 using XFramework.Domain.Generic.Enums;
@@ -71,7 +72,10 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         foreach (var fileUploadRequest in request.FileList)
         {
             var filePath = $"{entity.Guid}-pharmacy-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
-            var r = await blobServiceClient.GetBlobContainerClient("files-kyc").UploadBlobAsync(filePath, BinaryData.FromBytes(fileUploadRequest.FileBytes), CancellationToken.None);
+            var client = blobServiceClient.GetBlobContainerClient("files-kyc");
+            var blob = client.GetBlobClient(filePath);
+            await blob.UploadAsync(BinaryData.FromBytes(fileUploadRequest.FileBytes), new BlobUploadOptions {HttpHeaders = new() {ContentType = fileUploadRequest.ContentType}}, CancellationToken.None);
+            
             await _dataLayer.XnelSystemsContext.StorageFiles.AddAsync(new()
             {
                 ContentPath = $"/files-kyc/{filePath}",

@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 
 public class LaboratoryResponse
 {
@@ -15,4 +17,8 @@ public class LaboratoryResponse
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? Logo { get; set; }
+    
+    public List<LaboratoryLocationResponse> LaboratoryLocations { get; set; }
+    public List<LaboratoryMemberResponse> LaboratoryMembers { get; set; }
+    public List<StorageFileResponse> Files { get; set; }
 }

@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Logistic;
 
@@ -45,7 +46,7 @@ public class VerifyLogisticIdentityHandler : QueryBaseHandler, IRequestHandler<V
             Response = new()
             {
                 IsExisting = true,
-                IsActivated = identity.IsEnabled
+                IsActivated = identity.Status is (int)GenericStatusType.Approved
             },
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true
