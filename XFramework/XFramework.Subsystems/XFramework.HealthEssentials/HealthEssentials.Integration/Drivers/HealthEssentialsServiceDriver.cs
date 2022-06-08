@@ -41,7 +41,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<List<PharmacyMemberResponse>>> GetPharmacyMemberList(GetPharmacyMemberListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetPharmacyMemberListRequest, List<PharmacyMemberResponse>>(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPharmacyMember(VerifyPharmacyMemberRequest request)
@@ -51,7 +51,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<UpdatePharmacyMemberRequest>> UpdatePharmacyMember(UpdatePharmacyMemberRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<DeletePharmacyMemberRequest>> DeletePharmacyMember(DeletePharmacyMemberRequest request)
@@ -69,19 +69,19 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         throw new NotImplementedException();
     }
 
-    public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request)
+    /*public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request)
     {
         return await SendAsync<VerifyLogisticIdentityRequest, IdentityValidationResponse>(request);
-    }
+    }*/
 
     public async Task<QueryResponse<LogisticRiderHandleResponse>> GetLogisticRiderHandle(GetLogisticRiderHandleRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLogisticRiderHandleRequest, LogisticRiderHandleResponse>(request);
     }
 
     public async Task<QueryResponse<List<LogisticRiderHandleResponse>>> GetLogisticRiderHandleList(GetLogisticRiderHandleListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLogisticRiderHandleListRequest, List<LogisticRiderHandleResponse>>(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyLaboratoryMember(VerifyLaboratoryMemberRequest request)
@@ -104,24 +104,19 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         throw new NotImplementedException();
     }
 
-    async Task<QueryResponse<List<LaboratoryServiceResponse>>> IHealthEssentialsServiceWrapper.GetLaboratoryServiceList(GetLaboratoryServiceListRequest request)
+    public async Task<QueryResponse<List<LaboratoryServiceResponse>>> GetLaboratoryServiceList(GetLaboratoryServiceListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLaboratoryServiceListRequest, List<LaboratoryServiceResponse>>(request);
     }
 
     public async Task<QueryResponse<LaboratoryServiceResponse>> GetLaboratoryService(GetLaboratoryServiceRequest request)
     {
-        throw new NotImplementedException();
-    }
-
-    public async Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> GetLaboratoryServiceEntityList(GetLaboratoryServiceListRequest request)
-    {
-        return await SendAsync<GetLaboratoryServiceListRequest, List<LaboratoryServiceEntityResponse>>(request);
+        return await SendAsync<GetLaboratoryServiceRequest, LaboratoryServiceResponse>(request);
     }
 
     public async Task<QueryResponse<ConsultationResponse>> GetConsultation(GetConsultationRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetConsultationRequest, ConsultationResponse>(request);
     }
 
     public async Task<CmdResponse<CreateConsultationRequest>> CreateConsultation(CreateConsultationRequest request)
@@ -181,12 +176,12 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<LaboratoryMemberResponse>> GetLaboratoryMember(GetLaboratoryMemberRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLaboratoryMemberRequest, LaboratoryMemberResponse>(request);
     }
 
     public async Task<QueryResponse<List<LaboratoryMemberResponse>>> GetLaboratoryMemberList(GetLaboratoryMemberListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLaboratoryMemberListRequest, List<LaboratoryMemberResponse>>(request);
     }
 
     public async Task<CmdResponse<UpdateLaboratoryMemberRequest>> UpdateLaboratoryMember(UpdateLaboratoryMemberRequest request)
@@ -216,12 +211,12 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<LaboratoryServiceEntityResponse>> GetLaboratoryServiceEntity(GetLaboratoryServiceEntityRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLaboratoryServiceEntityRequest, LaboratoryServiceEntityResponse>(request);
     }
 
     public async Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> GetLaboratoryServiceEntityList(GetLaboratoryServiceEntityListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLaboratoryServiceEntityListRequest, List<LaboratoryServiceEntityResponse>>(request);
     }
 
     public async Task<CmdResponse<UpdateLaboratoryServiceEntityRequest>> UpdateLaboratoryServiceEntity(UpdateLaboratoryServiceEntityRequest request)
@@ -236,12 +231,12 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<LaboratoryServiceEntityGroupResponse>> GetLaboratoryServiceEntityGroup(GetLaboratoryServiceEntityGroupRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLaboratoryServiceEntityGroupRequest, LaboratoryServiceEntityGroupResponse>(request);
     }
 
     public async Task<QueryResponse<List<LaboratoryServiceEntityGroupResponse>>> GetLaboratoryServiceEntityGroupList(GetLaboratoryServiceEntityGroupListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLaboratoryServiceEntityGroupListRequest, List<LaboratoryServiceEntityGroupResponse>>(request);
     }
 
     public async Task<CmdResponse<UpdateLaboratoryServiceEntityGroupRequest>> UpdateLaboratoryServiceEntityGroup(UpdateLaboratoryServiceEntityGroupRequest request)
@@ -256,12 +251,12 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<List<ConsultationEntityResponse>>> GetConsultationEntityList(GetConsultationEntityListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetConsultationEntityListRequest, List<ConsultationEntityResponse>>(request);
     }
 
     public async Task<QueryResponse<ConsultationEntityResponse>> GetConsultationEntity(GetConsultationEntityRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetConsultationEntityRequest, ConsultationEntityResponse>(request);
     }
 
     public async Task<CmdResponse<CreateConsultationEntityRequest>> CreateConsultationEntity(CreateConsultationEntityRequest request)
@@ -281,7 +276,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<ConsultationPaymentResponse>> GetConsultationPayment(GetConsultationPaymentRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetConsultationPaymentRequest, ConsultationPaymentResponse>(request);
     }
 
     public async Task<QueryResponse<List<ConsultationPaymentResponse>>> GetConsultationPaymentList(GetConsultationPaymentListRequest request)
@@ -301,7 +296,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<LogisticResponse>> GetLogistic(GetLogisticRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLogisticRequest, LogisticResponse>(request);
     }
 
     public async Task<CmdResponse<CreateLogisticRequest>> CreateLogistic(CreateLogisticRequest request)
@@ -331,12 +326,12 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<LogisticRiderResponse>> GetLogisticRider(GetLogisticRiderRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLogisticRiderRequest, LogisticRiderResponse>(request);
     }
 
     public async Task<QueryResponse<List<LogisticRiderResponse>>> GetLogisticRiderList(GetLogisticRiderListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetLogisticRiderListRequest, List<LogisticRiderResponse>>(request);
     }
 
     public async Task<CmdResponse<CreateLogisticRiderRequest>> CreateLogisticRider(CreateLogisticRiderRequest request)
@@ -356,7 +351,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetPharmacyRequest, PharmacyResponse>(request);
     }
 
     public async Task<CmdResponse<CreatePharmacyRequest>> CreatePharmacy(CreatePharmacyRequest request)
@@ -376,7 +371,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<PharmacyMemberResponse>> GetPharmacyMember(GetPharmacyMemberRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetPharmacyMemberRequest, PharmacyMemberResponse>(request);
     }
 
     public async Task<CmdResponse<CreatePharmacyMemberRequest>> CreatePharmacyMember(CreatePharmacyMemberRequest request)
@@ -447,11 +442,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<List<PatientResponse>>> GetPatientList(GetPatientListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetPatientListRequest, List<PatientResponse>>(request);
     }
  
     public async Task<CmdResponse<UpdatePatientRequest>> UpdatePatient(UpdatePatientRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 }   
