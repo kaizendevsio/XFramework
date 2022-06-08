@@ -2,6 +2,6 @@
 
 namespace HealthEssentials.Core.DataAccess.Query.Entity.Pharmacy;
 
-public class VerifyPharmacyIdentityQuery : VerifyPharmacyIdentityRequest, IRequest<QueryResponse<IdentityValidationResponse>>
+public class VerifyPharmacyIdentityQuery : VerifyPharmacyMemberRequest, IRequest<QueryResponse<IdentityValidationResponse>>
 {
 }

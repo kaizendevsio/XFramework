@@ -8,6 +8,6 @@ public class CreatePatientIdentityHandler : BaseSignalRHandler, ISignalREventHan
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreatePatientIdentityRequest, CreatePatientIdentityCmd>(connection, mediator);
+        HandleRequestCmd<CreatePatientRequest, CreatePatientIdentityCmd>(connection, mediator);
     }
 }

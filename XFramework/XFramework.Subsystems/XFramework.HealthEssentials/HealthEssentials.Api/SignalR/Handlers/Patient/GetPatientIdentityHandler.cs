@@ -9,6 +9,6 @@ public class GetPatientIdentityHandler : BaseSignalRHandler, ISignalREventHandle
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestQuery<GetPatientIdentityRequest, GetPatientIdentityQuery, PatientResponse>(connection, mediator);
+        HandleRequestQuery<GetPatientRequest, GetPatientIdentityQuery, PatientResponse>(connection, mediator);
     }
 }

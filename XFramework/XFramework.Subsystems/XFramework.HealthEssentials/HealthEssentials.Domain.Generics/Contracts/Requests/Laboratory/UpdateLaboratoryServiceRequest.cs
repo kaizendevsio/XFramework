@@ -2,8 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 
-public class CreateLaboratoryServiceTypeGroupRequest : RequestBase
+public class UpdateLaboratoryServiceRequest : RequestBase
 {
-    public string? Name { get; set; }
-
+    
 }

@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 
-public class CreateDoctorIdentityRequest : RequestBase
+public class CreateDoctorRequest : RequestBase
 {
     public Guid? CredentialGuid { get; set; }
     public string? ProfessionalName { get; set; }

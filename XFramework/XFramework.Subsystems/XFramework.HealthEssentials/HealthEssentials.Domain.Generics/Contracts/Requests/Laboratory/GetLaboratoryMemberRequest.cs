@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 
-public class VerifyLaboratoryIdentityRequest : RequestBase
+public class GetLaboratoryMemberRequest : RequestBase
 {
-    public Guid? CredentialGuid { get; set; }
+    
 }

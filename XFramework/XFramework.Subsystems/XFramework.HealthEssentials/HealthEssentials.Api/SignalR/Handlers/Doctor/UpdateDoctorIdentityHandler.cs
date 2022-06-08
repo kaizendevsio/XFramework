@@ -8,6 +8,6 @@ public class UpdateDoctorIdentityHandler : BaseSignalRHandler, ISignalREventHand
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<UpdateDoctorIdentityRequest, UpdateDoctorIdentityCmd>(connection, mediator);
+        HandleRequestCmd<UpdateDoctorRequest, UpdateDoctorIdentityCmd>(connection, mediator);
     }
 }

@@ -3,6 +3,6 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 
 namespace HealthEssentials.Core.DataAccess.Query.Entity.Patient;
 
-public class VerifyPatientIdentityQuery : VerifyPatientIdentityRequest, IRequest<QueryResponse<IdentityValidationResponse>>
+public class VerifyPatientIdentityQuery : VerifyPatientRequest, IRequest<QueryResponse<IdentityValidationResponse>>
 {
 }

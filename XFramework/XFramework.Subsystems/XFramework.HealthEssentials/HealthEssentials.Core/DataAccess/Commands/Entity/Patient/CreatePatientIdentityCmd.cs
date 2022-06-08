@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
 
-public class CreatePatientIdentityCmd : CreatePatientIdentityRequest, IRequest<CmdResponse<CreatePatientIdentityCmd>>
+public class CreatePatientIdentityCmd : CreatePatientRequest, IRequest<CmdResponse<CreatePatientIdentityCmd>>
 {
     
 }

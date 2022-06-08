@@ -2,6 +2,6 @@
 
 namespace HealthEssentials.Core.DataAccess.Query.Entity.Doctor;
 
-public class VerifyDoctorIdentityQuery : VerifyDoctorIdentityRequest, IRequest<QueryResponse<IdentityValidationResponse>>
+public class VerifyDoctorIdentityQuery : VerifyDoctorRequest, IRequest<QueryResponse<IdentityValidationResponse>>
 {
 }

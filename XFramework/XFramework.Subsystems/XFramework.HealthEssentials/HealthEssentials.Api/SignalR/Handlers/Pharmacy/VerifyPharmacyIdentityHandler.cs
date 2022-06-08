@@ -8,6 +8,6 @@ public class VerifyPharmacyIdentityHandler : BaseSignalRHandler, ISignalREventHa
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestQuery<VerifyPharmacyIdentityRequest, VerifyPharmacyIdentityQuery, IdentityValidationResponse>(connection, mediator);
+        HandleRequestQuery<VerifyPharmacyMemberRequest, VerifyPharmacyIdentityQuery, IdentityValidationResponse>(connection, mediator);
     }
 }

@@ -8,6 +8,6 @@ public class CreatePharmacyIdentityHandler : BaseSignalRHandler, ISignalREventHa
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreatePharmacyIdentityRequest, CreatePharmacyIdentityCmd>(connection, mediator);
+        HandleRequestCmd<CreatePharmacyMemberRequest, CreatePharmacyIdentityCmd>(connection, mediator);
     }
 }

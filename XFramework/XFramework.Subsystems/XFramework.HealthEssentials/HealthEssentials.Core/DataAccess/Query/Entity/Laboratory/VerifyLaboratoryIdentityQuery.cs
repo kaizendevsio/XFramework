@@ -2,6 +2,6 @@
 
 namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
 
-public class VerifyLaboratoryIdentityQuery : VerifyLaboratoryIdentityRequest, IRequest<QueryResponse<IdentityValidationResponse>>
+public class VerifyLaboratoryIdentityQuery : VerifyLaboratoryMemberRequest, IRequest<QueryResponse<IdentityValidationResponse>>
 {
 }

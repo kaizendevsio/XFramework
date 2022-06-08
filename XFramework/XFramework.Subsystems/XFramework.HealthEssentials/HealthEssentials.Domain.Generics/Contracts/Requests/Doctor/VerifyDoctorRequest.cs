@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 
-public class GetDoctorIdentityRequest : RequestBase
+public class VerifyDoctorRequest : RequestBase
 {
     public Guid? CredentialGuid { get; set; }
 }

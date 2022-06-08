@@ -1,5 +1,5 @@
 ﻿namespace HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
 
-public class CreateLaboratoryIdentityCmd : CreateLaboratoryIdentityRequest, IRequest<CmdResponse<CreateLaboratoryIdentityCmd>>
+public class CreateLaboratoryIdentityCmd : CreateLaboratoryMemberRequest, IRequest<CmdResponse<CreateLaboratoryIdentityCmd>>
 {
 }
