@@ -6,10 +6,12 @@ using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Get.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update.Verification;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+using IdentityServer.Domain.Generic.Contracts.Responses.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -34,8 +36,8 @@ public interface IIdentityServiceWrapper : IXFrameworkService
     public Task<CmdResponse> ChangePassword(UpdatePasswordRequest request);
     public Task<CmdResponse> SendOneTimePassword(CheckOneTimePasswordRequest request);
         
-    public Task<QueryResponse<RoleResponse>> GetRole(GetRoleRequest request);
-    public Task<QueryResponse<List<RoleResponse>>> GetRoleList(GetRoleListRequest request);
+    public Task<QueryResponse<IdentityRoleResponse>> GetRole(GetRoleRequest request);
+    public Task<QueryResponse<List<IdentityRoleResponse>>> GetRoleList(GetRoleListRequest request);
     public Task<QueryResponse<RoleEntityResponse>> GetRoleEntity(GetRoleEntityRequest request);
     public Task<QueryResponse<List<RoleEntityResponse>>> GetRoleEntityList(GetRoleEntityListRequest request);
         
@@ -65,4 +67,5 @@ public interface IIdentityServiceWrapper : IXFrameworkService
     public Task<CmdResponse> CreateVerification(CreateVerificationRequest request);
     public Task<CmdResponse> UpdateVerification(UpdateVerificationRequest request);
     public Task<CmdResponse> CreateAffiliateSubscription(CreateAffiliateSubscriptionRequest request);
+    public Task<QueryResponse<List<SubscriptionResponse>>> GetUnregisteredSubscriberList(GetUnregisteredSubscriberListRequest request);
 }

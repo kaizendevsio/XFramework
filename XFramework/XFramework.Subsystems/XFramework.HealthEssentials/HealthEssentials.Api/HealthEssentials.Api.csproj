@@ -24,6 +24,9 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="IdentityServer.Domain.Generic">
+          <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
+        </Reference>
         <Reference Include="Wallets.Domain.Generic">
             <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
         </Reference>

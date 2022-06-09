@@ -1,4 +1,5 @@
-﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
@@ -12,6 +13,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Integration.Interfaces;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Drivers;
@@ -89,6 +91,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<List<CredentialResponse>>> GetPendingRegistrationCompletionList(GetPendingRegistrationCompletionListRequest request)
+    {
+        return await SendAsync<GetPendingRegistrationCompletionListRequest, List<CredentialResponse>>(request);
+    }
+
     public async Task<CmdResponse<CreateDoctorIdentityRequest>> CreateDoctorIdentity(CreateDoctorIdentityRequest request)
     {
         return await SendAsync(request);
@@ -100,6 +107,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<UpdateLaboratoryRequest>> UpdateLaboratory(UpdateLaboratoryRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryMemberRequest>> UpdateLaboratoryMember(UpdateLaboratoryMemberRequest request)
     {
         return await SendAsync(request);
     }
@@ -129,6 +141,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<CmdResponse<UpdateLogisticRiderRequest>> UpdatePharmacyMember(UpdateLogisticRiderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<CmdResponse<CreateLogisticRiderHandleRequest>> CreateLogisticRiderHandle(CreateLogisticRiderHandleRequest request)
     {
         return await SendAsync(request);
@@ -150,6 +167,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<UpdatePharmacyRequest>> UpdatePharmacy(UpdatePharmacyRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyMemberRequest>> UpdatePharmacyMember(UpdatePharmacyMemberRequest request)
     {
         return await SendAsync(request);
     }

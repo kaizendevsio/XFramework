@@ -6,10 +6,12 @@ using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Get.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update.Verification;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+using IdentityServer.Domain.Generic.Contracts.Responses.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -69,9 +71,9 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
         return await SendVoidAsync(request);
     }
 
-    public async Task<QueryResponse<RoleResponse>> GetRole(GetRoleRequest request)
+    public async Task<QueryResponse<IdentityRoleResponse>> GetRole(GetRoleRequest request)
     {
-        return await SendAsync<GetRoleRequest, RoleResponse>(request);
+        return await SendAsync<GetRoleRequest, IdentityRoleResponse>(request);
     }
 
     public async Task<QueryResponse<ExistenceResponse>> CheckCredentialExistence(CheckCredentialExistenceRequest request)
@@ -99,9 +101,9 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
         return await SendAsync<GetCredentialListRequest, List<CredentialResponse>>(request);
     }
 
-    public async Task<QueryResponse<List<RoleResponse>>> GetRoleList(GetRoleListRequest request)
+    public async Task<QueryResponse<List<IdentityRoleResponse>>> GetRoleList(GetRoleListRequest request)
     {
-        return await SendAsync<GetRoleListRequest, List<RoleResponse>>(request);
+        return await SendAsync<GetRoleListRequest, List<IdentityRoleResponse>>(request);
     }
 
     public async Task<QueryResponse<RoleEntityResponse>> GetRoleEntity(GetRoleEntityRequest request)
@@ -217,6 +219,11 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     public async Task<CmdResponse> CreateAffiliateSubscription(CreateAffiliateSubscriptionRequest request)
     {
         return await SendVoidAsync(request);
+    }
+
+    public async Task<QueryResponse<List<SubscriptionResponse>>> GetUnregisteredSubscriberList(GetUnregisteredSubscriberListRequest request)
+    {
+        return await SendAsync<GetUnregisteredSubscriberListRequest, List<SubscriptionResponse>>(request);
     }
 
     public async Task<QueryResponse<ExistenceResponse>> CheckContactExistence(CheckContactExistenceRequest request)

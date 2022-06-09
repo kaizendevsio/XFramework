@@ -79,7 +79,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
                 RefreshToken = token.RefreshToken,
                 IdentityGuid = Guid.Parse(credential.IdentityInfo.Guid),
                 CredentialGuid = Guid.Parse(credential.Guid),
-                RoleList = roleList.Adapt<List<RoleResponse>>() 
+                RoleList = roleList.Adapt<List<IdentityRoleResponse>>() 
             }
         };
     }
