@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
+﻿using XFramework.Domain.Generic.Contracts.Requests;
 
-public class DeletePharmacyRequest
+namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
+
+public class DeletePharmacyRequest : RequestBase
 {
-    
+    public Guid? Guid { get; set; }
 }

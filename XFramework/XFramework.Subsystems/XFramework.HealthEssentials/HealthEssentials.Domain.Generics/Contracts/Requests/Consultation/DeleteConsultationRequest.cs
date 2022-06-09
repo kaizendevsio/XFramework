@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+﻿using XFramework.Domain.Generic.Contracts.Requests;
 
-public class DeleteConsultationRequest
+namespace HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+
+public class DeleteConsultationRequest : RequestBase
 {
-    
+    public Guid? Guid { get; set; }
 }

@@ -1,6 +1,11 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+﻿using XFramework.Domain.Generic.Contracts.Requests;
 
-public class UpdateConsultationRequest
+namespace HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+
+public class UpdateConsultationRequest : RequestBase
 {
-    
+    public string? Name { get; set; }
+    public string? ShortName { get; set; }
+    public string? Description { get; set; }
+    public Guid? TypeGuid { get; set; }
 }

@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
+﻿using XFramework.Domain.Generic.Contracts.Requests;
 
-public class DeleteLaboratoryServiceEntityRequest
+namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
+
+public class DeleteLaboratoryServiceEntityRequest : RequestBase
 {
-    
+    public Guid? Guid { get; set; }
 }

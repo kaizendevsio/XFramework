@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+﻿using XFramework.Domain.Generic.Contracts.Requests;
 
-public class GetConsultationPaymentRequest
+namespace HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+
+public class GetConsultationPaymentRequest : RequestBase
 {
     
 }

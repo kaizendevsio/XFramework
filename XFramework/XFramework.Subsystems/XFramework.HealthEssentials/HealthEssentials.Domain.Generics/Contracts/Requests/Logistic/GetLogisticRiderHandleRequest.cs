@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
+﻿using XFramework.Domain.Generic.Contracts.Requests;
 
-public class GetLogisticRiderHandleRequest
+namespace HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
+
+public class GetLogisticRiderHandleRequest : RequestBase
 {
     
 }
