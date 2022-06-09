@@ -8,6 +8,6 @@ public class CreateLaboratoryServiceTypeGroupHandler : BaseSignalRHandler, ISign
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreateLaboratoryServiceEntityGroupRequest, CreateLaboratoryServiceTypeGroupCmd>(connection, mediator);
+        HandleRequestCmd<CreateLaboratoryServiceEntityGroupRequest, CreateLaboratoryServiceEntityGroupCmd>(connection, mediator);
     }
 }

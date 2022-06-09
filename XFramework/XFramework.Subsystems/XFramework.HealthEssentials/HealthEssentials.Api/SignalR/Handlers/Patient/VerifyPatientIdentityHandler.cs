@@ -8,6 +8,6 @@ public class VerifyPatientIdentityHandler : BaseSignalRHandler, ISignalREventHan
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestQuery<VerifyPatientRequest, VerifyPatientIdentityQuery, IdentityValidationResponse>(connection, mediator);
+        HandleRequestQuery<VerifyPatientRequest, VerifyPatientQuery, IdentityValidationResponse>(connection, mediator);
     }
 }

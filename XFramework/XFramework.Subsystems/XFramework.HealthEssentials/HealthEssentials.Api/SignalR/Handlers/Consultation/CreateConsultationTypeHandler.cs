@@ -9,6 +9,6 @@ public class CreateConsultationTypeHandler : BaseSignalRHandler, ISignalREventHa
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreateConsultationTypeRequest, CreateConsultationTypeCmd>(connection, mediator);
+        HandleRequestCmd<CreateConsultationTypeRequest, CreateConsultationEntityCmd>(connection, mediator);
     }
 }
