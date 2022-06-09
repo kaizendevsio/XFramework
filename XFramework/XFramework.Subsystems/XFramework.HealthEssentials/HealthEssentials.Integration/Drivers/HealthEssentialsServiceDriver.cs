@@ -56,7 +56,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeletePharmacyMemberRequest>> DeletePharmacyMember(DeletePharmacyMemberRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatient(VerifyPatientRequest request)
@@ -66,7 +66,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteLogisticRequest>> DeleteLogistic(DeleteLogisticRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     /*public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request)
@@ -91,7 +91,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteLogisticRiderRequest>> DeleteLogisticRider(DeleteLogisticRiderRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<LaboratoryResponse>> GetLaboratory(GetLaboratoryRequest request)
@@ -101,7 +101,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteLaboratoryMemberRequest>> DeleteLaboratoryMember(DeleteLaboratoryMemberRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<List<LaboratoryServiceResponse>>> GetLaboratoryServiceList(GetLaboratoryServiceListRequest request)
@@ -129,9 +129,9 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse> DeleteConsultation(DeleteConsultationRequest request)
+    public async Task<CmdResponse<DeleteConsultationRequest>> DeleteConsultation(DeleteConsultationRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<CreateConsultationTypeGroupRequest>> CreateConsultationTypeGroup(CreateConsultationTypeGroupRequest request)
@@ -146,7 +146,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteDoctorRequest>> DeleteDoctor(DeleteDoctorRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<AddSupportedConsultationRequest>> AddSupportedConsultation(AddSupportedConsultationRequest request)
@@ -171,7 +171,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteLaboratoryRequest>> DeleteLaboratory(DeleteLaboratoryRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<LaboratoryMemberResponse>> GetLaboratoryMember(GetLaboratoryMemberRequest request)
@@ -206,7 +206,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteLaboratoryServiceRequest>> DeleteLaboratoryService(DeleteLaboratoryServiceRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<LaboratoryServiceEntityResponse>> GetLaboratoryServiceEntity(GetLaboratoryServiceEntityRequest request)
@@ -226,7 +226,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteLaboratoryServiceEntityRequest>> DeleteLaboratoryServiceEntity(DeleteLaboratoryServiceEntityRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<LaboratoryServiceEntityGroupResponse>> GetLaboratoryServiceEntityGroup(GetLaboratoryServiceEntityGroupRequest request)
@@ -246,7 +246,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteLaboratoryServiceEntityGroupRequest>> DeleteLaboratoryServiceEntityGroup(DeleteLaboratoryServiceEntityGroupRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<List<ConsultationEntityResponse>>> GetConsultationEntityList(GetConsultationEntityListRequest request)
@@ -271,7 +271,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteConsultationEntityRequest>> DeleteConsultationEntity(DeleteConsultationEntityRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<ConsultationPaymentResponse>> GetConsultationPayment(GetConsultationPaymentRequest request)
@@ -321,7 +321,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeleteLogisticRiderHandleRequest>> DeleteLogisticRiderHandle(DeleteLogisticRiderHandleRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<LogisticRiderResponse>> GetLogisticRider(GetLogisticRiderRequest request)
@@ -366,7 +366,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeletePharmacyRequest>> DeletePharmacy(DeletePharmacyRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<PharmacyMemberResponse>> GetPharmacyMember(GetPharmacyMemberRequest request)
@@ -411,7 +411,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<CmdResponse<DeletePatientRequest>> DeletePatient(DeletePatientRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request)

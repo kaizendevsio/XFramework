@@ -185,7 +185,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<QueryResponse<ConsultationResponse>> GetConsultation(GetConsultationRequest request);
     public Task<CmdResponse<CreateConsultationRequest>> CreateConsultation(CreateConsultationRequest request);
     public Task<CmdResponse<UpdateConsultationRequest>> UpdateConsultation(UpdateConsultationRequest request);
-    public Task<CmdResponse> DeleteConsultation(DeleteConsultationRequest request);
+    public Task<CmdResponse<DeleteConsultationRequest>> DeleteConsultation(DeleteConsultationRequest request);
     #endregion
     #endregion
     
