@@ -11,11 +11,10 @@ public class CreateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
     
     public async Task<CmdResponse<CreateConsultationEntityCmd>> Handle(CreateConsultationEntityCmd request, CancellationToken cancellationToken)
     {
-        var type = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
-            .AsNoTracking()
+        var entityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
             .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", cancellationToken: cancellationToken);
        
-        if (type is null)
+        if (entityGroup is null)
         {
             return new ()
             {
@@ -26,7 +25,7 @@ public class CreateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
 
         var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.ConsultationEntity>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        entity.GroupId = type.Id;
+        entity.Group = entityGroup;
         
         _dataLayer.HealthEssentialsContext.ConsultationEntities.Add(entity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

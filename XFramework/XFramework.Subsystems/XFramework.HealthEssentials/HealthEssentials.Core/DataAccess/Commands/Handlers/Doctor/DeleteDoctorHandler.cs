@@ -10,6 +10,30 @@ public class DeleteDoctorHandler : CommandBaseHandler, IRequestHandler<DeleteDoc
     }
     public async Task<CmdResponse<DeleteDoctorCmd>> Handle(DeleteDoctorCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingRecord = await _dataLayer.HealthEssentialsContext.Doctors
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (existingRecord is null)
+        {
+            return new ()
+            {
+                Message = $"Doctor with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        existingRecord.IsDeleted = true;
+        existingRecord.IsEnabled = false;
+
+        _dataLayer.HealthEssentialsContext.Update(existingRecord);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+
+        return new()
+        {
+            Message = $"Doctor with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true
+        };
+
     }
 }

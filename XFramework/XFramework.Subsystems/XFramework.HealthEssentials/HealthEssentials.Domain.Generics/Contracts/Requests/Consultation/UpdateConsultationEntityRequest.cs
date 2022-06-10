@@ -7,8 +7,7 @@ public class UpdateConsultationEntityRequest : RequestBase
 {
     public string Name { get; set; } = null!;
     public string? Description { get; set; }
-    public string Guid { get; set; } = null!;
-    public long GroupId { get; set; }
+    public long GroupGuid { get; set; }
     public int? SortOrder { get; set; }
 
     public ConsultationEntityGroup Group { get; set; } = null!;

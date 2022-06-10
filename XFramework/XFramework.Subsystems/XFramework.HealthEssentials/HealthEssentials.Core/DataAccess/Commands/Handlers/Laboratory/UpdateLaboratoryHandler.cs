@@ -11,7 +11,8 @@ public class UpdateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Updat
     
     public async Task<CmdResponse<UpdateLaboratoryCmd>> Handle(UpdateLaboratoryCmd request, CancellationToken cancellationToken)
     {
-        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
         if (laboratory is null)
         {
             return new ()
@@ -20,6 +21,10 @@ public class UpdateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Updat
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
+        
+        
+        
+        
         
         laboratory.Status = (int) request.Status;
         _dataLayer.HealthEssentialsContext.Update(laboratory);
