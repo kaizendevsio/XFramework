@@ -47,6 +47,7 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
         entity.PasswordByte = hashPasswordByte;
         entity.IdentityInfoId = identityInfo.Id;
         entity.ApplicationId = application.Id;
+        entity.IsEnabled = true;
 
         await _dataLayer.IdentityCredentials.AddAsync(entity, cancellationToken);
             

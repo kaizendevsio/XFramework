@@ -22,14 +22,22 @@ public class GetCredentialListHandler : QueryBaseHandler, IRequestHandler<GetCre
         {
             return new ()
             {
-                Message = $"Identity with Guid {request.ApplicationGuid} does not exist",
+                Message = $"Application with guid '{request.ApplicationGuid}' not found",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
         var result = await _dataLayer.IdentityCredentials
             .Where(i => i.ApplicationId == appEntity.Id)
+            .Include(i => i.IdentityInfo)
+            .Include(i => i.IdentityRoles)
+            .ThenInclude(i => i.RoleEntity)
+            .Include(i => i.IdentityContacts)
+            .ThenInclude(i => i.Entity)
+            .OrderBy(i => i.CreatedAt)
+            .Take(request.PageSize)
             .AsNoTracking()
+            .AsSplitQuery()
             .ToListAsync(cancellationToken: cancellationToken);
 
         if (!result.Any())

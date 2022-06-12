@@ -63,11 +63,11 @@ public partial class SessionState
 
                 if (checkVerification.HttpStatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Accepted))
                 {
-                    if(await HandleFailure(checkVerification, action, true ,"There was an error while trying to sign you in: Account verification failure. Please try again")) return new()
+                    /*if(await HandleFailure(checkVerification, action, true ,"There was an error while trying to sign you in: Account verification failure. Please try again")) return new()
                     {
                         HttpStatusCode = HttpStatusCode.BadRequest,
                         IsSuccess = false
-                    };
+                    };*/
                 }
 
                 if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
