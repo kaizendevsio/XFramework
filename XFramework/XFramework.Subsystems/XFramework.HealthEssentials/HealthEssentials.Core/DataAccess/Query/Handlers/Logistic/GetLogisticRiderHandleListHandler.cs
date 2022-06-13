@@ -10,6 +10,28 @@ public class GetLogisticRiderHandleListHandler : QueryBaseHandler, IRequestHandl
     }
     public async Task<QueryResponse<List<LogisticRiderHandleResponse>>> Handle(GetLogisticRiderHandleListQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var logisticRiderHandle = await _dataLayer.HealthEssentialsContext.LogisticRiderHandles
+            .AsNoTracking()
+            .OrderBy(i => i.CreatedAt)
+            .Take(request.PageSize)
+            .ToListAsync(CancellationToken.None);
+
+        if (!logisticRiderHandle.Any())
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No Logistic Rider Handle Found",
+                IsSuccess = true
+            };
+        }
+        
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Logistic Rider Handle Found",
+            IsSuccess = true,
+            Response = logisticRiderHandle.Adapt<List<LogisticRiderHandleResponse>>()
+        };
     }
 }

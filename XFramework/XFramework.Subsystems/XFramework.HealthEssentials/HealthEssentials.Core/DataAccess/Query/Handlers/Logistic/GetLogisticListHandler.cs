@@ -11,7 +11,7 @@ public class GetLogisticListHandler : QueryBaseHandler, IRequestHandler<GetLogis
 
     public async Task<QueryResponse<List<LogisticResponse>>> Handle(GetLogisticListQuery request, CancellationToken cancellationToken)
     {
-        var Logistic = await _dataLayer.HealthEssentialsContext.Logistics
+        var logistic = await _dataLayer.HealthEssentialsContext.Logistics
             .AsNoTracking()
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
@@ -19,7 +19,7 @@ public class GetLogisticListHandler : QueryBaseHandler, IRequestHandler<GetLogis
             .Take(request.PageSize)
             .ToListAsync(CancellationToken.None);
 
-        if (!Logistic.Any())
+        if (!logistic.Any())
         {
             return new()
             {
@@ -34,7 +34,7 @@ public class GetLogisticListHandler : QueryBaseHandler, IRequestHandler<GetLogis
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Logistic Found",
             IsSuccess = true,
-            Response = Logistic.Adapt<List<LogisticResponse>>()
+            Response = logistic.Adapt<List<LogisticResponse>>()
         };
     }
 }

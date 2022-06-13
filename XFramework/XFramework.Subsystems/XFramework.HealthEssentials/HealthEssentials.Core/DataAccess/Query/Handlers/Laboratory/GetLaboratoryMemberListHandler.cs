@@ -10,6 +10,29 @@ public class GetLaboratoryMemberListHandler : QueryBaseHandler, IRequestHandler<
     }
     public async Task<QueryResponse<List<LaboratoryMemberResponse>>> Handle(GetLaboratoryMemberListQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var laboratoryMember = await _dataLayer.HealthEssentialsContext.LaboratoryMembers
+            .AsNoTracking()
+            .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .OrderBy(i => i.Name)
+            .Take(request.PageSize)
+            .ToListAsync(CancellationToken.None);
+
+        if (!laboratoryMember.Any())
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No Laboratory Member Found",
+                IsSuccess = true
+            };
+        }
+        
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Laboratory Member Found",
+            IsSuccess = true,
+            Response = laboratoryMember.Adapt<List<LaboratoryMemberResponse>>()
+        };
     }
 }
