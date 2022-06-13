@@ -17,16 +17,18 @@ public class UpdateLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRe
         {
             return new()
             {
-                Message = "Laboratory service group with Guid ${request.Guid} does not exist",
+                Message = $"Laboratory service group with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
         var serviceEntityGroup = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.LaboratoryServiceEntityGroup>();
         serviceEntityGroup.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        
 
         var updatedRecord = request.Adapt(existingRecord);
         updatedRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        
         
         _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups.Update(serviceEntityGroup);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
