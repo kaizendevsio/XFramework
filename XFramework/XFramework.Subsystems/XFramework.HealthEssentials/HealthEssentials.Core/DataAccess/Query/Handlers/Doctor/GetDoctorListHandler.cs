@@ -13,13 +13,14 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
     public async Task<QueryResponse<List<DoctorResponse>>> Handle(GetDoctorListQuery request, CancellationToken cancellationToken)
     {
         var doctor = await _dataLayer.HealthEssentialsContext.Doctors
-            .AsNoTracking()
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .Include(i => i.Entity)
             .ThenInclude(i => i.Group)
+            .AsSplitQuery()
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
         
         var mappedDoctors = doctor.Adapt<List<DoctorResponse>>();

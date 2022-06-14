@@ -12,9 +12,12 @@ public class GetPatientListHandler : QueryBaseHandler, IRequestHandler<GetPatien
     public async Task<QueryResponse<List<PatientResponse>>> Handle(GetPatientListQuery request, CancellationToken cancellationToken)
     {
         var patient = await _dataLayer.HealthEssentialsContext.Patients
-            .AsNoTracking()
+            .Include(i => i.Entity)
+            .ThenInclude(i => i.Group)
+            .AsSplitQuery()
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
         if (!patient.Any())

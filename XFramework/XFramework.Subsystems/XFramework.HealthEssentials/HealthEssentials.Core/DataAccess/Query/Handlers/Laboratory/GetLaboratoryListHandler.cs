@@ -15,11 +15,14 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
     public async Task<QueryResponse<List<LaboratoryResponse>>> Handle(GetLaboratoryListQuery request, CancellationToken cancellationToken)
     {
         var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
-            .AsNoTracking()
+            .Include(i => i.Entity) 
+            .ThenInclude(i => i.Group)
+            .AsSplitQuery()
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsNoTracking() 
             .ToListAsync(CancellationToken.None);
 
         if (!laboratory.Any())

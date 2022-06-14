@@ -11,9 +11,13 @@ public class GetLogisticRiderHandleListHandler : QueryBaseHandler, IRequestHandl
     public async Task<QueryResponse<List<LogisticRiderHandleResponse>>> Handle(GetLogisticRiderHandleListQuery request, CancellationToken cancellationToken)
     {
         var logisticRiderHandle = await _dataLayer.HealthEssentialsContext.LogisticRiderHandles
-            .AsNoTracking()
+            .Include(i => i.Logistic)
+            .ThenInclude(i => i.Entity)
+            .Include(i => i.LogisticRider)
+            .AsSplitQuery()
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
         if (!logisticRiderHandle.Any())

@@ -4,17 +4,17 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
 
 public class GetLaboratoryMemberListHandler : QueryBaseHandler, IRequestHandler<GetLaboratoryMemberListQuery, QueryResponse<List<LaboratoryMemberResponse>>>
 {
-    public GetLaboratoryMemberListHandler()
+    public GetLaboratoryMemberListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<QueryResponse<List<LaboratoryMemberResponse>>> Handle(GetLaboratoryMemberListQuery request, CancellationToken cancellationToken)
     {
         var laboratoryMember = await _dataLayer.HealthEssentialsContext.LaboratoryMembers
-            .AsNoTracking()
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
         if (!laboratoryMember.Any())
