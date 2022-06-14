@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
+﻿using IdentityServer.Domain.Generic.Contracts.Responses;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 
 public class DoctorResponse
 {
@@ -16,8 +18,12 @@ public class DoctorResponse
     public string? Clinic { get; set; }
     public string? ClinicAddress { get; set; }
     public decimal? BaseFee { get; set; }
-    public string? PhoneNumber { get; set; }
-    public string? EmailAddress { get; set; }
+    public string? PrcNumber { get; set; }
+    public string? PtrNumber { get; set; }
+    public string? PhilHealthNumber { get; set; }
+    public string? TinNumber { get; set; }
+    public int Status { get; set; }
     
     public DoctorEntityResponse Entity { get; set; } = null!;
+    public CredentialResponse? Credential { get; set; }
 }

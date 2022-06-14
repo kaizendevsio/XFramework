@@ -1,4 +1,7 @@
-﻿namespace IdentityServer.Domain.Generic.Contracts.Responses;
+﻿using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+using XFramework.Domain.Generic.Enums;
+
+namespace IdentityServer.Domain.Generic.Contracts.Responses;
 
 public class IdentityResponse
 {
@@ -14,7 +17,10 @@ public class IdentityResponse
     public string IdentityName { get; set; }
     public string IdentityDescription { get; set; }
     public DateTime Dob { get; set; }
-    public short Gender { get; set; }
+    public Gender Gender { get; set; }
     public bool IsVerified { get; set; }
-    public short CivilStatus { get; set; }
+    public CivilStatus CivilStatus { get; set; }
+    
+    public List<IdentityAddressResponse> IdentityAddresses { get; set; }
+
 }
