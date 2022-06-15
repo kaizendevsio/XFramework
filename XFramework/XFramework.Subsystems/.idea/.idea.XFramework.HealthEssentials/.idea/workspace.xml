@@ -6,21 +6,40 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/../../XnelSystems/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Consultation/DeleteConsultationEntityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Consultation/DeleteConsultationEntityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Consultation/DeleteConsultationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Consultation/DeleteConsultationHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Consultation/UpdateConsultationEntityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Consultation/UpdateConsultationEntityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Consultation/UpdateConsultationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Consultation/UpdateConsultationHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/DeleteDoctorHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/DeleteDoctorHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryMemberHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryServiceEntityGroupHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryServiceEntityGroupHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryServiceEntityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryServiceEntityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryServiceHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryServiceHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryMemberHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryServiceEntityGroupHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryServiceEntityGroupHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryServiceEntityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryServiceEntityHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryServiceHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryServiceHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/DeleteLogisticHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/DeleteLogisticHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/DeleteLogisticRiderHandleHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/DeleteLogisticRiderHandleHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/DeleteLogisticRiderHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/DeleteLogisticRiderHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/UpdateLogisticHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/UpdateLogisticHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/UpdateLogisticRiderHandleHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/UpdateLogisticRiderHandleHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/UpdateLogisticRiderHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Logistic/UpdateLogisticRiderHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Patient/DeletePatientHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Patient/DeletePatientHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/DeletePharmacyHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/DeletePharmacyHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/DeletePharmacyMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/DeletePharmacyMemberHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/UpdatePharmacyHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/UpdatePharmacyHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/UpdatePharmacyMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/UpdatePharmacyMemberHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Consultation/GetConsultationEntityListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Consultation/GetConsultationEntityListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Consultation/GetConsultationListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Consultation/GetConsultationListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryMemberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryMemberListHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryServiceEntityGroupListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryServiceEntityGroupListHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryServiceEntityListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryServiceEntityListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryServiceListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryServiceListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticListHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticRiderHandleListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticRiderHandleListHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticRiderListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticRiderListHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Patient/GetPatientListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Patient/GetPatientListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/GetPharmacyListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/GetPharmacyListHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/GetPharmacyMemberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/GetPharmacyMemberListHandler.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -174,7 +193,8 @@
       <workItem from="1655080800274" duration="1935000" />
       <workItem from="1655109997726" duration="4957000" />
       <workItem from="1655190962116" duration="1000" />
-      <workItem from="1655201794462" duration="3782000" />
+      <workItem from="1655201794462" duration="4442000" />
+      <workItem from="1655256931595" duration="1591000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>
@@ -260,7 +280,14 @@
       <option name="project" value="LOCAL" />
       <updated>1655122665699</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="Commit: &#10;- Get List Handlers">
+      <created>1655210672988</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1655210672988</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -294,7 +321,8 @@
     <MESSAGE value="- Refactored HealthEssentialsServiceDriver.cs" />
     <MESSAGE value="Commit&#10;- Consultation CRUD Handlers&#10;- Laboratory CRUD Handlers&#10;- Doctor CRUD Handlers" />
     <MESSAGE value="Commit:&#10;- Query Get List Handlers" />
-    <option name="LAST_COMMIT_MESSAGE" value="Commit:&#10;- Query Get List Handlers" />
+    <MESSAGE value="Commit: &#10;- Get List Handlers" />
+    <option name="LAST_COMMIT_MESSAGE" value="Commit: &#10;- Get List Handlers" />
     <option name="GROUP_MULTIFILE_MERGE_BY_DIRECTORY" value="true" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">

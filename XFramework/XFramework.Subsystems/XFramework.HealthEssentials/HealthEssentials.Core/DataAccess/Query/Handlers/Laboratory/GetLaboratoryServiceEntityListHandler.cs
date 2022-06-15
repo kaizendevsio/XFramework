@@ -4,10 +4,11 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
 
 public class GetLaboratoryServiceEntityListHandler : QueryBaseHandler, IRequestHandler<GetLaboratoryServiceEntityListQuery, QueryResponse<List<LaboratoryServiceEntityResponse>>>
 {
-    public GetLaboratoryServiceEntityListHandler()
+    public GetLaboratoryServiceEntityListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> Handle(GetLaboratoryServiceEntityListQuery request, CancellationToken cancellationToken)
     {
         var laboratoryServiceEntity = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities

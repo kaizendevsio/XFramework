@@ -6,16 +6,17 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Logistic;
 
 public class UpdateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHandler<UpdateLogisticRiderHandleCmd, CmdResponse<UpdateLogisticRiderHandleCmd>>
 {
-    public UpdateLogisticRiderHandleHandler()
+    public UpdateLogisticRiderHandleHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<UpdateLogisticRiderHandleCmd>> Handle(UpdateLogisticRiderHandleCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.LogisticRiderHandles
+        var existingLogisticRiderHandle = await _dataLayer.HealthEssentialsContext.LogisticRiderHandles
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
 
-        if (existingRecord == null)
+        if (existingLogisticRiderHandle == null)
         {
             return new()
             {
@@ -58,23 +59,23 @@ public class UpdateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
             Status = (short) GenericStatusType.Approved
         };
 
-        var updatedRecord = request.Adapt(existingRecord);
-        updatedRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        updatedRecord.Logistic = logistic;
-        updatedRecord.LogisticRider = rider;
+        var updatedLogisticRiderHandle = request.Adapt(existingLogisticRiderHandle);
+        updatedLogisticRiderHandle.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        updatedLogisticRiderHandle.Logistic = logistic;
+        updatedLogisticRiderHandle.LogisticRider = rider;
 
 
-        _dataLayer.HealthEssentialsContext.LogisticRiderHandles.Update(existingRecord);
+        _dataLayer.HealthEssentialsContext.LogisticRiderHandles.Update(updatedLogisticRiderHandle);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Logistic rider handle with Guid {existingRecord.Guid} updated successfully",
+            Message = $"Logistic rider handle with Guid {updatedLogisticRiderHandle.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(existingRecord.Guid)
+                Guid = Guid.Parse(updatedLogisticRiderHandle.Guid)
             }
         };
     }

@@ -10,14 +10,14 @@ public class UpdateLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
     }
     public async Task<CmdResponse<UpdateLaboratoryServiceCmd>> Handle(UpdateLaboratoryServiceCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.LaboratoryServices
+        var existingLaboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         
-        if (existingRecord is null)
+        if (existingLaboratoryService is null)
         {
             return new ()
             {
-                Message = $"Service with Guid {request.Guid} does not exist",
+                Message = $"Laboratory Service with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -36,22 +36,22 @@ public class UpdateLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
         
         var unit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(i => i.Guid == $"{request.UnitGuid}", cancellationToken: cancellationToken);
 
-        var updatedRecord = request.Adapt(existingRecord);
-        updatedRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        updatedRecord.Entity = serviceEntity;
-        updatedRecord.Unit = unit;
+        var updatedLaboratoryService = request.Adapt(existingLaboratoryService);
+        updatedLaboratoryService.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        updatedLaboratoryService.Entity = serviceEntity;
+        updatedLaboratoryService.Unit = unit;
         
-        _dataLayer.HealthEssentialsContext.Update(updatedRecord);
+        _dataLayer.HealthEssentialsContext.Update(updatedLaboratoryService);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Laboratory service with Guid {updatedRecord.Guid} updated successfully",
+            Message = $"Laboratory service with Guid {updatedLaboratoryService.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(updatedRecord.Guid)
+                Guid = Guid.Parse(updatedLaboratoryService.Guid)
             }
         };
     }

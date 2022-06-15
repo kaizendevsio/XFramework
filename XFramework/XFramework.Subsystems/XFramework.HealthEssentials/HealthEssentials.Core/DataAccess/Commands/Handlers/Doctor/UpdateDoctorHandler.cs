@@ -11,9 +11,9 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
 
     public async Task<CmdResponse<UpdateDoctorCmd>> Handle(UpdateDoctorCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.Doctors
+        var existingDoctor = await _dataLayer.HealthEssentialsContext.Doctors
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-        if (existingRecord is null)
+        if (existingDoctor is null)
         {
             return new ()
             {
@@ -22,8 +22,8 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
             };
         }
         
-        existingRecord.Status = (int) request.Status;
-        _dataLayer.HealthEssentialsContext.Update(existingRecord);
+        existingDoctor.Status = (int) request.Status;
+        _dataLayer.HealthEssentialsContext.Update(existingDoctor);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()

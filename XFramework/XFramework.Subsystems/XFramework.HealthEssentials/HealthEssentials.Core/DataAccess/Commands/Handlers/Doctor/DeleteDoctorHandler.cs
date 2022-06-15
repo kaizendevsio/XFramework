@@ -4,16 +4,17 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Doctor;
 
 public class DeleteDoctorHandler : CommandBaseHandler, IRequestHandler<DeleteDoctorCmd, CmdResponse<DeleteDoctorCmd>>
 {
-    public DeleteDoctorHandler()
+    public DeleteDoctorHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<DeleteDoctorCmd>> Handle(DeleteDoctorCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.Doctors
+        var existingDoctor = await _dataLayer.HealthEssentialsContext.Doctors
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
         
-        if (existingRecord is null)
+        if (existingDoctor is null)
         {
             return new ()
             {
@@ -22,10 +23,10 @@ public class DeleteDoctorHandler : CommandBaseHandler, IRequestHandler<DeleteDoc
             };
         }
         
-        existingRecord.IsDeleted = true;
-        existingRecord.IsEnabled = false;
+        existingDoctor.IsDeleted = true;
+        existingDoctor.IsEnabled = false;
 
-        _dataLayer.HealthEssentialsContext.Update(existingRecord);
+        _dataLayer.HealthEssentialsContext.Update(existingDoctor);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()

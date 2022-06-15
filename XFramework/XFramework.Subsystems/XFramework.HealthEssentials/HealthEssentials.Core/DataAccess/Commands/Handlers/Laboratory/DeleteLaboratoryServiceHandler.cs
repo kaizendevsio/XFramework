@@ -10,10 +10,10 @@ public class DeleteLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
     }
     public async Task<CmdResponse<DeleteLaboratoryServiceCmd>> Handle(DeleteLaboratoryServiceCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.LaboratoryServices
+        var existingLaboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
 
-        if (existingRecord == null)
+        if (existingLaboratoryService == null)
         {
             return new()
             {
@@ -22,10 +22,10 @@ public class DeleteLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
             };
         }
         
-        existingRecord.IsDeleted = true;
-        existingRecord.IsEnabled = false;
+        existingLaboratoryService.IsDeleted = true;
+        existingLaboratoryService.IsEnabled = false;
 
-        _dataLayer.HealthEssentialsContext.Update(existingRecord);
+        _dataLayer.HealthEssentialsContext.Update(existingLaboratoryService);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()

@@ -4,16 +4,17 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 
 public class DeleteConsultationEntityHandler : CommandBaseHandler, IRequestHandler<DeleteConsultationEntityCmd, CmdResponse<DeleteConsultationEntityCmd>>
 {
-    public DeleteConsultationEntityHandler()
+    public DeleteConsultationEntityHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<DeleteConsultationEntityCmd>> Handle(DeleteConsultationEntityCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.ConsultationEntities
+        var existingConsultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
 
-        if (existingRecord == null)
+        if (existingConsultationEntity == null)
         {
             return new()
             {
@@ -22,10 +23,10 @@ public class DeleteConsultationEntityHandler : CommandBaseHandler, IRequestHandl
             };
         }
         
-        existingRecord.IsDeleted = true;
-        existingRecord.IsEnabled = false;
+        existingConsultationEntity.IsDeleted = true;
+        existingConsultationEntity.IsEnabled = false;
         
-        _dataLayer.HealthEssentialsContext.Update(existingRecord);
+        _dataLayer.HealthEssentialsContext.Update(existingConsultationEntity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()

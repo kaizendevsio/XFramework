@@ -4,10 +4,11 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Consultation;
 
 public class GetConsultationEntityListHandler : QueryBaseHandler, IRequestHandler<GetConsultationEntityListQuery, QueryResponse<List<ConsultationEntityResponse>>>
 {
-    public GetConsultationEntityListHandler()
+    public GetConsultationEntityListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<QueryResponse<List<ConsultationEntityResponse>>> Handle(GetConsultationEntityListQuery request, CancellationToken cancellationToken)
     {
         var consultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities

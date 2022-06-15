@@ -16,7 +16,7 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
         {
             return new ()
             {
-                Message = $"Laboratory with Guid {request.Guid} not found",
+                Message = $"Pharmacy with Guid {request.Guid} not found",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -27,7 +27,7 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
         
         return new()
         {
-            Message = "Laboratory updated successfully",
+            Message = "Pharmacy updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             Request = request
         };

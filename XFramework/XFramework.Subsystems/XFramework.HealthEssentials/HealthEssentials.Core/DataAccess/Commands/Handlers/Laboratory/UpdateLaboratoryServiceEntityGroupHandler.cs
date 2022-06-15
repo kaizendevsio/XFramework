@@ -10,14 +10,14 @@ public class UpdateLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRe
     }
     public async Task<CmdResponse<UpdateLaboratoryServiceEntityGroupCmd>> Handle(UpdateLaboratoryServiceEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups
+        var existingLaboratoryServiceEntityGroup = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
 
-        if (existingRecord == null)
+        if (existingLaboratoryServiceEntityGroup == null)
         {
             return new()
             {
-                Message = $"Laboratory service group with Guid {request.Guid} does not exist",
+                Message = $"Laboratory service entity group with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -26,21 +26,21 @@ public class UpdateLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRe
         serviceEntityGroup.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         
 
-        var updatedRecord = request.Adapt(existingRecord);
-        updatedRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        var updatedLaboratoryServiceEntityGroup = request.Adapt(existingLaboratoryServiceEntityGroup);
+        updatedLaboratoryServiceEntityGroup.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         
         
-        _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups.Update(serviceEntityGroup);
+        _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups.Update(updatedLaboratoryServiceEntityGroup);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Laboratory service type group with Guid {updatedRecord.Guid} updated successfully",
+            Message = $"Laboratory service entity group with Guid {updatedLaboratoryServiceEntityGroup.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(updatedRecord.Guid)
+                Guid = Guid.Parse(updatedLaboratoryServiceEntityGroup.Guid)
             }
         };
     }

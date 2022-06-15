@@ -4,16 +4,17 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Logistic;
 
 public class DeleteLogisticHandler : CommandBaseHandler, IRequestHandler<DeleteLogisticCmd, CmdResponse<DeleteLogisticCmd>>
 {
-    public DeleteLogisticHandler()
+    public DeleteLogisticHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<DeleteLogisticCmd>> Handle(DeleteLogisticCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.Logistics
+        var existingLogistic = await _dataLayer.HealthEssentialsContext.Logistics
             .FirstOrDefaultAsync(x => x.Guid ==$"{request.Guid}", CancellationToken.None);
 
-        if (existingRecord == null)
+        if (existingLogistic == null)
         {
             return new()
             {
@@ -22,10 +23,10 @@ public class DeleteLogisticHandler : CommandBaseHandler, IRequestHandler<DeleteL
             };
         }
 
-        existingRecord.IsDeleted = true;
-        existingRecord.IsEnabled = false;
+        existingLogistic.IsDeleted = true;
+        existingLogistic.IsEnabled = false;
 
-        _dataLayer.HealthEssentialsContext.Update(existingRecord);
+        _dataLayer.HealthEssentialsContext.Update(existingLogistic);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()

@@ -5,16 +5,17 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Logistic;
 
 public class UpdateLogisticHandler : CommandBaseHandler, IRequestHandler<UpdateLogisticCmd, CmdResponse<UpdateLogisticCmd>>
 {
-    public UpdateLogisticHandler()
+    public UpdateLogisticHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<UpdateLogisticCmd>> Handle(UpdateLogisticCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.Logistics
+        var existingLogistic = await _dataLayer.HealthEssentialsContext.Logistics
             .FirstOrDefaultAsync(x => x.Guid ==$"{request.Guid}", CancellationToken.None);
 
-        if (existingRecord == null)
+        if (existingLogistic == null)
         {
             return new()
             {
@@ -23,21 +24,21 @@ public class UpdateLogisticHandler : CommandBaseHandler, IRequestHandler<UpdateL
             };
         }
         
-        var updateRecord = request.Adapt(existingRecord);
-        updateRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        updateRecord.Status = (int) GenericStatusType.Pending;
+        var updateLogistic = request.Adapt(existingLogistic);
+        updateLogistic.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        updateLogistic.Status = (int) GenericStatusType.Pending;
 
-        _dataLayer.HealthEssentialsContext.Logistics.Update(updateRecord);
+        _dataLayer.HealthEssentialsContext.Logistics.Update(updateLogistic);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Logistic with Guid {updateRecord.Guid} updated successfully",
+            Message = $"Logistic with Guid {updateLogistic.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(updateRecord.Guid)
+                Guid = Guid.Parse(updateLogistic.Guid)
             }
         };
     }

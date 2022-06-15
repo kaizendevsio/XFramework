@@ -5,16 +5,17 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 
 public class UpdateConsultationEntityHandler : CommandBaseHandler, IRequestHandler<UpdateConsultationEntityCmd, CmdResponse<UpdateConsultationEntityCmd>>
 {
-    public UpdateConsultationEntityHandler()
+    public UpdateConsultationEntityHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<UpdateConsultationEntityCmd>> Handle(UpdateConsultationEntityCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.ConsultationEntities
+        var existingConsultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
 
-        if (existingRecord == null)
+        if (existingConsultationEntity == null)
         {
             return new()
             {
@@ -35,21 +36,21 @@ public class UpdateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
             };
         }
 
-        var updatedRecord = request.Adapt(existingRecord);
-        updatedRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        updatedRecord.Group = entityGroup;
+        var updatedConsultationEntity = request.Adapt(existingConsultationEntity);
+        updatedConsultationEntity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        updatedConsultationEntity.Group = entityGroup;
         
-        _dataLayer.HealthEssentialsContext.ConsultationEntities.Update(updatedRecord);
+        _dataLayer.HealthEssentialsContext.ConsultationEntities.Update(updatedConsultationEntity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Consultation entity with Guid {updatedRecord.Guid} updated successfully",
+            Message = $"Consultation entity with Guid {updatedConsultationEntity.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(updatedRecord.Guid)
+                Guid = Guid.Parse(updatedConsultationEntity.Guid)
             }
         };
     }

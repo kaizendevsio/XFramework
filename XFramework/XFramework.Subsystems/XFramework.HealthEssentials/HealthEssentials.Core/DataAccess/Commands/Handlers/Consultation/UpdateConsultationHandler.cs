@@ -4,15 +4,16 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 
 public class UpdateConsultationHandler : CommandBaseHandler, IRequestHandler<UpdateConsultationCmd, CmdResponse<UpdateConsultationCmd>>
 {
-    public UpdateConsultationHandler()
+    public UpdateConsultationHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<UpdateConsultationCmd>> Handle(UpdateConsultationCmd request, CancellationToken cancellationToken)
     {
-        var existingRecord = await _dataLayer.HealthEssentialsContext.Consultations
+        var existingConsultation = await _dataLayer.HealthEssentialsContext.Consultations
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
-        if (existingRecord is null)
+        if (existingConsultation is null)
         {
             return new ()
             {
@@ -32,21 +33,21 @@ public class UpdateConsultationHandler : CommandBaseHandler, IRequestHandler<Upd
             }; 
         }
         
-        var updatedRecord = request.Adapt(existingRecord);
-        updatedRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        updatedRecord.Entity = entity;
+        var updatedConsultation = request.Adapt(existingConsultation);
+        updatedConsultation.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        updatedConsultation.Entity = entity;
         
-        _dataLayer.HealthEssentialsContext.Update(updatedRecord);
+        _dataLayer.HealthEssentialsContext.Update(updatedConsultation);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Consultation with Guid {updatedRecord.Guid} updated successfully",
+            Message = $"Consultation with Guid {updatedConsultation.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(updatedRecord.Guid)
+                Guid = Guid.Parse(updatedConsultation.Guid)
             }
         };
     }

@@ -4,10 +4,11 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Pharmacy;
 
 public class GetPharmacyMemberListHandler : QueryBaseHandler, IRequestHandler<GetPharmacyMemberListQuery, QueryResponse<List<PharmacyMemberResponse>>>
 {
-    public GetPharmacyMemberListHandler()
+    public GetPharmacyMemberListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<QueryResponse<List<PharmacyMemberResponse>>> Handle(GetPharmacyMemberListQuery request, CancellationToken cancellationToken)
     {
         var pharmacyMember = await _dataLayer.HealthEssentialsContext.PharmacyMembers
