@@ -107,8 +107,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
     
     #endregion
-    
-    
+
     #region Laboratory Portal
     #region Laboratory
     public Task<QueryResponse<LaboratoryResponse>> GetLaboratory(GetLaboratoryRequest request);

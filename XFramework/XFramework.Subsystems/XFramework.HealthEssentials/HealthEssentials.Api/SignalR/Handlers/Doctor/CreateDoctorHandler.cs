@@ -4,10 +4,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Doctor;
 
-public class UpdateDoctorIdentityHandler : BaseSignalRHandler, ISignalREventHandler
+public class CreateDoctorHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<UpdateDoctorRequest, UpdateDoctorCmd>(connection, mediator);
+        HandleRequestCmd<CreateDoctorRequest, CreateDoctorCmd>(connection, mediator);
     }
 }

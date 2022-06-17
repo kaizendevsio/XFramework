@@ -1,4 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
+using HealthEssentials.Domain.DataTransferObjects;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
 

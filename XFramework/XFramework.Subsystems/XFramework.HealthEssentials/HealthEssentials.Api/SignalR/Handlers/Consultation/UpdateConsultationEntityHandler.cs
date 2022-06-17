@@ -5,10 +5,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Consultation;
 
-public class CreateConsultationTypeHandler : BaseSignalRHandler, ISignalREventHandler
+public class UpdateConsultationEntityHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreateConsultationTypeRequest, CreateConsultationEntityCmd>(connection, mediator);
+        HandleRequestCmd<UpdateConsultationEntityRequest, UpdateConsultationEntityCmd>(connection, mediator);
     }
 }

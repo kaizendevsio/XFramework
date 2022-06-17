@@ -4,10 +4,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Pharmacy;
 
-public class CreatePharmacyIdentityHandler : BaseSignalRHandler, ISignalREventHandler
+public class UpdatePharmacyMemberHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreatePharmacyMemberRequest, CreatePharmacyMemberCmd>(connection, mediator);
+        HandleRequestCmd<UpdatePharmacyMemberRequest, UpdatePharmacyMemberCmd>(connection, mediator);
     }
 }

@@ -5,7 +5,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Doctor;
 
-public class GetDoctorIdentityHandler : BaseSignalRHandler, ISignalREventHandler
+public class GetDoctorHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {

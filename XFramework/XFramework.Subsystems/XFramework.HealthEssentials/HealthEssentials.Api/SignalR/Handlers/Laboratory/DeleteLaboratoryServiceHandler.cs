@@ -4,10 +4,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Laboratory;
 
-public class CreateLaboratoryServiceTypeHandler : BaseSignalRHandler, ISignalREventHandler
+public class DeleteLaboratoryServiceHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreateLaboratoryServiceEntityRequest, CreateLaboratoryServiceEntityCmd>(connection, mediator);
+        HandleRequestCmd<DeleteLaboratoryServiceRequest, DeleteLaboratoryServiceCmd>(connection, mediator);
     }
 }

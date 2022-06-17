@@ -1,13 +1,14 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
 using HealthEssentials.Core.DataAccess.Query.Entity.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Patient;
 
-public class CreatePatientIdentityHandler : BaseSignalRHandler, ISignalREventHandler
+public class GetPatientHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreatePatientRequest, CreatePatientCmd>(connection, mediator);
+        HandleRequestQuery<GetPatientRequest, GetPatientQuery, PatientResponse>(connection, mediator);
     }
 }
