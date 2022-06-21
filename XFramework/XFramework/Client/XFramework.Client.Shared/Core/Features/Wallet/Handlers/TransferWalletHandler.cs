@@ -52,7 +52,7 @@ public partial class WalletState
         
         private bool HandleValidation(out Unit handle)
         {
-            var wallet = CurrentState.WalletList.FirstOrDefault(i => i.WalletType.Guid == CurrentState.SendWalletVm.WalletEntityGuid);
+            var wallet = CurrentState.WalletList.FirstOrDefault(i => i.WalletEntity.Guid == CurrentState.SendWalletVm.WalletEntityGuid);
             if (wallet is null)
             {
                 SweetAlertService.FireAsync("Error", "You don't have the selected wallet");

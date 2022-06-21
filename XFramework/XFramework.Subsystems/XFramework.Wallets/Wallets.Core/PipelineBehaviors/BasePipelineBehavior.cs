@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using Sentry;
 using TypeSupport.Extensions;
 
 namespace Wallets.Core.PipelineBehaviors;
@@ -38,6 +39,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         }
         catch (Exception e)
         {
+            SentrySdk.CaptureMessage(e.ToString());
             //_dataLayer.RollBack();
             var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
 

@@ -1,4 +1,5 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Responses;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 
@@ -26,4 +27,5 @@ public class DoctorResponse
     
     public DoctorEntityResponse Entity { get; set; } = null!;
     public CredentialResponse? Credential { get; set; }
+    public List<StorageFileResponse>? Files { get; set; }
 }

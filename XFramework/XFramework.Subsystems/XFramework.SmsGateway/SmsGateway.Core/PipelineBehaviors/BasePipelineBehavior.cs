@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using Sentry;
 using TypeSupport.Extensions;
 
 namespace SmsGateway.Core.PipelineBehaviors;
@@ -32,6 +33,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         }
         catch (Exception e)
         {
+            SentrySdk.CaptureMessage(e.ToString());
             var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
                 
             responseInstance?.GetType().GetProperty("Message")?

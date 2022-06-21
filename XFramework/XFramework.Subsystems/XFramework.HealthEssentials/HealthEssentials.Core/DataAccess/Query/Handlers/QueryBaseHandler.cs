@@ -3,6 +3,10 @@
     public class QueryBaseHandler
     {
         public IDataLayer _dataLayer;
+        public IDataLayer _dataLayer2;
+        public IDataLayer _dataLayer3;
+        public IDataLayer _dataLayer4;
+        public IDataLayer _dataLayer5;
         
         public async Task<Domain.DataTransferObjects.Application> GetApplication(Guid? guid)
         {

@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
 public class PharmacyResponse
 {
@@ -18,7 +20,10 @@ public class PharmacyResponse
     public string? Website { get; set; }
     public string? Logo { get; set; }
     
-    public virtual List<PharmacyLocationResponse> PharmacyLocations { get; set; }
+    public virtual List<PharmacyLocationResponse>? PharmacyLocations { get; set; }
+    public List<PharmacyMemberResponse>? PharmacyMembers { get; set; }
+
     
-    public PharmacyEntityResponse Entity { get; set; } = null!;
+    public PharmacyEntityResponse? Entity { get; set; }
+    public List<StorageFileResponse>? Files { get; set; }
 }

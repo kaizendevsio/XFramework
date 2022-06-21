@@ -12,6 +12,7 @@ public class Program
             .UseDefaultServiceProvider(options => options.ValidateScopes = false)
             .ConfigureWebHostDefaults(webBuilder =>
             {
+                #if !DEBUG
                 webBuilder.UseSentry(o =>
                 {
                     o.Dsn = "https://1c265c3f6d7c426d841462ae49306e51@o1146205.ingest.sentry.io/6504164";
@@ -21,6 +22,8 @@ public class Program
                     // We recommend adjusting this value in production.
                     o.TracesSampleRate = 1.0;
                 });
+                #endif
+
                 webBuilder.UseStartup<Startup>(); 
             });
 }

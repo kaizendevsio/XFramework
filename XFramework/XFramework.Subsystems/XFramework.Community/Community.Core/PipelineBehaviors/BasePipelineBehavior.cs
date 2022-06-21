@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using Sentry;
 using TypeSupport.Extensions;
 
 namespace Community.Core.PipelineBehaviors;
@@ -39,7 +40,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         }
         catch (Exception e)
         {
-            _dataLayer.RollBack();
+            SentrySdk.CaptureMessage(e.ToString());
             var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
                 
             responseInstance?.GetType().GetProperty("Message")?

@@ -15,5 +15,5 @@ public class WalletResponse
     public long? WalletTypeId { get; set; }
     public decimal? Balance { get; set; }
     
-    public virtual WalletEntityResponse WalletType { get; set; }
+    public virtual WalletEntityResponse WalletEntity { get; set; }
 }

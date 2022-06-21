@@ -1,4 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Administrator;
+using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.Generics.Strings;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 
@@ -6,13 +7,19 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Administrator;
 
 public class GetPendingRegistrationCompletionListHandler : QueryBaseHandler, IRequestHandler<GetPendingRegistrationCompletionListQuery, QueryResponse<List<CredentialResponse>>>
 {
-    public GetPendingRegistrationCompletionListHandler(IDataLayer dataLayer)
+    private readonly IDataLayer _dataLayer2;
+    private readonly IDataLayer _dataLayer3;
+    private readonly IDataLayer _dataLayer4;
+
+    public GetPendingRegistrationCompletionListHandler(IDataLayer dataLayer, IDataLayer dataLayer2, IDataLayer dataLayer3, IDataLayer dataLayer4)
     {
+        _dataLayer2 = dataLayer2;
+        _dataLayer3 = dataLayer3;
+        _dataLayer4 = dataLayer4;
         _dataLayer = dataLayer;
     }
 
-    public async Task<QueryResponse<List<CredentialResponse>>> Handle(GetPendingRegistrationCompletionListQuery request,
-        CancellationToken cancellationToken)
+    public async Task<QueryResponse<List<CredentialResponse>>> Handle(GetPendingRegistrationCompletionListQuery request, CancellationToken cancellationToken)
     {
         var application = await GetApplication(request.RequestServer.ApplicationId);
 
@@ -22,8 +29,6 @@ public class GetPendingRegistrationCompletionListHandler : QueryBaseHandler, IRe
             .ThenInclude(i => i.Entity)
             .Include(i => i.IdentityRoles)
             .ThenInclude(i => i.RoleEntity)
-            .AsNoTracking()
-            .AsSplitQuery()
             .Where(c => c.Application == application)
             .Where(i => i.IdentityRoles.Any(p =>
                 p.RoleEntity.Guid == $"{IdentityRoleStrings.Doctor}" ||
@@ -31,6 +36,8 @@ public class GetPendingRegistrationCompletionListHandler : QueryBaseHandler, IRe
                 p.RoleEntity.Guid == $"{IdentityRoleStrings.Logistics}" ||
                 p.RoleEntity.Guid == $"{IdentityRoleStrings.Hospital}" ||
                 p.RoleEntity.Guid == $"{IdentityRoleStrings.Laboratory}"))
+            .AsNoTracking()
+            .AsSplitQuery()
             .ToListAsync(CancellationToken.None);
 
         if (credentials.Count == 0)
@@ -43,24 +50,25 @@ public class GetPendingRegistrationCompletionListHandler : QueryBaseHandler, IRe
             };
         }
 
-        var pendingRegistrationCompletion = (
-            from credential in credentials
-            let doctor = _dataLayer.HealthEssentialsContext.Doctors.Any(i => i.CredentialId == credential.Id)
-            where !doctor
-            let pharmacy = _dataLayer.HealthEssentialsContext.PharmacyMembers.Any(i => i.CredentialId == credential.Id)
-            where !pharmacy
-            let laboratory = _dataLayer.HealthEssentialsContext.LaboratoryMembers.Any(i => i.CredentialId == credential.Id)
-            where !laboratory
-            let logistic = _dataLayer.HealthEssentialsContext.LogisticRiders.Any(i => i.CredentialId == credential.Id)
-            where !logistic
-            select credential.Adapt<CredentialResponse>()).ToList();
+        var pendingRegistrationCompletion = new List<IdentityCredential>();
+        foreach (var credential in credentials)
+        {
+            var doctor = _dataLayer.HealthEssentialsContext.Doctors.AnyAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
+            var pharmacy = _dataLayer2.HealthEssentialsContext.PharmacyMembers.AnyAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
+            var laboratory = _dataLayer3.HealthEssentialsContext.LaboratoryMembers.AnyAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
+            var logistic = _dataLayer4.HealthEssentialsContext.LogisticRiders.AnyAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
+            
+            await Task.WhenAll( doctor, pharmacy, laboratory, logistic);
+            
+            if (!doctor.Result && !pharmacy.Result && !laboratory.Result && !logistic.Result) pendingRegistrationCompletion.Add(credential);
+        }
 
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Pending registration completion found",
             IsSuccess = true,
-            Response = pendingRegistrationCompletion
+            Response = pendingRegistrationCompletion.Adapt<List<CredentialResponse>>()
         };
     }
 }

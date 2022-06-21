@@ -35,6 +35,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<QueryResponse<IdentityValidationResponse>> VerifyDoctorIdentity(VerifyDoctorIdentityRequest request);
     public Task<QueryResponse<DoctorResponse>> GetDoctorIdentity(GetDoctorIdentityRequest request);
     public Task<QueryResponse<List<DoctorResponse>>> GetDoctorList(GetDoctorListRequest request);
+    public Task<QueryResponse<DoctorResponse>> GetDoctor(GetDoctorRequest request);
     public Task<CmdResponse<AddSupportedConsultationRequest>> AddSupportedConsultation(AddSupportedConsultationRequest request);
     public Task<QueryResponse<List<DoctorConsultationResponse>>> GetSupportedConsultationList(GetSupportedConsultationListRequest request);
     
@@ -56,6 +57,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<UpdatePharmacyMemberRequest>> UpdatePharmacyMember(UpdatePharmacyMemberRequest request);
     public Task<CmdResponse<CreatePharmacyIdentityRequest>> CreatePharmacyIdentity(CreatePharmacyIdentityRequest request);
     public Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request);
+    public Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request);
     
     #endregion
     
@@ -63,7 +65,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     
     public Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request);
     public Task<CmdResponse<CreateLogisticRequest>> CreateLogistic(CreateLogisticRequest request);
-    public Task<CmdResponse<UpdateLogisticRiderRequest>> UpdatePharmacyMember(UpdateLogisticRiderRequest request);
+    public Task<CmdResponse<UpdateLogisticRiderRequest>> UpdateLogisticRider(UpdateLogisticRiderRequest request);
     public Task<CmdResponse<CreateLogisticRiderHandleRequest>> CreateLogisticRiderHandle(CreateLogisticRiderHandleRequest request);
     public Task<CmdResponse<CreateLogisticRiderRequest>> CreateLogisticRider(CreateLogisticRiderRequest request);
     public Task<QueryResponse<List<LogisticResponse>>> GetLogisticList(GetLogisticListRequest request);

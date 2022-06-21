@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
+﻿using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 
 public class LaboratoryLocationResponse
 {
@@ -21,4 +23,14 @@ public class LaboratoryLocationResponse
     public string? Country { get; set; }
     public string Guid { get; set; } = null!;
     public int? Status { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public string? Website { get; set; }
+    public string? AlternativePhone { get; set; }
+    
+    public AddressBarangayResponse BarangayNavigation { get; set; }
+    public AddressCityResponse CityNavigation { get; set; }
+    public AddressCountryResponse CountryNavigation { get; set; }
+    public AddressProvinceResponse ProvinceNavigation { get; set; }
+    public AddressRegionResponse RegionNavigation { get; set; }
 }

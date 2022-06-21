@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using Sentry;
 using TypeSupport.Extensions;
 
 namespace HealthEssentials.Core.PipelineBehaviors
@@ -31,8 +32,8 @@ namespace HealthEssentials.Core.PipelineBehaviors
             }
             catch (Exception e)
             {
+                SentrySdk.CaptureMessage(e.ToString());
                 var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
-                
                 responseInstance?.GetType().GetProperty("Message")?
                     .SetValue(responseInstance, $"Error: {e.Message};", null);
                 

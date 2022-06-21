@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+﻿using IdentityServer.Domain.Generic.Contracts.Responses;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
 public class PharmacyMemberResponse
 {
@@ -11,5 +13,7 @@ public class PharmacyMemberResponse
     public string? Value { get; set; }
     public string Guid { get; set; } = null!;
     public string Name { get; set; } = null!;
+    public int Status { get; set; }
 
+    public CredentialResponse? Credential { get; set; }
 }
