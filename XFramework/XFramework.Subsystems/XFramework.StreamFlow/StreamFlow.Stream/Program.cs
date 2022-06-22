@@ -14,6 +14,7 @@ namespace StreamFlow.Stream
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
+                    #if !DEBUG
                     webBuilder.UseSentry(o =>
                     {
                         o.Dsn = "https://f160d850e62148bd9e278c22fdc4c104@o1146205.ingest.sentry.io/6504187";
@@ -23,6 +24,8 @@ namespace StreamFlow.Stream
                         // We recommend adjusting this value in production.
                         o.TracesSampleRate = 1.0;
                     });
+                    #endif
+
                     webBuilder.UseStartup<Startup>(); 
                 });
         

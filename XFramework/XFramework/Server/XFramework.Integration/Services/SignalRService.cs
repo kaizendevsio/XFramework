@@ -219,7 +219,7 @@ public class SignalRService : ISignalRService
         catch (Exception e)
         {
             Console.WriteLine($"Failed to connect to StreamFlow server: {e.Message} : {e.InnerException?.Message}");
-            if (retry >= StreamFlowConfiguration.MaxRetry) return false;
+            //if (retry >= StreamFlowConfiguration.MaxRetry) return false;
             Console.WriteLine($"Retrying in {StreamFlowConfiguration.ReconnectDelay}ms");
             await Task.Delay(StreamFlowConfiguration.ReconnectDelay);
             goto RetryConnection;

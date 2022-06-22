@@ -14,13 +14,13 @@ public class LaboratoryLocationResponse
     public string? UnitNumber { get; set; }
     public string? Street { get; set; }
     public string? Building { get; set; }
-    public string? Barangay { get; set; }
-    public string? City { get; set; }
+    public long? Barangay { get; set; }
+    public long? City { get; set; }
     public string? Subdivision { get; set; }
-    public string? Region { get; set; }
+    public long? Region { get; set; }
     public bool? MainAddress { get; set; }
-    public string? Province { get; set; }
-    public string? Country { get; set; }
+    public long? Province { get; set; }
+    public long? Country { get; set; }
     public string Guid { get; set; } = null!;
     public int? Status { get; set; }
     public string? Phone { get; set; }
@@ -28,9 +28,9 @@ public class LaboratoryLocationResponse
     public string? Website { get; set; }
     public string? AlternativePhone { get; set; }
     
-    public AddressBarangayResponse BarangayNavigation { get; set; }
-    public AddressCityResponse CityNavigation { get; set; }
-    public AddressCountryResponse CountryNavigation { get; set; }
-    public AddressProvinceResponse ProvinceNavigation { get; set; }
-    public AddressRegionResponse RegionNavigation { get; set; }
+    public AddressBarangayResponse? BarangayNavigation { get; set; }
+    public AddressCityResponse? CityNavigation { get; set; }
+    public AddressCountryResponse? CountryNavigation { get; set; }
+    public AddressProvinceResponse? ProvinceNavigation { get; set; }
+    public AddressRegionResponse? RegionNavigation { get; set; }
 }

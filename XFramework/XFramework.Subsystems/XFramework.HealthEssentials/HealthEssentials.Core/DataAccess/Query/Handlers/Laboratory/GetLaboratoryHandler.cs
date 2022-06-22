@@ -1,4 +1,5 @@
-﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+﻿using System.Text.Json;
+using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
@@ -38,7 +39,7 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
         
         var response = laboratory.Adapt<LaboratoryResponse>();
 
-        response.Files = GetFilesList(response);
+        await GetFilesList(response);
         await GetMemberList(response);
         await GetBranchList(response);
 
@@ -51,6 +52,14 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
         };        
     }
 
+    private async Task GetFilesList(LaboratoryResponse response)
+    {
+        response.Files = _dataLayer.XnelSystemsContext.StorageFiles
+            .Where(i => i.IdentifierGuid == response.Guid)
+            .AsNoTracking()
+            .ToList()
+            .Adapt<List<StorageFileResponse>>();
+    }
     private async Task GetBranchList(LaboratoryResponse response)
     {
         for (var index = 0; index < response.LaboratoryLocations.Count; index++)
@@ -63,30 +72,27 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
 
             var countryNavigation = _dataLayer.XnelSystemsContext.AddressCountries
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Id == int.Parse(countryId), CancellationToken.None);
+                .FirstOrDefaultAsync(i => i.Id == countryId, CancellationToken.None);
             var regionNavigation = _dataLayer2.XnelSystemsContext.AddressRegions
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Id == int.Parse(countryId), CancellationToken.None);
+                .FirstOrDefaultAsync(i => i.Id == regionId, CancellationToken.None);
             var provinceNavigation = _dataLayer3.XnelSystemsContext.AddressProvinces
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Id == int.Parse(countryId), CancellationToken.None);
+                .FirstOrDefaultAsync(i => i.Id == provinceId, CancellationToken.None);
             var cityNavigation = _dataLayer4.XnelSystemsContext.AddressCities
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Id == int.Parse(countryId), CancellationToken.None);
+                .FirstOrDefaultAsync(i => i.Id == cityId, CancellationToken.None);
             var barangayNavigation = _dataLayer5.XnelSystemsContext.AddressBarangays
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Id == int.Parse(countryId), CancellationToken.None);
+                .FirstOrDefaultAsync(i => i.Id == barangayId, CancellationToken.None);
 
             await Task.WhenAll(countryNavigation, regionNavigation, provinceNavigation, cityNavigation, barangayNavigation);
 
-            response.LaboratoryLocations[index].CountryNavigation =
-                countryNavigation.Result?.Adapt<AddressCountryResponse>();
+            response.LaboratoryLocations[index].CountryNavigation = countryNavigation.Result?.Adapt<AddressCountryResponse>();
             response.LaboratoryLocations[index].RegionNavigation = regionNavigation.Result?.Adapt<AddressRegionResponse>();
-            response.LaboratoryLocations[index].ProvinceNavigation =
-                provinceNavigation.Result?.Adapt<AddressProvinceResponse>();
+            response.LaboratoryLocations[index].ProvinceNavigation = provinceNavigation.Result?.Adapt<AddressProvinceResponse>();
             response.LaboratoryLocations[index].CityNavigation = cityNavigation.Result?.Adapt<AddressCityResponse>();
-            response.LaboratoryLocations[index].BarangayNavigation =
-                barangayNavigation?.Result.Adapt<AddressBarangayResponse>();
+            response.LaboratoryLocations[index].BarangayNavigation = barangayNavigation?.Result.Adapt<AddressBarangayResponse>();
         }
     }
 
@@ -105,13 +111,5 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
                 .Adapt<CredentialResponse>();
         }
     }
-
-    private List<StorageFileResponse> GetFilesList(LaboratoryResponse response)
-    {
-        return _dataLayer.XnelSystemsContext.StorageFiles
-            .Where(i => i.IdentifierGuid == response.Guid)
-            .AsNoTracking()
-            .ToList()
-            .Adapt<List<StorageFileResponse>>();
-    }
+    
 }

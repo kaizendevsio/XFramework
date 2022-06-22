@@ -11,8 +11,8 @@ public class PharmacyMemberResponse
     public long CredentialId { get; set; }
     public long PharmacyId { get; set; }
     public string? Value { get; set; }
-    public string Guid { get; set; } = null!;
-    public string Name { get; set; } = null!;
+    public string? Guid { get; set; }
+    public string? Name { get; set; }
     public int Status { get; set; }
 
     public CredentialResponse? Credential { get; set; }
