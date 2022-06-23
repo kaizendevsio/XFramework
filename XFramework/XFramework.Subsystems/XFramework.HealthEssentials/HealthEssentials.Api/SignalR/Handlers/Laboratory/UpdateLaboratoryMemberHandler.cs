@@ -1,6 +1,5 @@
-﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Doctor;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
+using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Laboratory;

@@ -49,10 +49,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Controllers" />
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\HealthEssentials.Core\HealthEssentials.Core.csproj" />
       <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
       <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj" />

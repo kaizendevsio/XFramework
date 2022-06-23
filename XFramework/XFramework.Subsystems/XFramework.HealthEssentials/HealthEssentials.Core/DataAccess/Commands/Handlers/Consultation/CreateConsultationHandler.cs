@@ -11,34 +11,33 @@ public class CreateConsultationHandler : CommandBaseHandler, IRequestHandler<Cre
     
     public async Task<CmdResponse<CreateConsultationCmd>> Handle(CreateConsultationCmd request, CancellationToken cancellationToken)
     {
-        var type = await _dataLayer.HealthEssentialsContext.ConsultationEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.TypeGuid}", cancellationToken: cancellationToken);
+        var entity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", CancellationToken.None);
        
-        if (type is null)
+        if (entity is null)
         {
             return new ()
             {
-                Message = $"Consultation type with Guid {request.TypeGuid} does not exist",
+                Message = $"Consultation entity with Guid {request.EntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
-        var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Consultation>();
-        entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        entity.EntityId = type.Id;
+        var newRecord = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Consultation>();
+        newRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        newRecord.Entity = entity;
         
-        _dataLayer.HealthEssentialsContext.Consultations.Add(entity);
+        _dataLayer.HealthEssentialsContext.Add(newRecord);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Consultation with Guid {entity.Guid} created successfully",
+            Message = $"Consultation with Guid {newRecord.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(entity.Guid)
+                Guid = Guid.Parse(newRecord.Guid)
             }
         };
     }

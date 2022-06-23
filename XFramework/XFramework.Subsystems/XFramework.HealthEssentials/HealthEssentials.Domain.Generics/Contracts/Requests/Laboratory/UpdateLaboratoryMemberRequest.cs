@@ -4,13 +4,10 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 
 public class UpdateLaboratoryMemberRequest : RequestBase
 {
-    public DateTime CreatedAt { get; set; }
-    public DateTime ModifiedAt { get; set; }
-    public bool? IsEnabled { get; set; }
-    public bool IsDeleted { get; set; }
-    public long CredentialId { get; set; }
-    public long LaboratoryId { get; set; }
-    public string? Value { get; set; }
-    public string Name { get; set; } = null!;
-    public GenericStatusType Status { get; set; }
+    public Guid? LaboratoryGuid { get; set; }
+    public Guid? CredentialGuid { get; set; }
+    public string? ProfessionalName { get; set; }
+    public string? Email { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string? Description { get; set; }
 }

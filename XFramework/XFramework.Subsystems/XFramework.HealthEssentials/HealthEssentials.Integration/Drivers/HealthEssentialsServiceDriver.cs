@@ -31,39 +31,69 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
 
-    public async Task<CmdResponse<UpdateDoctorIdentityRequest>> UpdateDoctorIdentity(UpdateDoctorIdentityRequest request)
+    public async Task<CmdResponse<UpdateDoctorRequest>> UpdateDoctor(UpdateDoctorRequest request)
     {
         return await SendAsync(request);
     }
 
-    public async Task<QueryResponse<IdentityValidationResponse>> VerifyDoctorIdentity(VerifyDoctorIdentityRequest request)
+    public async Task<QueryResponse<IdentityValidationResponse>> VerifyDoctor(VerifyDoctorRequest request)
     {
-        return await SendAsync<VerifyDoctorIdentityRequest, IdentityValidationResponse>(request);
+        return await SendAsync<VerifyDoctorRequest, IdentityValidationResponse>(request);
     }
 
-    public async Task<QueryResponse<IdentityValidationResponse>> VerifyPharmacyIdentity(VerifyPharmacyIdentityRequest request)
+    public async Task<QueryResponse<List<PharmacyMemberResponse>>> GetPharmacyMemberList(GetPharmacyMemberListRequest request)
     {
-        return await SendAsync<VerifyPharmacyIdentityRequest, IdentityValidationResponse>(request);
+        return await SendAsync<GetPharmacyMemberListRequest, List<PharmacyMemberResponse>>(request);
     }
 
-    public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatientIdentity(VerifyPatientIdentityRequest request)
+    public async Task<QueryResponse<IdentityValidationResponse>> VerifyPharmacyMember(VerifyPharmacyMemberRequest request)
     {
-        return await SendAsync<VerifyPatientIdentityRequest, IdentityValidationResponse>(request);
+        return await SendAsync<VerifyPharmacyMemberRequest, IdentityValidationResponse>(request);
     }
 
-    public async Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request)
+    public async Task<CmdResponse<UpdatePharmacyMemberRequest>> UpdatePharmacyMember(UpdatePharmacyMemberRequest request)
     {
-        return await SendAsync<GetPharmacyRequest, PharmacyResponse>(request);
+        return await SendAsync(request);
     }
 
-    public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request)
+    public async Task<CmdResponse<DeletePharmacyMemberRequest>> DeletePharmacyMember(DeletePharmacyMemberRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatient(VerifyPatientRequest request)
+    {
+        return await SendAsync<VerifyPatientRequest, IdentityValidationResponse>(request);
+    }
+
+    public async Task<CmdResponse<DeleteLogisticRequest>> DeleteLogistic(DeleteLogisticRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    /*public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request)
     {
         return await SendAsync<VerifyLogisticIdentityRequest, IdentityValidationResponse>(request);
+    }*/
+
+    public async Task<QueryResponse<LogisticRiderHandleResponse>> GetLogisticRiderHandle(GetLogisticRiderHandleRequest request)
+    {
+        return await SendAsync<GetLogisticRiderHandleRequest, LogisticRiderHandleResponse>(request);
     }
 
-    public async Task<QueryResponse<IdentityValidationResponse>> VerifyLaboratoryIdentity(VerifyLaboratoryIdentityRequest request)
+    public async Task<QueryResponse<List<LogisticRiderHandleResponse>>> GetLogisticRiderHandleList(GetLogisticRiderHandleListRequest request)
     {
-        return await SendAsync<VerifyLaboratoryIdentityRequest, IdentityValidationResponse>(request);
+        return await SendAsync<GetLogisticRiderHandleListRequest, List<LogisticRiderHandleResponse>>(request);
+    }
+
+    public async Task<QueryResponse<IdentityValidationResponse>> VerifyLaboratoryMember(VerifyLaboratoryMemberRequest request)
+    {
+        return await SendAsync<VerifyLaboratoryMemberRequest, IdentityValidationResponse>(request);
+    }
+
+    public async Task<CmdResponse<DeleteLogisticRiderRequest>> DeleteLogisticRider(DeleteLogisticRiderRequest request)
+    {
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<LaboratoryResponse>> GetLaboratory(GetLaboratoryRequest request)
@@ -71,12 +101,37 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync<GetLaboratoryRequest, LaboratoryResponse>(request);
     }
 
-    public async Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> GetLaboratoryServiceList(GetLaboratoryServiceListRequest request)
+    public async Task<CmdResponse<DeleteLaboratoryMemberRequest>> DeleteLaboratoryMember(DeleteLaboratoryMemberRequest request)
     {
-        return await SendAsync<GetLaboratoryServiceListRequest, List<LaboratoryServiceEntityResponse>>(request);
+        return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreateConsultationRequest>> CreateConsultationEntity(CreateConsultationRequest request)
+    public async Task<QueryResponse<List<LaboratoryServiceResponse>>> GetLaboratoryServiceList(GetLaboratoryServiceListRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceListRequest, List<LaboratoryServiceResponse>>(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryServiceResponse>> GetLaboratoryService(GetLaboratoryServiceRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceRequest, LaboratoryServiceResponse>(request);
+    }
+
+    public async Task<QueryResponse<ConsultationResponse>> GetConsultation(GetConsultationRequest request)
+    {
+        return await SendAsync<GetConsultationRequest, ConsultationResponse>(request);
+    }
+
+    public async Task<CmdResponse<CreateConsultationRequest>> CreateConsultation(CreateConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateConsultationRequest>> UpdateConsultation(UpdateConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteConsultationRequest>> DeleteConsultation(DeleteConsultationRequest request)
     {
         return await SendAsync(request);
     }
@@ -91,9 +146,9 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<QueryResponse<DoctorResponse>> GetDoctor(GetDoctorRequest request)
+    public async Task<CmdResponse<DeleteDoctorRequest>> DeleteDoctor(DeleteDoctorRequest request)
     {
-        return await SendAsync<GetDoctorRequest, DoctorResponse>(request);
+        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<AddSupportedConsultationRequest>> AddSupportedConsultation(AddSupportedConsultationRequest request)
@@ -101,12 +156,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<QueryResponse<List<CredentialResponse>>> GetPendingRegistrationCompletionList(GetPendingRegistrationCompletionListRequest request)
-    {
-        return await SendAsync<GetPendingRegistrationCompletionListRequest, List<CredentialResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateDoctorIdentityRequest>> CreateDoctorIdentity(CreateDoctorIdentityRequest request)
+    public async Task<CmdResponse<CreateDoctorRequest>> CreateDoctor(CreateDoctorRequest request)
     {
         return await SendAsync(request);
     }
@@ -121,12 +171,27 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<CmdResponse<DeleteLaboratoryRequest>> DeleteLaboratory(DeleteLaboratoryRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryMemberResponse>> GetLaboratoryMember(GetLaboratoryMemberRequest request)
+    {
+        return await SendAsync<GetLaboratoryMemberRequest, LaboratoryMemberResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryMemberResponse>>> GetLaboratoryMemberList(GetLaboratoryMemberListRequest request)
+    {
+        return await SendAsync<GetLaboratoryMemberListRequest, List<LaboratoryMemberResponse>>(request);
+    }
+
     public async Task<CmdResponse<UpdateLaboratoryMemberRequest>> UpdateLaboratoryMember(UpdateLaboratoryMemberRequest request)
     {
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreateLaboratoryIdentityRequest>> CreateLaboratoryIdentity(CreateLaboratoryIdentityRequest request)
+    public async Task<CmdResponse<CreateLaboratoryMemberRequest>> CreateLaboratoryMember(CreateLaboratoryMemberRequest request)
     {
         return await SendAsync(request);
     }
@@ -136,14 +201,104 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreateLaboratoryServiceTypeGroupRequest>> CreateLaboratoryServiceTypeGroup(CreateLaboratoryServiceTypeGroupRequest request)
+    public async Task<CmdResponse<UpdateLaboratoryServiceRequest>> UpdateLaboratoryService(UpdateLaboratoryServiceRequest request)
     {
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreateLaboratoryServiceTypeRequest>> CreateLaboratoryServiceType(CreateLaboratoryServiceTypeRequest request)
+    public async Task<CmdResponse<DeleteLaboratoryServiceRequest>> DeleteLaboratoryService(DeleteLaboratoryServiceRequest request)
     {
         return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryServiceEntityResponse>> GetLaboratoryServiceEntity(GetLaboratoryServiceEntityRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceEntityRequest, LaboratoryServiceEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> GetLaboratoryServiceEntityList(GetLaboratoryServiceEntityListRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceEntityListRequest, List<LaboratoryServiceEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryServiceEntityRequest>> UpdateLaboratoryServiceEntity(UpdateLaboratoryServiceEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryServiceEntityRequest>> DeleteLaboratoryServiceEntity(DeleteLaboratoryServiceEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryServiceEntityGroupResponse>> GetLaboratoryServiceEntityGroup(GetLaboratoryServiceEntityGroupRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceEntityGroupRequest, LaboratoryServiceEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryServiceEntityGroupResponse>>> GetLaboratoryServiceEntityGroupList(GetLaboratoryServiceEntityGroupListRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceEntityGroupListRequest, List<LaboratoryServiceEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryServiceEntityGroupRequest>> UpdateLaboratoryServiceEntityGroup(UpdateLaboratoryServiceEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryServiceEntityGroupRequest>> DeleteLaboratoryServiceEntityGroup(DeleteLaboratoryServiceEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<List<ConsultationEntityResponse>>> GetConsultationEntityList(GetConsultationEntityListRequest request)
+    {
+        return await SendAsync<GetConsultationEntityListRequest, List<ConsultationEntityResponse>>(request);
+    }
+
+    public async Task<QueryResponse<ConsultationEntityResponse>> GetConsultationEntity(GetConsultationEntityRequest request)
+    {
+        return await SendAsync<GetConsultationEntityRequest, ConsultationEntityResponse>(request);
+    }
+
+    public async Task<CmdResponse<CreateConsultationEntityRequest>> CreateConsultationEntity(CreateConsultationEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateConsultationEntityRequest>> UpdateConsultationEntity(UpdateConsultationEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteConsultationEntityRequest>> DeleteConsultationEntity(DeleteConsultationEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<ConsultationPaymentResponse>> GetConsultationPayment(GetConsultationPaymentRequest request)
+    {
+        return await SendAsync<GetConsultationPaymentRequest, ConsultationPaymentResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<ConsultationPaymentResponse>>> GetConsultationPaymentList(GetConsultationPaymentListRequest request)
+    {
+        throw new NotImplementedException();
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryServiceEntityGroupRequest>> CreateLaboratoryServiceEntityGroup(CreateLaboratoryServiceEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryServiceEntityRequest>> CreateLaboratoryServiceEntity(CreateLaboratoryServiceEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LogisticResponse>> GetLogistic(GetLogisticRequest request)
+    {
+        return await SendAsync<GetLogisticRequest, LogisticResponse>(request);
     }
 
     public async Task<CmdResponse<CreateLogisticRequest>> CreateLogistic(CreateLogisticRequest request)
@@ -151,7 +306,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<UpdateLogisticRiderRequest>> UpdateLogisticRider(UpdateLogisticRiderRequest request)
+    public async Task<CmdResponse<UpdateLogisticRequest>> UpdateLogistic(UpdateLogisticRequest request)
     {
         return await SendAsync(request);
     }
@@ -161,14 +316,44 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<CmdResponse<UpdateLogisticRiderHandleRequest>> UpdateLogisticRiderHandle(UpdateLogisticRiderHandleRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLogisticRiderHandleRequest>> DeleteLogisticRiderHandle(DeleteLogisticRiderHandleRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LogisticRiderResponse>> GetLogisticRider(GetLogisticRiderRequest request)
+    {
+        return await SendAsync<GetLogisticRiderRequest, LogisticRiderResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LogisticRiderResponse>>> GetLogisticRiderList(GetLogisticRiderListRequest request)
+    {
+        return await SendAsync<GetLogisticRiderListRequest, List<LogisticRiderResponse>>(request);
+    }
+
     public async Task<CmdResponse<CreateLogisticRiderRequest>> CreateLogisticRider(CreateLogisticRiderRequest request)
     {
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreatePatientIdentityRequest>> CreatePatientIdentity(CreatePatientIdentityRequest request)
+    public async Task<CmdResponse<UpdateLogisticRiderRequest>> UpdateLogisticRider(UpdateLogisticRiderRequest request)
     {
         return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<CreatePatientRequest>> CreatePatient(CreatePatientRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request)
+    {
+        return await SendAsync<GetPharmacyRequest, PharmacyResponse>(request);
     }
 
     public async Task<CmdResponse<CreatePharmacyRequest>> CreatePharmacy(CreatePharmacyRequest request)
@@ -181,12 +366,17 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<UpdatePharmacyMemberRequest>> UpdatePharmacyMember(UpdatePharmacyMemberRequest request)
+    public async Task<CmdResponse<DeletePharmacyRequest>> DeletePharmacy(DeletePharmacyRequest request)
     {
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreatePharmacyIdentityRequest>> CreatePharmacyIdentity(CreatePharmacyIdentityRequest request)
+    public async Task<QueryResponse<PharmacyMemberResponse>> GetPharmacyMember(GetPharmacyMemberRequest request)
+    {
+        return await SendAsync<GetPharmacyMemberRequest, PharmacyMemberResponse>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyMemberRequest>> CreatePharmacyMember(CreatePharmacyMemberRequest request)
     {
         return await SendAsync(request);
     }
@@ -194,6 +384,16 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<CmdResponse<CreateConsultationPaymentRequest>> CreateConsultationPayment(CreateConsultationPaymentRequest request)
     {
         return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateConsultationPaymentRequest>> UpdateConsultationPayment(UpdateConsultationPaymentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse> DeleteConsultationPayment(DeleteConsultationPaymentRequest request)
+    {
+        throw new NotImplementedException();
     }
 
     public async Task<QueryResponse<List<ConsultationResponse>>> GetConsultationList(GetConsultationListRequest request)
@@ -211,6 +411,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync<GetLogisticListRequest, List<LogisticResponse>>(request);
     }
 
+    public async Task<CmdResponse<DeletePatientRequest>> DeletePatient(DeletePatientRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request)
     {
         return await SendAsync<GetPharmacyListRequest, List<PharmacyResponse>>(request);
@@ -221,18 +426,29 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync<GetDoctorListRequest, List<DoctorResponse>>(request);
     }
 
-    public async Task<QueryResponse<PatientResponse>> GetPatientIdentity(GetPatientIdentityRequest request)
+
+    public async Task<QueryResponse<PatientResponse>> GetPatient(GetPatientRequest request)
     {
-        return await SendAsync<GetPatientIdentityRequest, PatientResponse>(request);
+        return await SendAsync<GetPatientRequest, PatientResponse>(request);
     }
 
-    public async Task<QueryResponse<DoctorResponse>> GetDoctorIdentity(GetDoctorIdentityRequest request)
+    public async Task<QueryResponse<DoctorResponse>> GetDoctor(GetDoctorRequest request)
     {
-        return await SendAsync<GetDoctorIdentityRequest, DoctorResponse>(request);
+        return await SendAsync<GetDoctorRequest, DoctorResponse>(request);
     }
 
     public async Task<QueryResponse<List<DoctorConsultationResponse>>> GetSupportedConsultationList(GetSupportedConsultationListRequest request)
     {
         return await SendAsync<GetSupportedConsultationListRequest, List<DoctorConsultationResponse>>(request);
+    }
+
+    public async Task<QueryResponse<List<PatientResponse>>> GetPatientList(GetPatientListRequest request)
+    {
+        return await SendAsync<GetPatientListRequest, List<PatientResponse>>(request);
+    }
+ 
+    public async Task<CmdResponse<UpdatePatientRequest>> UpdatePatient(UpdatePatientRequest request)
+    {
+        return await SendAsync(request);
     }
 }   

@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
+using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;

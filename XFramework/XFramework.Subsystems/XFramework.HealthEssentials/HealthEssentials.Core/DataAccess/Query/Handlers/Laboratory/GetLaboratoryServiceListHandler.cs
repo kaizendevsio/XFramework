@@ -11,11 +11,14 @@ public class GetLaboratoryServiceListHandler : QueryBaseHandler, IRequestHandler
     
     public async Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> Handle(GetLaboratoryServiceListQuery request, CancellationToken cancellationToken)
     {
-        var laboratoryServiceEntities = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities
-            .AsNoTracking()
+        var laboratoryServiceEntities = await _dataLayer.HealthEssentialsContext.LaboratoryServices
+            .Include(i => i.Entity)
+            .ThenInclude(i => i.Group)
             .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsSplitQuery()
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
         if (!laboratoryServiceEntities.Any())

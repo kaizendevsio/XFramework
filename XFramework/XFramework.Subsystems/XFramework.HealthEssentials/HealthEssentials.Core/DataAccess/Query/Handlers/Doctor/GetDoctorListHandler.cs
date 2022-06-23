@@ -18,10 +18,12 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
             .Where(i => i.Status == (int) request.Status)
             .Include(i => i.Entity)
             .ThenInclude(i => i.Group)
+            .AsSplitQuery()
             .OrderBy(i => i.Name)
             .AsNoTracking()
             .AsSplitQuery()
             .Take(request.PageSize)
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
         
         
