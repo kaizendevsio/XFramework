@@ -21,7 +21,30 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
             };
         }
         
-        laboratoryMember.Status = (int) request.Status;
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
+        if (credential is null)
+        {
+            return new ()
+            {
+                Message = $"Credential with Guid {request.CredentialGuid} not found",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(i => i.Guid == $"{request.LaboratoryGuid}", cancellationToken: cancellationToken);
+        if (laboratory is null)
+        {
+            return new ()
+            {
+                Message = $"Laboratory with Guid {request.CredentialGuid} not found",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        laboratoryMember = request.Adapt(laboratoryMember);
+        laboratoryMember.CredentialId = credential.Id;
+        laboratoryMember.Laboratory = laboratory;
+        
         _dataLayer.HealthEssentialsContext.Update(laboratoryMember);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         

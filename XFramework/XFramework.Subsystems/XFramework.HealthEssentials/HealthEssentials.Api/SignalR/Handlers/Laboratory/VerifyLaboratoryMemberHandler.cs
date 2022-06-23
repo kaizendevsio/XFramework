@@ -4,10 +4,10 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Laboratory;
 
-public class VerifyLaboratoryIdentityHandler : BaseSignalRHandler, ISignalREventHandler
+public class VerifyLaboratoryMemberHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestQuery<VerifyLaboratoryMemberRequest, VerifyLaboratoryIdentityQuery, IdentityValidationResponse>(connection, mediator);
+        HandleRequestQuery<VerifyLaboratoryMemberRequest, VerifyLaboratoryMemberQuery, IdentityValidationResponse>(connection, mediator);
     }
 }

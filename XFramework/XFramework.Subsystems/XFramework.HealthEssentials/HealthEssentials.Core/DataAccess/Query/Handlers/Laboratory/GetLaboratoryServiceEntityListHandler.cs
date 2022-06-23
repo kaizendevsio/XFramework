@@ -13,10 +13,10 @@ public class GetLaboratoryServiceEntityListHandler : QueryBaseHandler, IRequestH
     {
         var laboratoryServiceEntity = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities
             .Include(i => i.Group)
-            .AsSplitQuery()
-            .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 

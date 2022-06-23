@@ -30,7 +30,14 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:HealthEssentialsService"));
     }
 
-
+    public async Task<QueryResponse<List<CredentialResponse>>> GetPendingRegistrationCompletionList(GetPendingRegistrationCompletionListRequest request)
+    {
+        return await SendAsync<GetPendingRegistrationCompletionListRequest, List<CredentialResponse>>(request);
+    }
+    public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request)
+    {
+        return await SendAsync<VerifyLogisticRiderRequest, IdentityValidationResponse>(request);
+    }
     public async Task<CmdResponse<UpdateDoctorRequest>> UpdateDoctor(UpdateDoctorRequest request)
     {
         return await SendAsync(request);
@@ -71,9 +78,9 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    /*public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request)
+    /*public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticRiderRequest request)
     {
-        return await SendAsync<VerifyLogisticIdentityRequest, IdentityValidationResponse>(request);
+        return await SendAsync<VerifyLogisticRiderRequest, IdentityValidationResponse>(request);
     }*/
 
     public async Task<QueryResponse<LogisticRiderHandleResponse>> GetLogisticRiderHandle(GetLogisticRiderHandleRequest request)

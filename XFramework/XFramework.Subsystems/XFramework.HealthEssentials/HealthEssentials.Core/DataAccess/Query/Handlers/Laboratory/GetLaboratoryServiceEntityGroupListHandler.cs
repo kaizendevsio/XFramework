@@ -12,9 +12,10 @@ public class GetLaboratoryServiceEntityGroupListHandler : QueryBaseHandler, IReq
     public async Task<QueryResponse<List<LaboratoryServiceEntityGroupResponse>>> Handle(GetLaboratoryServiceEntityGroupListQuery request, CancellationToken cancellationToken)
     {
         var laboratoryServiceEntityGroup = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups
-            .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 

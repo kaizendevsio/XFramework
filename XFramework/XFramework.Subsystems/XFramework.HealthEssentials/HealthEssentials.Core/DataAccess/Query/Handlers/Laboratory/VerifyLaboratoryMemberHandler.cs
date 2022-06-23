@@ -5,14 +5,14 @@ using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
 
-public class VerifyLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<VerifyLaboratoryIdentityQuery, QueryResponse<IdentityValidationResponse>>
+public class VerifyLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<VerifyLaboratoryMemberQuery, QueryResponse<IdentityValidationResponse>>
 {
     public VerifyLaboratoryMemberHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<QueryResponse<IdentityValidationResponse>> Handle(VerifyLaboratoryIdentityQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<IdentityValidationResponse>> Handle(VerifyLaboratoryMemberQuery request, CancellationToken cancellationToken)
     {
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
             .AsNoTracking()

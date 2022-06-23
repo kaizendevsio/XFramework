@@ -14,11 +14,11 @@ public class GetPharmacyListHandler : QueryBaseHandler, IRequestHandler<GetPharm
         var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
             .Include(i => i.PharmacyLocations)
             .Include(i => i.Entity)
-            .AsSplitQuery()
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 

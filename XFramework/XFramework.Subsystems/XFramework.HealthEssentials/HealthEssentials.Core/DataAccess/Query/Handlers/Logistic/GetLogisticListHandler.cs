@@ -13,11 +13,11 @@ public class GetLogisticListHandler : QueryBaseHandler, IRequestHandler<GetLogis
     {
         var logistic = await _dataLayer.HealthEssentialsContext.Logistics
             .Include(i => i.Entity)
-            .AsSplitQuery()
-            .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 

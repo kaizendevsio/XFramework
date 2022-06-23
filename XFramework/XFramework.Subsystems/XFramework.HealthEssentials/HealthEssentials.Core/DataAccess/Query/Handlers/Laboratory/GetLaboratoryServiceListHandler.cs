@@ -14,7 +14,7 @@ public class GetLaboratoryServiceListHandler : QueryBaseHandler, IRequestHandler
         var laboratoryServiceEntities = await _dataLayer.HealthEssentialsContext.LaboratoryServices
             .Include(i => i.Entity)
             .ThenInclude(i => i.Group)
-            .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

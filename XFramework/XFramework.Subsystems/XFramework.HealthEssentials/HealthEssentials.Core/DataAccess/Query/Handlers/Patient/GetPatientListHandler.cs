@@ -15,9 +15,9 @@ public class GetPatientListHandler : QueryBaseHandler, IRequestHandler<GetPatien
         var patient = await _dataLayer.HealthEssentialsContext.Patients
             .Include(i => i.Entity)
             .ThenInclude(i => i.Group)
-            .AsSplitQuery()
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
+            .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 

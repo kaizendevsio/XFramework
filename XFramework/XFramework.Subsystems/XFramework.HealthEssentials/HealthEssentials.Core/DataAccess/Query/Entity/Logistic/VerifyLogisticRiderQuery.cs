@@ -2,6 +2,6 @@
 
 namespace HealthEssentials.Core.DataAccess.Query.Entity.Logistic;
 
-public class VerifyLogisticIdentityQuery : VerifyLogisticIdentityRequest, IRequest<QueryResponse<IdentityValidationResponse>>
+public class VerifyLogisticRiderQuery : VerifyLogisticRiderRequest, IRequest<QueryResponse<IdentityValidationResponse>>
 {
 }

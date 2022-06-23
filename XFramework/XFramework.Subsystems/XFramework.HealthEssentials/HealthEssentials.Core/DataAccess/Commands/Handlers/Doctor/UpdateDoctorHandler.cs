@@ -11,8 +11,7 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
 
     public async Task<CmdResponse<UpdateDoctorCmd>> Handle(UpdateDoctorCmd request, CancellationToken cancellationToken)
     {
-        var existingDoctor = await _dataLayer.HealthEssentialsContext.Doctors
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        var existingDoctor = await _dataLayer.HealthEssentialsContext.Doctors.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
         if (existingDoctor is null)
         {
             return new ()
@@ -22,7 +21,30 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
             };
         }
         
-        existingDoctor.Status = (int) request.Status;
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
+        if (credential is null)
+        {
+            return new ()
+            {
+                Message = $"Credential with Guid {request.CredentialGuid} not found",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", cancellationToken: cancellationToken);
+        if (entity is null)
+        {
+            return new ()
+            {
+                Message = $"Entity with Guid {request.EntityGuid} not found",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        existingDoctor = request.Adapt(existingDoctor);
+        existingDoctor.CredentialId = credential.Id;
+        existingDoctor.Entity = entity;
+        
         _dataLayer.HealthEssentialsContext.Update(existingDoctor);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         

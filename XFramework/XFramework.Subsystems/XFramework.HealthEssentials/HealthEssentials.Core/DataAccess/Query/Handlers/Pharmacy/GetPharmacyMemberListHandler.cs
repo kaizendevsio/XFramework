@@ -13,10 +13,10 @@ public class GetPharmacyMemberListHandler : QueryBaseHandler, IRequestHandler<Ge
     {
         var pharmacyMember = await _dataLayer.HealthEssentialsContext.PharmacyMembers
             .Include(i => i.Pharmacy)
-            .AsSplitQuery()
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsSplitQuery()
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 

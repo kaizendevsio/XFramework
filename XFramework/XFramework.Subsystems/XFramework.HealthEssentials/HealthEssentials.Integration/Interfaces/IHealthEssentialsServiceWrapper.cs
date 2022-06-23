@@ -62,7 +62,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeletePharmacyRequest>> DeletePharmacy(DeletePharmacyRequest request);
     #endregion
     
-    // Pharmacy Identity -> Pharmacy Member
     #region Pharmacy Member
     
     public Task<QueryResponse<PharmacyMemberResponse>> GetPharmacyMember(GetPharmacyMemberRequest request);
@@ -85,12 +84,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<UpdateLogisticRequest>> UpdateLogistic(UpdateLogisticRequest request);
     public Task<CmdResponse<DeleteLogisticRequest>> DeleteLogistic(DeleteLogisticRequest request);
     #endregion
-    
-    // Logistic Identity not in database
-    /*#region Logistic Identity
-    public Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticIdentityRequest request);
-    #endregion*/
-    
+
     #region Logistic Rider Handle
     public Task<QueryResponse<LogisticRiderHandleResponse>> GetLogisticRiderHandle(GetLogisticRiderHandleRequest request);
     public Task<QueryResponse<List<LogisticRiderHandleResponse>>> GetLogisticRiderHandleList(GetLogisticRiderHandleListRequest request);
@@ -101,6 +95,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #region Logistic Rider
+    public Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request);
     public Task<QueryResponse<LogisticRiderResponse>> GetLogisticRider(GetLogisticRiderRequest request);
     public Task<QueryResponse<List<LogisticRiderResponse>>> GetLogisticRiderList(GetLogisticRiderListRequest request);
     public Task<CmdResponse<CreateLogisticRiderRequest>> CreateLogisticRider(CreateLogisticRiderRequest request);
@@ -119,7 +114,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteLaboratoryRequest>> DeleteLaboratory(DeleteLaboratoryRequest request);
     #endregion
 
-    // Laboratory Identity -> Laboratory Member
     #region Laboratory Member
     public Task<QueryResponse<LaboratoryMemberResponse>> GetLaboratoryMember(GetLaboratoryMemberRequest request);
     public Task<QueryResponse<List<LaboratoryMemberResponse>>> GetLaboratoryMemberList(GetLaboratoryMemberListRequest request);
@@ -160,7 +154,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
     #endregion
     
-    #region Consultation Portal
+    #region Consultation
     #region Consultation Entity
     
     public Task<QueryResponse<List<ConsultationEntityResponse>>> GetConsultationEntityList(GetConsultationEntityListRequest request);
@@ -190,8 +184,14 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
     #endregion
     
-    #region Common
-    
+    #region Member
+    public Task<QueryResponse<List<CredentialResponse>>> GetPendingRegistrationCompletionList(GetPendingRegistrationCompletionListRequest request);
+
     #endregion
+    
+    #region Administrator
+
+    #endregion
+
     
 }

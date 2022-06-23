@@ -14,7 +14,7 @@ public class GetConsultationEntityListHandler : QueryBaseHandler, IRequestHandle
         var consultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
             .Include(i => i.Group)
             .AsSplitQuery()
-            .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
             .AsNoTracking()

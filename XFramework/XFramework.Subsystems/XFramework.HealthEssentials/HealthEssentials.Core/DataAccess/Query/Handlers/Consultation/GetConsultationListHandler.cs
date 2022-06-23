@@ -15,7 +15,7 @@ public class GetConsultationListHandler : QueryBaseHandler, IRequestHandler<GetC
             .Include(i => i.Entity)
             .ThenInclude(i => i.Group)
             .AsSplitQuery()
-            .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
             .AsNoTracking()

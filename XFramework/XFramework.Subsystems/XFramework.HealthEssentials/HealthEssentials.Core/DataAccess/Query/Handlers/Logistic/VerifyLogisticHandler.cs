@@ -4,14 +4,14 @@ using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Logistic;
 
-public class VerifyLogisticHandler : QueryBaseHandler, IRequestHandler<VerifyLogisticIdentityQuery, QueryResponse<IdentityValidationResponse>>
+public class VerifyLogisticHandler : QueryBaseHandler, IRequestHandler<VerifyLogisticRiderQuery, QueryResponse<IdentityValidationResponse>>
 {
     public VerifyLogisticHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<QueryResponse<IdentityValidationResponse>> Handle(VerifyLogisticIdentityQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<IdentityValidationResponse>> Handle(VerifyLogisticRiderQuery request, CancellationToken cancellationToken)
     {
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
             .AsNoTracking()

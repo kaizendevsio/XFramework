@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
 
-public class VerifyLogisticIdentityRequest : RequestBase
+public class VerifyLogisticRiderRequest : RequestBase
 {
     public Guid? CredentialGuid { get; set; }
 }
