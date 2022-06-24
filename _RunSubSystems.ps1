@@ -20,13 +20,13 @@ dotnet "build" "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems
 Write-Host Starting Services..
 Write-Host ..
 
-dotnet "run" "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Community.sln"
-dotnet "run" "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.HealthEssentials.sln"
-dotnet "run" "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.IdentityServer.sln"
-dotnet "run" "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Messaging.sln"
-dotnet "run" "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.SmsGateway.sln"
-dotnet "run" "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.StreamFlow.sln"
-dotnet "run" "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets.sln"
+dotnet run --solution "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Community.sln"
+dotnet run --solution "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.HealthEssentials.sln"
+dotnet run --solution "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.IdentityServer.sln"
+dotnet run --solution "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Messaging.sln"
+dotnet run --solution "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.SmsGateway.sln"
+dotnet run --solution "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.StreamFlow.sln"
+dotnet run --solution "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets.sln"
 
 Write-Host ..
 Write-Host Services Started Successfully
