@@ -1,4 +1,8 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 
 public class LaboratoryJobOrderResponse
 {
@@ -19,8 +23,17 @@ public class LaboratoryJobOrderResponse
     public decimal? DiscountType { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     public long ScheduleId { get; set; }
     public long? ConsultationJobOrderId { get; set; }
     public long? PatientId { get; set; }
+    
+    public virtual ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
+    public virtual LaboratoryResponse? Laboratory { get; set; }
+    public virtual LaboratoryLocationResponse? LaboratoryLocation { get; set; }
+    public virtual PatientResponse? Patient { get; set; }
+    public virtual ScheduleResponse? Schedule { get; set; }
+    public virtual ICollection<LaboratoryJobOrderDetailResponse>? LaboratoryJobOrderDetails { get; set; }
+    public virtual ICollection<LaboratoryJobOrderResultResponse>? LaboratoryJobOrderResults { get; set; }
+    public virtual ICollection<PatientLaboratoryResponse>? PatientLaboratories { get; set; }
 }
