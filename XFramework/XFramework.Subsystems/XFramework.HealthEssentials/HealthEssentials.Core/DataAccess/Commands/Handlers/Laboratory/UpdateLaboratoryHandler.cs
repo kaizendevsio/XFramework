@@ -11,8 +11,9 @@ public class UpdateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Updat
     
     public async Task<CmdResponse<UpdateLaboratoryCmd>> Handle(UpdateLaboratoryCmd request, CancellationToken cancellationToken)
     {
-        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-        if (laboratory is null)
+        var existingLaboratory = await _dataLayer.HealthEssentialsContext.Laboratories
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        if (existingLaboratory is null)
         {
             return new ()
             {
@@ -21,8 +22,12 @@ public class UpdateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Updat
             };
         }
         
-        laboratory.Status = (int) request.Status;
-        _dataLayer.HealthEssentialsContext.Update(laboratory);
+        
+        
+        
+        
+        existingLaboratory.Status = (int) request.Status;
+        _dataLayer.HealthEssentialsContext.Update(existingLaboratory);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()

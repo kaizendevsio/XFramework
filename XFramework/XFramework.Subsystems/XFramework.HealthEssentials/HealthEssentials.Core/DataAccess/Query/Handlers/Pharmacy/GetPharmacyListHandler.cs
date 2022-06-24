@@ -12,13 +12,14 @@ public class GetPharmacyListHandler : QueryBaseHandler, IRequestHandler<GetPharm
     public async Task<QueryResponse<List<PharmacyResponse>>> Handle(GetPharmacyListQuery request, CancellationToken cancellationToken)
     {
         var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
-            .AsNoTracking()
             .Include(i => i.PharmacyLocations)
             .Include(i => i.Entity)
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsSplitQuery()
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
         if (!pharmacy.Any())

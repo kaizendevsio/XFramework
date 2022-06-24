@@ -26,12 +26,13 @@ public class GetSupportedConsultationListHandler : QueryBaseHandler, IRequestHan
         }
         
         var consultations = await _dataLayer.HealthEssentialsContext.DoctorConsultations
-            .AsNoTracking()
-            .Where(i => EF.Functions.Like(i.Consultation.Name, $"%{request.SearchField}%"))
+            .Where(i => EF.Functions.ILike(i.Consultation.Name, $"%{request.SearchField}%"))
             .Where(i => i.DoctorId == doctor.Id)
             .Include(i => i.Consultation)
-            .Take(request.PageSize)
             .OrderBy(i => i.CreatedAt)
+            .Take(request.PageSize)
+            .AsSplitQuery()
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
         if (!consultations.Any())

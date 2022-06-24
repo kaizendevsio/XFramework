@@ -12,10 +12,13 @@ public class GetConsultationListHandler : QueryBaseHandler, IRequestHandler<GetC
     public async Task<QueryResponse<List<ConsultationResponse>>> Handle(GetConsultationListQuery request, CancellationToken cancellationToken)
     {
         var consultation = await _dataLayer.HealthEssentialsContext.Consultations
-            .AsNoTracking()
-            .Where(i => EF.Functions.Like(i.Name, $"%{request.SearchField}%"))
+            .Include(i => i.Entity)
+            .ThenInclude(i => i.Group)
+            .AsSplitQuery()
+            .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
         if (!consultation.Any())
