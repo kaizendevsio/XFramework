@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Tag;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 
 public class LaboratoryTagResponse
 {
@@ -10,5 +12,8 @@ public class LaboratoryTagResponse
     public string? Value { get; set; }
     public long? TagId { get; set; }
     public string Guid { get; set; } = null!;
+
+    public LaboratoryResponse? Laboratory { get; set; }
+    public TagResponse? Tag { get; set; }
     
 }

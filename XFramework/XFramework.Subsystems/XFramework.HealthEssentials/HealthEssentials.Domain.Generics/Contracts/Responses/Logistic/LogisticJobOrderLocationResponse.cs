@@ -8,7 +8,6 @@ public class LogisticJobOrderLocationResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long LogisticJobOrderId { get; set; }
     public short Status { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }

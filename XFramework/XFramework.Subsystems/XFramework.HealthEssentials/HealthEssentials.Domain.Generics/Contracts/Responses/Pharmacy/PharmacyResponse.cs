@@ -8,7 +8,6 @@ public class PharmacyResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long EntityId { get; set; }
     public string? Name { get; set; }
     public string? ShortName { get; set; }
     public string? Slogan { get; set; }

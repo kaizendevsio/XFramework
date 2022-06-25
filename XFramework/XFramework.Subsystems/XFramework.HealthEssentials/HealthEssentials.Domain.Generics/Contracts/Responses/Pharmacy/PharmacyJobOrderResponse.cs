@@ -1,5 +1,7 @@
 ﻿
 
+using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
+
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
 public class PharmacyJobOrderResponse
@@ -8,7 +10,6 @@ public class PharmacyJobOrderResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long PharmacyLocationId { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? Remarks { get; set; }
     public short? Status { get; set; }
@@ -22,7 +23,7 @@ public class PharmacyJobOrderResponse
     public DateTime? CompletedAt { get; set; }
     public string? PrescriptionNote { get; set; }
     public string Guid { get; set; } = null!;
-    public long ScheduleId { get; set; }
 
     public PharmacyLocationResponse PharmacyLocation { get; set; } = null!;
+    public ScheduleResponse? Schedule { get; set; }
 }

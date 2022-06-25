@@ -6,9 +6,10 @@ public class LogisticRiderHandleResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long LogisticId { get; set; }
-    public long LogisticRiderId { get; set; }
     public short Status { get; set; }
     public string Guid { get; set; } = null!;
+
+    public LogisticRiderResponse? LogisticRider { get; set; }
+    public LogisticResponse? Logistic { get; set; }
 
 }

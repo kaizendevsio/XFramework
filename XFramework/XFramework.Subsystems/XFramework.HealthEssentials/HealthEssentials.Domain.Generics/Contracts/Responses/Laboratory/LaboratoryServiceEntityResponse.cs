@@ -9,6 +9,7 @@ public class LaboratoryServiceEntityResponse
     public string Name { get; set; } = null!;
     public string? Description { get; set; }
     public string Guid { get; set; } = null!;
-    public long GroupId { get; set; }
     public int? SortOrder { get; set; }
+
+    public LaboratoryServiceEntityGroupResponse? Group { get; set; }
 }

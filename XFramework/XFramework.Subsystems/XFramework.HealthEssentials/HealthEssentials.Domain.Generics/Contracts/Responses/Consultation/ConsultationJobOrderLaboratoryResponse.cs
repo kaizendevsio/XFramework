@@ -1,5 +1,7 @@
 ﻿
 
+using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
+
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
 public class ConsultationJobOrderLaboratoryResponse
@@ -8,8 +10,6 @@ public class ConsultationJobOrderLaboratoryResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long ConsultationJobOrderId { get; set; }
-    public long LaboratoryServiceId { get; set; }
     public long? SuggestedLaboratoryLocationId { get; set; }
     public string? Quantity { get; set; }
     public string? PrescriptionNote { get; set; }
@@ -17,5 +17,6 @@ public class ConsultationJobOrderLaboratoryResponse
     public short? Status { get; set; }
     public string Guid { get; set; } = null!;
     
-    public ConsultationJobOrderResponse ConsultationJobOrder { get; set; } = null!;
+    public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
+    public LaboratoryServiceResponse? LaboratoryService { get; set; }
 }

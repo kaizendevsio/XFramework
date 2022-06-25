@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
 public class PharmacyStockResponse
 {
@@ -6,8 +8,6 @@ public class PharmacyStockResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long PharmacyId { get; set; }
-    public long MedicineId { get; set; }
     public DateTime LastRestock { get; set; }
     public long? AvailableQuantity { get; set; }
     public long? CriticalQuantity { get; set; }
@@ -15,4 +15,7 @@ public class PharmacyStockResponse
     public long? MaxQuantity { get; set; }
     public long? Unit { get; set; }
     public string Guid { get; set; } = null!;
+
+    public PharmacyResponse? Pharmacy { get; set; }
+    public MedicineResponse? Medicine { get; set; }
 }

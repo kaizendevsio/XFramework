@@ -1,5 +1,7 @@
 ﻿
 
+using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
+
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 
 public class LogisticJobOrderResponse
@@ -8,11 +10,10 @@ public class LogisticJobOrderResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long RiderId { get; set; }
     public string Guid { get; set; } = null!;
     public short Status { get; set; }
-    public long ScheduleId { get; set; }
     
     public LogisticRiderResponse Rider { get; set; } = null!;
+    public ScheduleResponse? Schedule { get; set; }
 
 }

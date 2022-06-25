@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
 public class ConsultationJobOrderResponse
 {
@@ -6,7 +8,6 @@ public class ConsultationJobOrderResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long ConsultationId { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? Remarks { get; set; }
     public short? Status { get; set; }
@@ -20,10 +21,10 @@ public class ConsultationJobOrderResponse
     public DateTime? CompletedAt { get; set; }
     public string? Prescription { get; set; }
     public string Guid { get; set; } = null!;
-    public long ScheduleId { get; set; }
     public string? Diagnosis { get; set; }
     public string? Treatment { get; set; }
     public string? Symptoms { get; set; }
     
-    /*public Consultation Consultation { get; set; } = null!;*/
+    public ConsultationResponse? Consultation { get; set; }
+    public ScheduleResponse? Schedule { get; set; }
 }

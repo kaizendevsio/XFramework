@@ -9,11 +9,11 @@ public class PharmacyMemberResponse
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
     public long CredentialId { get; set; }
-    public long PharmacyId { get; set; }
     public string? Value { get; set; }
     public string? Guid { get; set; }
     public string? Name { get; set; }
     public int Status { get; set; }
 
     public CredentialResponse? Credential { get; set; }
+    public PharmacyResponse? Pharmacy { get; set; }
 }

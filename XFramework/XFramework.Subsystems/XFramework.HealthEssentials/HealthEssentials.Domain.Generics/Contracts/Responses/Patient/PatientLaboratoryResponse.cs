@@ -11,8 +11,8 @@ public class PatientLaboratoryResponse
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
     public long PatientId { get; set; }
-    public long? LaboratoryJobOrderId { get; set; }
     public string Guid { get; set; } = null!;
 
     public LaboratoryJobOrderResponse? LaboratoryJobOrder { get; set; }
+    public PatientResponse? Patient { get; set; }
 }
