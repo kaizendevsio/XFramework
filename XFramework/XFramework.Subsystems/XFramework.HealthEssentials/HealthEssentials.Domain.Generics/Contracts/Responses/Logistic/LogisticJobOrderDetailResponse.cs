@@ -14,7 +14,7 @@ public class LogisticJobOrderDetailResponse
     public string Name { get; set; } = null!;
     public string Description { get; set; } = null!;
     public long Quantity { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     public long UnitPrice { get; set; }
     public long Discount { get; set; }
     public long DiscountType { get; set; }

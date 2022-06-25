@@ -13,6 +13,6 @@ public class PharmacyJobOrderMedicineResponse
     public string? PrescriptionNote { get; set; }
     public string? Remarks { get; set; }
     public TransactionStatus? Status { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
 }

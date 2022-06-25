@@ -10,5 +10,5 @@ public class ConsultationResponse
     public string? Name { get; set; }
     public string? ShortName { get; set; }
     public string? Description { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 }

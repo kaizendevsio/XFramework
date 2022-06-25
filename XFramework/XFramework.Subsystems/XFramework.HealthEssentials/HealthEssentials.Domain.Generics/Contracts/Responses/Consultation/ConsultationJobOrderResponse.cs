@@ -20,7 +20,7 @@ public class ConsultationJobOrderResponse
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Prescription { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     public string? Diagnosis { get; set; }
     public string? Treatment { get; set; }
     public string? Symptoms { get; set; }

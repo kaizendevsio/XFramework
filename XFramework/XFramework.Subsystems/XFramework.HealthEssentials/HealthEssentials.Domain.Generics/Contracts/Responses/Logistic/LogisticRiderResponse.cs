@@ -12,7 +12,7 @@ public class LogisticRiderResponse
     public string? Description { get; set; }
     public string? Remarks { get; set; }
     public short? Status { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
     public CredentialResponse? Credential { get; set; }
 }

@@ -11,7 +11,7 @@ public class VendorResponse
     public string? Name { get; set; }
     public string? Description { get; set; }
     public bool? IsGenericProvider { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
-    public VendorEntityResponse Entity { get; set; } = null!;
+    public VendorEntityResponse? Entity { get; set; }
 }

@@ -1,10 +1,13 @@
-﻿namespace HealthEssentials.Api.HostedService;
+﻿using HealthEssentials.Integration.Interfaces;
+
+namespace HealthEssentials.Api.HostedService;
 
 public class SampleService : IHostedService
 {
 
-    public SampleService()
+    public SampleService(IHealthEssentialsServiceWrapper wrapper)
     {
+      /**/
     }
 
     public Task StartAsync(CancellationToken cancellationToken)

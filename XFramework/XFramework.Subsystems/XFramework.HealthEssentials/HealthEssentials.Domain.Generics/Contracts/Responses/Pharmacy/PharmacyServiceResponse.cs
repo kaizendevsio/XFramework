@@ -16,9 +16,9 @@ public class PharmacyServiceResponse
     public decimal? Price { get; set; }
     public decimal? MaxDiscount { get; set; }
     public decimal? Quantity { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
-    public PharmacyServiceEntityResponse Entity { get; set; } = null!;
+    public PharmacyServiceEntityResponse? Entity { get; set; }
     public PharmacyLocationResponse? PharmacyLocation { get; set; }
     public UnitResponse? Unit { get; set; }
     public PharmacyResponse? Pharmacy { get; set; }

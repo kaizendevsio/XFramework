@@ -9,7 +9,7 @@ public class PatientTagResponse
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
     public string? Value { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
     public PatientResponse? Patient { get; set; }
     public TagResponse? Tag { get; set; }

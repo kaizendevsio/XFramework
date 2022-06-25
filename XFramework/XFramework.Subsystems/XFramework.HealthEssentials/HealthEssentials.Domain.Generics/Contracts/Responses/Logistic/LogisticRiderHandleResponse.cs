@@ -7,7 +7,7 @@ public class LogisticRiderHandleResponse
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
     public short Status { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
     public LogisticRiderResponse? LogisticRider { get; set; }
     public LogisticResponse? Logistic { get; set; }

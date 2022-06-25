@@ -13,7 +13,7 @@ public class PatientAilmentDetailResponse
     public string? DoctorName { get; set; }
     public short? Status { get; set; }
     public string? Remarks { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     
     public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
     public PatientAilmentResponse? PatientAilment { get; set; }

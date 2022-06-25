@@ -16,9 +16,9 @@ public class HospitalServiceResponse
     public decimal? Price { get; set; }
     public decimal? MaxDiscount { get; set; }
     public decimal? Quantity { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     
-    public HospitalServiceEntityResponse Entity { get; set; } = null!;
+    public HospitalServiceEntityResponse? Entity { get; set; }
     public HospitalLocationResponse? HospitalLocation { get; set; }
     public HospitalResponse? Hospital { get; set; }
     public UnitResponse? Unit { get; set; }

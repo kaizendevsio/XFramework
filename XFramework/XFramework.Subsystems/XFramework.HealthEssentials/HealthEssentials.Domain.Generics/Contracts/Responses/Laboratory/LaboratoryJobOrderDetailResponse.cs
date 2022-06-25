@@ -13,5 +13,5 @@ public class LaboratoryJobOrderDetailResponse
     public short? Status { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 }

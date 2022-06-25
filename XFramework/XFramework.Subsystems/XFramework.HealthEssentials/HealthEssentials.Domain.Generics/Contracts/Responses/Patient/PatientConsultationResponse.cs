@@ -10,7 +10,7 @@ public class PatientConsultationResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
     public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
     public PatientResponse? Patient { get; set; }

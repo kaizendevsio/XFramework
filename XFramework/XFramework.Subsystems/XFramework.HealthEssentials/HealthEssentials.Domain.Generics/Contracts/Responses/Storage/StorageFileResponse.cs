@@ -8,7 +8,7 @@ public class StorageFileResponse
     public bool IsDeleted { get; set; }
     public string ContentPath { get; set; } = null!;
     public long EntityId { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     public string? IdentifierGuid { get; set; }
     public decimal? FileSize { get; set; }
     public DateTime? ExpireAt { get; set; }

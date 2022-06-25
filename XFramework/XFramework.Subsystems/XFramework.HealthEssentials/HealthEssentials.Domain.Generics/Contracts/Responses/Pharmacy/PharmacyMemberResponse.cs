@@ -10,7 +10,7 @@ public class PharmacyMemberResponse
     public bool IsDeleted { get; set; }
     public long CredentialId { get; set; }
     public string? Value { get; set; }
-    public string? Guid { get; set; }
+    public Guid? Guid { get; set; }
     public string? Name { get; set; }
     public int Status { get; set; }
 

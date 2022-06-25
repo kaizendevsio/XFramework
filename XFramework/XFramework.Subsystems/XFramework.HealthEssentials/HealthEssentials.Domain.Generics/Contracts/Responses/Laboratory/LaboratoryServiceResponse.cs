@@ -14,7 +14,7 @@ public class LaboratoryServiceResponse
     public decimal? Price { get; set; }
     public decimal? MaxDiscount { get; set; }
     public decimal? Quantity { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
     public LaboratoryServiceEntityGroupResponse? Entity { get; set; }
     public LaboratoryLocationResponse? LaboratoryLocation { get; set; }

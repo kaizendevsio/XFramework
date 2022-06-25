@@ -10,10 +10,10 @@ public class LogisticJobOrderResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     public short Status { get; set; }
     
-    public LogisticRiderResponse Rider { get; set; } = null!;
+    public LogisticRiderResponse? Rider { get; set; }
     public ScheduleResponse? Schedule { get; set; }
 
 }
