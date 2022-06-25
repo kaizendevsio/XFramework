@@ -18,7 +18,6 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
         _helperService = helperService;
         _dataLayer = dataLayer;
     }
-    
     public async Task<CmdResponse<CreateDoctorCmd>> Handle(CreateDoctorCmd request, CancellationToken cancellationToken)
     {
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials

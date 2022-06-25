@@ -15,7 +15,7 @@ public class SchedulePriorityResponse
     public DateTime ExpireAt { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
-    public SchedulePriorityEntityResponse Entity { get; set; } = null!;
+    public SchedulePriorityEntityResponse? Entity { get; set; }
 }

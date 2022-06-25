@@ -22,8 +22,8 @@ public class PharmacyJobOrderResponse
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? PrescriptionNote { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
-    public PharmacyLocationResponse PharmacyLocation { get; set; } = null!;
+    public PharmacyLocationResponse? PharmacyLocation { get; set; }
     public ScheduleResponse? Schedule { get; set; }
 }

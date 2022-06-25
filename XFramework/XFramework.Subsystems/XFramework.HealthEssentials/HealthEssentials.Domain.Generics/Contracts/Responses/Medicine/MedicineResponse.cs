@@ -13,7 +13,7 @@ public class MedicineResponse
     public string? ScientificName { get; set; }
     public string? Description { get; set; }
     public string? ChemicalComponent { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     
-    public MedicineEntityResponse Entity { get; set; } = null!;
+    public MedicineEntityResponse? Entity { get; set; }
 }

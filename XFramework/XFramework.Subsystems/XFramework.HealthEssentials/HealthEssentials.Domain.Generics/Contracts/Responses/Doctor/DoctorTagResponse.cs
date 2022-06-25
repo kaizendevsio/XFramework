@@ -9,8 +9,7 @@ public class DoctorTagResponse
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
     public string? Value { get; set; }
-    public long? TagId { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     
     public DoctorResponse Doctor { get; set; } = null!;
     public TagResponse? Tag { get; set; }

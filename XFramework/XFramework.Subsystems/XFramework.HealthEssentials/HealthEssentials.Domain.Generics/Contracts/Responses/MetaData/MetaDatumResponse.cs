@@ -10,7 +10,7 @@ public class MetaDatumResponse
     public bool IsDeleted { get; set; }
     public long? KeyId { get; set; }
     public string? Value { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     
-    public MetaDataEntityResponse Entity { get; set; } = null!;
+    public MetaDataEntityResponse? Entity { get; set; }
 }

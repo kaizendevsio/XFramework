@@ -10,7 +10,7 @@ public class AilmentTagResponse
     public bool IsDeleted { get; set; }
     public long AilmentId { get; set; }
     public string? Value { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
     public TagResponse? Tag { get; set; }
    

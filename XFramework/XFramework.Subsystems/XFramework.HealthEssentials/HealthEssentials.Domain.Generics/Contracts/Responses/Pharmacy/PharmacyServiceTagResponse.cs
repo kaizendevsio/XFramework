@@ -11,8 +11,8 @@ public class PharmacyServiceTagResponse
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
     public string? Value { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
-    public PharmacyServiceResponse PharmacyService { get; set; } = null!;
+    public PharmacyServiceResponse? PharmacyService { get; set; }
     public TagResponse? Tag { get; set; }
 }

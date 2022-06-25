@@ -6,8 +6,8 @@ public class MedicineVendorResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
     public MedicineResponse? Medicine { get; set; }
-    public MedicineVendorResponse Vendor { get; set; }
+    public MedicineVendorResponse? Vendor { get; set; }
 }

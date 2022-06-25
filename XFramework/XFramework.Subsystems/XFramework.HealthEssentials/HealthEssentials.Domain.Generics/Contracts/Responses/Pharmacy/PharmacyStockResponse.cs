@@ -14,7 +14,7 @@ public class PharmacyStockResponse
     public long? MinQuantity { get; set; }
     public long? MaxQuantity { get; set; }
     public long? Unit { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
     public PharmacyResponse? Pharmacy { get; set; }
     public MedicineResponse? Medicine { get; set; }

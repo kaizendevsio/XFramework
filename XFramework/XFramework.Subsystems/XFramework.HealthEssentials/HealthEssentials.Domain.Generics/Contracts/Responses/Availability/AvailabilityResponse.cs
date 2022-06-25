@@ -17,7 +17,7 @@ public class AvailabilityResponse
     public DateTime TimeStart { get; set; }
     public DateTime TimeEnd { get; set; }
     public bool? IsAvailable { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     
     public ScheduleEntityResponse Entity { get; set; } = null!;
 }

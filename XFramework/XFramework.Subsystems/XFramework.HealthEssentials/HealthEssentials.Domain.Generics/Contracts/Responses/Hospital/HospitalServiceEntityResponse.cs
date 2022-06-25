@@ -10,8 +10,8 @@ public class HospitalServiceEntityResponse
     public bool IsDeleted { get; set; }
     public string Name { get; set; } = null!;
     public string? Description { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     public int? SortOrder { get; set; }
     
-    public HospitalServiceEntityGroupResponse Group { get; set; } = null!;
+    public HospitalServiceEntityGroupResponse? Group { get; set; }
 }

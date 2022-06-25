@@ -19,5 +19,5 @@ public class HospitalLocationResponse
     public bool? MainAddress { get; set; }
     public long? Province { get; set; }
     public long? Country { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 }

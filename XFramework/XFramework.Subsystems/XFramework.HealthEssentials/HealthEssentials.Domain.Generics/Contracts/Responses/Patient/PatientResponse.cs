@@ -12,8 +12,8 @@ public class PatientResponse
     public bool IsDeleted { get; set; }
     public string? Description { get; set; }
     public string? Remarks { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 
-    public PatientEntityResponse Entity { get; set; } = null!;
-    public CredentialResponse Credential { get; set; } = null!;
+    public PatientEntityResponse? Entity { get; set; }
+    public CredentialResponse? Credential { get; set; }
 }

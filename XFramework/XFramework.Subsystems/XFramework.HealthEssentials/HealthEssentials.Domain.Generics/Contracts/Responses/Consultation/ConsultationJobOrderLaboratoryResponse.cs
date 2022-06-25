@@ -15,7 +15,7 @@ public class ConsultationJobOrderLaboratoryResponse
     public string? PrescriptionNote { get; set; }
     public string? Remarks { get; set; }
     public short? Status { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     
     public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
     public LaboratoryServiceResponse? LaboratoryService { get; set; }

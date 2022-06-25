@@ -7,5 +7,5 @@ public class AilmentEntityGroupResponse
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
     public string Name { get; set; } = null!;
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
 }

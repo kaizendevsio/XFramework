@@ -9,7 +9,7 @@ public class LogisticResponse
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? Remarks { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public string? Website { get; set; }

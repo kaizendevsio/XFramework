@@ -26,11 +26,29 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #region Doctor Portal
 
     #region Doctor
+    /// <summary>
+    /// Validates the doctor login.
+    /// </summary>
     public Task<QueryResponse<IdentityValidationResponse>> VerifyDoctor(VerifyDoctorRequest request);
+    /// <summary>
+    /// Gets the doctor profile.
+    /// </summary>
     public Task<QueryResponse<DoctorResponse>> GetDoctor(GetDoctorRequest request);
+    /// <summary>
+    ///  Get all doctors in the system.
+    /// </summary>
     public Task<QueryResponse<List<DoctorResponse>>> GetDoctorList(GetDoctorListRequest request);
+    /// <summary>
+    ///   Creates a new doctor in the system.
+    /// </summary>
     public Task<CmdResponse<CreateDoctorRequest>> CreateDoctor(CreateDoctorRequest request);
+    /// <summary>
+    /// Updates the doctor profile.
+    /// </summary>
     public Task<CmdResponse<UpdateDoctorRequest>> UpdateDoctor(UpdateDoctorRequest request);
+    /// <summary>
+    /// Deletes the doctor from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteDoctorRequest>> DeleteDoctor(DeleteDoctorRequest request);
     #endregion
 
@@ -43,11 +61,29 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #region Patient
+    /// <summary>
+    /// Gets the patient profile.
+    /// </summary>
     public Task<QueryResponse<PatientResponse>> GetPatient(GetPatientRequest request);
+    /// <summary>
+    /// Get all patients in the system.
+    /// </summary>
     public Task<QueryResponse<List<PatientResponse>>> GetPatientList(GetPatientListRequest request);
+    /// <summary>
+    ///  Validates the patient login.
+    /// </summary>
     public Task<QueryResponse<IdentityValidationResponse>> VerifyPatient(VerifyPatientRequest request);
+    /// <summary>
+    ///  Creates a new patient in the system.
+    /// </summary>
     public Task<CmdResponse<CreatePatientRequest>> CreatePatient(CreatePatientRequest request);
+    /// <summary>
+    ///  Updates the patient profile.
+    /// </summary>
     public Task<CmdResponse<UpdatePatientRequest>> UpdatePatient(UpdatePatientRequest request);
+    /// <summary>
+    ///  Deletes the patient from the system.
+    /// </summary>
     public Task<CmdResponse<DeletePatientRequest>> DeletePatient(DeletePatientRequest request);
     
     #endregion
@@ -55,20 +91,55 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #region Pharmacy Portal
 
     #region Pharmacy
-    public Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request);
+    /// <summary>
+    ///  Gets the pharmacy profile.
+    /// </summary>
     public Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request);
+    /// <summary>
+    ///  Get all pharmacies in the system.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request);
+    /// <summary>
+    ///  Creates a new pharmacy in the system.
+    /// </summary>
     public Task<CmdResponse<CreatePharmacyRequest>> CreatePharmacy(CreatePharmacyRequest request);
+    /// <summary>
+    ///  Updates the pharmacy profile.
+    /// </summary>
     public Task<CmdResponse<UpdatePharmacyRequest>> UpdatePharmacy(UpdatePharmacyRequest request);
+    /// <summary>
+    ///  Deletes the pharmacy from the system.
+    /// </summary>
     public Task<CmdResponse<DeletePharmacyRequest>> DeletePharmacy(DeletePharmacyRequest request);
     #endregion
     
     #region Pharmacy Member
     
+    /// <summary>
+    /// Gets the pharmacy member profile.
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
     public Task<QueryResponse<PharmacyMemberResponse>> GetPharmacyMember(GetPharmacyMemberRequest request);
+    /// <summary>
+    ///  Get all pharmacy members in the system.
+    /// </summary>
     public Task<QueryResponse<List<PharmacyMemberResponse>>> GetPharmacyMemberList(GetPharmacyMemberListRequest request);
+    /// <summary>
+    /// Validates the pharmacy member login.
+    /// </summary>
     public Task<QueryResponse<IdentityValidationResponse>> VerifyPharmacyMember(VerifyPharmacyMemberRequest request);
+    /// <summary>
+    ///  Creates a new pharmacy member in the system.
+    /// </summary>
     public Task<CmdResponse<CreatePharmacyMemberRequest>> CreatePharmacyMember(CreatePharmacyMemberRequest request);
+    /// <summary>
+    ///  Updates the pharmacy member profile.
+    /// </summary>
     public Task<CmdResponse<UpdatePharmacyMemberRequest>> UpdatePharmacyMember(UpdatePharmacyMemberRequest request);
+    /// <summary>
+    ///  Deletes the pharmacy member from the system.
+    /// </summary>
     public Task<CmdResponse<DeletePharmacyMemberRequest>> DeletePharmacyMember(DeletePharmacyMemberRequest request);
     
     #endregion
@@ -78,108 +149,276 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #region Logistic Portal
 
     #region Logistic
-    public Task<QueryResponse<List<LogisticResponse>>> GetLogisticList(GetLogisticListRequest request);
+    /// <summary>
+    /// Gets the logistic profile.
+    /// </summary>
     public Task<QueryResponse<LogisticResponse>> GetLogistic(GetLogisticRequest request);
+    /// <summary>
+    /// Get all logistics in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LogisticResponse>>> GetLogisticList(GetLogisticListRequest request);
+    /// <summary>
+    ///  Creates a new logistic in the system.
+    /// </summary>
     public Task<CmdResponse<CreateLogisticRequest>> CreateLogistic(CreateLogisticRequest request);
+    /// <summary>
+    /// Updates the logistic profile.
+    /// </summary>
     public Task<CmdResponse<UpdateLogisticRequest>> UpdateLogistic(UpdateLogisticRequest request);
+    /// <summary>
+    ///  Deletes the logistic from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteLogisticRequest>> DeleteLogistic(DeleteLogisticRequest request);
     #endregion
 
     #region Logistic Rider Handle
+    /// <summary>
+    ///  Gets the logistic rider handle profile.
+    /// </summary>
     public Task<QueryResponse<LogisticRiderHandleResponse>> GetLogisticRiderHandle(GetLogisticRiderHandleRequest request);
+    /// <summary>
+    ///  Get all logistic rider handles in the system.
+    /// </summary>
     public Task<QueryResponse<List<LogisticRiderHandleResponse>>> GetLogisticRiderHandleList(GetLogisticRiderHandleListRequest request);
+    /// <summary>
+    ///  Creates a new logistic rider handle in the system.
+    /// </summary>
     public Task<CmdResponse<CreateLogisticRiderHandleRequest>> CreateLogisticRiderHandle(CreateLogisticRiderHandleRequest request);
+    /// <summary>
+    ///  Updates the logistic rider handle profile.
+    /// </summary>
     public Task<CmdResponse<UpdateLogisticRiderHandleRequest>> UpdateLogisticRiderHandle(UpdateLogisticRiderHandleRequest request);
+    /// <summary>
+    ///  Deletes the logistic rider handle from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteLogisticRiderHandleRequest>> DeleteLogisticRiderHandle(DeleteLogisticRiderHandleRequest request);
     
     #endregion
 
     #region Logistic Rider
-    public Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request);
+    /// <summary>
+    /// Gets the logistic rider profile.
+    /// </summary>
     public Task<QueryResponse<LogisticRiderResponse>> GetLogisticRider(GetLogisticRiderRequest request);
+    /// <summary>
+    /// Get all logistic riders in the system.
+    /// </summary>
     public Task<QueryResponse<List<LogisticRiderResponse>>> GetLogisticRiderList(GetLogisticRiderListRequest request);
+    /// <summary>
+    /// Validates the logistic rider login.
+    /// </summary>
+    public Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request);
+    /// <summary>
+    ///  Creates a new logistic rider in the system.
+    /// </summary>
     public Task<CmdResponse<CreateLogisticRiderRequest>> CreateLogisticRider(CreateLogisticRiderRequest request);
+    /// <summary>
+    ///  Updates the logistic rider profile.
+    /// </summary>
     public Task<CmdResponse<UpdateLogisticRiderRequest>> UpdateLogisticRider(UpdateLogisticRiderRequest request);
+    /// <summary>
+    ///  Deletes the logistic rider from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteLogisticRiderRequest>> DeleteLogisticRider(DeleteLogisticRiderRequest request);
     #endregion
     
     #endregion
 
     #region Laboratory Portal
+    
     #region Laboratory
+    /// <summary>
+    /// Gets the laboratory profile.
+    /// </summary>
     public Task<QueryResponse<LaboratoryResponse>> GetLaboratory(GetLaboratoryRequest request);
+    /// <summary>
+    ///  Get all laboratories in the system.
+    /// </summary>
     public Task<QueryResponse<List<LaboratoryResponse>>> GetLaboratoryList(GetLaboratoryListRequest request);
+    /// <summary>
+    ///  Creates a new laboratory in the system.
+    /// </summary>
     public Task<CmdResponse<CreateLaboratoryRequest>> CreateLaboratory(CreateLaboratoryRequest request);
+    /// <summary>
+    ///  Updates the laboratory profile.
+    /// </summary>
     public Task<CmdResponse<UpdateLaboratoryRequest>> UpdateLaboratory(UpdateLaboratoryRequest request);
+    /// <summary>
+    ///  Deletes the laboratory from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteLaboratoryRequest>> DeleteLaboratory(DeleteLaboratoryRequest request);
     #endregion
 
     #region Laboratory Member
+    /// <summary>
+    ///  Gets the laboratory member profile.
+    /// </summary>
     public Task<QueryResponse<LaboratoryMemberResponse>> GetLaboratoryMember(GetLaboratoryMemberRequest request);
+    /// <summary>
+    ///  Get all laboratory members in the system.
+    /// </summary>
     public Task<QueryResponse<List<LaboratoryMemberResponse>>> GetLaboratoryMemberList(GetLaboratoryMemberListRequest request);
-    
+    /// <summary>
+    /// Validates the laboratory member login.
+    /// </summary>
     public Task<QueryResponse<IdentityValidationResponse>> VerifyLaboratoryMember(VerifyLaboratoryMemberRequest request);
+    /// <summary>
+    /// Creates a new laboratory member in the system.
+    /// </summary>
     public Task<CmdResponse<CreateLaboratoryMemberRequest>> CreateLaboratoryMember(CreateLaboratoryMemberRequest request);
+    /// <summary>
+    ///  Updates the laboratory member profile.
+    /// </summary>
     public Task<CmdResponse<UpdateLaboratoryMemberRequest>> UpdateLaboratoryMember(UpdateLaboratoryMemberRequest request);
+    /// <summary>
+    ///  Deletes the laboratory member from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteLaboratoryMemberRequest>> DeleteLaboratoryMember(DeleteLaboratoryMemberRequest request);
     
     #endregion
 
     #region Laboratory Service
-
-    public Task<QueryResponse<List<LaboratoryServiceResponse>>> GetLaboratoryServiceList(GetLaboratoryServiceListRequest request);
+    /// <summary>
+    ///  Gets the laboratory service profile.
+    /// </summary>
     public Task<QueryResponse<LaboratoryServiceResponse>> GetLaboratoryService(GetLaboratoryServiceRequest request);
+    /// <summary>
+    ///  Get all laboratory services in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryServiceResponse>>> GetLaboratoryServiceList(GetLaboratoryServiceListRequest request);
+    /// <summary>
+    ///  Creates a new laboratory service in the system.
+    /// </summary>
     public Task<CmdResponse<CreateLaboratoryServiceRequest>> CreateLaboratoryService(CreateLaboratoryServiceRequest request);
+    /// <summary>
+    ///  Updates the laboratory service profile.
+    /// </summary>
     public Task<CmdResponse<UpdateLaboratoryServiceRequest>> UpdateLaboratoryService(UpdateLaboratoryServiceRequest request);
+    /// <summary>
+    ///  Deletes the laboratory service from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteLaboratoryServiceRequest>> DeleteLaboratoryService(DeleteLaboratoryServiceRequest request);
     
     #endregion
     
     #region Laboratory Service Entity
     
+    /// <summary>
+    ///  Gets the laboratory service entity profile.
+    /// </summary>
     public Task<QueryResponse<LaboratoryServiceEntityResponse>> GetLaboratoryServiceEntity(GetLaboratoryServiceEntityRequest request);
+    /// <summary>
+    ///  Get all laboratory service entities in the system.
+    /// </summary>
     public Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> GetLaboratoryServiceEntityList(GetLaboratoryServiceEntityListRequest request);
+    /// <summary>
+    ///  Creates a new laboratory service entity in the system.
+    /// </summary>
     public Task<CmdResponse<CreateLaboratoryServiceEntityRequest>> CreateLaboratoryServiceEntity(CreateLaboratoryServiceEntityRequest request);
+    /// <summary>
+    ///  Updates the laboratory service entity profile.
+    /// </summary>
     public Task<CmdResponse<UpdateLaboratoryServiceEntityRequest>> UpdateLaboratoryServiceEntity(UpdateLaboratoryServiceEntityRequest request);
+    /// <summary>
+    ///  Deletes the laboratory service entity from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteLaboratoryServiceEntityRequest>> DeleteLaboratoryServiceEntity(DeleteLaboratoryServiceEntityRequest request);
 
     #endregion
 
     #region Laboratory Service Entity Group
+    /// <summary>
+    ///  Gets the laboratory service entity group profile.
+    /// </summary>
     public Task<QueryResponse<LaboratoryServiceEntityGroupResponse>> GetLaboratoryServiceEntityGroup(GetLaboratoryServiceEntityGroupRequest request);
+    /// <summary>
+    ///  Get all laboratory service entity groups in the system.
+    /// </summary>
     public Task<QueryResponse<List<LaboratoryServiceEntityGroupResponse>>> GetLaboratoryServiceEntityGroupList(GetLaboratoryServiceEntityGroupListRequest request);
+    /// <summary>
+    ///  Creates a new laboratory service entity group in the system.
+    /// </summary>
     public Task<CmdResponse<CreateLaboratoryServiceEntityGroupRequest>> CreateLaboratoryServiceEntityGroup(CreateLaboratoryServiceEntityGroupRequest request);
+    /// <summary>
+    ///  Updates the laboratory service entity group profile.
+    /// </summary>
     public Task<CmdResponse<UpdateLaboratoryServiceEntityGroupRequest>> UpdateLaboratoryServiceEntityGroup(UpdateLaboratoryServiceEntityGroupRequest request);
+    /// <summary>
+    ///  Deletes the laboratory service entity group from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteLaboratoryServiceEntityGroupRequest>> DeleteLaboratoryServiceEntityGroup(DeleteLaboratoryServiceEntityGroupRequest request);
     #endregion
     #endregion
     
     #region Consultation
     #region Consultation Entity
-    
-    public Task<QueryResponse<List<ConsultationEntityResponse>>> GetConsultationEntityList(GetConsultationEntityListRequest request);
+    /// <summary>
+    ///  Gets the consultation entity profile.
+    /// </summary>
     public Task<QueryResponse<ConsultationEntityResponse>> GetConsultationEntity(GetConsultationEntityRequest request);
+    /// <summary>
+    ///  Get all consultation entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<ConsultationEntityResponse>>> GetConsultationEntityList(GetConsultationEntityListRequest request);
+    /// <summary>
+    ///  Creates a new consultation entity in the system.
+    /// </summary>
     public Task<CmdResponse<CreateConsultationEntityRequest>> CreateConsultationEntity(CreateConsultationEntityRequest request);
+    /// <summary>
+    ///  Updates the consultation entity profile.
+    /// </summary>
     public Task<CmdResponse<UpdateConsultationEntityRequest>> UpdateConsultationEntity(UpdateConsultationEntityRequest request);
+    /// <summary>
+    ///  Deletes the consultation entity from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteConsultationEntityRequest>> DeleteConsultationEntity(DeleteConsultationEntityRequest request);
     
     #endregion
 
     #region Consultation Payment
+    /// <summary>
+    ///  Gets the consultation payment profile.
+    /// </summary>
     public Task<QueryResponse<ConsultationPaymentResponse>> GetConsultationPayment(GetConsultationPaymentRequest request);
+    /// <summary>
+    ///  Get all consultation payments in the system.
+    /// </summary>
     public Task<QueryResponse<List<ConsultationPaymentResponse>>> GetConsultationPaymentList(GetConsultationPaymentListRequest request);
+    /// <summary>
+    ///  Creates a new consultation payment in the system.
+    /// </summary>
     public Task<CmdResponse<CreateConsultationPaymentRequest>> CreateConsultationPayment(CreateConsultationPaymentRequest request);
-
+    /// <summary>
+    ///  Updates the consultation payment profile.
+    /// </summary>
     public Task<CmdResponse<UpdateConsultationPaymentRequest>> UpdateConsultationPayment(UpdateConsultationPaymentRequest request);
+    /// <summary>
+    ///  Deletes the consultation payment from the system.
+    /// </summary>
     public Task<CmdResponse> DeleteConsultationPayment(DeleteConsultationPaymentRequest request);
 
     #endregion
 
     #region Consultation
-    public Task<QueryResponse<List<ConsultationResponse>>> GetConsultationList(GetConsultationListRequest request);
+    /// <summary>
+    ///  Gets the consultation profile.
+    /// </summary>
     public Task<QueryResponse<ConsultationResponse>> GetConsultation(GetConsultationRequest request);
+    /// <summary>
+    ///  Get all consultations in the system.
+    /// </summary>
+    public Task<QueryResponse<List<ConsultationResponse>>> GetConsultationList(GetConsultationListRequest request);
+    /// <summary>
+    ///  Creates a new consultation in the system.
+    /// </summary>
     public Task<CmdResponse<CreateConsultationRequest>> CreateConsultation(CreateConsultationRequest request);
+    /// <summary>
+    ///  Updates the consultation profile.
+    /// </summary>
     public Task<CmdResponse<UpdateConsultationRequest>> UpdateConsultation(UpdateConsultationRequest request);
+    /// <summary>
+    ///  Deletes the consultation from the system.
+    /// </summary>
     public Task<CmdResponse<DeleteConsultationRequest>> DeleteConsultation(DeleteConsultationRequest request);
     #endregion
     #endregion
