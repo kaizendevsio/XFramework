@@ -192,6 +192,5 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #region Administrator
 
     #endregion
-
     
 }
