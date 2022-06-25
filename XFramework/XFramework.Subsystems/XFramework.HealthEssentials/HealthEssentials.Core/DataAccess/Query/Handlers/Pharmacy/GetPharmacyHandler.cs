@@ -55,7 +55,7 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
     private async Task GetFilesList(PharmacyResponse response)
     {
         response.Files = _dataLayer.XnelSystemsContext.StorageFiles
-            .Where(i => i.IdentifierGuid == response.Guid)
+            .Where(i => i.IdentifierGuid == $"{response.Guid}")
             .AsNoTracking()
             .ToList()
             .Adapt<List<StorageFileResponse>>();

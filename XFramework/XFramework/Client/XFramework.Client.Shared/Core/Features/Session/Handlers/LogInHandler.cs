@@ -84,7 +84,7 @@ public partial class SessionState
             }         
 
             // Set Session State To Active
-            await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
+            await Mediator.Send(new SetState() {State = CurrentSessionState.Active});
             
             // Fetch User Identity And Credential and Contact List
             var identityResponse = await IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});

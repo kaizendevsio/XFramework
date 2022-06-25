@@ -33,7 +33,7 @@ public partial class WalletState
  
         public override async Task<Unit> Handle(GetWalletList action, CancellationToken aCancellationToken)
         {
-            if(SessionState.State is not Domain.Generic.Enums.SessionState.Active) return Unit.Value;
+            if(SessionState.State is not CurrentSessionState.Active) return Unit.Value;
             var response = await WalletServiceWrapper.GetWalletList(new()
             {
                 CredentialGuid = SessionState.Credential.Guid

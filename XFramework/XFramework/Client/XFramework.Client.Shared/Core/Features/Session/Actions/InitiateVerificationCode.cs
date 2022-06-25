@@ -1,5 +1,4 @@
 ﻿using XFramework.Client.Shared.Entity.Models.Requests.Common;
-using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 

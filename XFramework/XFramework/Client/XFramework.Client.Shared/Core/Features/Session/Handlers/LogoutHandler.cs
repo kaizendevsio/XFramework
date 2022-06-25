@@ -47,7 +47,7 @@ public partial class SessionState
                 });
                 await Mediator.Send(new SetState()
                 {
-                    State = Domain.Generic.Enums.SessionState.Inactive,
+                    State = CurrentSessionState.Inactive,
                     LoginVm = new(),
                     RegisterVm = new(),
                     ForgotPasswordVm = new()

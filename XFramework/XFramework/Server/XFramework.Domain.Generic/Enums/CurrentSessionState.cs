@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Enums
 {
-    public enum SessionState
+    public enum CurrentSessionState
     {
         Inactive = 0,
         Active = 1,

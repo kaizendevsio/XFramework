@@ -5,7 +5,6 @@ using Mapster;
 using Messaging.Integration.Interfaces;
 using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Entity.Models.Requests.Session;
-using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;

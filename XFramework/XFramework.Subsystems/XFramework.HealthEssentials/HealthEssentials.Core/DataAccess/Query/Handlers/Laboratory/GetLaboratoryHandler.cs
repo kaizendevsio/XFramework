@@ -55,7 +55,7 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
     private async Task GetFilesList(LaboratoryResponse response)
     {
         response.Files = _dataLayer.XnelSystemsContext.StorageFiles
-            .Where(i => i.IdentifierGuid == response.Guid)
+            .Where(i => i.IdentifierGuid == $"{response.Guid}")
             .AsNoTracking()
             .ToList()
             .Adapt<List<StorageFileResponse>>();

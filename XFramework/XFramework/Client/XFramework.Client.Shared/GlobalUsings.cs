@@ -29,3 +29,4 @@ global using XFramework.Client.Shared.Core.Services;
 global using IdentityServer.Integration.Drivers;
 global using IdentityServer.Integration.Interfaces;
 global using System.Text.Json.Serialization;
+global using XFramework.Domain.Generic.Enums;

@@ -34,7 +34,11 @@ public class GetDoctorHandler : QueryBaseHandler, IRequestHandler<GetDoctorQuery
         }
         
         var response = doctor.Adapt<DoctorResponse>();
-        response.Files = _dataLayer.XnelSystemsContext.StorageFiles.AsNoTracking().Where(i => i.IdentifierGuid == response.Guid).ToList().Adapt<List<StorageFileResponse>>();
+        response.Files = _dataLayer.XnelSystemsContext.StorageFiles
+            .Where(i => i.IdentifierGuid == $"{response.Guid}")
+            .AsNoTracking()
+            .ToList()
+            .Adapt<List<StorageFileResponse>>();
         
         return new()
         {

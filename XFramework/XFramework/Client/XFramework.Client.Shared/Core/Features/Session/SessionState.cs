@@ -13,7 +13,7 @@ public partial class SessionState : State<SessionState>
          ForgotPasswordVm = new();
          VerificationVm = new();
     }
-    public Domain.Generic.Enums.SessionState State { get; set; }
+    public CurrentSessionState State { get; set; }
     public List<ContactResponse> ContactList { get; set; }
     public CredentialResponse Credential { get; set; }
     public IdentityResponse Identity { get; set; }

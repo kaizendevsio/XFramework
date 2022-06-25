@@ -4,7 +4,6 @@ using IdentityServer.Domain.Generic.Contracts.Requests.Update;
 using Mapster;
 using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Core.Features.Application;
-using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 using XFramework.Integration.Services;
