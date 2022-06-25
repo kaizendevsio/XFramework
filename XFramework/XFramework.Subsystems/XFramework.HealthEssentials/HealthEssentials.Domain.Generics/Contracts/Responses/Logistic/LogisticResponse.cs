@@ -6,7 +6,6 @@ public class LogisticResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long EntityId { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? Remarks { get; set; }
@@ -15,4 +14,6 @@ public class LogisticResponse
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? Logo { get; set; }
+
+    public LogisticEntityResponse? Entity { get; set; }
 }

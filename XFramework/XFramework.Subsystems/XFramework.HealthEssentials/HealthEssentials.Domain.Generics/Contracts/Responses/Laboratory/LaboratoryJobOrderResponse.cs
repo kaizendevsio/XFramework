@@ -10,8 +10,6 @@ public class LaboratoryJobOrderResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long LaboratoryLocationId { get; set; }
-    public long LaboratoryId { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? Remarks { get; set; }
     public short? Status { get; set; }
@@ -24,9 +22,6 @@ public class LaboratoryJobOrderResponse
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public Guid? Guid { get; set; }
-    public long ScheduleId { get; set; }
-    public long? ConsultationJobOrderId { get; set; }
-    public long? PatientId { get; set; }
     
     public virtual ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
     public virtual LaboratoryResponse? Laboratory { get; set; }

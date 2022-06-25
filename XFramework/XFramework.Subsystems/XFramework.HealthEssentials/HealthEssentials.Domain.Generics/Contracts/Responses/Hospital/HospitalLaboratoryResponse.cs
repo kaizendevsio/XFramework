@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Hospital;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Hospital;
 
 public class HospitalLaboratoryResponse
 {
@@ -6,9 +8,8 @@ public class HospitalLaboratoryResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long HospitalId { get; set; }
-    public long? LaboratoryId { get; set; }
     public string Guid { get; set; } = null!;   
     
-    /*public Hospital Hospital { get; set; } = null!;*/
+    public HospitalResponse Hospital { get; set; } = null!;
+    public LaboratoryResponse? Laboratory { get; set; }
 }

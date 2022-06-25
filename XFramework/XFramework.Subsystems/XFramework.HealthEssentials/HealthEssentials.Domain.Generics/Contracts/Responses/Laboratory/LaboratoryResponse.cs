@@ -8,7 +8,6 @@ public class LaboratoryResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long EntityId { get; set; }
     public string? Name { get; set; }
     public string? ShortName { get; set; }
     public string? Description { get; set; }
@@ -17,7 +16,8 @@ public class LaboratoryResponse
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? Logo { get; set; }
-    
+
+    public LaboratoryEntityResponse? Entity { get; set; }
     public List<LaboratoryLocationResponse> LaboratoryLocations { get; set; }
     public List<LaboratoryMemberResponse> LaboratoryMembers { get; set; }
     public List<StorageFileResponse> Files { get; set; }

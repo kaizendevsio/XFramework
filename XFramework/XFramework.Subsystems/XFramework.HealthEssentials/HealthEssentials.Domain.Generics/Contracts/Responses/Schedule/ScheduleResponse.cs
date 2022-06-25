@@ -8,11 +8,9 @@ public class ScheduleResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long EntityId { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public short? Status { get; set; }
-    public long PriorityId { get; set; }
     public DateTime StartAt { get; set; }
     public DateTime ExpireAt { get; set; }
     public DateTime? StartedAt { get; set; }
@@ -20,4 +18,5 @@ public class ScheduleResponse
     public string Guid { get; set; } = null!;
 
     public ScheduleEntityResponse Entity { get; set; } = null!;
+    public SchedulePriorityResponse? Priority { get; set; }
 }

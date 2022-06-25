@@ -33,4 +33,5 @@ public class LaboratoryLocationResponse
     public AddressCountryResponse? CountryNavigation { get; set; }
     public AddressProvinceResponse? ProvinceNavigation { get; set; }
     public AddressRegionResponse? RegionNavigation { get; set; }
+    public LaboratoryResponse? Laboratory { get; set; }
 }

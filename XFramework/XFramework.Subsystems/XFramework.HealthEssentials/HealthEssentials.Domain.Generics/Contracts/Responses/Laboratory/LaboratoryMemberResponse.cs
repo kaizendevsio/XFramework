@@ -9,11 +9,11 @@ public class LaboratoryMemberResponse
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
     public long CredentialId { get; set; }
-    public long LaboratoryId { get; set; }
     public string? Value { get; set; }
     public string Guid { get; set; } = null!;
     public string Name { get; set; } = null!;
     public int Status { get; set; }
 
     public CredentialResponse? Credential { get; set; }
+    public LaboratoryResponse? Laboratory { get; set; }
 }

@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Tag;
+
+namespace HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 
 public class AilmentTagResponse
 {
@@ -9,7 +11,7 @@ public class AilmentTagResponse
     public long AilmentId { get; set; }
     public string? Value { get; set; }
     public string Guid { get; set; } = null!;
-    public long TagId { get; set; }
-    
-    /*public Ailment Ailment { get; set; } = null!;*/
+
+    public TagResponse? Tag { get; set; }
+   
 }

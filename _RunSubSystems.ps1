@@ -23,7 +23,7 @@ Write-Host ..
 Start-Job -ScriptBlock {dotnet run --project "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Stream\StreamFlow.Stream.csproj"}
 Start-Job -ScriptBlock {dotnet run --project "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj"}
 Start-Job -ScriptBlock {dotnet run --project "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Api\Wallets.Api.csproj"}
-Start-Job -ScriptBlock {dotnet run --project "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Messaging\Messaging.Api\Messaging.Api\csproj.Api\Messaging.Api.csproj"}
+Start-Job -ScriptBlock {dotnet run --project "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Messaging\Messaging.Api\Messaging.Api.csproj"}
 Start-Job -ScriptBlock {dotnet run --project "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj"}
 Start-Job -ScriptBlock {dotnet run --project "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Api\HealthEssentials.Api.csproj"}
 Start-Job -ScriptBlock {dotnet run --project "C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Community.sln"}
