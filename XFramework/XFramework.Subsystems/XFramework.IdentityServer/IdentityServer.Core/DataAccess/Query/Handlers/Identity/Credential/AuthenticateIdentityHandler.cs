@@ -192,7 +192,7 @@ public class AuthenticateIdentityHandler : QueryBaseHandler, IRequestHandler<Aut
         {
             Token = token,
             LogonDateTime = DateTime.Now,
-            SessionState = SessionState.Active,
+            SessionState = CurrentSessionState.Active,
             MaxSessionTimeSpan = TimeSpan.FromMinutes(30)
         });
     }

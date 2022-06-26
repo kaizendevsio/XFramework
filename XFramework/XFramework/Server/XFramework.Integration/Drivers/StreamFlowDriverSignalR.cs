@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using MessagePack;
 using Microsoft.AspNetCore.SignalR.Client;
 using StreamFlow.Domain.Generic.BusinessObjects;
@@ -59,9 +60,10 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 };
             }
             default:
+                var options = new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles};
                 return new(){
                     HttpStatusCode = HttpStatusCode.Accepted,
-                    Response = JsonSerializer.Deserialize<TResponse>(signalRResponse.Response)
+                    Response = JsonSerializer.Deserialize<TResponse>(signalRResponse.Response, options)
                 };
                 break;
             }

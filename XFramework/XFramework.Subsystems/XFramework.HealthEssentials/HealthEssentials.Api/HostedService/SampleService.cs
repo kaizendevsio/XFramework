@@ -7,7 +7,6 @@ public class SampleService : IHostedService
 
     public SampleService(IHealthEssentialsServiceWrapper wrapper)
     {
-      /**/
     }
 
     public Task StartAsync(CancellationToken cancellationToken)

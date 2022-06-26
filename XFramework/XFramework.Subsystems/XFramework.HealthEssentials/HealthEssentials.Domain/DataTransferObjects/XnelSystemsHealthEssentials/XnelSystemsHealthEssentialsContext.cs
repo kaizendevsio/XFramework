@@ -1505,6 +1505,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
+                entity.Property(e => e.Description).HasColumnType("character varying");
+
                 entity.Property(e => e.Guid)
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
@@ -2841,6 +2843,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.Id).HasColumnName("ID");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Description).HasColumnType("character varying");
 
                 entity.Property(e => e.Guid)
                     .HasColumnType("character varying")

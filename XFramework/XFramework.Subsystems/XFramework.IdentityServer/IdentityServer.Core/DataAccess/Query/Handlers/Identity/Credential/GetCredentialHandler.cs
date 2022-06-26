@@ -35,8 +35,12 @@ public class GetCredentialHandler : QueryBaseHandler ,IRequestHandler<GetCredent
             
             .Include(i => i.IdentityRoles)
             .ThenInclude(i => i.RoleEntity)
+            
             .Include(i => i.IdentityContacts)
             .ThenInclude(i => i.Entity)
+            .Include(i => i.IdentityContacts)
+            .ThenInclude(i => i.Group)
+            
             .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);

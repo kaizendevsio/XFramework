@@ -47,7 +47,8 @@ public class VerifyLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<V
             Response = new()
             {
                 IsExisting = true,
-                IsActivated = identity.Status is (int)GenericStatusType.Approved
+                IsActivated = identity.Status is (int)GenericStatusType.Approved,
+                Guid = Guid.Parse(identity.Guid)
             },
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true

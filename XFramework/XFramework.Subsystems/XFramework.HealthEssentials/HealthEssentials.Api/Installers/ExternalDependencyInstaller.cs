@@ -15,7 +15,6 @@ public class ExternalDependencyInstaller : IInstaller
         // FluentValidation
         services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
-            
-           
+        TypeAdapterConfig.GlobalSettings.Default.PreserveReference(true);
     }
 }

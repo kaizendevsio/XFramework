@@ -13,6 +13,7 @@ public class PharmacyMemberResponse
     public Guid? Guid { get; set; }
     public string? Name { get; set; }
     public int Status { get; set; }
+    public string? Description { get; set; }
 
     public CredentialResponse? Credential { get; set; }
     public PharmacyResponse? Pharmacy { get; set; }

@@ -11,8 +11,9 @@ public class LaboratoryMemberResponse
     public long CredentialId { get; set; }
     public string? Value { get; set; }
     public Guid? Guid { get; set; }
-    public string Name { get; set; } = null!;
+    public string? Name { get; set; }
     public int Status { get; set; }
+    public string? Description { get; set; }
 
     public CredentialResponse? Credential { get; set; }
     public LaboratoryResponse? Laboratory { get; set; }
