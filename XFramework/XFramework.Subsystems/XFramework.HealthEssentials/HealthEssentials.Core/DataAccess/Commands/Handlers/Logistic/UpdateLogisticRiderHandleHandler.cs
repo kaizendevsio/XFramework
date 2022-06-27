@@ -26,7 +26,6 @@ public class UpdateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
         }
         
         var logistic = await _dataLayer.HealthEssentialsContext.Logistics
-            .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.LogisticGuid}", cancellationToken: cancellationToken);
        
         if (logistic is null)
@@ -39,7 +38,6 @@ public class UpdateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
         }
         
         var rider = await _dataLayer.HealthEssentialsContext.LogisticRiders
-            .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.RiderGuid}", cancellationToken: cancellationToken);
        
         if (rider is null)
@@ -51,19 +49,9 @@ public class UpdateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
             };
         }
 
-        var entity = new LogisticRiderHandle()
-        {
-            Logistic = logistic,
-            LogisticRider = rider,
-            Guid = $"{Guid.NewGuid()}",
-            Status = (short) GenericStatusType.Approved
-        };
-
         var updatedLogisticRiderHandle = request.Adapt(existingLogisticRiderHandle);
-        updatedLogisticRiderHandle.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         updatedLogisticRiderHandle.Logistic = logistic;
         updatedLogisticRiderHandle.LogisticRider = rider;
-
 
         _dataLayer.HealthEssentialsContext.LogisticRiderHandles.Update(updatedLogisticRiderHandle);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

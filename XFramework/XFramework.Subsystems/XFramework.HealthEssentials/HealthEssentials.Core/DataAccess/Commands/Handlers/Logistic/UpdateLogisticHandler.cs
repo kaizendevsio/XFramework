@@ -24,21 +24,20 @@ public class UpdateLogisticHandler : CommandBaseHandler, IRequestHandler<UpdateL
             };
         }
         
-        var updateLogistic = request.Adapt(existingLogistic);
-        updateLogistic.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        updateLogistic.Status = (int) GenericStatusType.Pending;
+        var updatedLogistic = request.Adapt(existingLogistic);
+        updatedLogistic.Status = (int) GenericStatusType.Pending;
 
-        _dataLayer.HealthEssentialsContext.Logistics.Update(updateLogistic);
+        _dataLayer.HealthEssentialsContext.Logistics.Update(updatedLogistic);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Logistic with Guid {updateLogistic.Guid} updated successfully",
+            Message = $"Logistic with Guid {updatedLogistic.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(updateLogistic.Guid)
+                Guid = Guid.Parse(updatedLogistic.Guid)
             }
         };
     }

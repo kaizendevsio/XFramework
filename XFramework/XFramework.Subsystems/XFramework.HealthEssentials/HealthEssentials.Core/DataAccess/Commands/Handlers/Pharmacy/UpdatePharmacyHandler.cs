@@ -1,4 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
 
@@ -11,8 +12,8 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
     
     public async Task<CmdResponse<UpdatePharmacyCmd>> Handle(UpdatePharmacyCmd request, CancellationToken cancellationToken)
     {
-        var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-        if (pharmacy is null)
+        var existingPharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        if (existingPharmacy is null)
         {
             return new ()
             {
@@ -21,15 +22,34 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
             };
         }
         
-        pharmacy.Status = (int) request.Status;
-        _dataLayer.HealthEssentialsContext.Update(pharmacy);
+        var entity = await _dataLayer.HealthEssentialsContext.PharmacyEntities
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (entity is null)
+        {
+            return new ()
+            {
+                Message = $"Pharmacy with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var updatedPharmacy = request.Adapt(existingPharmacy);
+        updatedPharmacy.Entity = entity;
+        updatedPharmacy.Status = (int) GenericStatusType.Pending;
+
+        _dataLayer.HealthEssentialsContext.Update(updatedPharmacy);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()
         {
-            Message = "Pharmacy updated successfully",
+            Message = $"Logistic rider with Guid {updatedPharmacy.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            Request = request
+            IsSuccess = true,
+            Request = new()
+            {
+                Guid = Guid.Parse(updatedPharmacy.Guid)
+            }
         };
     }
 }

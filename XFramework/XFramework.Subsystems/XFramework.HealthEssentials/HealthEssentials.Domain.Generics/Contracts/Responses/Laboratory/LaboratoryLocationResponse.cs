@@ -10,33 +10,26 @@ public class LaboratoryLocationResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    [JsonIgnore] public long LaboratoryId { get; set; }
+    public long LaboratoryId { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? UnitNumber { get; set; }
     public string? Street { get; set; }
     public string? Building { get; set; }
-    public long? Barangay { get; set; }
-    public long? City { get; set; }
+    public long? BarangayId { get; set; }
+    public long? CityId { get; set; }
     public string? Subdivision { get; set; }
-    public long? Region { get; set; }
+    public long? RegionId { get; set; }
     public bool? MainAddress { get; set; }
-    public long? Province { get; set; }
-    public long? Country { get; set; }
-    public Guid? Guid { get; set; }
+    public long? ProvinceId { get; set; }
+    public long? CountryId { get; set; }
+    public string Guid { get; set; } = null!;
     public int? Status { get; set; }
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? AlternativePhone { get; set; }
-    
-    public AddressBarangayResponse? BarangayNavigation { get; set; }
-    public AddressCityResponse? CityNavigation { get; set; }
-    public AddressCountryResponse? CountryNavigation { get; set; }
-    public AddressProvinceResponse? ProvinceNavigation { get; set; }
-    public AddressRegionResponse? RegionNavigation { get; set; }
+
     public LaboratoryResponse? Laboratory { get; set; }
-    public List<LaboratoryMemberResponse>? LaboratoryMembers { get; set; }
-    public List<StorageFileResponse>? Files { get; set; }
 
 }

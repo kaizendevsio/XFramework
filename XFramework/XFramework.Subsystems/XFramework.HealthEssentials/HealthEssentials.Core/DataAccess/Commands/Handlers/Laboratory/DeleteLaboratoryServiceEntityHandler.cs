@@ -4,9 +4,9 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
 public class DeleteLaboratoryServiceEntityHandler : CommandBaseHandler, IRequestHandler<DeleteLaboratoryServiceEntityCmd, CmdResponse<DeleteLaboratoryServiceEntityCmd>>
 {
-    public DeleteLaboratoryServiceEntityHandler()
+    public DeleteLaboratoryServiceEntityHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<CmdResponse<DeleteLaboratoryServiceEntityCmd>> Handle(DeleteLaboratoryServiceEntityCmd request, CancellationToken cancellationToken)
     {

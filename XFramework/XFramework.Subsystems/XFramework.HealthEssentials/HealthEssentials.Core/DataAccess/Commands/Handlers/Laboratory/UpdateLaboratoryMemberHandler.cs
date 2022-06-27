@@ -11,8 +11,8 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
     
     public async Task<CmdResponse<UpdateLaboratoryMemberCmd>> Handle(UpdateLaboratoryMemberCmd request, CancellationToken cancellationToken)
     {
-        var laboratoryMember = await _dataLayer.HealthEssentialsContext.LaboratoryMembers.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-        if (laboratoryMember is null)
+        var existingLaboratoryMember = await _dataLayer.HealthEssentialsContext.LaboratoryMembers.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        if (existingLaboratoryMember is null)
         {
             return new ()
             {
@@ -36,16 +36,29 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         {
             return new ()
             {
-                Message = $"Laboratory with Guid {request.CredentialGuid} not found",
+                Message = $"Laboratory with Guid {request.LaboratoryGuid} not found",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
-        laboratoryMember = request.Adapt(laboratoryMember);
-        laboratoryMember.CredentialId = credential.Id;
-        laboratoryMember.Laboratory = laboratory;
+        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         
-        _dataLayer.HealthEssentialsContext.Update(laboratoryMember);
+        if (laboratoryLocation is null)
+        {
+            return new ()
+            {
+                Message = $"Laboratory Location with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var updatedLaboratoryMember = request.Adapt(existingLaboratoryMember);
+        updatedLaboratoryMember.CredentialId = credential.Id;
+        updatedLaboratoryMember.Laboratory = laboratory;
+        updatedLaboratoryMember.LaboratoryLocation = laboratoryLocation;
+        
+        _dataLayer.HealthEssentialsContext.Update(existingLaboratoryMember);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()

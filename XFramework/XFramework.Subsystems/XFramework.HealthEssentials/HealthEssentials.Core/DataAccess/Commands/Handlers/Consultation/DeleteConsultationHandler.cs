@@ -13,6 +13,7 @@ public class DeleteConsultationHandler : CommandBaseHandler, IRequestHandler<Del
     {
         var existingConsultation = await _dataLayer.HealthEssentialsContext.Consultations
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
+        
         if (existingConsultation is null)
         {
             return new ()

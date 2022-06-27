@@ -19,25 +19,24 @@ public class UpdateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
         {
             return new()
             {
-                Message = $"Consultation with Guid {request.Guid} does not exist",
+                Message = $"Consultation entity with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
         var entityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", cancellationToken: cancellationToken);
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}",CancellationToken.None);
        
         if (entityGroup is null)
         {
             return new ()
             {
-                Message = $"Consultation type group with Guid {request.GroupGuid} does not exist",
+                Message = $"Consultation entity group with Guid {request.GroupGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
         var updatedConsultationEntity = request.Adapt(existingConsultationEntity);
-        updatedConsultationEntity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         updatedConsultationEntity.Group = entityGroup;
         
         _dataLayer.HealthEssentialsContext.ConsultationEntities.Update(updatedConsultationEntity);

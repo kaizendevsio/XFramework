@@ -4,9 +4,9 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
 public class DeleteLaboratoryServiceHandler : CommandBaseHandler, IRequestHandler<DeleteLaboratoryServiceCmd, CmdResponse<DeleteLaboratoryServiceCmd>>
 {
-    public DeleteLaboratoryServiceHandler()
+    public DeleteLaboratoryServiceHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<CmdResponse<DeleteLaboratoryServiceCmd>> Handle(DeleteLaboratoryServiceCmd request, CancellationToken cancellationToken)
     {
@@ -17,7 +17,7 @@ public class DeleteLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
         {
             return new()
             {
-                Message = $"Laboratory service entity with Guid {request.Guid} does not exist",
+                Message = $"Laboratory Service with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -30,7 +30,7 @@ public class DeleteLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
         
         return new()
         {
-            Message = $"Laboratory  service with Guid {request.Guid} has been deleted",
+            Message = $"Laboratory Service with Guid {request.Guid} has been deleted",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true
         };

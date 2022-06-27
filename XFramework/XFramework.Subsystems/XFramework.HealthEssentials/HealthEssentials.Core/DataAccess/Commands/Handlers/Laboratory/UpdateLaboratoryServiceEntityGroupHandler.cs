@@ -22,13 +22,7 @@ public class UpdateLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRe
             };
         }
         
-        var serviceEntityGroup = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.LaboratoryServiceEntityGroup>();
-        serviceEntityGroup.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        
-
         var updatedLaboratoryServiceEntityGroup = request.Adapt(existingLaboratoryServiceEntityGroup);
-        updatedLaboratoryServiceEntityGroup.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        
         
         _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups.Update(updatedLaboratoryServiceEntityGroup);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
