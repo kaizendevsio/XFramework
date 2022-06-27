@@ -1,4 +1,6 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+﻿using System.Text.Json.Serialization;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using IdentityServer.Domain.Generic.Contracts.Responses.Address;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
@@ -8,7 +10,7 @@ public class PharmacyLocationResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long PharmacyId { get; set; }
+    [JsonIgnore] public long PharmacyId { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? UnitNumber { get; set; }
@@ -33,4 +35,9 @@ public class PharmacyLocationResponse
     public AddressCountryResponse? CountryNavigation { get; set; }
     public AddressProvinceResponse? ProvinceNavigation { get; set; }
     public AddressRegionResponse? RegionNavigation { get; set; }
+    
+    public PharmacyResponse? Pharmacy { get; set; }
+    public List<PharmacyMemberResponse>? PharmacyMembers { get; set; }
+    public List<StorageFileResponse>? Files { get; set; }
+
 }

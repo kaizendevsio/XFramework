@@ -8,6 +8,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public PharmacyLocation()
         {
             PharmacyJobOrders = new HashSet<PharmacyJobOrder>();
+            PharmacyMembers = new HashSet<PharmacyMember>();
             PharmacyServices = new HashSet<PharmacyService>();
         }
 
@@ -38,6 +39,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
         public virtual Pharmacy Pharmacy { get; set; } = null!;
         public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; set; }
+        public virtual ICollection<PharmacyMember> PharmacyMembers { get; set; }
         public virtual ICollection<PharmacyService> PharmacyServices { get; set; }
     }
 }

@@ -39,7 +39,6 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
         
         var response = pharmacy.Adapt<PharmacyResponse>();
 
-        await GetFilesList(response);
         await GetMemberList(response);
         await GetBranchList(response);
 
@@ -50,15 +49,6 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
             IsSuccess = true,
             Response = response
         };        
-    }
-
-    private async Task GetFilesList(PharmacyResponse response)
-    {
-        response.Files = _dataLayer.XnelSystemsContext.StorageFiles
-            .Where(i => i.IdentifierGuid == $"{response.Guid}")
-            .AsNoTracking()
-            .ToList()
-            .Adapt<List<StorageFileResponse>>();
     }
 
     private async Task GetBranchList(PharmacyResponse response)

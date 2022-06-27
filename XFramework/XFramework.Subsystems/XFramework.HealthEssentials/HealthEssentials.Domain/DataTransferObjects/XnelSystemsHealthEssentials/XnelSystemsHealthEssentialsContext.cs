@@ -1526,6 +1526,11 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasForeignKey(d => d.LaboratoryId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("laboratorymember_laboratory_id_fk");
+
+                entity.HasOne(d => d.LaboratoryLocation)
+                    .WithMany(p => p.LaboratoryMembers)
+                    .HasForeignKey(d => d.LaboratoryLocationId)
+                    .HasConstraintName("laboratorymember_laboratorylocation_id_fk");
             });
 
             modelBuilder.Entity<LaboratoryService>(entity =>
@@ -2865,6 +2870,11 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasForeignKey(d => d.PharmacyId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pharmacymember_pharmacy_id_fk");
+
+                entity.HasOne(d => d.PharmacyLocation)
+                    .WithMany(p => p.PharmacyMembers)
+                    .HasForeignKey(d => d.PharmacyLocationId)
+                    .HasConstraintName("pharmacymember_pharmacylocation_id_fk");
             });
 
             modelBuilder.Entity<PharmacyService>(entity =>

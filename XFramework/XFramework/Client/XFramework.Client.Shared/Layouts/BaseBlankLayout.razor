@@ -28,17 +28,22 @@
         public string SplashSpinner { get; set; } = "assets/img/loader.svg";
         public string SplashLogo { get; set; } = "assets/img/logo.svg";
         public string SplashBackground { get; set; } = "white";
+        private DateTime _startTime = DateTime.Now;
+        private DateTime _endTime;
         
         bool _stateRestored;
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender)
             {
-                new Timer(new TimerCallback(async (e) =>
+                    _endTime = DateTime.Now;
+                    Console.WriteLine($"Core state restored in {_endTime.Subtract(_startTime).TotalMilliseconds}ms");
+                await Mediator.Send(new ApplicationState.RestoreStates()).ContinueWith(async (t) =>
                 {
-                    await Mediator.Send(new ApplicationState.RestoreStates()).ContinueWith(t => { _stateRestored = true; StateHasChanged(); });
-                })
-                , null, 10, 0);
+                    
+                    _stateRestored = true;
+                    StateHasChanged();
+                });
             }
         }
     }

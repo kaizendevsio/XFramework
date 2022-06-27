@@ -144,6 +144,15 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     
     #endregion
     
+    #region Pharmacy Location
+
+    /// <summary>
+    /// Gets the pharmacy location details.
+    /// </summary>
+    public Task<QueryResponse<PharmacyLocationResponse>> GetPharmacyLocation(GetPharmacyLocationRequest request);
+
+    #endregion
+    
     #endregion
 
     #region Logistic Portal
@@ -247,6 +256,15 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     ///  Deletes the laboratory from the system.
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryRequest>> DeleteLaboratory(DeleteLaboratoryRequest request);
+    #endregion
+
+    #region Laboratory Location
+
+    /// <summary>
+    /// Gets the laboratory location details.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryLocationResponse>> GetLaboratoryLocation(GetLaboratoryLocationRequest request);
+
     #endregion
 
     #region Laboratory Member

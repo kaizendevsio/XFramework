@@ -71,7 +71,7 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
 
         foreach (var fileUploadRequest in request.FileList)
         {
-            var filePath = $"{entity.Guid}-laboratory-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
+            var filePath = $"{location.Guid}-laboratory-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
             var client = blobServiceClient.GetBlobContainerClient("files-kyc");
             var blob = client.GetBlobClient(filePath);
             await blob.UploadAsync(BinaryData.FromBytes(fileUploadRequest.FileBytes), new BlobUploadOptions {HttpHeaders = new() {ContentType = fileUploadRequest.ContentType}}, CancellationToken.None);
@@ -79,7 +79,7 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
             await _dataLayer.XnelSystemsContext.StorageFiles.AddAsync(new()
             {
                 ContentPath = $"/files-kyc/{filePath}",
-                IdentifierGuid = entity.Guid,
+                IdentifierGuid = location.Guid,
                 StorageFileIdentifierId = storageFileIdentifiers.FirstOrDefault(i => i.Guid == $"{fileUploadRequest.Entity}")?.Id,
                 EntityId = 1
             });

@@ -14,6 +14,7 @@ public class GetLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<GetL
     {
         var laboratoryMember = await _dataLayer.HealthEssentialsContext.LaboratoryMembers
             .Include(i => i.Laboratory)
+            .Include(i => i.LaboratoryLocation)
             .Where(i => i.Guid == $"{request.Guid}")
             .AsNoTracking()
             .AsSplitQuery()

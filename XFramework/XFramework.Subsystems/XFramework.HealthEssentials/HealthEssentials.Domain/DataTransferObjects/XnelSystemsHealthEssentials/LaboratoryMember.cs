@@ -17,7 +17,9 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string Name { get; set; } = null!;
         public int Status { get; set; }
         public string? Description { get; set; }
+        public long? LaboratoryLocationId { get; set; }
 
         public virtual Laboratory Laboratory { get; set; } = null!;
+        public virtual LaboratoryLocation? LaboratoryLocation { get; set; }
     }
 }

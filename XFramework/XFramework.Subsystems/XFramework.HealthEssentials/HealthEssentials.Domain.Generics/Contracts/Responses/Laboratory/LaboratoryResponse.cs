@@ -20,5 +20,4 @@ public class LaboratoryResponse
     public LaboratoryEntityResponse? Entity { get; set; }
     public List<LaboratoryLocationResponse> LaboratoryLocations { get; set; }
     public List<LaboratoryMemberResponse> LaboratoryMembers { get; set; }
-    public List<StorageFileResponse> Files { get; set; }
 }

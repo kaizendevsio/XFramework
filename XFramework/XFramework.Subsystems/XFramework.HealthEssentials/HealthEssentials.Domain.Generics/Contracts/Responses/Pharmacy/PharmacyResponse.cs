@@ -18,11 +18,11 @@ public class PharmacyResponse
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? Logo { get; set; }
+    public int Status { get; set; }
     
     public virtual List<PharmacyLocationResponse>? PharmacyLocations { get; set; }
     public List<PharmacyMemberResponse>? PharmacyMembers { get; set; }
 
     
     public PharmacyEntityResponse? Entity { get; set; }
-    public List<StorageFileResponse>? Files { get; set; }
 }

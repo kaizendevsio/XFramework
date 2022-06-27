@@ -51,7 +51,6 @@ public partial class ApplicationState
                 throw;
             }
             
-            Console.WriteLine("State Restored");
             return Unit.Value;
         }
     }

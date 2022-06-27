@@ -2,6 +2,7 @@
 using Azure.Storage.Blobs.Models;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
+using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 
@@ -24,30 +25,29 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         entity.EntityId = 1;
         entity.Status = (int) GenericStatusType.Pending;
 
-        if (request.Address is not null)
-        {
-            var country = await _dataLayer.XnelSystemsContext.AddressCountries.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.CountryGuid}", cancellationToken: cancellationToken);
-            var region = await _dataLayer.XnelSystemsContext.AddressRegions.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.RegionGuid}", cancellationToken: cancellationToken);
-            var province = await _dataLayer.XnelSystemsContext.AddressProvinces.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.ProvinceGuid}", cancellationToken: cancellationToken);
-            var city = await _dataLayer.XnelSystemsContext.AddressCities.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.CityGuid}", cancellationToken: cancellationToken);
-            var barangay = await _dataLayer.XnelSystemsContext.AddressBarangays.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.BarangayGuid}", cancellationToken: cancellationToken);
+       
+        var country = await _dataLayer.XnelSystemsContext.AddressCountries.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.CountryGuid}", cancellationToken: cancellationToken);
+        var region = await _dataLayer.XnelSystemsContext.AddressRegions.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.RegionGuid}", cancellationToken: cancellationToken);
+        var province = await _dataLayer.XnelSystemsContext.AddressProvinces.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.ProvinceGuid}", cancellationToken: cancellationToken);
+        var city = await _dataLayer.XnelSystemsContext.AddressCities.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.CityGuid}", cancellationToken: cancellationToken);
+        var barangay = await _dataLayer.XnelSystemsContext.AddressBarangays.FirstOrDefaultAsync(i => i.Guid == $"{request.Address.BarangayGuid}", cancellationToken: cancellationToken);
 
-            await _dataLayer.HealthEssentialsContext.PharmacyLocations.AddAsync(new()
-            {
-                Name = request.Address.Name,
-                UnitNumber = request.Address.UnitNumber,
-                Barangay = barangay.Id,
-                City = city.Id,
-                Region = region.Id,
-                MainAddress = true,
-                Province = province.Id,
-                Country = country.Id,
-                Pharmacy = entity,
-                Status = (int) GenericStatusType.Pending
-            }, CancellationToken.None);
-        }
-        
-        _dataLayer.HealthEssentialsContext.Pharmacies.Add(entity);
+        var location = new PharmacyLocation()
+        {
+            Name = request.Address.Name,
+            UnitNumber = request.Address.UnitNumber,
+            Barangay = barangay.Id,
+            City = city.Id,
+            Region = region.Id,
+            MainAddress = true,
+            Province = province.Id,
+            Country = country.Id,
+            Pharmacy = entity,
+            Status = (int) GenericStatusType.Pending
+        };
+
+        await _dataLayer.HealthEssentialsContext.PharmacyLocations.AddAsync(location, CancellationToken.None);
+        await _dataLayer.HealthEssentialsContext.Pharmacies.AddAsync(entity, CancellationToken.None);
         
         var tags = await _dataLayer.HealthEssentialsContext.Tags.Where(i => i.EntityId == 1).ToListAsync(CancellationToken.None);
         foreach (var item in request.TagList)
@@ -71,7 +71,7 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
 
         foreach (var fileUploadRequest in request.FileList)
         {
-            var filePath = $"{entity.Guid}-pharmacy-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
+            var filePath = $"{location.Guid}-pharmacy-{_helperService.GenerateRandomString(8)}-{fileUploadRequest.FileName}";
             var client = blobServiceClient.GetBlobContainerClient("files-kyc");
             var blob = client.GetBlobClient(filePath);
             await blob.UploadAsync(BinaryData.FromBytes(fileUploadRequest.FileBytes), new BlobUploadOptions {HttpHeaders = new() {ContentType = fileUploadRequest.ContentType}}, CancellationToken.None);
@@ -79,7 +79,7 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
             await _dataLayer.XnelSystemsContext.StorageFiles.AddAsync(new()
             {
                 ContentPath = $"/files-kyc/{filePath}",
-                IdentifierGuid = entity.Guid,
+                IdentifierGuid = location.Guid,
                 StorageFileIdentifierId = storageFileIdentifiers.FirstOrDefault(i => i.Guid == $"{fileUploadRequest.Entity}")?.Id,
                 EntityId = 1
             });

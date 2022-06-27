@@ -68,6 +68,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<PharmacyLocationResponse>> GetPharmacyLocation(GetPharmacyLocationRequest request)
+    {
+        return await SendAsync<GetPharmacyLocationRequest, PharmacyLocationResponse>(request);
+    }
+
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatient(VerifyPatientRequest request)
     {
         return await SendAsync<VerifyPatientRequest, IdentityValidationResponse>(request);
@@ -181,6 +186,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<CmdResponse<DeleteLaboratoryRequest>> DeleteLaboratory(DeleteLaboratoryRequest request)
     {
         return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryLocationResponse>> GetLaboratoryLocation(GetLaboratoryLocationRequest request)
+    {
+        return await SendAsync<GetLaboratoryLocationRequest, LaboratoryLocationResponse>(request);
     }
 
     public async Task<QueryResponse<LaboratoryMemberResponse>> GetLaboratoryMember(GetLaboratoryMemberRequest request)

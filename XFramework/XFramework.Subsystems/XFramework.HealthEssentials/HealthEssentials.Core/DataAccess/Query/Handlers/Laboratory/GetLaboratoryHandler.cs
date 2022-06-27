@@ -39,7 +39,6 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
         
         var response = laboratory.Adapt<LaboratoryResponse>();
 
-        await GetFilesList(response);
         await GetMemberList(response);
         await GetBranchList(response);
 
@@ -51,15 +50,7 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
             Response = response
         };        
     }
-
-    private async Task GetFilesList(LaboratoryResponse response)
-    {
-        response.Files = _dataLayer.XnelSystemsContext.StorageFiles
-            .Where(i => i.IdentifierGuid == $"{response.Guid}")
-            .AsNoTracking()
-            .ToList()
-            .Adapt<List<StorageFileResponse>>();
-    }
+    
     private async Task GetBranchList(LaboratoryResponse response)
     {
         for (var index = 0; index < response.LaboratoryLocations.Count; index++)
