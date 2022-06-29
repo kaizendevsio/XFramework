@@ -1,5 +1,4 @@
 ﻿using System.Text.Json.Serialization;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
 
@@ -32,13 +31,15 @@ public class PharmacyLocationResponse
     public string? AlternativePhone { get; set; }
 
     public PharmacyResponse? Pharmacy { get; set; }
-    public List<PharmacyJobOrder> PharmacyJobOrders { get; set; }
-    public List<PharmacyMember> PharmacyMembers { get; set; }
-    public List<PharmacyService> PharmacyServices { get; set; }
+    public List<PharmacyJobOrderResponse>? PharmacyJobOrders { get; set; }
+    public List<PharmacyMemberResponse>? PharmacyMembers { get; set; }
+    public List<PharmacyServiceResponse>? PharmacyServices { get; set; }
+    public List<StorageFileResponse>? Files { get; set; }
     public AddressBarangayResponse? Barangay { get; set; }
     public AddressCityResponse? City { get; set; }
     public AddressRegionResponse? Region { get; set; }
     public AddressProvinceResponse? Province { get; set; }
     public AddressCountryResponse? Country { get; set; }
+    
 
 }

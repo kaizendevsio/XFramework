@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
 
@@ -31,11 +32,13 @@ public class LaboratoryLocationResponse
     public string? AlternativePhone { get; set; }
 
     public LaboratoryResponse? Laboratory { get; set; }
-    public List<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; set; }
-    public List<LaboratoryJobOrder> LaboratoryJobOrders { get; set; }
-    public List<LaboratoryLocationTag> LaboratoryLocationTags { get; set; }
-    public List<LaboratoryMember> LaboratoryMembers { get; set; }
-    public List<LaboratoryService> LaboratoryServices { get; set; }
+    public List<ConsultationJobOrderLaboratoryResponse>? ConsultationJobOrderLaboratories { get; set; }
+    public List<LaboratoryJobOrderResponse>? LaboratoryJobOrders { get; set; }
+    public List<LaboratoryLocationTagResponse>? LaboratoryLocationTags { get; set; }
+    public List<LaboratoryMemberResponse>? LaboratoryMembers { get; set; }
+    public List<LaboratoryServiceResponse>? LaboratoryServices { get; set; }
+    
+    public List<StorageFileResponse>? Files { get; set; }
     public AddressBarangayResponse? Barangay { get; set; }
     public AddressCityResponse? City { get; set; }
     public AddressRegionResponse? Region { get; set; }
