@@ -18,9 +18,5 @@
     <ItemGroup>
         <Folder Include="BusinessObjects" />
     </ItemGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj" />
-    </ItemGroup>
     
 </Project>

@@ -1,5 +1,4 @@
 ﻿using System.Text.Json.Serialization;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
 
