@@ -36,12 +36,12 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         {
             Name = request.Address.Name,
             UnitNumber = request.Address.UnitNumber,
-            Barangay = barangay.Id,
-            City = city.Id,
-            Region = region.Id,
+            BarangayId = barangay.Id,
+            CityId = city.Id,
+            RegionId = region.Id,
             MainAddress = true,
-            Province = province.Id,
-            Country = country.Id,
+            ProvinceId = province.Id,
+            CountryId = country.Id,
             Pharmacy = entity,
             Status = (int) GenericStatusType.Pending
         };

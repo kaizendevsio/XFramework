@@ -1,4 +1,5 @@
-﻿using Blazored.LocalStorage;
+﻿using System.Diagnostics;
+using Blazored.LocalStorage;
 using TypeSupport.Extensions;
 using XFramework.Client.Shared.Entity.Enums;
 
@@ -62,11 +63,18 @@ public static class StateHelper
             _ => throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null)
         };
         if (s is null)
-        {
+        { 
             mediator.Send(Activator.CreateInstance<TAction>());
             return;
         }
 
+        
+        // measure time to restore state
+        var stopwatch = new Stopwatch();
+        stopwatch.Start();
         SetProperties(JsonSerializer.Deserialize<TAction>(s), state);
+        stopwatch.Stop();
+        Console.WriteLine($"Restore {state.GetType().Name} state took {stopwatch.ElapsedMilliseconds}ms");
+        
     }
 }

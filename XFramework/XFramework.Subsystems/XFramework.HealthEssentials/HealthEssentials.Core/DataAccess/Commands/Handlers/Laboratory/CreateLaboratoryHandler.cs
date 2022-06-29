@@ -34,12 +34,12 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
         {
             Name = request.Address.Name,
             UnitNumber = request.Address.UnitNumber,
-            Barangay = barangay.Id,
-            City = city.Id,
-            Region = region.Id,
+            BarangayId = barangay.Id,
+            CityId = city.Id,
+            RegionId = region.Id,
             MainAddress = true,
-            Province = province.Id,
-            Country = country.Id,
+            ProvinceId = province.Id,
+            CountryId = country.Id,
             Laboratory = entity,
             Status = (int) GenericStatusType.Pending
         };
