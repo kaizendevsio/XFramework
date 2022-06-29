@@ -15,5 +15,5 @@ public class AilmentResponse
     public string? Description { get; set; }
     public Guid? Guid { get; set; }
     
-    public AilmentEntityResponse Entity { get; set; } = null!;
+    public AilmentEntityResponse? Entity { get; set; }
 }

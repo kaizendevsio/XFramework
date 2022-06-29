@@ -24,61 +24,61 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
         }
         
         var barangay = await _dataLayer.XnelSystemsContext.AddressBarangays
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.BarangayId}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.BarangayGuid}", CancellationToken.None);
         
         if (barangay is null)
         {
             return new ()
             {
-                Message = $"Barangay with Guid {request.BarangayId} does not exist",
+                Message = $"Barangay with Guid {request.BarangayGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
         var city = await _dataLayer.XnelSystemsContext.AddressCities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.CityId}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.CityGuid}", CancellationToken.None);
 
         if (city is null)
         {
             return new ()
             {
-                Message = $"City with Guid {request.CityId} does not exist",
+                Message = $"City with Guid {request.CityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
         var region = await _dataLayer.XnelSystemsContext.AddressRegions
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.RegionId}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.RegionGuid}", CancellationToken.None);
 
         if (region is null)
         {
             return new ()
             {
-                Message = $"Region with Guid {request.RegionId} does not exist",
+                Message = $"Region with Guid {request.RegionGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
         var province = await _dataLayer.XnelSystemsContext.AddressProvinces
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ProvinceId}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.ProvinceGuid}", CancellationToken.None);
 
         if (province is null)
         {
             return new ()
             {
-                Message = $"Province with Guid {request.ProvinceId} does not exist",
+                Message = $"Province with Guid {request.ProvinceGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
         var country = await _dataLayer.XnelSystemsContext.AddressCountries
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.CountryId}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.CountryGuid}", CancellationToken.None);
 
         if (country is null)
         {
             return new ()
             {
-                Message = $"Country with Guid {request.CountryId} does not exist",
+                Message = $"Country with Guid {request.CountryGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
