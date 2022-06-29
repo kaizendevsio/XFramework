@@ -1,5 +1,4 @@
-﻿using System.Transactions;
-using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using XFramework.Domain.Generic.Contracts.Requests;
 using TransactionStatus = System.Transactions.TransactionStatus;
 
