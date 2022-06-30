@@ -4,10 +4,11 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
 public class DeleteLaboratoryHandler : CommandBaseHandler, IRequestHandler<DeleteLaboratoryCmd, CmdResponse<DeleteLaboratoryCmd>>
 {
-    public DeleteLaboratoryHandler()
+    public DeleteLaboratoryHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+    
     public async Task<CmdResponse<DeleteLaboratoryCmd>> Handle(DeleteLaboratoryCmd request, CancellationToken cancellationToken)
     {
         var existingLaboratory = await _dataLayer.HealthEssentialsContext.Laboratories

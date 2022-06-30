@@ -14,7 +14,6 @@ public class CreateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
     public async Task<CmdResponse<CreateLogisticRiderHandleCmd>> Handle(CreateLogisticRiderHandleCmd request, CancellationToken cancellationToken)
     {
         var logistic = await _dataLayer.HealthEssentialsContext.Logistics
-            .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.LogisticGuid}", cancellationToken: cancellationToken);
        
         if (logistic is null)
@@ -27,7 +26,6 @@ public class CreateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
         }
         
         var rider = await _dataLayer.HealthEssentialsContext.LogisticRiders
-            .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.RiderGuid}", cancellationToken: cancellationToken);
        
         if (rider is null)
@@ -39,25 +37,22 @@ public class CreateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
             };
         }
 
-        var entity = new LogisticRiderHandle()
-        {
-            Logistic = logistic,
-            LogisticRider = rider,
-            Guid = $"{Guid.NewGuid()}",
-            Status = (short) GenericStatusType.Approved
-        };
+        var handle = request.Adapt<LogisticRiderHandle>();
+        handle.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        handle.Logistic = logistic;
+        handle.LogisticRider = rider;
         
-        _dataLayer.HealthEssentialsContext.LogisticRiderHandles.Add(entity);
+        await _dataLayer.HealthEssentialsContext.LogisticRiderHandles.AddAsync(handle,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Logistic rider handle with Guid {entity.Guid} created successfully",
+            Message = $"Logistic rider handle with Guid {handle.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(entity.Guid)
+                Guid = Guid.Parse(handle.Guid)
             }
         };
     }

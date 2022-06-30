@@ -73,6 +73,26 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync<GetPharmacyLocationRequest, PharmacyLocationResponse>(request);
     }
 
+    public async Task<QueryResponse<List<PharmacyLocationResponse>>> GetPharmacyLocationList(GetPharmacyLocationListRequest request)
+    {
+        return await SendAsync<GetPharmacyLocationListRequest, List<PharmacyLocationResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyLocationRequest>> CreatePharmacyLocation(CreatePharmacyLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyLocationRequest>> UpdatePharmacyLocation(UpdatePharmacyLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyLocationRequest>> DeletePharmacyLocation(DeletePharmacyLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatient(VerifyPatientRequest request)
     {
         return await SendAsync<VerifyPatientRequest, IdentityValidationResponse>(request);
@@ -191,6 +211,26 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<QueryResponse<LaboratoryLocationResponse>> GetLaboratoryLocation(GetLaboratoryLocationRequest request)
     {
         return await SendAsync<GetLaboratoryLocationRequest, LaboratoryLocationResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryLocationResponse>>> GetLaboratoryLocationList(GetLaboratoryLocationListRequest request)
+    {
+        return await SendAsync<GetLaboratoryLocationListRequest, List<LaboratoryLocationResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryLocationRequest>> CreateLaboratoryLocation(CreateLaboratoryLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryLocationRequest>> UpdateLaboratoryLocation(UpdateLaboratoryLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryLocationRequest>> DeleteLaboratoryLocation(DeleteLaboratoryLocationRequest request)
+    {
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<LaboratoryMemberResponse>> GetLaboratoryMember(GetLaboratoryMemberRequest request)

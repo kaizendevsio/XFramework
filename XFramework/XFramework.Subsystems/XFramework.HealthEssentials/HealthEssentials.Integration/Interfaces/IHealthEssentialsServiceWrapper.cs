@@ -60,7 +60,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     
     #endregion
 
-    #region Patient
+    #region Patient Portal
     /// <summary>
     /// Gets the patient profile.
     /// </summary>
@@ -150,6 +150,23 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// Gets the pharmacy location details.
     /// </summary>
     public Task<QueryResponse<PharmacyLocationResponse>> GetPharmacyLocation(GetPharmacyLocationRequest request);
+    /// <summary>
+    ///  Get all pharmacy locations in the system.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyLocationResponse>>> GetPharmacyLocationList(GetPharmacyLocationListRequest request);
+    /// <summary>
+    ///  Creates a new pharmacy location in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyLocationRequest>> CreatePharmacyLocation(CreatePharmacyLocationRequest request);
+    /// <summary>
+    ///  Updates the pharmacy location details.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyLocationRequest>> UpdatePharmacyLocation(UpdatePharmacyLocationRequest request);
+    /// <summary>
+    ///  Deletes the pharmacy location from the system.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyLocationRequest>> DeletePharmacyLocation(DeletePharmacyLocationRequest request);
+    
 
     #endregion
     
@@ -264,6 +281,23 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// Gets the laboratory location details.
     /// </summary>
     public Task<QueryResponse<LaboratoryLocationResponse>> GetLaboratoryLocation(GetLaboratoryLocationRequest request);
+    /// <summary>
+    ///  Get all laboratory locations in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryLocationResponse>>> GetLaboratoryLocationList(GetLaboratoryLocationListRequest request);
+    /// <summary>
+    ///  Creates a new laboratory location in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryLocationRequest>> CreateLaboratoryLocation(CreateLaboratoryLocationRequest request);
+    /// <summary>
+    ///  Updates the laboratory location profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryLocationRequest>> UpdateLaboratoryLocation(UpdateLaboratoryLocationRequest request);
+    /// <summary>
+    ///  Deletes the laboratory location from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryLocationRequest>> DeleteLaboratoryLocation(DeleteLaboratoryLocationRequest request);
+    
 
     #endregion
 
@@ -368,7 +402,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
     #endregion
     
-    #region Consultation
+    #region Consultation Portal
     #region Consultation Entity
     /// <summary>
     ///  Gets the consultation entity profile.
@@ -441,12 +475,13 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
     #endregion
     
+    
+    #region Administrator Portal
+    
     #region Member
     public Task<QueryResponse<List<CredentialResponse>>> GetPendingRegistrationCompletionList(GetPendingRegistrationCompletionListRequest request);
 
     #endregion
-    
-    #region Administrator
 
     #endregion
     

@@ -12,8 +12,8 @@ public class UpdatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<U
     
     public async Task<CmdResponse<UpdatePharmacyMemberCmd>> Handle(UpdatePharmacyMemberCmd request, CancellationToken cancellationToken)
     {
-        var pharmacyMember = await _dataLayer.HealthEssentialsContext.PharmacyMembers.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-        if (pharmacyMember is null)
+        var existingPharmacyMember = await _dataLayer.HealthEssentialsContext.PharmacyMembers.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        if (existingPharmacyMember is null)
         {
             return new ()
             {
@@ -42,18 +42,35 @@ public class UpdatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<U
             };
         }
         
-        pharmacyMember = request.Adapt(pharmacyMember);
-        pharmacyMember.CredentialId = credential.Id;
-        pharmacyMember.Pharmacy = pharmacy;
+        var pharmacyLocation = await _dataLayer.HealthEssentialsContext.PharmacyLocations
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+
+        if (pharmacyLocation is null)
+        {
+            return new ()
+            {
+                Message = $"Pharmacy Location with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
         
-        _dataLayer.HealthEssentialsContext.Update(pharmacyMember);
+        var updatedPharmacyMember = request.Adapt(existingPharmacyMember);
+        updatedPharmacyMember.CredentialId = credential.Id;
+        updatedPharmacyMember.Pharmacy = pharmacy;
+        updatedPharmacyMember.PharmacyLocation = pharmacyLocation;
+        
+        _dataLayer.HealthEssentialsContext.Update(updatedPharmacyMember);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()
         {
-            Message = "Laboratory updated successfully",
+            Message = $"Pharmacy member with Guid {request.Guid} updated successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            Request = request
+            IsSuccess = true,
+            Request = new()
+            {
+                Guid = Guid.Parse(updatedPharmacyMember.Guid)
+            }
         };
     }
 }

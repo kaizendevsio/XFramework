@@ -4,10 +4,11 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
 public class DeleteLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler<DeleteLaboratoryMemberCmd, CmdResponse<DeleteLaboratoryMemberCmd>>
 {
-    public DeleteLaboratoryMemberHandler()
+    public DeleteLaboratoryMemberHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+    
     public async Task<CmdResponse<DeleteLaboratoryMemberCmd>> Handle(DeleteLaboratoryMemberCmd request, CancellationToken cancellationToken)
     {
         var existingLaboratoryMember = await _dataLayer.HealthEssentialsContext.LaboratoryMembers
@@ -16,7 +17,7 @@ public class DeleteLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         {
             return new()
             {
-                Message = $"Laboratory member with Guid {request.Guid} does not exist",
+                Message = $"Laboratory member with guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }

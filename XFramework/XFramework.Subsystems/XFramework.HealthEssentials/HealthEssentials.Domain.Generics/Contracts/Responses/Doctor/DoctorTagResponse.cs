@@ -11,6 +11,6 @@ public class DoctorTagResponse
     public string? Value { get; set; }
     public Guid? Guid { get; set; }
     
-    public DoctorResponse Doctor { get; set; } = null!;
+    public DoctorResponse? Doctor { get; set; }
     public TagResponse? Tag { get; set; }
 }

@@ -14,7 +14,7 @@ public class DoctorResponse
     public string? Description { get; set; }
     public string? Remarks { get; set; }
     public Guid? Guid { get; set; }
-    public string Name { get; set; } = null!;
+    public string? Name { get; set; }
     public int? ExperienceYears { get; set; }
     public string? Clinic { get; set; }
     public string? ClinicAddress { get; set; }
@@ -25,7 +25,7 @@ public class DoctorResponse
     public string? TinNumber { get; set; }
     public int Status { get; set; }
     
-    public DoctorEntityResponse Entity { get; set; } = null!;
+    public DoctorEntityResponse? Entity { get; set; }
     public CredentialResponse? Credential { get; set; }
     public List<StorageFileResponse>? Files { get; set; }
 }

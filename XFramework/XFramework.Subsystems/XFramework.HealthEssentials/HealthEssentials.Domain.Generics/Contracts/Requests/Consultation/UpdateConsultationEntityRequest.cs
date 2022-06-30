@@ -10,5 +10,5 @@ public class UpdateConsultationEntityRequest : RequestBase
     public long GroupGuid { get; set; }
     public int? SortOrder { get; set; }
 
-    public ConsultationEntityGroupResponse Group { get; set; } = null!;
+    public ConsultationEntityGroupResponse? Group { get; set; }
 }

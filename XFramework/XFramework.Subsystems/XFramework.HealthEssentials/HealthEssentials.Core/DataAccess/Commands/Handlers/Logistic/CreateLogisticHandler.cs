@@ -16,7 +16,7 @@ public class CreateLogisticHandler : CommandBaseHandler, IRequestHandler<CreateL
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.Status = (int) GenericStatusType.Pending;
 
-        _dataLayer.HealthEssentialsContext.Logistics.Add(entity);
+        await _dataLayer.HealthEssentialsContext.Logistics.AddAsync(entity,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()

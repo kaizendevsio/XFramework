@@ -13,6 +13,7 @@ public class UpdateConsultationHandler : CommandBaseHandler, IRequestHandler<Upd
     {
         var existingConsultation = await _dataLayer.HealthEssentialsContext.Consultations
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
+        
         if (existingConsultation is null)
         {
             return new ()
@@ -22,20 +23,20 @@ public class UpdateConsultationHandler : CommandBaseHandler, IRequestHandler<Upd
             }; 
         }
         
-        var entity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
+        var consultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
             .FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", CancellationToken.None);
-        if (entity is null)
+       
+        if (consultationEntity is null)
         {
             return new ()
             {
                 Message = $"Consultation entity with Guid {request.EntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
-            }; 
+            };
         }
         
         var updatedConsultation = request.Adapt(existingConsultation);
-        updatedConsultation.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        updatedConsultation.Entity = entity;
+        updatedConsultation.Entity = consultationEntity;
         
         _dataLayer.HealthEssentialsContext.Update(updatedConsultation);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

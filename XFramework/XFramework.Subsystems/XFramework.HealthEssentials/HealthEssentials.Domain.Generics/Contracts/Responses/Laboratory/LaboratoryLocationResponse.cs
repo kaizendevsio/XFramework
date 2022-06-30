@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
 
@@ -16,27 +17,31 @@ public class LaboratoryLocationResponse
     public string? UnitNumber { get; set; }
     public string? Street { get; set; }
     public string? Building { get; set; }
-    public long? Barangay { get; set; }
-    public long? City { get; set; }
+    [JsonIgnore] public long? BarangayId { get; set; }
+    [JsonIgnore] public long? CityId { get; set; }
     public string? Subdivision { get; set; }
-    public long? Region { get; set; }
+    [JsonIgnore] public long? RegionId { get; set; }
     public bool? MainAddress { get; set; }
-    public long? Province { get; set; }
-    public long? Country { get; set; }
-    public Guid? Guid { get; set; }
+    [JsonIgnore] public long? ProvinceId { get; set; }
+    [JsonIgnore] public long? CountryId { get; set; }
+    public string Guid { get; set; } = null!;
     public int? Status { get; set; }
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? AlternativePhone { get; set; }
-    
-    public AddressBarangayResponse? BarangayNavigation { get; set; }
-    public AddressCityResponse? CityNavigation { get; set; }
-    public AddressCountryResponse? CountryNavigation { get; set; }
-    public AddressProvinceResponse? ProvinceNavigation { get; set; }
-    public AddressRegionResponse? RegionNavigation { get; set; }
-    public LaboratoryResponse? Laboratory { get; set; }
-    public List<LaboratoryMemberResponse>? LaboratoryMembers { get; set; }
-    public List<StorageFileResponse>? Files { get; set; }
 
+    public LaboratoryResponse? Laboratory { get; set; }
+    public List<ConsultationJobOrderLaboratoryResponse>? ConsultationJobOrderLaboratories { get; set; }
+    public List<LaboratoryJobOrderResponse>? LaboratoryJobOrders { get; set; }
+    public List<LaboratoryLocationTagResponse>? LaboratoryLocationTags { get; set; }
+    public List<LaboratoryMemberResponse>? LaboratoryMembers { get; set; }
+    public List<LaboratoryServiceResponse>? LaboratoryServices { get; set; }
+    
+    public List<StorageFileResponse>? Files { get; set; }
+    public AddressBarangayResponse? Barangay { get; set; }
+    public AddressCityResponse? City { get; set; }
+    public AddressRegionResponse? Region { get; set; }
+    public AddressProvinceResponse? Province { get; set; }
+    public AddressCountryResponse? Country { get; set; }
 }

@@ -23,20 +23,18 @@ public class UpdateLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
         }
         
         var serviceEntityGroup = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", cancellationToken: cancellationToken);
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", CancellationToken.None);
        
         if (serviceEntityGroup is null)
         {
             return new ()
             {
-                Message = $"Service type group with Guid {request.GroupGuid} does not exist",
+                Message = $"Service entity group with Guid {request.GroupGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
         var updatedLaboratoryServiceEntity = request.Adapt(existingLaboratoryServiceEntity);
-        updatedLaboratoryServiceEntity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         updatedLaboratoryServiceEntity.Group = serviceEntityGroup;
         
         _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities.Update(updatedLaboratoryServiceEntity);

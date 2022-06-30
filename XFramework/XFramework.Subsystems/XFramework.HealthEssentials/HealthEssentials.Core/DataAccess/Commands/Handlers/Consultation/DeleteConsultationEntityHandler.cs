@@ -18,7 +18,7 @@ public class DeleteConsultationEntityHandler : CommandBaseHandler, IRequestHandl
         {
             return new()
             {
-                Message = $"Consultation with Guid {request.Guid} does not exist",
+                Message = $"Consultation entity with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -31,7 +31,7 @@ public class DeleteConsultationEntityHandler : CommandBaseHandler, IRequestHandl
         
         return new()
         {
-            Message = $"Consultation with Guid {request.Guid} has been deleted",
+            Message = $"Consultation entity with Guid {request.Guid} has been deleted",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true
         };
