@@ -4,7 +4,7 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
 
 public class UpdatePharmacyLocationRequest : RequestBase
 {
-    public long PharmacyId { get; set; }
+    public long PharmacyGuid { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? UnitNumber { get; set; }

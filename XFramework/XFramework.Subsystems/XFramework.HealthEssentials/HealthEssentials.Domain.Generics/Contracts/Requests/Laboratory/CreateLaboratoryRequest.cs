@@ -13,6 +13,6 @@ public class CreateLaboratoryRequest : RequestBase
     public string? Logo { get; set; }
     
     public CreateAddressRequest? Address { get; set; }
-    public List<FileUploadRequest> FileList { get; set; }
-    public List<string> SupportedLaboratoryServiceList { get; set; }    
+    public List<FileUploadRequest>? FileList { get; set; }
+    public List<string>? SupportedLaboratoryServiceList { get; set; }    
 }

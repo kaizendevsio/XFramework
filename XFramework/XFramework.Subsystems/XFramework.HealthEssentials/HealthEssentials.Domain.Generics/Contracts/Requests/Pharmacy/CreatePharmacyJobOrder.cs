@@ -22,5 +22,5 @@ public class CreatePharmacyJobOrder : RequestBase
     public string? PrescriptionNote { get; set; }
     public Guid? ScheduleGuid { get; set; }
 
-    public List<PharmacyJobOrderMedicineResponse> MedicineList { get; set; }
+    public List<PharmacyJobOrderMedicineResponse>? MedicineList { get; set; }
 }

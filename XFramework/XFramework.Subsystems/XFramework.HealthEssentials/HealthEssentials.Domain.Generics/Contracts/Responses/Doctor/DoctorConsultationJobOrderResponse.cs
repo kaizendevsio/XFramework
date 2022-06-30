@@ -10,8 +10,8 @@ public class DoctorConsultationJobOrderResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long DoctorId { get; set; }
     public Guid? Guid { get; set; }
     
     public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
+    public DoctorResponse? Doctor { get; set; }
 }

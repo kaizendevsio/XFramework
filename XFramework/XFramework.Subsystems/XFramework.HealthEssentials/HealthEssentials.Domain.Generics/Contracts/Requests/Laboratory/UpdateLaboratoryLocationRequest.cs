@@ -4,7 +4,7 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 
 public class UpdateLaboratoryLocationRequest : RequestBase
 {
-    public long LaboratoryId { get; set; }
+    public long LaboratoryGuid { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? UnitNumber { get; set; }

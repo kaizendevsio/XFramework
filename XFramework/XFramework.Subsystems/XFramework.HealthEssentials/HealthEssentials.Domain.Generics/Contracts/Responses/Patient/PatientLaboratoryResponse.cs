@@ -10,7 +10,6 @@ public class PatientLaboratoryResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long PatientId { get; set; }
     public Guid? Guid { get; set; }
 
     public LaboratoryJobOrderResponse? LaboratoryJobOrder { get; set; }
