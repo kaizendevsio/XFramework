@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests.Get;
 
-public class GetCredentialListRequest : RequestBase
+public class GetCredentialListRequest : QueryableRequest
 {
     public Guid? ApplicationGuid { get; set; }
     public RoleEntity IdentityRole { get; set; }

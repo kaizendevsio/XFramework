@@ -1,9 +1,5 @@
-﻿using System.Threading.Tasks;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
-using Wallets.Core.DataAccess.Commands.Entity.Wallets;
+﻿using Microsoft.AspNetCore.Mvc;
 using Wallets.Core.DataAccess.Commands.Entity.Wallets.Identity;
-using Wallets.Core.DataAccess.Query.Entity.Wallets;
 using Wallets.Core.DataAccess.Query.Entity.Wallets.Identity;
 
 namespace Wallets.Api.Controllers.V1.Wallets;
@@ -72,7 +68,7 @@ public class IdentityWalletsController : XFrameworkControllerBase
     }
 
     [HttpPost("Transfer")]
-    public async Task<JsonResult> Transfer([FromBody] TransferWalletCmd request)
+    public async Task<JsonResult> Transfer([FromBody] ConvertWalletCmd request)
     {
         var result = await _mediator.Send(request);
         return new JsonResult(result);

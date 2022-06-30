@@ -1,4 +1,13 @@
 ﻿@inherits LayoutComponentBase
 
 <MudThemeProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+
 @Body
+
+@code
+{
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+}

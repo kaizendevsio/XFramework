@@ -1,10 +1,8 @@
-﻿using LoadManna.Integration.Drivers;
-using LoadManna.Integration.Interfaces.Wrappers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+﻿/*using LoadManna.Integration.Drivers;
+using LoadManna.Integration.Interfaces.Wrappers;*/
+
 using Wallets.Api.SignalR;
 using Wallets.Core.Services;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
@@ -17,6 +15,6 @@ public class WrapperInstaller : IInstaller
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
         services.AddTransient<ILoggerWrapper, LoggerService>();
         services.AddSingleton<ISignalRService, SignalRWrapper>();
-        services.AddSingleton<IPaymentGatewayWrapper, PaymentGatewayDriver>();
+        /*services.AddSingleton<IPaymentGatewayWrapper, PaymentGatewayDriver>();*/
     }
 }

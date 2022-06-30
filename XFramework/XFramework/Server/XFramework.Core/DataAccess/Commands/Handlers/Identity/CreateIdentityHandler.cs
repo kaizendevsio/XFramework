@@ -1,4 +1,6 @@
 ﻿
+using System.Text.Json;
+
 namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
 {
     public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateIdentityCmd, CmdResponse>
@@ -33,7 +35,6 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
                 CredentialGuid = cuid,
                 Value = request.Email
             };
-            
             
             var checkIdentityExistence = await IdentityServiceWrapper.CheckIdentityExistence(request.Adapt<CheckIdentityExistenceRequest>());
             if (checkIdentityExistence.HttpStatusCode == HttpStatusCode.Conflict)

@@ -1,16 +1,12 @@
 ﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity;
-using IdentityServer.Domain.DataTransferObjects.Legacy;
 using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace IdentityServer.Core.DataAccess.Query.Handlers.Identity;
 
 public class CheckIdentityExistenceHandler : QueryBaseHandler ,IRequestHandler<CheckIdentityExistenceQuery, QueryResponse<ExistenceResponse>>
 {
-    private readonly LegacyContext _legacyContext;
-
-    public CheckIdentityExistenceHandler(IDataLayer dataLayer, LegacyContext legacyContext)
+    public CheckIdentityExistenceHandler(IDataLayer dataLayer)
     {
-        _legacyContext = legacyContext;
         _dataLayer = dataLayer;
     }
         
@@ -23,13 +19,15 @@ public class CheckIdentityExistenceHandler : QueryBaseHandler ,IRequestHandler<C
                 HttpStatusCode = HttpStatusCode.Accepted
             };
         }
-        
-        var existing = _dataLayer.TblIdentityInformations
+     
+        var application = await GetApplication(request.RequestServer.ApplicationId);
+        var existing = _dataLayer.IdentityInformations
             .AsNoTracking()
             .Where(i => i.FirstName == request.FirstName)
             .Where(i  => i.MiddleName == request.MiddleName)
             .Where(i => i.LastName == request.LastName)
             .Where(i => i.Guid != $"{request.Guid}")
+            .Where(i => i.ApplicationId != application.Id)
             .Any();
             
         if (existing)

@@ -4,91 +4,90 @@ using System.Xml.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace XFramework.Integration.Extensions
+namespace XFramework.Integration.Extensions;
+
+public static class HttpFormExtension
 {
-    public static class HttpFormExtension
+    private static IDictionary<string, string> ToKeyValue(this object metaToken)
     {
-        private static IDictionary<string, string> ToKeyValue(this object metaToken)
+        if (metaToken == null)
         {
-            if (metaToken == null)
-            {
-                return null;
-            }
+            return null;
+        }
 
-            // Added by me: avoid cyclic references
-            var serializer = new JsonSerializer { ReferenceLoopHandling = ReferenceLoopHandling.Ignore };
-            var token = metaToken as JToken;
-            if (token == null)
-            {
-                // Modified by me: use serializer defined above
-                return ToKeyValue(JObject.FromObject(metaToken, serializer));
-            }
+        // Added by me: avoid cyclic references
+        var serializer = new JsonSerializer { ReferenceLoopHandling = ReferenceLoopHandling.Ignore };
+        var token = metaToken as JToken;
+        if (token == null)
+        {
+            // Modified by me: use serializer defined above
+            return ToKeyValue(JObject.FromObject(metaToken, serializer));
+        }
 
-            if (token.HasValues)
+        if (token.HasValues)
+        {
+            var contentData = new Dictionary<string, string>();
+            foreach (var child in token.Children().ToList())
             {
-                var contentData = new Dictionary<string, string>();
-                foreach (var child in token.Children().ToList())
+                var childContent = child.ToKeyValue();
+                if (childContent != null)
                 {
-                    var childContent = child.ToKeyValue();
-                    if (childContent != null)
-                    {
-                        contentData = contentData.Concat(childContent)
-                            .ToDictionary(k => k.Key, v => v.Value);
-                    }
+                    contentData = contentData.Concat(childContent)
+                        .ToDictionary(k => k.Key, v => v.Value);
                 }
-
-                return contentData;
             }
 
-            var jValue = token as JValue;
-            if (jValue?.Value == null)
-            {
-                return null;
-            }
-
-            var value = jValue?.Type == JTokenType.Date
-                ? jValue?.ToString("o", CultureInfo.InvariantCulture)
-                : jValue?.ToString(CultureInfo.InvariantCulture);
-
-            return new Dictionary<string, string> { { token.Path, value } };
+            return contentData;
         }
 
-        public static FormUrlEncodedContent ToFormData(this object obj)
+        var jValue = token as JValue;
+        if (jValue?.Value == null)
         {
-            var formData = obj.ToKeyValue();
-
-            return new FormUrlEncodedContent(formData);
+            return null;
         }
 
-        public static string JsonToQuery(this string jsonQuery)
-        {
-            string str = "?";
-            str += jsonQuery
-                .Replace(":", "=")
-                .Replace("{", "")
-                .Replace("}", "")
-                .Replace(",", "&")
-                .Replace("\"", "");
-            return str;
-        }
+        var value = jValue?.Type == JTokenType.Date
+            ? jValue?.ToString("o", CultureInfo.InvariantCulture)
+            : jValue?.ToString(CultureInfo.InvariantCulture);
 
-        public static T ToXmlObject<T>(this string stringObject)
-        {
-            var serializer = new XmlSerializer(typeof(T));
-            using var reader = new StringReader(stringObject);
-            var result = (T)(serializer.Deserialize(reader));
+        return new Dictionary<string, string> { { token.Path, value } };
+    }
 
-            return result;
-        }
+    public static FormUrlEncodedContent ToFormData(this object obj)
+    {
+        var formData = obj.ToKeyValue();
 
-        public static string UrlEncode(this string text)
-        {
-            return HttpUtility.UrlEncode(text);
-        }
+        return new FormUrlEncodedContent(formData);
+    }
 
-        public static string UrlDecode(this string text)
-        {
-            return HttpUtility.UrlDecode(text);
-        }
+    public static string JsonToQuery(this string jsonQuery)
+    {
+        string str = "?";
+        str += jsonQuery
+            .Replace(":", "=")
+            .Replace("{", "")
+            .Replace("}", "")
+            .Replace(",", "&")
+            .Replace("\"", "");
+        return str;
+    }
+
+    public static T ToXmlObject<T>(this string stringObject)
+    {
+        var serializer = new XmlSerializer(typeof(T));
+        using var reader = new StringReader(stringObject);
+        var result = (T)(serializer.Deserialize(reader));
+
+        return result;
+    }
+
+    public static string UrlEncode(this string text)
+    {
+        return HttpUtility.UrlEncode(text);
+    }
+
+    public static string UrlDecode(this string text)
+    {
+        return HttpUtility.UrlDecode(text);
     }
 }

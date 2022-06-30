@@ -1,4 +1,6 @@
 ﻿using FluentValidation;
+using Sentry;
+using TypeSupport.Extensions;
 
 namespace IdentityServer.Core.PipelineBehaviors;
 
@@ -9,10 +11,9 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     private readonly IDataLayer _dataLayer;
     private TResponse _response;
 
-    public BasePipelineBehavior(IEnumerable<IValidator<TRequest>> validators, IDataLayer dataLayer)
+    public BasePipelineBehavior(IEnumerable<IValidator<TRequest>> validators)
     {
         _validators = validators;
-        _dataLayer = dataLayer;
     }
 
     public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
@@ -24,21 +25,22 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
             // Post Validation
             
             // Create data layer transaction
-            await using var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
+            //await using var transaction = await _dataLayer.Database.BeginTransactionAsync(cancellationToken);
                 
             // Pre Handler
             _response = await next();
             // Post Handler
 
             // Commit data layer transaction
-            await transaction.CommitAsync(cancellationToken);
+            //await transaction.CommitAsync(cancellationToken);
             await PostHandler(request);                
 
             return _response;
         }
         catch (Exception e)
         {
-            _dataLayer.RollBack();
+            SentrySdk.CaptureMessage(e.ToString());
+            //_dataLayer.RollBack();
             var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
                 
             responseInstance?.GetType().GetProperty("Message")?
@@ -78,19 +80,32 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     {
         if (_response.GetType() == typeof(CmdResponse<TRequest>))
         {
-            _response.GetType().GetProperty("Request")?.SetValue(_response, request, null);
+            if (_response.ContainsProperty("Request"))
+            {
+                _response.SetPropertyValue("Request", request);
+            }
         }
 
-        if (_response.GetType().GetProperty("Message")?.GetValue(_response) == null)
+        if (_response.ContainsProperty("Message"))
         {
-            _response.GetType().GetProperty("Message")?.SetValue(_response, HttpStatusCode.Accepted.ToString(), null);
+            if (_response.GetPropertyValue("Message") == null)
+            {
+                _response.SetPropertyValue("Message", $"{HttpStatusCode.Accepted}");
+            }
+        }
+        
+        if (_response.ContainsProperty("HttpStatusCode"))
+        {
+            if (_response.GetPropertyValue("HttpStatusCode")?.ToString() == "0")
+            {
+                _response.SetPropertyValue("HttpStatusCode", HttpStatusCode.Accepted);
+            }
         }
 
-        if (_response.GetType().GetProperty("HttpStatusCode")?.GetValue(_response)?.ToString() == "0")
+        if (_response.ContainsProperty("IsSuccess"))
         {
-            _response.GetType().GetProperty("HttpStatusCode")?.SetValue(_response, HttpStatusCode.Accepted, null);
+            _response.SetPropertyValue("IsSuccess", true);
         }
-            
             
         await Task.FromResult(_response);
     }

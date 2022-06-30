@@ -6,6 +6,6 @@ public class UpdateCredentialHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<UpdateCredentialRequest, UpdateCredentialCmd>(connection, mediator);
+        HandleRequestCmd<UpdateCredentialRequest, UpdateCredentialCmd>(connection, mediator);
     }
 }

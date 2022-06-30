@@ -1,6 +1,4 @@
-﻿using MediatR;
-using Microsoft.AspNetCore.SignalR.Client;
-using Wallets.Core.DataAccess.Commands.Entity.Wallets;
+﻿using Wallets.Core.DataAccess.Commands.Entity.Wallets;
 using Wallets.Domain.Generic.Contracts.Requests.Update;
 
 namespace Wallets.Api.SignalR.Handlers.Wallets.Entity;
@@ -9,6 +7,6 @@ public class UpdateWalletEntityHandler  : BaseSignalRHandler, ISignalREventHandl
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<UpdateWalletEntityRequest, UpdateWalletEntityCmd>(connection, mediator);
+        HandleRequestCmd<UpdateWalletEntityRequest, UpdateWalletEntityCmd>(connection, mediator);
     }
 }

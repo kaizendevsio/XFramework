@@ -1,7 +1,4 @@
-﻿using MediatR;
-using Microsoft.AspNetCore.SignalR.Client;
-
-namespace Wallets.Api.SignalR;
+﻿namespace Wallets.Api.SignalR;
 
 public interface ISignalREventHandler
 {

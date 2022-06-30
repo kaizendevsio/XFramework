@@ -11,7 +11,7 @@ public class DeleteWalletHandler  : CommandBaseHandler, IRequestHandler<DeleteWa
         
     public async Task<CmdResponse<DeleteWalletCmd>> Handle(DeleteWalletCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblUserWallets.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        var entity = await _dataLayer.Wallets.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
         if (entity == null)
         {
             return new ()
@@ -22,6 +22,7 @@ public class DeleteWalletHandler  : CommandBaseHandler, IRequestHandler<DeleteWa
         }
 
         entity.IsDeleted = true;
+        entity.IsEnabled = false;
         _dataLayer.Update(entity);
             
         await _dataLayer.SaveChangesAsync(cancellationToken);

@@ -13,3 +13,4 @@ global using System.Text;
 global using IdentityServer.Core.DataAccess.Commands.Entity.Identity.Credential;
 global using XFramework.Domain.Generic.Enums;
 global using XFramework.Integration.Services.Helpers;
+global using Application = IdentityServer.Domain.DataTransferObjects.Application;

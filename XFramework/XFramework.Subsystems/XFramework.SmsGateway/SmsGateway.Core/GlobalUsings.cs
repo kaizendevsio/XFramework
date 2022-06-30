@@ -1,0 +1,13 @@
+﻿global using System;
+global using System.Net;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using SmsGateway.Core.Interfaces;
+global using SmsGateway.Domain.DataTransferObjects;
+global using Mapster;
+global using MediatR;
+global using XFramework.Domain.Generic.BusinessObjects;
+global using Microsoft.EntityFrameworkCore;
+global using System.Text;
+global using XFramework.Domain.Generic.Enums;
+global using XFramework.Integration.Services.Helpers;

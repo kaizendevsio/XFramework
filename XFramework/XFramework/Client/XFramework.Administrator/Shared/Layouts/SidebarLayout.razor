@@ -1,0 +1,27 @@
+﻿<MudPaper Height="100vh">
+    <MudDrawerContainer Class="mud-height-full">
+        <MudDrawer Open="true" Elevation="0" Variant="@DrawerVariant.Persistent" Color="Color.Primary">
+            <MudDrawerHeader>
+                <MudText Typo="Typo.h6">XFramework</MudText>
+            </MudDrawerHeader>
+            <MudNavMenu>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Dashboard" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Dashboard");})">Dashboard</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.SupervisedUserCircle" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Profile"); })">Profile</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AccountBalanceWallet" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Wallets"); })">Wallets</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.AccountBalanceWallet" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/WalletTypes"); })">Wallet Types</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.VerifiedUser" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Users"); })">Users</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.SupervisedUserCircle" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Roles"); })">Roles</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Groups" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Enterprises"); })">Enterprises</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Apps" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/Application"); })">Application</MudNavLink>
+                <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Filled.Settings" IconColor="Color.Inherit" OnClick="@(async () => { await NavigateTo("/AdminSettings"); })">Admin Settings</MudNavLink>
+            </MudNavMenu>
+        </MudDrawer>
+        <MudCardContent>
+            <MudContainer Fixed="@true" Class="pt-3">
+                <MudText Typo="Typo.h2"><strong>@LayoutState.View.Title</strong></MudText>
+                @*<MudText Typo="Typo.h5">@LayoutState.View.Toolbar.Title.</MudText>*@
+                @Body
+            </MudContainer>
+        </MudCardContent>
+    </MudDrawerContainer>
+</MudPaper>

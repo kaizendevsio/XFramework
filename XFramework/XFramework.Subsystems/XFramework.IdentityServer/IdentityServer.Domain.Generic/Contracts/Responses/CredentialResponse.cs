@@ -1,4 +1,6 @@
-﻿namespace IdentityServer.Domain.Generic.Contracts.Responses;
+﻿using Wallets.Domain.Generic.Contracts.Responses;
+
+namespace IdentityServer.Domain.Generic.Contracts.Responses;
 
 public class CredentialResponse
 {
@@ -13,7 +15,10 @@ public class CredentialResponse
     public long ApplicationId { get; set; }
     public string Token { get; set; }
 
-    public virtual IdentityResponse Identity { get; set; }
-    public virtual List<RoleResponse> TblIdentityRoles { get; set; }
-    public virtual List<ContactResponse> TblIdentityContacts { get; set; }
+    public virtual IdentityResponse IdentityInfo { get; set; }
+    public virtual List<IdentityRoleResponse> IdentityRoles { get; set; }
+    public virtual List<ContactResponse> IdentityContacts { get; set; }
+    public virtual List<WalletTransactionResponse> WalletTransactions { get; set; }
+    public virtual List<WalletResponse> Wallets { get; set; }
+    public virtual List<WithdrawalRequestResponse> WithdrawalRequests { get; set; }
 }

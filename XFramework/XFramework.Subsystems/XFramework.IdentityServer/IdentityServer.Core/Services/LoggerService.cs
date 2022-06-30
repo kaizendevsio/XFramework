@@ -13,7 +13,7 @@ public class LoggerService : ILoggerWrapper
         
     public async Task<Guid?> NewLog(string name, string message, string initiator, RequestServerBO requestServer, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
     {
-        var entity = await _dataLayer.TblApplications
+        var entity = await _dataLayer.Applications
             .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{requestServer.ApplicationId}");
@@ -22,7 +22,7 @@ public class LoggerService : ILoggerWrapper
             throw new ArgumentException($"Application with Guid '{requestServer.ApplicationId}' does not exist in any tenants");
         }
         
-        var log = new TblLog()
+        var log = new Log()
         {
             ApplicationId = entity.Id,
             Initiator = initiator,
@@ -30,10 +30,10 @@ public class LoggerService : ILoggerWrapper
             Message = message,
             Name = name,
             Type = (short?) logType,
-            Uuid = requestServer.RequestId.ToString()
+            Guid = requestServer.RequestId.ToString()
         };
 
-        _dataLayer.TblLogs.Add(log);
+        _dataLayer.Logs.Add(log);
         await _dataLayer.SaveChangesAsync();
 
         return requestServer.RequestId;

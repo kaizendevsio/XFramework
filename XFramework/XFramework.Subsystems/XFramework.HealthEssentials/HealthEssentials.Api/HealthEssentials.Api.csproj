@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Sentry.AspNetCore" Version="3.17.1" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Mapster" Version="7.2.0" />
+        <PackageReference Include="MediatR" Version="9.0.0" />
+        <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.0" NoWarn="NU1605" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="6.0.0" NoWarn="NU1605" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.2" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.2" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
+        <PackageReference Include="BinaryPack" Version="1.0.3" />
+        <PackageReference Include="ByteSize" Version="2.1.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Reference Include="IdentityServer.Domain.Generic">
+          <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="Wallets.Domain.Generic">
+            <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="SmsGateway.Domain.Generic">
+            <HintPath>..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\bin\Debug\net6.0\SmsGateway.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="SmsGateway.Integration">
+            <HintPath>..\..\XFramework.SmsGateway\SmsGateway.Integration\bin\Debug\net6.0\SmsGateway.Integration.dll</HintPath>
+        </Reference>
+        <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net6.0\StreamFlow.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
+        </Reference>
+        <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\HealthEssentials.Core\HealthEssentials.Core.csproj" />
+      <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
+      <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj" />
+      <ProjectReference Include="..\HealthEssentials.Integration\HealthEssentials.Integration.csproj" />
+    </ItemGroup>
+    
+</Project>

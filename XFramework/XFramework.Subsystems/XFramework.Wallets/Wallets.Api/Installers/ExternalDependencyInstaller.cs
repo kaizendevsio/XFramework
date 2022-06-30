@@ -1,7 +1,4 @@
 ﻿using FluentValidation;
-using MediatR;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using Wallets.Core.DataAccess.Commands.Handlers;
 using Wallets.Core.PipelineBehaviors;
@@ -18,7 +15,5 @@ public class ExternalDependencyInstaller : IInstaller
         // FluentValidation
         services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
-
-
     }
 }

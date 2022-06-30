@@ -19,7 +19,7 @@ using XFramework.Integration.Interfaces;
 
 namespace StreamFlow.Stream.Services.Handlers.Events
 {
-    public class InvokeMethodHandler : CommandBaseHandler, IRequestHandler<InvokeMethodQuery, QueryResponseBO<StreamFlowInvokeResponse>>
+    public class InvokeMethodHandler : CommandBaseHandler, IRequestHandler<InvokeMethodQuery, QueryResponse<StreamFlowInvokeResponse>>
     {
         public InvokeMethodHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration, IHelperService helperService)
         {
@@ -28,11 +28,11 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             _hubContext = hubContext;
             _streamFlowConfiguration = streamFlowConfiguration;
         }
-        public async Task<QueryResponseBO<StreamFlowInvokeResponse>> Handle(InvokeMethodQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponse<StreamFlowInvokeResponse>> Handle(InvokeMethodQuery request, CancellationToken cancellationToken)
         {
             // Check if Client is Registered
-            var client = _cachingService.Clients.FirstOrDefault(x => x.StreamId == request.Context.ConnectionId);
-            if (client == null)
+            var client = _cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == request.Context.ConnectionId);
+            if (client.Value == null)
             {
                 Console.WriteLine($"Unknown or unauthorized client detected");
                 await _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
@@ -44,20 +44,20 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
             request.RequestServer = new()
             {
-                RequestId = client.Guid,
-                Name = client.Name
+                RequestId = client.Value.Guid,
+                Name = client.Value.Name
             };
 
             var telemetry = new StreamFlowTelemetryBO
             {
-                ClientGuid = client.Guid,
+                ClientGuid = client.Value.Guid,
                 RequestGuid = request.MessageQueue.RequestGuid,
                 ConsumerGuid = request.MessageQueue.ConsumerGuid
             };
             
-            var c = _cachingService.Clients.FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
+            var c = _cachingService.Clients.FirstOrDefault(x => x.Value.Guid == request.MessageQueue.Recipient);
 
-            if (c != null)
+            if (c.Value != null)
             {
                 _helperService.StopWatch.Start("Invoked Method");
                 var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessageBO>();
@@ -71,7 +71,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     };
                 }
                 
-                await _hubContext.Clients.Client(c.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
+                await _hubContext.Clients.Client(c.Value.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
                 var response = await methodCallCompletionSource.Task.ConfigureAwait(false);
 
                 _helperService.StopWatch.Stop("Invoke Response Received");
@@ -80,14 +80,14 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     HttpStatusCode = HttpStatusCode.Accepted,
                     Response = new ()
                     {
-                        HttpStatusCode = response.Adapt<CmdResponseBO>().HttpStatusCode,
+                        HttpStatusCode = response.Adapt<CmdResponse>().HttpStatusCode,
                         Response = response.Data
                     }
                 };
 
             }
 
-            if (_cachingService.AbsoluteClients.All(x => x.Guid != request.MessageQueue.Recipient))
+            if (_cachingService.AbsoluteClients.All(x => x.Value.Guid != request.MessageQueue.Recipient))
             {
                 Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
                 return new()

@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using XFramework.Domain.Generic.BusinessObjects;
 
 namespace PaymentGateways.Core.PipelineBehaviors
 {

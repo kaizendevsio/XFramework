@@ -17,3 +17,5 @@ global using Wallets.Domain.Generic.Contracts.Responses;
 global using Wallets.Core.DataAccess.Commands.Entity.Wallets;
 global using Wallets.Core.Interfaces;
 global using Wallets.Domain.DataTransferObjects;
+global using IdentityServer.Integration.Drivers;
+global using IdentityServer.Integration.Interfaces;

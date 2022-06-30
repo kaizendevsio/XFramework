@@ -1,5 +1,4 @@
 ﻿using FluentValidation;
-using XFramework.Domain.Generic.BusinessObjects;
 
 namespace PaymentGateways.Core.Validations.Common
 {

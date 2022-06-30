@@ -6,7 +6,7 @@ $currentDirectoryName = Split-Path -Path (Get-Location) -Leaf
 $currentDirectoryPath = Split-Path -Path (Get-Location)
 $answer = Read-Host "Build And Deploy" $currentDirectoryName"? (y -Yes / n -No)"
 
-if($answer -eq "y"){
+if ($answer -eq "y") {
    Write-Host XFramework Technologies. MIT License 2022
    Write-Host XFramework Auto Deployment Script
    Write-Host Version 4.1.0
@@ -31,11 +31,24 @@ if($answer -eq "y"){
    dotnet publish "XFramework\XFramework\Server\XFramework.Api\XFramework.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.CentralServer.Published" -c "Release"
 
    Write-Host Building Release.Wallets ...
-   dotnet publish "XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Api\Wallets.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.WalletsServer.Published" -c "Release"
+   dotnet publish "XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Api\Wallets.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.Wallets.Published" -c "Release"
 
+   Write-Host Building Release.Community ...
+   dotnet publish "XFramework\XFramework.Subsystems\XFramework.Community\Community.Api\Community.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.Community.Published" -c "Release"
+
+   Write-Host Building Release.Messaging ...
+   dotnet publish "XFramework\XFramework.Subsystems\XFramework.Messaging\Messaging.Api\Messaging.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.Messaging.Published" -c "Release"
+
+   Write-Host Building Release.SmsGateway ...
+   dotnet publish "XFramework\XFramework.Subsystems\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.SmsGateway.Published" -c "Release"
+
+   Write-Host Building Release.HealthEssentials ...
+   dotnet publish "XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Api\HealthEssentials.Api.csproj" -o "C:\Projects\Published\Release.XnelSystems\XnelSystems.HealthEssentials.Published" -c "Release"
 
    Write-Host Syncing to Github ...
    Set-Location "C:\Projects\Published\Release.XnelSystems"
+
+   git branch
    git add *.*
    git commit -m "One Click Deploy"
 
@@ -47,11 +60,11 @@ if($answer -eq "y"){
    pause
    exit
 }
-else{
+else {
    Write-Host
    Write-Host Deployment Aborted
    Write-Host
 
    pause
-exit
+   exit
 }

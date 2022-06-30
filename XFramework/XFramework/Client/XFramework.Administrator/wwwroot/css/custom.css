@@ -1,0 +1,199 @@
+﻿/* Scrollbar styles */
+::-webkit-scrollbar {
+    width: 5px !important;
+    height: 12px !important;
+}
+
+::-webkit-scrollbar-track {
+    background: #f5f5f5 !important;
+    border-radius: 10px !important;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px !important;
+    background: #ccc !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #999 !important;
+}
+
+
+/* Chat containers */
+.container {
+    border: 2px solid #dedede;
+    background-color: #f1f1f1;
+    border-radius: 5px;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+/* Darker chat container */
+.darker {
+    border-color: #ccc;
+    background-color: #ddd;
+}
+
+/* Clear floats */
+.container::after {
+    content: "";
+    clear: both;
+    display: table;
+}
+
+/* Style images */
+.container img {
+    float: left;
+    max-width: 60px;
+    width: 100%;
+    margin-right: 20px;
+    border-radius: 50%;
+}
+
+/* Style the right image */
+.container img.right {
+    float: right;
+    margin-left: 20px;
+    margin-right:0;
+}
+
+/* Style time text */
+.time-right {
+    float: right;
+    color: #aaa;
+}
+
+/* Style time text */
+.time-left {
+    float: left;
+    color: #999;
+}
+
+
+/* 8. loader */
+.loader-wrap {
+    height: 100%;
+    width: 100%;
+    position: fixed;
+    z-index: 999;
+    top: 0;
+    left: 0;
+    color: var(--bs-dark);
+}
+
+.loader-wrap:after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    z-index: 0;
+    background-color: var(--bs-primary);
+}
+
+.loader-wrap > div {
+    z-index: 1;
+    position: relative;
+}
+
+.loader-cube-wrap {
+    align-self: flex-end;
+    animation-duration: 2s;
+    animation-iteration-count: infinite;
+    height: 100px;
+    margin: 0 auto 0 auto;
+    transform-origin: bottom;
+    position: relative;
+    width: 100px;
+}
+
+.loader-cube-wrap img {
+    max-width: 100%;
+}
+
+.loader-cube-animate {
+    animation-name: cubeanimate;
+    animation-timing-function: cubic-bezier(0.28, 0.84, 0.42, 1);
+}
+
+@keyframes cubeanimate {
+    0% {
+        transform: scale(1, 1) translateY(0);
+    }
+    10% {
+        transform: scale(1.1, 0.9) translateY(0);
+    }
+    30% {
+        transform: scale(0.9, 1.1) translateY(-30px);
+    }
+    50% {
+        transform: scale(1.05, 0.95) translateY(0);
+    }
+    57% {
+        transform: scale(1, 1) translateY(-7px);
+    }
+    64% {
+        transform: scale(1, 1) translateY(0);
+    }
+    100% {
+        transform: scale(1, 1) translateY(0);
+    }
+}
+
+.progressstimer {
+    height: 50px;
+    width: 50px;
+    line-height: 50px;
+    text-align: center;
+    vertical-align: middle;
+    display: inline-block;
+    margin: 0 auto 10px auto;
+    position: relative;
+}
+
+.progressstimer img {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 0;
+    -webkit-animation: rotating 1s linear infinite;
+    animation: rotating 1s linear infinite;
+}
+
+.progressstimer .timer {
+    font-size: 12px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-top: -2px;
+}
+
+@-webkit-keyframes rotating {
+    from {
+        -webkit-transform: rotate(0deg);
+        -o-transform: rotate(0deg);
+        transform: rotate(0deg);
+    }
+    to {
+        -webkit-transform: rotate(360deg);
+        -o-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes rotating {
+    from {
+        -ms-transform: rotate(0deg);
+        -moz-transform: rotate(0deg);
+        -webkit-transform: rotate(0deg);
+        -o-transform: rotate(0deg);
+        transform: rotate(0deg);
+    }
+    to {
+        -ms-transform: rotate(360deg);
+        -moz-transform: rotate(360deg);
+        -webkit-transform: rotate(360deg);
+        -o-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}

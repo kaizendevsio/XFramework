@@ -5,7 +5,7 @@ namespace Wallets.Domain.Generic.Contracts.Responses;
 public class WalletResponse
 {
     public Guid? Guid { get; set; }
-    public bool? IsEnabled { get; set; }
+    public bool IsEnabled { get; set; }
     public DateTime? CreatedAt { get; set; }
     public long? CreatedBy { get; set; }
     public DateTime? ModifiedAt { get; set; }
@@ -15,5 +15,5 @@ public class WalletResponse
     public long? WalletTypeId { get; set; }
     public decimal? Balance { get; set; }
     
-    public virtual WalletEntityResponse WalletType { get; set; }
+    public virtual WalletEntityResponse WalletEntity { get; set; }
 }

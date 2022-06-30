@@ -2,7 +2,7 @@
 
 namespace XFramework.Domain.Generic.Contracts.Requests.Create
 {
-    public class CreateUserRequest : RequestBase
+    public class CreateUserRequest : TransactionRequestBase
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }
@@ -14,8 +14,8 @@ namespace XFramework.Domain.Generic.Contracts.Requests.Create
 
         public string UserAlias { get; set; }
         public string UserName { get; set; }
-        public string PasswordString { get; set; }
-        public string ConfirmPasswordString { get; set; }
+        public string Password { get; set; }
+        public string PasswordConfirm { get; set; }
         public Guid? RoleEntity { get; set; }
     }
 }

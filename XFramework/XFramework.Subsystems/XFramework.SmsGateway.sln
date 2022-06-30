@@ -1,0 +1,53 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Application", "Application", "{6D820F41-6FF4-492F-B8C5-98F7FFB1339E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Domain", "Domain", "{A8B2993A-E570-4312-85B3-18ACD812BAB1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Presentation", "Presentation", "{5F7F8AD8-2073-47CA-913D-76FE1135AADB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Core", "XFramework.SmsGateway\SmsGateway.Core\SmsGateway.Core.csproj", "{4ACE1892-02A8-4362-B312-63C713EF9FB8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Integration", "XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj", "{BDB4251E-0770-40F1-A587-0A8E2CA5A979}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Domain", "XFramework.SmsGateway\SmsGateway.Domain\SmsGateway.Domain.csproj", "{2AB57930-F172-4FB6-904B-CC72465E0900}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Domain.Generic", "XFramework.SmsGateway\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj", "{6EE17B70-CF40-4A3B-BE67-9EE712786EC1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Api", "XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj", "{297D1465-34E8-46BC-96CE-971A76242E8D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4ACE1892-02A8-4362-B312-63C713EF9FB8} = {6D820F41-6FF4-492F-B8C5-98F7FFB1339E}
+		{BDB4251E-0770-40F1-A587-0A8E2CA5A979} = {6D820F41-6FF4-492F-B8C5-98F7FFB1339E}
+		{2AB57930-F172-4FB6-904B-CC72465E0900} = {A8B2993A-E570-4312-85B3-18ACD812BAB1}
+		{6EE17B70-CF40-4A3B-BE67-9EE712786EC1} = {A8B2993A-E570-4312-85B3-18ACD812BAB1}
+		{297D1465-34E8-46BC-96CE-971A76242E8D} = {5F7F8AD8-2073-47CA-913D-76FE1135AADB}
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4ACE1892-02A8-4362-B312-63C713EF9FB8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4ACE1892-02A8-4362-B312-63C713EF9FB8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4ACE1892-02A8-4362-B312-63C713EF9FB8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4ACE1892-02A8-4362-B312-63C713EF9FB8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDB4251E-0770-40F1-A587-0A8E2CA5A979}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDB4251E-0770-40F1-A587-0A8E2CA5A979}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDB4251E-0770-40F1-A587-0A8E2CA5A979}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDB4251E-0770-40F1-A587-0A8E2CA5A979}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2AB57930-F172-4FB6-904B-CC72465E0900}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2AB57930-F172-4FB6-904B-CC72465E0900}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2AB57930-F172-4FB6-904B-CC72465E0900}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2AB57930-F172-4FB6-904B-CC72465E0900}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6EE17B70-CF40-4A3B-BE67-9EE712786EC1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6EE17B70-CF40-4A3B-BE67-9EE712786EC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6EE17B70-CF40-4A3B-BE67-9EE712786EC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6EE17B70-CF40-4A3B-BE67-9EE712786EC1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{297D1465-34E8-46BC-96CE-971A76242E8D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{297D1465-34E8-46BC-96CE-971A76242E8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{297D1465-34E8-46BC-96CE-971A76242E8D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{297D1465-34E8-46BC-96CE-971A76242E8D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

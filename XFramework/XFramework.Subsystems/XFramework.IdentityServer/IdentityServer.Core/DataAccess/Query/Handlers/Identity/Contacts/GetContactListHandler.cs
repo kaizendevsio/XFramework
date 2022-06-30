@@ -12,7 +12,7 @@ public class GetContactListHandler : QueryBaseHandler ,IRequestHandler<GetContac
     
     public async Task<QueryResponse<List<ContactResponse>>> Handle(GetContactListQuery request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.TblIdentityCredentials
+        var credential = await _dataLayer.IdentityCredentials
             .Include(i => i.IdentityInfo)
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
@@ -26,9 +26,9 @@ public class GetContactListHandler : QueryBaseHandler ,IRequestHandler<GetContac
             };
         }
         
-        var entity = await _dataLayer.TblIdentityContacts
+        var entity = await _dataLayer.IdentityContacts
             .Where(i => i.UserCredentialId == credential.Id)
-            .Include( i => i.Ucentities)
+            .Include( i => i.Entity)
             .AsNoTracking()
             .AsSplitQuery()
             .ToListAsync(cancellationToken);

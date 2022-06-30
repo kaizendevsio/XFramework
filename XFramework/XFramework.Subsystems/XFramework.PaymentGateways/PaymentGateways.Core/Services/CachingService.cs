@@ -1,6 +1,5 @@
 ﻿using PaymentGateways.Core.Interfaces;
 using System.Collections.Generic;
-using XFramework.Domain.Generic.BusinessObjects;
 
 namespace PaymentGateways.Core.Services
 {

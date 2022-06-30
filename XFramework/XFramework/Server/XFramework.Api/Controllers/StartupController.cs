@@ -9,8 +9,9 @@ namespace XFramework.Api.Controllers
     [ApiVersion("2.0")]
     public class StartupController : ControllerBase
     {
+        [EnableQuery]
         [HttpGet]
-        public ActionResult Startup()
+        public ApiStatusBO Startup()
         {
             var apiStatus = new ApiStatusBO
             {
@@ -31,8 +32,7 @@ namespace XFramework.Api.Controllers
                 },
                 Status = "Running"
             };
-
-            return Ok(apiStatus);
+            return apiStatus;
         }
     }
 }

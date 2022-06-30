@@ -5,7 +5,7 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Stream.Services.Entity.Events
 {
-    public class InvokeMethodResponseCmd : CommandBaseEntity, IRequest<CmdResponseBO<InvokeMethodResponseCmd>>
+    public class InvokeMethodResponseCmd : CommandBaseEntity, IRequest<CmdResponse<InvokeMethodResponseCmd>>
     {
         public InvokeMethodResponseCmd()
         {

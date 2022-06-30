@@ -11,7 +11,7 @@ public class GetAllAppInfoQueryHandler : QueryBaseHandler, IRequestHandler<GetAp
     }
     public async Task<QueryResponse<List<GetApplicationListResponse>>> Handle(GetAppAppListQuery request, CancellationToken cancellationToken)
     {
-        var result = await _dataLayer.TblApplications.ToListAsync(cancellationToken: cancellationToken);
+        var result = await _dataLayer.Applications.ToListAsync(cancellationToken: cancellationToken);
         if (!result.Any())
         {
             return new QueryResponse<List<GetApplicationListResponse>>()

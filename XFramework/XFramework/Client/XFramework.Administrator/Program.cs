@@ -21,6 +21,9 @@ builder.Services.AddMudServices();
 //builder.Services.AddValidatorsFromAssemblyContaining<BaseValidator>();
 builder.Services.AddScoped(sp => new HttpClient {BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)});
 
+builder.Services.AddSingleton<IIndexedDbFactory, IndexedDbFactory>();
+builder.Services.AddSingleton<IndexedDbService>();
+
 builder.Services.AddSingleton<ISignalRService, SignalRService>();
 builder.Services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
 builder.Services.AddSingleton<IIdentityServiceWrapper, IdentityServerDriver>();

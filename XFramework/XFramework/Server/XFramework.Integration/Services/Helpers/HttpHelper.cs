@@ -1,25 +1,32 @@
-﻿using System.Text;
+﻿using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.Security;
 
-namespace XFramework.Integration.Services.Helpers
+namespace XFramework.Integration.Services.Helpers;
+
+public class HttpHelper
 {
-    public class HttpHelper
+    public IConfiguration Configuration { get; }
+    public HttpHelper(IConfiguration configuration)
     {
-        public IConfiguration Configuration { get; }
-        public HttpHelper(IConfiguration configuration)
-        {
-            Configuration = configuration;
-        }
-        public async Task<HttpResponseBO<T>> PostAsync<T>(Uri baseUrl, string url, object param, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false)
+        Configuration = configuration;
+    }
+    public async Task<HttpResponseBO<T>> PostAsync<T>(Uri baseUrl, string url, object param, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
+    {
+        try
         {
             var cookies = new CookieContainer();
             var handler = new HttpClientHandler {CookieContainer = cookies};
             using var client = new HttpClient(handler) {BaseAddress = baseUrl, Timeout = TimeSpan.FromHours(2)};
             
             if (clearDefaultRequestHeaders) client.DefaultRequestHeaders.Clear();
+            if (authenticationHeader != null)
+            {
+                client.DefaultRequestHeaders.Authorization = authenticationHeader;
+            }
             if (requestCookies != null)
             {
                 var cookieCount = requestCookies.Count;
@@ -37,6 +44,7 @@ namespace XFramework.Integration.Services.Helpers
             var response = new HttpResponseBO<T>
             {
                 StatusCode = x.StatusCode,
+                IsSuccess = x.IsSuccessStatusCode,
                 ReasonPhrase = x.ReasonPhrase,
                 Cookies = responseCookies, 
                 Result = typeof(T) != typeof(string) 
@@ -45,7 +53,15 @@ namespace XFramework.Integration.Services.Helpers
             };
             return response;
         }
-        public async Task<HttpResponseBO<T>> GetAsync<T>(Uri baseUrl, string url, object param = null, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false)
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+    }
+    public async Task<HttpResponseBO<T>> GetAsync<T>(Uri baseUrl, string url, object param = null, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
+    {
+        try
         {
             var cookies = new CookieContainer();
             var handler = new HttpClientHandler
@@ -55,6 +71,10 @@ namespace XFramework.Integration.Services.Helpers
             };
             using var client = new HttpClient(handler) {BaseAddress = baseUrl, Timeout = TimeSpan.FromHours(2)};
             if (clearDefaultRequestHeaders) client.DefaultRequestHeaders.Clear();
+            if (authenticationHeader != null)
+            {
+                client.DefaultRequestHeaders.Authorization = authenticationHeader;
+            }
             if (requestCookies != null)
             {
                 var cookieCount = requestCookies.Count;
@@ -85,6 +105,7 @@ namespace XFramework.Integration.Services.Helpers
                 StatusCode = x.StatusCode,
                 ReasonPhrase = x.ReasonPhrase,
                 Cookies = responseCookies, 
+                IsSuccess = x.IsSuccessStatusCode,
                 Result = typeof(T) != typeof(string) 
                     ? JsonSerializer.Deserialize<T>(x.Content.ReadAsStringAsync().Result, new JsonSerializerOptions(){PropertyNameCaseInsensitive = true}) 
                     : (T)Activator.CreateInstance(typeof(T), x.Content.ReadAsStringAsync().Result.ToCharArray())
@@ -92,16 +113,22 @@ namespace XFramework.Integration.Services.Helpers
             
             return response;
         }
-        public async Task<HttpResponseBO<T>> SecurePostJsonAsync<T, TContent>(string requestUri, EncryptedRequestBase<TContent> requestContent,CookieCollection cookieCollection = null)
+        catch (Exception e)
         {
-            var encryptionSecret = Configuration.GetValue<string>("Application:PaddedEncryptionSecret");
-            var keyString = $"{encryptionSecret}{DateTime.UtcNow:yyyyMMddHHmm}";
-
-            requestContent.AspNetCoreSession = requestContent.AspNetCoreSession;
-            requestContent.Content = requestContent.AsJsonContent().EncryptWithAes(keyString);
-            requestContent.RsaSignature = $"{requestContent.AsJsonContent()}{keyString}".ToSha512();
-            
-            return await PostAsync<T>(new Uri(requestUri),"",requestContent, cookieCollection);
+            Console.WriteLine(e);
+            throw;
         }
+       
+    }
+    public async Task<HttpResponseBO<T>> SecurePostJsonAsync<T, TContent>(string requestUri, EncryptedRequestBase<TContent> requestContent,CookieCollection cookieCollection = null)
+    {
+        var encryptionSecret = Configuration.GetValue<string>("Application:PaddedEncryptionSecret");
+        var keyString = $"{encryptionSecret}{DateTime.UtcNow:yyyyMMddHHmm}";
+
+        requestContent.AspNetCoreSession = requestContent.AspNetCoreSession;
+        requestContent.Content = requestContent.AsJsonContent().EncryptWithAes(keyString);
+        requestContent.RsaSignature = $"{requestContent.AsJsonContent()}{keyString}".ToSha512();
+            
+        return await PostAsync<T>(new Uri(requestUri),"",requestContent, cookieCollection);
     }
 }

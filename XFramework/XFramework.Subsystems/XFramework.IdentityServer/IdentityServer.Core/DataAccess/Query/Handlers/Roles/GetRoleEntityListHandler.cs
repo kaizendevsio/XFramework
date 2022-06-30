@@ -12,7 +12,7 @@ public class GetRoleEntityListHandler : QueryBaseHandler, IRequestHandler<GetRol
         
     public async Task<QueryResponse<List<RoleEntityResponse>>> Handle(GetRoleEntityListQuery request, CancellationToken cancellationToken)
     {
-        var appEntity = await _dataLayer.TblApplications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
+        var appEntity = await _dataLayer.Applications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
         if (appEntity == null)
         {
             return new ()
@@ -22,7 +22,7 @@ public class GetRoleEntityListHandler : QueryBaseHandler, IRequestHandler<GetRol
             };
         }
         
-        var result = await _dataLayer.TblIdentityRoleEntities
+        var result = await _dataLayer.IdentityRoleEntities
             .Where(i => i.ApplicationId == appEntity.Id)
             .AsNoTracking()
             .ToListAsync(cancellationToken: cancellationToken);

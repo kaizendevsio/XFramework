@@ -12,8 +12,9 @@ public class GetContactHandler : QueryBaseHandler ,IRequestHandler<GetContactQue
     
     public async Task<QueryResponse<ContactResponse>> Handle(GetContactQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityContacts
-            .Include( i => i.Ucentities)
+        var entity = await _dataLayer.IdentityContacts
+            .Include( i => i.Entity)
+            .Include( i => i.Group)
             .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);

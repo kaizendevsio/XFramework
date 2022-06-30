@@ -1,105 +1,106 @@
 ﻿using Wallets.Core.DataAccess.Commands.Entity.Wallets.Identity;
+using XFramework.Integration.Interfaces.Wrappers;
 
 namespace Wallets.Core.DataAccess.Commands.Handlers.Wallets.Identity;
 
 public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<TransferWalletCmd, CmdResponse<TransferWalletCmd>>
 {
-    public TransferWalletHandler(IDataLayer dataLayer)
+    private readonly IIdentityServiceWrapper _identityServiceWrapper;
+
+    public TransferWalletHandler(IIdentityServiceWrapper identityServiceWrapper ,IDataLayer dataLayer, IMediator mediator)
     {
+        _identityServiceWrapper = identityServiceWrapper;
+        _mediator = mediator;
         _dataLayer = dataLayer;
     }
     
     public async Task<CmdResponse<TransferWalletCmd>> Handle(TransferWalletCmd request, CancellationToken cancellationToken)
     {
-        var initiatorCredentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
-        if (initiatorCredentialEntity == null)
+        switch (request.Amount)
+        {
+            case <= 0:
+                return new ()
+                {
+                    Message = $"Amount is required",
+                    HttpStatusCode = HttpStatusCode.BadRequest
+                };
+            case > 9_999_999_999:
+                return new ()
+                {
+                    Message = $"Amount exceeds maximum allowed",
+                    HttpStatusCode = HttpStatusCode.BadRequest
+                };
+        }
+        
+        var fromCredential = await _dataLayer.IdentityCredentials
+            .Include(i => i.Wallets)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
+        if (fromCredential == null)
         {
             return new ()
             {
-                Message = $"Credential with Guid {request.FromCredentialGuid} does not exist",
+                Message = $"Credential with Guid {request.CredentialGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
-        var fromCredentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.FromCredentialGuid}", cancellationToken);
-        if (fromCredentialEntity == null)
+        // Check Recipient Type
+        var toCredential = new IdentityCredential();
+        toCredential = Guid.TryParse(request.Recipient, out var credentialGuid)
+            ? await _dataLayer.IdentityCredentials
+                .Include(i => i.Wallets)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(i => i.Guid == $"{request.Recipient}", cancellationToken)
+            : await _dataLayer.IdentityCredentials
+                .Include(i => i.Wallets)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(i => i.UserName == $"{request.Recipient}", cancellationToken);
+        
+        if (toCredential == null)
         {
-            return new ()
+            // Try To Get Credential From Contact
+            var credentialByContact = await _identityServiceWrapper.GetCredentialByContact(new() {ContactValue = request.Recipient});
+            if (credentialByContact.HttpStatusCode is not HttpStatusCode.Accepted)
             {
-                Message = $"Credential with Guid {request.FromCredentialGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new ()
+                {
+                    Message = $"Credential {request.Recipient} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                }; 
+            }
         }
         
-        var toCredentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.ToCredentialGuid}", cancellationToken);
-        if (toCredentialEntity == null)
+        var walletEntity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
+        if (walletEntity == null)
         {
             return new ()
             {
-                Message = $"Credential with Guid {request.ToCredentialGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-            
-        var fromWalletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.FromWalletEntityGuid}", cancellationToken);
-        if (fromWalletEntity == null)
-        {
-            return new ()
-            {
-                Message = $"Wallet entity with Guid {request.FromWalletEntityGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        var toWalletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.ToWalletEntityGuid}", cancellationToken);
-        if (toWalletEntity == null)
-        {
-            return new ()
-            {
-                Message = $"Wallet entity with Guid {request.ToWalletEntityGuid} does not exist",
+                Message = $"Wallet entity with Guid {request.WalletEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
-        if (request.Amount == 0)
-        {
-            return new ()
-            {
-                Message = $"Amount is required",
-                HttpStatusCode = HttpStatusCode.BadRequest
-            };
-        }
-        
-        if (request.Amount > 99999999)
-        {
-            return new ()
-            {
-                Message = $"Amount exceeds maximum allowed",
-                HttpStatusCode = HttpStatusCode.BadRequest
-            };
-        }
-        
-        var fromUserWallet = await _dataLayer.TblUserWallets
-            .Where(i => i.UserAuthId == fromCredentialEntity.Id)
-            .Where(i => i.WalletTypeId == fromWalletEntity.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var fromUserWallet = fromCredential.Wallets
+            .Where(i => i.WalletEntityId == walletEntity.Id)
+            .FirstOrDefault();
         if (fromUserWallet == null)
         {
             return new ()
             {
-                Message = $"Wallet with entity Guid {request.FromWalletEntityGuid} and credential Guid {request.FromCredentialGuid} does not exist",
+                Message = $"Credential with guid '{fromCredential.Guid}' does not have wallet with wallet entity guid '{request.WalletEntityGuid}'",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
             
-        var toUserWallet = await _dataLayer.TblUserWallets
-            .Where(i => i.UserAuthId == toCredentialEntity.Id)
-            .Where(i => i.WalletTypeId == toWalletEntity.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var toUserWallet = toCredential.Wallets
+            .Where(i => i.WalletEntityId == walletEntity.Id)
+            .FirstOrDefault();
         if (toUserWallet == null)
         {
             return new ()
             {
-                Message = $"Wallet with entity Guid {request.ToWalletEntityGuid} and credential Guid {request.ToCredentialGuid} does not exist",
+                Message = $"Credential with guid '{toCredential.Guid}' does not have wallet with wallet entity guid '{request.WalletEntityGuid}'",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -112,12 +113,12 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
                 HttpStatusCode = HttpStatusCode.BadRequest
             };
         }
-        _dataLayer.TblUserWalletTransactions.Add(new ()
+        _dataLayer.WalletTransactions.Add(new ()
         {
-            UserAuthId = initiatorCredentialEntity.Id,
+            IdentityCredential = fromCredential,
             Amount = request.Amount,
-            SourceUserWalletId = fromUserWallet.Id,
-            TargetUserWalletId = toUserWallet.Id,
+            SourceUserWallet = fromUserWallet,
+            TargetUserWallet = toUserWallet,
             RunningBalance = fromUserWallet.Balance + request.Amount,
             PreviousBalance = fromUserWallet.Balance,
             Remarks = request.Remarks
@@ -135,6 +136,5 @@ public class TransferWalletHandler : CommandBaseHandler, IRequestHandler<Transfe
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = $"You transferred {request.Amount} to Wallet Guid:{toUserWallet.Guid}"
         };
-        
     }
 }

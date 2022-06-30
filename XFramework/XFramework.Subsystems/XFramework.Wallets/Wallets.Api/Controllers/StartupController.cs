@@ -1,11 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using System;
 using System.Reflection;
 using System.Runtime.Versioning;
-using System.Threading.Tasks;
 using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Integration.Interfaces;
-using XFramework.Integration.Services;
 
 namespace Wallets.Api.Controllers;
 

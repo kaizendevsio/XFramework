@@ -2,7 +2,7 @@
 
 namespace XFramework.Api.Controllers.V2.Identity
 {
-    /*[Authorize]*/
+    [Authorize]
     [Route("Api/v{version:apiVersion}/Identity/[controller]")]
     [ApiController]
     [ApiVersion("2.0")]
@@ -16,19 +16,29 @@ namespace XFramework.Api.Controllers.V2.Identity
             _mediator = mediator;
         }
         
-        [HttpGet]
-        public async Task<JsonResult> Get(Guid guid)
+        [EnableQuery]
+        [HttpGet("GetByContact")]
+        public async Task<ActionResult> Get(string contactValue)
         {
-            var result = await _identityServiceWrapper.GetCredential(new () { Guid = guid });
-            return new JsonResult(result);
+            var result = await _identityServiceWrapper.GetCredentialByContact(new () { ContactValue = contactValue });
+            return Ok(result);
         }
         
+        [EnableQuery]
+        [HttpGet]
+        public async Task<ActionResult> Get(Guid guid)
+        {
+            var result = await _identityServiceWrapper.GetCredential(new () { Guid = guid });
+            return Ok(result);
+        }
+        
+        [EnableQuery]
         [HttpGet("List")]
-        public async Task<JsonResult> List(Guid? applicationGuid)
+        public async Task<ActionResult> List(Guid? applicationGuid)
         {
             var request = new GetCredentialListRequest(){ApplicationGuid = applicationGuid};
             var result = await _identityServiceWrapper.GetCredentialList(request);
-            return new JsonResult(result);
+            return Ok(result);
         }
         
         [HttpGet("Validate")]

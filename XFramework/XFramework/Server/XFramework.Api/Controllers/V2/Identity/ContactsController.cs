@@ -14,19 +14,21 @@ namespace XFramework.Api.Controllers.V2.Identity
             _identityServiceWrapper = identityServiceWrapper;
         }
         
+        [EnableQuery]
         [HttpGet]
-        public async Task<JsonResult> Get(Guid guid)
+        public async Task<ActionResult> Get(Guid guid)
         {
             var result = await _identityServiceWrapper.GetContact(new () { Guid = guid });
-            return new JsonResult(result);
+            return Ok(result);
         }
         
+        [EnableQuery]
         [HttpGet("List")]
-        public async Task<JsonResult> GetList(Guid? credentialGuid)
+        public async Task<ActionResult> GetList(Guid? credentialGuid)
         {
             var request = new GetContactListRequest(){CredentialGuid = credentialGuid};
             var result = await _identityServiceWrapper.GetContactList(InjectAuthorization(request));
-            return new JsonResult(result);
+            return Ok(result);
         }
         
         [HttpGet("Validate")]

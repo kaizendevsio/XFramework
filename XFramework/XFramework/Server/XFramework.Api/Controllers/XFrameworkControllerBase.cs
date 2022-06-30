@@ -1,8 +1,10 @@
-﻿using System.Security.Claims;
+﻿using System;
+using System.Security.Claims;
 using System.Text.Json;
 using IdentityServer.Domain.Generic.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using TypeSupport.Extensions;
 
 namespace XFramework.Api.Controllers
 {
@@ -32,12 +34,13 @@ namespace XFramework.Api.Controllers
             var roleList = JsonSerializer.Deserialize<List<RoleEntity>>(roleString);
 
             if (roleList.Any(i => i == RoleEntity.Administrator)) return request;
+
+            if (!request.ContainsProperty("CredentialGuid")) return request;
             
-            var propertyInfo = request.GetType().GetProperty("CredentialGuid");
-            var requestValue = propertyInfo.GetValue(request);
-            if (string.IsNullOrEmpty($"{requestValue}"))
+            var requestValue = request.GetPropertyValue("CredentialGuid");
+            if (string.IsNullOrEmpty(requestValue?.ToString()))
             {
-                propertyInfo?.SetValue(request, credentialGuid);
+                request.SetPropertyValue("CredentialGuid", Guid.Parse(credentialGuid));
             }
             return request;
         }

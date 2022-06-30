@@ -16,7 +16,7 @@ using XFramework.Domain.Generic.Configurations;
 
 namespace StreamFlow.Stream.Services.Handlers.Events
 {
-    public class InvokeMethodResponseHandler : CommandBaseHandler, IRequestHandler<InvokeMethodResponseCmd, CmdResponseBO<InvokeMethodResponseCmd>>
+    public class InvokeMethodResponseHandler : CommandBaseHandler, IRequestHandler<InvokeMethodResponseCmd, CmdResponse<InvokeMethodResponseCmd>>
     {
         public InvokeMethodResponseHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
         {
@@ -26,14 +26,14 @@ namespace StreamFlow.Stream.Services.Handlers.Events
         }
 
 
-        public async Task<CmdResponseBO<InvokeMethodResponseCmd>> Handle(InvokeMethodResponseCmd request, CancellationToken cancellationToken)
+        public async Task<CmdResponse<InvokeMethodResponseCmd>> Handle(InvokeMethodResponseCmd request, CancellationToken cancellationToken)
         {
             // Check if Client is Registered
-            var client = _cachingService.Clients.FirstOrDefault(x => x.StreamId == request.Context.ConnectionId);
-            if (client == null)
+            var client = _cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == request.Context.ConnectionId);
+            if (client.Value == null)
             {
                 Console.WriteLine($"Unknown or unauthorized client detected");
-                _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
+                await _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Forbidden
@@ -42,20 +42,20 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
             request.RequestServer = new()
             {
-                RequestId = client.Guid,
-                Name = client.Name
+                RequestId = client.Value.Guid,
+                Name = client.Value.Name
             };
 
             var telemetry = new StreamFlowTelemetryBO
             {
-                ClientGuid = client.Guid,
+                ClientGuid = client.Value.Guid,
                 RequestGuid = request.MessageQueue.RequestGuid,
                 ConsumerGuid = request.MessageQueue.ConsumerGuid
             };
             
-            var c = _cachingService.Clients.FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
+            var c = _cachingService.Clients.FirstOrDefault(x => x.Value.Guid == request.MessageQueue.Recipient);
 
-            if (c != null)
+            if (c.Value != null)
             {
                 if (_cachingService.PendingMethodCalls.TryRemove(request.MessageQueue.RequestGuid, out TaskCompletionSource<StreamFlowMessageBO> methodCallCompletionSource))
                 {
@@ -69,7 +69,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                 };
             }
             
-            if (_cachingService.AbsoluteClients.All(x => x.Guid != request.MessageQueue.Recipient))
+            if (_cachingService.AbsoluteClients.All(x => x.Value.Guid != request.MessageQueue.Recipient))
             {
                 Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
                 goto returnYield;
@@ -81,13 +81,13 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                 goto returnYield;
             }
 
-            if (_cachingService.QueuedMessages.Where(i => i.Recipient == request.MessageQueue.Recipient).Count() > _streamFlowConfiguration.QueueDepth)
+            if (_cachingService.QueuedMessages.Where(i => i.Value.Recipient == request.MessageQueue.Recipient).Count() > _streamFlowConfiguration.QueueDepth)
             {
                 Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} cannot be queued: Queue depth has been exhausted");
                 goto returnYield;
             }
                     
-            _cachingService.QueuedMessages.Add(request.MessageQueue);
+            _cachingService.QueuedMessages.TryAdd(Guid.NewGuid() , request.MessageQueue);
             Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been queued; Recipient unavailable");
 
             returnYield:

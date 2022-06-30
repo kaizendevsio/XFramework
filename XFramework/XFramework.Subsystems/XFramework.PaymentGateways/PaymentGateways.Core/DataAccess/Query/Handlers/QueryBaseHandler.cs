@@ -1,8 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
 using PaymentGateways.Core.Interfaces;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Integration.Interfaces;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace PaymentGateways.Core.DataAccess.Query.Handlers
 {

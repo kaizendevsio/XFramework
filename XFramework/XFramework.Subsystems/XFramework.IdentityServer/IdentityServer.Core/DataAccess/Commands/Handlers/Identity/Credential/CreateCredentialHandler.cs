@@ -10,8 +10,8 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
     public async Task<CmdResponse<CreateCredentialCmd>> Handle(CreateCredentialCmd request, CancellationToken cancellationToken)
     {
         var application = await GetApplication(request.RequestServer.ApplicationId);
-        var identityInfo = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.IdentityGuid}", cancellationToken: cancellationToken);
-        var entity = request.Adapt<TblIdentityCredential>();
+        var identityInfo = await _dataLayer.IdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.IdentityGuid}", cancellationToken: cancellationToken);
+        var entity = request.Adapt<IdentityCredential>();
             
         if (identityInfo == null)
         {
@@ -22,7 +22,12 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
             };
         }
 
-        var anyCredential = _dataLayer.TblIdentityCredentials
+        if (string.IsNullOrEmpty(request.UserName))
+        {
+            goto SkipDuplicateCheck;
+        }
+        
+        var anyCredential = _dataLayer.IdentityCredentials
             .AsNoTracking()
             .Any(i => i.UserName == request.UserName);
             
@@ -34,35 +39,51 @@ public class CreateCredentialHandler : CommandBaseHandler, IRequestHandler<Creat
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
+        
+        SkipDuplicateCheck:
         var hashPasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: request.Password, workFactor:11));
 
         entity.Guid = request.Guid != null ? request.Guid.ToString() : Guid.NewGuid().ToString();
         entity.PasswordByte = hashPasswordByte;
         entity.IdentityInfoId = identityInfo.Id;
         entity.ApplicationId = application.Id;
+        entity.IsEnabled = true;
 
-        await _dataLayer.TblIdentityCredentials.AddAsync(entity, cancellationToken);
+        await _dataLayer.IdentityCredentials.AddAsync(entity, cancellationToken);
             
-        var roleEntity = await _dataLayer.TblIdentityRoleEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.RoleEntity}", cancellationToken: cancellationToken);
-
-        if (roleEntity == null)
+        if (request.RoleList is null || !request.RoleList.Any())
         {
             return new ()
             {
-                Message = $"Role with Guid '{request.RoleEntity}' does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
+                Message = $"The role list is required",
+                HttpStatusCode = HttpStatusCode.BadRequest
             };
         }
-
-        var role = new TblIdentityRole()
+        
+        foreach (var item in request.RoleList)
         {
-            UserCred = entity,
-            RoleEntityId = roleEntity.Id
-        };
+            var roleEntity = await _dataLayer.IdentityRoleEntities
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Guid == $"{item}" && i.ApplicationId == application.Id, CancellationToken.None);
 
-        await _dataLayer.TblIdentityRoles.AddAsync(role, cancellationToken);
+            if (roleEntity == null)
+            {
+                return new ()
+                {
+                    Message = $"Role with Guid '{item}' does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            
+            await _dataLayer.IdentityRoles.AddAsync(new IdentityRole()
+            {
+                UserCred = entity,
+                RoleEntityId = roleEntity.Id,
+                IsEnabled = true
+            }, CancellationToken.None);
+        }
+
+      
         await _dataLayer.SaveChangesAsync(cancellationToken);
 
         return new ()

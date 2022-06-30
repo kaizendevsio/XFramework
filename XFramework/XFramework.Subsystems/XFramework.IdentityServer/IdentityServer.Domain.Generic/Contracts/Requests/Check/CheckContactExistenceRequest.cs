@@ -7,5 +7,6 @@ public class CheckContactExistenceRequest : RequestBase
 {
     public GenericContactType ContactType { get; set; }
     public string Value { get; set; }
+    public Guid? GroupGuid { get; set; }
     public Guid? Guid { get; set; }
 }

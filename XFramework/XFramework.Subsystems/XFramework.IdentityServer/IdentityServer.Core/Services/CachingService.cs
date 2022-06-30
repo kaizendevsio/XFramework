@@ -1,4 +1,6 @@
-﻿namespace IdentityServer.Core.Services;
+﻿using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+
+namespace IdentityServer.Core.Services;
 
 public class CachingService : ICachingService
 {
@@ -8,4 +10,9 @@ public class CachingService : ICachingService
     }
 
     public List<IdentitySessionBO> IdentitySessions { get; set; }
+    public List<AddressCountryResponse> AddressCountryResponseList { get; set; } = new();
+    public List<AddressRegionResponse> AddressRegionResponseList { get; set; } = new();
+    public List<AddressProvinceResponse> AddressProvinceResponseList { get; set; } = new();
+    public List<AddressCityResponse> AddressCityResponseList { get; set; } = new();
+    public List<AddressBarangayResponse> AddressBarangayResponseList { get; set; } = new();
 }

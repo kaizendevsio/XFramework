@@ -1,0 +1,20 @@
+﻿<MudDialog>
+    <DialogContent>
+        
+        <h1>HEHEHE</h1>
+        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus aliquam deserunt dolor ducimus enim eos exercitationem ipsum maxime minima nam nobis, pariatur porro, quibusdam quis sapiente sed voluptates voluptatum! Earum!</p>
+        
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Ok</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    void Submit() => MudDialog.Close(DialogResult.Ok(true));
+    void Cancel() => MudDialog.Cancel();
+}

@@ -7,5 +7,5 @@ public class AuthorizeIdentityResponse
     public string AccessToken  { get; set; }
     public string RefreshToken  { get; set; }
 
-    public List<RoleResponse> RoleList { get; set; }
+    public List<IdentityRoleResponse> RoleList { get; set; }
 }
