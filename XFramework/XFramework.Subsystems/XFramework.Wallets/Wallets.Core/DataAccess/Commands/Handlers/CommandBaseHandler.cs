@@ -3,5 +3,6 @@
 public class CommandBaseHandler
 {
     public IDataLayer _dataLayer;
+    public IMediator _mediator;
 
 }

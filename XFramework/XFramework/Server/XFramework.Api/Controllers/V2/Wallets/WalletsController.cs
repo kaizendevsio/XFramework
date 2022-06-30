@@ -20,11 +20,11 @@ namespace XFramework.Api.Controllers.V2.Wallets
 
         [EnableQuery]
         [HttpGet]
-        public async Task<JsonResult> Get(Guid? guid)
+        public async Task<ActionResult> Get(Guid? guid)
         {
             var request = new GetWalletRequest() {Guid = guid};
             var result = await WalletServiceWrapper.GetWallet(request);
-            return new JsonResult(result);
+            return Ok(result);
         }
 
         [EnableQuery]

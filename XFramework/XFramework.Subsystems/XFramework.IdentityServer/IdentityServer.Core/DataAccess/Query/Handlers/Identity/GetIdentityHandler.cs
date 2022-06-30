@@ -12,7 +12,7 @@ public class GetIdentityHandler : QueryBaseHandler ,IRequestHandler<GetIdentityQ
     
     public async Task<QueryResponse<IdentityResponse>> Handle(GetIdentityQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == request.Guid.ToString(), cancellationToken: cancellationToken);
+        var entity = await _dataLayer.IdentityInformations.FirstOrDefaultAsync(i => i.Guid == request.Guid.ToString(), cancellationToken: cancellationToken);
            
         if (entity == null)
         {

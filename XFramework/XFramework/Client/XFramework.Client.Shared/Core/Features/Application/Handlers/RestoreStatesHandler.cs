@@ -1,6 +1,8 @@
 using Blazored.LocalStorage;
 using Microsoft.Extensions.Configuration;
+using XFramework.Client.Shared.Core.Features.Community;
 using XFramework.Client.Shared.Core.Features.Wallet;
+using XFramework.Client.Shared.Entity.Enums;
 
 namespace XFramework.Client.Shared.Core.Features.Application;
 
@@ -30,11 +32,20 @@ public partial class ApplicationState
         {
             try
             { 
-                await IndexedDbService.InitializeDb();
+                var statePersistenceFromAppSettings = Configuration.GetValue<string>("Application:Persistence:State:Driver");
+                var persistStateBy = (PersistStateBy)Enum.Parse(typeof(PersistStateBy), statePersistenceFromAppSettings);
+
+                if (persistStateBy is PersistStateBy.IndexDb)
+                {
+                    await IndexedDbService.InitializeDb();
+                }
+                var tasks = new Task[3];
                 
-                StateHelper.RestoreState(Mediator, IndexedDbService,new ApplicationState.SetState() , ApplicationState);
-                StateHelper.RestoreState(Mediator,IndexedDbService ,new SessionState.SetState() , SessionState);
-                StateHelper.RestoreState(Mediator,IndexedDbService ,new WalletState.SetState() , WalletState);
+                tasks[0] = StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new CommunityState.SetState() , CommunityState, persistStateBy);
+                tasks[1] = StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new SessionState.SetState() , SessionState, persistStateBy);
+                tasks[2] = StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new WalletState.SetState() , WalletState, persistStateBy);
+
+                await Task.WhenAll(tasks);
             }
             catch (Exception e)
             {
@@ -42,7 +53,6 @@ public partial class ApplicationState
                 throw;
             }
             
-            Console.WriteLine("State Restored");
             return Unit.Value;
         }
     }

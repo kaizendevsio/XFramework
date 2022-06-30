@@ -79,13 +79,13 @@ namespace XFramework.Core.DataAccess
                         case "IsEnabled":
                             property.CurrentValue = true;
                             break;
-                        case "CreatedOn":
+                        case "CreatedAt":
                             if (entry.State == EntityState.Added)
                             {
                                 property.CurrentValue = DateTime.Now;
                             }
                             break;
-                        case "ModifiedOn":
+                        case "ModifiedAt":
                             property.CurrentValue = DateTime.Now;
                             break;
                         case "IsDeleted":

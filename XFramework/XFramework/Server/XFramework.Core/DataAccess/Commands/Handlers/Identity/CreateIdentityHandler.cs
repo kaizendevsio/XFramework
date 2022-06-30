@@ -36,7 +36,6 @@ namespace XFramework.Core.DataAccess.Commands.Handlers.Identity
                 Value = request.Email
             };
             
-            
             var checkIdentityExistence = await IdentityServiceWrapper.CheckIdentityExistence(request.Adapt<CheckIdentityExistenceRequest>());
             if (checkIdentityExistence.HttpStatusCode == HttpStatusCode.Conflict)
             {

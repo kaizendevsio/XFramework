@@ -1,9 +1,4 @@
-﻿using MediatR;
-using Microsoft.Extensions.Configuration;
-using System;
-using System.Linq;
-using Wallets.Api.Installers;
-using XFramework.Domain.Generic.Configurations;
+﻿using XFramework.Domain.Generic.Configurations;
 using XFramework.Integration.Services;
 
 namespace Wallets.Api.SignalR;

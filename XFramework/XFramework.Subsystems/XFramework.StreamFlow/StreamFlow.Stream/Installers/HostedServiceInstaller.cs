@@ -9,6 +9,7 @@ namespace StreamFlow.Stream.Installers
         public void InstallServices(IServiceCollection services, IConfiguration configuration)
         {
             services.AddHostedService<BootService>();
+            services.AddHostedService<ProcessMonitorHostedService>();
         }
     }
 }

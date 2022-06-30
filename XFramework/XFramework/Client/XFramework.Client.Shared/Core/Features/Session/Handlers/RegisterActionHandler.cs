@@ -6,14 +6,13 @@ using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    protected class RegisterActionHandler : ActionHandler<Register>
+    protected class RegisterActionHandler : ActionHandler<Register, CmdResponse>
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
@@ -34,19 +33,30 @@ public partial class SessionState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(Register action, CancellationToken aCancellationToken)
+        public override async Task<CmdResponse> Handle(Register action, CancellationToken aCancellationToken)
         {
+            IsSilent = action.IsSilent;
+            CurrentState.RegisterVm.RoleList ??= action.RoleList;
+            
             // Inform UI About Busy State
             await ReportTask("Creating Account..", true);
 
             // Check If Any Given Data Are Already Existing
-            if (await CheckDuplicateRecords(action)) return Unit.Value;
+            if (await CheckDuplicateRecords(action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.NotAcceptable,
+                IsSuccess = false
+            };
 
             // Check If Passwords Are Correct
             if (!CurrentState.RegisterVm.Password.Equals(CurrentState.RegisterVm.PasswordConfirmation))
             {
                 SweetAlertService.FireAsync("Password does not match",$"", SweetAlertIcon.Error);
-                return Unit.Value;
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.BadRequest,
+                    IsSuccess = false
+                };
             }
             
             // Create Guids
@@ -59,17 +69,24 @@ public partial class SessionState
             identityRequest.Guid = identityGuid;
             
             var identity = await IdentityServiceWrapper.CreateIdentity(identityRequest);
-            if (await HandleFailure(identity, action)) return Unit.Value;
+            if (await HandleFailure(identity, action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                IsSuccess = false
+            };;
             
             // Send Create Credential Request
             await ReportProgress("Creating credential..");
             var credentialRequest = CurrentState.RegisterVm.Adapt<CreateCredentialRequest>();
             credentialRequest.Guid = credentialGuid;
             credentialRequest.IdentityGuid = identityGuid;
-            credentialRequest.RoleEntity = Guid.Parse("fb2ec753-66b2-4259-b65f-1c6402e58209");
             
             var credential = await IdentityServiceWrapper.CreateCredential(credentialRequest);
-            if (await HandleFailure(credential, action)) return Unit.Value;
+            if (await HandleFailure(credential, action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                IsSuccess = false
+            };
             
             // Send Create Phone Contact Request
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
@@ -79,9 +96,15 @@ public partial class SessionState
                 {
                     CredentialGuid = credentialGuid,
                     ContactType = GenericContactType.Phone,
-                    Value = CurrentState.RegisterVm.PhoneNumber
+                    Value = CurrentState.RegisterVm.PhoneNumber,
+                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
+                    SendOtp = !action.SkipVerification
                 });
-                if (await HandleFailure(phoneContact, action)) return Unit.Value;
+                if (await HandleFailure(phoneContact, action)) return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    IsSuccess = false
+                };
             }
             
             // Send Create Email Contact Request
@@ -92,9 +115,14 @@ public partial class SessionState
                 {
                     CredentialGuid = credentialGuid,
                     ContactType = GenericContactType.Email,
-                    Value = CurrentState.RegisterVm.EmailAddress
+                    Value = CurrentState.RegisterVm.EmailAddress,
+                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767")
                 });
-                if (await HandleFailure(emailContact, action)) return Unit.Value;
+                if (await HandleFailure(emailContact, action)) return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    IsSuccess = false
+                };
             }
 
             // If WalletList property is provided, automatically create wallets
@@ -124,18 +152,31 @@ public partial class SessionState
 
                 SessionState.LoginVm.Username = username; 
                 SessionState.LoginVm.Password = CurrentState.RegisterVm.Password; 
-                await Mediator.Send(new Login() {NavigateToOnSuccess = action.NavigateToOnSuccess});
+                await Mediator.Send(new Login()
+                {
+                    NavigateToOnSuccess = action.NavigateToOnSuccess,
+                    SkipVerification = action.SkipVerification,
+                    Role = action.RoleList.First()
+                });
             
-                return Unit.Value;
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.Accepted,
+                    IsSuccess = true
+                };
             }
             
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(credential, action);
 
             // Inform UI About Not Busy State
-            ReportTask("Done", false);
+            ReportTask("", false);
             
-            return Unit.Value;
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.Accepted,
+                IsSuccess = true
+            };;
         }
 
         private async Task CreateWallets(List<(Guid?, decimal)> walletList, Guid credentialGuid)
@@ -171,7 +212,8 @@ public partial class SessionState
                 var phoneExistence = await IdentityServiceWrapper.CheckContactExistence(new()
                 {
                     ContactType = GenericContactType.Phone,
-                    Value = CurrentState.RegisterVm.PhoneNumber
+                    Value = CurrentState.RegisterVm.PhoneNumber,
+                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
                 });
                 if (await HandleFailure(phoneExistence, action)) return true;
             }
@@ -183,7 +225,8 @@ public partial class SessionState
                 var emailExistence = await IdentityServiceWrapper.CheckContactExistence(new()
                 {
                     ContactType = GenericContactType.Email,
-                    Value = CurrentState.RegisterVm.EmailAddress
+                    Value = CurrentState.RegisterVm.EmailAddress,
+                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
                 });
                 if (await HandleFailure(emailExistence, action)) return true;
             }

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using BinaryPack;
 using MessagePack;
 using StreamFlow.Domain.Generic.Enums;
 using XFramework.Domain.Generic.Enums;
@@ -12,11 +14,14 @@ namespace StreamFlow.Domain.Generic.Contracts.Requests
         {
             
         }
-        public StreamFlowMessageBO(object request)
+        
+        public void SetData<T>(T request) where T : new()
         {
+            var options = new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles};
             CommandName = request.GetType().Name.Replace("Request", string.Empty);
-            Data = JsonSerializer.Serialize(request);
+            Data = JsonSerializer.Serialize(request, options);
         }
+        
         public string CommandName { get; set; }
         public string Data { get; set; }
         public string Message { get; set; }

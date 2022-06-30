@@ -17,5 +17,5 @@ public class AddressCountryResponse
     public string Guid { get; set; }
 
     public CurrencyEntityResponse Currency { get; set; }
-    public List<AddressRegionResponse> TblAddressRegions { get; set; }
+    public List<AddressRegionResponse> AddressRegions { get; set; }
 }

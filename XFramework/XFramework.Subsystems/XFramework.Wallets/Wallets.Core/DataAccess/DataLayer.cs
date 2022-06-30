@@ -57,7 +57,7 @@ public class DataLayer : XnelSystemsContext, IDataLayer
         var auditEntries = new List<AuditEntryBO>();
         foreach (var entry in ChangeTracker.Entries())
         {
-            if (entry.Entity is TblAuditHistory || entry.State == EntityState.Detached || entry.State == EntityState.Unchanged)
+            if (entry.Entity is AuditHistory || entry.State == EntityState.Detached || entry.State == EntityState.Unchanged)
                 continue;
 
             var auditEntry = new AuditEntryBO(entry);
@@ -69,22 +69,28 @@ public class DataLayer : XnelSystemsContext, IDataLayer
                 switch (property.Metadata.Name)
                 {
                     case "IsEnabled":
-                        property.CurrentValue = true;
+                        property.CurrentValue ??= true;
                         break;
-                    case "CreatedOn":
+                    case "CreatedAt":
                         if (entry.State == EntityState.Added)
                         {
-                            property.CurrentValue = DateTime.Now;
+                            property.CurrentValue = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc);
                         }
                         break;
-                    case "ModifiedOn":
-                        property.CurrentValue = DateTime.Now;
+                    case "ModifiedAt":
+                        property.CurrentValue = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc);
                         break;
                     case "IsDeleted":
                         property.CurrentValue ??= false;
                         break;
                     case "CreatedBy":
-                        property.CurrentValue ??= (long?)0m;
+                        property.CurrentValue ??= (long?) 0m;
+                        break;
+                    case "Guid":
+                        if (string.IsNullOrEmpty($"{property.CurrentValue}"))
+                        {
+                            property.CurrentValue = $"{Guid.NewGuid()}";
+                        }
                         break;
                     default:
                         break;
@@ -131,7 +137,7 @@ public class DataLayer : XnelSystemsContext, IDataLayer
         // Save audit entities that have all the modifications
         foreach (var auditEntry in auditEntries.Where(_ => !_.HasTemporaryProperties))
         {
-            TblAuditHistories.Add(auditEntry.ToAudit());
+            AuditHistories.Add(auditEntry.ToAudit());
         }
 
         // keep a list of entries where the value of some properties are unknown at this step
@@ -160,7 +166,7 @@ public class DataLayer : XnelSystemsContext, IDataLayer
             }
 
             // Save the Audit entry
-            TblAuditHistories.Add(auditEntry.ToAudit());
+            AuditHistories.Add(auditEntry.ToAudit());
         }
 
         return SaveChanges();

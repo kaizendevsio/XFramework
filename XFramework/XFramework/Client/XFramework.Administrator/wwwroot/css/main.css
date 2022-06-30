@@ -1,0 +1,4 @@
+/* This file is reserved for overriding and extending the template styles. */
+.os-content-glue{
+    display: none!important;
+}

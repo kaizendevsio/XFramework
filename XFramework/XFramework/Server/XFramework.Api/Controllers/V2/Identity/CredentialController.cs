@@ -18,27 +18,27 @@ namespace XFramework.Api.Controllers.V2.Identity
         
         [EnableQuery]
         [HttpGet("GetByContact")]
-        public async Task<JsonResult> Get(string contactValue)
+        public async Task<ActionResult> Get(string contactValue)
         {
             var result = await _identityServiceWrapper.GetCredentialByContact(new () { ContactValue = contactValue });
-            return new JsonResult(result);
+            return Ok(result);
         }
         
         [EnableQuery]
         [HttpGet]
-        public async Task<JsonResult> Get(Guid guid)
+        public async Task<ActionResult> Get(Guid guid)
         {
             var result = await _identityServiceWrapper.GetCredential(new () { Guid = guid });
-            return new JsonResult(result);
+            return Ok(result);
         }
         
         [EnableQuery]
         [HttpGet("List")]
-        public async Task<JsonResult> List(Guid? applicationGuid)
+        public async Task<ActionResult> List(Guid? applicationGuid)
         {
             var request = new GetCredentialListRequest(){ApplicationGuid = applicationGuid};
             var result = await _identityServiceWrapper.GetCredentialList(request);
-            return new JsonResult(result);
+            return Ok(result);
         }
         
         [HttpGet("Validate")]

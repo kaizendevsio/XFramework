@@ -16,6 +16,6 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task<bool> Connect();
     public Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request);
     public Task PushAsync(StreamFlowMessageBO request);
-    public Task Subscribe(StreamFlowClientBO request);
-    public Task Unsubscribe(StreamFlowClientBO request);
+    /*public Task Subscribe(StreamFlowClientBO request);
+    public Task Unsubscribe(StreamFlowClientBO request);*/
 }

@@ -24,16 +24,17 @@
       <PackageReference Include="MediatR" Version="9.0.0" />
       <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
+      <PackageReference Include="Sentry" Version="3.17.1" />
       <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.14.1" />
         <PackageReference Include="TypeSupport" Version="1.1.12" />
     </ItemGroup>
 
     <ItemGroup>
-      <Reference Include="LoadManna.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\LoadManna\LoadManna\LoadManna\Server\LoadManna.Server\LoadManna.Integration\bin\Debug\net6.0\LoadManna.Integration.dll</HintPath>
+      <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
       </Reference>
-      <Reference Include="PaymentGateways.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\LoadManna\LoadManna\LoadManna.Subsystems\LoadManna.PaymentGateways\PaymentGateways.Domain.Generic\bin\Debug\net6.0\PaymentGateways.Domain.Generic.dll</HintPath>
+      <Reference Include="IdentityServer.Integration">
+        <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Integration\bin\Debug\net6.0\IdentityServer.Integration.dll</HintPath>
       </Reference>
       <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>

@@ -11,7 +11,7 @@ public class DecrementWalletHandler : CommandBaseHandler, IRequestHandler<Decrem
         
     public async Task<CmdResponse<DecrementWalletCmd>> Handle(DecrementWalletCmd request, CancellationToken cancellationToken)
     {
-        var credentialEntity = await _dataLayer.TblIdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
+        var credentialEntity = await _dataLayer.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken);
         if (credentialEntity == null)
         {
             return new ()
@@ -21,7 +21,7 @@ public class DecrementWalletHandler : CommandBaseHandler, IRequestHandler<Decrem
             };
         }
         
-        var walletEntity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
+        var walletEntity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.WalletEntityGuid}", cancellationToken);
         if (walletEntity == null)
         {
             return new ()
@@ -31,9 +31,9 @@ public class DecrementWalletHandler : CommandBaseHandler, IRequestHandler<Decrem
             };
         }
 
-        var entity = await _dataLayer.TblUserWallets
-            .Where(i => i.UserAuthId == credentialEntity.Id)
-            .Where(i => i.WalletTypeId == walletEntity.Id)
+        var entity = await _dataLayer.Wallets
+            .Where(i => i.IdentityCredentialId == credentialEntity.Id)
+            .Where(i => i.WalletEntityId == walletEntity.Id)
             .FirstOrDefaultAsync(cancellationToken);
         if (entity == null)
         {

@@ -4,11 +4,10 @@ public class CommandBaseHandler
 {
     public IDataLayer _dataLayer;
 
-    public async Task<TblApplication> GetApplication(Guid? guid)
+    public async Task<Application> GetApplication(Guid? guid)
     {
         if (guid is null) return null;
-        var entity = await _dataLayer.TblApplications
-            .AsNoTracking()
+        var entity = await _dataLayer.Applications
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{guid}");
         if (entity is null)

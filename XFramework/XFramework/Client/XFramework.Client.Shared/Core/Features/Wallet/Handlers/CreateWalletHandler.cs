@@ -38,7 +38,7 @@ public partial class WalletState
             }
 
             // Check if CredentialGuid is provided
-            if (SessionState.State is not Domain.Generic.Enums.SessionState.Active && action.CredentialGuid is null)
+            if (SessionState.State is not CurrentSessionState.Active && action.CredentialGuid is null)
             {
                 SweetAlertService.FireAsync("Error", "Could not create wallet, credentials not provided");
                 return Unit.Value;
@@ -46,7 +46,7 @@ public partial class WalletState
             
             // Map view model to request object
             var request = action.Adapt<CreateWalletRequest>();
-            request.CredentialGuid = SessionState.State is Domain.Generic.Enums.SessionState.Active ? SessionState.Credential.Guid : action.CredentialGuid;
+            request.CredentialGuid = SessionState.State is CurrentSessionState.Active ? SessionState.Credential.Guid : action.CredentialGuid;
             
             // Send the request
             var response = await WalletServiceWrapper.CreateWallet(request);

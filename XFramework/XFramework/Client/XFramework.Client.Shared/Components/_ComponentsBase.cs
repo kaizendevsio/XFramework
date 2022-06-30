@@ -1,8 +1,11 @@
-﻿using XFramework.Client.Shared.Core.Features.Application;
+﻿using XFramework.Client.Shared.Core.Features.Address;
+using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Cache;
+using XFramework.Client.Shared.Core.Features.Cryptocurrency;
 using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Modals;
 using XFramework.Client.Shared.Core.Features.Session;
+using XFramework.Client.Shared.Core.Features.Wallet;
 
 namespace XFramework.Client.Shared.Components;
 
@@ -23,7 +26,10 @@ public class XComponentsBase : BlazorStateComponent
     public LayoutState LayoutState => GetState<LayoutState>();
     public SessionState SessionState => GetState<SessionState>();
     public ModalState ModalState => GetState<ModalState>();
+    public AddressState AddressState => Store.GetState<AddressState>();
     public CacheState CacheState => GetState<CacheState>();
+    public WalletState WalletState => GetState<WalletState>();
+    public CryptocurrencyState CryptocurrencyState => GetState<CryptocurrencyState>();
 
     public string Cursor => AppState.IsBusy ? "progress" : "arrow";
     

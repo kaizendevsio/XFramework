@@ -1,0 +1,37 @@
+﻿@page "/Enterprises"
+@inherits EnterprisesBase
+
+<h1 class="text-center">Enterprises List</h1>
+<table class="table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Phone</th>
+      <th>DOB</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+   @foreach (var item in Model)
+   {
+     <tr>
+       <td>@item.Name</td>
+       <td>@item.Email</td>
+       <td>@item.Phone</td>
+       <td>@item.DateOfBirth</td>
+       <td>@item.Status</td>
+       <td>
+         <MudButton Color="Color.Primary" @onclick="@((e) => EditModal(new()))">Edit</MudButton>
+         <MudButton Color="Color.Error" @onclick="@((e) => DeleteModal(new()))">Delete</MudButton>
+       </td>
+     </tr>
+   }
+   </tbody>
+</table>
+
+
+<MudButton OnClick="@((e) => CreateModal(new()))">Open Create Modal</MudButton>
+
+

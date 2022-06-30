@@ -2,9 +2,6 @@
 using System.Threading.Tasks;
 using PaymentGateways.Core.Interfaces;
 using PaymentGateways.Domain.DataTransferObjects;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Enums;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace PaymentGateways.Core.Services
 {

@@ -1,29 +1,14 @@
-
-@if (_stateRestored)
-{
-    @Body
-}
-else
-{
-    @*<div class="text-center" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%)">
-        <img class="" src="assets/images/favicon.png" alt="" width="150px">
-    </div>*@
-    
-    <p class="mt-4 text-uppercase position-absolute text-muted w-100 text-center" style="bottom: 20px">Initializing..</p>
-}
-
-@code
-{
-    bool _stateRestored;
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+@using XFramework.Client.Shared.Core.Services.Interface
+<CascadingValue Value="this">
+    @if (ApplicationState.StateRestored)
     {
-        if (firstRender)
-        {
-            new Timer(new TimerCallback(async (e) =>
-            {
-                await Mediator.Send(new ApplicationState.RestoreStates()).ContinueWith(t => { _stateRestored = true; StateHasChanged(); });
-            })
-            , null, 10, 0);
-        }
+        @Body
     }
-}
+
+    @code
+    {
+        [Inject] public IIdentityServiceWrapper IdentityServiceWrapper { get; set; }
+        [Inject] public IBootstrapService BootstrapService { get; set; }
+    }
+</CascadingValue>
+

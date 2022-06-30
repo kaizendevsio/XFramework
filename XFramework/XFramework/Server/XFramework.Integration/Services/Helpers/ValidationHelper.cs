@@ -9,7 +9,7 @@ public static class ValidationHelper
         if (convertOnly)
         {
             if (phoneNumber.Any(char.IsLetter)) return phoneNumber;
-            if (phoneNumber.Contains('+') != true)
+            if (!phoneNumber.Contains('+'))
             {
                 phoneNumber = $"+63{phoneNumber.Substring(1)}";
             }
@@ -40,10 +40,10 @@ public static class ValidationHelper
                 throw new ArgumentException("Incorrect Phone number format, format should be +XXXXXXXXXXXX or XXXXXXXXXXX");
             }
         }
-        /*if (phoneNumber.Contains('+') != true)
+        if (!phoneNumber.Contains('+'))
         {
             phoneNumber = $"+63{phoneNumber.Substring(1)}";
-        }*/
+        }
         return phoneNumber;
     }
 

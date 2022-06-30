@@ -6,4 +6,15 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <Folder Include="BusinessObjects" />
+      <Folder Include="Contracts\Requests\Check" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+        <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
 </Project>

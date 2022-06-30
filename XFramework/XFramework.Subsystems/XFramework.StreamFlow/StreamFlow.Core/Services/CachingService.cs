@@ -15,9 +15,10 @@ namespace StreamFlow.Core.Services
         {
         }
 
-        public List<StreamFlowClientBO> Clients { get; set; } = new();
-        public List<StreamFlowClientBO> AbsoluteClients { get; set; } = new();
-        public List<StreamFlowMessageBO> QueuedMessages { get; set; } = new();
+        public ConcurrentDictionary<int, StreamFlowClientBO> Clients { get; set; } = new();
+        public ConcurrentDictionary<int, StreamFlowClientBO> LatestClients { get; set; } = new();
+        public ConcurrentDictionary<int, StreamFlowClientBO> AbsoluteClients { get; set; } = new();
+        public ConcurrentDictionary<Guid, StreamFlowMessageBO> QueuedMessages { get; set; } = new();
         public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; } = new();
     }
 }

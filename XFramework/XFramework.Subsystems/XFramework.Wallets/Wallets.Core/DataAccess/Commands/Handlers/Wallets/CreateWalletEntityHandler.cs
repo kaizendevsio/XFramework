@@ -9,7 +9,7 @@ public class CreateWalletEntityHandler : CommandBaseHandler, IRequestHandler<Cre
 
     public async Task<CmdResponse<CreateWalletEntityCmd>> Handle(CreateWalletEntityCmd request, CancellationToken cancellationToken)
     {
-        var currencyEntity = await _dataLayer.TblCurrencyEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.CurrencyEntityGuid}", cancellationToken);
+        var currencyEntity = await _dataLayer.CurrencyEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.CurrencyEntityGuid}", cancellationToken);
         if (currencyEntity == null)
         {
             return new()
@@ -19,10 +19,10 @@ public class CreateWalletEntityHandler : CommandBaseHandler, IRequestHandler<Cre
             };
         }
 
-        var entity = request.Adapt<TblWalletEntity>();
+        var entity = request.Adapt<WalletEntity>();
         entity.CurrencyEntity = currencyEntity;
         
-        _dataLayer.TblWalletEntities.Add(entity);
+        _dataLayer.WalletEntities.Add(entity);
         await _dataLayer.SaveChangesAsync(cancellationToken);
 
         return new()

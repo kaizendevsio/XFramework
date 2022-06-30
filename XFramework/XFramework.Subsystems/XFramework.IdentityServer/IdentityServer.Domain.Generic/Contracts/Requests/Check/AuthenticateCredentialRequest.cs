@@ -10,4 +10,5 @@ public class AuthenticateCredentialRequest : RequestBase
     public string Password { get; set; }
     public bool Remember { get; set; }
     public AuthorizeBy AuthorizeBy { get; set; }
+    public Guid? Role { get; set; }
 }

@@ -8,6 +8,7 @@ namespace XFramework.Domain.Generic.BusinessObjects
 
         public T Result { get; set; }
         public HttpStatusCode StatusCode { get; set; }
+        public bool IsSuccess { get; set; }
         public string ReasonPhrase { get; set; }
     }
 }

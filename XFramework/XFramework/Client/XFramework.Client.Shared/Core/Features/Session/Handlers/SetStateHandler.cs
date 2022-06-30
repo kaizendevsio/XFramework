@@ -36,7 +36,5 @@ public partial class SessionState
             }
             return Unit.Value;
         }
-
-        
     }
 }

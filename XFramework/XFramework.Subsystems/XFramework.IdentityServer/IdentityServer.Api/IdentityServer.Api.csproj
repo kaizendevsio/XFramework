@@ -14,7 +14,10 @@
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="6.0.0" NoWarn="NU1605" />
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.2" />
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.2" />
+        <PackageReference Include="Sentry.AspNetCore" Version="3.17.1" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
+        <PackageReference Include="BinaryPack" Version="1.0.3" />
+        <PackageReference Include="ByteSize" Version="2.1.1" />
     </ItemGroup>
 
     <ItemGroup>
@@ -28,6 +31,12 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Reference Include="Messaging.Domin.Generic">
+        <HintPath>..\..\XFramework.Messaging\Messaging.Domin.Generic\bin\Debug\net6.0\Messaging.Domin.Generic.dll</HintPath>
+      </Reference>
+      <Reference Include="Messaging.Integration">
+        <HintPath>..\..\XFramework.Messaging\Messaging.Integration\bin\Debug\net6.0\Messaging.Integration.dll</HintPath>
+      </Reference>
       <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
         <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net6.0\StreamFlow.Domain.dll</HintPath>
       </Reference>

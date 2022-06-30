@@ -1,8 +1,4 @@
-﻿using Microsoft.Extensions.Hosting;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace Wallets.Api.HostedService;
+﻿namespace Wallets.Api.HostedService;
 
 public class SampleService : IHostedService
 {

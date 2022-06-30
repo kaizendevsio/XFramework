@@ -2,7 +2,7 @@
 
 namespace XFramework.Domain.Generic.Contracts.Requests.Create
 {
-    public class CreateUserRequest : RequestBase
+    public class CreateUserRequest : TransactionRequestBase
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }

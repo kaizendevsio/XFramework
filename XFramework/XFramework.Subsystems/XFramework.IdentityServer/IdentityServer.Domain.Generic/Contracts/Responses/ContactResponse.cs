@@ -9,9 +9,10 @@ public class ContactResponse
     public DateTime? ModifiedAt { get; set; }
     public long? ModifiedBy { get; set; }
     public bool IsDeleted { get; set; }
-    public Guid? UcentitiesGuid { get; set; }
     public string Value { get; set; }
     public Guid? CredentialGuid { get; set; }
 
-    public virtual ContactEntityResponse Ucentities { get; set; }
+    public virtual ContactEntityResponse Entity { get; set; }
+    public virtual IdentityContactGroupResponse Group { get; set; }
+    
 }

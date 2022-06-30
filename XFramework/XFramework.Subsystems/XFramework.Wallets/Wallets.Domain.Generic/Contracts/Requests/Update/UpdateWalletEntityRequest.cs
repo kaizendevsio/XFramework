@@ -2,7 +2,7 @@
 
 namespace Wallets.Domain.Generic.Contracts.Requests.Update;
 
-public class UpdateWalletEntityRequest : RequestBase  
+public class UpdateWalletEntityRequest : TransactionRequestBase  
 {
     public Guid? Guid { get; set; }
     public string Code { get; set; }

@@ -1,5 +1,6 @@
 ﻿using Blazored.LocalStorage;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
 using Mapster;
 using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Core.Features.Application;
@@ -10,10 +11,11 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    protected class LogInHandler : ActionHandler<Login>
+    protected class LogInHandler : ActionHandler<Login, CmdResponse>
     {
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
+        public bool VerificationRequired { get; set; }
         
         public LogInHandler(IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
@@ -31,25 +33,58 @@ public partial class SessionState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(Login action, CancellationToken aCancellationToken)
+        public override async Task<CmdResponse> Handle(Login action, CancellationToken aCancellationToken)
         {
             // Inform UI About Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
 
             // Map view model to request object
             var request = CurrentState.LoginVm.Adapt<AuthenticateCredentialRequest>();
+            request.Role = action.Role;
             
             // Send the request
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
             
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, true ,"There was an error while trying to sign you in. Please check your credentials and try again")) return Unit.Value;
-           
-            // Set Session State To Active
-            await Mediator.Send(new SetState() {State = Domain.Generic.Enums.SessionState.Active});
+            if(await HandleFailure(response, action, false ,$"There was an error while trying to sign you in")) return new()
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                IsSuccess = false
+            };
+            
+            var checkVerification = new QueryResponse<IdentityVerificationSummaryResponse>();
+            if (!action.SkipVerification)
+            {
+                checkVerification = await IdentityServiceWrapper.CheckVerification(new()
+                {
+                    CredentialGuid = response.Response.CredentialGuid,
+                    VerificationTypeGuid = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
+                });
 
-            // If Success URL property is provided, navigate to the given URL
-            await HandleSuccess(response, action, true);
+                if (checkVerification.HttpStatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Accepted))
+                {
+                    /*if(await HandleFailure(checkVerification, action, true ,"There was an error while trying to sign you in: Account verification failure. Please try again")) return new()
+                    {
+                        HttpStatusCode = HttpStatusCode.BadRequest,
+                        IsSuccess = false
+                    };*/
+                }
+
+                if (checkVerification.HttpStatusCode is HttpStatusCode.NotFound || !checkVerification.Response.IsVerified)
+                {
+                    VerificationRequired = true;
+                    await Mediator.Send(new InitiateVerificationCode
+                    {
+                        CredentialGuid = response.Response.CredentialGuid,
+                        NavigateToOnSuccess = action.NavigateToOnSuccess,
+                        NavigateToOnFailure = action.NavigateToOnFailure,
+                        NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired
+                    });
+                }
+            }         
+
+            // Set Session State To Active
+            await Mediator.Send(new SetState() {State = CurrentSessionState.Active});
             
             // Fetch User Identity And Credential and Contact List
             var identityResponse = await IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});
@@ -63,7 +98,13 @@ public partial class SessionState
                 Credential = credentialResponse.Response,
                 ContactList = contactListResponse.Response
             });
-            
+
+            if (action.SkipVerification || (checkVerification.HttpStatusCode is not HttpStatusCode.NotFound && checkVerification.Response.IsVerified))
+            {
+                // If Success URL property is provided, navigate to the given URL
+                await HandleSuccess(response, action, true);
+            }
+
             // Reset Session Forms
             await Mediator.Send(new SetState()
             {
@@ -75,13 +116,35 @@ public partial class SessionState
             // Initialize Wallets If Specified
             if (action.InitializeWallets)
             {
-                await Mediator.Send(new WalletState.GetWalletList());
+                try
+                {
+                    await Mediator.Send(new WalletState.GetWalletList());
+                    if (action.AutoRefreshWallets)
+                    {
+                       WalletState.Timer = new Timer(_ =>
+                        {
+                            Task.Run(async () =>
+                            {
+                                await Mediator.Send(new WalletState.GetWalletList());
+                            });
+                        }, null, action.AutoRefreshWalletsInterval, action.AutoRefreshWalletsInterval);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    throw;
+                }
             }
 
             // Inform UI About Not Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
             
-            return Unit.Value;
+            return new()
+            {
+                HttpStatusCode = VerificationRequired ? HttpStatusCode.PreconditionRequired : HttpStatusCode.Accepted,
+                IsSuccess = true
+            };
         }
     }
 }

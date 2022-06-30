@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Sentry;
 using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
 
@@ -48,6 +49,7 @@ namespace StreamFlow.Core.PipelineBehaviors
             }
             catch (Exception e)
             {
+                SentrySdk.CaptureMessage(e.ToString());
                 var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
 
                 responseInstance?.GetType().GetProperty("Message")?

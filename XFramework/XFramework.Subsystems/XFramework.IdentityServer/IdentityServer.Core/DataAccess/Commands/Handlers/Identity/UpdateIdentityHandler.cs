@@ -8,7 +8,7 @@ public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateI
     }
     public async Task<CmdResponse<UpdateIdentityCmd>> Handle(UpdateIdentityCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
+        var entity = await _dataLayer.IdentityInformations.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
         if (entity == null)
         {
             return new CmdResponse<UpdateIdentityCmd>

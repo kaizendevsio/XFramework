@@ -9,7 +9,7 @@ public class UpdateWalletEntityHandler: CommandBaseHandler, IRequestHandler<Upda
         
     public async Task<CmdResponse<UpdateWalletEntityCmd>> Handle(UpdateWalletEntityCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblWalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}" , cancellationToken);
+        var entity = await _dataLayer.WalletEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}" , cancellationToken);
         if (entity == null)
         {
             return new()

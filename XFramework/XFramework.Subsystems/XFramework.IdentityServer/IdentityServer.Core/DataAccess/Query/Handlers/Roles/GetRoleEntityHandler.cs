@@ -12,7 +12,7 @@ public class GetRoleEntityHandler : QueryBaseHandler, IRequestHandler<GetRoleEnt
     
     public async Task<QueryResponse<RoleEntityResponse>> Handle(GetRoleEntityQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityRoleEntities
+        var entity = await _dataLayer.IdentityRoleEntities
             .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);

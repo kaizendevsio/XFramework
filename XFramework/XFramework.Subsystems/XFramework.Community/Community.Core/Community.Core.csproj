@@ -6,13 +6,6 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
-
-    <ItemGroup>
-        <ProjectReference Include="..\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
-        <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
-        <PackageReference Include="TypeSupport" Version="1.1.12" />
-    </ItemGroup>
-
     <ItemGroup>
         <PackageReference Include="BCrypt.Net-Next" Version="4.0.2" />
         <PackageReference Include="FluentValidation" Version="10.3.4" />
@@ -20,7 +13,9 @@
         <PackageReference Include="Mapster" Version="7.2.0" />
         <PackageReference Include="MediatR" Version="9.0.0" />
         <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
+        <PackageReference Include="Sentry" Version="3.17.1" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.14.1" />
+        <PackageReference Include="TypeSupport" Version="1.1.12" />
     </ItemGroup>
 
     <ItemGroup>
@@ -31,5 +26,14 @@
             <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
         </Reference>
     </ItemGroup>
-    
+
+    <ItemGroup>
+      <ProjectReference Include="..\Community.Domain.Generic\Community.Domain.Generic.csproj" />
+      <ProjectReference Include="..\Community.Domain\Community.Domain.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="DataAccess\Query\Validations\Identity" />
+    </ItemGroup>
+
 </Project>

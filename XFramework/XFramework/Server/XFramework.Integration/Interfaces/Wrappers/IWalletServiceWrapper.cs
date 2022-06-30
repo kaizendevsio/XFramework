@@ -18,8 +18,7 @@ public interface IWalletServiceWrapper : IXFrameworkService
     public Task<CmdResponse> DeleteWalletEntity(DeleteWalletEntityRequest request);
 
     #endregion
-
-
+    
     #region Wallet
 
     public Task<CmdResponse> CreateWallet(CreateWalletRequest request);
@@ -30,6 +29,7 @@ public interface IWalletServiceWrapper : IXFrameworkService
     public Task<CmdResponse> DecrementWallet(DecrementWalletRequest request);
     public Task<CmdResponse> IncrementWallet(IncrementWalletRequest request);
     public Task<CmdResponse> TransferWallet(TransferWalletRequest request);
+    public Task<CmdResponse> ConvertWallet(ConvertWalletRequest request);
         
     public Task<QueryResponse<WalletDepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request);
     public Task<QueryResponse<WalletDepositResponse>> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request);

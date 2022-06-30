@@ -1,4 +1,6 @@
-﻿using XFramework.Integration.Drivers;
+﻿using Community.Integration.Drivers;
+using Community.Integration.Interfaces;
+using XFramework.Integration.Drivers;
 
 namespace XFramework.Api.Installers
 {
@@ -6,6 +8,7 @@ namespace XFramework.Api.Installers
     {
         public void InstallServices(IServiceCollection services, IConfiguration configuration)
         {
+            services.AddSingleton<ICommunityServiceWrapper, CommunityServiceDriver>();
             services.AddSingleton<IIdentityServiceWrapper, IdentityServerDriver>();
             services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
             //services.AddSingleton<ILoggerWrapper, RecordsDriver>();

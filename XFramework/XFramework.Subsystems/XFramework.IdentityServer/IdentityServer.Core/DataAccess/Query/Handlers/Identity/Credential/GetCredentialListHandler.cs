@@ -1,7 +1,5 @@
 ﻿using IdentityServer.Core.DataAccess.Query.Entity.Identity.Credentials;
-using IdentityServer.Domain.DataTransferObjects.Legacy;
 using IdentityServer.Domain.Generic.Contracts.Responses;
-using IdentityServer.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Interfaces.Wrappers;
 
@@ -19,19 +17,27 @@ public class GetCredentialListHandler : QueryBaseHandler, IRequestHandler<GetCre
     public async Task<QueryResponse<List<CredentialResponse>>> Handle(GetCredentialListQuery request, CancellationToken cancellationToken)
     {
         
-        var appEntity = await _dataLayer.TblApplications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
+        var appEntity = await _dataLayer.Applications.FirstOrDefaultAsync(i => i.Guid == $"{request.ApplicationGuid}", cancellationToken);
         if (appEntity == null)
         {
             return new ()
             {
-                Message = $"Identity with Guid {request.ApplicationGuid} does not exist",
+                Message = $"Application with guid '{request.ApplicationGuid}' not found",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
-        var result = await _dataLayer.TblIdentityCredentials
+        var result = await _dataLayer.IdentityCredentials
             .Where(i => i.ApplicationId == appEntity.Id)
+            .Include(i => i.IdentityInfo)
+            .Include(i => i.IdentityRoles)
+            .ThenInclude(i => i.RoleEntity)
+            .Include(i => i.IdentityContacts)
+            .ThenInclude(i => i.Entity)
+            .OrderBy(i => i.CreatedAt)
+            .Take(request.PageSize)
             .AsNoTracking()
+            .AsSplitQuery()
             .ToListAsync(cancellationToken: cancellationToken);
 
         if (!result.Any())

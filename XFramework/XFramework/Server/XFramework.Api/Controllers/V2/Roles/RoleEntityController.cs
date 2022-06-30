@@ -18,19 +18,19 @@ namespace XFramework.Api.Controllers.V2.Roles
         
         [EnableQuery]
         [HttpGet]
-        public async Task<JsonResult> Get(Guid guid)
+        public async Task<ActionResult> Get(Guid guid)
         {
             var result = await _identityServiceWrapper.GetRoleEntity(new () { Guid = guid });
-            return new JsonResult(result);
+            return Ok(result);
         }
         
         [EnableQuery]
         [HttpPost("List")]
-        public async Task<JsonResult> GeList(Guid? applicationGuid)
+        public async Task<ActionResult> GeList(Guid? applicationGuid)
         {
             var request = new GetRoleEntityListRequest(){ApplicationGuid = applicationGuid};
             var result = await _identityServiceWrapper.GetRoleEntityList(request);
-            return new JsonResult(result);
+            return Ok(result);
         }
         
     }

@@ -1,4 +1,6 @@
-﻿namespace XFramework.Client.Shared.Core.Features.Cryptocurrency;
+﻿using XFramework.Client.Shared.Entity.Models.Responses.CoinCap;
+
+namespace XFramework.Client.Shared.Core.Features.Cryptocurrency;
 
 public partial class CryptocurrencyState : State<CryptocurrencyState>
 {
@@ -6,4 +8,7 @@ public partial class CryptocurrencyState : State<CryptocurrencyState>
     {
         
     }
+
+    public List<AssetResponse> AssetList { get; set; }
+    public AssetResponse SelectedAsset { get; set; }
 }

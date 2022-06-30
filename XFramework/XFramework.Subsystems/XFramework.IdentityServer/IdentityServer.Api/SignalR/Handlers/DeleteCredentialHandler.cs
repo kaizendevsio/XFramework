@@ -6,6 +6,6 @@ public class DeleteCredentialHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<DeleteCredentialRequest, DeleteCredentialCmd>(connection, mediator);
+        HandleVoidRequestCmd<DeleteCredentialRequest, DeleteCredentialCmd>(connection, mediator);
     }
 }

@@ -1,4 +1,7 @@
-﻿using TypeSupport.Extensions;
+﻿using System.Diagnostics;
+using Blazored.LocalStorage;
+using TypeSupport.Extensions;
+using XFramework.Client.Shared.Entity.Enums;
 
 namespace XFramework.Client.Shared.Core.Helpers;
 
@@ -45,15 +48,33 @@ public static class StateHelper
         }
     }
 
-    public static void RestoreState<TAction, TState>(IMediator mediator ,IndexedDbService indexedDbService , TAction action, TState state)
+    public static async Task RestoreState<TAction, TState>(IMediator mediator, IndexedDbService indexedDbService, ISessionStorageService sessionStorageService, 
+        ILocalStorageService localStorageService, TAction action, TState state, PersistStateBy persistStateBy = PersistStateBy.SessionStorage)
     {
-        var s = indexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == $"{state.GetType().Name}")?.Value;
-        if (s is null)
+        var s = persistStateBy switch
         {
+            PersistStateBy.NotSpecified => throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented"),
+            PersistStateBy.LocalStorage => await localStorageService.GetItemAsStringAsync(state.GetType().Name, CancellationToken.None),
+            PersistStateBy.SessionStorage => await sessionStorageService.GetItemAsStringAsync(state.GetType().Name, CancellationToken.None),
+            PersistStateBy.IndexDb => indexedDbService.Database.StateCache.FirstOrDefault(i => i.Key == state.GetType().Name)?.Value,
+            PersistStateBy.CloudStore => throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented"),
+            PersistStateBy.GoogleDrive => throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented"),
+            PersistStateBy.OneDrive => throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented"),
+            _ => throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null)
+        };
+        if (s is null)
+        { 
             mediator.Send(Activator.CreateInstance<TAction>());
             return;
         }
 
+        
+        // measure time to restore state
+        var stopwatch = new Stopwatch();
+        stopwatch.Start();
         SetProperties(JsonSerializer.Deserialize<TAction>(s), state);
+        stopwatch.Stop();
+        Console.WriteLine($"Restore {state.GetType().Name} state took {stopwatch.ElapsedMilliseconds}ms");
+        
     }
 }

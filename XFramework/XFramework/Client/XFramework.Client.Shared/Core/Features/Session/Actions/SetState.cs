@@ -1,4 +1,5 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Responses;
+using XFramework.Client.Shared.Entity.Models.Requests.Session;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 
@@ -6,7 +7,7 @@ public partial class SessionState
 {
     public class SetState : IAction
     {
-        public Domain.Generic.Enums.SessionState? State { get; set; }
+        public CurrentSessionState? State { get; set; }
         public List<ContactResponse> ContactList { get; set; }
         public CredentialResponse Credential { get; set; }
         public IdentityResponse Identity { get; set; }

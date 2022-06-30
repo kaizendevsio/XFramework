@@ -6,6 +6,6 @@ public class CreateCredentialHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequest<CreateCredentialRequest, CreateCredentialCmd>(connection, mediator);
+        HandleRequestCmd<CreateCredentialRequest, CreateCredentialCmd>(connection, mediator);
     }
 }

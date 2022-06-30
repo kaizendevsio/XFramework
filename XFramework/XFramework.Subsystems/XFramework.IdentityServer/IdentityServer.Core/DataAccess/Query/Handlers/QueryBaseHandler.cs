@@ -14,10 +14,10 @@ public class QueryBaseHandler
     public ILoggerWrapper _recordsService;
     public JwtOptionsBO _jwtOptions;
 
-    public async Task<TblApplication> GetApplication(Guid? guid)
+    public async Task<Domain.DataTransferObjects.Application> GetApplication(Guid? guid)
     {
         if (guid is null) return null;
-        var entity = await _dataLayer.TblApplications
+        var entity = await _dataLayer.Applications
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{guid}");
         if (entity is null)

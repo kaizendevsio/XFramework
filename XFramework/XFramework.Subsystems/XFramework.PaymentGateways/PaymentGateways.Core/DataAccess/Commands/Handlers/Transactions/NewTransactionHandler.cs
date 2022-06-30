@@ -5,7 +5,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PaymentGateways.Core.DataAccess.Commands.Entity.Transactions;
 using PaymentGateways.Core.Interfaces;
-using XFramework.Domain.Generic.BusinessObjects;
 
 namespace PaymentGateways.Core.DataAccess.Commands.Handlers.Transactions
 {

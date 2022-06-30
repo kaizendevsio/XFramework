@@ -2,7 +2,7 @@
 
 namespace Wallets.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateWalletWithdrawalRequest : RequestBase
+public class CreateWalletWithdrawalRequest : TransactionRequestBase
 {
     public Guid? CredentialGuid { get; set; }
     public Guid? GatewayGuid { get; set; }

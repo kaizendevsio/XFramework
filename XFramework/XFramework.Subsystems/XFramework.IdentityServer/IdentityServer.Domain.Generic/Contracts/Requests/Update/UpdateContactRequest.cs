@@ -4,7 +4,7 @@ using XFramework.Domain.Generic.Enums;
 
 namespace IdentityServer.Domain.Generic.Contracts.Requests.Update;
 
-public class UpdateContactRequest : RequestBase
+public class UpdateContactRequest : TransactionRequestBase
 {
     public string Value { get; set; }
     public Guid? Guid { get; set; }

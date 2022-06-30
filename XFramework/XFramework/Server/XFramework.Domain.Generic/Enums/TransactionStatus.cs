@@ -11,6 +11,11 @@ namespace XFramework.Domain.Generic.Enums
         Failed = 3,
         Canceled = 4,
         Completed = 5,
-        Rejected = 6
+        Rejected = 6,
+        Refunded = 7,
+        Expired = 8,
+        Reversed = 9,
+        OnHold = 10,
+        OnGoing = 11,
     }
 }

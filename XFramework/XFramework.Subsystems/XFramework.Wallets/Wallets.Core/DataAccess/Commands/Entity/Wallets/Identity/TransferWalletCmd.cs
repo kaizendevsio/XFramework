@@ -2,4 +2,5 @@
 
 public class TransferWalletCmd : TransferWalletRequest, IRequest<CmdResponse<TransferWalletCmd>>
 {
+    
 }

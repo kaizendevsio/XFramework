@@ -23,10 +23,10 @@ namespace XFramework.Api.Controllers.V2.Identity
         [EnableQuery]
         [Authorize]
         [HttpGet]
-        public async Task<JsonResult> Get(Guid guid)
+        public async Task<ActionResult> Get(Guid guid)
         {
             var result = await _identityServiceWrapper.GetIdentity(new () { Guid = guid });
-            return new JsonResult(result);
+            return Ok(result);
         }
         
         [Authorize]

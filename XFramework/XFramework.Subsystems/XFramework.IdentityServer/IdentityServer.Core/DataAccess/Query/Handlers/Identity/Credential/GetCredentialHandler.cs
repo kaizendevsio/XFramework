@@ -12,8 +12,35 @@ public class GetCredentialHandler : QueryBaseHandler ,IRequestHandler<GetCredent
     
     public async Task<QueryResponse<CredentialResponse>> Handle(GetCredentialQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.TblIdentityCredentials
-            .Include( i => i.IdentityInfo)
+        var entity = await _dataLayer.IdentityCredentials
+            .Include(i => i.IdentityInfo)
+            .ThenInclude(i => i.IdentityAddresses)
+            .ThenInclude(i => i.CountryNavigation)
+            
+            .Include(i => i.IdentityInfo)
+            .ThenInclude(i => i.IdentityAddresses)
+            .ThenInclude(i => i.RegionNavigation)
+            
+            .Include(i => i.IdentityInfo)
+            .ThenInclude(i => i.IdentityAddresses)
+            .ThenInclude(i => i.ProvinceNavigation)
+            
+            .Include(i => i.IdentityInfo)
+            .ThenInclude(i => i.IdentityAddresses)
+            .ThenInclude(i => i.CityNavigation)
+            
+            .Include(i => i.IdentityInfo)
+            .ThenInclude(i => i.IdentityAddresses)
+            .ThenInclude(i => i.BarangayNavigation)
+            
+            .Include(i => i.IdentityRoles)
+            .ThenInclude(i => i.RoleEntity)
+            
+            .Include(i => i.IdentityContacts)
+            .ThenInclude(i => i.Entity)
+            .Include(i => i.IdentityContacts)
+            .ThenInclude(i => i.Group)
+            
             .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);

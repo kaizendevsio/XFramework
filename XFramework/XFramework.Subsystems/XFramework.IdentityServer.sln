@@ -18,6 +18,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Test", "XFra
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Domain.Generic", "XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj", "{78255E06-8F70-47D0-A8F0-61F406554DF1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Integration", "XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj", "{0D520FC8-D3E8-40CD-8A96-468DC5DFF482}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Domain.Generic", "XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj", "{0CCB6EC0-4016-4B74-95FA-B0953B13162C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,6 +36,8 @@ Global
 		{6C891D8B-FAE2-4300-965E-1749E62ACACD} = {39B46295-27E9-4529-ACA7-4EC985D02AD8}
 		{E5C70635-256C-4FAC-ABA9-9A3107DB616E} = {C40B8AD2-BC08-4AA9-850E-F32AFB2542EB}
 		{78255E06-8F70-47D0-A8F0-61F406554DF1} = {B8C0B4C5-A6D0-4763-87D2-B8601C434A81}
+		{0D520FC8-D3E8-40CD-8A96-468DC5DFF482} = {C40B8AD2-BC08-4AA9-850E-F32AFB2542EB}
+		{0CCB6EC0-4016-4B74-95FA-B0953B13162C} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{5812C495-8B5B-40D3-9F96-BF886E1C6CCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -56,5 +64,13 @@ Global
 		{78255E06-8F70-47D0-A8F0-61F406554DF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{78255E06-8F70-47D0-A8F0-61F406554DF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{78255E06-8F70-47D0-A8F0-61F406554DF1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0D520FC8-D3E8-40CD-8A96-468DC5DFF482}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D520FC8-D3E8-40CD-8A96-468DC5DFF482}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0D520FC8-D3E8-40CD-8A96-468DC5DFF482}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D520FC8-D3E8-40CD-8A96-468DC5DFF482}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0CCB6EC0-4016-4B74-95FA-B0953B13162C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0CCB6EC0-4016-4B74-95FA-B0953B13162C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0CCB6EC0-4016-4B74-95FA-B0953B13162C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0CCB6EC0-4016-4B74-95FA-B0953B13162C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

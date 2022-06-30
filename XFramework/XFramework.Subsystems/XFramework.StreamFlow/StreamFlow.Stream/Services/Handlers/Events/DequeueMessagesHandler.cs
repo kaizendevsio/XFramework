@@ -30,7 +30,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
         public async Task<CmdResponse<DequeueMessagesCmd>> Handle(DequeueMessagesCmd request, CancellationToken cancellationToken)
         {
-            var queuedMessages = _cachingService.QueuedMessages.Where(i => i.Recipient == request.Client.Guid).ToList();
+            var queuedMessages = _cachingService.QueuedMessages.Where(i => i.Value.Recipient == request.Client.Guid).ToList();
             if (queuedMessages.Any())
             {
                 Console.WriteLine($"Dequeuing items from cache..");
@@ -39,10 +39,10 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     var entity = new PushMessageCmd()
                     {
                         Context = request.Context,
-                        MessageQueue = message
+                        MessageQueue = message.Value
                     };
                     await _mediator.Send(entity).ConfigureAwait(false);
-                    _cachingService.QueuedMessages.Remove(message);
+                    _cachingService.QueuedMessages.TryRemove(message);
                 }
                 Console.WriteLine($"Dequeued {queuedMessages.Count} item(s) from cache");
             }

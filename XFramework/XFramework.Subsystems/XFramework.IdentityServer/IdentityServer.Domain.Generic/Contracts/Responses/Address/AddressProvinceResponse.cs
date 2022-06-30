@@ -2,6 +2,7 @@ namespace IdentityServer.Domain.Generic.Contracts.Responses.Address;
 
 public class AddressProvinceResponse
 {
+    public long Id { get; set; }
     public long PsgcCode { get; set; }
     public string Description { get; set; }
     public long RegCode { get; set; }
@@ -10,5 +11,5 @@ public class AddressProvinceResponse
     public DateTime? UpdatedAt { get; set; }
     public string Guid { get; set; }
     
-    public List<AddressCityResponse> TblAddressCities { get; set; }
+    public List<AddressCityResponse> AddressCities { get; set; }
 }

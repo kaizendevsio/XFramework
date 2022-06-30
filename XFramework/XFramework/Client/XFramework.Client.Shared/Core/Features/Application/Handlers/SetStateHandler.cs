@@ -29,8 +29,8 @@ public partial class ApplicationState
         {
             try
             {
-                await HandleProgressStatus(action);
                 StateHelper.SetProperties(action,CurrentState);
+                await HandleProgressStatus(action);
                 Persist(CurrentState);
             }
             catch (Exception e)
@@ -48,15 +48,15 @@ public partial class ApplicationState
                 SweetAlertService.UpdateAsync(new()
                 {
                     Title = action.ProgressTitle,
-                    Html = $"<img src='assets/img/loader.svg' width='96px' />",
+                    Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
                 });
             }
             if (!string.IsNullOrEmpty(action.ProgressMessage))
             {
                 SweetAlertService.UpdateAsync(new()
                 {
-                    Title = CurrentState.ProgressTitle,
-                    Html = $"<img src='assets/img/loader.svg' width='96px' /> <p>{action.ProgressMessage}</p>",
+                    //Title = CurrentState.ProgressTitle,
+                    Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div> <p>{action.ProgressMessage}</p>",
                 });
             }
             
@@ -67,9 +67,9 @@ public partial class ApplicationState
                 case true:
                     SweetAlertService.FireAsync(new()
                     {
-                        Title = CurrentState.ProgressTitle,
+                        //Title = CurrentState.ProgressTitle,
                         Text = CurrentState.ProgressMessage,
-                        Html = $"<img src='assets/img/loader.svg' width='96px' />",
+                        Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
                         ShowConfirmButton = false,
                     });
                     break;
