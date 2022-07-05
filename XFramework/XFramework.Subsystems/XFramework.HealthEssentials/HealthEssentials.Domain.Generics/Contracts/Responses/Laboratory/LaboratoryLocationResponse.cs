@@ -24,7 +24,7 @@ public class LaboratoryLocationResponse
     public bool? MainAddress { get; set; }
     [JsonIgnore] public long? ProvinceId { get; set; }
     [JsonIgnore] public long? CountryId { get; set; }
-    public string Guid { get; set; } = null!;
+    public Guid? Guid { get; set; }
     public int? Status { get; set; }
     public string? Phone { get; set; }
     public string? Email { get; set; }

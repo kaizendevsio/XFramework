@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
@@ -13,7 +14,7 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
     public async Task<CmdResponse<CreateLaboratoryLocationCmd>> Handle(CreateLaboratoryLocationCmd request, CancellationToken cancellationToken)
     {
         var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryGuid}", CancellationToken.None);
         
         if (laboratory is null)
         {
@@ -92,7 +93,8 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
         laboratoryLocation.RegionId = region.Id;
         laboratoryLocation.ProvinceId = province.Id;
         laboratoryLocation.CountryId = country.Id;
-        
+        laboratoryLocation.Status = (int?) (request.Status is GenericStatusType.None ? GenericStatusType.Pending : request.Status);
+
 
         await _dataLayer.HealthEssentialsContext.LaboratoryLocations.AddAsync(laboratoryLocation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

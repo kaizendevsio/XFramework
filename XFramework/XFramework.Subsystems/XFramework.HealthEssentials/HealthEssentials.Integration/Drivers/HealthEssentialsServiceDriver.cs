@@ -1,10 +1,40 @@
 ﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
@@ -12,6 +42,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using HealthEssentials.Integration.Interfaces;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
@@ -34,10 +65,12 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     {
         return await SendAsync<GetPendingRegistrationCompletionListRequest, List<CredentialResponse>>(request);
     }
+    
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request)
     {
         return await SendAsync<VerifyLogisticRiderRequest, IdentityValidationResponse>(request);
     }
+    
     public async Task<CmdResponse<UpdateDoctorRequest>> UpdateDoctor(UpdateDoctorRequest request)
     {
         return await SendAsync(request);
@@ -93,6 +126,31 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<StorageFileResponse>> GetPharmacyLocationDocument(GetPharmacyLocationDocumentRequest request)
+    {
+        return await SendAsync<GetPharmacyLocationDocumentRequest, StorageFileResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<StorageFileResponse>>> GetPharmacyLocationDocumentList(GetPharmacyLocationDocumentListRequest request)
+    {
+        return await SendAsync<GetPharmacyLocationDocumentListRequest, List<StorageFileResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyLocationDocumentRequest>> CreatePharmacyLocationDocument(CreatePharmacyLocationDocumentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyLocationDocumentRequest>> UpdatePharmacyLocationDocument(UpdatePharmacyLocationDocumentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyLocationDocumentRequest>> DeletePharmacyLocationDocument(DeletePharmacyLocationDocumentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatient(VerifyPatientRequest request)
     {
         return await SendAsync<VerifyPatientRequest, IdentityValidationResponse>(request);
@@ -102,11 +160,6 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     {
         return await SendAsync(request);
     }
-
-    /*public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticIdentity(VerifyLogisticRiderRequest request)
-    {
-        return await SendAsync<VerifyLogisticRiderRequest, IdentityValidationResponse>(request);
-    }*/
 
     public async Task<QueryResponse<LogisticRiderHandleResponse>> GetLogisticRiderHandle(GetLogisticRiderHandleRequest request)
     {
@@ -229,6 +282,31 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<DeleteLaboratoryLocationRequest>> DeleteLaboratoryLocation(DeleteLaboratoryLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<StorageFileResponse>> GetLaboratoryLocationDocument(GetLaboratoryLocationDocumentRequest request)
+    {
+        return await SendAsync<GetLaboratoryLocationDocumentRequest, StorageFileResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<StorageFileResponse>>> GetLaboratoryLocationDocumentList(GetLaboratoryLocationDocumentListRequest request)
+    {
+        return await SendAsync<GetLaboratoryLocationDocumentListRequest, List<StorageFileResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryLocationDocumentRequest>> CreateLaboratoryLocationDocument(CreateLaboratoryLocationDocumentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryLocationDocumentRequest>> UpdateLaboratoryLocationDocument(UpdateLaboratoryLocationDocumentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryLocationDocumentRequest>> DeleteLaboratoryLocationDocument(DeleteLaboratoryLocationDocumentRequest request)
     {
         return await SendAsync(request);
     }

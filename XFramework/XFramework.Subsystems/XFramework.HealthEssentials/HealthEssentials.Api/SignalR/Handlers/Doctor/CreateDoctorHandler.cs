@@ -1,6 +1,7 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Doctor;
 using HealthEssentials.Core.DataAccess.Query.Entity.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Create;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Doctor;
 

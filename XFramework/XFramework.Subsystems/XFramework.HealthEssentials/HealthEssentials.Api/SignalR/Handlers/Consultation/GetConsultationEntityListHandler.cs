@@ -2,6 +2,7 @@
 using HealthEssentials.Core.DataAccess.Query.Entity.Consultation;
 using HealthEssentials.Core.DataAccess.Query.Entity.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
