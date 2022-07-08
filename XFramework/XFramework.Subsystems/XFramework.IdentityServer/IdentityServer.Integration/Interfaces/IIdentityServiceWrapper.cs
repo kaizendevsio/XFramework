@@ -1,13 +1,21 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Location;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Storage;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
+using IdentityServer.Domain.Generic.Contracts.Requests.Delete.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Delete.Location;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Get.Location;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update;
+using IdentityServer.Domain.Generic.Contracts.Requests.Update.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Update.Location;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update.Verification;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
@@ -62,6 +70,12 @@ public interface IIdentityServiceWrapper : IXFrameworkService
     public Task<QueryResponse<List<AddressBarangayResponse>>> GetBarangayList(GetBarangayListRequest request);
     public Task<QueryResponse<IdentityLocationResponse>> GetLocation(GetLocationRequest request);
     public Task<QueryResponse<List<IdentityLocationResponse>>> GetLocationList(GetLocationListRequest request);
+    
+    public Task<CmdResponse<CreateFileRequest>> CreateFile(CreateFileRequest request);
+
+    public Task<CmdResponse<CreateAddressRequest>> CreateAddress(CreateAddressRequest request);
+    public Task<CmdResponse<UpdateAddressRequest>> UpdateAddress(UpdateAddressRequest request);
+    public Task<CmdResponse<DeleteAddressRequest>> DeleteAddress(DeleteAddressRequest request);
     
     public Task<QueryResponse<IdentityVerificationSummaryResponse>> CheckVerification(CheckVerificationRequest request);
     public Task<CmdResponse> CreateVerification(CreateVerificationRequest request);

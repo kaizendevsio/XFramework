@@ -39,11 +39,13 @@ public partial class ApplicationState
                 {
                     await IndexedDbService.InitializeDb();
                 }
+                var tasks = new Task[3];
+                
+                tasks[0] = StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new CommunityState.SetState() , CommunityState, persistStateBy);
+                tasks[1] = StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new SessionState.SetState() , SessionState, persistStateBy);
+                tasks[2] = StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new WalletState.SetState() , WalletState, persistStateBy);
 
-                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService, new ApplicationState.SetState() , ApplicationState, persistStateBy);
-                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new SessionState.SetState() , SessionState, persistStateBy);
-                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new WalletState.SetState() , WalletState, persistStateBy);
-                StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new CommunityState.SetState() , CommunityState, persistStateBy);
+                await Task.WhenAll(tasks);
             }
             catch (Exception e)
             {

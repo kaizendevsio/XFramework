@@ -1,51 +1,14 @@
+@using XFramework.Client.Shared.Core.Services.Interface
 <CascadingValue Value="this">
-    @if (_stateRestored)
+    @if (ApplicationState.StateRestored)
     {
         @Body
     }
-    else
-    {
-        <div style="background-color: @SplashBackground; width: 100vw; height: 100vh">
-            <div class="text-center" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%)">
-                <img class="" src="@SplashLogo" alt="" width="150px">
-            </div>
-        </div>
-       
-        <div class="text-center" style="position: absolute; top: 65%; left: 50%; transform: translate(-50%,-50%); width: 70%">
-            <div class="loadingio-spinner-ellipsis-hm5jphe6my"><div class="ldio-o8ctnog1lcq">
-                <div></div><div></div><div></div><div></div><div></div>
-            </div></div>
-        </div>
-        
-        @*<p class="mt-4 text-uppercase position-absolute text-muted w-100 text-center" style="bottom: 20px">Initializing..</p>*@
-    }
-    
+
     @code
     {
-        [Inject]
-        public IIdentityServiceWrapper IdentityServiceWrapper { get; set; }
-        
-        public string SplashSpinner { get; set; } = "assets/img/loader.svg";
-        public string SplashLogo { get; set; } = "assets/img/logo.svg";
-        public string SplashBackground { get; set; } = "white";
-        private DateTime _startTime = DateTime.Now;
-        private DateTime _endTime;
-        
-        bool _stateRestored;
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (firstRender)
-            {
-                    _endTime = DateTime.Now;
-                    Console.WriteLine($"Core state restored in {_endTime.Subtract(_startTime).TotalMilliseconds}ms");
-                await Mediator.Send(new ApplicationState.RestoreStates()).ContinueWith(async (t) =>
-                {
-                    
-                    _stateRestored = true;
-                    StateHasChanged();
-                });
-            }
-        }
+        [Inject] public IIdentityServiceWrapper IdentityServiceWrapper { get; set; }
+        [Inject] public IBootstrapService BootstrapService { get; set; }
     }
 </CascadingValue>
 

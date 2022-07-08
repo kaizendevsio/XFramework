@@ -1,4 +1,5 @@
-﻿using XFramework.Client.Shared.Core.Features.Layout;
+﻿using XFramework.Client.Shared.Core.Features.Application;
+using XFramework.Client.Shared.Core.Features.Layout;
 
 namespace XFramework.Client.Shared.Components;
 
@@ -16,6 +17,7 @@ public class XLayoutBase : BlazorStateLayoutComponent
     [Inject] public IMediator Mediator { get; set; }
     
     
+    public ApplicationState ApplicationState => GetState<ApplicationState>();
     public LayoutState LayoutState => GetState<LayoutState>();
     public SessionState SessionState => GetState<SessionState>();
     

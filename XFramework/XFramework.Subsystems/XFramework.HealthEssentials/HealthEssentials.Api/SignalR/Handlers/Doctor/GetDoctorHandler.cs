@@ -1,5 +1,6 @@
 using HealthEssentials.Core.DataAccess.Query.Entity.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Get;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 

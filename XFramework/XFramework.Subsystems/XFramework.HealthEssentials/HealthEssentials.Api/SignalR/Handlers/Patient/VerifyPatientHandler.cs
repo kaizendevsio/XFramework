@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Patient;

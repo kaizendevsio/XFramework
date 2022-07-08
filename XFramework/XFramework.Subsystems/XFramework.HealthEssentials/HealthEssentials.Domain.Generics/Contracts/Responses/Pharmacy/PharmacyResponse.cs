@@ -1,6 +1,4 @@
-﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
-
-namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+﻿namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
 public class PharmacyResponse
 {

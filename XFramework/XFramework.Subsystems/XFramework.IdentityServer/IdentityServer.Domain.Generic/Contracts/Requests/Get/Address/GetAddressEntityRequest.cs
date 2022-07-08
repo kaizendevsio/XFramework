@@ -4,5 +4,4 @@ namespace IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
 
 public class GetAddressEntityRequest : RequestBase
 {
-    public Guid? Guid { get; set; }
 }

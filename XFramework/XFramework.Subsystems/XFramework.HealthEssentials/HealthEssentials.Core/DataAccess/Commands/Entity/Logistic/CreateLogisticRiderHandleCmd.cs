@@ -1,4 +1,5 @@
-﻿using XFramework.Domain.Generic.Enums;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Create;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
 

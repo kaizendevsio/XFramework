@@ -58,6 +58,7 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         laboratoryMember.Laboratory = laboratory;
         laboratoryMember.CredentialId = credential.Id;
         laboratoryMember.LaboratoryLocation = laboratoryLocation;
+        laboratoryMember.Status = (int) (request.Status is GenericStatusType.None ? GenericStatusType.Pending : request.Status);
         
         await _dataLayer.HealthEssentialsContext.LaboratoryMembers.AddAsync(laboratoryMember, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

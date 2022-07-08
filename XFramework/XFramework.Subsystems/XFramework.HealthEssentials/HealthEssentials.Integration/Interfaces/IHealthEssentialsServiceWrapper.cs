@@ -1,10 +1,40 @@
 ﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
@@ -12,6 +42,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -170,6 +201,32 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
 
     #endregion
     
+    #region Pharmacy Location Document
+
+    /// <summary>
+    /// Gets the pharmacy location document details.
+    /// </summary>
+    public Task<QueryResponse<StorageFileResponse>> GetPharmacyLocationDocument(GetPharmacyLocationDocumentRequest request);
+    /// <summary>
+    ///  Get all pharmacy location documents in the system.
+    /// </summary>
+    public Task<QueryResponse<List<StorageFileResponse>>> GetPharmacyLocationDocumentList(GetPharmacyLocationDocumentListRequest request);
+    /// <summary>
+    ///  Creates a new pharmacy location document in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyLocationDocumentRequest>> CreatePharmacyLocationDocument(CreatePharmacyLocationDocumentRequest request);
+    /// <summary>
+    ///  Updates the pharmacy location document details.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyLocationDocumentRequest>> UpdatePharmacyLocationDocument(UpdatePharmacyLocationDocumentRequest request);
+    /// <summary>
+    ///  Deletes the pharmacy location document from the system.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyLocationDocumentRequest>> DeletePharmacyLocationDocument(DeletePharmacyLocationDocumentRequest request);
+    
+
+    #endregion
+    
     #endregion
 
     #region Logistic Portal
@@ -297,6 +354,32 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     ///  Deletes the laboratory location from the system.
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryLocationRequest>> DeleteLaboratoryLocation(DeleteLaboratoryLocationRequest request);
+    
+
+    #endregion
+    
+    #region Laboratory Location Document
+
+    /// <summary>
+    /// Gets the laboratory location document details.
+    /// </summary>
+    public Task<QueryResponse<StorageFileResponse>> GetLaboratoryLocationDocument(GetLaboratoryLocationDocumentRequest request);
+    /// <summary>
+    ///  Get all laboratory location documents in the system.
+    /// </summary>
+    public Task<QueryResponse<List<StorageFileResponse>>> GetLaboratoryLocationDocumentList(GetLaboratoryLocationDocumentListRequest request);
+    /// <summary>
+    ///  Creates a new laboratory location document in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryLocationDocumentRequest>> CreateLaboratoryLocationDocument(CreateLaboratoryLocationDocumentRequest request);
+    /// <summary>
+    ///  Updates the laboratory location document profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryLocationDocumentRequest>> UpdateLaboratoryLocationDocument(UpdateLaboratoryLocationDocumentRequest request);
+    /// <summary>
+    ///  Deletes the laboratory location document from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryLocationDocumentRequest>> DeleteLaboratoryLocationDocument(DeleteLaboratoryLocationDocumentRequest request);
     
 
     #endregion
