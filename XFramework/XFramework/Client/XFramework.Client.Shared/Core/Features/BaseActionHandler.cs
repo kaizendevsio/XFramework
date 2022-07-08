@@ -7,6 +7,7 @@ using XFramework.Client.Shared.Core.Features.Cache;
 using XFramework.Client.Shared.Core.Features.Community;
 using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Session;
+using XFramework.Client.Shared.Core.Features.Todo;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Client.Shared.Core.Services;
 using XFramework.Client.Shared.Entity.Enums;
@@ -39,6 +40,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     protected CacheState CacheState => Store.GetState<CacheState>();
     protected WalletState WalletState => Store.GetState<WalletState>();
     protected CommunityState CommunityState => Store.GetState<CommunityState>();
+    protected TodoState TodoState => Store.GetState<TodoState>();
 
     protected ActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService,
         NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient,

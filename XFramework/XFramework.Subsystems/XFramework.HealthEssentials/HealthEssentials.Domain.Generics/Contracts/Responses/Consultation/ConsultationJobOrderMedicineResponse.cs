@@ -1,6 +1,4 @@
-﻿
-
-using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 

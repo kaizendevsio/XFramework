@@ -8,4 +8,5 @@ public class SampleModel
     public string Phone { get; set; }
     public DateTime DateOfBirth { get; set; }
     public int Status { get; set; }
+
 }

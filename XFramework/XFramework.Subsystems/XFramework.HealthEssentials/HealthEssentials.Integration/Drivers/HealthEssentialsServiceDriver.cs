@@ -168,12 +168,12 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreateConsultationTypeGroupRequest>> CreateConsultationTypeGroup(CreateConsultationTypeGroupRequest request)
+    public async Task<CmdResponse<CreateConsultationEntityGroupRequest>> CreateConsultationTypeGroup(CreateConsultationEntityGroupRequest request)
     {
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreateConsultationTypeRequest>> CreateConsultationType(CreateConsultationTypeRequest request)
+    public async Task<CmdResponse<CreateConsultationEntityRequest>> CreateConsultationEntity(CreateConsultationEntityRequest request)
     {
         return await SendAsync(request);
     }
@@ -316,11 +316,6 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<QueryResponse<ConsultationEntityResponse>> GetConsultationEntity(GetConsultationEntityRequest request)
     {
         return await SendAsync<GetConsultationEntityRequest, ConsultationEntityResponse>(request);
-    }
-
-    public async Task<CmdResponse<CreateConsultationEntityRequest>> CreateConsultationEntity(CreateConsultationEntityRequest request)
-    {
-        return await SendAsync(request);
     }
 
     public async Task<CmdResponse<UpdateConsultationEntityRequest>> UpdateConsultationEntity(UpdateConsultationEntityRequest request)
