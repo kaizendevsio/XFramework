@@ -13,6 +13,7 @@ public class UpdateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Updat
     {
         var existingLaboratory = await _dataLayer.HealthEssentialsContext.Laboratories
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        
         if (existingLaboratory is null)
         {
             return new ()

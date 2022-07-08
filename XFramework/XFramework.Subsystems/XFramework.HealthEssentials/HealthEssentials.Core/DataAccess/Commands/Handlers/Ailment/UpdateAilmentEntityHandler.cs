@@ -11,6 +11,40 @@ public class UpdateAilmentEntityHandler : CommandBaseHandler, IRequestHandler<Up
     
     public async Task<CmdResponse<UpdateAilmentEntityCmd>> Handle(UpdateAilmentEntityCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingAilmentEntity = await _dataLayer.HealthEssentialsContext.AilmentEntities
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (existingAilmentEntity is null)
+        {
+            return new ()
+            {
+                Message = $"Ailment Entity with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var ailmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
+
+        if (ailmentEntityGroup == null)
+        {
+            return new ()
+            {
+                Message = $"Ailment entity group with Guid {request.GroupGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        var updatedAilmentEntity = request.Adapt(existingAilmentEntity);
+        updatedAilmentEntity.Group = ailmentEntityGroup;
+        
+        _dataLayer.HealthEssentialsContext.AilmentEntities.Update(updatedAilmentEntity);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        
+        return new ()
+        {
+            Message = $"Ailment Entity with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }

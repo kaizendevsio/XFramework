@@ -11,21 +11,18 @@ public class CreateConsultationEntityGroupHandler : CommandBaseHandler, IRequest
     
     public async Task<CmdResponse<CreateConsultationEntityGroupCmd>> Handle(CreateConsultationEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.ConsultationEntityGroup>();
-        entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        var group = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.ConsultationEntityGroup>();
+        group.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         
-        _dataLayer.HealthEssentialsContext.ConsultationEntityGroups.Add(entity);
+        await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups.AddAsync(group,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(group.Guid);
         return new()
         {
-            Message = $"Consultation entity group with Guid {entity.Guid} created successfully",
+            Message = $"Consultation entity group with Guid {group.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(entity.Guid)
-            }
         };
     }
 }

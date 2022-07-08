@@ -11,6 +11,28 @@ public class DeleteAilmentHandler : CommandBaseHandler, IRequestHandler<DeleteAi
     
     public async Task<CmdResponse<DeleteAilmentCmd>> Handle(DeleteAilmentCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingAilment = await _dataLayer.HealthEssentialsContext.Ailments
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (existingAilment is null)
+        {
+            return new ()
+            {
+                Message = $"Ailment with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        existingAilment.IsDeleted = true;
+        existingAilment.IsEnabled = false;
+        
+        _dataLayer.HealthEssentialsContext.Update(existingAilment);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        
+        return new ()
+        {
+            Message = $"Ailment with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }
