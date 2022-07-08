@@ -63,14 +63,11 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         await _dataLayer.HealthEssentialsContext.LaboratoryMembers.AddAsync(laboratoryMember, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(laboratoryMember.Guid);
         return new()
         {
             Message = $"Laboratory member with Guid {laboratoryMember.Guid} has been created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            Request = new()
-            {
-                Guid = Guid.Parse(laboratoryMember.Guid)
-            }
         };
     }
 }

@@ -98,7 +98,8 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
 
         await _dataLayer.HealthEssentialsContext.LaboratoryLocations.AddAsync(laboratoryLocation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
-        
+
+        request.Guid = Guid.Parse(laboratoryLocation.Guid);
         return new ()
         {
             Message = $"Laboratory Location with Guid {request.Guid} has been created",

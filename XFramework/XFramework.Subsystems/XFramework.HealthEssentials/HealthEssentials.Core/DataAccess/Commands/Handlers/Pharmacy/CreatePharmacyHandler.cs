@@ -39,15 +39,12 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         await _dataLayer.HealthEssentialsContext.Pharmacies.AddAsync(pharmacy, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(pharmacy.Guid);
         return new()
         {
             Message = "Successfully created pharmacy",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(pharmacy.Guid)
-            }
         };
     }
 }

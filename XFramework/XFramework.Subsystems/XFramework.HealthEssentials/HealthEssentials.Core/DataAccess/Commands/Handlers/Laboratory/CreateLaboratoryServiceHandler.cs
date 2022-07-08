@@ -70,15 +70,12 @@ public class CreateLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
         await _dataLayer.HealthEssentialsContext.LaboratoryServices.AddAsync(service,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(service.Guid);
         return new()
         {
             Message = $"Laboratory service with Guid {service.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(service.Guid)
-            }
         };
     }
 }

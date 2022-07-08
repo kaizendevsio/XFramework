@@ -43,15 +43,12 @@ public class CreatePatientHandler : CommandBaseHandler, IRequestHandler<CreatePa
         await _dataLayer.HealthEssentialsContext.Patients.AddAsync(patient,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(patient.Guid);
         return new()
         {
             Message = $"Patient with Guid {patient.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(patient.Guid)
-            }
         };
     }
 }

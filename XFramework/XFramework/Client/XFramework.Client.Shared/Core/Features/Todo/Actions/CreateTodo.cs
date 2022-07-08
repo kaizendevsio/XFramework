@@ -1,4 +1,4 @@
-﻿namespace XFramework.Client.Shared.Core.Features.Todo.Actions;
+﻿namespace XFramework.Client.Shared.Core.Features.Todo;
 
 public partial class TodoState
 {

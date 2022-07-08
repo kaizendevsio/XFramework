@@ -45,15 +45,12 @@ public class CreateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
         await _dataLayer.HealthEssentialsContext.LogisticRiderHandles.AddAsync(handle,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(handle.Guid);
         return new()
         {
             Message = $"Logistic rider handle with Guid {handle.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(handle.Guid)
-            }
         };
     }
 }

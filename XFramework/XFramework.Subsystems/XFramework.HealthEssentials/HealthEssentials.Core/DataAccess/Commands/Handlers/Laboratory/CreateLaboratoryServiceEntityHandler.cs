@@ -32,15 +32,13 @@ public class CreateLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
         await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities.AddAsync(serviceEntity,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(serviceEntity.Guid);
         return new()
         {
             Message = $"Laboratory service entity with Guid {serviceEntity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(serviceEntity.Guid)
-            }
+           
         };
     }
 }

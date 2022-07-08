@@ -95,6 +95,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
         await _dataLayer.HealthEssentialsContext.PharmacyLocations.AddAsync(pharmacyLocation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
+        request.Guid = Guid.Parse(pharmacyLocation.Guid);
         return new ()
         {
             Message = $"Pharmacy Location with Guid {request.Guid} has been created",

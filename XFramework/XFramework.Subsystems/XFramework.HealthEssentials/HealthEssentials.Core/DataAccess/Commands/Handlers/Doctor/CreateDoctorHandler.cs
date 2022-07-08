@@ -52,14 +52,11 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
         await _dataLayer.HealthEssentialsContext.Doctors.AddAsync(doctor, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(doctor.Guid);
         return new()
         {
             Message = $"Doctor {request.ProfessionalName} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            Request = new()
-            {
-                Guid = Guid.Parse(doctor.Guid)
-            }
         };
     }
 }

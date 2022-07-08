@@ -38,15 +38,12 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
         await _dataLayer.HealthEssentialsContext.Laboratories.AddAsync(laboratory, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
+        request.Guid = Guid.Parse(laboratory.Guid);
         return new()
         {
             Message = $"Laboratory with Guid {laboratory.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(laboratory.Guid)
-            }
         };
     }
 }
