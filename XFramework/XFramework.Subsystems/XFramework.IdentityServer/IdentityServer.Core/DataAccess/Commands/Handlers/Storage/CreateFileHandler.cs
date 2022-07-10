@@ -22,7 +22,7 @@ public class CreateFileHandler : CommandBaseHandler, IRequestHandler<CreateFileC
         {
             return new ()
             {
-                Message = $"File with guid {request.EntityGuid} not found",
+                Message = $"File entity with guid {request.EntityGuid} not found",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }

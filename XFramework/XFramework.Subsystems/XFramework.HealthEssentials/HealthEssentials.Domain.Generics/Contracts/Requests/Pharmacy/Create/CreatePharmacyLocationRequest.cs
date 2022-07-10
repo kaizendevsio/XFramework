@@ -10,14 +10,13 @@ public class CreatePharmacyLocationRequest : RequestBase
     public string? UnitNumber { get; set; }
     public string? Street { get; set; }
     public string? Building { get; set; }
-    public long? BarangayGuid { get; set; }
-    public long? CityGuid { get; set; }
+    public Guid? BarangayGuid { get; set; }
+    public Guid? CityGuid { get; set; }
     public string? Subdivision { get; set; }
-    public long? RegionGuid { get; set; }
+    public Guid? RegionGuid { get; set; }
     public bool? MainAddress { get; set; }
-    public long? ProvinceGuid { get; set; }
-    public long? CountryGuid { get; set; }
-    public Guid? Guid { get; set; }
+    public Guid? ProvinceGuid { get; set; }
+    public Guid? CountryGuid { get; set; }
     public GenericStatusType Status { get; set; }
     public string? Phone { get; set; }
     public string? Email { get; set; }

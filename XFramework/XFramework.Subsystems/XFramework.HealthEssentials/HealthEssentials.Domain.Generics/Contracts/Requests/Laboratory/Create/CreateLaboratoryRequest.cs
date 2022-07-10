@@ -11,6 +11,7 @@ public class CreateLaboratoryRequest : RequestBase
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? Logo { get; set; }
+    public Guid? EntityGuid { get; set; }
     
     public CreateAddressRequest? Address { get; set; }
     public List<FileUploadRequest>? FileList { get; set; }

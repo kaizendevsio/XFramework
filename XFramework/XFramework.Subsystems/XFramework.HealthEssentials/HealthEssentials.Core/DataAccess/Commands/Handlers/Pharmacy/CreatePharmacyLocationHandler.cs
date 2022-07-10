@@ -12,7 +12,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
     public async Task<CmdResponse<CreatePharmacyLocationCmd>> Handle(CreatePharmacyLocationCmd request, CancellationToken cancellationToken)
     {
         var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.PharmacyGuid}", CancellationToken.None);
         
         if (pharmacy is null)
         {
@@ -95,10 +95,11 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
         await _dataLayer.HealthEssentialsContext.PharmacyLocations.AddAsync(pharmacyLocation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
+        request.Guid = Guid.Parse(pharmacyLocation.Guid);
         return new ()
         {
             Message = $"Pharmacy Location with Guid {request.Guid} has been created",
-            HttpStatusCode = HttpStatusCode.Created
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -21,13 +21,13 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
     public async Task<CmdResponse<CreatePharmacyCmd>> Handle(CreatePharmacyCmd request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.HealthEssentialsContext.PharmacyEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
         
         if (entity is null)
         {
             return new ()
             {
-                Message = $"Pharmacy with Guid {request.Guid} does not exist",
+                Message = $"Pharmacy entity with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -35,19 +35,16 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         var pharmacy = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Pharmacy>();
         pharmacy.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         pharmacy.Status = (int) GenericStatusType.Pending;
+        pharmacy.Entity = entity;
 
         await _dataLayer.HealthEssentialsContext.Pharmacies.AddAsync(pharmacy, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(pharmacy.Guid);
         return new()
         {
             Message = "Successfully created pharmacy",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(pharmacy.Guid)
-            }
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -383,6 +383,32 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     
 
     #endregion
+    
+    #region Laboratory Job Order
+
+    /// <summary>
+    /// Gets the laboratory job order details.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryJobOrderResponse>> GetLaboratoryJobOrder(GetLaboratoryJobOrderRequest request);
+    /// <summary>
+    ///  Get all laboratory job orders in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryJobOrderResponse>>> GetLaboratoryJobOrderList(GetLaboratoryJobOrderListRequest request);
+    /// <summary>
+    ///  Creates a new laboratory job order in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryJobOrderRequest>> CreateLaboratoryJobOrder(CreateLaboratoryJobOrderRequest request);
+    /// <summary>
+    ///  Updates the laboratory job order profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryJobOrderRequest>> UpdateLaboratoryJobOrder(UpdateLaboratoryJobOrderRequest request);
+    /// <summary>
+    ///  Deletes the laboratory job order from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryJobOrderRequest>> DeleteLaboratoryJobOrder(DeleteLaboratoryJobOrderRequest request);
+    
+
+    #endregion
 
     #region Laboratory Member
     /// <summary>
@@ -483,6 +509,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryServiceEntityGroupRequest>> DeleteLaboratoryServiceEntityGroup(DeleteLaboratoryServiceEntityGroupRequest request);
     #endregion
+    
     #endregion
     
     #region Consultation Portal
@@ -557,8 +584,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteConsultationRequest>> DeleteConsultation(DeleteConsultationRequest request);
     #endregion
     #endregion
-    
-    
+
     #region Administrator Portal
     
     #region Member

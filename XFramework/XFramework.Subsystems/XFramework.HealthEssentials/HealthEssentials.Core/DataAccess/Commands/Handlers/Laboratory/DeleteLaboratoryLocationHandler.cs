@@ -32,7 +32,7 @@ public class DeleteLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
         return new ()
         {
             Message = $"Laboratory Location with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
         
     }

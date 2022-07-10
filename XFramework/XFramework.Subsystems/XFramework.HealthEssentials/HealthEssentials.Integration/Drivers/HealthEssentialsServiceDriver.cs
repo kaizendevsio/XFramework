@@ -311,6 +311,31 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<LaboratoryJobOrderResponse>> GetLaboratoryJobOrder(GetLaboratoryJobOrderRequest request)
+    {
+        return await SendAsync<GetLaboratoryJobOrderRequest, LaboratoryJobOrderResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryJobOrderResponse>>> GetLaboratoryJobOrderList(GetLaboratoryJobOrderListRequest request)
+    {
+        return await SendAsync<GetLaboratoryJobOrderListRequest, List<LaboratoryJobOrderResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryJobOrderRequest>> CreateLaboratoryJobOrder(CreateLaboratoryJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryJobOrderRequest>> UpdateLaboratoryJobOrder(UpdateLaboratoryJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryJobOrderRequest>> DeleteLaboratoryJobOrder(DeleteLaboratoryJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<LaboratoryMemberResponse>> GetLaboratoryMember(GetLaboratoryMemberRequest request)
     {
         return await SendAsync<GetLaboratoryMemberRequest, LaboratoryMemberResponse>(request);

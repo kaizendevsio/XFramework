@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BinaryPack;
@@ -28,6 +29,8 @@ namespace StreamFlow.Domain.Generic.Contracts.Requests
         public Guid? Recipient { get; set; }
         public Guid RequestGuid { get; set; } = Guid.NewGuid();
         public Guid? ConsumerGuid { get; set; }
+        public HttpStatusCode ResponseStatusCode { get; set; } = HttpStatusCode.OK;
+        public bool IsResponseSuccessful => (int)ResponseStatusCode < 300;
         public MessageExchangeType ExchangeType { get; set; } = MessageExchangeType.FanOut;
         public GenericPriorityType PriorityType { get; set; } = GenericPriorityType.Information;
     }

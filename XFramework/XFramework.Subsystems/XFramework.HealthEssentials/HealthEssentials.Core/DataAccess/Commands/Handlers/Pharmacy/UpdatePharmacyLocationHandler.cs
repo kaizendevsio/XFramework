@@ -109,7 +109,7 @@ public class UpdatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
         return new ()
         {
             Message = $"Pharmacy Location with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }
