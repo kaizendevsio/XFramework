@@ -36,15 +36,15 @@ public class CreateConsultationTagHandler : CommandBaseHandler, IRequestHandler<
             };
         }
 
-        var consulationTag = request.Adapt<ConsultationTag>();
-        consulationTag.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        consulationTag.Consultation = consultation;
-        consulationTag.Tag = tag;
+        var consultationTag = request.Adapt<ConsultationTag>();
+        consultationTag.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        consultationTag.Consultation = consultation;
+        consultationTag.Tag = tag;
         
-        await _dataLayer.HealthEssentialsContext.ConsultationTags.AddAsync(consulationTag, CancellationToken.None);
+        await _dataLayer.HealthEssentialsContext.ConsultationTags.AddAsync(consultationTag, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
-        request.Guid = Guid.Parse(consulationTag.Guid);
+        request.Guid = Guid.Parse(consultationTag.Guid);
         return new ()
         {
             Message = $"Consultation Tag with Guid {request.Guid} created successfully",

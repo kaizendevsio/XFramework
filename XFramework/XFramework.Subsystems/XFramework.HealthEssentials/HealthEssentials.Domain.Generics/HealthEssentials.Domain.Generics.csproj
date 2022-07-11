@@ -21,6 +21,7 @@
         <Folder Include="Contracts\Requests\Administrtor\Delete" />
         <Folder Include="Contracts\Requests\Administrtor\Update" />
         <Folder Include="Contracts\Requests\Administrtor\Verify" />
+        <Folder Include="Contracts\Requests\Ailment\Verify" />
         <Folder Include="Contracts\Requests\Consultation\Verify" />
         <Folder Include="Contracts\Requests\Hospital\Delete" />
         <Folder Include="Contracts\Requests\Hospital\Get" />

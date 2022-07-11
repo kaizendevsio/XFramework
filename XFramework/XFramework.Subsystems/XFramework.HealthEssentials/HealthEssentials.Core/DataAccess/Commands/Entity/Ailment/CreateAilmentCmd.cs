@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Create;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Entity.Ailment;
 
