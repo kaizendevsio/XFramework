@@ -41,7 +41,7 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
         }
         
         var pharmacyLocation = await _dataLayer.HealthEssentialsContext.PharmacyLocations
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.PharmacyLocationGuid}", cancellationToken: cancellationToken);
 
         if (pharmacyLocation is null)
         {
@@ -57,7 +57,7 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
         pharmacyMember.Pharmacy = pharmacy;
         pharmacyMember.CredentialId = credential.Id;
         pharmacyMember.PharmacyLocation = pharmacyLocation;
-        
+
         await _dataLayer.HealthEssentialsContext.PharmacyMembers.AddAsync(pharmacyMember, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
@@ -65,8 +65,7 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
         return new()
         {
             Message = $"Pharmacy Member with Guid {pharmacyMember.Guid} created successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

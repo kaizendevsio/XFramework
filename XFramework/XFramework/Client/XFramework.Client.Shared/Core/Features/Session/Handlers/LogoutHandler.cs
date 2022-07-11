@@ -1,5 +1,6 @@
 ﻿using Blazored.LocalStorage;
 using Microsoft.Extensions.Configuration;
+using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Wallet;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
@@ -58,6 +59,8 @@ public partial class SessionState
                     WalletList = new()
                 });
             }
+
+            await Mediator.Send(new ApplicationState.SetState() {StateRestored = true});
             
             if (string.IsNullOrEmpty(action.NavigateTo))
             {

@@ -109,7 +109,7 @@ public class UpdateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
         return new ()
         {
             Message = $"Laboratory Location with Guid {request.Guid} has been updated",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

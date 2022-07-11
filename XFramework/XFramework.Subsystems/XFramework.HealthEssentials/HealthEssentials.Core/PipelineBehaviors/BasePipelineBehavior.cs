@@ -73,7 +73,7 @@ namespace HealthEssentials.Core.PipelineBehaviors
             {
                 if (_response.ContainsProperty("Request"))
                 {
-                    _response.SetPropertyValue("Request", request);
+                    _response.SetPropertyValue("Request", request); 
                 }
             }
 

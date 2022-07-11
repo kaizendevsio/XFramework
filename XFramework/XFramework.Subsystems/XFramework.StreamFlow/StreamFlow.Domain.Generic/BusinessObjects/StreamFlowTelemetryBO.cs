@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 
 namespace StreamFlow.Domain.Generic.BusinessObjects
 {
@@ -8,5 +9,6 @@ namespace StreamFlow.Domain.Generic.BusinessObjects
         public Guid RequestGuid { get; set; }
         public Guid? ClientGuid { get; set; }
         public Guid? ConsumerGuid { get; set; }
+        public HttpStatusCode ResponseStatusCode { get; set; } = HttpStatusCode.OK;
     }
 }

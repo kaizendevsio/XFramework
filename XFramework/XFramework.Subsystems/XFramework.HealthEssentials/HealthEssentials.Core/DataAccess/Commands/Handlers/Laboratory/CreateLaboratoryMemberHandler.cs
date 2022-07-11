@@ -16,7 +16,6 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
     public async Task<CmdResponse<CreateLaboratoryMemberCmd>> Handle(CreateLaboratoryMemberCmd request, CancellationToken cancellationToken)
     {
         var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
-            .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.LaboratoryGuid}", cancellationToken: cancellationToken);
        
         if (laboratory is null)
@@ -42,7 +41,7 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         }
 
         var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryLocationGuid}", CancellationToken.None);
         
         if (laboratoryLocation is null)
         {
@@ -67,7 +66,7 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         return new()
         {
             Message = $"Laboratory member with Guid {laboratoryMember.Guid} has been created",
-            HttpStatusCode = HttpStatusCode.Accepted,
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

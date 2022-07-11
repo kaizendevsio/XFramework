@@ -37,6 +37,7 @@
 
     <ItemGroup>
       <Folder Include="Core\Features\Messaging\Handlers" />
+      <Folder Include="Core\Features\Todo" />
       <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Responses" />
     </ItemGroup>
