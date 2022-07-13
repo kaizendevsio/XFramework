@@ -4,18 +4,61 @@
     <projectFile profileName="HealthEssentials.Api">XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj</projectFile>
     <projectFile profileName="IIS Express">XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj</projectFile>
   </component>
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/discord.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Checkout_at_6_29_2022_2_55_PM_[Changes]/shelved.patch" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Update_at_6_24_2022_15_58__Changes_.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Update_at_6_24_2022_15_58__Changes_.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Community/.idea/discord.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.StreamFlow/.idea/discord.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/GetDoctorJobOrderListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Laboratory/CreateLaboratoryLocationHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Laboratory/GetLaboratoryJobOrderListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Pharmacy/CreatePharmacyLocationHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Pharmacy/GetPharmacyJobOrderListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorJobOrderListQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Laboratory/GetLaboratoryJobOrderListQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Pharmacy/GetPharmacyJobOrderListQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorJobOrderListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryJobOrderListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/GetPharmacyJobOrderListHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Delete/DeleteLaboratoryJobOrderRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/SignalR/Handlers/CreateFileHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/SignalR/Handlers/DeleteFileHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/SignalR/Handlers/UpdateFileHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/discord.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/discord.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/CreateConsultationEntityRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/CreateConsultationEntityRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/UpdateConsultationEntityRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/UpdateConsultationEntityRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/UpdatePharmacyJobOrder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/UpdatePharmacyJobOrder.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Laboratory/LaboratoryResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Laboratory/LaboratoryResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Pharmacy/PharmacyResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Pharmacy/PharmacyResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/HealthEssentials.Domain.Generics.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/HealthEssentials.Domain.Generics.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/CreateLaboratoryHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/CreateLaboratoryHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/CreateLaboratoryLocationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/CreateLaboratoryLocationHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/CreateLaboratoryMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/CreateLaboratoryMemberHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryLocationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/DeleteLaboratoryLocationHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryLocationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryLocationHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/CreatePharmacyHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/CreatePharmacyHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/CreatePharmacyLocationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/CreatePharmacyLocationHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/CreatePharmacyMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/CreatePharmacyMemberHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/DeletePharmacyLocationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/DeletePharmacyLocationHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/UpdatePharmacyLocationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/UpdatePharmacyLocationHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Create/CreateLaboratoryMemberRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Create/CreateLaboratoryMemberRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Create/CreateLaboratoryRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Create/CreateLaboratoryRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Create/CreatePharmacyLocationRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Create/CreatePharmacyLocationRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Create/CreatePharmacyMemberRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Create/CreatePharmacyMemberRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Create/CreatePharmacyRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Create/CreatePharmacyRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceDriver.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Interfaces/IHealthEssentialsServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Interfaces/IHealthEssentialsServiceWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Storage/CreateFileHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Storage/CreateFileHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowTelemetryBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/BusinessObjects/StreamFlowTelemetryBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessageBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/CreateSubscriptionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/CreateSubscriptionHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogoutHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogoutHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Layouts/BaseBlankLayout.razor" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Layouts/BaseBlankLayout.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/BaseSignalRHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/BaseSignalRHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../_RunSubSystems.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/../../_RunSubSystems.ps1" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,19 +73,18 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$/../.." value="Development-Marquesa" />
+        <entry key="$PROJECT_DIR$/../.." value="Development" />
       </map>
     </option>
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/GetConsultationListRequest.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/GetLaboratoryResultListRequest.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/Get/GetConsultationListRequest.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Get/GetLaboratoryResultListRequest.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Requests/Create/Address/CreateAddressRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/Address/IdentityAddressResponse.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/CredentialResponse.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/IdentityResponse.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/IdentityRoleResponse.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Application/Handlers/RestoreStatesHandler.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/FileUploadRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/QueryableRequest.cs" root0="SKIP_HIGHLIGHTING" />
@@ -53,7 +95,6 @@
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/BaseSignalRHandler.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/ICrudService.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/5bfd8d9a6b3c4231a94aa60a37a737bb27e00/7b/c6ea6191/Extensions.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
@@ -66,34 +107,37 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "FileHistory.git4idea.history.GitHistoryProvider_flatOrder0": "0",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatOrder1": "1",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatOrder2": "2",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatOrder3": "3",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatWidth0": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatWidth1": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatWidth2": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatWidth3": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeOrder0": "0",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeOrder1": "1",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeOrder2": "2",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeOrder3": "3",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeWidth0": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeWidth1": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeWidth2": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeWidth3": "494",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "last_opened_file_path": "C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatOrder0&quot;: &quot;0&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatOrder1&quot;: &quot;1&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatOrder2&quot;: &quot;2&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatOrder3&quot;: &quot;3&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatWidth0&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatWidth1&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatWidth2&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatWidth3&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeOrder0&quot;: &quot;0&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeOrder1&quot;: &quot;1&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeOrder2&quot;: &quot;2&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeOrder3&quot;: &quot;3&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeWidth0&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeWidth1&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeWidth2&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeWidth3&quot;: &quot;494&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;editor.preferences.fonts.default&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected=".NET Launch Settings Profile.HealthEssentials.Api">
     <configuration name="HealthEssentials.Api" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
       <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj" />
@@ -185,6 +229,23 @@
       <workItem from="1656381606912" duration="163000" />
       <workItem from="1656381919220" duration="633000" />
       <workItem from="1656384232788" duration="1174000" />
+      <workItem from="1656386340972" duration="718000" />
+      <workItem from="1656465588698" duration="3724000" />
+      <workItem from="1656470921957" duration="62000" />
+      <workItem from="1656474824972" duration="1623000" />
+      <workItem from="1656484611972" duration="2115000" />
+      <workItem from="1656556052725" duration="3273000" />
+      <workItem from="1656568577926" duration="5137000" />
+      <workItem from="1656811271693" duration="5808000" />
+      <workItem from="1656870207476" duration="1709000" />
+      <workItem from="1657009960415" duration="3753000" />
+      <workItem from="1657076781460" duration="2899000" />
+      <workItem from="1657150999314" duration="2005000" />
+      <workItem from="1657189607240" duration="1739000" />
+      <workItem from="1657225591626" duration="15302000" />
+      <workItem from="1657332090757" duration="839000" />
+      <workItem from="1657358548402" duration="14542000" />
+      <workItem from="1657426897821" duration="5038000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>
@@ -249,7 +310,28 @@
       <option name="project" value="LOCAL" />
       <updated>1656334183827</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="- Added PharmacyLocation and LaboratoryLocation Get list">
+      <created>1656386449814</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1656386449814</updated>
+    </task>
+    <task id="LOCAL-00011" summary="- Fixed error on Responses">
+      <created>1656484795025</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1656484795025</updated>
+    </task>
+    <task id="LOCAL-00012" summary=" - Safety Backup">
+      <created>1657019750143</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1657019750143</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -258,6 +340,16 @@
   <component name="UnityCheckinConfiguration" checkUnsavedScenes="true" />
   <component name="UnityProjectConfiguration" hasMinimizedUI="false" />
   <component name="UnityUnitTestConfiguration" currentTestLauncher="NUnit" />
+  <component name="Vcs.Log.History.Properties">
+    <option name="COLUMN_ID_ORDER">
+      <list>
+        <option value="Default.Root" />
+        <option value="Default.Author" />
+        <option value="Default.Date" />
+        <option value="Default.Subject" />
+      </list>
+    </option>
+  </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">
       <map>
@@ -277,12 +369,14 @@
     <MESSAGE value="  - HealthEssentials: Created Request Models" />
     <MESSAGE value="- Commit Workspace" />
     <MESSAGE value="Safety Backup" />
-    <MESSAGE value=" - Safety Backup" />
     <MESSAGE value=" - Applied changes from 'Development_HEService_Refactor' branch" />
     <MESSAGE value=" - Updated _RunSubSystems.ps1" />
     <MESSAGE value="- Updated HE Responses&#10;- Added Wrappers Descriptions" />
     <MESSAGE value="- Updated CRUD Handlers&#10;- Added PharmacyLocation.cs and LaboratoryLocation.cs" />
-    <option name="LAST_COMMIT_MESSAGE" value="- Updated CRUD Handlers&#10;- Added PharmacyLocation.cs and LaboratoryLocation.cs" />
+    <MESSAGE value="- Added PharmacyLocation and LaboratoryLocation Get list" />
+    <MESSAGE value="- Fixed error on Responses" />
+    <MESSAGE value=" - Safety Backup" />
+    <option name="LAST_COMMIT_MESSAGE" value=" - Safety Backup" />
     <option name="GROUP_MULTIFILE_MERGE_BY_DIRECTORY" value="true" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">

@@ -1,13 +1,21 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Location;
+using IdentityServer.Domain.Generic.Contracts.Requests.Create.Storage;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
 using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
+using IdentityServer.Domain.Generic.Contracts.Requests.Delete.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Delete.Location;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Get.Location;
 using IdentityServer.Domain.Generic.Contracts.Requests.Get.Subscription;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update;
+using IdentityServer.Domain.Generic.Contracts.Requests.Update.Address;
+using IdentityServer.Domain.Generic.Contracts.Requests.Update.Location;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update.Verification;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
@@ -199,6 +207,26 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     public async Task<QueryResponse<List<IdentityLocationResponse>>> GetLocationList(GetLocationListRequest request)
     {
         return await SendAsync<GetLocationListRequest, List<IdentityLocationResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateFileRequest>> CreateFile(CreateFileRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<CreateAddressRequest>> CreateAddress(CreateAddressRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateAddressRequest>> UpdateAddress(UpdateAddressRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteAddressRequest>> DeleteAddress(DeleteAddressRequest request)
+    {
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<IdentityVerificationSummaryResponse>> CheckVerification(CheckVerificationRequest request)

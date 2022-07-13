@@ -23,23 +23,58 @@ public class UpdateLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
         }
         
         var serviceEntity = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", cancellationToken: cancellationToken);
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
        
         if (serviceEntity is null)
         {
             return new ()
             {
-                Message = $"Service type with Guid {request.EntityGuid} does not exist",
+                Message = $"Service entity with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (laboratory is null)
+        {
+            return new ()
+            {
+                Message = $"Laboratory with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
-        var unit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(i => i.Guid == $"{request.UnitGuid}", cancellationToken: cancellationToken);
-
+        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (laboratoryLocation is null)
+        {
+            return new ()
+            {
+                Message = $"Laboratory location with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var unit = await _dataLayer.HealthEssentialsContext.Units
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.UnitGuid}", CancellationToken.None);
+        
+        if (unit is null)
+        {
+            return new ()
+            {
+                Message = $"Unit with Guid {request.UnitGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
         var updatedLaboratoryService = request.Adapt(existingLaboratoryService);
-        updatedLaboratoryService.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         updatedLaboratoryService.Entity = serviceEntity;
         updatedLaboratoryService.Unit = unit;
+        updatedLaboratoryService.Laboratory = laboratory;
+        updatedLaboratoryService.LaboratoryLocation = laboratoryLocation;
         
         _dataLayer.HealthEssentialsContext.Update(updatedLaboratoryService);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

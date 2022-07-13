@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Verify;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Pharmacy;

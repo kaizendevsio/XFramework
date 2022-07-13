@@ -1,8 +1,0 @@
-﻿using XFramework.Domain.Generic.Contracts.Requests;
-
-namespace HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
-
-public class CreateConsultationTypeGroupRequest : RequestBase
-{
-    public string? Name { get; set; }
-}

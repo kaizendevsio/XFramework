@@ -12,37 +12,72 @@ public class CreateLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
     
     public async Task<CmdResponse<CreateLaboratoryServiceCmd>> Handle(CreateLaboratoryServiceCmd request, CancellationToken cancellationToken)
     {
-        var type = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.TypeGuid}", cancellationToken: cancellationToken);
+        var serviceEntity = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
        
-        if (type is null)
+        if (serviceEntity is null)
         {
             return new ()
             {
-                Message = $"Service type with Guid {request.TypeGuid} does not exist",
+                Message = $"Service entity with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (laboratory is null)
+        {
+            return new ()
+            {
+                Message = $"Laboratory with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
-        var unit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(i => i.Guid == $"{request.UnitGuid}", cancellationToken: cancellationToken);
-
-        var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.LaboratoryService>();
-        entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        entity.EntityId = type.Id;
-        entity.Unit = unit;
+        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         
-        _dataLayer.HealthEssentialsContext.LaboratoryServices.Add(entity);
+        if (laboratoryLocation is null)
+        {
+            return new ()
+            {
+                Message = $"Laboratory location with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var unit = await _dataLayer.HealthEssentialsContext.Units
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.UnitGuid}", CancellationToken.None);
+        
+        if (unit is null)
+        {
+            return new ()
+            {
+                Message = $"Unit with Guid {request.UnitGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+
+        var service = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.LaboratoryService>();
+        service.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        service.Entity = serviceEntity;
+        service.Unit = unit;
+        service.Laboratory = laboratory;
+        service.LaboratoryLocation = laboratoryLocation;
+        
+        await _dataLayer.HealthEssentialsContext.LaboratoryServices.AddAsync(service,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Laboratory service with Guid {entity.Guid} created successfully",
+            Message = $"Laboratory service with Guid {service.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
             Request = new()
             {
-                Guid = Guid.Parse(entity.Guid)
+                Guid = Guid.Parse(service.Guid)
             }
         };
     }

@@ -20,7 +20,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Domain.Gener
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Integration", "XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj", "{0D520FC8-D3E8-40CD-8A96-468DC5DFF482}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "_Dependencies", "_Dependencies", "{6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Domain.Generic", "XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj", "{0CCB6EC0-4016-4B74-95FA-B0953B13162C}"
 EndProject

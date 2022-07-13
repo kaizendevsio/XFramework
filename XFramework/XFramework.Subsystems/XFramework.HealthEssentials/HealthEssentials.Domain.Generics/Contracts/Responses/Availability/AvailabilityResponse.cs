@@ -19,5 +19,5 @@ public class AvailabilityResponse
     public bool? IsAvailable { get; set; }
     public Guid? Guid { get; set; }
     
-    public ScheduleEntityResponse Entity { get; set; } = null!;
+    public ScheduleEntityResponse? Entity { get; set; }
 }

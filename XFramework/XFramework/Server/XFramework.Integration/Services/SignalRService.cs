@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
+using TypeSupport.Extensions;
 using XFramework.Domain.Generic.Configurations;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Entity.Contracts.Responses;
@@ -99,7 +100,8 @@ public class SignalRService : ISignalRService
                             ConsumerGuid = response.Telemetry.ConsumerGuid,
                             RequestGuid = response.Telemetry.RequestGuid,
                             Data = response.Data,
-                            Message = response.Message
+                            Message = response.Message,
+                            ResponseStatusCode = response.Telemetry.ResponseStatusCode
                         };
                         await Task.Run(() => methodCallCompletionSource.SetResult(result));
                     }
@@ -251,8 +253,7 @@ public class SignalRService : ISignalRService
         }
         catch (Exception e)
         {
-            Console.WriteLine(
-                $"Invoked Method '{methodName}' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
+            Console.WriteLine($"Invoked Method '{methodName}' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
         }
 
         //StopWatch.Stop($"Invoked Method '{methodName}' returned {result}");
@@ -292,11 +293,11 @@ public class SignalRService : ISignalRService
                     methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
                 }), null, 30_000, 0);
 
-            Console.WriteLine($"Invoke Method '{args1.CommandName}', awaiting response...");
+            Console.WriteLine($"Request Sent: '{args1.CommandName}', awaiting response...");
             var streamFlowMessage = await response;
 
             Stopwatch.Stop();
-            Console.WriteLine($"Invoked Method '{args1.CommandName}' in {Stopwatch.ElapsedMilliseconds}ms");
+            Console.WriteLine($"Response Received: '{args1.CommandName}' => {streamFlowMessage.ResponseStatusCode} ({(streamFlowMessage.IsResponseSuccessful ? "Success" : "Failed")}) ; took {Stopwatch.ElapsedMilliseconds}ms");
 
             return new()
             {
@@ -307,8 +308,7 @@ public class SignalRService : ISignalRService
         }
         catch (Exception e)
         {
-            Console.WriteLine(
-                $"Invoked Method 'push' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
+            Console.WriteLine($"Invoked Method 'push' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
             return new()
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError,

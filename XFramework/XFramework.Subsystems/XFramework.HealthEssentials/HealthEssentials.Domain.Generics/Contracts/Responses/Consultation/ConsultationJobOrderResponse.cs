@@ -1,4 +1,5 @@
-﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
@@ -27,4 +28,6 @@ public class ConsultationJobOrderResponse
     
     public ConsultationResponse? Consultation { get; set; }
     public ScheduleResponse? Schedule { get; set; }
+    public PatientResponse? Patient { get; set; }
+
 }
