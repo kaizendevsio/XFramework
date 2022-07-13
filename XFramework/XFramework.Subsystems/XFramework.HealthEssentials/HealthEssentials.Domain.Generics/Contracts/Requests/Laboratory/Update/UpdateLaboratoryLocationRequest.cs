@@ -17,7 +17,6 @@ public class UpdateLaboratoryLocationRequest : RequestBase
     public bool? MainAddress { get; set; }
     public long? ProvinceGuid { get; set; }
     public long? CountryGuid { get; set; }
-    public Guid? Guid { get; set; }
     public GenericStatusType Status { get; set; }
     public string? Phone { get; set; }
     public string? Email { get; set; }

@@ -593,5 +593,17 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #endregion
+
+    #region Ailment Portal
+
+    
+
+    #endregion
+
+    #region Hospital Portal
+
+    
+
+    #endregion
     
 }

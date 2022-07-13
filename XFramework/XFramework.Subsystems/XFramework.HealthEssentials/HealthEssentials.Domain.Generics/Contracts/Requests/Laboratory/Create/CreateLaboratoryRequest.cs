@@ -15,5 +15,5 @@ public class CreateLaboratoryRequest : RequestBase
     
     public CreateAddressRequest? Address { get; set; }
     public List<FileUploadRequest>? FileList { get; set; }
-    public List<string> SupportedLaboratoryServiceList { get; set; }    
+    public List<string>? SupportedLaboratoryServiceList { get; set; }    
 }
