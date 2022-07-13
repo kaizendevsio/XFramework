@@ -1,5 +1,4 @@
-﻿
-
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
@@ -24,6 +23,9 @@ public class PharmacyJobOrderResponse
     public string? PrescriptionNote { get; set; }
     public Guid? Guid { get; set; }
 
+    public PatientResponse? Patient { get; set; }
     public PharmacyLocationResponse? PharmacyLocation { get; set; }
     public ScheduleResponse? Schedule { get; set; }
+    public List<PharmacyJobOrderConsultationJobOrderResponse>? PharmacyJobOrderConsultationJobOrders { get; set; }
+    public List<PharmacyJobOrderMedicineResponse>? PharmacyJobOrderMedicines { get; set; }
 }

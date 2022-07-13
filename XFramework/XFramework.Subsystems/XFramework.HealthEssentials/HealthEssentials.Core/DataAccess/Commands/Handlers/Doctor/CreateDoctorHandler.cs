@@ -33,13 +33,13 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
         }
         
         var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
 
         if (entity is null)
         {
             return new ()
             {
-                Message = $"Doctor with Guid {request.Guid} does not exist",
+                Message = $"Doctor entity with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -54,7 +54,7 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
 
         return new()
         {
-            Message = $"Doctor {request.ProfessionalName} created successfully",
+            Message = $"Doctor {request.Name} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             Request = new()
             {

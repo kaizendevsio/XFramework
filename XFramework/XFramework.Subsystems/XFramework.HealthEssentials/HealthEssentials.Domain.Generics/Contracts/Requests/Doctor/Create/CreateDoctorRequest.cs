@@ -6,7 +6,8 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Create;
 public class CreateDoctorRequest : RequestBase
 {
     public Guid? CredentialGuid { get; set; }
-    public string? ProfessionalName { get; set; }
+    public Guid? EntityGuid { get; set; }
+    public string? Name { get; set; }
     public string? PrcNumber { get; set; }
     public string? PtrNumber { get; set; }
     public string? PhilHealthNumber { get; set; }

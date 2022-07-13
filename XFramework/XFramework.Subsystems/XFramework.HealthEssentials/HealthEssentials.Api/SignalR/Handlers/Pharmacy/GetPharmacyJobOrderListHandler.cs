@@ -6,7 +6,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Pharmacy;
 
-public class GetPharmacyJobOrderListJobOrderListHandler : BaseSignalRHandler, ISignalREventHandler
+public class GetPharmacyJobOrderListHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {

@@ -5,7 +5,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Laboratory;
 
-public class GetLaboratoryJobOrderListJobOrderListHandler : BaseSignalRHandler, ISignalREventHandler
+public class GetLaboratoryJobOrderListHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {

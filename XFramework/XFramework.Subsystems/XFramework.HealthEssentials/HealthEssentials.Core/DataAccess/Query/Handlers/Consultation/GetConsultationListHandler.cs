@@ -14,11 +14,11 @@ public class GetConsultationListHandler : QueryBaseHandler, IRequestHandler<GetC
         var consultation = await _dataLayer.HealthEssentialsContext.Consultations
             .Include(i => i.Entity)
             .ThenInclude(i => i.Group)
-            .AsSplitQuery()
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
             .AsNoTracking()
+            .AsSplitQuery()
             .ToListAsync(CancellationToken.None);
 
         if (!consultation.Any())
