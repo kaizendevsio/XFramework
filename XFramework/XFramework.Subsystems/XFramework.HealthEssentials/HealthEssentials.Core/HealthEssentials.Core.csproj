@@ -42,25 +42,21 @@
 
     <ItemGroup>
       <Folder Include="DataAccess\Commands\Entity\Medicine" />
-      <Folder Include="DataAccess\Commands\Entity\MetaData" />
       <Folder Include="DataAccess\Commands\Entity\Tag" />
       <Folder Include="DataAccess\Commands\Entity\Unit" />
       <Folder Include="DataAccess\Commands\Entity\Vendor" />
       <Folder Include="DataAccess\Commands\Handlers\Medicine" />
-      <Folder Include="DataAccess\Commands\Handlers\MetaData" />
       <Folder Include="DataAccess\Commands\Handlers\Schedule" />
       <Folder Include="DataAccess\Commands\Handlers\Tag" />
       <Folder Include="DataAccess\Commands\Handlers\Unit" />
       <Folder Include="DataAccess\Commands\Handlers\Vendor" />
       <Folder Include="DataAccess\Commands\Validations" />
       <Folder Include="DataAccess\Query\Entity\Medicine" />
-      <Folder Include="DataAccess\Query\Entity\MetaData" />
       <Folder Include="DataAccess\Query\Entity\Schedule" />
       <Folder Include="DataAccess\Query\Entity\Tag" />
       <Folder Include="DataAccess\Query\Entity\Unit" />
       <Folder Include="DataAccess\Query\Entity\Vendor" />
       <Folder Include="DataAccess\Query\Handlers\Medicine" />
-      <Folder Include="DataAccess\Query\Handlers\MetaData" />
       <Folder Include="DataAccess\Query\Handlers\Schedule" />
       <Folder Include="DataAccess\Query\Handlers\Tag" />
       <Folder Include="DataAccess\Query\Handlers\Unit" />
