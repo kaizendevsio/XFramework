@@ -5,6 +5,7 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
 public class UpdatePharmacyMemberRequest : RequestBase
 {
     public Guid? PharmacyGuid { get; set; }
+    public Guid? PharmacyLocationGuid { get; set; }
     public Guid? CredentialGuid { get; set; }
     
     public bool? IsEnabled { get; set; }

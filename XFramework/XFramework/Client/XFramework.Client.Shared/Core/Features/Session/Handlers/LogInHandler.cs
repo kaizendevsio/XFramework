@@ -13,12 +13,14 @@ public partial class SessionState
 {
     protected class LogInHandler : ActionHandler<Login, CmdResponse>
     {
+        public IWebAssemblyHostEnvironment HostEnvironment { get; }
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
         public bool VerificationRequired { get; set; }
         
-        public LogInHandler(IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public LogInHandler(IWebAssemblyHostEnvironment hostEnvironment, IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            HostEnvironment = hostEnvironment;
             IdentityServiceWrapper = identityServiceWrapper;
             Configuration = configuration;
             SessionStorageService = sessionStorageService;
@@ -53,7 +55,7 @@ public partial class SessionState
             };
             
             var checkVerification = new QueryResponse<IdentityVerificationSummaryResponse>();
-            if (!action.SkipVerification)
+            if (!action.SkipVerification && HostEnvironment.IsProduction())
             {
                 checkVerification = await IdentityServiceWrapper.CheckVerification(new()
                 {
@@ -99,7 +101,12 @@ public partial class SessionState
                 ContactList = contactListResponse.Response
             });
 
-            if (action.SkipVerification || (checkVerification.HttpStatusCode is not HttpStatusCode.NotFound && checkVerification.Response.IsVerified))
+            if (!HostEnvironment.IsProduction())
+            {
+                // If Success URL property is provided, navigate to the given URL
+                await HandleSuccess(response, action, true);
+            }
+            else if (action.SkipVerification || (checkVerification.HttpStatusCode is not HttpStatusCode.NotFound && checkVerification.Response.IsVerified))
             {
                 // If Success URL property is provided, navigate to the given URL
                 await HandleSuccess(response, action, true);
