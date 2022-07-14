@@ -21,23 +21,10 @@ public class UpdateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Updat
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var entity = await _dataLayer.HealthEssentialsContext.LaboratoryEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
-        if (entity is null)
-        {
-            return new ()
-            {
-                Message = $"Laboratory with Guid {request.Guid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
 
         var updatedLaboratory = request.Adapt(existingLaboratory);
-        updatedLaboratory.Entity = entity;
     
-        _dataLayer.HealthEssentialsContext.Update(existingLaboratory);
+        _dataLayer.HealthEssentialsContext.Update(updatedLaboratory);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()

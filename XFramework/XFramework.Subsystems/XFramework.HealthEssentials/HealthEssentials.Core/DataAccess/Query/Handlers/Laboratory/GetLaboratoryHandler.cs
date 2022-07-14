@@ -91,6 +91,7 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
     {
         for (var index = 0; index < response.LaboratoryMembers.Count; index++)
         {
+            response.LaboratoryMembers[index].Laboratory = response;
             response.LaboratoryMembers[index].Credential = _dataLayer.XnelSystemsContext.IdentityCredentials
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)

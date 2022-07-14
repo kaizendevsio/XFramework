@@ -14,13 +14,15 @@ public partial class SessionState
 {
     protected class InitiateVerificationCodeHandler : ActionHandler<InitiateVerificationCode, CmdResponse>
     {
+        public IWebAssemblyHostEnvironment HostEnvironment { get; }
         public IMessagingServiceWrapper MessagingServiceWrapper { get; }
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
 
         
-        public InitiateVerificationCodeHandler(IMessagingServiceWrapper messagingServiceWrapper ,IIdentityServiceWrapper identityServiceWrapper, IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public InitiateVerificationCodeHandler(IWebAssemblyHostEnvironment hostEnvironment, IMessagingServiceWrapper messagingServiceWrapper ,IIdentityServiceWrapper identityServiceWrapper, IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            HostEnvironment = hostEnvironment;
             MessagingServiceWrapper = messagingServiceWrapper;
             IdentityServiceWrapper = identityServiceWrapper;
             Configuration = configuration;
@@ -38,6 +40,16 @@ public partial class SessionState
 
         public override async Task<CmdResponse> Handle(InitiateVerificationCode action, CancellationToken aCancellationToken)
         {
+            if (!HostEnvironment.IsProduction())
+            {
+                await NavigateTo(action.NavigateToOnSuccess);
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.Accepted,
+                    IsSuccess = true
+                };
+            }
+             
             if (action.LocalVerification is true)
             {
                 await MessagingServiceWrapper.CreateVerificationMessage(new()

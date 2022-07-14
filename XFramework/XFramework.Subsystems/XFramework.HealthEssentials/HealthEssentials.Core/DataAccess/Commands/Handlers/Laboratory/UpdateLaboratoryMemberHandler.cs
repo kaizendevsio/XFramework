@@ -20,43 +20,49 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-        if (credential is null)
-        {
-            return new ()
-            {
-                Message = $"Credential with Guid {request.CredentialGuid} not found",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        
-        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(i => i.Guid == $"{request.LaboratoryGuid}", cancellationToken: cancellationToken);
-        if (laboratory is null)
-        {
-            return new ()
-            {
-                Message = $"Laboratory with Guid {request.LaboratoryGuid} not found",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        
-        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
-        if (laboratoryLocation is null)
-        {
-            return new ()
-            {
-                Message = $"Laboratory Location with Guid {request.Guid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        
         var updatedLaboratoryMember = request.Adapt(existingLaboratoryMember);
-        updatedLaboratoryMember.CredentialId = credential.Id;
-        updatedLaboratoryMember.Laboratory = laboratory;
-        updatedLaboratoryMember.LaboratoryLocation = laboratoryLocation;
+
+        if (request.CredentialGuid is not null)
+        {
+            var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
+            if (credential is null)
+            {
+                return new ()
+                {
+                    Message = $"Credential with Guid {request.CredentialGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedLaboratoryMember.CredentialId = credential.Id;
+        }
+
+        if (request.LaboratoryGuid is not null)
+        {
+            var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(i => i.Guid == $"{request.LaboratoryGuid}", cancellationToken: cancellationToken);
+            if (laboratory is null)
+            {
+                return new ()
+                {
+                    Message = $"Laboratory with Guid {request.LaboratoryGuid} not found",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedLaboratoryMember.Laboratory = laboratory;
+        }
+
+        if (request.LaboratoryLocationGuid is not null)
+        {
+            var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryLocationGuid}", CancellationToken.None);
+            if (laboratoryLocation is null)
+            {
+                return new ()
+                {
+                    Message = $"Laboratory Location with Guid {request.LaboratoryLocationGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedLaboratoryMember.LaboratoryLocation = laboratoryLocation;
+        }
         
         _dataLayer.HealthEssentialsContext.Update(existingLaboratoryMember);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
