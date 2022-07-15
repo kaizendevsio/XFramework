@@ -48,6 +48,7 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
         doctor.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         doctor.Entity = entity;
         doctor.CredentialId = credential.Id;
+        doctor.Status = (int) GenericStatusType.Pending;
         
         await _dataLayer.HealthEssentialsContext.Doctors.AddAsync(doctor, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
