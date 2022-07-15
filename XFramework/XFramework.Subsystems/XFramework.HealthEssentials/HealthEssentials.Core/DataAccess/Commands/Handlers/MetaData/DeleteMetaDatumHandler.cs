@@ -11,9 +11,7 @@ public class DeleteMetaDatumHandler : CommandBaseHandler, IRequestHandler<Delete
     
     public async Task<CmdResponse<DeleteMetaDatumCmd>> Handle(DeleteMetaDatumCmd request, CancellationToken cancellationToken)
     {
-        var existingMetaDatum = await _dataLayer.HealthEssentialsContext.MetaData
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingMetaDatum = await _dataLayer.HealthEssentialsContext.MetaData.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingMetaDatum is null)
         {
             return new ()

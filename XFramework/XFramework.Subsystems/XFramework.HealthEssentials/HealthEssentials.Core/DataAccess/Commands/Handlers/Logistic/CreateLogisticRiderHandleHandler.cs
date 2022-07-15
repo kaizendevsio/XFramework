@@ -13,9 +13,7 @@ public class CreateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
     
     public async Task<CmdResponse<CreateLogisticRiderHandleCmd>> Handle(CreateLogisticRiderHandleCmd request, CancellationToken cancellationToken)
     {
-        var logistic = await _dataLayer.HealthEssentialsContext.Logistics
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.LogisticGuid}", cancellationToken: cancellationToken);
-       
+        var logistic = await _dataLayer.HealthEssentialsContext.Logistics.FirstOrDefaultAsync(i => i.Guid == $"{request.LogisticGuid}", cancellationToken: cancellationToken);
         if (logistic is null)
         {
             return new ()
@@ -25,9 +23,7 @@ public class CreateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
             };
         }
         
-        var rider = await _dataLayer.HealthEssentialsContext.LogisticRiders
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.RiderGuid}", cancellationToken: cancellationToken);
-       
+        var rider = await _dataLayer.HealthEssentialsContext.LogisticRiders.FirstOrDefaultAsync(i => i.Guid == $"{request.RiderGuid}", cancellationToken: cancellationToken);
         if (rider is null)
         {
             return new ()

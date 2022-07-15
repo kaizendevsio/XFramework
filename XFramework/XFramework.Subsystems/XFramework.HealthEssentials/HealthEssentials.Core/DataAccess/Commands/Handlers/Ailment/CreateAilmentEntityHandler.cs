@@ -12,9 +12,7 @@ public class CreateAilmentEntityHandler : CommandBaseHandler, IRequestHandler<Cr
     
     public async Task<CmdResponse<CreateAilmentEntityCmd>> Handle(CreateAilmentEntityCmd request, CancellationToken cancellationToken)
     {
-        var ailmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
-
+        var ailmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
         if (ailmentEntityGroup == null)
         {
             return new ()

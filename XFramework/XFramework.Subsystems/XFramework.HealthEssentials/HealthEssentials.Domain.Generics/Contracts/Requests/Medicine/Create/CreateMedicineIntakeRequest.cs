@@ -2,7 +2,7 @@
 
 public class CreateMedicineIntakeRequest : RequestBase
 {
-    public Guid EntityGuid { get; set; }
+    public Guid? EntityGuid { get; set; }
     public string? Name { get; set; }
     public string? ScientificName { get; set; }
     public string? Description { get; set; }

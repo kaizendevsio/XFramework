@@ -11,9 +11,7 @@ public class DeleteConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
     
     public async Task<CmdResponse<DeleteConsultationJobOrderLaboratoryCmd>> Handle(DeleteConsultationJobOrderLaboratoryCmd request, CancellationToken cancellationToken)
     {
-        var existingJobOrderLaboratory = await _dataLayer.HealthEssentialsContext.ConsultationJobOrderLaboratories
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingJobOrderLaboratory = await _dataLayer.HealthEssentialsContext.ConsultationJobOrderLaboratories.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingJobOrderLaboratory is null)
         {
             return new ()

@@ -11,9 +11,7 @@ public class DeleteConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
     
     public async Task<CmdResponse<DeleteConsultationJobOrderMedicineCmd>> Handle(DeleteConsultationJobOrderMedicineCmd request, CancellationToken cancellationToken)
     {
-        var existingJobOrderMedicine = await _dataLayer.HealthEssentialsContext.ConsultationJobOrderMedicines
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingJobOrderMedicine = await _dataLayer.HealthEssentialsContext.ConsultationJobOrderMedicines.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingJobOrderMedicine is null)
         {
             return new ()

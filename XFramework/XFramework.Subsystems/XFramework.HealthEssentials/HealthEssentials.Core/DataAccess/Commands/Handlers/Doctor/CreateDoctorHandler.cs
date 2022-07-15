@@ -20,9 +20,7 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
     }
     public async Task<CmdResponse<CreateDoctorCmd>> Handle(CreateDoctorCmd request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
-       
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
         if (credential is null)
         {
             return new ()
@@ -32,9 +30,7 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
             };
         }
         
-        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (entity is null)
         {
             return new ()
@@ -57,6 +53,7 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
         {
             Message = $"Doctor {request.ProfessionalName} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

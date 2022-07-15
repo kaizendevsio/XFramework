@@ -11,9 +11,7 @@ public class UpdateAilmentEntityHandler : CommandBaseHandler, IRequestHandler<Up
     
     public async Task<CmdResponse<UpdateAilmentEntityCmd>> Handle(UpdateAilmentEntityCmd request, CancellationToken cancellationToken)
     {
-        var existingAilmentEntity = await _dataLayer.HealthEssentialsContext.AilmentEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingAilmentEntity = await _dataLayer.HealthEssentialsContext.AilmentEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingAilmentEntity is null)
         {
             return new ()
@@ -22,23 +20,23 @@ public class UpdateAilmentEntityHandler : CommandBaseHandler, IRequestHandler<Up
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var ailmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
+        var updatedAilmentEntity = request.Adapt(existingAilmentEntity);
 
-        if (ailmentEntityGroup == null)
-        {
-            return new ()
+        if (request.GroupGuid is not null)
+        { 
+            var ailmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
+            if (ailmentEntityGroup == null)
             {
-                Message = $"Ailment entity group with Guid {request.GroupGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new()
+                {
+                    Message = $"Ailment entity group with Guid {request.GroupGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedAilmentEntity.Group = ailmentEntityGroup;
         }
 
-        var updatedAilmentEntity = request.Adapt(existingAilmentEntity);
-        updatedAilmentEntity.Group = ailmentEntityGroup;
-        
-        _dataLayer.HealthEssentialsContext.AilmentEntities.Update(updatedAilmentEntity);
+        _dataLayer.HealthEssentialsContext.Update(updatedAilmentEntity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new ()

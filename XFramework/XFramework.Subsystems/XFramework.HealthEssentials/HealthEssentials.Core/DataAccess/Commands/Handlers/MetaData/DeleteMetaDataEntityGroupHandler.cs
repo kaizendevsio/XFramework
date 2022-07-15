@@ -11,9 +11,7 @@ public class DeleteMetaDataEntityGroupHandler : CommandBaseHandler, IRequestHand
     
     public async Task<CmdResponse<DeleteMetaDataEntityGroupCmd>> Handle(DeleteMetaDataEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var existingGroup = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingGroup = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingGroup is null)
         {
             return new ()

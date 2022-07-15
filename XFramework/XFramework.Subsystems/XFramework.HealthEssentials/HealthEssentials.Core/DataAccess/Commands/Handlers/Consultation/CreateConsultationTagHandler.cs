@@ -12,9 +12,7 @@ public class CreateConsultationTagHandler : CommandBaseHandler, IRequestHandler<
     
     public async Task<CmdResponse<CreateConsultationTagCmd>> Handle(CreateConsultationTagCmd request, CancellationToken cancellationToken)
     {
-        var consultation = await _dataLayer.HealthEssentialsContext.Consultations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationGuid}", CancellationToken.None);
-        
+        var consultation = await _dataLayer.HealthEssentialsContext.Consultations.FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationGuid}", CancellationToken.None);
         if (consultation is null)
         {
             return new ()
@@ -24,9 +22,7 @@ public class CreateConsultationTagHandler : CommandBaseHandler, IRequestHandler<
             };
         }
         
-        var tag = await _dataLayer.HealthEssentialsContext.Tags
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.TagGuid}", CancellationToken.None);
-        
+        var tag = await _dataLayer.HealthEssentialsContext.Tags.FirstOrDefaultAsync(x => x.Guid == $"{request.TagGuid}", CancellationToken.None);
         if (tag is null)
         {
             return new ()
@@ -47,8 +43,9 @@ public class CreateConsultationTagHandler : CommandBaseHandler, IRequestHandler<
         request.Guid = Guid.Parse(consultationTag.Guid);
         return new ()
         {
-            Message = $"Consultation Tag with Guid {request.Guid} created successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            Message = $"Consultation Tag with Guid {consultationTag.Guid} created successfully",
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

@@ -11,9 +11,7 @@ public class UpdateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Up
 
     public async Task<CmdResponse<UpdateLogisticRiderCmd>> Handle(UpdateLogisticRiderCmd request, CancellationToken cancellationToken)
     {
-        var existingLogisticRider = await _dataLayer.HealthEssentialsContext.LogisticRiders
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingLogisticRider = await _dataLayer.HealthEssentialsContext.LogisticRiders.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingLogisticRider == null)
         {
             return new()
@@ -21,36 +19,30 @@ public class UpdateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Up
                 Message = $"Logistic rider with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
-            
         }
-
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-       
-        if (credential is null)
-        {
-            return new ()
-            {
-                Message = $"Credential with Guid {request.CredentialGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-
         var updatedLogisticRider = request.Adapt(existingLogisticRider);
-        updatedLogisticRider.CredentialId = credential.Id;
+
+        if (request.CredentialGuid is not null)
+        {
+            var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
+            if (credential is null)
+            {
+                return new ()
+                {
+                    Message = $"Credential with Guid {request.CredentialGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedLogisticRider.CredentialId = credential.Id;
+        }
         
         _dataLayer.HealthEssentialsContext.LogisticRiders.Update(updatedLogisticRider);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()
         {
-            Message = $"Logistic rider with Guid {updatedLogisticRider.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(updatedLogisticRider.Guid)
-            }
+            Message = $"Logistic rider with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

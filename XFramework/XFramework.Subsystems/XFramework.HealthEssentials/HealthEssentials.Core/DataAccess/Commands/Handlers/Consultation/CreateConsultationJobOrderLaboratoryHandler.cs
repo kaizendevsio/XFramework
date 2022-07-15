@@ -12,9 +12,7 @@ public class CreateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
     
     public async Task<CmdResponse<CreateConsultationJobOrderLaboratoryCmd>> Handle(CreateConsultationJobOrderLaboratoryCmd request, CancellationToken cancellationToken)
     {
-        var consultationJobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationJobOrderGuid}", CancellationToken.None);
-        
+        var consultationJobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders.FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationJobOrderGuid}", CancellationToken.None);
         if (consultationJobOrder is null)
         {
             return new ()
@@ -24,9 +22,7 @@ public class CreateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
             };
         }
         
-        var laboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryServiceGuid}", CancellationToken.None);
-        
+        var laboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryServiceGuid}", CancellationToken.None);
         if (laboratoryService is null)
         {
             return new ()
@@ -36,9 +32,7 @@ public class CreateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
             };
         }
         
-        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.SuggestedLaboratoryLocationGuid}", CancellationToken.None);
-        
+        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.SuggestedLaboratoryLocationGuid}", CancellationToken.None);
         if (laboratoryLocation is null)
         {
             return new ()
@@ -60,8 +54,9 @@ public class CreateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
         request.Guid = Guid.Parse(consultationJobOrderLaboratory.Guid);
         return new ()
         {
-            Message = $"Consultation Job Order Laboratory with Guid {request.Guid} created successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            Message = $"Consultation Job Order Laboratory with Guid {consultationJobOrderLaboratory.Guid} created successfully",
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

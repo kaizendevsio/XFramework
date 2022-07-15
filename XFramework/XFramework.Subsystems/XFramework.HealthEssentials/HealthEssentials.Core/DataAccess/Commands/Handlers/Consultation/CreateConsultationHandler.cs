@@ -11,9 +11,7 @@ public class CreateConsultationHandler : CommandBaseHandler, IRequestHandler<Cre
     
     public async Task<CmdResponse<CreateConsultationCmd>> Handle(CreateConsultationCmd request, CancellationToken cancellationToken)
     {
-        var consultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", CancellationToken.None);
-       
+        var consultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (consultationEntity is null)
         {
             return new ()

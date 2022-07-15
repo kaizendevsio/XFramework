@@ -16,9 +16,7 @@ public class CreateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Cr
     
     public async Task<CmdResponse<CreateLogisticRiderCmd>> Handle(CreateLogisticRiderCmd request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-       
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
         if (credential is null)
         {
             return new ()

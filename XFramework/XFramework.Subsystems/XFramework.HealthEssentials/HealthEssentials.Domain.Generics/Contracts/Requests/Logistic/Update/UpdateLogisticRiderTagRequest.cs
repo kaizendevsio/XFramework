@@ -2,7 +2,7 @@
 
 public class UpdateLogisticRiderTagRequest : RequestBase
 {
-    public Guid LogisticRiderGuid { get; set; }
+    public Guid? LogisticRiderGuid { get; set; }
     public string? Value { get; set; }
     public Guid? TagGuid { get; set; }
 }

@@ -11,9 +11,7 @@ public class UpdateAilmentHandler : CommandBaseHandler, IRequestHandler<UpdateAi
     
     public async Task<CmdResponse<UpdateAilmentCmd>> Handle(UpdateAilmentCmd request, CancellationToken cancellationToken)
     {
-        var existingAilment = await _dataLayer.HealthEssentialsContext.Ailments
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingAilment = await _dataLayer.HealthEssentialsContext.Ailments.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingAilment is null)
         {
             return new ()
@@ -22,23 +20,23 @@ public class UpdateAilmentHandler : CommandBaseHandler, IRequestHandler<UpdateAi
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var ailmentEntity = await _dataLayer.HealthEssentialsContext.AilmentEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
-        
-        if (ailmentEntity == null)
-        {
-            return new ()
+        var updatedAilment = request.Adapt(existingAilment);
+
+        if (request.EntityGuid is not null)
+        { 
+            var ailmentEntity = await _dataLayer.HealthEssentialsContext.AilmentEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None); 
+            if (ailmentEntity == null)
             {
-                Message = $"Ailment entity with Guid {request.EntityGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new()
+                {
+                    Message = $"Ailment entity with Guid {request.EntityGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedAilment.Entity = ailmentEntity;
         }
 
-        var updatedAilment = request.Adapt(existingAilment);
-        updatedAilment.Entity = ailmentEntity;
-        
-        _dataLayer.HealthEssentialsContext.Ailments.Update(updatedAilment);
+        _dataLayer.HealthEssentialsContext.Update(updatedAilment);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new ()

@@ -11,9 +11,7 @@ public class DeleteLogisticHandler : CommandBaseHandler, IRequestHandler<DeleteL
 
     public async Task<CmdResponse<DeleteLogisticCmd>> Handle(DeleteLogisticCmd request, CancellationToken cancellationToken)
     {
-        var existingLogistic = await _dataLayer.HealthEssentialsContext.Logistics
-            .FirstOrDefaultAsync(x => x.Guid ==$"{request.Guid}", CancellationToken.None);
-
+        var existingLogistic = await _dataLayer.HealthEssentialsContext.Logistics.FirstOrDefaultAsync(x => x.Guid ==$"{request.Guid}", CancellationToken.None);
         if (existingLogistic == null)
         {
             return new()
@@ -31,9 +29,8 @@ public class DeleteLogisticHandler : CommandBaseHandler, IRequestHandler<DeleteL
         
         return new()
         {
-            Message = $"Logistic with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            Message = $"Logistic with Guid {request.Guid} deleted successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

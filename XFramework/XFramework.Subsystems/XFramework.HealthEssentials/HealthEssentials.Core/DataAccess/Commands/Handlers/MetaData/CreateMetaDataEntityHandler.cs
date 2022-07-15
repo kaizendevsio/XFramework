@@ -12,9 +12,7 @@ public class CreateMetaDataEntityHandler : CommandBaseHandler, IRequestHandler<C
     
     public async Task<CmdResponse<CreateMetaDataEntityCmd>> Handle(CreateMetaDataEntityCmd request, CancellationToken cancellationToken)
     {
-        var entityGroup = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
-        
+        var entityGroup = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
         if (entityGroup is null)
         {
             return new ()

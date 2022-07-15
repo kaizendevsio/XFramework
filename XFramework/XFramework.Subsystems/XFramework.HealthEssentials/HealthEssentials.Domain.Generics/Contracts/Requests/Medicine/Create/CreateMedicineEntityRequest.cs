@@ -3,6 +3,6 @@
 public class CreateMedicineEntityRequest : RequestBase
 {
     public string? Name { get; set; }
-    public Guid GroupGuid { get; set; }
+    public Guid? GroupGuid { get; set; }
     public int? SortOrder { get; set; }
 }

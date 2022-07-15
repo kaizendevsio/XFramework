@@ -2,9 +2,9 @@
 
 public class CreateHospitalServiceRequest : RequestBase
 {
-    public Guid EntityGuid { get; set; }
-    public Guid HospitalLocationGuid { get; set; }
-    public Guid HospitalGuid { get; set; }
+    public Guid? EntityGuid { get; set; }
+    public Guid? HospitalLocationGuid { get; set; }
+    public Guid? HospitalGuid { get; set; }
     public string? Name { get; set; }
     public string? ShortName { get; set; }
     public string? Description { get; set; }

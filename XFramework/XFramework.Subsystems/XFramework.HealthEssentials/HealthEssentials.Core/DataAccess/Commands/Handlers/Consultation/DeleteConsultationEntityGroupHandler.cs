@@ -11,9 +11,7 @@ public class DeleteConsultationEntityGroupHandler : CommandBaseHandler, IRequest
     
     public async Task<CmdResponse<DeleteConsultationEntityGroupCmd>> Handle(DeleteConsultationEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var existingGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-      
+        var existingGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingGroup is null)
         {
             return new ()

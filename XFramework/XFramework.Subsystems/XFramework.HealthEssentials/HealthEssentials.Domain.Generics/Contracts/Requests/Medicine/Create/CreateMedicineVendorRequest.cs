@@ -2,6 +2,6 @@
 
 public class CreateMedicineVendorRequest : RequestBase
 {
-    public Guid MedicineGuid { get; set; }
-    public Guid VendorGuid { get; set; }
+    public Guid? MedicineGuid { get; set; }
+    public Guid? VendorGuid { get; set; }
 }

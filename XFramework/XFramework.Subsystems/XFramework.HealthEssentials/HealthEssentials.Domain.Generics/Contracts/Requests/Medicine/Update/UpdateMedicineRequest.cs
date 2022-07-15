@@ -2,7 +2,7 @@
 
 public class UpdateMedicineRequest : RequestBase
 {
-    public Guid EntityGuid { get; set; }
+    public Guid? EntityGuid { get; set; }
     public string? Name { get; set; }
     public string? ShortName { get; set; }
     public string? ScientificName { get; set; }

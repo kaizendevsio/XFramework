@@ -11,9 +11,7 @@ public class UpdateMetaDataEntityGroupHandler : CommandBaseHandler, IRequestHand
     
     public async Task<CmdResponse<UpdateMetaDataEntityGroupCmd>> Handle(UpdateMetaDataEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var existingGroup = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingGroup = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingGroup is null)
         {
             return new ()
@@ -22,7 +20,6 @@ public class UpdateMetaDataEntityGroupHandler : CommandBaseHandler, IRequestHand
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-
         var updatedGroup = request.Adapt(existingGroup);
 
         _dataLayer.HealthEssentialsContext.Update(updatedGroup);

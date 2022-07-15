@@ -11,9 +11,7 @@ public class UpdateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
     
     public async Task<CmdResponse<UpdateConsultationJobOrderMedicineCmd>> Handle(UpdateConsultationJobOrderMedicineCmd request, CancellationToken cancellationToken)
     {
-        var existingJobOrderMedicine = await _dataLayer.HealthEssentialsContext.ConsultationJobOrderMedicines
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingJobOrderMedicine = await _dataLayer.HealthEssentialsContext.ConsultationJobOrderMedicines.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingJobOrderMedicine is null)
         {
             return new ()
@@ -22,47 +20,50 @@ public class UpdateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var jobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationJobOrderGuid}", CancellationToken.None);
-        
-        if (jobOrder is null)
+        var updatedJobOrderMedicine = request.Adapt(existingJobOrderMedicine);
+
+        if (request.ConsultationJobOrderGuid is not null)
         {
-            return new ()
+            var jobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders.FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationJobOrderGuid}", CancellationToken.None);
+            if (jobOrder is null)
             {
-                Message = $"Consultation Job Order with Guid {request.ConsultationJobOrderGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        
-        var medicine = await _dataLayer.HealthEssentialsContext.Medicines
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineGuid}", CancellationToken.None);
-        
-        if (medicine is null)
-        {
-            return new ()
-            {
-                Message = $"Medicine with Guid {request.MedicineGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        
-        var medicineIntake = await _dataLayer.HealthEssentialsContext.MedicineIntakes
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineIntakeGuid}", CancellationToken.None);
-        
-        if (medicineIntake is null)
-        {
-            return new ()
-            {
-                Message = $"Medicine Intake with Guid {request.MedicineIntakeGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new ()
+                {
+                    Message = $"Consultation Job Order with Guid {request.ConsultationJobOrderGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedJobOrderMedicine.ConsultationJobOrder = jobOrder;
         }
 
-        var updatedJobOrderMedicine = request.Adapt(existingJobOrderMedicine);
-        updatedJobOrderMedicine.ConsultationJobOrder = jobOrder;
-        updatedJobOrderMedicine.Medicine = medicine;
-        updatedJobOrderMedicine.MedicineIntake = medicineIntake;
+        if (request.MedicineGuid is not null)
+        {
+            var medicine = await _dataLayer.HealthEssentialsContext.Medicines.FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineGuid}", CancellationToken.None);
+            if (medicine is null)
+            {
+                return new ()
+                {
+                    Message = $"Medicine with Guid {request.MedicineGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedJobOrderMedicine.Medicine = medicine;
+        }
+
+        if (request.MedicineIntakeGuid is not null)
+        {
+            var medicineIntake = await _dataLayer.HealthEssentialsContext.MedicineIntakes.FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineIntakeGuid}", CancellationToken.None);
+            if (medicineIntake is null)
+            {
+                return new ()
+                {
+                    Message = $"Medicine Intake with Guid {request.MedicineIntakeGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedJobOrderMedicine.MedicineIntake = medicineIntake;
+        }
+
 
         _dataLayer.HealthEssentialsContext.Update(updatedJobOrderMedicine);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
@@ -70,12 +71,7 @@ public class UpdateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
         return new()
         {
             Message = $"Consultation Job Order Medicine with Guid {updatedJobOrderMedicine.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(updatedJobOrderMedicine.Guid)
-            }
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

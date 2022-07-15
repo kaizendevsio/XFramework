@@ -11,9 +11,7 @@ public class CreateAilmentHandler : CommandBaseHandler, IRequestHandler<CreateAi
     
     public async Task<CmdResponse<CreateAilmentCmd>> Handle(CreateAilmentCmd request, CancellationToken cancellationToken)
     {
-        var ailmentEntity = await _dataLayer.HealthEssentialsContext.AilmentEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
-        
+        var ailmentEntity = await _dataLayer.HealthEssentialsContext.AilmentEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (ailmentEntity == null)
         {
             return new ()

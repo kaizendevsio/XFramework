@@ -11,9 +11,7 @@ public class DeleteAilmentEntityGroupHandler : CommandBaseHandler, IRequestHandl
     
     public async Task<CmdResponse<DeleteAilmentEntityGroupCmd>> Handle(DeleteAilmentEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var existingAilmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingAilmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingAilmentEntityGroup is null)
         {
             return new ()

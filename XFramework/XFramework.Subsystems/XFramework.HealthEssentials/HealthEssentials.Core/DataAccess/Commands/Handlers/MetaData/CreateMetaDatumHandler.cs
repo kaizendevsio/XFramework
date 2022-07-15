@@ -12,9 +12,7 @@ public class CreateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Create
     
     public async Task<CmdResponse<CreateMetaDatumCmd>> Handle(CreateMetaDatumCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.HealthEssentialsContext.MetaDataEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
-        
+        var entity = await _dataLayer.HealthEssentialsContext.MetaDataEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (entity is null)
         {
             return new ()

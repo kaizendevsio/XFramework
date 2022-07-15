@@ -2,7 +2,7 @@
 
 public class UpdateLaboratoryServiceTagRequest : RequestBase
 {
-    public Guid LaboratoryServiceGuid { get; set; }
+    public Guid? LaboratoryServiceGuid { get; set; }
     public string? Value { get; set; }
     public Guid? TagGuid { get; set; }
 }

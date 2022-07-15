@@ -12,9 +12,7 @@ public class CreateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
     
     public async Task<CmdResponse<CreateConsultationJobOrderMedicineCmd>> Handle(CreateConsultationJobOrderMedicineCmd request, CancellationToken cancellationToken)
     {
-        var jobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationJobOrderGuid}", CancellationToken.None);
-        
+        var jobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders.FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationJobOrderGuid}", CancellationToken.None);
         if (jobOrder is null)
         {
             return new ()
@@ -24,9 +22,7 @@ public class CreateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
             };
         }
         
-        var medicine = await _dataLayer.HealthEssentialsContext.Medicines
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineGuid}", CancellationToken.None);
-        
+        var medicine = await _dataLayer.HealthEssentialsContext.Medicines.FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineGuid}", CancellationToken.None);
         if (medicine is null)
         {
             return new ()
@@ -36,9 +32,7 @@ public class CreateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
             };
         }
         
-        var medicineIntake = await _dataLayer.HealthEssentialsContext.MedicineIntakes
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineIntakeGuid}", CancellationToken.None);
-        
+        var medicineIntake = await _dataLayer.HealthEssentialsContext.MedicineIntakes.FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineIntakeGuid}", CancellationToken.None);
         if (medicineIntake is null)
         {
             return new ()
@@ -60,8 +54,9 @@ public class CreateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
         request.Guid = Guid.Parse(consultationJobOrderMedicine.Guid);
         return new ()
         {
-            Message = $"Consultation Job Order Medicine with Guid {request.Guid} created successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            Message = $"Consultation Job Order Medicine with Guid {consultationJobOrderMedicine.Guid} created successfully",
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

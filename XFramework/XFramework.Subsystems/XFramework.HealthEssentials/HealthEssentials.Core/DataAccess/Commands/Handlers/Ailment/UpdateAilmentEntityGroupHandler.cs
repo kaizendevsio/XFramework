@@ -11,9 +11,7 @@ public class UpdateAilmentEntityGroupHandler : CommandBaseHandler, IRequestHandl
     
     public async Task<CmdResponse<UpdateAilmentEntityGroupCmd>> Handle(UpdateAilmentEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var existingAilmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingAilmentEntityGroup = await _dataLayer.HealthEssentialsContext.AilmentEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingAilmentEntityGroup is null)
         {
             return new ()
@@ -22,10 +20,9 @@ public class UpdateAilmentEntityGroupHandler : CommandBaseHandler, IRequestHandl
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-
         var updatedAilmentEntityGroup = request.Adapt(existingAilmentEntityGroup);
         
-        _dataLayer.HealthEssentialsContext.AilmentEntityGroups.Update(updatedAilmentEntityGroup);
+        _dataLayer.HealthEssentialsContext.Update(updatedAilmentEntityGroup);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new ()

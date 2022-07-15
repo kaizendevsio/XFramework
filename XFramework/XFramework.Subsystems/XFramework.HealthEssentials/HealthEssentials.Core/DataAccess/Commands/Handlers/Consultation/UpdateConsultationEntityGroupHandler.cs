@@ -11,9 +11,7 @@ public class UpdateConsultationEntityGroupHandler : CommandBaseHandler, IRequest
     
     public async Task<CmdResponse<UpdateConsultationEntityGroupCmd>> Handle(UpdateConsultationEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var existingGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-      
+        var existingGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingGroup is null)
         {
             return new ()
@@ -22,7 +20,6 @@ public class UpdateConsultationEntityGroupHandler : CommandBaseHandler, IRequest
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-
         var updatedGroup = request.Adapt(existingGroup);
         
         _dataLayer.HealthEssentialsContext.Update(updatedGroup);
@@ -30,13 +27,8 @@ public class UpdateConsultationEntityGroupHandler : CommandBaseHandler, IRequest
         
         return new ()
         {
-            Message = $"Consultation entity group with Guid {updatedGroup.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(updatedGroup.Guid)
-            }
+            Message = $"Consultation entity group with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

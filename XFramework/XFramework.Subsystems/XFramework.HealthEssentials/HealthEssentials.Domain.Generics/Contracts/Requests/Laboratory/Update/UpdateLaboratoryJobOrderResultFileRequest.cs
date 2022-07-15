@@ -2,6 +2,6 @@
 
 public class UpdateLaboratoryJobOrderResultFileRequest : RequestBase
 {
-    public Guid LaboratoryJobOrderResultGuid { get; set; }
-    public Guid StorageFileGuid { get; set; }
+    public Guid? LaboratoryJobOrderResultGuid { get; set; }
+    public Guid? StorageFileGuid { get; set; }
 }

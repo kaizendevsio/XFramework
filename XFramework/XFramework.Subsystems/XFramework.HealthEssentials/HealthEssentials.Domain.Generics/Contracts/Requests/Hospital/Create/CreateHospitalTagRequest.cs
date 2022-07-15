@@ -2,7 +2,7 @@
 
 public class CreateHospitalTagRequest : RequestBase
 {
-    public Guid HospitalGuid { get; set; }
+    public Guid? HospitalGuid { get; set; }
     public string? Value { get; set; }
     public Guid? TagGuid { get; set; }
 }

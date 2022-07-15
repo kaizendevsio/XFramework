@@ -2,7 +2,7 @@
 
 public class UpdateMedicineTagRequest : RequestBase
 {
-    public Guid MedicineGuid { get; set; }
+    public Guid? MedicineGuid { get; set; }
     public string? Value { get; set; }
-    public Guid TagGuid { get; set; }
+    public Guid? TagGuid { get; set; }
 }

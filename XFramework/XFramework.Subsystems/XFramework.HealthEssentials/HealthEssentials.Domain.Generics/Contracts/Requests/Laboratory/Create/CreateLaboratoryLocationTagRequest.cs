@@ -2,7 +2,7 @@
 
 public class CreateLaboratoryLocationTagRequest : RequestBase
 {
-    public Guid LaboratoryLocationGuid { get; set; }
+    public Guid? LaboratoryLocationGuid { get; set; }
     public string? Value { get; set; }
     public Guid? TagGuid { get; set; }
 }

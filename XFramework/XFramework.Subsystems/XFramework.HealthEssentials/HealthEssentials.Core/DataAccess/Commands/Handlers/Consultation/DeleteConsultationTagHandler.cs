@@ -11,9 +11,7 @@ public class DeleteConsultationTagHandler : CommandBaseHandler, IRequestHandler<
     
     public async Task<CmdResponse<DeleteConsultationTagCmd>> Handle(DeleteConsultationTagCmd request, CancellationToken cancellationToken)
     {
-        var existingTag = await _dataLayer.HealthEssentialsContext.ConsultationTags
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingTag = await _dataLayer.HealthEssentialsContext.ConsultationTags.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingTag is null)
         {
             return new ()

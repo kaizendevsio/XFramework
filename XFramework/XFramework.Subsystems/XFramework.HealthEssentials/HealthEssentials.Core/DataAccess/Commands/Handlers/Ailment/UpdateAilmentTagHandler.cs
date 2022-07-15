@@ -11,9 +11,7 @@ public class UpdateAilmentTagHandler : CommandBaseHandler, IRequestHandler<Updat
     
     public async Task<CmdResponse<UpdateAilmentTagCmd>> Handle(UpdateAilmentTagCmd request, CancellationToken cancellationToken)
     {
-        var existingAilmentTag = await _dataLayer.HealthEssentialsContext.AilmentTags
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingAilmentTag = await _dataLayer.HealthEssentialsContext.AilmentTags.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingAilmentTag is null)
         {
             return new ()
@@ -22,36 +20,37 @@ public class UpdateAilmentTagHandler : CommandBaseHandler, IRequestHandler<Updat
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var ailment = await _dataLayer.HealthEssentialsContext.Ailments
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.AilmentGuid}", CancellationToken.None);
-        
-        if (ailment == null)
-        {
-            return new ()
+        var updatedAilmentTag = request.Adapt(existingAilmentTag);
+
+        if (request.AilmentGuid is not null)
+        { 
+            var ailment = await _dataLayer.HealthEssentialsContext.Ailments.FirstOrDefaultAsync(x => x.Guid == $"{request.AilmentGuid}", CancellationToken.None); 
+            if (ailment == null)
             {
-                Message = $"Ailment with Guid {request.AilmentGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        
-        var tag = await _dataLayer.HealthEssentialsContext.Tags
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.TagGuid}", CancellationToken.None);
-        
-        if (tag == null)
-        {
-            return new ()
-            {
-                Message = $"Ailment with Guid {request.TagGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new()
+                {
+                    Message = $"Ailment with Guid {request.AilmentGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedAilmentTag.Ailment = ailment;
         }
 
-        var updatedAilmentTag = request.Adapt(existingAilmentTag);
-        updatedAilmentTag.Ailment = ailment;
-        updatedAilmentTag.Tag = tag;
+        if (request.TagGuid is not null)
+        {
+            var tag = await _dataLayer.HealthEssentialsContext.Tags.FirstOrDefaultAsync(x => x.Guid == $"{request.TagGuid}", CancellationToken.None);
+            if (tag == null)
+            {
+                return new ()
+                {
+                    Message = $"Ailment with Guid {request.TagGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedAilmentTag.Tag = tag;
+        }
         
-        _dataLayer.HealthEssentialsContext.AilmentTags.Update(updatedAilmentTag);
+        _dataLayer.HealthEssentialsContext.Update(updatedAilmentTag);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new ()

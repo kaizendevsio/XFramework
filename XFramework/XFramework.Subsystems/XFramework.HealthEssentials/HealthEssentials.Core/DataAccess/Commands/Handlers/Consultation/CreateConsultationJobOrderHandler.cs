@@ -12,9 +12,7 @@ public class CreateConsultationJobOrderHandler : CommandBaseHandler, IRequestHan
     
     public async Task<CmdResponse<CreateConsultationJobOrderCmd>> Handle(CreateConsultationJobOrderCmd request, CancellationToken cancellationToken)
     {
-        var consultation = await _dataLayer.HealthEssentialsContext.Consultations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationGuid}", CancellationToken.None);
-        
+        var consultation = await _dataLayer.HealthEssentialsContext.Consultations.FirstOrDefaultAsync(x => x.Guid == $"{request.ConsultationGuid}", CancellationToken.None);
         if (consultation is null)
         {
             return new ()
@@ -24,9 +22,7 @@ public class CreateConsultationJobOrderHandler : CommandBaseHandler, IRequestHan
             };
         }
         
-        var schedule = await _dataLayer.HealthEssentialsContext.Schedules
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ScheduleGuid}", CancellationToken.None);
-        
+        var schedule = await _dataLayer.HealthEssentialsContext.Schedules.FirstOrDefaultAsync(x => x.Guid == $"{request.ScheduleGuid}", CancellationToken.None);
         if (schedule is null)
         {
             return new ()

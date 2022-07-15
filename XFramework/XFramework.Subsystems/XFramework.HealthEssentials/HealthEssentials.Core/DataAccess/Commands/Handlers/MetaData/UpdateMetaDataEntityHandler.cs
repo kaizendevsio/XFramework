@@ -11,9 +11,7 @@ public class UpdateMetaDataEntityHandler : CommandBaseHandler, IRequestHandler<U
     
     public async Task<CmdResponse<UpdateMetaDataEntityCmd>> Handle(UpdateMetaDataEntityCmd request, CancellationToken cancellationToken)
     {
-        var existingEntity = await _dataLayer.HealthEssentialsContext.MetaDataEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingEntity = await _dataLayer.HealthEssentialsContext.MetaDataEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingEntity is null)
         {
             return new ()
@@ -22,21 +20,23 @@ public class UpdateMetaDataEntityHandler : CommandBaseHandler, IRequestHandler<U
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-
-        var entityGroup = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
-        
-        if (entityGroup is null)
-        {
-            return new ()
-            {
-                Message = $"Entity group with guid {request.GroupGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        
         var updatedEntity = request.Adapt(existingEntity);
-        updatedEntity.Group = entityGroup;
+
+        if (request.GroupGuid is not null)
+        {
+            var entityGroup = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups
+                .FirstOrDefaultAsync(x => x.Guid == $"{request.GroupGuid}", CancellationToken.None);
+            
+            if (entityGroup is null)
+            {
+                return new ()
+                {
+                    Message = $"Entity group with guid {request.GroupGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedEntity.Group = entityGroup;
+        }
         
         _dataLayer.HealthEssentialsContext.Update(updatedEntity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

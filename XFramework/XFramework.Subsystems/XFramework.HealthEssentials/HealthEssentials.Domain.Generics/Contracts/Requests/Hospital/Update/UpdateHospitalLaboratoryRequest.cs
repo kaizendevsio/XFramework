@@ -2,6 +2,6 @@
 
 public class UpdateHospitalLaboratoryRequest : RequestBase
 {
-    public Guid HospitalGuid { get; set; }
+    public Guid? HospitalGuid { get; set; }
     public Guid? LaboratoryGuid { get; set; }
 }

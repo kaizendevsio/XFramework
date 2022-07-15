@@ -2,7 +2,7 @@
 
 public class CreateLogisticJobOrderDetailRequest : RequestBase
 {
-    public Guid LogisticJobOrderGuid { get; set; }
+    public Guid? LogisticJobOrderGuid { get; set; }
     public short Status { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }

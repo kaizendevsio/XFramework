@@ -12,9 +12,7 @@ public class CreateAilmentTagHandler : CommandBaseHandler, IRequestHandler<Creat
     
     public async Task<CmdResponse<CreateAilmentTagCmd>> Handle(CreateAilmentTagCmd request, CancellationToken cancellationToken)
     {
-        var ailment = await _dataLayer.HealthEssentialsContext.Ailments
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.AilmentGuid}", CancellationToken.None);
-        
+        var ailment = await _dataLayer.HealthEssentialsContext.Ailments.FirstOrDefaultAsync(x => x.Guid == $"{request.AilmentGuid}", CancellationToken.None);
         if (ailment == null)
         {
             return new ()
@@ -24,9 +22,7 @@ public class CreateAilmentTagHandler : CommandBaseHandler, IRequestHandler<Creat
             };
         }
         
-        var tag = await _dataLayer.HealthEssentialsContext.Tags
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.TagGuid}", CancellationToken.None);
-        
+        var tag = await _dataLayer.HealthEssentialsContext.Tags.FirstOrDefaultAsync(x => x.Guid == $"{request.TagGuid}", CancellationToken.None);
         if (tag == null)
         {
             return new ()

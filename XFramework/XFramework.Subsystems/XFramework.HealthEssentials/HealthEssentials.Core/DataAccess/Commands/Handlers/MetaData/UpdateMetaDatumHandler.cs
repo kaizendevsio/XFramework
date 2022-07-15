@@ -11,9 +11,7 @@ public class UpdateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Update
     
     public async Task<CmdResponse<UpdateMetaDatumCmd>> Handle(UpdateMetaDatumCmd request, CancellationToken cancellationToken)
     {
-        var existingMetaDatum = await _dataLayer.HealthEssentialsContext.MetaData
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingMetaDatum = await _dataLayer.HealthEssentialsContext.MetaData.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingMetaDatum is null)
         {
             return new ()
@@ -22,23 +20,23 @@ public class UpdateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Update
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var entity = await _dataLayer.HealthEssentialsContext.MetaDataEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
-        
-        if (entity is null)
-        {
-            return new ()
-            {
-                Message = $"Entity with Guid {request.EntityGuid} not found",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-
         var updatedMetaDatum = request.Adapt(existingMetaDatum);
-        updatedMetaDatum.Entity = entity;
+
+        if (request.EntityGuid is not null)
+        {
+            var entity = await _dataLayer.HealthEssentialsContext.MetaDataEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
+            if (entity is null)
+            {
+                return new ()
+                {
+                    Message = $"Entity with Guid {request.EntityGuid} not found",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedMetaDatum.Entity = entity;
+        }
         
-        _dataLayer.HealthEssentialsContext.MetaData.Update(updatedMetaDatum);
+        _dataLayer.HealthEssentialsContext.Update(updatedMetaDatum);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new ()
