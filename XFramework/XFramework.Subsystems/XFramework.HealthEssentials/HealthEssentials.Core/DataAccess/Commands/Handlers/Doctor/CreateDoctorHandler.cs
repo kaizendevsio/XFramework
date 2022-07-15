@@ -20,9 +20,7 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
     }
     public async Task<CmdResponse<CreateDoctorCmd>> Handle(CreateDoctorCmd request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
-       
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
         if (credential is null)
         {
             return new ()
