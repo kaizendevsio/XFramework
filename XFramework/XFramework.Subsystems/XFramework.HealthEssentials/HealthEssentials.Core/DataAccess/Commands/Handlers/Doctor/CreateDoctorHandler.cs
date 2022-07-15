@@ -20,7 +20,9 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
     }
     public async Task<CmdResponse<CreateDoctorCmd>> Handle(CreateDoctorCmd request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
+       
         if (credential is null)
         {
             return new ()
@@ -30,12 +32,14 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
             };
         }
         
-        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
+
         if (entity is null)
         {
             return new ()
             {
-                Message = $"Doctor with Guid {request.Guid} does not exist",
+                Message = $"Doctor entity with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -48,12 +52,14 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
         await _dataLayer.HealthEssentialsContext.Doctors.AddAsync(doctor, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
-        request.Guid = Guid.Parse(doctor.Guid);
         return new()
         {
-            Message = $"Doctor {request.ProfessionalName} created successfully",
+            Message = $"Doctor {request.Name} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            Request = new()
+            {
+                Guid = Guid.Parse(doctor.Guid)
+            }
         };
     }
 }

@@ -19,7 +19,7 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
                 Message = $"Doctor with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
-        } 
+        }
         var updatedDoctor = request.Adapt(existingDoctor);
 
         if (request.CredentialGuid is not null)
@@ -27,36 +27,37 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
             var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
             if (credential is null)
             {
-                return new()
+                return new ()
                 {
                     Message = $"Credential with Guid {request.CredentialGuid} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
-            } 
+            }
             updatedDoctor.CredentialId = credential.Id;
         }
 
         if (request.EntityGuid is not null)
         {
-            var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+            var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
             if (entity is null)
             {
-                return new()
+                return new ()
                 {
-                    Message = $"Doctor with Guid {request.Guid} does not exist",
+                    Message = $"Doctor entity with Guid {request.EntityGuid} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
             updatedDoctor.Entity = entity;
         }
-        
+
         _dataLayer.HealthEssentialsContext.Update(updatedDoctor);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()
         {
-            Message = $"Doctor with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            Message = "Doctor Identity Updated Successfully",
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Request = request
         };
     }
 }

@@ -21,6 +21,7 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
         var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
             .Include(i => i.Entity)
             .Include(i => i.PharmacyLocations)
+            .ThenInclude(i => i.PharmacyMembers)
             .Include(i => i.PharmacyMembers)
             .Where(i => i.Guid == $"{request.Guid}")
             .AsNoTracking()
