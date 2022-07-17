@@ -30,20 +30,19 @@ public partial class MemberState
 
         public override async Task<CmdResponse> Handle(GetMember action, CancellationToken aCancellationToken)
         {
-            ReportTask(action);
+            //ReportTask(action);
 
             var response1 = IdentityServiceWrapper.GetCredential(new() { Guid = action.CredentialGuid});
             var response2 = WalletServiceWrapper.GetWalletList(new() { CredentialGuid = action.CredentialGuid});
 
             await Task.WhenAll(response1, response2);
-            ReportTask(action, true);
+            //ReportTask(action, true);
 
             if (await HandleFailure(response1.Result, action, true)) return response1.Result.Adapt<CmdResponse>();
 
             CurrentState.SelectedMember = response1.Result.Response;
             CurrentState.SelectedMember.Wallets = response2.Result.Response;
             await Mediator.Send(new SetState(){SelectedMember = CurrentState.SelectedMember});
-            await Mediator.Send(new ApplicationState.SetState(){IsBusy = false});
 
             return new()
             {

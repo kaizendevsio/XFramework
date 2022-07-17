@@ -244,6 +244,18 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         }
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
     }
+    public async Task ReportTask<T>(QueryableRequest action, IEnumerable<T> list,bool isDone = false)
+    {
+        if (action.Silent) return;
+        if (list.TryGetNonEnumeratedCount(out var count) && count > 0) return;
+        if (list.Any()) return;
+        if (!isDone)
+        {
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+            return;
+        }
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+    }
     public async Task ReportProgress(string message)
     {
         await Mediator.Send(new ApplicationState.SetState() {ProgressMessage = message});
@@ -479,6 +491,18 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     public async Task ReportTask(QueryableRequest action, bool isDone = false)
     {
         if (action.Silent) return;
+        if (!isDone)
+        {
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+            return;
+        }
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+    }
+    public async Task ReportTask<T>(QueryableRequest action, IEnumerable<T> list,bool isDone = false)
+    {
+        if (action.Silent) return;
+        if (list.TryGetNonEnumeratedCount(out var count) && count > 0) return;
+        if (list.Any()) return;
         if (!isDone)
         {
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});

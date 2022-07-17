@@ -11,6 +11,5 @@ public partial class MemberState
         public List<CredentialResponse>? MemberList { get; set; }
         public CredentialResponse? SelectedMember { get; set; }
         public string? SearchString { get; set; }
-        public string? FilePreviewContentPath { get; set; }
     }
 } 

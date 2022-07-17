@@ -11,8 +11,8 @@
         <PackageReference Include="FluentValidation" Version="10.3.4" />
         <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="10.3.4" />
         <PackageReference Include="Mapster" Version="7.2.0" />
-        <PackageReference Include="MediatR" Version="9.0.0" />
-        <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
+        <PackageReference Include="MediatR" Version="10.0.1" />
+        <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="10.0.1" />
         <PackageReference Include="Sentry" Version="3.17.1" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.14.1" />
         <PackageReference Include="TypeSupport" Version="1.1.12" />

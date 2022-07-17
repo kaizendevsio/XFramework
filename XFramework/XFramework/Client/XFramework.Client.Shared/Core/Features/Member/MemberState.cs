@@ -9,10 +9,8 @@ public partial class MemberState : State<MemberState>
     {
         
     }
-
     public List<SubscriptionResponse> UnregisteredSubscriber { get; set; } = new();
     public List<CredentialResponse> MemberList { get; set; } = new();
     public CredentialResponse SelectedMember { get; set; } = new();
     public string SearchString { get; set; } = string.Empty;
-
 }

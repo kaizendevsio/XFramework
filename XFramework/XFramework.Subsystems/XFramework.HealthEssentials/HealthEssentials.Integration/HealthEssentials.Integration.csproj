@@ -25,7 +25,7 @@
     <ItemGroup>
         <PackageReference Include="BCrypt.Net-Next" Version="4.0.2" />
         <PackageReference Include="Mapster" Version="7.2.0" />
-        <PackageReference Include="MediatR" Version="9.0.0" />
+        <PackageReference Include="MediatR" Version="10.0.1" />
         <PackageReference Include="MessagePack" Version="2.3.85" />
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.2" />
         <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.2" />

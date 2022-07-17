@@ -30,7 +30,7 @@ public partial class MemberState
 
         public override async Task<CmdResponse> Handle(GetMemberList action, CancellationToken aCancellationToken)
         {
-            ReportTask(action);
+            ReportTask(action, CurrentState.MemberList);
             
             var response = await IdentityServiceWrapper.GetCredentialList(new()
             {
@@ -38,7 +38,7 @@ public partial class MemberState
                 PageSize = 1000
             });
             
-            ReportTask(action,true);
+            ReportTask(action, CurrentState.MemberList,true);
 
             if (await HandleFailure(response, action, true)) return response.Adapt<CmdResponse>();
             await Mediator.Send(new SetState(){MemberList = response.Response});
