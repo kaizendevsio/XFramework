@@ -1,8 +1,5 @@
-using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
 using TypeSupport.Extensions;
 using XFramework.Client.Shared.Core.Features.Configuration;
-using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Cache;
 using XFramework.Client.Shared.Core.Features.Community;
 using XFramework.Client.Shared.Core.Features.Layout;
@@ -10,6 +7,7 @@ using XFramework.Client.Shared.Core.Features.Session;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Client.Shared.Core.Services;
 using XFramework.Client.Shared.Entity.Enums;
+using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Security;
 
 namespace XFramework.Client.Shared.Core.Features;
@@ -59,7 +57,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     public abstract Task<Unit> Handle(TAction action, CancellationToken aCancellationToken);
     public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
     {
-        if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
+        if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
         // Display message to UI
@@ -91,7 +89,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     }
     public async Task<bool> HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false,  string customMessage = "")
     {
-        if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
+        if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
         // Display message to UI
@@ -235,6 +233,16 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
         {
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
         }
+    }
+    public async Task ReportTask(QueryableRequest action, bool isDone = false)
+    {
+        if (action.Silent) return;
+        if (!isDone)
+        {
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+            return;
+        }
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
     }
     public async Task ReportProgress(string message)
     {
@@ -290,7 +298,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     public abstract Task<TResponse> Handle(TAction action, CancellationToken aCancellationToken);
     public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
     {
-        if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
+        if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
         // Display message to UI
@@ -322,7 +330,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     }
     public async Task<bool> HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false,  string customMessage = "")
     {
-        if (response.HttpStatusCode is HttpStatusCode.Accepted) return false;
+        if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
         // Display message to UI
@@ -467,6 +475,16 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
         {
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
         }
+    }
+    public async Task ReportTask(QueryableRequest action, bool isDone = false)
+    {
+        if (action.Silent) return;
+        if (!isDone)
+        {
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+            return;
+        }
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
     }
     public async Task ReportProgress(string message)
     {

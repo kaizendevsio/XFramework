@@ -1,6 +1,3 @@
-using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
 namespace XFramework.Client.Shared.Core.Features.Affiliate;
 
 public partial class AddressState

@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Notification;
+﻿namespace XFramework.Client.Shared.Core.Features.Notification;
 
 public partial class NotificationState
 {

@@ -1,11 +1,8 @@
-﻿using Blazored.LocalStorage;
-using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update;
 using Mapster;
 using Messaging.Integration.Interfaces;
-using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Entity.Models.Requests.Session;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 

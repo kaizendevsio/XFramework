@@ -2,12 +2,10 @@ using System;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Blazored.LocalStorage;
 using BlazorState;
 using CurrieTechnologies.Razor.SweetAlert2;
 using MediatR;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Configuration;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 

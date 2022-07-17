@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-using XFramework.Client.Shared.Core.Features.Application;
-using XFramework.Integration.Interfaces;
+﻿using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;

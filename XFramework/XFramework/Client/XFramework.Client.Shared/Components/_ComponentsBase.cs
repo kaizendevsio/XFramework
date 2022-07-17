@@ -1,5 +1,4 @@
 ﻿using XFramework.Client.Shared.Core.Features.Address;
-using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Cache;
 using XFramework.Client.Shared.Core.Features.Cryptocurrency;
 using XFramework.Client.Shared.Core.Features.Layout;

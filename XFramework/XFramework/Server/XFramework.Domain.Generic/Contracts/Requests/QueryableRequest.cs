@@ -7,4 +7,5 @@ public class QueryableRequest : RequestBase
     public string OrderBy { get; set; }
     public string OrderByDirection { get; set; }
     public string SearchField { get; set; }
+    public bool Silent { get; set; }
 }   

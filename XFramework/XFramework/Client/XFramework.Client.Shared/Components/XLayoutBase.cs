@@ -1,5 +1,4 @@
-﻿using XFramework.Client.Shared.Core.Features.Application;
-using XFramework.Client.Shared.Core.Features.Layout;
+﻿using XFramework.Client.Shared.Core.Features.Layout;
 
 namespace XFramework.Client.Shared.Components;
 
