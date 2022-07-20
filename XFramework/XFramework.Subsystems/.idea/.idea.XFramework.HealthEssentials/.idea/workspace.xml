@@ -8,121 +8,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Create/CreateDoctorConsultationHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Create/CreateDoctorConsultationJobOrderHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Create/CreateDoctorEntityGroupHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Create/CreateDoctorEntityHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Create/CreateDoctorTagHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Delete/DeleteDoctorConsultationHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Delete/DeleteDoctorConsultationJobOrderHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Delete/DeleteDoctorEntityGroupHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Delete/DeleteDoctorEntityHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Delete/DeleteDoctorTagHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Get/GetDoctorConsultationJobOrderListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Get/GetDoctorConsultationListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Get/GetDoctorEntityGroupListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Get/GetDoctorEntityListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Get/GetDoctorTagListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Update/UpdateDoctorConsultationHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Update/UpdateDoctorConsultationJobOrderHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Update/UpdateDoctorEntityGroupHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Update/UpdateDoctorEntityHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Doctor/Update/UpdateDoctorTagHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/CreateDoctorEntityCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/CreateDoctorEntityGroupCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/CreateDoctorTagCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/DeleteDoctorConsultationCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/DeleteDoctorConsultationJobOrderCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/DeleteDoctorEntityCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/DeleteDoctorEntityGroupCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/DeleteDoctorTagCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/UpdateDoctorConsultationCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/UpdateDoctorConsultationJobOrderCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/UpdateDoctorEntityCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/UpdateDoctorEntityGroupCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/UpdateDoctorTagCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorConsultationHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorConsultationJobOrderHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorEntityGroupHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorEntityHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorTagHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/DeleteDoctorConsultationHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/DeleteDoctorConsultationJobOrderHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/DeleteDoctorEntityGroupHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/DeleteDoctorEntityHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/DeleteDoctorTagHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorConsultationHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorConsultationJobOrderHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorEntityGroupHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorEntityHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorTagHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorConsultationJobOrderListQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorConsultationJobOrderQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorConsultationListQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorConsultationQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorEntityGroupListQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorEntityGroupQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorEntityListQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorEntityQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorTagListQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Doctor/GetDoctorTagQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorConsultationHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorConsultationJobOrderHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorConsultationJobOrderListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorConsultationListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorEntityGroupHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorEntityGroupListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorEntityHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorEntityListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorTagHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/GetDoctorTagListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Create/CreateDoctorEntityGroupRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Create/CreateDoctorEntityRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Create/CreateDoctorTagRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Delete/DeleteDoctorConsultationJobOrderRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Delete/DeleteDoctorConsultationRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Delete/DeleteDoctorEntityGroupRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Delete/DeleteDoctorEntityRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Delete/DeleteDoctorTagRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorConsultationJobOrderListRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorConsultationJobOrderRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorConsultationListRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorConsultationRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorEntityGroupListRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorEntityGroupRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorEntityListRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorEntityRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorTagListRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Get/GetDoctorTagRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Update/UpdateDoctorConsultationJobOrderRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Update/UpdateDoctorConsultationRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Update/UpdateDoctorEntityGroupRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Update/UpdateDoctorEntityRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Update/UpdateDoctorTagRequest.cs" afterDir="false" />
+    <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="- Added CRUD Hospital &amp; SignalR Handler">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/CreateDoctorConsultationCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/CreateDoctorConsultationCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/CreateDoctorConsultationJobOrderCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Doctor/CreateDoctorConsultationJobOrderCmd.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/CreateDoctorHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/UpdateDoctorHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Ailment/GetAilmentEntityListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Ailment/GetAilmentEntityListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Ailment/GetAilmentListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Ailment/GetAilmentListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Consultation/GetConsultationEntityGroupListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Consultation/GetConsultationEntityGroupListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalEntityGroupListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalEntityGroupListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalEntityListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalEntityListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalServiceEntityGroupListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalServiceEntityGroupListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalServiceEntityListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalServiceEntityListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalServiceListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Hospital/GetHospitalServiceListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticEntityListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticEntityListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticJobOrderDetailListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticJobOrderDetailListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticJobOrderLocationListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticJobOrderLocationListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticRiderHandleListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/GetLogisticRiderHandleListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/MetaData/GetMetaDataEntityGroupListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/MetaData/GetMetaDataEntityGroupListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/MetaData/GetMetaDataEntityListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/MetaData/GetMetaDataEntityListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/Create/CreateConsultationEntityRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/Create/CreateConsultationEntityRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/Create/CreateConsultationTypeRequest.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Create/CreateDoctorConsultationRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Create/CreateDoctorConsultationRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceDriver.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Interfaces/IHealthEssentialsServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Interfaces/IHealthEssentialsServiceWrapper.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -334,7 +222,7 @@
       <workItem from="1658129168440" duration="338000" />
       <workItem from="1658132454443" duration="1136000" />
       <workItem from="1658146972831" duration="1071000" />
-      <workItem from="1658284514488" duration="9199000" />
+      <workItem from="1658284514488" duration="10843000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>
@@ -434,7 +322,14 @@
       <option name="project" value="LOCAL" />
       <updated>1657676510019</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="- Added CRUD Hospital &amp; SignalR Handler">
+      <created>1658295080906</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1658295080906</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -479,7 +374,8 @@
     <MESSAGE value="- Added PharmacyLocation and LaboratoryLocation Get list" />
     <MESSAGE value="- Fixed error on Responses" />
     <MESSAGE value=" - Safety Backup" />
-    <option name="LAST_COMMIT_MESSAGE" value=" - Safety Backup" />
+    <MESSAGE value="- Added CRUD Hospital &amp; SignalR Handler" />
+    <option name="LAST_COMMIT_MESSAGE" value="- Added CRUD Hospital &amp; SignalR Handler" />
     <option name="GROUP_MULTIFILE_MERGE_BY_DIRECTORY" value="true" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">

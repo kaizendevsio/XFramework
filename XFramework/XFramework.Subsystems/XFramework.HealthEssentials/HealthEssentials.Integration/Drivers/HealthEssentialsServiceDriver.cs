@@ -1,45 +1,48 @@
-﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor.Get;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Update;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Verify;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Verify;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Verify;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Verify;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
@@ -65,7 +68,182 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     {
         return await SendAsync<GetPendingRegistrationCompletionListRequest, List<CredentialResponse>>(request);
     }
-    
+
+    public async Task<QueryResponse<AilmentResponse>> GetAilment(GetAilmentRequest request)
+    {
+        return await SendAsync<GetAilmentRequest, AilmentResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<AilmentResponse>>> GetAilmentList(GetAilmentListRequest request)
+    {
+        return await SendAsync<GetAilmentListRequest, List<AilmentResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateAilmentRequest>> CreateAilment(CreateAilmentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateAilmentRequest>> UpdateAilment(UpdateAilmentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteAilmentRequest>> DeleteAilment(DeleteAilmentRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<AilmentEntityResponse>> GetAilmentEntity(GetAilmentEntityRequest request)
+    {
+        return await SendAsync<GetAilmentEntityRequest, AilmentEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<AilmentEntityResponse>>> GetAilmentEntityList(GetAilmentEntityListRequest request)
+    {
+        return await SendAsync<GetAilmentEntityListRequest, List<AilmentEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateAilmentEntityRequest>> CreateAilmentEntity(CreateAilmentEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateAilmentEntityRequest>> UpdateAilmentEntity(UpdateAilmentEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteAilmentEntityRequest>> DeleteAilmentEntity(DeleteAilmentEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<AilmentEntityGroupResponse>> GetAilmentEntityGroup(GetAilmentEntityGroupRequest request)
+    {
+        return await SendAsync<GetAilmentEntityGroupRequest, AilmentEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<AilmentEntityGroupResponse>>> GetAilmentEntityGroupList(GetAilmentEntityGroupListRequest request)
+    {
+        return await SendAsync<GetAilmentEntityGroupListRequest, List<AilmentEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateAilmentEntityGroupRequest>> CreateAilmentEntityGroup(CreateAilmentEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateAilmentEntityGroupRequest>> UpdateAilmentEntityGroup(UpdateAilmentEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteAilmentEntityGroupRequest>> DeleteAilmentEntityGroup(DeleteAilmentEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<AilmentTagResponse>> GetAilmentTag(GetAilmentTagRequest request)
+    {
+        return await SendAsync<GetAilmentTagRequest, AilmentTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<AilmentTagResponse>>> GetAilmentTagList(GetAilmentTagListRequest request)
+    {
+        return await SendAsync<GetAilmentTagListRequest, List<AilmentTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateAilmentTagRequest>> CreateAilmentTag(CreateAilmentTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateAilmentTagRequest>> UpdateAilmentTag(UpdateAilmentTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteAilmentTagRequest>> DeleteAilmentTag(DeleteAilmentTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MetaDataEntityGroupResponse>> GetMetaDataEntityGroup(GetMetaDataEntityGroupRequest request)
+    {
+        return await SendAsync<GetMetaDataEntityGroupRequest, MetaDataEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MetaDataEntityGroupResponse>>> GetMetaDataEntityGroupList(GetMetaDataEntityGroupListRequest request)
+    {
+        return await SendAsync<GetMetaDataEntityGroupListRequest, List<MetaDataEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMetaDataEntityGroupRequest>> CreateMetaDataEntityGroup(CreateMetaDataEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMetaDataEntityGroupRequest>> UpdateMetaDataEntityGroup(UpdateMetaDataEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMetaDataEntityGroupRequest>> DeleteMetaDataEntityGroup(DeleteMetaDataEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MetaDataEntityResponse>> GetMetaDataEntity(GetMetaDataEntityRequest request)
+    {
+        return await SendAsync<GetMetaDataEntityRequest, MetaDataEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MetaDataEntityResponse>>> GetMetaDataEntityList(GetMetaDataEntityListRequest request)
+    {
+        return await SendAsync<GetMetaDataEntityListRequest, List<MetaDataEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMetaDataEntityRequest>> CreateMetaDataEntity(CreateMetaDataEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMetaDataEntityRequest>> UpdateMetaDataEntity(UpdateMetaDataEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMetaDataEntityRequest>> DeleteMetaDataEntity(DeleteMetaDataEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MetaDatumResponse>> GetMetaDatum(GetMetaDatumRequest request)
+    {
+        return await SendAsync<GetMetaDatumRequest, MetaDatumResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MetaDatumResponse>>> GetMetaDatumList(GetMetaDatumListRequest request)
+    {
+        return await SendAsync<GetMetaDatumListRequest, List<MetaDatumResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMetaDatumRequest>> CreateMetaDatum(CreateMetaDatumRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMetaDatumRequest>> UpdateMetaDatum(UpdateMetaDatumRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMetaDatumRequest>> DeleteMetaDatum(DeleteMetaDatumRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request)
     {
         return await SendAsync<VerifyLogisticRiderRequest, IdentityValidationResponse>(request);

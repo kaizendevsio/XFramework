@@ -1,5 +1,9 @@
 ﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Delete;
@@ -23,6 +27,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Delete;
@@ -35,11 +43,13 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
@@ -625,32 +635,96 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #region Ailment Portal
-
     #region Ailment
-
-    
-
+    /// <summary>
+    /// Gets the ailment profile.
+    /// </summary>
+    public Task<QueryResponse<AilmentResponse>> GetAilment(GetAilmentRequest request);
+    /// <summary>
+    /// Gets all ailments in the system.
+    /// </summary>
+    public Task<QueryResponse<List<AilmentResponse>>> GetAilmentList(GetAilmentListRequest request);
+    /// <summary>
+    /// Creates a new ailment in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateAilmentRequest>> CreateAilment(CreateAilmentRequest request);
+    /// <summary>
+    /// Updates the ailment profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateAilmentRequest>> UpdateAilment(UpdateAilmentRequest request);
+    /// <summary>
+    /// Deletes the ailment from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteAilmentRequest>> DeleteAilment(DeleteAilmentRequest request);
     #endregion
-
     #region Ailment Entity
-
-    
-
+    /// <summary>
+    /// Gets the ailment entity profile.
+    /// </summary>
+    public Task<QueryResponse<AilmentEntityResponse>> GetAilmentEntity(GetAilmentEntityRequest request);
+    /// <summary>
+    /// Gets all ailment entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<AilmentEntityResponse>>> GetAilmentEntityList(GetAilmentEntityListRequest request);
+    /// <summary>
+    /// Creates a new ailment entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateAilmentEntityRequest>> CreateAilmentEntity(CreateAilmentEntityRequest request);
+    /// <summary>
+    ///  Updates the ailment entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateAilmentEntityRequest>> UpdateAilmentEntity(UpdateAilmentEntityRequest request);
+    /// <summary>
+    /// Deletes the ailment entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteAilmentEntityRequest>> DeleteAilmentEntity(DeleteAilmentEntityRequest request);
     #endregion
-
     #region Ailment Entity Group
-
-    
-
+    /// <summary>
+    ///  Gets the ailment entity group profile.
+    /// </summary>
+    public Task<QueryResponse<AilmentEntityGroupResponse>> GetAilmentEntityGroup(GetAilmentEntityGroupRequest request);
+    /// <summary>
+    /// Get all ailment entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<AilmentEntityGroupResponse>>> GetAilmentEntityGroupList(GetAilmentEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new ailment entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateAilmentEntityGroupRequest>> CreateAilmentEntityGroup(CreateAilmentEntityGroupRequest request);
+    /// <summary>
+    /// Updates the ailment entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateAilmentEntityGroupRequest>> UpdateAilmentEntityGroup(UpdateAilmentEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the ailment entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteAilmentEntityGroupRequest>> DeleteAilmentEntityGroup(DeleteAilmentEntityGroupRequest request);
     #endregion
-
     #region Ailment Tag
-
+    /// <summary>
+    /// Gets the ailment tag profile.
+    /// </summary>
+    public Task<QueryResponse<AilmentTagResponse>> GetAilmentTag(GetAilmentTagRequest request);
+    /// <summary>
+    ///  Gets all ailment tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<AilmentTagResponse>>> GetAilmentTagList(GetAilmentTagListRequest request);
+    /// <summary>
+    /// Creates a new ailment tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateAilmentTagRequest>> CreateAilmentTag(CreateAilmentTagRequest request);
+    /// <summary>
+    ///  Updates the ailment tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateAilmentTagRequest>> UpdateAilmentTag(UpdateAilmentTagRequest request);
+    /// <summary>
+    /// Deletes the ailment tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteAilmentTagRequest>> DeleteAilmentTag(DeleteAilmentTagRequest request);
     
 
     #endregion
-
-
     #endregion
 
     #region Hospital Portal
@@ -660,9 +734,73 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #region Meta Data Portal
+    #region Meta Data Entity Group
+    /// <summary>
+    /// Gets the meta data entity group profile.
+    /// </summary>
+    public Task<QueryResponse<MetaDataEntityGroupResponse>> GetMetaDataEntityGroup(GetMetaDataEntityGroupRequest request);
+    /// <summary>
+    /// Gets all meta data entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MetaDataEntityGroupResponse>>> GetMetaDataEntityGroupList(GetMetaDataEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new meta data entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMetaDataEntityGroupRequest>> CreateMetaDataEntityGroup(CreateMetaDataEntityGroupRequest request);
+    /// <summary>
+    ///  Updates the meta data entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMetaDataEntityGroupRequest>> UpdateMetaDataEntityGroup(UpdateMetaDataEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the meta data entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMetaDataEntityGroupRequest>> DeleteMetaDataEntityGroup(DeleteMetaDataEntityGroupRequest request);
+    #endregion
+    #region Meta Data Entity
+    /// <summary>
+    ///  Gets the meta data entity profile.
+    /// </summary>
+    public Task<QueryResponse<MetaDataEntityResponse>> GetMetaDataEntity(GetMetaDataEntityRequest request);
+    /// <summary>
+    ///  Get all meta data entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MetaDataEntityResponse>>> GetMetaDataEntityList(GetMetaDataEntityListRequest request);
+    /// <summary>
+    ///  Creates a new meta data entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMetaDataEntityRequest>> CreateMetaDataEntity(CreateMetaDataEntityRequest request);
+    /// <summary>
+    ///  Updates the meta data entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMetaDataEntityRequest>> UpdateMetaDataEntity(UpdateMetaDataEntityRequest request);
+    /// <summary>
+    ///  Deletes the meta data entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMetaDataEntityRequest>> DeleteMetaDataEntity(DeleteMetaDataEntityRequest request);
 
-    
-
+    #endregion
+    #region MetaDatum
+    /// <summary>
+    /// Gets the meta data profile.
+    /// </summary>
+    public Task<QueryResponse<MetaDatumResponse>> GetMetaDatum(GetMetaDatumRequest request);
+    /// <summary>
+    /// Gets all meta data in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MetaDatumResponse>>> GetMetaDatumList(GetMetaDatumListRequest request);
+    /// <summary>
+    /// Creates a new meta data in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMetaDatumRequest>> CreateMetaDatum(CreateMetaDatumRequest request);
+    /// <summary>
+    ///  Updates the meta data profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMetaDatumRequest>> UpdateMetaDatum(UpdateMetaDatumRequest request);
+    /// <summary>
+    /// Deletes the meta data from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMetaDatumRequest>> DeleteMetaDatum(DeleteMetaDatumRequest request);
+    #endregion
     #endregion
     
 }
