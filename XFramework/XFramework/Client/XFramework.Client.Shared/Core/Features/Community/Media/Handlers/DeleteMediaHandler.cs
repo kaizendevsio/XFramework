@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Media;
+﻿namespace XFramework.Client.Shared.Core.Features.Media;
 
 public partial class MediaState
 {

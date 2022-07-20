@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Pages;
+﻿namespace XFramework.Client.Shared.Core.Features.Pages;
 
 public partial class PageState
 {

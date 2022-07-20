@@ -11,9 +11,7 @@ public class CreatePatientHandler : CommandBaseHandler, IRequestHandler<CreatePa
     
     public async Task<CmdResponse<CreatePatientCmd>> Handle(CreatePatientCmd request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-       
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
         if (credential is null)
         {
             return new ()
@@ -23,9 +21,7 @@ public class CreatePatientHandler : CommandBaseHandler, IRequestHandler<CreatePa
             };
         }
 
-        var entity = await _dataLayer.HealthEssentialsContext.PatientEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var entity = await _dataLayer.HealthEssentialsContext.PatientEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (entity is null)
         {
             return new ()

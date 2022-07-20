@@ -1,9 +1,5 @@
-﻿using Blazored.LocalStorage;
-using Mapster;
-using Microsoft.Extensions.Configuration;
+﻿using Mapster;
 using Wallets.Domain.Generic.Contracts.Requests.Create;
-using XFramework.Client.Shared.Core.Features.Application;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Wallet;
 

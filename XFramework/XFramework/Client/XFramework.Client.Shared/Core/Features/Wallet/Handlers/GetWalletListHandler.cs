@@ -1,8 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-using XFramework.Integration.Interfaces.Wrappers;
-
-namespace XFramework.Client.Shared.Core.Features.Wallet;
+﻿namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
