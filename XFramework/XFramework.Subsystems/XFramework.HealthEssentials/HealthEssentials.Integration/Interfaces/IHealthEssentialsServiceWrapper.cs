@@ -583,6 +583,36 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteConsultationRequest>> DeleteConsultation(DeleteConsultationRequest request);
     #endregion
+
+    #region Consultation Entity Group
+
+    
+
+    #endregion
+
+    #region Consultation Job Order Laboratory
+
+    
+
+    #endregion
+
+    #region Consultation Job Order
+
+    
+
+    #endregion
+
+    #region Consultation Job Order Medicine
+
+    
+
+    #endregion
+
+    #region Consultation Tag
+
+    
+
+    #endregion
     #endregion
 
     #region Administrator Portal
@@ -596,11 +626,40 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
 
     #region Ailment Portal
 
+    #region Ailment
+
     
 
     #endregion
 
+    #region Ailment Entity
+
+    
+
+    #endregion
+
+    #region Ailment Entity Group
+
+    
+
+    #endregion
+
+    #region Ailment Tag
+
+    
+
+    #endregion
+
+
+    #endregion
+
     #region Hospital Portal
+
+    
+
+    #endregion
+
+    #region Meta Data Portal
 
     
 

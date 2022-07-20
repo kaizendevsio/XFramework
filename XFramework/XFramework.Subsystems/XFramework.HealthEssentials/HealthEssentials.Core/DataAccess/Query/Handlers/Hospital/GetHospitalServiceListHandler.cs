@@ -16,7 +16,7 @@ public class GetHospitalServiceListHandler : QueryBaseHandler, IRequestHandler<G
             .Include(x => x.Hospital)
             .ThenInclude(x => x.HospitalLocations)
             .Include(x => x.Unit)
-            .Where(x => EF.Functions.Like(x.Name, $"{request.SearchField}"))
+            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

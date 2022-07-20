@@ -15,7 +15,7 @@ public class GetAilmentListHandler : QueryBaseHandler, IRequestHandler<GetAilmen
         var ailment = await _dataLayer.HealthEssentialsContext.Ailments
             .Include(x => x.Entity)
             .ThenInclude(x => x.Group)
-            .Where(x => EF.Functions.Like(x.Name, $"{request.SearchField}"))
+            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

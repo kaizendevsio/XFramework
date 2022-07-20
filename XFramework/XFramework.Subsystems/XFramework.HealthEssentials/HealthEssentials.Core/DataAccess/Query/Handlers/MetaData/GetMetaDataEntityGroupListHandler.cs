@@ -13,7 +13,7 @@ public class GetMetaDataEntityGroupListHandler : QueryBaseHandler, IRequestHandl
     public async Task<QueryResponse<List<MetaDataEntityGroupResponse>>> Handle(GetMetaDataEntityGroupListQuery request, CancellationToken cancellationToken)
     {
         var group = await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups
-            .Where(x => EF.Functions.Like(x.Name, $"{request.SearchField}"))
+            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

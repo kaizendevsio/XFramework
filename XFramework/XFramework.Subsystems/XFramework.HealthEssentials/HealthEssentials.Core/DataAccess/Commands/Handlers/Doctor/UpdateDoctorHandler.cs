@@ -53,11 +53,10 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
         _dataLayer.HealthEssentialsContext.Update(updatedDoctor);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
-        return new()
+        return new ()
         {
-            Message = "Doctor Identity Updated Successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            Request = request
+            Message = $"Doctor with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

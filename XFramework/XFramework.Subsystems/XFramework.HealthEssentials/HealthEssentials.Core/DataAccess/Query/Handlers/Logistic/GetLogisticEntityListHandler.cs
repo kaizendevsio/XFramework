@@ -12,7 +12,7 @@ public class GetLogisticEntityListHandler : QueryBaseHandler, IRequestHandler<Ge
     public async Task<QueryResponse<List<LogisticEntityResponse>>> Handle(GetLogisticEntityListQuery request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.HealthEssentialsContext.LogisticEntities
-            .Where(x => EF.Functions.Like(x.Name, $"{request.SearchField}"))
+            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

@@ -4,9 +4,8 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Creat
 
 public class CreateConsultationEntityRequest : RequestBase
 {
-    public string Name { get; set; } = null!;
+    public string? Name { get; set; }
     public string? Description { get; set; }
-    public Guid? Guid { get; set; }
     public Guid? GroupGuid { get; set; }
     public int? SortOrder { get; set; }
 
