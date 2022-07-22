@@ -16,9 +16,7 @@ public class CreateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Cr
     
     public async Task<CmdResponse<CreateLogisticRiderCmd>> Handle(CreateLogisticRiderCmd request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-       
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
         if (credential is null)
         {
             return new ()
@@ -36,15 +34,12 @@ public class CreateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Cr
         await _dataLayer.HealthEssentialsContext.LogisticRiders.AddAsync(rider, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(rider.Guid);
         return new()
         {
             Message = $"Rider with guid {rider.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(rider.Guid)
-            }
         };
     }
 }

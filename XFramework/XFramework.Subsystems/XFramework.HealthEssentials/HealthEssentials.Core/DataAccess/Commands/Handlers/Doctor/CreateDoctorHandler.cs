@@ -30,9 +30,7 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
             };
         }
         
-        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
-
+        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (entity is null)
         {
             return new ()
@@ -51,14 +49,12 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
         await _dataLayer.HealthEssentialsContext.Doctors.AddAsync(doctor, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(doctor.Guid);
         return new()
         {
-            Message = $"Doctor {request.Name} created successfully",
+            Message = $"Doctor with Guid {doctor.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            Request = new()
-            {
-                Guid = Guid.Parse(doctor.Guid)
-            }
+            IsSuccess = true,
         };
     }
 }

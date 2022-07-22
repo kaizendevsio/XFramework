@@ -8,10 +8,10 @@ public class AilmentTagResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long AilmentId { get; set; }
     public string? Value { get; set; }
     public Guid? Guid { get; set; }
 
+    public AilmentResponse? Ailment { get; set; }
     public TagResponse? Tag { get; set; }
    
 }

@@ -1,5 +1,9 @@
 ﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Administrtor.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Ailment.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Consultation.Delete;
@@ -23,6 +27,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Delete;
@@ -35,11 +43,13 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
@@ -536,7 +546,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteConsultationEntityRequest>> DeleteConsultationEntity(DeleteConsultationEntityRequest request);
     
     #endregion
-
     #region Consultation Payment
     /// <summary>
     ///  Gets the consultation payment profile.
@@ -557,10 +566,9 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// <summary>
     ///  Deletes the consultation payment from the system.
     /// </summary>
-    public Task<CmdResponse> DeleteConsultationPayment(DeleteConsultationPaymentRequest request);
+    public Task<CmdResponse<DeleteConsultationPaymentRequest>> DeleteConsultationPayment(DeleteConsultationPaymentRequest request);
 
     #endregion
-
     #region Consultation
     /// <summary>
     ///  Gets the consultation profile.
@@ -583,6 +591,116 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteConsultationRequest>> DeleteConsultation(DeleteConsultationRequest request);
     #endregion
+    #region Consultation Entity Group
+    /// <summary>
+    /// Gets the consultation entity group profile.
+    /// </summary>
+    public Task<QueryResponse<ConsultationEntityGroupResponse>> GetConsultationEntityGroup(GetConsultationEntityGroupRequest request);
+    /// <summary>
+    /// Get all consultation entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<ConsultationEntityGroupResponse>>> GetConsultationEntityGroupList(GetConsultationEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new consultation entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateConsultationEntityGroupRequest>> CreateConsultationEntityGroup(CreateConsultationEntityGroupRequest request);
+    /// <summary>
+    ///  Updates the consultation entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateConsultationEntityGroupRequest>> UpdateConsultationEntityGroup(UpdateConsultationEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the consultation entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteConsultationEntityGroupRequest>> DeleteConsultationEntityGroup(DeleteConsultationEntityGroupRequest request);
+    #endregion
+    #region Consultation Job Order Laboratory
+    /// <summary>
+    /// Gets the consultation job order laboratory profile.
+    /// </summary>
+    public Task<QueryResponse<ConsultationJobOrderLaboratoryResponse>> GetConsultationJobOrderLaboratory(GetConsultationJobOrderLaboratoryRequest request);
+    /// <summary>
+    /// Get all consultation job order laboratories in the system.
+    /// </summary>
+    public Task<QueryResponse<List<ConsultationJobOrderLaboratoryResponse>>> GetConsultationJobOrderLaboratoryList(GetConsultationJobOrderLaboratoryListRequest request);
+    /// <summary>
+    /// Creates a new consultation job order laboratory in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateConsultationJobOrderLaboratoryRequest>> CreateConsultationJobOrderLaboratory(CreateConsultationJobOrderLaboratoryRequest request);
+    /// <summary>
+    /// Updates the consultation job order laboratory profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateConsultationJobOrderLaboratoryRequest>> UpdateConsultationJobOrderLaboratory(UpdateConsultationJobOrderLaboratoryRequest request);
+    /// <summary>
+    /// Deletes the consultation job order laboratory from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteConsultationJobOrderLaboratoryRequest>> DeleteConsultationJobOrderLaboratory(DeleteConsultationJobOrderLaboratoryRequest request);
+    #endregion
+    #region Consultation Job Order
+    /// <summary>
+    /// Gets the consultation job order profile.
+    /// </summary>
+    public Task<QueryResponse<ConsultationJobOrderResponse>> GetConsultationJobOrder(GetConsultationJobOrderRequest request);
+    /// <summary>
+    /// Get all consultation job orders in the system.
+    /// </summary>
+    public Task<QueryResponse<List<ConsultationJobOrderResponse>>> GetConsultationJobOrderList(GetConsultationJobOrderListRequest request);
+    /// <summary>
+    /// Creates a new consultation job order in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateConsultationJobOrderRequest>> CreateConsultationJobOrder(CreateConsultationJobOrderRequest request);
+    /// <summary>
+    /// Updates the consultation job order profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateConsultationJobOrderRequest>> UpdateConsultationJobOrder(UpdateConsultationJobOrderRequest request);
+    /// <summary>
+    /// Deletes the consultation job order from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteConsultationJobOrderRequest>> DeleteConsultationJobOrder(DeleteConsultationJobOrderRequest request);
+    #endregion
+    #region Consultation Job Order Medicine
+    /// <summary>
+    /// Gets the consultation job order medicine profile.
+    /// </summary>
+    public Task<QueryResponse<ConsultationJobOrderMedicineResponse>> GetConsultationJobOrderMedicine(GetConsultationJobOrderMedicineRequest request);
+    /// <summary>
+    /// Get all consultation job order medicines in the system.
+    /// </summary>
+    public Task<QueryResponse<List<ConsultationJobOrderMedicineResponse>>> GetConsultationJobOrderMedicineList(GetConsultationJobOrderMedicineListRequest request);
+    /// <summary>
+    /// Creates a new consultation job order medicine in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateConsultationJobOrderMedicineRequest>> CreateConsultationJobOrderMedicine(CreateConsultationJobOrderMedicineRequest request);
+    /// <summary>
+    /// Updates the consultation job order medicine profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateConsultationJobOrderMedicineRequest>> UpdateConsultationJobOrderMedicine(UpdateConsultationJobOrderMedicineRequest request);
+    /// <summary>
+    /// Deletes the consultation job order medicine from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteConsultationJobOrderMedicineRequest>> DeleteConsultationJobOrderMedicine(DeleteConsultationJobOrderMedicineRequest request);
+    #endregion
+    #region Consultation Tag
+    /// <summary>
+    /// Gets the consultation tag profile.
+    /// </summary>
+    public Task<QueryResponse<ConsultationTagResponse>> GetConsultationTag(GetConsultationTagRequest request);
+    /// <summary>
+    /// Get all consultation tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<ConsultationTagResponse>>> GetConsultationTagList(GetConsultationTagListRequest request);
+    /// <summary>
+    /// Creates a new consultation tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateConsultationTagRequest>> CreateConsultationTag(CreateConsultationTagRequest request);
+    /// <summary>
+    ///  Updates the consultation tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateConsultationTagRequest>> UpdateConsultationTag(UpdateConsultationTagRequest request);
+    /// <summary>
+    /// Deletes the consultation tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteConsultationTagRequest>> DeleteConsultationTag(DeleteConsultationTagRequest request);
+    #endregion
     #endregion
 
     #region Administrator Portal
@@ -593,5 +711,179 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #endregion
+
+    #region Ailment Portal
+    #region Ailment
+    /// <summary>
+    /// Gets the ailment profile.
+    /// </summary>
+    public Task<QueryResponse<AilmentResponse>> GetAilment(GetAilmentRequest request);
+    /// <summary>
+    /// Gets all ailments in the system.
+    /// </summary>
+    public Task<QueryResponse<List<AilmentResponse>>> GetAilmentList(GetAilmentListRequest request);
+    /// <summary>
+    /// Creates a new ailment in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateAilmentRequest>> CreateAilment(CreateAilmentRequest request);
+    /// <summary>
+    /// Updates the ailment profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateAilmentRequest>> UpdateAilment(UpdateAilmentRequest request);
+    /// <summary>
+    /// Deletes the ailment from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteAilmentRequest>> DeleteAilment(DeleteAilmentRequest request);
+    #endregion
+    #region Ailment Entity
+    /// <summary>
+    /// Gets the ailment entity profile.
+    /// </summary>
+    public Task<QueryResponse<AilmentEntityResponse>> GetAilmentEntity(GetAilmentEntityRequest request);
+    /// <summary>
+    /// Gets all ailment entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<AilmentEntityResponse>>> GetAilmentEntityList(GetAilmentEntityListRequest request);
+    /// <summary>
+    /// Creates a new ailment entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateAilmentEntityRequest>> CreateAilmentEntity(CreateAilmentEntityRequest request);
+    /// <summary>
+    ///  Updates the ailment entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateAilmentEntityRequest>> UpdateAilmentEntity(UpdateAilmentEntityRequest request);
+    /// <summary>
+    /// Deletes the ailment entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteAilmentEntityRequest>> DeleteAilmentEntity(DeleteAilmentEntityRequest request);
+    #endregion
+    #region Ailment Entity Group
+    /// <summary>
+    ///  Gets the ailment entity group profile.
+    /// </summary>
+    public Task<QueryResponse<AilmentEntityGroupResponse>> GetAilmentEntityGroup(GetAilmentEntityGroupRequest request);
+    /// <summary>
+    /// Get all ailment entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<AilmentEntityGroupResponse>>> GetAilmentEntityGroupList(GetAilmentEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new ailment entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateAilmentEntityGroupRequest>> CreateAilmentEntityGroup(CreateAilmentEntityGroupRequest request);
+    /// <summary>
+    /// Updates the ailment entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateAilmentEntityGroupRequest>> UpdateAilmentEntityGroup(UpdateAilmentEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the ailment entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteAilmentEntityGroupRequest>> DeleteAilmentEntityGroup(DeleteAilmentEntityGroupRequest request);
+    #endregion
+    #region Ailment Tag
+    /// <summary>
+    /// Gets the ailment tag profile.
+    /// </summary>
+    public Task<QueryResponse<AilmentTagResponse>> GetAilmentTag(GetAilmentTagRequest request);
+    /// <summary>
+    ///  Gets all ailment tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<AilmentTagResponse>>> GetAilmentTagList(GetAilmentTagListRequest request);
+    /// <summary>
+    /// Creates a new ailment tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateAilmentTagRequest>> CreateAilmentTag(CreateAilmentTagRequest request);
+    /// <summary>
+    ///  Updates the ailment tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateAilmentTagRequest>> UpdateAilmentTag(UpdateAilmentTagRequest request);
+    /// <summary>
+    /// Deletes the ailment tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteAilmentTagRequest>> DeleteAilmentTag(DeleteAilmentTagRequest request);
     
+
+    #endregion
+    #endregion
+
+    #region Hospital Portal
+
+    
+
+    #endregion
+
+    #region Meta Data Portal
+    #region Meta Data Entity Group
+    /// <summary>
+    /// Gets the meta data entity group profile.
+    /// </summary>
+    public Task<QueryResponse<MetaDataEntityGroupResponse>> GetMetaDataEntityGroup(GetMetaDataEntityGroupRequest request);
+    /// <summary>
+    /// Gets all meta data entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MetaDataEntityGroupResponse>>> GetMetaDataEntityGroupList(GetMetaDataEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new meta data entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMetaDataEntityGroupRequest>> CreateMetaDataEntityGroup(CreateMetaDataEntityGroupRequest request);
+    /// <summary>
+    ///  Updates the meta data entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMetaDataEntityGroupRequest>> UpdateMetaDataEntityGroup(UpdateMetaDataEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the meta data entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMetaDataEntityGroupRequest>> DeleteMetaDataEntityGroup(DeleteMetaDataEntityGroupRequest request);
+    #endregion
+    #region Meta Data Entity
+    /// <summary>
+    ///  Gets the meta data entity profile.
+    /// </summary>
+    public Task<QueryResponse<MetaDataEntityResponse>> GetMetaDataEntity(GetMetaDataEntityRequest request);
+    /// <summary>
+    ///  Get all meta data entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MetaDataEntityResponse>>> GetMetaDataEntityList(GetMetaDataEntityListRequest request);
+    /// <summary>
+    ///  Creates a new meta data entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMetaDataEntityRequest>> CreateMetaDataEntity(CreateMetaDataEntityRequest request);
+    /// <summary>
+    ///  Updates the meta data entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMetaDataEntityRequest>> UpdateMetaDataEntity(UpdateMetaDataEntityRequest request);
+    /// <summary>
+    ///  Deletes the meta data entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMetaDataEntityRequest>> DeleteMetaDataEntity(DeleteMetaDataEntityRequest request);
+
+    #endregion
+    #region MetaDatum
+    /// <summary>
+    /// Gets the meta data profile.
+    /// </summary>
+    public Task<QueryResponse<MetaDatumResponse>> GetMetaDatum(GetMetaDatumRequest request);
+    /// <summary>
+    /// Gets all meta data in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MetaDatumResponse>>> GetMetaDatumList(GetMetaDatumListRequest request);
+    /// <summary>
+    /// Creates a new meta data in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMetaDatumRequest>> CreateMetaDatum(CreateMetaDatumRequest request);
+    /// <summary>
+    ///  Updates the meta data profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMetaDatumRequest>> UpdateMetaDatum(UpdateMetaDatumRequest request);
+    /// <summary>
+    /// Deletes the meta data from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMetaDatumRequest>> DeleteMetaDatum(DeleteMetaDatumRequest request);
+    #endregion
+    #endregion
+
+    #region Vendor Portal
+
+    
+
+    #endregion
 }

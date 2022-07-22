@@ -12,9 +12,7 @@ public class UpdateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
 
     public async Task<CmdResponse<UpdateConsultationEntityCmd>> Handle(UpdateConsultationEntityCmd request, CancellationToken cancellationToken)
     {
-        var existingConsultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var existingConsultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingConsultationEntity == null)
         {
             return new()
@@ -23,34 +21,29 @@ public class UpdateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var entityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}",CancellationToken.None);
-       
-        if (entityGroup is null)
+        var updatedConsultationEntity = request.Adapt(existingConsultationEntity);
+
+        if (request.GroupGuid is not null)
         {
-            return new ()
+            var entityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups.FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}",CancellationToken.None);
+            if (entityGroup is null)
             {
-                Message = $"Consultation entity group with Guid {request.GroupGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new ()
+                {
+                    Message = $"Consultation entity group with Guid {request.GroupGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedConsultationEntity.Group = entityGroup;
         }
 
-        var updatedConsultationEntity = request.Adapt(existingConsultationEntity);
-        updatedConsultationEntity.Group = entityGroup;
-        
-        _dataLayer.HealthEssentialsContext.ConsultationEntities.Update(updatedConsultationEntity);
+        _dataLayer.HealthEssentialsContext.Update(updatedConsultationEntity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Consultation entity with Guid {updatedConsultationEntity.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(updatedConsultationEntity.Guid)
-            }
+            Message = $"Consultation entity with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

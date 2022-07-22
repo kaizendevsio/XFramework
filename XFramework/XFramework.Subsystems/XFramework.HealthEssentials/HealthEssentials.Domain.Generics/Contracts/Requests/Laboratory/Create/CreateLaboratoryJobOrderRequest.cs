@@ -21,5 +21,5 @@ public class CreateLaboratoryJobOrderRequest : RequestBase
     public DateTime? CompletedAt { get; set; }
     public Guid? ScheduleGuid { get; set; }
 
-    public List<LaboratoryJobOrderDetailResponse> DetailList { get; set; }
+    public List<LaboratoryJobOrderDetailResponse>? DetailList { get; set; }
 }

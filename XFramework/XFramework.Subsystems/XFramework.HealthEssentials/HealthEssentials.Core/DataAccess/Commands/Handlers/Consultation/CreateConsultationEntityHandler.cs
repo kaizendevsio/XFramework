@@ -11,9 +11,7 @@ public class CreateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
     
     public async Task<CmdResponse<CreateConsultationEntityCmd>> Handle(CreateConsultationEntityCmd request, CancellationToken cancellationToken)
     {
-        var entityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", CancellationToken.None);
-       
+        var entityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups.FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", CancellationToken.None);
         if (entityGroup is null)
         {
             return new ()
@@ -30,15 +28,12 @@ public class CreateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
         await _dataLayer.HealthEssentialsContext.ConsultationEntities.AddAsync(consultationEntity, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(consultationEntity.Guid);
         return new()
         {
             Message = $"Consultation entity with Guid {consultationEntity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(consultationEntity.Guid)
-            }
         };
     }
 }
