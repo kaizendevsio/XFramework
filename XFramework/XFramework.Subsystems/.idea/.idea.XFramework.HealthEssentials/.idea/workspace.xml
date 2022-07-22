@@ -9,13 +9,28 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../../.idea/.idea.XFramework.Client/.idea/discord.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/.idea.XFramework.Client/.idea/discord.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryLocationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Laboratory/UpdateLaboratoryLocationHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/UpdatePharmacyLocationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Pharmacy/UpdatePharmacyLocationHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Update/UpdateLaboratoryLocationRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Update/UpdateLaboratoryLocationRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Update/UpdateLaboratoryRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Update/UpdateLaboratoryRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Update/UpdatePharmacyLocationRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Update/UpdatePharmacyLocationRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Update/UpdatePharmacyRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Update/UpdatePharmacyRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/XFramework.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/XFramework.Core.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -222,6 +237,7 @@
       <workItem from="1657861054105" duration="481000" />
       <workItem from="1657902950058" duration="3956000" />
       <workItem from="1658006108728" duration="10040000" />
+      <workItem from="1658451288363" duration="3169000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>

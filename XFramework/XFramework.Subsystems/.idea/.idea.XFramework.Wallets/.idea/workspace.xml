@@ -8,48 +8,26 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d37d412-dd63-4bc1-9000-5a758e6c9722" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/discord.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/UpdateMemberContact.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/UpdateMemberCredential.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/UpdateMemberInfo.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberContactHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberCredentialHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberInfoHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/Community.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Community.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Core/Community.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Community.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Integration/Community.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Integration/Community.Integration.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/HealthEssentials.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/HealthEssentials.Integration.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Integration/Messaging.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Integration/Messaging.Integration.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/SmsGateway.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/SmsGateway.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/SmsGateway.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/SmsGateway.Integration.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/StreamFlow.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/StreamFlow.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Wallets.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Wallets.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/XLayoutBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/XLayoutBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/_ComponentsBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/_ComponentsBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Actions/ClearState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Actions/ClearState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Actions/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Actions/SetState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/ClearStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/SetStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/SetStateHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/SetState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetUnregisteredSubscriberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetUnregisteredSubscriberListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/MemberState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/MemberState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -75,7 +53,9 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/../../../LoadManna/LoadManna/LoadManna.Subsystems/LoadManna.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Requests/CreatePaymentRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/TransactionRequestBase.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
@@ -268,6 +248,7 @@
       <workItem from="1655343450640" duration="27000" />
       <workItem from="1656196005050" duration="25000" />
       <workItem from="1658029065350" duration="29000" />
+      <workItem from="1658207210504" duration="2224000" />
     </task>
     <task id="LOCAL-00001" summary="Initial Template">
       <created>1621423842771</created>
