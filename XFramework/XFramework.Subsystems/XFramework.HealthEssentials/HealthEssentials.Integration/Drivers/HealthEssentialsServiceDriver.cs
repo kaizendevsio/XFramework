@@ -64,6 +64,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:HealthEssentialsService"));
     }
 
+    public async Task<CmdResponse<DeleteConsultationTagRequest>> DeleteConsultationTag(DeleteConsultationTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<List<CredentialResponse>>> GetPendingRegistrationCompletionList(GetPendingRegistrationCompletionListRequest request)
     {
         return await SendAsync<GetPendingRegistrationCompletionListRequest, List<CredentialResponse>>(request);
@@ -399,7 +404,122 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<CreateConsultationEntityGroupRequest>> CreateConsultationTypeGroup(CreateConsultationEntityGroupRequest request)
+    public async Task<QueryResponse<ConsultationEntityGroupResponse>> GetConsultationEntityGroup(GetConsultationEntityGroupRequest request)
+    {
+        return await SendAsync<GetConsultationEntityGroupRequest, ConsultationEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<ConsultationEntityGroupResponse>>> GetConsultationEntityGroupList(GetConsultationEntityGroupListRequest request)
+    {
+        return await SendAsync<GetConsultationEntityGroupListRequest, List<ConsultationEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateConsultationEntityGroupRequest>> CreateConsultationEntityGroup(CreateConsultationEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateConsultationEntityGroupRequest>> UpdateConsultationEntityGroup(UpdateConsultationEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteConsultationEntityGroupRequest>> DeleteConsultationEntityGroup(DeleteConsultationEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<ConsultationJobOrderLaboratoryResponse>> GetConsultationJobOrderLaboratory(GetConsultationJobOrderLaboratoryRequest request)
+    {
+        return await SendAsync<GetConsultationJobOrderLaboratoryRequest, ConsultationJobOrderLaboratoryResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<ConsultationJobOrderLaboratoryResponse>>> GetConsultationJobOrderLaboratoryList(GetConsultationJobOrderLaboratoryListRequest request)
+    {
+        return await SendAsync<GetConsultationJobOrderLaboratoryListRequest, List<ConsultationJobOrderLaboratoryResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateConsultationJobOrderLaboratoryRequest>> CreateConsultationJobOrderLaboratory(CreateConsultationJobOrderLaboratoryRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateConsultationJobOrderLaboratoryRequest>> UpdateConsultationJobOrderLaboratory(UpdateConsultationJobOrderLaboratoryRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteConsultationJobOrderLaboratoryRequest>> DeleteConsultationJobOrderLaboratory(DeleteConsultationJobOrderLaboratoryRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<ConsultationJobOrderResponse>> GetConsultationJobOrder(GetConsultationJobOrderRequest request)
+    {
+        return await SendAsync<GetConsultationJobOrderRequest, ConsultationJobOrderResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<ConsultationJobOrderResponse>>> GetConsultationJobOrderList(GetConsultationJobOrderListRequest request)
+    {
+        return await SendAsync<GetConsultationJobOrderListRequest, List<ConsultationJobOrderResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateConsultationJobOrderRequest>> CreateConsultationJobOrder(CreateConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateConsultationJobOrderRequest>> UpdateConsultationJobOrder(UpdateConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteConsultationJobOrderRequest>> DeleteConsultationJobOrder(DeleteConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<ConsultationJobOrderMedicineResponse>> GetConsultationJobOrderMedicine(GetConsultationJobOrderMedicineRequest request)
+    {
+        return await SendAsync<GetConsultationJobOrderMedicineRequest, ConsultationJobOrderMedicineResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<ConsultationJobOrderMedicineResponse>>> GetConsultationJobOrderMedicineList(GetConsultationJobOrderMedicineListRequest request)
+    {
+        return await SendAsync<GetConsultationJobOrderMedicineListRequest, List<ConsultationJobOrderMedicineResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateConsultationJobOrderMedicineRequest>> CreateConsultationJobOrderMedicine(CreateConsultationJobOrderMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateConsultationJobOrderMedicineRequest>> UpdateConsultationJobOrderMedicine(UpdateConsultationJobOrderMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteConsultationJobOrderMedicineRequest>> DeleteConsultationJobOrderMedicine(DeleteConsultationJobOrderMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<ConsultationTagResponse>> GetConsultationTag(GetConsultationTagRequest request)
+    {
+        return await SendAsync<GetConsultationTagRequest, ConsultationTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<ConsultationTagResponse>>> GetConsultationTagList(GetConsultationTagListRequest request)
+    {
+        return await SendAsync<GetConsultationTagListRequest, List<ConsultationTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateConsultationTagRequest>> CreateConsultationTag(CreateConsultationTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateConsultationTagRequest>> UpdateConsultationTag(UpdateConsultationTagRequest request)
     {
         return await SendAsync(request);
     }
@@ -616,7 +736,7 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
 
     public async Task<QueryResponse<List<ConsultationPaymentResponse>>> GetConsultationPaymentList(GetConsultationPaymentListRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync<GetConsultationPaymentListRequest, List<ConsultationPaymentResponse>>(request);
     }
 
     public async Task<CmdResponse<CreateLaboratoryServiceEntityGroupRequest>> CreateLaboratoryServiceEntityGroup(CreateLaboratoryServiceEntityGroupRequest request)
@@ -724,9 +844,9 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse> DeleteConsultationPayment(DeleteConsultationPaymentRequest request)
+    public async Task<CmdResponse<DeleteConsultationPaymentRequest>> DeleteConsultationPayment(DeleteConsultationPaymentRequest request)
     {
-        throw new NotImplementedException();
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<List<ConsultationResponse>>> GetConsultationList(GetConsultationListRequest request)

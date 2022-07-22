@@ -31,20 +31,8 @@
         <Folder Include="Contracts\Requests\Schedule\Update" />
         <Folder Include="Contracts\Requests\Schedule\Verify" />
         <Folder Include="Contracts\Requests\Storage" />
-        <Folder Include="Contracts\Requests\Tag\Create" />
-        <Folder Include="Contracts\Requests\Tag\Delete" />
-        <Folder Include="Contracts\Requests\Tag\Get" />
-        <Folder Include="Contracts\Requests\Tag\Update" />
         <Folder Include="Contracts\Requests\Tag\Verify" />
-        <Folder Include="Contracts\Requests\Unit\Create" />
-        <Folder Include="Contracts\Requests\Unit\Delete" />
-        <Folder Include="Contracts\Requests\Unit\Get" />
-        <Folder Include="Contracts\Requests\Unit\Update" />
         <Folder Include="Contracts\Requests\Unit\Verify" />
-        <Folder Include="Contracts\Requests\Vendor\Create" />
-        <Folder Include="Contracts\Requests\Vendor\Delete" />
-        <Folder Include="Contracts\Requests\Vendor\Get" />
-        <Folder Include="Contracts\Requests\Vendor\Update" />
         <Folder Include="Contracts\Requests\Vendor\Verify" />
     </ItemGroup>
     

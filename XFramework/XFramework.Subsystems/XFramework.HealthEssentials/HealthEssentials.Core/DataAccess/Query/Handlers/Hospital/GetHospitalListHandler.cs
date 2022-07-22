@@ -13,8 +13,9 @@ public class GetHospitalListHandler : QueryBaseHandler, IRequestHandler<GetHospi
     {
         var hospital = await _dataLayer.HealthEssentialsContext.Hospitals
             .Include(x => x.Entity)
+            .ThenInclude(x => x.Group)
             .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
-            .OrderBy(x => x.CreatedAt)
+            .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()
             .AsNoTracking()
