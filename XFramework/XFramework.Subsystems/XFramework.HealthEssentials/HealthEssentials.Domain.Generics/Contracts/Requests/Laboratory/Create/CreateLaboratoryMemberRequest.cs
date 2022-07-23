@@ -7,10 +7,9 @@ public class CreateLaboratoryMemberRequest : RequestBase
 {
     public Guid? CredentialGuid { get; set; }
     public Guid? LaboratoryGuid { get; set; }
-    public Guid? LaboratoryLocationGuid { get; set; }
-    
-    public string? Name { get; set; }
     public string? Value { get; set; }
+    public string? Name { get; set; }
+    public int Status { get; set; }
     public string? Description { get; set; }
-    public GenericStatusType Status { get; set; }
+    public Guid? LaboratoryLocationGuid { get; set; }
 }

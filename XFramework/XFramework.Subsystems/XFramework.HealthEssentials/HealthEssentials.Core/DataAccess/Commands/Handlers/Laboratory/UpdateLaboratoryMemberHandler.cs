@@ -67,11 +67,10 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         _dataLayer.HealthEssentialsContext.Update(existingLaboratoryMember);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
-        return new()
+        return new ()
         {
-            Message = "Laboratory updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            Request = request
+            Message = $"Laboratory member with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

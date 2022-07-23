@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
 
-public class CreateLaboratoryServiceCmd : Domain.Generics.Contracts.Requests.Laboratory.Create.CreateLaboratoryServiceRequest, IRequest<CmdResponse<CreateLaboratoryServiceCmd>>
+public class CreateLaboratoryServiceCmd : CreateLaboratoryServiceRequest, IRequest<CmdResponse<CreateLaboratoryServiceCmd>>
 {
     
 }
