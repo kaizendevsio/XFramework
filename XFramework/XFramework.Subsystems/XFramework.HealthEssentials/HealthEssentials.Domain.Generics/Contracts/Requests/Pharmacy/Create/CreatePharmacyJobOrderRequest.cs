@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Create;
 
-public class CreatePharmacyJobOrder : RequestBase
+public class CreatePharmacyJobOrderRequest : RequestBase
 {
     public Guid? PharmacyLocationGuid { get; set; }
     public Guid? PatientGuid { get; set; }

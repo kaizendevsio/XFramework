@@ -8,6 +8,7 @@ public partial class WalletState
     public class SetState : IAction
     {
         public List<WalletResponse> WalletList { get; set; }
+        public SendWalletRequest SendWalletVm { get; set; }
         public SendWalletRequest CurrentTransactionVm { get; set; }
     }
 }

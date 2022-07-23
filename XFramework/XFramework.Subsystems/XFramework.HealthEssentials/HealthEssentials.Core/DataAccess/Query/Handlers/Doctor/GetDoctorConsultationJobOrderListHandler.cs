@@ -15,6 +15,7 @@ public class GetDoctorConsultationJobOrderListHandler : QueryBaseHandler, IReque
         var jobOrder = await _dataLayer.HealthEssentialsContext.DoctorConsultationJobOrders
             .Include(x => x.ConsultationJobOrder)
             .Include(x => x.Doctor)
+            .Where(i => i.ConsultationJobOrder.Status == (int)request.Status)
             .OrderBy(x => x.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()
