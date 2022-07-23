@@ -11,4 +11,5 @@ public enum TransactionRecordType
     Expired = 6,
     Deleted = 7,
     Reversed = 8,
+    OnGoing = 9,
 }

@@ -14,8 +14,10 @@ public class GetDoctorConsultationJobOrderHandler : QueryBaseHandler, IRequestHa
     {
         var jobOrder = await _dataLayer.HealthEssentialsContext.DoctorConsultationJobOrders
             .Include(x => x.ConsultationJobOrder.Consultation)
+            .Include(x => x.ConsultationJobOrder.PatientConsultations)
+            .ThenInclude(i => i.Patient)
+            .Include(x => x.ConsultationJobOrder.Schedule)
             .Include(x => x.Doctor)
-            .OrderBy(x => x.CreatedAt)
             .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}" ,CancellationToken.None);
