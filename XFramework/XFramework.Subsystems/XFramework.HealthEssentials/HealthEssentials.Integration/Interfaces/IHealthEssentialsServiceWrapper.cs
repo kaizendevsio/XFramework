@@ -65,7 +65,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public HubConnectionState ConnectionState { get; }
 
     #region Doctor Portal
-
     #region Doctor
     /// <summary>
     /// Validates the doctor login.
@@ -92,13 +91,121 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteDoctorRequest>> DeleteDoctor(DeleteDoctorRequest request);
     #endregion
-
+    #region Doctor Consultation
+    /// <summary>
+    /// Gets the doctor consultation.
+    /// </summary>
+    public Task<QueryResponse<DoctorConsultationResponse>> GetDoctorConsultation(GetDoctorConsultationRequest request);
+    /// <summary>
+    /// Gets the doctor consultation list.
+    /// </summary>
+    public Task<QueryResponse<List<DoctorConsultationResponse>>> GetDoctorConsultationList(GetDoctorConsultationListRequest request);
+    /// <summary>
+    ///  Creates a new doctor consultation.
+    /// </summary>
+    public Task<CmdResponse<CreateDoctorConsultationRequest>> CreateDoctorConsultation(CreateDoctorConsultationRequest request);
+    /// <summary>
+    /// Updates the doctor consultation.
+    /// </summary>
+    public Task<CmdResponse<UpdateDoctorConsultationRequest>> UpdateDoctorConsultation(UpdateDoctorConsultationRequest request);
+    /// <summary>
+    /// Deletes the doctor consultation.
+    /// </summary>
+    public Task<CmdResponse<DeleteDoctorConsultationRequest>> DeleteDoctorConsultation(DeleteDoctorConsultationRequest request);
+    #endregion
+    #region Doctor Consultation Job Order
+    /// <summary>
+    /// Gets the doctor consultation job order.
+    /// </summary>
+    public Task<QueryResponse<DoctorConsultationJobOrderResponse>> GetDoctorConsultationJobOrder(GetDoctorConsultationJobOrderRequest request);
+    /// <summary>
+    /// Gets the doctor consultation job order list.
+    /// </summary>
+    public Task<QueryResponse<List<DoctorConsultationJobOrderResponse>>> GetDoctorConsultationJobOrderList(GetDoctorConsultationJobOrderListRequest request);
+    /// <summary>
+    /// Creates a new doctor consultation job order.
+    /// </summary>
+    public Task<CmdResponse<CreateDoctorConsultationJobOrderRequest>> CreateDoctorConsultationJobOrder(CreateDoctorConsultationJobOrderRequest request);
+    /// <summary>
+    /// Updates the doctor consultation job order.
+    /// </summary>
+    public Task<CmdResponse<UpdateDoctorConsultationJobOrderRequest>> UpdateDoctorConsultationJobOrder(UpdateDoctorConsultationJobOrderRequest request);
+    /// <summary>
+    /// Deletes the doctor consultation job order.
+    /// </summary>
+    public Task<CmdResponse<DeleteDoctorConsultationJobOrderRequest>> DeleteDoctorConsultationJobOrder(DeleteDoctorConsultationJobOrderRequest request);
+    #endregion
+    #region Doctor Entity
+    /// <summary>
+    /// Gets the doctor entity.
+    /// </summary>
+    public Task<QueryResponse<DoctorEntityResponse>> GetDoctorEntity(GetDoctorEntityRequest request);
+    /// <summary>
+    /// Gets the doctor entity list.
+    /// </summary>
+    public Task<QueryResponse<List<DoctorEntityResponse>>> GetDoctorEntityList(GetDoctorEntityListRequest request);
+    /// <summary>
+    /// Creates a new doctor entity.
+    /// </summary>
+    public Task<CmdResponse<CreateDoctorEntityRequest>> CreateDoctorEntity(CreateDoctorEntityRequest request);
+    /// <summary>
+    /// Updates the doctor entity.
+    /// </summary>
+    public Task<CmdResponse<UpdateDoctorEntityRequest>> UpdateDoctorEntity(UpdateDoctorEntityRequest request);
+    /// <summary>
+    /// Deletes the doctor entity.
+    /// </summary>
+    public Task<CmdResponse<DeleteDoctorEntityRequest>> DeleteDoctorEntity(DeleteDoctorEntityRequest request);
+    #endregion
+    #region Doctor Entity Group
+    /// <summary>
+    /// Gets the doctor entity group.
+    /// </summary>
+    public Task<QueryResponse<DoctorEntityGroupResponse>> GetDoctorEntityGroup(GetDoctorEntityGroupRequest request);
+    /// <summary>
+    /// Gets the doctor entity group list.
+    /// </summary>
+    public Task<QueryResponse<List<DoctorEntityGroupResponse>>> GetDoctorEntityGroupList(GetDoctorEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new doctor entity group.
+    /// </summary>
+    public Task<CmdResponse<CreateDoctorEntityGroupRequest>> CreateDoctorEntityGroup(CreateDoctorEntityGroupRequest request);
+    /// <summary>
+    /// Updates the doctor entity group.
+    /// </summary>
+    public Task<CmdResponse<UpdateDoctorEntityGroupRequest>> UpdateDoctorEntityGroup(UpdateDoctorEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the doctor entity group.
+    /// </summary>
+    public Task<CmdResponse<DeleteDoctorEntityGroupRequest>> DeleteDoctorEntityGroup(DeleteDoctorEntityGroupRequest request);
+    #endregion
+    #region Doctor Tag
+    /// <summary>
+    /// Gets the doctor tag.
+    /// </summary>
+    public Task<QueryResponse<DoctorTagResponse>> GetDoctorTag(GetDoctorTagRequest request);
+    /// <summary>
+    /// Gets the doctor tag list.
+    /// </summary>
+    public Task<QueryResponse<List<DoctorTagResponse>>> GetDoctorTagList(GetDoctorTagListRequest request);
+    /// <summary>
+    /// Creates a new doctor tag.
+    /// </summary>
+    public Task<CmdResponse<CreateDoctorTagRequest>> CreateDoctorTag(CreateDoctorTagRequest request);
+    /// <summary>
+    /// Updates the doctor tag.
+    /// </summary>
+    public Task<CmdResponse<UpdateDoctorTagRequest>> UpdateDoctorTag(UpdateDoctorTagRequest request);
+    /// <summary>
+    /// Deletes the doctor tag.
+    /// </summary>
+    public Task<CmdResponse<DeleteDoctorTagRequest>> DeleteDoctorTag(DeleteDoctorTagRequest request);
+    #endregion
     // No Supported Consultation in Database
     #region Supported Consultation
     public Task<CmdResponse<AddSupportedConsultationRequest>> AddSupportedConsultation(AddSupportedConsultationRequest request);
     public Task<QueryResponse<List<DoctorConsultationResponse>>> GetSupportedConsultationList(GetSupportedConsultationListRequest request);
     #endregion
-    
     #endregion
 
     #region Patient Portal

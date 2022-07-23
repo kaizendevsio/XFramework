@@ -22,7 +22,6 @@ public class UpdateDoctorTagHandler : CommandBaseHandler, IRequestHandler<Update
         }
         var updatedDoctorTag = request.Adapt(existingDoctorTag);
 
-
         if (request.DoctorGuid is null)
         {
             var doctor = await _dataLayer.HealthEssentialsContext.Doctors.FirstOrDefaultAsync(x => x.Guid == $"{request.DoctorGuid}", CancellationToken.None);

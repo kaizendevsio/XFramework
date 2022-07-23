@@ -20,7 +20,6 @@ public class UpdateDoctorConsultationHandler : CommandBaseHandler, IRequestHandl
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-
         var updatedDoctorConsultation = request.Adapt(existingDoctorConsultation);
 
         if (request.ConsultationGuid is null)
