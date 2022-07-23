@@ -21,6 +21,7 @@ public class GetDoctorConsultationJobOrderListHandler : QueryBaseHandler, IReque
             .Where(i => EF.Functions.ILike(i.ConsultationJobOrder.Prescription, $"%{request.SearchField}%"))
             .Where(i => EF.Functions.ILike(i.ConsultationJobOrder.Diagnosis, $"%{request.SearchField}%"))
             .Where(i => EF.Functions.ILike(i.ConsultationJobOrder.Treatment, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Symptoms, $"%{request.SearchField}%"))
             .OrderBy(x => x.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()

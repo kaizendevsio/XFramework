@@ -15,6 +15,13 @@ public class GetPatientConsultationListHandler : QueryBaseHandler, IRequestHandl
         var patientConsultation = await _dataLayer.HealthEssentialsContext.PatientConsultations
             .Include(x => x.ConsultationJobOrder)
             .Include(x => x.Patient)
+            .Where(x => x.ConsultationJobOrder.Status == (int)request.Status)
+            .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Remarks, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Diagnosis, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Prescription, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Symptoms, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Treatment, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.ReferenceNumber, $"%{request.SearchField}%"))
             .OrderBy(x => x.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()

@@ -13,5 +13,6 @@ public class UpdatePharmacyRequest : RequestBase
     public string? Email { get; set; }
     public string? Website { get; set; }
     public string? Logo { get; set; }
-    public GenericStatusType Status { get; set; }
+    public int Status { get; set; }
+    public Guid? EntityGuid { get; set; }
 }
