@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
 
-public class GetLaboratoryEntityGroupQuery
+namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+
+public class GetLaboratoryEntityGroupQuery : GetLaboratoryEntityGroupRequest, IRequest<QueryResponse<LaboratoryEntityGroupResponse>>
 {
     
 }

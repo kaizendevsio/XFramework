@@ -10,6 +10,6 @@ public class GetLaboratoryServiceListHandler : BaseSignalRHandler, ISignalREvent
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestQuery<GetLaboratoryServiceListRequest, GetLaboratoryServiceListQuery, List<LaboratoryServiceEntityResponse>>(connection, mediator);
+        HandleRequestQuery<GetLaboratoryServiceListRequest, GetLaboratoryServiceListQuery, List<LaboratoryServiceResponse>>(connection, mediator);
     }
 }

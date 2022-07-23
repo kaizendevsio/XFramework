@@ -11,6 +11,26 @@ public class DeleteLaboratoryEntityHandler : CommandBaseHandler, IRequestHandler
     
     public async Task<CmdResponse<DeleteLaboratoryEntityCmd>> Handle(DeleteLaboratoryEntityCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingEntity = await _dataLayer.HealthEssentialsContext.LaboratoryEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        if (existingEntity is null)
+        {
+            return new ()
+            {
+                Message = $"Laboratory Entity with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        existingEntity.IsDeleted = true;
+        existingEntity.IsEnabled = false;
+
+        _dataLayer.HealthEssentialsContext.Update(existingEntity);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        
+        return new ()
+        {
+            Message = $"Laboratory Entity with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }

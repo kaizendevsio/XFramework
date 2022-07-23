@@ -11,30 +11,31 @@ public class GetLaboratoryJobOrderHandler : QueryBaseHandler, IRequestHandler<Ge
     
     public async Task<QueryResponse<LaboratoryJobOrderResponse>> Handle(GetLaboratoryJobOrderQuery request, CancellationToken cancellationToken)
     {
-        var laboratory = await _dataLayer.HealthEssentialsContext.LaboratoryJobOrders
-            .Include(i => i.ConsultationJobOrder.Consultation)
-            .Include(i => i.LaboratoryJobOrderResults)
+        var laboratoryJobOrders = await _dataLayer.HealthEssentialsContext.LaboratoryJobOrders
+            .Include(i => i.ConsultationJobOrder)
+            .Include(x => x.Laboratory)
+            .Include(x => x.LaboratoryLocation)
+            .Include(x => x.Patient)
+            .Include(x => x.Schedule)
             .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}" ,CancellationToken.None);
 
-        if (laboratory is null)
+        if (laboratoryJobOrders is null)
         {
             return new()
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
-                Message = "Laboratory Job Order not found",
+                Message = "No Laboratory Job Order Found",
                 IsSuccess = true
             };
         }
-        
-        var response = laboratory.Adapt<LaboratoryJobOrderResponse>();
+
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            Message = "Laboratory Job Order found",
-            IsSuccess = true,
-            Response = response
+            Message = "Laboratory Job Order Found",
+            Response = laboratoryJobOrders.Adapt<LaboratoryJobOrderResponse>()
         };
     }
 }

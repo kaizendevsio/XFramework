@@ -34,7 +34,6 @@ public class GetLaboratoryServiceEntityListHandler : QueryBaseHandler, IRequestH
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory Service Entity Found",
-            IsSuccess = true,
             Response = laboratoryServiceEntity.Adapt<List<LaboratoryServiceEntityResponse>>()
         };
     }

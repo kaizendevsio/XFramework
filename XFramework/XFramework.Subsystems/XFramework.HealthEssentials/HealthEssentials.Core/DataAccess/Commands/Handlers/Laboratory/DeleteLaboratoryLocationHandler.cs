@@ -11,9 +11,7 @@ public class DeleteLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
     
     public async Task<CmdResponse<DeleteLaboratoryLocationCmd>> Handle(DeleteLaboratoryLocationCmd request, CancellationToken cancellationToken)
     {
-        var existingLaboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingLaboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingLaboratoryLocation is null)
         {
             return new ()

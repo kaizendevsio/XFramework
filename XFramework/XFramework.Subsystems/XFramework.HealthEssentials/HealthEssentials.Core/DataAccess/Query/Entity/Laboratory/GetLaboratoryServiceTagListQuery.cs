@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
 
-public class GetLaboratoryServiceTagListQuery
+namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+
+public class GetLaboratoryServiceTagListQuery : GetLaboratoryServiceTagListRequest, IRequest<QueryResponse<List<LaboratoryServiceTagResponse>>>
 {
     
 }

@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
 
-public class GetLaboratoryJobOrderResultFileListQuery
+namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+
+public class GetLaboratoryJobOrderResultFileListQuery : GetLaboratoryJobOrderResultFileListRequest, IRequest<QueryResponse<List<LaboratoryJobOrderResultFileResponse>>>
 {
     
 }

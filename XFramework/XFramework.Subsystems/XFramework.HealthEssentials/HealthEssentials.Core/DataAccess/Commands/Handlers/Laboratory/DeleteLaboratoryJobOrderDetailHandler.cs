@@ -11,6 +11,26 @@ public class DeleteLaboratoryJobOrderDetailHandler : CommandBaseHandler, IReques
     
     public async Task<CmdResponse<DeleteLaboratoryJobOrderDetailCmd>> Handle(DeleteLaboratoryJobOrderDetailCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingDetail = await _dataLayer.HealthEssentialsContext.LaboratoryJobOrderDetails.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        if (existingDetail is null)
+        {
+            return new ()
+            {
+                Message = $"Laboratory Job Order Detail with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        existingDetail.IsDeleted = true;
+        existingDetail.IsEnabled = false;
+
+        _dataLayer.HealthEssentialsContext.Update(existingDetail);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        
+        return new ()
+        {
+            Message = $"Laboratory Job Order Detail with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }
