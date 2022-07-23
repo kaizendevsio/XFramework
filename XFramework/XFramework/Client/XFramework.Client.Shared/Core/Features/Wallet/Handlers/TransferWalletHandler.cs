@@ -29,10 +29,13 @@ public partial class WalletState
 
             var result = await WalletServiceWrapper.TransferWallet(new()
             {
+                ClientReference = CurrentState.SendWalletVm.ClientReference,
                 CredentialGuid = SessionState.Credential.Guid,
+                WalletEntityGuid = CurrentState.SendWalletVm.WalletEntityGuid,
                 Recipient = CurrentState.SendWalletVm.Recipient,
                 Amount = CurrentState.SendWalletVm.Amount,
-                Remarks = CurrentState.SendWalletVm.Remarks
+                Remarks = CurrentState.SendWalletVm.Remarks,
+
             });
 
             if (result.HttpStatusCode is HttpStatusCode.Accepted)
@@ -41,7 +44,7 @@ public partial class WalletState
             }
             
             await HandleFailure(result, action);
-            await HandleSuccess(result, action);
+            await HandleSuccess(result, action, false, "Payment Successful");
             
             return Unit.Value;
         }

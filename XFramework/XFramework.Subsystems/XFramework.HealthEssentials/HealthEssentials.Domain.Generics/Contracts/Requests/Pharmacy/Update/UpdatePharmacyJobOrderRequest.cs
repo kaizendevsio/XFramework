@@ -4,7 +4,7 @@ using TransactionStatus = System.Transactions.TransactionStatus;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
 
-public class UpdatePharmacyJobOrder : RequestBase
+public class UpdatePharmacyJobOrderRequest : RequestBase
 {
     public string? ReferenceNumber { get; set; }
     public string? Remarks { get; set; }

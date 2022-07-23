@@ -15,8 +15,10 @@ public class GetLaboratoryJobOrderListHandler : QueryBaseHandler, IRequestHandle
     public async Task<QueryResponse<List<LaboratoryJobOrderResponse>>> Handle(GetLaboratoryJobOrderListQuery request, CancellationToken cancellationToken)
     {
         var laboratory = await _dataLayer.HealthEssentialsContext.LaboratoryJobOrders
+            .Include(i => i.ConsultationJobOrder)
             .Where(i => EF.Functions.ILike(i.ReferenceNumber, $"%{request.SearchField}%"))
-            .Where(i => i.Status == (int) request.RecordType)
+            .Where(i => i.Status == (int) request.Status)
+            .Where(i => i.LaboratoryLocation.Guid == $"{request.LaboratoryLocationGuid}")
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
             .AsNoTracking()

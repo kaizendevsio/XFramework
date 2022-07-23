@@ -334,6 +334,26 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<PharmacyJobOrderResponse>> GetPharmacyJobOrder(GetPharmacyJobOrderRequest request)
+    {
+        return await SendAsync<GetPharmacyJobOrderRequest, PharmacyJobOrderResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyJobOrderResponse>>> GetPharmacyJobOrderList(GetPharmacyJobOrderListRequest request)
+    {
+        return await SendAsync<GetPharmacyJobOrderListRequest, List<PharmacyJobOrderResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyJobOrderRequest>> CreatePharmacyJobOrder(CreatePharmacyJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyJobOrderRequest>> UpdatePharmacyJobOrder(UpdatePharmacyJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatient(VerifyPatientRequest request)
     {
         return await SendAsync<VerifyPatientRequest, IdentityValidationResponse>(request);
@@ -530,6 +550,26 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<DeleteDoctorRequest>> DeleteDoctor(DeleteDoctorRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<DoctorConsultationJobOrderResponse>> GetDoctorJobOrder(GetDoctorConsultationJobOrderRequest request)
+    {
+        return await SendAsync<GetDoctorConsultationJobOrderRequest, DoctorConsultationJobOrderResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<DoctorConsultationJobOrderResponse>>> GetDoctorJobOrderList(GetDoctorConsultationJobOrderListRequest request)
+    {
+        return await SendAsync<GetDoctorConsultationJobOrderListRequest, List<DoctorConsultationJobOrderResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateDoctorConsultationJobOrderRequest>> CreateDoctorJobOrder(CreateDoctorConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateDoctorConsultationJobOrderRequest>> UpdateDoctorJobOrder(UpdateDoctorConsultationJobOrderRequest request)
     {
         return await SendAsync(request);
     }

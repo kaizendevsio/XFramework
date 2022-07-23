@@ -93,6 +93,27 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteDoctorRequest>> DeleteDoctor(DeleteDoctorRequest request);
     #endregion
 
+    #region Doctor Job Order
+
+    /// <summary>
+    ///  Gets the doctor job order.
+    /// </summary>
+    public Task<QueryResponse<DoctorConsultationJobOrderResponse>> GetDoctorJobOrder(GetDoctorConsultationJobOrderRequest request);
+    /// <summary>
+    ///  Gets the doctor job order list.
+    /// </summary>
+    public Task<QueryResponse<List<DoctorConsultationJobOrderResponse>>> GetDoctorJobOrderList(GetDoctorConsultationJobOrderListRequest request);
+    /// <summary>
+    ///  Creates a new doctor job order in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateDoctorConsultationJobOrderRequest>> CreateDoctorJobOrder(CreateDoctorConsultationJobOrderRequest request);
+    /// <summary>
+    /// Updates the doctor job order.
+    /// </summary>
+    public Task<CmdResponse<UpdateDoctorConsultationJobOrderRequest>> UpdateDoctorJobOrder(UpdateDoctorConsultationJobOrderRequest request);
+
+    #endregion
+
     // No Supported Consultation in Database
     #region Supported Consultation
     public Task<CmdResponse<AddSupportedConsultationRequest>> AddSupportedConsultation(AddSupportedConsultationRequest request);
@@ -234,6 +255,27 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeletePharmacyLocationDocumentRequest>> DeletePharmacyLocationDocument(DeletePharmacyLocationDocumentRequest request);
     
+
+    #endregion
+    
+    #region Pharmacy Job Order
+
+    /// <summary>
+    ///  Gets the Pharmacy job order.
+    /// </summary>
+    public Task<QueryResponse<PharmacyJobOrderResponse>> GetPharmacyJobOrder(GetPharmacyJobOrderRequest request);
+    /// <summary>
+    ///  Gets the Pharmacy job order list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyJobOrderResponse>>> GetPharmacyJobOrderList(GetPharmacyJobOrderListRequest request);
+    /// <summary>
+    ///  Creates a new Pharmacy job order in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyJobOrderRequest>> CreatePharmacyJobOrder(CreatePharmacyJobOrderRequest request);
+    /// <summary>
+    /// Updates the Pharmacy job order.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyJobOrderRequest>> UpdatePharmacyJobOrder(UpdatePharmacyJobOrderRequest request);
 
     #endregion
     
