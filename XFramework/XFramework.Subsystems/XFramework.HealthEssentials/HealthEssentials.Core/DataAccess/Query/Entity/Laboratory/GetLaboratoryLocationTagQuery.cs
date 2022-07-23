@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
 
-public class GetLaboratoryLocationTagQuery
+namespace HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
+
+public class GetLaboratoryLocationTagQuery : GetLaboratoryLocationTagRequest, IRequest<QueryResponse<LaboratoryLocationTagResponse>>
 {
     
 }

@@ -36,6 +36,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
@@ -45,6 +49,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using HealthEssentials.Integration.Interfaces;
 using IdentityServer.Domain.Generic.Contracts.Responses;
@@ -245,6 +250,31 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<DeleteMetaDatumRequest>> DeleteMetaDatum(DeleteMetaDatumRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<ScheduleResponse>> GetSchedule(GetScheduleRequest request)
+    {
+        return await SendAsync<GetScheduleRequest, ScheduleResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<ScheduleResponse>>> GetScheduleList(GetScheduleListRequest request)
+    {
+        return await SendAsync<GetScheduleListRequest, List<ScheduleResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateScheduleRequest>> CreateSchedule(CreateScheduleRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateScheduleRequest>> UpdateSchedule(UpdateScheduleRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteScheduleRequest>> DeleteSchedule(DeleteScheduleRequest request)
     {
         return await SendAsync(request);
     }
@@ -851,6 +881,206 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<DeleteLaboratoryServiceEntityGroupRequest>> DeleteLaboratoryServiceEntityGroup(DeleteLaboratoryServiceEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryJobOrderResultResponse>> GetLaboratoryJobOrderResult(GetLaboratoryJobOrderResultRequest request)
+    {
+        return await SendAsync<GetLaboratoryJobOrderResultRequest, LaboratoryJobOrderResultResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryJobOrderResultResponse>>> GetLaboratoryJobOrderResultList(GetLaboratoryJobOrderResultListRequest request)
+    {
+        return await SendAsync<GetLaboratoryJobOrderResultListRequest, List<LaboratoryJobOrderResultResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryJobOrderResultRequest>> CreateLaboratoryJobOrderResult(CreateLaboratoryJobOrderResultRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryJobOrderResultRequest>> UpdateLaboratoryJobOrderResult(UpdateLaboratoryJobOrderResultRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryJobOrderResultRequest>> DeleteLaboratoryJobOrderResult(DeleteLaboratoryJobOrderResultRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryJobOrderResultFileResponse>> GetLaboratoryJobOrderResultFile(GetLaboratoryJobOrderResultFileRequest request)
+    {
+        return await SendAsync<GetLaboratoryJobOrderResultFileRequest, LaboratoryJobOrderResultFileResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryJobOrderResultFileResponse>>> GetLaboratoryJobOrderResultFileList(GetLaboratoryJobOrderResultFileListRequest request)
+    {
+        return await SendAsync<GetLaboratoryJobOrderResultFileListRequest, List<LaboratoryJobOrderResultFileResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryJobOrderResultFileRequest>> CreateLaboratoryJobOrderResultFile(CreateLaboratoryJobOrderResultFileRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryJobOrderResultFileRequest>> UpdateLaboratoryJobOrderResultFile(UpdateLaboratoryJobOrderResultFileRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryJobOrderResultFileRequest>> DeleteLaboratoryJobOrderResultFile(DeleteLaboratoryJobOrderResultFileRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryJobOrderDetailResponse>> GetLaboratoryJobOrderDetail(GetLaboratoryJobOrderDetailRequest request)
+    {
+        return await SendAsync<GetLaboratoryJobOrderDetailRequest, LaboratoryJobOrderDetailResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryJobOrderDetailResponse>>> GetLaboratoryJobOrderDetailList(GetLaboratoryJobOrderDetailListRequest request)
+    {
+        return await SendAsync<GetLaboratoryJobOrderDetailListRequest, List<LaboratoryJobOrderDetailResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryJobOrderDetailRequest>> CreateLaboratoryJobOrderDetail(CreateLaboratoryJobOrderDetailRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryJobOrderDetailRequest>> UpdateLaboratoryJobOrderDetail(UpdateLaboratoryJobOrderDetailRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryJobOrderDetailRequest>> DeleteLaboratoryJobOrderDetail(DeleteLaboratoryJobOrderDetailRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryLocationTagResponse>> GetLaboratoryLocationTag(GetLaboratoryLocationTagRequest request)
+    {
+        return await SendAsync<GetLaboratoryLocationTagRequest, LaboratoryLocationTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryLocationTagResponse>>> GetLaboratoryLocationTagList(GetLaboratoryLocationTagListRequest request)
+    {
+        return await SendAsync<GetLaboratoryLocationTagListRequest, List<LaboratoryLocationTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryLocationTagRequest>> CreateLaboratoryLocationTag(CreateLaboratoryLocationTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryLocationTagRequest>> UpdateLaboratoryLocationTag(UpdateLaboratoryLocationTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryLocationTagRequest>> DeleteLaboratoryLocationTag(DeleteLaboratoryLocationTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryServiceTagResponse>> GetLaboratoryServiceTag(GetLaboratoryServiceTagRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceTagRequest, LaboratoryServiceTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryServiceTagResponse>>> GetLaboratoryServiceTagList(GetLaboratoryServiceTagListRequest request)
+    {
+        return await SendAsync<GetLaboratoryServiceTagListRequest, List<LaboratoryServiceTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryServiceTagRequest>> CreateLaboratoryServiceTag(CreateLaboratoryServiceTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryServiceTagRequest>> UpdateLaboratoryServiceTag(UpdateLaboratoryServiceTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryServiceTagRequest>> DeleteLaboratoryServiceTag(DeleteLaboratoryServiceTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryTagResponse>> GetLaboratoryTag(GetLaboratoryTagRequest request)
+    {
+        return await SendAsync<GetLaboratoryTagRequest, LaboratoryTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryTagResponse>>> GetLaboratoryTagList(GetLaboratoryTagListRequest request)
+    {
+        return await SendAsync<GetLaboratoryTagListRequest, List<LaboratoryTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryTagRequest>> CreateLaboratoryTag(CreateLaboratoryTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryTagRequest>> UpdateLaboratoryTag(UpdateLaboratoryTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryTagRequest>> DeleteLaboratoryTag(DeleteLaboratoryTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryEntityResponse>> GetLaboratoryEntity(GetLaboratoryEntityRequest request)
+    {
+        return await SendAsync<GetLaboratoryEntityRequest, LaboratoryEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryEntityResponse>>> GetLaboratoryEntityList(GetLaboratoryEntityListRequest request)
+    {
+        return await SendAsync<GetLaboratoryEntityListRequest, List<LaboratoryEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryEntityRequest>> CreateLaboratoryEntity(CreateLaboratoryEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryEntityRequest>> UpdateLaboratoryEntity(UpdateLaboratoryEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryEntityRequest>> DeleteLaboratoryEntity(DeleteLaboratoryEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LaboratoryEntityGroupResponse>> GetLaboratoryEntityGroup(GetLaboratoryEntityGroupRequest request)
+    {
+        return await SendAsync<GetLaboratoryEntityGroupRequest, LaboratoryEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LaboratoryEntityGroupResponse>>> GetLaboratoryEntityGroupList(GetLaboratoryEntityGroupListRequest request)
+    {
+        return await SendAsync<GetLaboratoryEntityGroupListRequest, List<LaboratoryEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLaboratoryEntityGroupRequest>> CreateLaboratoryEntityGroup(CreateLaboratoryEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLaboratoryEntityGroupRequest>> UpdateLaboratoryEntityGroup(UpdateLaboratoryEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLaboratoryEntityGroupRequest>> DeleteLaboratoryEntityGroup(DeleteLaboratoryEntityGroupRequest request)
     {
         return await SendAsync(request);
     }

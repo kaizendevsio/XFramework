@@ -43,6 +43,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
@@ -52,6 +56,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -470,7 +475,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #region Laboratory Portal
-    
     #region Laboratory
     /// <summary>
     /// Gets the laboratory profile.
@@ -493,9 +497,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryRequest>> DeleteLaboratory(DeleteLaboratoryRequest request);
     #endregion
-
     #region Laboratory Location
-
     /// <summary>
     /// Gets the laboratory location details.
     /// </summary>
@@ -516,12 +518,8 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     ///  Deletes the laboratory location from the system.
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryLocationRequest>> DeleteLaboratoryLocation(DeleteLaboratoryLocationRequest request);
-    
-
     #endregion
-    
     #region Laboratory Location Document
-
     /// <summary>
     /// Gets the laboratory location document details.
     /// </summary>
@@ -542,12 +540,8 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     ///  Deletes the laboratory location document from the system.
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryLocationDocumentRequest>> DeleteLaboratoryLocationDocument(DeleteLaboratoryLocationDocumentRequest request);
-    
-
     #endregion
-    
     #region Laboratory Job Order
-
     /// <summary>
     /// Gets the laboratory job order details.
     /// </summary>
@@ -568,10 +562,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     ///  Deletes the laboratory job order from the system.
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryJobOrderRequest>> DeleteLaboratoryJobOrder(DeleteLaboratoryJobOrderRequest request);
-    
-
     #endregion
-
     #region Laboratory Member
     /// <summary>
     ///  Gets the laboratory member profile.
@@ -597,9 +588,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     ///  Deletes the laboratory member from the system.
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryMemberRequest>> DeleteLaboratoryMember(DeleteLaboratoryMemberRequest request);
-    
     #endregion
-
     #region Laboratory Service
     /// <summary>
     ///  Gets the laboratory service profile.
@@ -623,9 +612,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteLaboratoryServiceRequest>> DeleteLaboratoryService(DeleteLaboratoryServiceRequest request);
     
     #endregion
-    
     #region Laboratory Service Entity
-    
     /// <summary>
     ///  Gets the laboratory service entity profile.
     /// </summary>
@@ -646,9 +633,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     ///  Deletes the laboratory service entity from the system.
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryServiceEntityRequest>> DeleteLaboratoryServiceEntity(DeleteLaboratoryServiceEntityRequest request);
-
     #endregion
-
     #region Laboratory Service Entity Group
     /// <summary>
     ///  Gets the laboratory service entity group profile.
@@ -671,7 +656,184 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteLaboratoryServiceEntityGroupRequest>> DeleteLaboratoryServiceEntityGroup(DeleteLaboratoryServiceEntityGroupRequest request);
     #endregion
+    #region Laboratory Job Order Result
+    /// <summary>
+    /// Gets the laboratory job order result profile.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryJobOrderResultResponse>> GetLaboratoryJobOrderResult(GetLaboratoryJobOrderResultRequest request);
+    /// <summary>
+    /// Get all laboratory job order results in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryJobOrderResultResponse>>> GetLaboratoryJobOrderResultList(GetLaboratoryJobOrderResultListRequest request);
+    /// <summary>
+    /// Creates a new laboratory job order result in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryJobOrderResultRequest>> CreateLaboratoryJobOrderResult(CreateLaboratoryJobOrderResultRequest request);
+    /// <summary>
+    /// Updates the laboratory job order result profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryJobOrderResultRequest>> UpdateLaboratoryJobOrderResult(UpdateLaboratoryJobOrderResultRequest request);
+    /// <summary>
+    /// Deletes the laboratory job order result from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryJobOrderResultRequest>> DeleteLaboratoryJobOrderResult(DeleteLaboratoryJobOrderResultRequest request);
+    #endregion
+    #region Laboratory Job Order Result File
+    /// <summary>
+    ///  Gets the laboratory service entity group profile.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryJobOrderResultFileResponse>> GetLaboratoryJobOrderResultFile(GetLaboratoryJobOrderResultFileRequest request);
+    /// <summary>
+    ///  Get all laboratory service entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryJobOrderResultFileResponse>>> GetLaboratoryJobOrderResultFileList(GetLaboratoryJobOrderResultFileListRequest request);
+    /// <summary>
+    ///  Creates a new laboratory service entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryJobOrderResultFileRequest>> CreateLaboratoryJobOrderResultFile(CreateLaboratoryJobOrderResultFileRequest request);
+    /// <summary>
+    ///  Updates the laboratory service entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryJobOrderResultFileRequest>> UpdateLaboratoryJobOrderResultFile(UpdateLaboratoryJobOrderResultFileRequest request);
+    /// <summary>
+    ///  Deletes the laboratory service entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryJobOrderResultFileRequest>> DeleteLaboratoryJobOrderResultFile(DeleteLaboratoryJobOrderResultFileRequest request);
+    #endregion
+    #region Laboratory Job Order Detail
+    /// <summary>
+    /// Gets the laboratory job order detail profile.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryJobOrderDetailResponse>> GetLaboratoryJobOrderDetail(GetLaboratoryJobOrderDetailRequest request);
+    /// <summary>
+    /// Get all laboratory job order details in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryJobOrderDetailResponse>>> GetLaboratoryJobOrderDetailList(GetLaboratoryJobOrderDetailListRequest request);
+    /// <summary>
+    /// Creates a new laboratory job order detail in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryJobOrderDetailRequest>> CreateLaboratoryJobOrderDetail(CreateLaboratoryJobOrderDetailRequest request);
+    /// <summary>
+    /// Updates the laboratory job order detail profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryJobOrderDetailRequest>> UpdateLaboratoryJobOrderDetail(UpdateLaboratoryJobOrderDetailRequest request);
+    /// <summary>
+    /// Deletes the laboratory job order detail from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryJobOrderDetailRequest>> DeleteLaboratoryJobOrderDetail(DeleteLaboratoryJobOrderDetailRequest request);
+    #endregion
+    #region Laboratory Location Tag
+    /// <summary>
+    /// Gets the laboratory location tag profile.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryLocationTagResponse>> GetLaboratoryLocationTag(GetLaboratoryLocationTagRequest request);
+    /// <summary>
+    /// Get all laboratory location tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryLocationTagResponse>>> GetLaboratoryLocationTagList(GetLaboratoryLocationTagListRequest request);
+    /// <summary>
+    /// Creates a new laboratory location tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryLocationTagRequest>> CreateLaboratoryLocationTag(CreateLaboratoryLocationTagRequest request);
+    /// <summary>
+    /// Updates the laboratory location tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryLocationTagRequest>> UpdateLaboratoryLocationTag(UpdateLaboratoryLocationTagRequest request);
+    /// <summary>
+    /// Deletes the laboratory location tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryLocationTagRequest>> DeleteLaboratoryLocationTag(DeleteLaboratoryLocationTagRequest request);
+    #endregion
+    #region Laboratory Service Tag
+    /// <summary>
+    /// Gets the laboratory service tag profile.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryServiceTagResponse>> GetLaboratoryServiceTag(GetLaboratoryServiceTagRequest request);
+    /// <summary>
+    /// Get all laboratory service tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryServiceTagResponse>>> GetLaboratoryServiceTagList(GetLaboratoryServiceTagListRequest request);
+    /// <summary>
+    /// Creates a new laboratory service tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryServiceTagRequest>> CreateLaboratoryServiceTag(CreateLaboratoryServiceTagRequest request);
+    /// <summary>
+    /// Updates the laboratory service tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryServiceTagRequest>> UpdateLaboratoryServiceTag(UpdateLaboratoryServiceTagRequest request);
+    /// <summary>
+    /// Deletes the laboratory service tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryServiceTagRequest>> DeleteLaboratoryServiceTag(DeleteLaboratoryServiceTagRequest request);
     
+
+    #endregion
+    #region Laboratory Tag
+    /// <summary>
+    /// Gets the laboratory tag profile.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryTagResponse>> GetLaboratoryTag(GetLaboratoryTagRequest request);
+    /// <summary>
+    /// Get all laboratory tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryTagResponse>>> GetLaboratoryTagList(GetLaboratoryTagListRequest request);
+    /// <summary>
+    /// Creates a new laboratory tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryTagRequest>> CreateLaboratoryTag(CreateLaboratoryTagRequest request);
+    /// <summary>
+    /// Updates the laboratory tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryTagRequest>> UpdateLaboratoryTag(UpdateLaboratoryTagRequest request);
+    /// <summary>
+    /// Deletes the laboratory tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryTagRequest>> DeleteLaboratoryTag(DeleteLaboratoryTagRequest request);
+    #endregion
+    #region Laboratory Entity
+    /// <summary>
+    /// Gets the laboratory entity profile.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryEntityResponse>> GetLaboratoryEntity(GetLaboratoryEntityRequest request);
+    /// <summary>
+    /// Get all laboratory entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryEntityResponse>>> GetLaboratoryEntityList(GetLaboratoryEntityListRequest request);
+    /// <summary>
+    /// Creates a new laboratory entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryEntityRequest>> CreateLaboratoryEntity(CreateLaboratoryEntityRequest request);
+    /// <summary>
+    /// Updates the laboratory entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryEntityRequest>> UpdateLaboratoryEntity(UpdateLaboratoryEntityRequest request);
+    /// <summary>
+    /// Deletes the laboratory entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryEntityRequest>> DeleteLaboratoryEntity(DeleteLaboratoryEntityRequest request);
+    #endregion
+    #region Laboratory Entity Group
+    /// <summary>
+    /// Gets the laboratory entity group profile.
+    /// </summary>
+    public Task<QueryResponse<LaboratoryEntityGroupResponse>> GetLaboratoryEntityGroup(GetLaboratoryEntityGroupRequest request);
+    /// <summary>
+    /// Get all laboratory entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LaboratoryEntityGroupResponse>>> GetLaboratoryEntityGroupList(GetLaboratoryEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new laboratory entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLaboratoryEntityGroupRequest>> CreateLaboratoryEntityGroup(CreateLaboratoryEntityGroupRequest request);
+    /// <summary>
+    /// Updates the laboratory entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLaboratoryEntityGroupRequest>> UpdateLaboratoryEntityGroup(UpdateLaboratoryEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the laboratory entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLaboratoryEntityGroupRequest>> DeleteLaboratoryEntityGroup(DeleteLaboratoryEntityGroupRequest request);
+    #endregion
     #endregion
     
     #region Consultation Portal
@@ -854,7 +1016,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteConsultationTagRequest>> DeleteConsultationTag(DeleteConsultationTagRequest request);
     #endregion
     #endregion
-
+    
     #region Administrator Portal
     
     #region Member
@@ -863,7 +1025,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #endregion
-
+    
     #region Ailment Portal
     #region Ailment
     /// <summary>
@@ -956,13 +1118,13 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
 
     #endregion
     #endregion
-
+    
     #region Hospital Portal
 
     
 
     #endregion
-
+    
     #region Meta Data Portal
     #region Meta Data Entity Group
     /// <summary>
@@ -1032,10 +1194,35 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteMetaDatumRequest>> DeleteMetaDatum(DeleteMetaDatumRequest request);
     #endregion
     #endregion
-
+    
     #region Vendor Portal
 
     
 
+    #endregion
+
+    #region Schedule Portal
+    #region Schedule
+    /// <summary>
+    /// Gets the schedule profile.
+    /// </summary>
+    public Task<QueryResponse<ScheduleResponse>> GetSchedule(GetScheduleRequest request);
+    /// <summary>
+    /// Gets all schedules in the system.
+    /// </summary>
+    public Task<QueryResponse<List<ScheduleResponse>>> GetScheduleList(GetScheduleListRequest request);
+    /// <summary>
+    /// Creates a new schedule in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateScheduleRequest>> CreateSchedule(CreateScheduleRequest request);
+    /// <summary>
+    /// Updates the schedule profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateScheduleRequest>> UpdateSchedule(UpdateScheduleRequest request);
+    /// <summary>
+    /// Deletes the schedule from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteScheduleRequest>> DeleteSchedule(DeleteScheduleRequest request);
+    #endregion
     #endregion
 }

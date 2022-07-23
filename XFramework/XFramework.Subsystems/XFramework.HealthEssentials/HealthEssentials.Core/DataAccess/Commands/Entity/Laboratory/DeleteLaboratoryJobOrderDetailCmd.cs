@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Delete;
 
-public class DeleteLaboratoryJobOrderDetailCmd
+namespace HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
+
+public class DeleteLaboratoryJobOrderDetailCmd : DeleteLaboratoryJobOrderDetailRequest, IRequest<CmdResponse<DeleteLaboratoryJobOrderDetailCmd>>
 {
     
 }

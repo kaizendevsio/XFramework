@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Update;
 
-public class UpdateLaboratoryEntityCmd
+namespace HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
+
+public class UpdateLaboratoryEntityCmd : UpdateLaboratoryEntityRequest, IRequest<CmdResponse<UpdateLaboratoryEntityCmd>>
 {
     
 }

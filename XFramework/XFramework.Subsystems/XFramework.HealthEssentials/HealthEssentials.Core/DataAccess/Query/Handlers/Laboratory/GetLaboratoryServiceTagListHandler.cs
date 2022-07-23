@@ -1,6 +1,16 @@
-﻿namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
+﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
 
-public class GetLaboratoryServiceTagListHandler
+namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
+
+public class GetLaboratoryServiceTagListHandler : QueryBaseHandler, IRequestHandler<GetLaboratoryServiceTagListQuery, QueryResponse<List<LaboratoryServiceTagResponse>>>
 {
-    
+    public GetLaboratoryServiceTagListHandler(IDataLayer dataLayer)
+    {
+        _dataLayer = dataLayer;
+    }
+
+    public async Task<QueryResponse<List<LaboratoryServiceTagResponse>>> Handle(GetLaboratoryServiceTagListQuery request, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
 }

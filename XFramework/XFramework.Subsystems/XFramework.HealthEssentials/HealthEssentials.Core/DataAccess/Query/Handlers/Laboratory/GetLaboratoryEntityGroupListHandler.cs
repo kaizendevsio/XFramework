@@ -1,6 +1,16 @@
-﻿namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
+﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
 
-public class GetLaboratoryEntityGroupListHandler
+namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
+
+public class GetLaboratoryEntityGroupListHandler : QueryBaseHandler, IRequestHandler<GetLaboratoryEntityGroupListQuery, QueryResponse<List<LaboratoryEntityGroupResponse>>>
 {
-    
+    public GetLaboratoryEntityGroupListHandler(IDataLayer dataLayer)
+    {
+        _dataLayer = dataLayer;
+    }
+
+    public async Task<QueryResponse<List<LaboratoryEntityGroupResponse>>> Handle(GetLaboratoryEntityGroupListQuery request, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
 }

@@ -33,7 +33,6 @@ public class GetLaboratoryServiceEntityGroupListHandler : QueryBaseHandler, IReq
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory Service Entity Group Found",
-            IsSuccess = true,
             Response = laboratoryServiceEntityGroup.Adapt<List<LaboratoryServiceEntityGroupResponse>>()
         };
     }

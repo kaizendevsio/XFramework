@@ -12,10 +12,7 @@ public class CreateLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
     
     public async Task<CmdResponse<CreateLaboratoryServiceEntityCmd>> Handle(CreateLaboratoryServiceEntityCmd request, CancellationToken cancellationToken)
     {
-        var group = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", cancellationToken: cancellationToken);
-       
+        var group = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups.FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", CancellationToken.None);
         if (group is null)
         {
             return new ()

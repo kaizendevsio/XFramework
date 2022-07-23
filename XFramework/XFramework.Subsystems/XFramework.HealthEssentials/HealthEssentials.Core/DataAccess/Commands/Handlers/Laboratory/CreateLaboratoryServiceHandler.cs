@@ -12,45 +12,37 @@ public class CreateLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
     
     public async Task<CmdResponse<CreateLaboratoryServiceCmd>> Handle(CreateLaboratoryServiceCmd request, CancellationToken cancellationToken)
     {
-        var serviceEntity = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-       
+        var serviceEntity = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (serviceEntity is null)
         {
             return new ()
             {
-                Message = $"Service entity with Guid {request.Guid} does not exist",
+                Message = $"Service entity with Guid {request.EntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
-        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryGuid}", CancellationToken.None);
         if (laboratory is null)
         {
             return new ()
             {
-                Message = $"Laboratory with Guid {request.Guid} does not exist",
+                Message = $"Laboratory with Guid {request.LaboratoryGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
-        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryLocationGuid}", CancellationToken.None);
         if (laboratoryLocation is null)
         {
             return new ()
             {
-                Message = $"Laboratory location with Guid {request.Guid} does not exist",
+                Message = $"Laboratory location with Guid {request.LaboratoryLocationGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
-        var unit = await _dataLayer.HealthEssentialsContext.Units
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.UnitGuid}", CancellationToken.None);
-        
+        var unit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(i => i.Guid == $"{request.UnitGuid}", CancellationToken.None);
         if (unit is null)
         {
             return new ()
