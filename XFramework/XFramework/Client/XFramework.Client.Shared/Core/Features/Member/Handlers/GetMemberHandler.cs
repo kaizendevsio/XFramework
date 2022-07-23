@@ -36,7 +36,7 @@ public partial class MemberState
             var response2 = WalletServiceWrapper.GetWalletList(new() { CredentialGuid = action.CredentialGuid});
 
             await Task.WhenAll(response1, response2);
-            //ReportTask(action, true);
+            //ReportTaskCompleted();
 
             if (await HandleFailure(response1.Result, action, true)) return response1.Result.Adapt<CmdResponse>();
 

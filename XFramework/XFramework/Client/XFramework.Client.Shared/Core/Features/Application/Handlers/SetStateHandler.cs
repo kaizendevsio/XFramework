@@ -62,13 +62,16 @@ public partial class ApplicationState
                 case null:
                     return;
                 case true:
-                    SweetAlertService.FireAsync(new()
+                    if (action.NoSpinner is false or null)
                     {
-                        //Title = CurrentState.ProgressTitle,
-                        Text = CurrentState.ProgressMessage,
-                        Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
-                        ShowConfirmButton = false,
-                    });
+                        SweetAlertService.FireAsync(new()
+                        {
+                            //Title = CurrentState.ProgressTitle,
+                            Text = CurrentState.ProgressMessage,
+                            Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
+                            ShowConfirmButton = false,
+                        });
+                    }
                     break;
                 case false:
                     SweetAlertService.CloseAsync();

@@ -26,7 +26,8 @@ public partial class WalletState
         public override async Task<Unit> Handle(TransferWallet action, CancellationToken aCancellationToken)
         {
             if (HandleValidation(out var handle)) return handle;
-
+            await Mediator.Send(new GetWalletList());
+            
             var result = await WalletServiceWrapper.TransferWallet(new()
             {
                 ClientReference = CurrentState.SendWalletVm.ClientReference,
@@ -41,6 +42,7 @@ public partial class WalletState
             if (result.HttpStatusCode is HttpStatusCode.Accepted)
             {
                 Mediator.Send(new GetWalletList());
+                CurrentState.SendWalletVm.Action?.Invoke();
             }
             
             await HandleFailure(result, action);
