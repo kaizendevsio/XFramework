@@ -14,7 +14,7 @@ public class GetAvailabilityListHandler : QueryBaseHandler, IRequestHandler<GetA
     {
         var availability = await _dataLayer.HealthEssentialsContext.Availabilities
             .Include(x => x.Entity)
-            .Where(x => EF.Functions.Like(x.Name, $"{request.SearchField}"))
+            .Where(x => EF.Functions.ILike(x.Name, $"{request.SearchField}"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

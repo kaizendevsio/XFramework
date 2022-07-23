@@ -13,7 +13,7 @@ public class GetHospitalEntityGroupListHandler : QueryBaseHandler, IRequestHandl
     public async Task<QueryResponse<List<HospitalEntityGroupResponse>>> Handle(GetHospitalEntityGroupListQuery request, CancellationToken cancellationToken)
     {
         var entityGroup = await _dataLayer.HealthEssentialsContext.HospitalEntityGroups
-            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

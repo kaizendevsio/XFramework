@@ -13,7 +13,7 @@ public class GetLogisticJobOrderLocationListHandler : QueryBaseHandler, IRequest
     {
         var location = await _dataLayer.HealthEssentialsContext.LogisticJobOrderLocations
             .Include(x => x.LogisticJobOrder)
-            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

@@ -11,6 +11,30 @@ public class GetConsultationJobOrderHandler : QueryBaseHandler, IRequestHandler<
     
     public async Task<QueryResponse<ConsultationJobOrderResponse>> Handle(GetConsultationJobOrderQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var consultationJobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders
+            .Include(x => x.Consultation)
+            .Include(x => x.Schedule)
+            .Include(x => x.PatientConsultations)
+            .ThenInclude(x => x.Patient)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+
+        if (consultationJobOrder is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No consultation job order found",
+                IsSuccess = true
+            };
+        }
+        
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Record found",
+            Response = consultationJobOrder.Adapt<ConsultationJobOrderResponse>()
+        };
     }
 }

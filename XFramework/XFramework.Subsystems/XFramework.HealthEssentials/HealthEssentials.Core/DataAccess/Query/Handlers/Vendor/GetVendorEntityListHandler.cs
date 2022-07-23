@@ -14,7 +14,7 @@ public class GetVendorEntityListHandler : QueryBaseHandler, IRequestHandler<GetV
     {
         var entity = await _dataLayer.HealthEssentialsContext.VendorEntities
             .Include(x => x.Group)
-            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

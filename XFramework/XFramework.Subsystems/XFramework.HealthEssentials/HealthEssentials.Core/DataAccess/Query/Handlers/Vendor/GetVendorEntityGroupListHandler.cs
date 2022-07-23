@@ -13,7 +13,7 @@ public class GetVendorEntityGroupListHandler : QueryBaseHandler, IRequestHandler
     public async Task<QueryResponse<List<VendorEntityGroupResponse>>> Handle(GetVendorEntityGroupListQuery request, CancellationToken cancellationToken)
     {
         var group = await _dataLayer.HealthEssentialsContext.VendorEntityGroups
-            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

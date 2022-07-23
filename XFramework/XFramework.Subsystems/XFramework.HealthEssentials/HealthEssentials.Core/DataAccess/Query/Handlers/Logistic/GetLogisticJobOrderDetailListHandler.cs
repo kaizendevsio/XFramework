@@ -14,7 +14,7 @@ public class GetLogisticJobOrderDetailListHandler : QueryBaseHandler, IRequestHa
         var jobOrderDetail = await _dataLayer.HealthEssentialsContext.LogisticJobOrderDetails
             .Include(x => x.LogisticJobOrder)
             .Include(x => x.Unit)
-            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

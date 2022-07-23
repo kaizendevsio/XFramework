@@ -12,7 +12,7 @@ public class GetConsultationEntityGroupListHandler : QueryBaseHandler, IRequestH
     public async Task<QueryResponse<List<ConsultationEntityGroupResponse>>> Handle(GetConsultationEntityGroupListQuery request, CancellationToken cancellationToken)
     {
         var consultationEntityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
-            .Where(x => EF.Functions.Like(x.Name, $"%{request.SearchField}%"))
+            .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

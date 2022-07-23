@@ -554,22 +554,128 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<QueryResponse<DoctorConsultationJobOrderResponse>> GetDoctorJobOrder(GetDoctorConsultationJobOrderRequest request)
+    public async Task<QueryResponse<DoctorConsultationResponse>> GetDoctorConsultation(GetDoctorConsultationRequest request)
     {
-        return await SendAsync<GetDoctorConsultationJobOrderRequest, DoctorConsultationJobOrderResponse>(request);
+        return await SendAsync<GetDoctorConsultationRequest, DoctorConsultationResponse>(request);
     }
 
-    public async Task<QueryResponse<List<DoctorConsultationJobOrderResponse>>> GetDoctorJobOrderList(GetDoctorConsultationJobOrderListRequest request)
+    public async Task<QueryResponse<List<DoctorConsultationResponse>>> GetDoctorConsultationList(GetDoctorConsultationListRequest request)
     {
-        return await SendAsync<GetDoctorConsultationJobOrderListRequest, List<DoctorConsultationJobOrderResponse>>(request);
+        return await SendAsync<GetDoctorConsultationListRequest, List<DoctorConsultationResponse>>(request);
     }
 
-    public async Task<CmdResponse<CreateDoctorConsultationJobOrderRequest>> CreateDoctorJobOrder(CreateDoctorConsultationJobOrderRequest request)
+    public async Task<CmdResponse<CreateDoctorConsultationRequest>> CreateDoctorConsultation(CreateDoctorConsultationRequest request)
     {
         return await SendAsync(request);
     }
 
-    public async Task<CmdResponse<UpdateDoctorConsultationJobOrderRequest>> UpdateDoctorJobOrder(UpdateDoctorConsultationJobOrderRequest request)
+    public async Task<CmdResponse<UpdateDoctorConsultationRequest>> UpdateDoctorConsultation(UpdateDoctorConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteDoctorConsultationRequest>> DeleteDoctorConsultation(DeleteDoctorConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<DoctorConsultationJobOrderResponse>> GetDoctorConsultationJobOrder(GetDoctorConsultationJobOrderRequest request)
+    {
+        return await SendAsync<GetDoctorConsultationJobOrderRequest, DoctorConsultationJobOrderResponse>(request);
+    }
+
+
+    public async Task<QueryResponse<List<DoctorConsultationJobOrderResponse>>> GetDoctorConsultationJobOrderList(GetDoctorConsultationJobOrderListRequest request)
+    {
+        return await SendAsync<GetDoctorConsultationJobOrderListRequest, List<DoctorConsultationJobOrderResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateDoctorConsultationJobOrderRequest>> CreateDoctorConsultationJobOrder(CreateDoctorConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateDoctorConsultationJobOrderRequest>> UpdateDoctorConsultationJobOrder(UpdateDoctorConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteDoctorConsultationJobOrderRequest>> DeleteDoctorConsultationJobOrder(DeleteDoctorConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<DoctorEntityResponse>> GetDoctorEntity(GetDoctorEntityRequest request)
+    {
+        return await SendAsync<GetDoctorEntityRequest, DoctorEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<DoctorEntityResponse>>> GetDoctorEntityList(GetDoctorEntityListRequest request)
+    {
+        return await SendAsync<GetDoctorEntityListRequest, List<DoctorEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateDoctorEntityRequest>> CreateDoctorEntity(CreateDoctorEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateDoctorEntityRequest>> UpdateDoctorEntity(UpdateDoctorEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteDoctorEntityRequest>> DeleteDoctorEntity(DeleteDoctorEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<DoctorEntityGroupResponse>> GetDoctorEntityGroup(GetDoctorEntityGroupRequest request)
+    {
+        return await SendAsync<GetDoctorEntityGroupRequest, DoctorEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<DoctorEntityGroupResponse>>> GetDoctorEntityGroupList(GetDoctorEntityGroupListRequest request)
+    {
+        return await SendAsync<GetDoctorEntityGroupListRequest, List<DoctorEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateDoctorEntityGroupRequest>> CreateDoctorEntityGroup(CreateDoctorEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateDoctorEntityGroupRequest>> UpdateDoctorEntityGroup(UpdateDoctorEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteDoctorEntityGroupRequest>> DeleteDoctorEntityGroup(DeleteDoctorEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<DoctorTagResponse>> GetDoctorTag(GetDoctorTagRequest request)
+    {
+        return await SendAsync<GetDoctorTagRequest, DoctorTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<DoctorTagResponse>>> GetDoctorTagList(GetDoctorTagListRequest request)
+    {
+        return await SendAsync<GetDoctorTagListRequest, List<DoctorTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateDoctorTagRequest>> CreateDoctorTag(CreateDoctorTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateDoctorTagRequest>> UpdateDoctorTag(UpdateDoctorTagRequest request)
+  {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteDoctorTagRequest>> DeleteDoctorTag(DeleteDoctorTagRequest request)
     {
         return await SendAsync(request);
     }
@@ -844,6 +950,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<CmdResponse<DeletePatientConsultationRequest>> DeletePatientConsultation(DeletePatientConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request)
     {
         return await SendAsync<GetPharmacyRequest, PharmacyResponse>(request);
@@ -909,6 +1020,26 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<PatientConsultationResponse>> GetPatientConsultation(GetPatientConsultationRequest request)
+    {
+        return await SendAsync<GetPatientConsultationRequest, PatientConsultationResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PatientConsultationResponse>>> GetPatientConsultationList(GetPatientConsultationListRequest request)
+    {
+        return await SendAsync<GetPatientConsultationListRequest, List<PatientConsultationResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePatientConsultationRequest>> CreatePatientConsultation(CreatePatientConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePatientConsultationRequest>> UpdatePatientConsultation(UpdatePatientConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<List<PharmacyResponse>>> GetPharmacyList(GetPharmacyListRequest request)
     {
         return await SendAsync<GetPharmacyListRequest, List<PharmacyResponse>>(request);
@@ -918,7 +1049,6 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     {
         return await SendAsync<GetDoctorListRequest, List<DoctorResponse>>(request);
     }
-
 
     public async Task<QueryResponse<PatientResponse>> GetPatient(GetPatientRequest request)
     {
