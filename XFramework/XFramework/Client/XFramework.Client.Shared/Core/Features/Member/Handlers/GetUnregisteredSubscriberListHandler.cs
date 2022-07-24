@@ -31,10 +31,8 @@ public partial class MemberState
         public override async Task<CmdResponse> Handle(GetUnregisteredSubscriberList action, CancellationToken aCancellationToken)
         {
             ReportTask(action);
-            
             var unregisteredSubscriberList = await IdentityServiceWrapper.GetUnregisteredSubscriberList(new());
-            
-            ReportTask(action, true);
+            ReportTaskCompleted();
 
             if (await HandleFailure(unregisteredSubscriberList, action, true)) return unregisteredSubscriberList.Adapt<CmdResponse>();
             await Mediator.Send(new SetState(){UnregisteredSubscriber = unregisteredSubscriberList.Response});

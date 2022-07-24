@@ -25,6 +25,8 @@ public class DoctorResponse
     public int Status { get; set; }
     
     public DoctorEntityResponse? Entity { get; set; }
+    public List<DoctorTagResponse>? DoctorTags { get; set; }
+    public List<DoctorConsultationResponse>? DoctorConsultations { get; set; }
     public CredentialResponse? Credential { get; set; }
     public List<StorageFileResponse>? Files { get; set; }
 }

@@ -8,5 +8,6 @@ public class GetPatientConsultationListHandler : BaseSignalRHandler, ISignalREve
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestQuery<GetPatientConsultationListRequest, GetPatientConsultationListQuery, List<PatientConsultationResponse>>(connection, mediator);    }
+        HandleRequestQuery<GetPatientConsultationListRequest, GetPatientConsultationListQuery, List<PatientConsultationResponse>>(connection, mediator);    
+    }
 }

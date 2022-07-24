@@ -38,7 +38,7 @@ public partial class MemberState
                 PageSize = 1000
             });
             
-            ReportTask(action, CurrentState.MemberList,true);
+            ReportTaskCompleted();
 
             if (await HandleFailure(response, action, true)) return response.Adapt<CmdResponse>();
             await Mediator.Send(new SetState(){MemberList = response.Response});

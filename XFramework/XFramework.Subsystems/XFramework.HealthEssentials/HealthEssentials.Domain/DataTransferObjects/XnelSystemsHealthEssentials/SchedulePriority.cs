@@ -19,10 +19,6 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string? Name { get; set; }
         public string? Description { get; set; }
         public short? Status { get; set; }
-        public DateTime StartAt { get; set; }
-        public DateTime ExpireAt { get; set; }
-        public DateTime? StartedAt { get; set; }
-        public DateTime? CompletedAt { get; set; }
         public string Guid { get; set; } = null!;
 
         public virtual SchedulePriorityEntity Entity { get; set; } = null!;

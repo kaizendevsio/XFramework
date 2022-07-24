@@ -410,6 +410,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .IsRequired()
                     .HasDefaultValueSql("true");
 
+                entity.Property(e => e.MeetingLink).HasColumnType("character varying");
+
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Prescription).HasColumnType("character varying");
