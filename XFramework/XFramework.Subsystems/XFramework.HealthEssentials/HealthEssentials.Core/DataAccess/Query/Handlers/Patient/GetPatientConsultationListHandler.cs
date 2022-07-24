@@ -13,9 +13,10 @@ public class GetPatientConsultationListHandler : QueryBaseHandler, IRequestHandl
     public async Task<QueryResponse<List<PatientConsultationResponse>>> Handle(GetPatientConsultationListQuery request, CancellationToken cancellationToken)
     {
         var patientConsultation = await _dataLayer.HealthEssentialsContext.PatientConsultations
-            .Include(x => x.ConsultationJobOrder)
-            .Include(x => x.Patient)
-            .Where(x => x.ConsultationJobOrder.Status == (int)request.Status)
+            //.Include(x => x.ConsultationJobOrder.DoctorConsultationJobOrders)
+            //.ThenInclude(i => i.Doctor)
+            //.Include(x => x.Patient)
+            //.Where(x => x.ConsultationJobOrder.Status == (int)request.Status)
             .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Remarks, $"%{request.SearchField}%"))
             .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Diagnosis, $"%{request.SearchField}%"))
             .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Prescription, $"%{request.SearchField}%"))
