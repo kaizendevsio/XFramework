@@ -17,7 +17,6 @@ public class CreateConsultationJobOrderRequest : RequestBase
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Prescription { get; set; }
-    public long ScheduleId { get; set; }
     public string? Diagnosis { get; set; }
     public string? Treatment { get; set; }
     public string? Symptoms { get; set; }
