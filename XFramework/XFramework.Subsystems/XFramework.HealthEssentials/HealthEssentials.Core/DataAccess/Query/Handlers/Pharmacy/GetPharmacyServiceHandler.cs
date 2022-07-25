@@ -11,6 +11,31 @@ public class GetPharmacyServiceHandler : QueryBaseHandler, IRequestHandler<GetPh
 
     public async Task<QueryResponse<PharmacyServiceResponse>> Handle(GetPharmacyServiceQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var service = await _dataLayer.HealthEssentialsContext.PharmacyServices
+            .Include(x => x.Entity)
+            .ThenInclude(x => x.Group)
+            .Include(x => x.PharmacyLocation)
+            .ThenInclude(x => x.Pharmacy)
+            .Include(x => x.Unit)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (service is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No data found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Data Found",
+            Response = service.Adapt<PharmacyServiceResponse>()
+        };
     }
 }

@@ -266,7 +266,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
     
     #region Pharmacy Portal
-
     #region Pharmacy
     /// <summary>
     ///  Gets the pharmacy profile.
@@ -289,7 +288,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeletePharmacyRequest>> DeletePharmacy(DeletePharmacyRequest request);
     #endregion
-    
     #region Pharmacy Member
     
     /// <summary>
@@ -320,9 +318,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeletePharmacyMemberRequest>> DeletePharmacyMember(DeletePharmacyMemberRequest request);
     
     #endregion
-    
     #region Pharmacy Location
-
     /// <summary>
     /// Gets the pharmacy location details.
     /// </summary>
@@ -346,7 +342,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     
 
     #endregion
-    
     #region Pharmacy Location Document
 
     /// <summary>
@@ -372,9 +367,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     
 
     #endregion
-    
     #region Pharmacy Job Order
-
     /// <summary>
     ///  Gets the Pharmacy job order.
     /// </summary>
@@ -391,9 +384,211 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// Updates the Pharmacy job order.
     /// </summary>
     public Task<CmdResponse<UpdatePharmacyJobOrderRequest>> UpdatePharmacyJobOrder(UpdatePharmacyJobOrderRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy job order.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyJobOrderRequest>> DeletePharmacyJobOrder(DeletePharmacyJobOrderRequest request);
+    #endregion
+    #region Pharmacy Entity
+    /// <summary>
+    /// Gets the Pharmacy entity.
+    /// </summary>
+    public Task<QueryResponse<PharmacyEntityResponse>> GetPharmacyEntity(GetPharmacyEntityRequest request);
+    /// <summary>
+    /// Gets the Pharmacy entity list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyEntityResponse>>> GetPharmacyEntityList(GetPharmacyEntityListRequest request);
+    /// <summary>
+    /// Creates a new Pharmacy entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyEntityRequest>> CreatePharmacyEntity(CreatePharmacyEntityRequest request);
+    /// <summary>
+    /// Updates the Pharmacy entity.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyEntityRequest>> UpdatePharmacyEntity(UpdatePharmacyEntityRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy entity.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyEntityRequest>> DeletePharmacyEntity(DeletePharmacyEntityRequest request);
+    
 
     #endregion
-    
+    #region Pharmacy Job Order Consultation Job Order
+    /// <summary>
+    /// Gets the Pharmacy job order consultation job order.
+    /// </summary>
+    public Task<QueryResponse<PharmacyJobOrderConsultationJobOrderResponse>> GetPharmacyJobOrderConsultationJobOrder(GetPharmacyJobOrderConsultationJobOrderRequest request);
+    /// <summary>
+    ///  Gets the Pharmacy job order consultation job order list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyJobOrderConsultationJobOrderResponse>>> GetPharmacyJobOrderConsultationJobOrderList(GetPharmacyJobOrderConsultationJobOrderListRequest request);
+    /// <summary>
+    /// Creates a new Pharmacy job order consultation job order in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyJobOrderConsultationJobOrderRequest>> CreatePharmacyJobOrderConsultationJobOrder(CreatePharmacyJobOrderConsultationJobOrderRequest request);
+    /// <summary>
+    /// Updates the Pharmacy job order consultation job order.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyJobOrderConsultationJobOrderRequest>> UpdatePharmacyJobOrderConsultationJobOrder(UpdatePharmacyJobOrderConsultationJobOrderRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy job order consultation job order.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyJobOrderConsultationJobOrderRequest>> DeletePharmacyJobOrderConsultationJobOrder(DeletePharmacyJobOrderConsultationJobOrderRequest request);
+    #endregion
+    #region Pharmacy Job Order Medicine
+    /// <summary>
+    /// Gets the Pharmacy job order medicine.
+    /// </summary>
+    public Task<QueryResponse<PharmacyJobOrderMedicineResponse>> GetPharmacyJobOrderMedicine(GetPharmacyJobOrderMedicineRequest request);
+    /// <summary>
+    ///  Gets the Pharmacy job order medicine list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyJobOrderMedicineResponse>>> GetPharmacyJobOrderMedicineList(GetPharmacyJobOrderMedicineListRequest request);
+    /// <summary>
+    ///  Creates a new Pharmacy job order medicine in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyJobOrderMedicineRequest>> CreatePharmacyJobOrderMedicine(CreatePharmacyJobOrderMedicineRequest request);
+    /// <summary>
+    /// Updates the Pharmacy job order medicine.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyJobOrderMedicineRequest>> UpdatePharmacyJobOrderMedicine(UpdatePharmacyJobOrderMedicineRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy job order medicine.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyJobOrderMedicineRequest>> DeletePharmacyJobOrderMedicine(DeletePharmacyJobOrderMedicineRequest request);
+    #endregion
+    #region Pharmacy Service Entity Group
+    /// <summary>
+    /// Gets the Pharmacy service entity group.
+    /// </summary>
+    public Task<QueryResponse<PharmacyServiceEntityGroupResponse>> GetPharmacyServiceEntityGroup(GetPharmacyServiceEntityGroupRequest request);
+    /// <summary>
+    /// Gets the Pharmacy service entity group list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyServiceEntityGroupResponse>>> GetPharmacyServiceEntityGroupList(GetPharmacyServiceEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new Pharmacy service entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyServiceEntityGroupRequest>> CreatePharmacyServiceEntityGroup(CreatePharmacyServiceEntityGroupRequest request);
+    /// <summary>
+    /// Updates the Pharmacy service entity group.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyServiceEntityGroupRequest>> UpdatePharmacyServiceEntityGroup(UpdatePharmacyServiceEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy service entity group.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyServiceEntityGroupRequest>> DeletePharmacyServiceEntityGroup(DeletePharmacyServiceEntityGroupRequest request);
+    #endregion
+    #region Pharmacy Service Entity
+    /// <summary>
+    /// Gets the Pharmacy service entity.
+    /// </summary>
+    public Task<QueryResponse<PharmacyServiceEntityResponse>> GetPharmacyServiceEntity(GetPharmacyServiceEntityRequest request);
+    /// <summary>
+    ///  Gets the Pharmacy service entity list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyServiceEntityResponse>>> GetPharmacyServiceEntityList(GetPharmacyServiceEntityListRequest request);
+    /// <summary>
+    /// Creates a new Pharmacy service entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyServiceEntityRequest>> CreatePharmacyServiceEntity(CreatePharmacyServiceEntityRequest request);
+    /// <summary>
+    /// Updates the Pharmacy service entity.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyServiceEntityRequest>> UpdatePharmacyServiceEntity(UpdatePharmacyServiceEntityRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy service entity.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyServiceEntityRequest>> DeletePharmacyServiceEntity(DeletePharmacyServiceEntityRequest request);
+    #endregion
+    #region Pharmacy Service
+    /// <summary>
+    /// Gets the Pharmacy service.
+    /// </summary>
+    public Task<QueryResponse<PharmacyServiceResponse>> GetPharmacyService(GetPharmacyServiceRequest request);
+    /// <summary>
+    /// Gets the Pharmacy service list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyServiceResponse>>> GetPharmacyServiceList(GetPharmacyServiceListRequest request);
+    /// <summary>
+    /// Creates a new Pharmacy service in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyServiceRequest>> CreatePharmacyService(CreatePharmacyServiceRequest request);
+    /// <summary>
+    /// Updates the Pharmacy service.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyServiceRequest>> UpdatePharmacyService(UpdatePharmacyServiceRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy service.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyServiceRequest>> DeletePharmacyService(DeletePharmacyServiceRequest request);
+    #endregion
+    #region Pharmacy Service Tag
+    /// <summary>
+    /// Gets the Pharmacy service tag.
+    /// </summary>
+    public Task<QueryResponse<PharmacyServiceTagResponse>> GetPharmacyServiceTag(GetPharmacyServiceTagRequest request);
+    /// <summary>
+    ///  Gets the Pharmacy service tag list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyServiceTagResponse>>> GetPharmacyServiceTagList(GetPharmacyServiceTagListRequest request);
+    /// <summary>
+    /// Creates a new Pharmacy service tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyServiceTagRequest>> CreatePharmacyServiceTag(CreatePharmacyServiceTagRequest request);
+    /// <summary>
+    /// Updates the Pharmacy service tag.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyServiceTagRequest>> UpdatePharmacyServiceTag(UpdatePharmacyServiceTagRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy service tag.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyServiceTagRequest>> DeletePharmacyServiceTag(DeletePharmacyServiceTagRequest request);
+    #endregion
+    #region Pharmacy Stock
+    /// <summary>
+    /// Gets the Pharmacy stock.
+    /// </summary>
+    public Task<QueryResponse<PharmacyStockResponse>> GetPharmacyStock(GetPharmacyStockRequest request);
+    /// <summary>
+    /// Gets the Pharmacy stock list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyStockResponse>>> GetPharmacyStockList(GetPharmacyStockListRequest request);
+    /// <summary>
+    /// Creates a new Pharmacy stock in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyStockRequest>> CreatePharmacyStock(CreatePharmacyStockRequest request);
+    /// <summary>
+    /// Updates the Pharmacy stock.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyStockRequest>> UpdatePharmacyStock(UpdatePharmacyStockRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy stock.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyStockRequest>> DeletePharmacyStock(DeletePharmacyStockRequest request);
+    #endregion
+    #region Pharmacy Tag
+    /// <summary>
+    /// Gets the Pharmacy tag.
+    /// </summary>
+    public Task<QueryResponse<PharmacyTagResponse>> GetPharmacyTag(GetPharmacyTagRequest request);
+    /// <summary>
+    /// Gets the Pharmacy tag list.
+    /// </summary>
+    public Task<QueryResponse<List<PharmacyTagResponse>>> GetPharmacyTagList(GetPharmacyTagListRequest request);
+    /// <summary>
+    /// Creates a new Pharmacy tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreatePharmacyTagRequest>> CreatePharmacyTag(CreatePharmacyTagRequest request);
+    /// <summary>
+    /// Updates the Pharmacy tag.
+    /// </summary>
+    public Task<CmdResponse<UpdatePharmacyTagRequest>> UpdatePharmacyTag(UpdatePharmacyTagRequest request);
+    /// <summary>
+    /// Deletes the Pharmacy tag.
+    /// </summary>
+    public Task<CmdResponse<DeletePharmacyTagRequest>> DeletePharmacyTag(DeletePharmacyTagRequest request);
+    #endregion
     #endregion
 
     #region Logistic Portal

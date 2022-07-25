@@ -11,9 +11,10 @@ public class GetPharmacyJobOrderListHandler : QueryBaseHandler, IRequestHandler<
 
     public async Task<QueryResponse<List<PharmacyJobOrderResponse>>> Handle(GetPharmacyJobOrderListQuery request, CancellationToken cancellationToken)
     {
-        var pharmacy = await _dataLayer.HealthEssentialsContext.PharmacyJobOrders
+        var jobOrder = await _dataLayer.HealthEssentialsContext.PharmacyJobOrders
             .Include(i => i.PharmacyLocation)
             .Include(i => i.Schedule)
+            .Include(x => x.Patient)
             .Where(i => EF.Functions.ILike(i.ReferenceNumber, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .Where(i => i.PharmacyLocation.Guid == $"{request.PharmacyLocationGuid}")
@@ -23,7 +24,7 @@ public class GetPharmacyJobOrderListHandler : QueryBaseHandler, IRequestHandler<
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
-        if (!pharmacy.Any())
+        if (!jobOrder.Any())
         {
             return new()
             {
@@ -38,7 +39,7 @@ public class GetPharmacyJobOrderListHandler : QueryBaseHandler, IRequestHandler<
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Records found",
             IsSuccess = true,
-            Response = pharmacy.Adapt<List<PharmacyJobOrderResponse>>()
+            Response = jobOrder.Adapt<List<PharmacyJobOrderResponse>>()
         };
     }
 }

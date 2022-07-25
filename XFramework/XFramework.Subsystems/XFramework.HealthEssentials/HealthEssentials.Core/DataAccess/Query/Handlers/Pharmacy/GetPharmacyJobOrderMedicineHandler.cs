@@ -11,6 +11,29 @@ public class GetPharmacyJobOrderMedicineHandler : QueryBaseHandler, IRequestHand
 
     public async Task<QueryResponse<PharmacyJobOrderMedicineResponse>> Handle(GetPharmacyJobOrderMedicineQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var jobOrderMedicine = await _dataLayer.HealthEssentialsContext.PharmacyJobOrderMedicines
+            .Include(x => x.PharmacyJobOrder)
+            .Include(x => x.Medicine)
+            .Include(x => x.MedicineIntake)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (jobOrderMedicine is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No data found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Data Found",
+            Response = jobOrderMedicine.Adapt<PharmacyJobOrderMedicineResponse>()
+        };
     }
 }

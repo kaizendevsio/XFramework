@@ -11,6 +11,25 @@ public class GetPharmacyServiceEntityGroupHandler : QueryBaseHandler, IRequestHa
 
     public async Task<QueryResponse<PharmacyServiceEntityGroupResponse>> Handle(GetPharmacyServiceEntityGroupQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var group = await _dataLayer.HealthEssentialsContext.PharmacyServiceEntityGroups
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (group is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No data found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Data Found",
+            Response = group.Adapt<PharmacyServiceEntityGroupResponse>()
+        };
     }
 }

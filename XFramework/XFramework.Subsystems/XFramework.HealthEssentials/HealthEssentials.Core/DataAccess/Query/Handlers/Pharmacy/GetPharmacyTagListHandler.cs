@@ -11,6 +11,31 @@ public class GetPharmacyTagListHandler : QueryBaseHandler, IRequestHandler<GetPh
 
     public async Task<QueryResponse<List<PharmacyTagResponse>>> Handle(GetPharmacyTagListQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var pharmacyTag = await _dataLayer.HealthEssentialsContext.PharmacyTags
+            .Include(x => x.Pharmacy)
+            .Include(x => x.Tag)
+            .OrderBy(x => x.CreatedAt)
+            .Take(request.PageSize)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .ToListAsync(CancellationToken.None);
+        
+        if (!pharmacyTag.Any())
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No data found",
+                IsSuccess = true
+            };
+        }
+        
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Data found",
+            IsSuccess = true,
+            Response = pharmacyTag.Adapt<List<PharmacyTagResponse>>()
+        };
     }
 }
