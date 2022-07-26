@@ -14,7 +14,6 @@ public class GetPharmacyJobOrderConsultationJobOrderListHandler : QueryBaseHandl
         var consultationJobOrder = await _dataLayer.HealthEssentialsContext.PharmacyJobOrderConsultationJobOrders
             .Include(x => x.ConsultationJobOrder)
             .Include(x => x.PharmacyJobOrder)
-            .Where(x => x.Status == (int) request.Status)
             .OrderBy(x => x.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()

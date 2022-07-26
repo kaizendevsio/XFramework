@@ -6,6 +6,8 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Update;
 
 public class UpdatePharmacyJobOrderRequest : RequestBase
 {
+    public Guid? PharmacyLocationGuid { get; set; }
+    public Guid? PatientGuid { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? Remarks { get; set; }
     public TransactionStatus? Status { get; set; }

@@ -15,7 +15,6 @@ public class GetDoctorConsultationJobOrderListHandler : QueryBaseHandler, IReque
         var jobOrder = await _dataLayer.HealthEssentialsContext.DoctorConsultationJobOrders
             .Include(x => x.ConsultationJobOrder)
             .Include(x => x.Doctor)
-            .Where(i => i.ConsultationJobOrder.Status == (int)request.Status)
             .Where(i => EF.Functions.ILike(i.ConsultationJobOrder.Remarks, $"%{request.SearchField}%")
                         || EF.Functions.ILike(i.ConsultationJobOrder.ReferenceNumber, $"%{request.SearchField}%")
                         || EF.Functions.ILike(i.ConsultationJobOrder.Prescription, $"%{request.SearchField}%")

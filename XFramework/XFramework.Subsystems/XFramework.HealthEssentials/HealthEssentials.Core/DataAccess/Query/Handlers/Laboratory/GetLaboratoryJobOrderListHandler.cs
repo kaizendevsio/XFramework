@@ -26,7 +26,6 @@ public class GetLaboratoryJobOrderListHandler : QueryBaseHandler, IRequestHandle
                         || EF.Functions.ILike(i.ConsultationJobOrder.Prescription, $"%{request.SearchField}%")
                         || EF.Functions.ILike(i.ConsultationJobOrder.Symptoms, $"%{request.SearchField}%")
                         || EF.Functions.ILike(i.ConsultationJobOrder.Treatment, $"%{request.SearchField}%"))
-            .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()

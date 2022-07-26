@@ -21,7 +21,6 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
         var updatedPharmacy = request.Adapt(existingPharmacy);
 
         _dataLayer.HealthEssentialsContext.Update(updatedPharmacy);
@@ -29,13 +28,8 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
         
         return new()
         {
-            Message = $"Pharmacy updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(updatedPharmacy.Guid)
-            }
+            Message = $"Pharmacy with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

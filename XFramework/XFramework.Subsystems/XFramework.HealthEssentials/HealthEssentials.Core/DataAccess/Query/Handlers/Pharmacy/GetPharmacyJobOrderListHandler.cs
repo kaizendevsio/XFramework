@@ -16,7 +16,6 @@ public class GetPharmacyJobOrderListHandler : QueryBaseHandler, IRequestHandler<
             .Include(i => i.Schedule)
             .Include(x => x.Patient)
             .Where(i => EF.Functions.ILike(i.ReferenceNumber, $"%{request.SearchField}%"))
-            .Where(i => i.Status == (int) request.Status)
             .Where(i => i.PharmacyLocation.Guid == $"{request.PharmacyLocationGuid}")
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)

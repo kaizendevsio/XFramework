@@ -11,6 +11,24 @@ public class UpdatePharmacyServiceEntityGroupHandler : CommandBaseHandler, IRequ
 
     public async Task<CmdResponse<UpdatePharmacyServiceEntityGroupCmd>> Handle(UpdatePharmacyServiceEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingGroup = await _dataLayer.HealthEssentialsContext.PharmacyServiceEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        if (existingGroup is null)
+        {
+            return new ()
+            {
+                Message = $"Pharmacy Service Entity Group with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        var updatedGroup = request.Adapt(existingGroup);
+
+        _dataLayer.HealthEssentialsContext.Update(updatedGroup);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        
+        return new ()
+        {
+            Message = $"Pharmacy Service Entity Group with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }
