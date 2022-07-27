@@ -104,7 +104,7 @@ public class GetLaboratoryLocationHandler : QueryBaseHandler, IRequestHandler<Ge
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
-                .Where(i => i.Id == response.LaboratoryMembers[o].CredentialId)
+                .Where(i => i.Guid == response.LaboratoryMembers[o].CredentialId)
                 .AsSplitQuery()
                 .AsNoTracking()
                 .FirstOrDefault()?

@@ -102,7 +102,7 @@ public class GetPharmacyLocationHandler : QueryBaseHandler, IRequestHandler<GetP
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
-                .Where(i => i.Id == response.PharmacyMembers[o].CredentialId)
+                .Where(i => i.Guid == response.PharmacyMembers[o].CredentialId)
                 .AsSplitQuery()
                 .AsNoTracking()
                 .FirstOrDefault()?

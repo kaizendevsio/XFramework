@@ -14,6 +14,8 @@ public class GetConsultationJobOrderHandler : QueryBaseHandler, IRequestHandler<
         var consultationJobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders
             .Include(x => x.Consultation)
             .Include(x => x.Schedule)
+            .Include(x => x.DoctorConsultationJobOrders)
+            .ThenInclude(x => x.Doctor)
             .Include(x => x.PatientConsultations)
             .ThenInclude(x => x.Patient)
             .AsSplitQuery()

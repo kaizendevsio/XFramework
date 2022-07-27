@@ -21,7 +21,7 @@ public class GetLaboratoryJobOrderListHandler : QueryBaseHandler, IRequestHandle
             .Include(x => x.Patient)
             .Include(x => x.Schedule)
             .Where(i => EF.Functions.ILike(i.ReferenceNumber, $"%{request.SearchField}%"))
-            .Where(i => i.Status == (int) request.Status)
+            .Where(i => i.LaboratoryLocation.Guid == $"{request.LaboratoryLocationGuid}")
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()

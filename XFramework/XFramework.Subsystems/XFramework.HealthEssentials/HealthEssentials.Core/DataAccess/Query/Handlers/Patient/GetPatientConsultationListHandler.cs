@@ -17,7 +17,6 @@ public class GetPatientConsultationListHandler : QueryBaseHandler, IRequestHandl
             .ThenInclude(i => i.Doctor)
             .Include(x => x.Patient)
             .Include(x => x.ConsultationJobOrder.Consultation)
-            .Where(x => x.ConsultationJobOrder.Status == (int)request.Status)
             .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Remarks, $"%{request.SearchField}%")
                         || EF.Functions.ILike(x.ConsultationJobOrder.Diagnosis, $"%{request.SearchField}%")
                         || EF.Functions.ILike(x.ConsultationJobOrder.Prescription, $"%{request.SearchField}%")

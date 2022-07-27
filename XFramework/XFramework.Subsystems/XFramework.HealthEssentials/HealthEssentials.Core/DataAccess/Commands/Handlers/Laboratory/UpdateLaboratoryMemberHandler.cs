@@ -33,7 +33,7 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLaboratoryMember.CredentialId = credential.Id;
+            updatedLaboratoryMember.CredentialId = credential.Guid;
         }
 
         if (request.LaboratoryGuid is not null)

@@ -22,7 +22,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public bool? IsEnabled { get; set; }
         public bool IsDeleted { get; set; }
         public long EntityId { get; set; }
-        public long CredentialId { get; set; }
+        public string CredentialId { get; set; } = null!;
         public string? Description { get; set; }
         public string? Remarks { get; set; }
         public string Guid { get; set; } = null!;
