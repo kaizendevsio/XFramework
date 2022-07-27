@@ -22,10 +22,9 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
         var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
             .Include(i => i.LaboratoryLocations)
             .Include(i => i.LaboratoryMembers)
-            .Where(i => i.Guid == $"{request.Guid}")
             .AsNoTracking()
             .AsSplitQuery()
-            .FirstOrDefaultAsync(CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}",CancellationToken.None);
 
         if (laboratory is null)
         {

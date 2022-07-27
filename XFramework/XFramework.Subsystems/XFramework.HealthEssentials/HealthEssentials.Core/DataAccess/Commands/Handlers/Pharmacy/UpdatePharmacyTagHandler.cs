@@ -20,7 +20,6 @@ public class UpdatePharmacyTagHandler : CommandBaseHandler, IRequestHandler<Upda
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-
         var updatedTag = request.Adapt(existingTag);
 
         if (request.PharmacyGuid is null)

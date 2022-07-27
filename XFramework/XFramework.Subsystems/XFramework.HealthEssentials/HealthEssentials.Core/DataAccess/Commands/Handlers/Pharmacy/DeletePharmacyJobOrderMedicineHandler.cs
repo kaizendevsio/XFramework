@@ -11,6 +11,26 @@ public class DeletePharmacyJobOrderMedicineHandler : CommandBaseHandler, IReques
 
     public async Task<CmdResponse<DeletePharmacyJobOrderMedicineCmd>> Handle(DeletePharmacyJobOrderMedicineCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingJobOrderMedicine = await _dataLayer.HealthEssentialsContext.PharmacyJobOrderMedicines.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        if (existingJobOrderMedicine is null)
+        {
+            return new ()
+            {
+                Message = $"Pharmacy Job Order Medicine with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        existingJobOrderMedicine.IsDeleted = true;
+        existingJobOrderMedicine.IsEnabled = false;
+
+        _dataLayer.HealthEssentialsContext.Update(existingJobOrderMedicine);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        
+        return new ()
+        {
+            Message = $"Pharmacy Job Order Medicine with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }

@@ -20,7 +20,6 @@ public class UpdatePharmacyStockHandler : CommandBaseHandler, IRequestHandler<Up
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-
         var updatedStock = request.Adapt(existingStock);
 
         if (request.PharmacyGuid is null)

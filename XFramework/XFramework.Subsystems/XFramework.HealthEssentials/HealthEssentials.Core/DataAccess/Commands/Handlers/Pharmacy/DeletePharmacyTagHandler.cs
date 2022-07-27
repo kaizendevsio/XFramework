@@ -11,6 +11,26 @@ public class DeletePharmacyTagHandler : CommandBaseHandler, IRequestHandler<Dele
 
     public async Task<CmdResponse<DeletePharmacyTagCmd>> Handle(DeletePharmacyTagCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingTag = await _dataLayer.HealthEssentialsContext.PharmacyTags.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        if (existingTag is null)
+        {
+            return new ()
+            {
+                Message = $"Tag with Guid {request.Guid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        existingTag.IsDeleted = true;
+        existingTag.IsEnabled = false;
+
+        _dataLayer.HealthEssentialsContext.Update(existingTag);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        
+        return new ()
+        {
+            Message = $"Tag with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }
