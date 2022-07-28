@@ -34,7 +34,7 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
                 .AsSplitQuery()
-                .FirstOrDefaultAsync(i => i.Id == item.CredentialId, CancellationToken.None);
+                .FirstOrDefaultAsync(i => i.Guid == item.CredentialId, CancellationToken.None);
 
            if (a is null) continue;
            

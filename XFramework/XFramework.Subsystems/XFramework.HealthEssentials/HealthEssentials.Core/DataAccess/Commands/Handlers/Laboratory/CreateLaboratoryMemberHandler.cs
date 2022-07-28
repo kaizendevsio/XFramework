@@ -48,7 +48,7 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         var laboratoryMember = request.Adapt<LaboratoryMember>();
         laboratoryMember.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         laboratoryMember.Laboratory = laboratory;
-        laboratoryMember.CredentialId = credential.Id;
+        laboratoryMember.CredentialId = credential.Guid;
         laboratoryMember.LaboratoryLocation = laboratoryLocation;
         
         await _dataLayer.HealthEssentialsContext.LaboratoryMembers.AddAsync(laboratoryMember, CancellationToken.None);

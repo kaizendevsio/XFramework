@@ -49,7 +49,7 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
         var pharmacyMember = request.Adapt<PharmacyMember>();
         pharmacyMember.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         pharmacyMember.Pharmacy = pharmacy;
-        pharmacyMember.CredentialId = credential.Id;
+        pharmacyMember.CredentialId = credential.Guid;
         pharmacyMember.PharmacyLocation = pharmacyLocation;
 
         await _dataLayer.HealthEssentialsContext.PharmacyMembers.AddAsync(pharmacyMember, CancellationToken.None);

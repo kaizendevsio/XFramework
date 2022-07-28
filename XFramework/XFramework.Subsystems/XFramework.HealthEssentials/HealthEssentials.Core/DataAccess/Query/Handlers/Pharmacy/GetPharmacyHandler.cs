@@ -86,7 +86,7 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
                 .AsSplitQuery()
-                .Where(i => i.Id == response.PharmacyMembers[index].CredentialId)
+                .Where(i => i.Guid == response.PharmacyMembers[index].CredentialId)
                 .FirstOrDefault()?
                 .Adapt<CredentialResponse>();
         }

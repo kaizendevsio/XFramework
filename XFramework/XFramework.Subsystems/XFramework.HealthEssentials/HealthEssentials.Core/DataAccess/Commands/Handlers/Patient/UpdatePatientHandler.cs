@@ -32,7 +32,7 @@ public class UpdatePatientHandler : CommandBaseHandler, IRequestHandler<UpdatePa
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPatient.CredentialId = credential.Id;
+            updatedPatient.CredentialId = credential.Guid;
         }
 
         if (request.EntityGuid is null)

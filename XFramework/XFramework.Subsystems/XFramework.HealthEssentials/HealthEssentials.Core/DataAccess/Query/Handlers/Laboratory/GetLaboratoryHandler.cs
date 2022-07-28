@@ -95,7 +95,7 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
-                .Where(i => i.Id == response.LaboratoryMembers[index].CredentialId)
+                .Where(i => i.Guid == response.LaboratoryMembers[index].CredentialId)
                 .AsSplitQuery()
                 .AsNoTracking()
                 .FirstOrDefault()?

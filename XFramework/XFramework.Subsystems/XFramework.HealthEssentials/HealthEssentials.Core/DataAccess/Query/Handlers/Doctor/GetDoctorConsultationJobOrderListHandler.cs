@@ -13,8 +13,10 @@ public class GetDoctorConsultationJobOrderListHandler : QueryBaseHandler, IReque
     public async Task<QueryResponse<List<DoctorConsultationJobOrderResponse>>> Handle(GetDoctorConsultationJobOrderListQuery request, CancellationToken cancellationToken)
     {
         var jobOrder = await _dataLayer.HealthEssentialsContext.DoctorConsultationJobOrders
-            .Include(x => x.ConsultationJobOrder)
+            .Include(x => x.ConsultationJobOrder.PatientConsultations)
+            .ThenInclude(i => i.Patient)
             .Include(x => x.Doctor)
+            .Where(i => i.Doctor.Guid == $"{request.DoctorGuid}")
             .Where(i => EF.Functions.ILike(i.ConsultationJobOrder.Remarks, $"%{request.SearchField}%")
                         || EF.Functions.ILike(i.ConsultationJobOrder.ReferenceNumber, $"%{request.SearchField}%")
                         || EF.Functions.ILike(i.ConsultationJobOrder.Prescription, $"%{request.SearchField}%")

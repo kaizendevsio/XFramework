@@ -5,5 +5,4 @@ namespace HealthEssentials.Core.DataAccess.Query.Entity.Doctor;
 
 public class GetDoctorConsultationJobOrderListQuery : GetDoctorConsultationJobOrderListRequest, IRequest<QueryResponse<List<DoctorConsultationJobOrderResponse>>>
 {
-    
 }
