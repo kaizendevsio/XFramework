@@ -1,4 +1,6 @@
-﻿using XFramework.Client.Shared.Core.Features.Address;
+﻿using Humanizer;
+using IdentityServer.Domain.Generic.Contracts.Responses;
+using XFramework.Client.Shared.Core.Features.Address;
 using XFramework.Client.Shared.Core.Features.Cache;
 using XFramework.Client.Shared.Core.Features.Cryptocurrency;
 using XFramework.Client.Shared.Core.Features.Layout;
@@ -43,4 +45,11 @@ public class XComponentsBase : BlazorStateComponent
     {
         await Mediator.Send(new SessionState.NavigateBack());
     }
+    
+    // Global Methods
+    
+    public string FullName(CredentialResponse? item) => $"{item?.IdentityInfo.FirstName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.MiddleName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.LastName?.ToLowerInvariant().Humanize(LetterCasing.Title)}";
+    public string NickName(CredentialResponse? item) => $"{item?.IdentityInfo.FirstName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.MiddleName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.LastName?.ToLowerInvariant().Humanize(LetterCasing.Title)}";
+    public string PhoneNumber(CredentialResponse? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Entity.Name == "Phone")?.Value}";
+    public string EmailAddress(CredentialResponse? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Entity.Name == "Email")?.Value}";
 }
