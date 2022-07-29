@@ -6,10 +6,11 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Hospital;
 
 public class GetHospitalEntityGroupListHandler : QueryBaseHandler, IRequestHandler<GetHospitalEntityGroupListQuery, QueryResponse<List<HospitalEntityGroupResponse>>>
 {
-    public GetHospitalEntityGroupListHandler()
+    public GetHospitalEntityGroupListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<QueryResponse<List<HospitalEntityGroupResponse>>> Handle(GetHospitalEntityGroupListQuery request, CancellationToken cancellationToken)
     {
         var entityGroup = await _dataLayer.HealthEssentialsContext.HospitalEntityGroups

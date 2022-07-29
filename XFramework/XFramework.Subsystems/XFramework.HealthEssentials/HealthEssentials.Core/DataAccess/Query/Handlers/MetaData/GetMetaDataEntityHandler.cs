@@ -12,6 +12,27 @@ public class GetMetaDataEntityHandler : QueryBaseHandler, IRequestHandler<GetMet
     
     public async Task<QueryResponse<MetaDataEntityResponse>> Handle(GetMetaDataEntityQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var entity = await _dataLayer.HealthEssentialsContext.MetaDataEntities
+            .Include(x => x.Group)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (entity is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No record found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Record found",
+            Response = entity.Adapt<MetaDataEntityResponse>()
+        };
     }
 }

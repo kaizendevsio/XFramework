@@ -5,10 +5,11 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Hospital;
 
 public class GetHospitalLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetHospitalLaboratoryQuery, QueryResponse<HospitalLaboratoryResponse>>
 {
-    public GetHospitalLaboratoryHandler()
+    public GetHospitalLaboratoryHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<QueryResponse<HospitalLaboratoryResponse>> Handle(GetHospitalLaboratoryQuery request, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();

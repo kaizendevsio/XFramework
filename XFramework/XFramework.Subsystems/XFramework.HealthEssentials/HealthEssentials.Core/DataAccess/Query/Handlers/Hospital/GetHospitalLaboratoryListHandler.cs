@@ -5,10 +5,11 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Hospital;
 
 public class GetHospitalLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetHospitalLaboratoryListQuery, QueryResponse<List<HospitalLaboratoryResponse>>>
 {
-    public GetHospitalLaboratoryListHandler()
+    public GetHospitalLaboratoryListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<QueryResponse<List<HospitalLaboratoryResponse>>> Handle(GetHospitalLaboratoryListQuery request, CancellationToken cancellationToken)
     {
         var laboratory = await _dataLayer.HealthEssentialsContext.HospitalLaboratories

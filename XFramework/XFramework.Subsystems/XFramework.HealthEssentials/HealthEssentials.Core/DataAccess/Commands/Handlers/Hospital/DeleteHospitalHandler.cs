@@ -4,10 +4,11 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Hospital;
 
 public class DeleteHospitalHandler : CommandBaseHandler, IRequestHandler<DeleteHospitalCmd, CmdResponse<DeleteHospitalCmd>>
 {
-    public DeleteHospitalHandler()
+    public DeleteHospitalHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<DeleteHospitalCmd>> Handle(DeleteHospitalCmd request, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
