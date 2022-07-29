@@ -11,9 +11,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
     }
     public async Task<CmdResponse<CreatePharmacyLocationCmd>> Handle(CreatePharmacyLocationCmd request, CancellationToken cancellationToken)
     {
-        var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.PharmacyGuid}", CancellationToken.None);
-        
+        var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies.FirstOrDefaultAsync(x => x.Guid == $"{request.PharmacyGuid}", CancellationToken.None);
         if (pharmacy is null)
         {
             return new ()
@@ -23,9 +21,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
             };
         }
         
-        var barangay = await _dataLayer.XnelSystemsContext.AddressBarangays
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.BarangayGuid}", CancellationToken.None);
-        
+        var barangay = await _dataLayer.XnelSystemsContext.AddressBarangays.FirstOrDefaultAsync(x => x.Guid == $"{request.BarangayGuid}", CancellationToken.None);
         if (barangay is null)
         {
             return new ()
@@ -35,9 +31,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
             };
         }
         
-        var city = await _dataLayer.XnelSystemsContext.AddressCities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.CityGuid}", CancellationToken.None);
-
+        var city = await _dataLayer.XnelSystemsContext.AddressCities.FirstOrDefaultAsync(x => x.Guid == $"{request.CityGuid}", CancellationToken.None);
         if (city is null)
         {
             return new ()
@@ -47,9 +41,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
             };
         }
         
-        var region = await _dataLayer.XnelSystemsContext.AddressRegions
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.RegionGuid}", CancellationToken.None);
-
+        var region = await _dataLayer.XnelSystemsContext.AddressRegions.FirstOrDefaultAsync(x => x.Guid == $"{request.RegionGuid}", CancellationToken.None);
         if (region is null)
         {
             return new ()
@@ -59,9 +51,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
             };
         }
         
-        var province = await _dataLayer.XnelSystemsContext.AddressProvinces
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ProvinceGuid}", CancellationToken.None);
-
+        var province = await _dataLayer.XnelSystemsContext.AddressProvinces.FirstOrDefaultAsync(x => x.Guid == $"{request.ProvinceGuid}", CancellationToken.None);
         if (province is null)
         {
             return new ()
@@ -71,9 +61,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
             };
         }
         
-        var country = await _dataLayer.XnelSystemsContext.AddressCountries
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.CountryGuid}", CancellationToken.None);
-
+        var country = await _dataLayer.XnelSystemsContext.AddressCountries.FirstOrDefaultAsync(x => x.Guid == $"{request.CountryGuid}", CancellationToken.None);
         if (country is null)
         {
             return new ()
@@ -98,8 +86,9 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
         request.Guid = Guid.Parse(pharmacyLocation.Guid);
         return new ()
         {
-            Message = $"Pharmacy Location with Guid {request.Guid} has been created",
-            HttpStatusCode = HttpStatusCode.Accepted
+            Message = $"Pharmacy Location with Guid {pharmacyLocation.Guid} created successfully",
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

@@ -15,7 +15,6 @@ public class GetLaboratoryJobOrderDetailListHandler : QueryBaseHandler, IRequest
             .Include(x => x.LaboratoryService)
             .Include(x => x.LaboratoryJobOrder)
             .Where(x => EF.Functions.ILike(x.Remarks, $"%{request.SearchField}%"))
-            .Where(i => i.Status == (int) request.Status)
             .OrderBy(x => x.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()
