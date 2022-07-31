@@ -268,6 +268,10 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #region Pharmacy Portal
     #region Pharmacy
     /// <summary>
+    ///  Gets medicine auto complete list.
+    /// </summary>
+    public Task<QueryResponse<List<string>>> GetMedicineAutoComplete(GetMedicineAutoCompleteRequest request);
+    /// <summary>
     ///  Gets the pharmacy profile.
     /// </summary>
     public Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request);
