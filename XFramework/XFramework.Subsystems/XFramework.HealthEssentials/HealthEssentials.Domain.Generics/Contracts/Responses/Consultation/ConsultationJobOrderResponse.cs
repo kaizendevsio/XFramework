@@ -31,7 +31,9 @@ public class ConsultationJobOrderResponse
     public ConsultationResponse? Consultation { get; set; }
     public ScheduleResponse? Schedule { get; set; }
     public List<PatientConsultationResponse>? PatientConsultations { get; set; }
-    public List<DoctorConsultationJobOrderResponse> DoctorConsultationJobOrders { get; set; }
-
+    public List<DoctorConsultationJobOrderResponse>? DoctorConsultationJobOrders { get; set; }
+    public List<ConsultationJobOrderLaboratoryResponse>? ConsultationJobOrderLaboratories { get; set; }
+    public List<ConsultationJobOrderMedicineResponse>? ConsultationJobOrderMedicines { get; set; }
+    public List<PatientReminderResponse>? PatientReminders { get; set; }
 
 }

@@ -1415,6 +1415,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<List<string>>> GetMedicineAutoComplete(GetMedicineAutoCompleteRequest request)
+    {
+        return await SendAsync<GetMedicineAutoCompleteRequest, List<string>>(request);
+    }
+
     public async Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request)
     {
         return await SendAsync<GetPharmacyRequest, PharmacyResponse>(request);
