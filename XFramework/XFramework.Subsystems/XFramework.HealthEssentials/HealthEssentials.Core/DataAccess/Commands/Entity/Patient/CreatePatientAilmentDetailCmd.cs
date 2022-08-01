@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Create;
 
-public class CreatePatientAilmentDetailCmd
+namespace HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
+
+public class CreatePatientAilmentDetailCmd : CreatePatientAilmentDetailRequest, IRequest<CmdResponse<CreatePatientAilmentDetailCmd>>
 {
     
 }

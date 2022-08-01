@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Update;
 
-public class UpdatePatientTagCmd
+namespace HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
+
+public class UpdatePatientTagCmd : UpdatePatientTagRequest, IRequest<CmdResponse<UpdatePatientTagCmd>>
 {
     
 }

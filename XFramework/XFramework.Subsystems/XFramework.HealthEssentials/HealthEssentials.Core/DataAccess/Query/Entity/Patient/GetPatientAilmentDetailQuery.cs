@@ -1,6 +1,9 @@
-﻿namespace HealthEssentials.Core.DataAccess.Query.Entity.Patient;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Get;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 
-public class GetPatientAilmentDetailQuery
+namespace HealthEssentials.Core.DataAccess.Query.Entity.Patient;
+
+public class GetPatientAilmentDetailQuery : GetPatientAilmentDetailRequest, IRequest<QueryResponse<PatientAilmentDetailResponse>>
 {
     
 }

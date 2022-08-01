@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Delete;
 
-public class DeletePatientAilmentDetailCmd
+namespace HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
+
+public class DeletePatientAilmentDetailCmd : DeletePatientAilmentDetailRequest, IRequest<CmdResponse<DeletePatientAilmentDetailCmd>>
 {
     
 }
