@@ -71,7 +71,7 @@
       <Folder Include="SignalR\Handlers\MetaData\Verify" />
       <Folder Include="SignalR\Handlers\Schedule\Verify" />
       <Folder Include="SignalR\Handlers\Tag" />
-      <Folder Include="SignalR\Handlers\Unit" />
+      <Folder Include="SignalR\Handlers\Unit\Verify" />
       <Folder Include="SignalR\Handlers\Vendor" />
     </ItemGroup>
     

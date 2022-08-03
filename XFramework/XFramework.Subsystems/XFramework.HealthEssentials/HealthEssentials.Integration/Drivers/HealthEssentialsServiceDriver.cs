@@ -40,6 +40,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Update;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
@@ -51,6 +55,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
 using HealthEssentials.Integration.Interfaces;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
@@ -275,6 +280,81 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<DeleteScheduleRequest>> DeleteSchedule(DeleteScheduleRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<UnitResponse>> GetUnit(GetUnitRequest request)
+    {
+        return await SendAsync<GetUnitRequest, UnitResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<UnitResponse>>> GetUnitList(GetUnitListRequest request)
+    {
+        return await SendAsync<GetUnitListRequest, List<UnitResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateUnitRequest>> CreateUnit(CreateUnitRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateUnitRequest>> UpdateUnit(UpdateUnitRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteUnitRequest>> DeleteUnit(DeleteUnitRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<UnitEntityResponse>> GetUnitEntity(GetUnitEntityRequest request)
+    {
+        return await SendAsync<GetUnitEntityRequest, UnitEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<UnitEntityResponse>>> GetUnitEntityList(GetUnitEntityListRequest request)
+    {
+        return await SendAsync<GetUnitEntityListRequest, List<UnitEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateUnitEntityRequest>> CreateUnitEntity(CreateUnitEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateUnitEntityRequest>> UpdateUnitEntity(UpdateUnitEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteUnitEntityRequest>> DeleteUnitEntity(DeleteUnitEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<UnitEntityGroupResponse>> GetUnitEntityGroup(GetUnitEntityGroupRequest request)
+    {
+        return await SendAsync<GetUnitEntityGroupRequest, UnitEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<UnitEntityGroupResponse>>> GetUnitEntityGroupList(GetUnitEntityGroupListRequest request)
+    {
+        return await SendAsync<GetUnitEntityGroupListRequest, List<UnitEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateUnitEntityGroupRequest>> CreateUnitEntityGroup(CreateUnitEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateUnitEntityGroupRequest>> UpdateUnitEntityGroup(UpdateUnitEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteUnitEntityGroupRequest>> DeleteUnitEntityGroup(DeleteUnitEntityGroupRequest request)
     {
         return await SendAsync(request);
     }

@@ -47,6 +47,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Update;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
@@ -58,6 +62,7 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -1422,6 +1427,75 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// Deletes the schedule from the system.
     /// </summary>
     public Task<CmdResponse<DeleteScheduleRequest>> DeleteSchedule(DeleteScheduleRequest request);
+    #endregion
+    #endregion
+
+    #region Unit Portal
+    #region Unit
+    /// <summary>
+    /// Gets the unit profile.
+    /// </summary>
+    public Task<QueryResponse<UnitResponse>> GetUnit(GetUnitRequest request);
+    /// <summary>
+    /// Gets all units in the system.
+    /// </summary>
+    public Task<QueryResponse<List<UnitResponse>>> GetUnitList(GetUnitListRequest request);
+    /// <summary>
+    /// Creates a new unit in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateUnitRequest>> CreateUnit(CreateUnitRequest request);
+    /// <summary>
+    /// Updates the unit profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateUnitRequest>> UpdateUnit(UpdateUnitRequest request);
+    /// <summary>
+    /// Deletes the unit from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteUnitRequest>> DeleteUnit(DeleteUnitRequest request);
+    #endregion
+    #region Unit Entity
+    /// <summary>
+    /// Gets the unit entity profile.
+    /// </summary>
+    public Task<QueryResponse<UnitEntityResponse>> GetUnitEntity(GetUnitEntityRequest request);
+    /// <summary>
+    /// Gets all unit entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<UnitEntityResponse>>> GetUnitEntityList(GetUnitEntityListRequest request);
+    /// <summary>
+    /// Creates a new unit entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateUnitEntityRequest>> CreateUnitEntity(CreateUnitEntityRequest request);
+    /// <summary>
+    /// Updates the unit entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateUnitEntityRequest>> UpdateUnitEntity(UpdateUnitEntityRequest request);
+    /// <summary>
+    /// Deletes the unit entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteUnitEntityRequest>> DeleteUnitEntity(DeleteUnitEntityRequest request);
+    #endregion
+    #region Unit Entity Group
+    /// <summary>
+    ///  Gets the unit entity group profile.
+    /// </summary>
+    public Task<QueryResponse<UnitEntityGroupResponse>> GetUnitEntityGroup(GetUnitEntityGroupRequest request);
+    /// <summary>
+    /// Gets all unit entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<UnitEntityGroupResponse>>> GetUnitEntityGroupList(GetUnitEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new unit entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateUnitEntityGroupRequest>> CreateUnitEntityGroup(CreateUnitEntityGroupRequest request);
+    /// <summary>
+    /// Updates the unit entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateUnitEntityGroupRequest>> UpdateUnitEntityGroup(UpdateUnitEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the unit entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteUnitEntityGroupRequest>> DeleteUnitEntityGroup(DeleteUnitEntityGroupRequest request);
     #endregion
     #endregion
 }
