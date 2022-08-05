@@ -8,29 +8,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d37d412-dd63-4bc1-9000-5a758e6c9722" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Laboratory/GetLaboratoryMemberHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Consultation/Get/GetConsultationJobOrderHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Merge_at_7_23_2022_2_06_PM__Changes_.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Merge_at_7_23_2022_2_06_PM__Changes_.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HostedService/SampleService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HostedService/SampleService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/VerifyDoctorHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Doctor/VerifyDoctorHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/GetLaboratoryMemberHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/VerifyLaboratoryMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Laboratory/VerifyLaboratoryMemberHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/VerifyLogisticHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Logistic/VerifyLogisticHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/VerifyPharmacyMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Pharmacy/VerifyPharmacyMemberHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Common/IdentityValidationResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Common/IdentityValidationResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Laboratory/LaboratoryMemberResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Laboratory/LaboratoryMemberResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Pharmacy/PharmacyMemberResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Pharmacy/PharmacyMemberResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/LaboratoryMember.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/LaboratoryMember.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/PharmacyMember.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/PharmacyMember.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/XnelSystemsHealthEssentialsContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/XnelSystemsHealthEssentialsContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/HealthEssentials.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/HealthEssentials.Integration.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/AuthenticateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Query/Handlers/Identity/Credential/AuthenticateIdentityHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Development.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../_RunSubSystems.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/../../_RunSubSystems.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Schedule/Create/CreateScheduleHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Schedule/Create/CreateScheduleHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Schedule/CreateScheduleHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Schedule/CreateScheduleHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/Create/CreateConsultationJobOrderRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/Create/CreateConsultationJobOrderRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Consultation/ConsultationJobOrderResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Consultation/ConsultationJobOrderResponse.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/SchedulePriority.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/DataTransferObjects/XnelSystemsHealthEssentials/SchedulePriority.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Installers/WrapperInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Installers/WrapperInstaller.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -57,6 +44,7 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/TransactionRequestBase.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="IdeDocumentHistory">
     <changedPaths>
@@ -248,6 +236,11 @@
       <workItem from="1655237770880" duration="835000" />
       <workItem from="1655343450640" duration="27000" />
       <workItem from="1656196005050" duration="25000" />
+      <workItem from="1658029065350" duration="29000" />
+      <workItem from="1658207210504" duration="2224000" />
+      <workItem from="1658504636792" duration="951000" />
+      <workItem from="1658542993450" duration="2146000" />
+      <workItem from="1658621564268" duration="2859000" />
     </task>
     <task id="LOCAL-00001" summary="Initial Template">
       <created>1621423842771</created>

@@ -1,6 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-using XFramework.Client.Shared.Entity.Models.Responses.CoinCap;
+﻿using XFramework.Client.Shared.Entity.Models.Responses.CoinCap;
 
 namespace XFramework.Client.Shared.Core.Features.Cryptocurrency;
 

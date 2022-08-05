@@ -35,7 +35,7 @@ public class CreateConsultationPaymentHandler : CommandBaseHandler, IRequestHand
             };
         }
         
-        var doctorCredential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Id == doctor.CredentialId, CancellationToken.None);
+        var doctorCredential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == doctor.CredentialId, CancellationToken.None);
         if (doctorCredential is null)
         {
             return new ()
@@ -45,7 +45,7 @@ public class CreateConsultationPaymentHandler : CommandBaseHandler, IRequestHand
             };
         }
 
-        var patientCredential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Id == doctor.CredentialId, CancellationToken.None);
+        var patientCredential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == doctor.CredentialId, CancellationToken.None);
         if (patientCredential is null)
         {
             return new ()

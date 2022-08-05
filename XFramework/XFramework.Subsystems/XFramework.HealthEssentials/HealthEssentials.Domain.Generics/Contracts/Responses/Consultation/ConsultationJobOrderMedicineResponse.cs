@@ -1,6 +1,4 @@
-﻿
-
-using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
@@ -16,7 +14,7 @@ public class ConsultationJobOrderMedicineResponse
     public short? Status { get; set; }
     public Guid? Guid { get; set; }
     
-    public ConsultationJobOrderResponse ConsultationJobOrder { get; set; } = null!;
+    public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
     public MedicineResponse? Medicine { get; set; }
     public MedicineIntakeResponse? MedicineIntake { get; set; }
 }

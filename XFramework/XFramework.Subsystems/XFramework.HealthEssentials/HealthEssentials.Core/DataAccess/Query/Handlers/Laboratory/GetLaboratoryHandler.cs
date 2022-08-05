@@ -22,10 +22,9 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
         var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
             .Include(i => i.LaboratoryLocations)
             .Include(i => i.LaboratoryMembers)
-            .Where(i => i.Guid == $"{request.Guid}")
             .AsNoTracking()
             .AsSplitQuery()
-            .FirstOrDefaultAsync(CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}",CancellationToken.None);
 
         if (laboratory is null)
         {
@@ -55,35 +54,35 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
     {
         for (var index = 0; index < response.LaboratoryLocations.Count; index++)
         {
-            var countryId = response.LaboratoryLocations[index].Country;
-            var regionId = response.LaboratoryLocations[index].Region;
-            var provinceId = response.LaboratoryLocations[index].Province;
-            var cityId = response.LaboratoryLocations[index].City;
-            var barangayId = response.LaboratoryLocations[index].Barangay;
+            var countryId = response.LaboratoryLocations[index].CountryId;
+            var regionId = response.LaboratoryLocations[index].RegionId;
+            var provinceId = response.LaboratoryLocations[index].ProvinceId;
+            var cityId = response.LaboratoryLocations[index].CityId;
+            var barangayId = response.LaboratoryLocations[index].BarangayId;
 
-            var countryNavigation = _dataLayer.XnelSystemsContext.AddressCountries
+            var country = _dataLayer.XnelSystemsContext.AddressCountries
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Id == countryId, CancellationToken.None);
-            var regionNavigation = _dataLayer2.XnelSystemsContext.AddressRegions
+            var region = _dataLayer2.XnelSystemsContext.AddressRegions
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Id == regionId, CancellationToken.None);
-            var provinceNavigation = _dataLayer3.XnelSystemsContext.AddressProvinces
+            var province = _dataLayer3.XnelSystemsContext.AddressProvinces
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Id == provinceId, CancellationToken.None);
-            var cityNavigation = _dataLayer4.XnelSystemsContext.AddressCities
+            var city = _dataLayer4.XnelSystemsContext.AddressCities
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Id == cityId, CancellationToken.None);
-            var barangayNavigation = _dataLayer5.XnelSystemsContext.AddressBarangays
+            var barangay = _dataLayer5.XnelSystemsContext.AddressBarangays
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Id == barangayId, CancellationToken.None);
 
-            await Task.WhenAll(countryNavigation, regionNavigation, provinceNavigation, cityNavigation, barangayNavigation);
+            await Task.WhenAll(country, region, province, city, barangay);
 
-            response.LaboratoryLocations[index].CountryNavigation = countryNavigation.Result?.Adapt<AddressCountryResponse>();
-            response.LaboratoryLocations[index].RegionNavigation = regionNavigation.Result?.Adapt<AddressRegionResponse>();
-            response.LaboratoryLocations[index].ProvinceNavigation = provinceNavigation.Result?.Adapt<AddressProvinceResponse>();
-            response.LaboratoryLocations[index].CityNavigation = cityNavigation.Result?.Adapt<AddressCityResponse>();
-            response.LaboratoryLocations[index].BarangayNavigation = barangayNavigation?.Result.Adapt<AddressBarangayResponse>();
+            response.LaboratoryLocations[index].Country = country.Result?.Adapt<AddressCountryResponse>();
+            response.LaboratoryLocations[index].Region = region.Result?.Adapt<AddressRegionResponse>();
+            response.LaboratoryLocations[index].Province = province.Result?.Adapt<AddressProvinceResponse>();
+            response.LaboratoryLocations[index].City = city.Result?.Adapt<AddressCityResponse>();
+            response.LaboratoryLocations[index].Barangay = barangay?.Result.Adapt<AddressBarangayResponse>();
         }
     }
 
@@ -91,11 +90,12 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
     {
         for (var index = 0; index < response.LaboratoryMembers.Count; index++)
         {
+            response.LaboratoryMembers[index].Laboratory = response;
             response.LaboratoryMembers[index].Credential = _dataLayer.XnelSystemsContext.IdentityCredentials
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
-                .Where(i => i.Id == response.LaboratoryMembers[index].CredentialId)
+                .Where(i => i.Guid == response.LaboratoryMembers[index].CredentialId)
                 .AsSplitQuery()
                 .AsNoTracking()
                 .FirstOrDefault()?

@@ -55,7 +55,8 @@ namespace StreamFlow.Stream.Services.Handlers.Events
             {
                 ClientGuid = client.Value.Guid,
                 RequestGuid = request.MessageQueue.RequestGuid,
-                ConsumerGuid = request.MessageQueue.ConsumerGuid
+                ConsumerGuid = request.MessageQueue.ConsumerGuid,
+                ResponseStatusCode = request.MessageQueue.ResponseStatusCode
             };
 
             var contract = new StreamFlowContract()
@@ -119,7 +120,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
 
                     if (currentClient != null)
                     {
-                        Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {currentClient.Name}");
+                        Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {currentClient.Name} ({request.MessageQueue.ResponseStatusCode})");
                         await _hubContext.Clients.Client(currentClient.StreamId).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken);
                         break;
                     }

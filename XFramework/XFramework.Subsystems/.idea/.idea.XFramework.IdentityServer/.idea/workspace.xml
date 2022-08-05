@@ -10,8 +10,52 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="409723ac-d59d-499a-9f6f-0d22e3f077ee" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/discord.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/discord.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/UpdateMemberContact.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/UpdateMemberCredential.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/UpdateMemberInfo.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberContactHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberCredentialHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberInfoHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/Community.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Community.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Core/Community.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Community.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Integration/Community.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Integration/Community.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/HealthEssentials.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/HealthEssentials.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/UpdateCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Credential/UpdateCredentialHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Integration/Messaging.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Integration/Messaging.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/SmsGateway.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/SmsGateway.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/SmsGateway.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/SmsGateway.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/StreamFlow.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Core/StreamFlow.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Wallets.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Wallets.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/XLayoutBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/XLayoutBase.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/_ComponentsBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/_ComponentsBase.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Actions/ClearState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Actions/ClearState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Actions/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Actions/SetState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/ClearStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/ClearStateHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/SetStateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Handlers/SetStateHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Actions/SetState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberListHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetUnregisteredSubscriberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetUnregisteredSubscriberListHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/MemberState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/MemberState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Services/ConfigurationService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Services/ConfigurationService.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,6 +88,7 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HostedService/ProcessMonitorHostedService.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/Program.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/HostedService/ProcessMonitorHostedService.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.Messaging/Messaging.Domin.Generic/Contracts/Requests/Create/CreateDirectMessageRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/HostedService/ProcessMonitorHostedService.cs" root0="SKIP_HIGHLIGHTING" />
@@ -59,13 +104,13 @@
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Configurations/StreamFlowConfiguration.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/QueryableRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Enums/AuthorizeBy.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Enums/Gender.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Enums/GenericStatusType.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Interfaces/IXFrameworkService.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/BaseSignalRHandler.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/RecordsDriver.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="mock://C:/Projects/Net Core/XFramework/XFramework/XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Extensions/DateOnlyConverterExtension.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Security/Cryptography.cs" root0="SKIP_HIGHLIGHTING" />
@@ -147,12 +192,16 @@
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;XThreadsFramesViewSplitterKey&quot;: &quot;0.7590361&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Api/SignalR/Handlers&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
-  <component name="RunManager" selected=".NET Launch Settings Profile.IdentityServer.Api">
+  <component name="RunManager" selected=".NET Launch Settings Profile.IdentityServer.Api: IIS Express">
     <configuration name="IdentityServer.Test" type="DotNetProject" factoryName=".NET Project">
       <option name="EXE_PATH" value="" />
       <option name="PROGRAM_PARAMETERS" value="" />
@@ -401,6 +450,15 @@
       <workItem from="1656183317974" duration="58000" />
       <workItem from="1656184248211" duration="976000" />
       <workItem from="1656203209639" duration="2326000" />
+      <workItem from="1656506812184" duration="48000" />
+      <workItem from="1656816743198" duration="13999000" />
+      <workItem from="1656870207330" duration="878000" />
+      <workItem from="1657009970593" duration="1063000" />
+      <workItem from="1657246411147" duration="3082000" />
+      <workItem from="1657428174705" duration="661000" />
+      <workItem from="1658028367800" duration="134000" />
+      <workItem from="1658028987295" duration="18000" />
+      <workItem from="1658031447672" duration="80000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure To Support Sub-Systems">
       <created>1616960634242</created>

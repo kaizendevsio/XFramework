@@ -12,9 +12,7 @@ public class UpdateLogisticHandler : CommandBaseHandler, IRequestHandler<UpdateL
 
     public async Task<CmdResponse<UpdateLogisticCmd>> Handle(UpdateLogisticCmd request, CancellationToken cancellationToken)
     {
-        var existingLogistic = await _dataLayer.HealthEssentialsContext.Logistics
-            .FirstOrDefaultAsync(x => x.Guid ==$"{request.Guid}", CancellationToken.None);
-
+        var existingLogistic = await _dataLayer.HealthEssentialsContext.Logistics.FirstOrDefaultAsync(x => x.Guid ==$"{request.Guid}", CancellationToken.None);
         if (existingLogistic == null)
         {
             return new()
@@ -23,23 +21,16 @@ public class UpdateLogisticHandler : CommandBaseHandler, IRequestHandler<UpdateL
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var updateLogistic = request.Adapt(existingLogistic);
-        updateLogistic.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        updateLogistic.Status = (int) GenericStatusType.Pending;
+        var updatedLogistic = request.Adapt(existingLogistic);
+        updatedLogistic.Status = (int) GenericStatusType.Pending;
 
-        _dataLayer.HealthEssentialsContext.Logistics.Update(updateLogistic);
+        _dataLayer.HealthEssentialsContext.Logistics.Update(updatedLogistic);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
         return new()
         {
-            Message = $"Logistic with Guid {updateLogistic.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(updateLogistic.Guid)
-            }
+            Message = $"Logistic with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

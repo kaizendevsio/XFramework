@@ -14,5 +14,4 @@ public class StorageFileResponse
     public DateTime? ExpireAt { get; set; }
     public long? StorageFileIdentifierId { get; set; }
     public string? Hash { get; set; }
-
 }

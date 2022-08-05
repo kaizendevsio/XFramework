@@ -11,7 +11,7 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
 
     public async Task<CmdResponse<UpdateDoctorCmd>> Handle(UpdateDoctorCmd request, CancellationToken cancellationToken)
     {
-        var existingDoctor = await _dataLayer.HealthEssentialsContext.Doctors.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        var existingDoctor = await _dataLayer.HealthEssentialsContext.Doctors.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingDoctor is null)
         {
             return new ()
@@ -20,39 +20,43 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-        if (credential is null)
+        var updatedDoctor = request.Adapt(existingDoctor);
+
+        if (request.CredentialGuid is not null)
         {
-            return new ()
+            var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
+            if (credential is null)
             {
-                Message = $"Credential with Guid {request.CredentialGuid} not found",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new ()
+                {
+                    Message = $"Credential with Guid {request.CredentialGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedDoctor.CredentialId = credential.Guid;
         }
-        
-        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", cancellationToken: cancellationToken);
-        if (entity is null)
+
+        if (request.EntityGuid is not null)
         {
-            return new ()
+            var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
+            if (entity is null)
             {
-                Message = $"Entity with Guid {request.EntityGuid} not found",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new ()
+                {
+                    Message = $"Doctor entity with Guid {request.EntityGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedDoctor.Entity = entity;
         }
-        
-        existingDoctor = request.Adapt(existingDoctor);
-        existingDoctor.CredentialId = credential.Id;
-        existingDoctor.Entity = entity;
-        
-        _dataLayer.HealthEssentialsContext.Update(existingDoctor);
+
+        _dataLayer.HealthEssentialsContext.Update(updatedDoctor);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
-        return new()
+        return new ()
         {
-            Message = "Doctor Identity Updated Successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            Request = request
+            Message = $"Doctor with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

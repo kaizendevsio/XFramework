@@ -1,11 +1,7 @@
-﻿using Blazored.LocalStorage;
-using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
 using Mapster;
-using Microsoft.Extensions.Configuration;
-using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Wallet;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 
@@ -13,12 +9,14 @@ public partial class SessionState
 {
     protected class LogInHandler : ActionHandler<Login, CmdResponse>
     {
+        public IWebAssemblyHostEnvironment HostEnvironment { get; }
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
         public bool VerificationRequired { get; set; }
         
-        public LogInHandler(IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public LogInHandler(IWebAssemblyHostEnvironment hostEnvironment, IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            HostEnvironment = hostEnvironment;
             IdentityServiceWrapper = identityServiceWrapper;
             Configuration = configuration;
             SessionStorageService = sessionStorageService;
@@ -53,7 +51,7 @@ public partial class SessionState
             };
             
             var checkVerification = new QueryResponse<IdentityVerificationSummaryResponse>();
-            if (!action.SkipVerification)
+            if (!action.SkipVerification && HostEnvironment.IsProduction())
             {
                 checkVerification = await IdentityServiceWrapper.CheckVerification(new()
                 {
@@ -84,26 +82,41 @@ public partial class SessionState
             }         
 
             // Set Session State To Active
-            await Mediator.Send(new SetState() {State = CurrentSessionState.Active});
-            
-            // Fetch User Identity And Credential and Contact List
-            var identityResponse = await IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});
-            var credentialResponse = await IdentityServiceWrapper.GetCredential(new() {Guid = response.Response.CredentialGuid});
-            var contactListResponse = await IdentityServiceWrapper.GetContactList(new() {CredentialGuid = response.Response.CredentialGuid});
-            
-            // Set State And Update UI
             await Mediator.Send(new SetState()
             {
-                Identity = identityResponse.Response,
-                Credential = credentialResponse.Response,
-                ContactList = contactListResponse.Response
+                Identity = new(){Guid = response.Response.IdentityGuid},
+                Credential = new(){Guid = response.Response.CredentialGuid},
+                State = CurrentSessionState.Active
             });
-
-            if (action.SkipVerification || (checkVerification.HttpStatusCode is not HttpStatusCode.NotFound && checkVerification.Response.IsVerified))
+            
+            // Inform UI About Not Busy State
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+            
+            if (!HostEnvironment.IsProduction())
             {
                 // If Success URL property is provided, navigate to the given URL
                 await HandleSuccess(response, action, true);
             }
+            else if (action.SkipVerification || (checkVerification.HttpStatusCode is not HttpStatusCode.NotFound && checkVerification.Response.IsVerified))
+            {
+                // If Success URL property is provided, navigate to the given URL
+                await HandleSuccess(response, action, true);
+            }
+            
+            // Fetch User Identity And Credential and Contact List
+            var identityResponse = IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});
+            var credentialResponse = IdentityServiceWrapper.GetCredential(new() {Guid = response.Response.CredentialGuid});
+            var contactListResponse = IdentityServiceWrapper.GetContactList(new() {CredentialGuid = response.Response.CredentialGuid});
+
+            await Task.WhenAll(identityResponse, credentialResponse, contactListResponse);
+            
+            // Set State And Update UI
+            await Mediator.Send(new SetState()
+            {
+                Identity = identityResponse.Result.Response,
+                Credential = credentialResponse.Result.Response,
+                ContactList = contactListResponse.Result.Response
+            });
 
             // Reset Session Forms
             await Mediator.Send(new SetState()
@@ -137,9 +150,6 @@ public partial class SessionState
                 }
             }
 
-            // Inform UI About Not Busy State
-            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-            
             return new()
             {
                 HttpStatusCode = VerificationRequired ? HttpStatusCode.PreconditionRequired : HttpStatusCode.Accepted,

@@ -11,34 +11,29 @@ public class CreateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
     
     public async Task<CmdResponse<CreateConsultationEntityCmd>> Handle(CreateConsultationEntityCmd request, CancellationToken cancellationToken)
     {
-        var entityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", cancellationToken: cancellationToken);
-       
+        var entityGroup = await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups.FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", CancellationToken.None);
         if (entityGroup is null)
         {
             return new ()
             {
-                Message = $"Consultation type group with Guid {request.GroupGuid} does not exist",
+                Message = $"Consultation entity group with Guid {request.GroupGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
-        var entity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.ConsultationEntity>();
-        entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        entity.Group = entityGroup;
+        var consultationEntity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.ConsultationEntity>();
+        consultationEntity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        consultationEntity.Group = entityGroup;
         
-        _dataLayer.HealthEssentialsContext.ConsultationEntities.Add(entity);
+        await _dataLayer.HealthEssentialsContext.ConsultationEntities.AddAsync(consultationEntity, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(consultationEntity.Guid);
         return new()
         {
-            Message = $"Consultation type with Guid {entity.Guid} created successfully",
+            Message = $"Consultation entity with Guid {consultationEntity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(entity.Guid)
-            }
         };
     }
 }

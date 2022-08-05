@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Locations;
+﻿namespace XFramework.Client.Shared.Core.Features.Locations;
 
 public partial class LocationState
 {

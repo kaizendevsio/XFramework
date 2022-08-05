@@ -11,9 +11,7 @@ public class DeleteDoctorHandler : CommandBaseHandler, IRequestHandler<DeleteDoc
 
     public async Task<CmdResponse<DeleteDoctorCmd>> Handle(DeleteDoctorCmd request, CancellationToken cancellationToken)
     {
-        var existingDoctor = await _dataLayer.HealthEssentialsContext.Doctors
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
-        
+        var existingDoctor = await _dataLayer.HealthEssentialsContext.Doctors.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingDoctor is null)
         {
             return new ()
@@ -32,8 +30,7 @@ public class DeleteDoctorHandler : CommandBaseHandler, IRequestHandler<DeleteDoc
         return new()
         {
             Message = $"Doctor with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            HttpStatusCode = HttpStatusCode.OK
         };
 
     }

@@ -20,7 +20,8 @@ public class BaseSignalRHandler
         {
             RequestGuid = telemetry.RequestGuid,
             Recipient = telemetry.ClientGuid,
-            ExchangeType = MessageExchangeType.Direct
+            ExchangeType = MessageExchangeType.Direct,
+            ResponseStatusCode = data.GetPropertyValue<HttpStatusCode>("HttpStatusCode")
         };
         request.SetData(data);
         request.CommandName = "InvokeResponseHandler";

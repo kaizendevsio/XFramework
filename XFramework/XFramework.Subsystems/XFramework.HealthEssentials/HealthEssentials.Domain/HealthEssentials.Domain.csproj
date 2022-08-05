@@ -26,7 +26,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Folder Include="Contracts" />
         <Folder Include="DataTransferObjects" />
         <Folder Include="Enums" />
     </ItemGroup>

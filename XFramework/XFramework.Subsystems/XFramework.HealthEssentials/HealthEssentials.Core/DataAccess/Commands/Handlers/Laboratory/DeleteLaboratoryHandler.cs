@@ -4,15 +4,14 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
 public class DeleteLaboratoryHandler : CommandBaseHandler, IRequestHandler<DeleteLaboratoryCmd, CmdResponse<DeleteLaboratoryCmd>>
 {
-    public DeleteLaboratoryHandler()
+    public DeleteLaboratoryHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+    
     public async Task<CmdResponse<DeleteLaboratoryCmd>> Handle(DeleteLaboratoryCmd request, CancellationToken cancellationToken)
     {
-        var existingLaboratory = await _dataLayer.HealthEssentialsContext.Laboratories
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var existingLaboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingLaboratory == null)
         {
             return new()
@@ -31,8 +30,7 @@ public class DeleteLaboratoryHandler : CommandBaseHandler, IRequestHandler<Delet
         return new()
         {
             Message = $"Laboratory with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

@@ -12,6 +12,7 @@ global using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 global using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 global using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 global using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
+global using HealthEssentials.Core.DataAccess.Commands.Entity.Vendor;
 global using IdentityServer.Domain.Generic.Contracts.Requests.Create.Address;
 global using Mapster;
 global using XFramework.Domain.Generic.BusinessObjects;

@@ -19,13 +19,13 @@ public class GetPharmacyLocationHandler : QueryBaseHandler, IRequestHandler<GetP
     public async Task<QueryResponse<PharmacyLocationResponse>> Handle(GetPharmacyLocationQuery request, CancellationToken cancellationToken)
     {
         var pharmacyLocation = await _dataLayer.HealthEssentialsContext.PharmacyLocations
+            .Include(i => i.PharmacyJobOrders)
             .Include(i => i.PharmacyServices)
             .Include(i => i.PharmacyMembers)
             .Include(i => i.Pharmacy)
-            .Where(i => i.Guid == $"{request.Guid}")
             .AsNoTracking()
             .AsSplitQuery()
-            .FirstOrDefaultAsync(CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}",CancellationToken.None);
 
         if (pharmacyLocation is null)
         {
@@ -62,35 +62,25 @@ public class GetPharmacyLocationHandler : QueryBaseHandler, IRequestHandler<GetP
     }
     private async Task GetBranchAddressData(PharmacyLocationResponse response)
     {
-        var countryId = response.Country;
-        var regionId = response.Region;
-        var provinceId = response.Province;
-        var cityId = response.City;
-        var barangayId = response.Barangay;
+        var countryId = response.CountryId;
+        var regionId = response.RegionId;
+        var provinceId = response.ProvinceId;
+        var cityId = response.CityId;
+        var barangayId = response.BarangayId;
 
-        var countryNavigation = _dataLayer.XnelSystemsContext.AddressCountries
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == countryId, CancellationToken.None);
-        var regionNavigation = _dataLayer2.XnelSystemsContext.AddressRegions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == regionId, CancellationToken.None);
-        var provinceNavigation = _dataLayer3.XnelSystemsContext.AddressProvinces
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == provinceId, CancellationToken.None);
-        var cityNavigation = _dataLayer4.XnelSystemsContext.AddressCities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == cityId, CancellationToken.None);
-        var barangayNavigation = _dataLayer5.XnelSystemsContext.AddressBarangays
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == barangayId, CancellationToken.None);
+        var country = _dataLayer.XnelSystemsContext.AddressCountries.AsNoTracking().FirstOrDefaultAsync(i => i.Id == countryId, CancellationToken.None);
+        var region = _dataLayer2.XnelSystemsContext.AddressRegions.AsNoTracking().FirstOrDefaultAsync(i => i.Id == regionId, CancellationToken.None);
+        var province = _dataLayer3.XnelSystemsContext.AddressProvinces.AsNoTracking().FirstOrDefaultAsync(i => i.Id == provinceId, CancellationToken.None);
+        var city = _dataLayer4.XnelSystemsContext.AddressCities.AsNoTracking().FirstOrDefaultAsync(i => i.Id == cityId, CancellationToken.None);
+        var barangay = _dataLayer5.XnelSystemsContext.AddressBarangays.AsNoTracking().FirstOrDefaultAsync(i => i.Id == barangayId, CancellationToken.None);
 
-        await Task.WhenAll(countryNavigation, regionNavigation, provinceNavigation, cityNavigation, barangayNavigation);
+        await Task.WhenAll(country, region, province, city, barangay);
 
-        response.CountryNavigation = countryNavigation.Result?.Adapt<AddressCountryResponse>();
-        response.RegionNavigation = regionNavigation.Result?.Adapt<AddressRegionResponse>();
-        response.ProvinceNavigation = provinceNavigation.Result?.Adapt<AddressProvinceResponse>();
-        response.CityNavigation = cityNavigation.Result?.Adapt<AddressCityResponse>();
-        response.BarangayNavigation = barangayNavigation?.Result.Adapt<AddressBarangayResponse>();
+        response.Country = country.Result?.Adapt<AddressCountryResponse>();
+        response.Region = region.Result?.Adapt<AddressRegionResponse>();
+        response.Province = province.Result?.Adapt<AddressProvinceResponse>();
+        response.City = city.Result?.Adapt<AddressCityResponse>();
+        response.Barangay = barangay?.Result.Adapt<AddressBarangayResponse>();
     }
 
     private async Task GetMemberList(PharmacyLocationResponse response)
@@ -102,7 +92,7 @@ public class GetPharmacyLocationHandler : QueryBaseHandler, IRequestHandler<GetP
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
-                .Where(i => i.Id == response.PharmacyMembers[o].CredentialId)
+                .Where(i => i.Guid == response.PharmacyMembers[o].CredentialId)
                 .AsSplitQuery()
                 .AsNoTracking()
                 .FirstOrDefault()?

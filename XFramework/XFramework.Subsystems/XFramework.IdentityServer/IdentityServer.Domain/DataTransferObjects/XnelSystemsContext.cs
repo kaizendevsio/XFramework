@@ -1184,12 +1184,16 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .IsRequired()
                     .HasColumnType("character varying");
 
+                entity.Property(e => e.ContentType).HasColumnType("character varying");
+
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Guid)
                     .IsRequired()
                     .HasColumnType("character varying")
                     .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.Hash).HasColumnType("character varying");
 
                 entity.Property(e => e.IdentifierGuid).HasColumnType("character varying");
 
@@ -1198,6 +1202,8 @@ namespace IdentityServer.Domain.DataTransferObjects
                     .HasDefaultValueSql("true");
 
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.StorageFiles)

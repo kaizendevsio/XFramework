@@ -1,6 +1,8 @@
-﻿namespace HealthEssentials.Core.DataAccess.Commands.Entity.Doctor;
+﻿using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Create;
 
-public class CreateDoctorConsultationJobOrderCmd : CreateDoctorConsultationJobOrderRequest, IRequest<CmdResponse<CreateDoctorConsultationJobOrderRequest>>
+namespace HealthEssentials.Core.DataAccess.Commands.Entity.Doctor;
+
+public class CreateDoctorConsultationJobOrderCmd : CreateDoctorConsultationJobOrderRequest, IRequest<CmdResponse<CreateDoctorConsultationJobOrderCmd>>
 {
     
 }

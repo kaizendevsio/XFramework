@@ -1,8 +1,10 @@
-﻿using XFramework.Client.Shared.Core.Features.Address;
-using XFramework.Client.Shared.Core.Features.Application;
+﻿using Humanizer;
+using IdentityServer.Domain.Generic.Contracts.Responses;
+using XFramework.Client.Shared.Core.Features.Address;
 using XFramework.Client.Shared.Core.Features.Cache;
 using XFramework.Client.Shared.Core.Features.Cryptocurrency;
 using XFramework.Client.Shared.Core.Features.Layout;
+using XFramework.Client.Shared.Core.Features.Member;
 using XFramework.Client.Shared.Core.Features.Modals;
 using XFramework.Client.Shared.Core.Features.Session;
 using XFramework.Client.Shared.Core.Features.Wallet;
@@ -22,7 +24,8 @@ public class XComponentsBase : BlazorStateComponent
     [Inject] public IDialogService DialogService { get; set; }
     
     // Initialize States
-    public ApplicationState AppState => GetState<ApplicationState>();
+    public ApplicationState ApplicationState => GetState<ApplicationState>();
+    public MemberState MemberState => GetState<MemberState>();
     public LayoutState LayoutState => GetState<LayoutState>();
     public SessionState SessionState => GetState<SessionState>();
     public ModalState ModalState => GetState<ModalState>();
@@ -31,7 +34,7 @@ public class XComponentsBase : BlazorStateComponent
     public WalletState WalletState => GetState<WalletState>();
     public CryptocurrencyState CryptocurrencyState => GetState<CryptocurrencyState>();
 
-    public string Cursor => AppState.IsBusy ? "progress" : "arrow";
+    public string Cursor => ApplicationState.IsBusy ? "progress" : "arrow";
     
     // Global Methods
     public async Task NavigateTo(string path)
@@ -42,4 +45,11 @@ public class XComponentsBase : BlazorStateComponent
     {
         await Mediator.Send(new SessionState.NavigateBack());
     }
+    
+    // Global Methods
+    
+    public string FullName(CredentialResponse? item) => $"{item?.IdentityInfo.FirstName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.MiddleName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.LastName?.ToLowerInvariant().Humanize(LetterCasing.Title)}";
+    public string NickName(CredentialResponse? item) => $"{item?.IdentityInfo.FirstName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.MiddleName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.LastName?.ToLowerInvariant().Humanize(LetterCasing.Title)}";
+    public string PhoneNumber(CredentialResponse? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Entity.Name == "Phone")?.Value}";
+    public string EmailAddress(CredentialResponse? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Entity.Name == "Email")?.Value}";
 }

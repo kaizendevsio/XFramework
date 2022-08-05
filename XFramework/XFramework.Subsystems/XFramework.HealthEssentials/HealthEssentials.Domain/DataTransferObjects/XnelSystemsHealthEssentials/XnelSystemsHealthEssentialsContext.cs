@@ -410,6 +410,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .IsRequired()
                     .HasDefaultValueSql("true");
 
+                entity.Property(e => e.MeetingLink).HasColumnType("character varying");
+
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Prescription).HasColumnType("character varying");
@@ -573,6 +575,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.ClinicAddress).HasColumnType("character varying");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.CredentialId).HasColumnType("character varying");
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
@@ -1505,6 +1509,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
+                entity.Property(e => e.CredentialId).HasColumnType("character varying");
+
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
                 entity.Property(e => e.Guid)
@@ -2313,6 +2319,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
+                entity.Property(e => e.CredentialId).HasColumnType("character varying");
+
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
                 entity.Property(e => e.EntityId).HasColumnName("EntityID");
@@ -2696,6 +2704,11 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
 
+                entity.HasOne(d => d.Patient)
+                    .WithMany(p => p.PharmacyJobOrders)
+                    .HasForeignKey(d => d.PatientId)
+                    .HasConstraintName("pharmacyjoborder_patient_id_fk");
+
                 entity.HasOne(d => d.PharmacyLocation)
                     .WithMany(p => p.PharmacyJobOrders)
                     .HasForeignKey(d => d.PharmacyLocationId)
@@ -2848,6 +2861,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.Id).HasColumnName("ID");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.CredentialId).HasColumnType("character varying");
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 

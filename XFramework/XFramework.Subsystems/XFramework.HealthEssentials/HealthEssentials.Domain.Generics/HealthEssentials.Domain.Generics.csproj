@@ -17,6 +17,20 @@
 
     <ItemGroup>
         <Folder Include="BusinessObjects" />
+        <Folder Include="Contracts\Requests\Administrtor\Create" />
+        <Folder Include="Contracts\Requests\Administrtor\Delete" />
+        <Folder Include="Contracts\Requests\Administrtor\Update" />
+        <Folder Include="Contracts\Requests\Administrtor\Verify" />
+        <Folder Include="Contracts\Requests\Ailment\Verify" />
+        <Folder Include="Contracts\Requests\Consultation\Verify" />
+        <Folder Include="Contracts\Requests\Hospital\Verify" />
+        <Folder Include="Contracts\Requests\Medicine\Verify" />
+        <Folder Include="Contracts\Requests\MetaData\Verify" />
+        <Folder Include="Contracts\Requests\Schedule\Verify" />
+        <Folder Include="Contracts\Requests\Storage" />
+        <Folder Include="Contracts\Requests\Tag\Verify" />
+        <Folder Include="Contracts\Requests\Unit\Verify" />
+        <Folder Include="Contracts\Requests\Vendor\Verify" />
     </ItemGroup>
     
 </Project>

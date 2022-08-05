@@ -11,10 +11,8 @@ public class CreateConsultationHandler : CommandBaseHandler, IRequestHandler<Cre
     
     public async Task<CmdResponse<CreateConsultationCmd>> Handle(CreateConsultationCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.HealthEssentialsContext.ConsultationEntities
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", CancellationToken.None);
-       
-        if (entity is null)
+        var consultationEntity = await _dataLayer.HealthEssentialsContext.ConsultationEntities.FirstOrDefaultAsync(i => i.Guid == $"{request.EntityGuid}", CancellationToken.None);
+        if (consultationEntity is null)
         {
             return new ()
             {
@@ -23,22 +21,19 @@ public class CreateConsultationHandler : CommandBaseHandler, IRequestHandler<Cre
             };
         }
 
-        var newRecord = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Consultation>();
-        newRecord.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        newRecord.Entity = entity;
+        var consultation = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Consultation>();
+        consultation.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        consultation.Entity = consultationEntity;
         
-        _dataLayer.HealthEssentialsContext.Add(newRecord);
+        await _dataLayer.HealthEssentialsContext.Consultations.AddAsync(consultation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(consultation.Guid);
         return new()
         {
-            Message = $"Consultation with Guid {newRecord.Guid} created successfully",
+            Message = $"Consultation with Guid {consultation.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(newRecord.Guid)
-            }
         };
     }
 }

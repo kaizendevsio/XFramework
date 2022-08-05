@@ -11,8 +11,8 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
     
     public async Task<CmdResponse<UpdateLaboratoryMemberCmd>> Handle(UpdateLaboratoryMemberCmd request, CancellationToken cancellationToken)
     {
-        var laboratoryMember = await _dataLayer.HealthEssentialsContext.LaboratoryMembers.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-        if (laboratoryMember is null)
+        var existingLaboratoryMember = await _dataLayer.HealthEssentialsContext.LaboratoryMembers.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        if (existingLaboratoryMember is null)
         {
             return new ()
             {
@@ -20,39 +20,57 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-        if (credential is null)
+        var updatedLaboratoryMember = request.Adapt(existingLaboratoryMember);
+
+        if (request.CredentialGuid is not null)
         {
-            return new ()
+            var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
+            if (credential is null)
             {
-                Message = $"Credential with Guid {request.CredentialGuid} not found",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new ()
+                {
+                    Message = $"Credential with Guid {request.CredentialGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedLaboratoryMember.CredentialId = credential.Guid;
+        }
+
+        if (request.LaboratoryGuid is not null)
+        {
+            var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(i => i.Guid == $"{request.LaboratoryGuid}", cancellationToken: cancellationToken);
+            if (laboratory is null)
+            {
+                return new ()
+                {
+                    Message = $"Laboratory with Guid {request.LaboratoryGuid} not found",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedLaboratoryMember.Laboratory = laboratory;
+        }
+
+        if (request.LaboratoryLocationGuid is not null)
+        {
+            var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryLocationGuid}", CancellationToken.None);
+            if (laboratoryLocation is null)
+            {
+                return new ()
+                {
+                    Message = $"Laboratory Location with Guid {request.LaboratoryLocationGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            updatedLaboratoryMember.LaboratoryLocation = laboratoryLocation;
         }
         
-        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(i => i.Guid == $"{request.LaboratoryGuid}", cancellationToken: cancellationToken);
-        if (laboratory is null)
-        {
-            return new ()
-            {
-                Message = $"Laboratory with Guid {request.CredentialGuid} not found",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
-        }
-        
-        laboratoryMember = request.Adapt(laboratoryMember);
-        laboratoryMember.CredentialId = credential.Id;
-        laboratoryMember.Laboratory = laboratory;
-        
-        _dataLayer.HealthEssentialsContext.Update(laboratoryMember);
+        _dataLayer.HealthEssentialsContext.Update(existingLaboratoryMember);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
-        return new()
+        return new ()
         {
-            Message = "Laboratory updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            Request = request
+            Message = $"Laboratory member with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

@@ -11,9 +11,7 @@ public class DeleteLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
 
     public async Task<CmdResponse<DeleteLogisticRiderHandleCmd>> Handle(DeleteLogisticRiderHandleCmd request, CancellationToken cancellationToken)
     {
-        var existingLogisticRiderHandle = await _dataLayer.HealthEssentialsContext.LogisticRiderHandles
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var existingLogisticRiderHandle = await _dataLayer.HealthEssentialsContext.LogisticRiderHandles.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingLogisticRiderHandle == null)
         {
             return new()
@@ -32,8 +30,7 @@ public class DeleteLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
         return new()
         {
             Message = $"Logistic rider handle with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

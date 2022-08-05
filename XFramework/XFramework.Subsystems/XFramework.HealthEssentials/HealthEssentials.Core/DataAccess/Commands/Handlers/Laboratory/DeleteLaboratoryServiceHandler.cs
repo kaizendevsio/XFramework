@@ -4,20 +4,18 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
 public class DeleteLaboratoryServiceHandler : CommandBaseHandler, IRequestHandler<DeleteLaboratoryServiceCmd, CmdResponse<DeleteLaboratoryServiceCmd>>
 {
-    public DeleteLaboratoryServiceHandler()
+    public DeleteLaboratoryServiceHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<CmdResponse<DeleteLaboratoryServiceCmd>> Handle(DeleteLaboratoryServiceCmd request, CancellationToken cancellationToken)
     {
-        var existingLaboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var existingLaboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingLaboratoryService == null)
         {
             return new()
             {
-                Message = $"Laboratory service entity with Guid {request.Guid} does not exist",
+                Message = $"Laboratory Service with Guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -28,11 +26,10 @@ public class DeleteLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
         _dataLayer.HealthEssentialsContext.Update(existingLaboratoryService);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
-        return new()
+        return new ()
         {
-            Message = $"Laboratory  service with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            Message = $"Laboratory Service with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

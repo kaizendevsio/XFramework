@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Session;
+﻿namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {

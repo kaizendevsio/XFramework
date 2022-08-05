@@ -17,6 +17,9 @@ namespace IdentityServer.Domain.DataTransferObjects
         public decimal? FileSize { get; set; }
         public DateTime? ExpireAt { get; set; }
         public long? StorageFileIdentifierId { get; set; }
+        public string Hash { get; set; }
+        public string Name { get; set; }
+        public string ContentType { get; set; }
 
         public virtual StorageFileEntity Entity { get; set; }
         public virtual StorageFileIdentifier StorageFileIdentifier { get; set; }

@@ -7,6 +7,7 @@ public partial class ApplicationState : State<ApplicationState>
     }
 
     public bool IsBusy { get; set; }
+    public bool NoSpinner { get; set; }
     public string ProgressTitle { get; set; }
     public string ProgressMessage { get; set; }
     public bool StateRestored { get; set; }

@@ -31,7 +31,7 @@ public class GetLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<GetL
         }
         
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .Where(i => i.Id == laboratoryMember.CredentialId)
+            .Where(i => i.Guid == laboratoryMember.CredentialId)
             .AsNoTracking()
             .FirstOrDefaultAsync(CancellationToken.None);
        

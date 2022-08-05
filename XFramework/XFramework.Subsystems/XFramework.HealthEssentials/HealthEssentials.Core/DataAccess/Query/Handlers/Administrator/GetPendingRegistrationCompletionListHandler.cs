@@ -53,9 +53,9 @@ public class GetPendingRegistrationCompletionListHandler : QueryBaseHandler, IRe
         var pendingRegistrationCompletion = new List<IdentityCredential>();
         foreach (var credential in credentials)
         {
-            var doctor = _dataLayer.HealthEssentialsContext.Doctors.AnyAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
-            var pharmacy = _dataLayer2.HealthEssentialsContext.PharmacyMembers.AnyAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
-            var laboratory = _dataLayer3.HealthEssentialsContext.LaboratoryMembers.AnyAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
+            var doctor = _dataLayer.HealthEssentialsContext.Doctors.AnyAsync(i => i.CredentialId == credential.Guid, CancellationToken.None);
+            var pharmacy = _dataLayer2.HealthEssentialsContext.PharmacyMembers.AnyAsync(i => i.CredentialId == credential.Guid, CancellationToken.None);
+            var laboratory = _dataLayer3.HealthEssentialsContext.LaboratoryMembers.AnyAsync(i => i.CredentialId == credential.Guid, CancellationToken.None);
             var logistic = _dataLayer4.HealthEssentialsContext.LogisticRiders.AnyAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
             
             await Task.WhenAll( doctor, pharmacy, laboratory, logistic);

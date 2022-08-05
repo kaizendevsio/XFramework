@@ -40,6 +40,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string? Diagnosis { get; set; }
         public string? Treatment { get; set; }
         public string? Symptoms { get; set; }
+        public string MeetingLink { get; set; } = null!;
 
         public virtual Consultation Consultation { get; set; } = null!;
         public virtual Schedule Schedule { get; set; } = null!;

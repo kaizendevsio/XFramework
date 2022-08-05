@@ -8,7 +8,6 @@ public class AvailabilityResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long EntityId { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public short? Status { get; set; }
@@ -19,5 +18,5 @@ public class AvailabilityResponse
     public bool? IsAvailable { get; set; }
     public Guid? Guid { get; set; }
     
-    public ScheduleEntityResponse Entity { get; set; } = null!;
+    public ScheduleEntityResponse? Entity { get; set; }
 }

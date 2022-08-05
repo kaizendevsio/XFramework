@@ -2,18 +2,21 @@
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
 
-public class GetLaboratoryServiceListHandler : QueryBaseHandler, IRequestHandler<GetLaboratoryServiceListQuery, QueryResponse<List<LaboratoryServiceEntityResponse>>>
+public class GetLaboratoryServiceListHandler : QueryBaseHandler, IRequestHandler<GetLaboratoryServiceListQuery, QueryResponse<List<LaboratoryServiceResponse>>>
 {
     public GetLaboratoryServiceListHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<QueryResponse<List<LaboratoryServiceEntityResponse>>> Handle(GetLaboratoryServiceListQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<List<LaboratoryServiceResponse>>> Handle(GetLaboratoryServiceListQuery request, CancellationToken cancellationToken)
     {
-        var laboratoryServiceEntities = await _dataLayer.HealthEssentialsContext.LaboratoryServices
-            .Include(i => i.Entity)
-            .ThenInclude(i => i.Group)
+        var laboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices
+            .Include(x => x.Entity)
+            .ThenInclude(x => x.Group)
+            .Include(x => x.LaboratoryLocation)
+            .ThenInclude(x => x.Laboratory)
+            .Include(x => x.Unit)
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
@@ -21,7 +24,7 @@ public class GetLaboratoryServiceListHandler : QueryBaseHandler, IRequestHandler
             .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
-        if (!laboratoryServiceEntities.Any())
+        if (!laboratoryService.Any())
         {
             return new()
             {
@@ -34,9 +37,8 @@ public class GetLaboratoryServiceListHandler : QueryBaseHandler, IRequestHandler
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            Message = "Success",
-            IsSuccess = true,
-            Response = laboratoryServiceEntities.Adapt<List<LaboratoryServiceEntityResponse>>()
+            Message = "Records found",
+            Response = laboratoryService.Adapt<List<LaboratoryServiceResponse>>()
         };
         
     }

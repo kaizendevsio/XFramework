@@ -9,7 +9,7 @@ public class LaboratoryMemberResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    [JsonIgnore] public long CredentialId { get; set; }
+    public string? CredentialId { get; set; }
     public string? Value { get; set; }
     public Guid? Guid { get; set; }
     public string? Name { get; set; }

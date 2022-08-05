@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-using XFramework.Client.Shared.Core.Features.Application;
-using XFramework.Integration.Interfaces;
+﻿using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services.Helpers;
 using SessionState = XFramework.Client.Shared.Core.Features.Session.SessionState;
 
@@ -40,17 +37,30 @@ public partial class AffiliateState
         public override async Task<CmdResponse> Handle(CreateSubscription action, CancellationToken aCancellationToken)
         {
             await Mediator.Send(new ApplicationState.SetState(){IsBusy = true});
-            switch (action.ContactType)
+
+            try
             {
-                case GenericContactType.Email:
-                    SessionState.RegisterVm.EmailAddress = CurrentState.AffiliateSubscriptionVm.Value;
-                    CurrentState.AffiliateSubscriptionVm.SubscriptionEntityGuid = Guid.Parse("0904b14a-260c-41f5-af82-038c9a7f2bef");
-                    break;
-                case GenericContactType.Phone:
-                    CurrentState.AffiliateSubscriptionVm.Value = CurrentState.AffiliateSubscriptionVm.Value.ValidatePhoneNumber();
-                    SessionState.RegisterVm.PhoneNumber = CurrentState.AffiliateSubscriptionVm.Value;
-                    CurrentState.AffiliateSubscriptionVm.SubscriptionEntityGuid = Guid.Parse("86662fbc-4623-450d-93f1-f11b2913305e");
-                    break;
+                switch (action.ContactType)
+                {
+                    case GenericContactType.Email:
+                        SessionState.RegisterVm.EmailAddress = CurrentState.AffiliateSubscriptionVm.Value;
+                        CurrentState.AffiliateSubscriptionVm.SubscriptionEntityGuid = Guid.Parse("0904b14a-260c-41f5-af82-038c9a7f2bef");
+                        break;
+                    case GenericContactType.Phone:
+                        CurrentState.AffiliateSubscriptionVm.Value = CurrentState.AffiliateSubscriptionVm.Value.ValidatePhoneNumber();
+                        SessionState.RegisterVm.PhoneNumber = CurrentState.AffiliateSubscriptionVm.Value;
+                        CurrentState.AffiliateSubscriptionVm.SubscriptionEntityGuid = Guid.Parse("86662fbc-4623-450d-93f1-f11b2913305e");
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                SweetAlertService.FireAsync("Error", $"{e.Message}", SweetAlertIcon.Error);
+                return new()
+                {
+                    IsSuccess = false,
+                    Message = e.Message
+                };
             }
 
             var response = await IdentityServiceWrapper.CreateAffiliateSubscription(CurrentState.AffiliateSubscriptionVm);

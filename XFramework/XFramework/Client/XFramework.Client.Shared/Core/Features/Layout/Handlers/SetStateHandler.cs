@@ -1,5 +1,3 @@
-using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
 using XFramework.Client.Shared.Entity.Enums;
 
 namespace XFramework.Client.Shared.Core.Features.Layout;

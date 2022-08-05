@@ -4,15 +4,13 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
 public class DeleteLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRequestHandler<DeleteLaboratoryServiceEntityGroupCmd, CmdResponse<DeleteLaboratoryServiceEntityGroupCmd>>
 {
-    public DeleteLaboratoryServiceEntityGroupHandler()
+    public DeleteLaboratoryServiceEntityGroupHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<CmdResponse<DeleteLaboratoryServiceEntityGroupCmd>> Handle(DeleteLaboratoryServiceEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var existingLaboratoryServiceEntityGroup = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var existingLaboratoryServiceEntityGroup = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingLaboratoryServiceEntityGroup == null)
         {
             return new()
@@ -28,11 +26,10 @@ public class DeleteLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRe
         _dataLayer.HealthEssentialsContext.Update(existingLaboratoryServiceEntityGroup);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
-        return new()
+        return new ()
         {
-            Message = $"Laboratory  service entity group with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            Message = $"Laboratory service entity group with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.OK
         };
 
     }

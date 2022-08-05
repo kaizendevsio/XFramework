@@ -17,6 +17,7 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
         var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
             .Include(i => i.Entity) 
             .ThenInclude(i => i.Group)
+            .Include(i => i.LaboratoryLocations) 
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)

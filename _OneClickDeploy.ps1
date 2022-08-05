@@ -16,7 +16,7 @@ if ($answer -eq "y") {
    Write-Host Deleting Previous Release Versions ...
    Write-Host
 
-   Get-ChildItem -Path "C:\Projects\Published\Release.XnelSystems" -Exclude ".git" | Remove-Item -Recurse -Force
+   Get-ChildItem -Path "C:\Projects\Published\Release.XnelSystems" -Exclude ".git", "Scripts" | Remove-Item -Recurse -Force
 
    Write-Host =============== Building Server-Side Solutions ===============
    Write-Host

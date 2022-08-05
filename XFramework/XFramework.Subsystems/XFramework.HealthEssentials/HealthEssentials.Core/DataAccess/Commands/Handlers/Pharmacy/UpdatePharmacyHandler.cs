@@ -1,4 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
 
@@ -11,8 +12,8 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
     
     public async Task<CmdResponse<UpdatePharmacyCmd>> Handle(UpdatePharmacyCmd request, CancellationToken cancellationToken)
     {
-        var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
-        if (pharmacy is null)
+        var existingPharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
+        if (existingPharmacy is null)
         {
             return new ()
             {
@@ -20,16 +21,15 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        pharmacy.Status = (int) request.Status;
-        _dataLayer.HealthEssentialsContext.Update(pharmacy);
+        var updatedPharmacy = request.Adapt(existingPharmacy);
+
+        _dataLayer.HealthEssentialsContext.Update(updatedPharmacy);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
         return new()
         {
-            Message = "Pharmacy updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            Request = request
+            Message = $"Pharmacy with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

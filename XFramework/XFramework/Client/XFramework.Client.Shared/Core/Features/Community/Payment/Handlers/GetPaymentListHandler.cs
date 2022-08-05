@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Payment;
+﻿namespace XFramework.Client.Shared.Core.Features.Payment;
 
 public partial class PaymentState
 {

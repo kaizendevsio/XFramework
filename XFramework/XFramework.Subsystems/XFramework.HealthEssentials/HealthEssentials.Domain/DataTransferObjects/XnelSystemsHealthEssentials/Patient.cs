@@ -13,6 +13,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
             PatientLaboratories = new HashSet<PatientLaboratory>();
             PatientReminders = new HashSet<PatientReminder>();
             PatientTags = new HashSet<PatientTag>();
+            PharmacyJobOrders = new HashSet<PharmacyJobOrder>();
         }
 
         public long Id { get; set; }
@@ -21,7 +22,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public bool? IsEnabled { get; set; }
         public bool IsDeleted { get; set; }
         public long EntityId { get; set; }
-        public long CredentialId { get; set; }
+        public string CredentialId { get; set; } = null!;
         public string? Description { get; set; }
         public string? Remarks { get; set; }
         public string Guid { get; set; } = null!;
@@ -33,5 +34,6 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public virtual ICollection<PatientLaboratory> PatientLaboratories { get; set; }
         public virtual ICollection<PatientReminder> PatientReminders { get; set; }
         public virtual ICollection<PatientTag> PatientTags { get; set; }
+        public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; set; }
     }
 }
