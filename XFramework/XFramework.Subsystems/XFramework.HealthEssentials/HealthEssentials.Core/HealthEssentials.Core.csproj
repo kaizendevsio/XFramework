@@ -46,11 +46,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Commands\Entity\Tag" />
-      <Folder Include="DataAccess\Commands\Handlers\Tag" />
       <Folder Include="DataAccess\Commands\Validations" />
-      <Folder Include="DataAccess\Query\Entity\Tag" />
-      <Folder Include="DataAccess\Query\Handlers\Tag" />
       <Folder Include="Validations\Consultation" />
       <Folder Include="Validations\Doctor" />
       <Folder Include="Validations\Laboratory" />
