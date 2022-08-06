@@ -78,7 +78,7 @@ public class CommenceLiveConsultationHandler : CommandBaseHandler, IRequestHandl
         {
             return new ()
             {
-                Message = $"Consultation Job Order with Guid {request.Guid} has been commenced",
+                Message = $"Consultation Job Order with Guid {request.Guid} has commenced",
                 HttpStatusCode = HttpStatusCode.Accepted
             };
         }
@@ -90,7 +90,7 @@ public class CommenceLiveConsultationHandler : CommandBaseHandler, IRequestHandl
             Recipient = contact,
             Subject = "Consultation Commenced",
             Intent = "Notification",
-            Message = $"Your consultation with Dr. {jobOrder.DoctorConsultationJobOrders.FirstOrDefault()?.Doctor.Name} has commenced. Please open the app to start the consultation.",
+            Message = $"Your consultation with Dr. {jobOrder.DoctorConsultationJobOrders.FirstOrDefault()?.Doctor.Name} has started. Please open the app to start the consultation.",
             IsScheduled = false
         });
         
