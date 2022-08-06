@@ -71,7 +71,7 @@ public class UpdatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<U
         return new ()
         {
             Message = $"Pharmacy member with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -40,17 +40,20 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Get;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
 using HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
 using HealthEssentials.Integration.Interfaces;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
@@ -277,6 +280,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<CmdResponse<DeleteScheduleRequest>> DeleteSchedule(DeleteScheduleRequest request)
     {
         return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<List<UnitResponse>>> GetUnitList(GetUnitListRequest request)
+    {
+        return await SendAsync<GetUnitListRequest, List<UnitResponse>>(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request)
@@ -662,6 +670,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<QueryResponse<LaboratoryServiceResponse>> GetLaboratoryService(GetLaboratoryServiceRequest request)
     {
         return await SendAsync<GetLaboratoryServiceRequest, LaboratoryServiceResponse>(request);
+    }
+
+    public async Task<CmdResponse<ConcludeLiveConsultationRequest>> ConcludeLiveConsultation(ConcludeLiveConsultationRequest request)
+    {
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<ConsultationResponse>> GetConsultation(GetConsultationRequest request)
@@ -1335,6 +1348,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<CmdResponse<CommenceLiveConsultationRequest>> CommenceLiveConsultation(CommenceLiveConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<ConsultationPaymentResponse>> GetConsultationPayment(GetConsultationPaymentRequest request)
     {
         return await SendAsync<GetConsultationPaymentRequest, ConsultationPaymentResponse>(request);
@@ -1415,9 +1433,9 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<QueryResponse<List<string>>> GetMedicineAutoComplete(GetMedicineAutoCompleteRequest request)
+    public async Task<QueryResponse<List<MedicineResponse>>> GetMedicineAutoComplete(GetMedicineAutoCompleteRequest request)
     {
-        return await SendAsync<GetMedicineAutoCompleteRequest, List<string>>(request);
+        return await SendAsync<GetMedicineAutoCompleteRequest, List<MedicineResponse>>(request);
     }
 
     public async Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request)
@@ -1446,11 +1464,6 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<CreatePharmacyMemberRequest>> CreatePharmacyMember(CreatePharmacyMemberRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<CreateConsultationPaymentRequest>> CreateConsultationPayment(CreateConsultationPaymentRequest request)
     {
         return await SendAsync(request);
     }

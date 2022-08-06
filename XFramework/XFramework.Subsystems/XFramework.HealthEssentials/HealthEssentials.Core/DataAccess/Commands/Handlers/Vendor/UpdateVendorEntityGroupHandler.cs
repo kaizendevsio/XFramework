@@ -26,7 +26,7 @@ public class UpdateVendorEntityGroupHandler : CommandBaseHandler, IRequestHandle
         return new ()
         {
             Message = $"Entity Group with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

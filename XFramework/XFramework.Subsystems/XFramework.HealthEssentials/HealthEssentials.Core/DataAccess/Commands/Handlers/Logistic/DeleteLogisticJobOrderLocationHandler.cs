@@ -30,7 +30,7 @@ public class DeleteLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
         return new()
         {
             Message = $"Location with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -30,7 +30,7 @@ public class DeletePharmacyStockHandler : CommandBaseHandler, IRequestHandler<De
         return new ()
         {
             Message = $"Pharmacy Stock with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

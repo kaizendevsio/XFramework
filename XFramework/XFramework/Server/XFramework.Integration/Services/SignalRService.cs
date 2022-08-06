@@ -291,20 +291,33 @@ public class SignalRService : ISignalRService
             new Timer(new((e) =>
                 {
                     methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
-                }), null, 30_000, 0);
+                }), null, 300_000, 0);
 
             Console.WriteLine($"Request Sent: '{args1.CommandName}', awaiting response...");
-            var streamFlowMessage = await response;
-
-            Stopwatch.Stop();
-            Console.WriteLine($"Response Received: '{args1.CommandName}' => {streamFlowMessage.ResponseStatusCode} ({(streamFlowMessage.IsResponseSuccessful ? "Success" : "Failed")}) ; took {Stopwatch.ElapsedMilliseconds}ms");
-
-            return new()
+            try
             {
-                HttpStatusCode = HttpStatusCode.Accepted,
-                Response = streamFlowMessage.Data,
-                Message = streamFlowMessage.Message
-            };
+                var streamFlowMessage = await response;
+                Stopwatch.Stop();
+                Console.WriteLine($"Response Received: '{args1.CommandName}' => {streamFlowMessage.ResponseStatusCode} ({(streamFlowMessage.IsResponseSuccessful ? "Success" : "Failed")}) ; took {Stopwatch.ElapsedMilliseconds}ms");
+
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.Accepted,
+                    Response = streamFlowMessage.Data,
+                    Message = streamFlowMessage.Message
+                };
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Exception while awaiting response: {e.Message} : {e.InnerException?.Message}");
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.RequestTimeout,
+                    Message = $"Error while awaiting response for method '{args1.CommandName}' on {args1.Recipient}"
+                };
+            }
+
+           
         }
         catch (Exception e)
         {

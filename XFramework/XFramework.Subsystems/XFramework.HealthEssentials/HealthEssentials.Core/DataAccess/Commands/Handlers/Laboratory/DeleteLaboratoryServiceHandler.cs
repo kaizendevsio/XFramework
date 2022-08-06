@@ -29,7 +29,7 @@ public class DeleteLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
         return new ()
         {
             Message = $"Laboratory Service with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

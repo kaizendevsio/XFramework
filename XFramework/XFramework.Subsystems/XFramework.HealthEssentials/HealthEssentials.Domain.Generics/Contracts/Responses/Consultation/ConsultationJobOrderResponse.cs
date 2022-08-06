@@ -26,7 +26,7 @@ public class ConsultationJobOrderResponse
     public string? Diagnosis { get; set; }
     public string? Treatment { get; set; }
     public string? Symptoms { get; set; }
-    public string? MeetingLink { get; set; }
+    public string MeetingLink { get; set; }
     
     public ConsultationResponse? Consultation { get; set; }
     public ScheduleResponse? Schedule { get; set; }

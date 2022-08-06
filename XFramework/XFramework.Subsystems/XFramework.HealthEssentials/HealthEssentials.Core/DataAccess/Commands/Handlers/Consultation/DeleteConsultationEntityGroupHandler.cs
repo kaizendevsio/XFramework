@@ -30,7 +30,7 @@ public class DeleteConsultationEntityGroupHandler : CommandBaseHandler, IRequest
         return new ()
         {
             Message = $"Consultation entity group with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

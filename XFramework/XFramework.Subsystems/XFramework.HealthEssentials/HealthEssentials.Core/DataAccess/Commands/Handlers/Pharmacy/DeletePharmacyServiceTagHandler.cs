@@ -30,7 +30,7 @@ public class DeletePharmacyServiceTagHandler : CommandBaseHandler, IRequestHandl
         return new ()
         {
             Message = $"Pharmacy Service Tag with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

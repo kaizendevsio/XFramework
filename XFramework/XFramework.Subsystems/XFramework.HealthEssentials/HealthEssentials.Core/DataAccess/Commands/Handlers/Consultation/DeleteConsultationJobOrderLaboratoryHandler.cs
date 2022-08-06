@@ -30,7 +30,7 @@ public class DeleteConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
         return new ()
         {
             Message = $"Consultation Job Order Laboratory with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

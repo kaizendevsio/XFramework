@@ -30,7 +30,7 @@ public class DeleteScheduleHandler : CommandBaseHandler, IRequestHandler<DeleteS
         return new()
         {
             Message = $"Schedule with Guid {request.Guid} deleted successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

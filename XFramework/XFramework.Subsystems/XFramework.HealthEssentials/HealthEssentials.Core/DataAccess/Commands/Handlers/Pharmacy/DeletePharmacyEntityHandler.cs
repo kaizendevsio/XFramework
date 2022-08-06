@@ -30,7 +30,7 @@ public class DeletePharmacyEntityHandler : CommandBaseHandler, IRequestHandler<D
         return new()
         {
             Message = $"Pharmacy Entity with Guid {request.Guid} deleted successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

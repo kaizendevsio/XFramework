@@ -28,7 +28,7 @@ public class UpdatePharmacyEntityHandler : CommandBaseHandler, IRequestHandler<U
         return new()
         {
             Message = $"Pharmacy Entity with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }

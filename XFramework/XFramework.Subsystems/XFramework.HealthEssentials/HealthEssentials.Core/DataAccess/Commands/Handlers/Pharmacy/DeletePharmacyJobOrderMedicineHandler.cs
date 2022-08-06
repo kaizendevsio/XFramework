@@ -30,7 +30,7 @@ public class DeletePharmacyJobOrderMedicineHandler : CommandBaseHandler, IReques
         return new ()
         {
             Message = $"Pharmacy Job Order Medicine with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

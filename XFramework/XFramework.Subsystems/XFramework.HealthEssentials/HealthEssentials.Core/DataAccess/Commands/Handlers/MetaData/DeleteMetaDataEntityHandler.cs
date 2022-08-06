@@ -30,7 +30,7 @@ public class DeleteMetaDataEntityHandler : CommandBaseHandler, IRequestHandler<D
         return new ()
         {
             Message = $"Entity with Guid {request.Guid} deleted successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }

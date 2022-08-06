@@ -28,7 +28,7 @@ public class DeleteVendorEntityGroupHandler : CommandBaseHandler, IRequestHandle
         return new ()
         {
             Message = $"Entity Group with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

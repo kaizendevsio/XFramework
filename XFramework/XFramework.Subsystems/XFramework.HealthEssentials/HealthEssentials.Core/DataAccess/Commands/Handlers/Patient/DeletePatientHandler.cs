@@ -30,7 +30,7 @@ public class DeletePatientHandler : CommandBaseHandler, IRequestHandler<DeletePa
         return new()
         {
             Message = $"Patient with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

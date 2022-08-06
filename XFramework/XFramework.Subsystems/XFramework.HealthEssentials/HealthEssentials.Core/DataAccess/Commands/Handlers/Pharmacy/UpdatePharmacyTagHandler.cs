@@ -56,7 +56,7 @@ public class UpdatePharmacyTagHandler : CommandBaseHandler, IRequestHandler<Upda
         return new ()
         {
             Message = $"Tag with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }

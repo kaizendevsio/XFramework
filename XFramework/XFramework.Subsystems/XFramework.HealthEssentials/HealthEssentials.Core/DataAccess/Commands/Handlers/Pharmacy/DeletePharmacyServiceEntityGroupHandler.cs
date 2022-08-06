@@ -30,7 +30,7 @@ public class DeletePharmacyServiceEntityGroupHandler : CommandBaseHandler, IRequ
         return new ()
         {
             Message = $"Pharmacy Service Entity Group with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -6,10 +6,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor;
 
 namespace HealthEssentials.Api.SignalR.Handlers.Consultation.Create;
 
-public class CreateConsultationPaymentHandler : BaseSignalRHandler, ISignalREventHandler
+public class ConcludeLiveConsultationHandler : BaseSignalRHandler, ISignalREventHandler
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<CreateConsultationPaymentRequest, CreateConsultationPaymentCmd>(connection, mediator);
+        HandleRequestCmd<ConcludeLiveConsultationRequest, ConcludeLiveConsultationCmd>(connection, mediator);
     }
 }

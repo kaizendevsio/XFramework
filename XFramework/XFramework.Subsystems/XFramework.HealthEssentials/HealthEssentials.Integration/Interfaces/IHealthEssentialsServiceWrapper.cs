@@ -47,17 +47,20 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Get;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
 using HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -270,7 +273,7 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// <summary>
     ///  Gets medicine auto complete list.
     /// </summary>
-    public Task<QueryResponse<List<string>>> GetMedicineAutoComplete(GetMedicineAutoCompleteRequest request);
+    public Task<QueryResponse<List<MedicineResponse>>> GetMedicineAutoComplete(GetMedicineAutoCompleteRequest request);
     /// <summary>
     ///  Gets the pharmacy profile.
     /// </summary>
@@ -1059,30 +1062,18 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteConsultationEntityRequest>> DeleteConsultationEntity(DeleteConsultationEntityRequest request);
     
     #endregion
-    #region Consultation Payment
-    /// <summary>
-    ///  Gets the consultation payment profile.
-    /// </summary>
-    public Task<QueryResponse<ConsultationPaymentResponse>> GetConsultationPayment(GetConsultationPaymentRequest request);
-    /// <summary>
-    ///  Get all consultation payments in the system.
-    /// </summary>
-    public Task<QueryResponse<List<ConsultationPaymentResponse>>> GetConsultationPaymentList(GetConsultationPaymentListRequest request);
-    /// <summary>
-    ///  Creates a new consultation payment in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateConsultationPaymentRequest>> CreateConsultationPayment(CreateConsultationPaymentRequest request);
-    /// <summary>
-    ///  Updates the consultation payment profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateConsultationPaymentRequest>> UpdateConsultationPayment(UpdateConsultationPaymentRequest request);
-    /// <summary>
-    ///  Deletes the consultation payment from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteConsultationPaymentRequest>> DeleteConsultationPayment(DeleteConsultationPaymentRequest request);
-
-    #endregion
+    
     #region Consultation
+    /// <summary>
+    /// Starts a new live consultation.
+    /// </summary>
+    /// <returns></returns>
+    public Task<CmdResponse<CommenceLiveConsultationRequest>> CommenceLiveConsultation(CommenceLiveConsultationRequest request);
+    /// <summary>
+    /// Ends a live consultation.
+    /// </summary>
+    /// <returns></returns>
+    public Task<CmdResponse<ConcludeLiveConsultationRequest>> ConcludeLiveConsultation(ConcludeLiveConsultationRequest request);
     /// <summary>
     ///  Gets the consultation profile.
     /// </summary>
@@ -1423,5 +1414,13 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteScheduleRequest>> DeleteSchedule(DeleteScheduleRequest request);
     #endregion
+    #endregion
+    
+    #region Unit
+    /// <summary>
+    /// Gets all schedules in the system.
+    /// </summary>
+    public Task<QueryResponse<List<UnitResponse>>> GetUnitList(GetUnitListRequest request);
+    
     #endregion
 }

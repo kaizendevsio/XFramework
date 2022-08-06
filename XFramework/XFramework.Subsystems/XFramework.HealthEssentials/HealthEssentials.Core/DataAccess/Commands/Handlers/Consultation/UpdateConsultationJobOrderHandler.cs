@@ -56,7 +56,7 @@ public class UpdateConsultationJobOrderHandler : CommandBaseHandler, IRequestHan
         return new()
         {
             Message = $"Consultation Job Order with Guid {updatedJobOrder.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

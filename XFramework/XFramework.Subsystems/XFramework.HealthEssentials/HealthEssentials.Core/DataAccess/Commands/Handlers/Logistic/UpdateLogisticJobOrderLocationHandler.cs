@@ -112,7 +112,7 @@ public class UpdateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
         return new()
         {
             Message = $"Location with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -31,6 +31,7 @@
         <!--<PackageReference Include="BinaryPack" Version="1.0.3" />-->
         <PackageReference Include="ByteSize" Version="2.1.1" />
         <PackageReference Include="Bogus" Version="34.0.2" />
+        <PackageReference Include="UnitsNet" Version="5.0.0-alpha006" />
 
 
     </ItemGroup>

@@ -56,7 +56,7 @@ public class UpdateAilmentTagHandler : CommandBaseHandler, IRequestHandler<Updat
         return new ()
         {
             Message = $"Ailment Tag with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }

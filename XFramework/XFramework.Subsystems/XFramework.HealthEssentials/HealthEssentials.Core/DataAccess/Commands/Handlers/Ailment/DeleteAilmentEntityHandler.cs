@@ -30,7 +30,7 @@ public class DeleteAilmentEntityHandler : CommandBaseHandler, IRequestHandler<De
         return new ()
         {
             Message = $"Ailment Entity with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

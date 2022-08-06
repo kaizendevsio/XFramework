@@ -70,7 +70,7 @@ public class UpdateLogisticJobOrderDetailHandler : CommandBaseHandler, IRequestH
         return new()
         {
             Message = $"Logistic Job Order Detail with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

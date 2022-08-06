@@ -30,7 +30,7 @@ public class DeleteMetaDatumHandler : CommandBaseHandler, IRequestHandler<Delete
         return new ()
         {
             Message = $"Meta Datum with Guid {request.Guid} deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

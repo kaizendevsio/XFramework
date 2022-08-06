@@ -7,6 +7,9 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
     {
         public Unit()
         {
+            ConsultationJobOrderMedicineDosageUnits = new HashSet<ConsultationJobOrderMedicine>();
+            ConsultationJobOrderMedicineDurationUnits = new HashSet<ConsultationJobOrderMedicine>();
+            ConsultationJobOrderMedicineIntakeUnits = new HashSet<ConsultationJobOrderMedicine>();
             HospitalServices = new HashSet<HospitalService>();
             LaboratoryServices = new HashSet<LaboratoryService>();
             LogisticJobOrderDetails = new HashSet<LogisticJobOrderDetail>();
@@ -27,6 +30,9 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string Guid { get; set; } = null!;
 
         public virtual UnitEntity Entity { get; set; } = null!;
+        public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicineDosageUnits { get; set; }
+        public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicineDurationUnits { get; set; }
+        public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicineIntakeUnits { get; set; }
         public virtual ICollection<HospitalService> HospitalServices { get; set; }
         public virtual ICollection<LaboratoryService> LaboratoryServices { get; set; }
         public virtual ICollection<LogisticJobOrderDetail> LogisticJobOrderDetails { get; set; }

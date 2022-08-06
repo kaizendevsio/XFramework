@@ -42,7 +42,7 @@ public class UpdateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Update
         return new ()
         {
             Message = $"Meta Datum with Guid {request.Guid} updated",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

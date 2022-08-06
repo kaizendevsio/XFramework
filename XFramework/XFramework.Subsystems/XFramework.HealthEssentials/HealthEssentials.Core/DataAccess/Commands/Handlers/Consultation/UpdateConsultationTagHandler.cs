@@ -56,7 +56,7 @@ public class UpdateConsultationTagHandler : CommandBaseHandler, IRequestHandler<
         return new()
         {
             Message = $"Consultation Tag with Guid {updatedTag.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

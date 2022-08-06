@@ -42,7 +42,7 @@ public class UpdateConsultationHandler : CommandBaseHandler, IRequestHandler<Upd
         return new()
         {
             Message = $"Consultation with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }
