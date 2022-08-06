@@ -21,8 +21,9 @@ public class CreateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
-        
-        var laboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryServiceGuid}", CancellationToken.None);
+        var consultationJobOrderLaboratory = request.Adapt<ConsultationJobOrderLaboratory>();
+
+        var laboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryServiceGuid}", CancellationToken.None);
         if (laboratoryService is null)
         {
             return new ()
@@ -32,21 +33,23 @@ public class CreateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
             };
         }
         
-        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.SuggestedLaboratoryLocationGuid}", CancellationToken.None);
-        if (laboratoryLocation is null)
+        if (request.SuggestedLaboratoryLocationGuid is not null)
         {
-            return new ()
+            var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.SuggestedLaboratoryLocationGuid}", CancellationToken.None);
+            if (laboratoryLocation is null)
             {
-                Message = $"Laboratory Location with Guid {request.SuggestedLaboratoryLocationGuid} does not exist",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new()
+                {
+                    Message = $"Laboratory Location with Guid {request.SuggestedLaboratoryLocationGuid} does not exist",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            consultationJobOrderLaboratory.SuggestedLaboratoryLocation = laboratoryLocation;
         }
 
-        var consultationJobOrderLaboratory = request.Adapt<ConsultationJobOrderLaboratory>();
         consultationJobOrderLaboratory.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         consultationJobOrderLaboratory.ConsultationJobOrder = consultationJobOrder;
         consultationJobOrderLaboratory.LaboratoryService = laboratoryService;
-        consultationJobOrderLaboratory.SuggestedLaboratoryLocation = laboratoryLocation;
 
         await _dataLayer.HealthEssentialsContext.ConsultationJobOrderLaboratories.AddAsync(consultationJobOrderLaboratory, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

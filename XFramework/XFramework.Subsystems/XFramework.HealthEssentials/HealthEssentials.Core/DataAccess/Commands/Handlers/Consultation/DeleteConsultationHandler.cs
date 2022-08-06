@@ -30,7 +30,7 @@ public class DeleteConsultationHandler : CommandBaseHandler, IRequestHandler<Del
         return new()
         {
             Message = $"Consultation with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

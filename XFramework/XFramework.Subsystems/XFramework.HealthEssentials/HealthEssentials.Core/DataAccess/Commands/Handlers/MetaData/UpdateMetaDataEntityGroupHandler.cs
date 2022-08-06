@@ -28,7 +28,7 @@ public class UpdateMetaDataEntityGroupHandler : CommandBaseHandler, IRequestHand
         return new()
         {
             Message = $"Meta Data Entity Group with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

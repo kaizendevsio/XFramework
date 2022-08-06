@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Patient;
 
@@ -13,7 +14,11 @@ public class GetPatientHandler : QueryBaseHandler, IRequestHandler<GetPatientQue
     public async Task<QueryResponse<PatientResponse>> Handle(GetPatientQuery request, CancellationToken cancellationToken)
     {
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
+            .Include(i => i.IdentityInfo)
+            .Include(i => i.IdentityContacts)
+            .ThenInclude(i => i.Entity)
             .AsNoTracking()
+            .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
        
         if (credential is null)
@@ -35,12 +40,14 @@ public class GetPatientHandler : QueryBaseHandler, IRequestHandler<GetPatientQue
                 Message = $"Patient with CredentialId {credential.Id} does not exist"
             };
         }
-        
+
+        var response = identity.Adapt<PatientResponse>();
+        response.Credential = credential.Adapt<CredentialResponse>();
         return new ()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Response = identity.Adapt<PatientResponse>()
+            Response = response
         };
     }
 }

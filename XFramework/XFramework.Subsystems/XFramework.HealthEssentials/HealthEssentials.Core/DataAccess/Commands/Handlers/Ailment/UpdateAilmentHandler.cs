@@ -42,7 +42,7 @@ public class UpdateAilmentHandler : CommandBaseHandler, IRequestHandler<UpdateAi
         return new ()
         {
             Message = $"Ailment with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
         
     }

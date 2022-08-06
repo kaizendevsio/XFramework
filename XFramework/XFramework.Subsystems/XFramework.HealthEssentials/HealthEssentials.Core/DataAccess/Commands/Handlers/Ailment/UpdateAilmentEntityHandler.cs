@@ -42,7 +42,7 @@ public class UpdateAilmentEntityHandler : CommandBaseHandler, IRequestHandler<Up
         return new ()
         {
             Message = $"Ailment Entity with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

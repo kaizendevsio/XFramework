@@ -30,7 +30,7 @@ public class DeleteLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
         return new()
         {
             Message = $"Logistic rider handle with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

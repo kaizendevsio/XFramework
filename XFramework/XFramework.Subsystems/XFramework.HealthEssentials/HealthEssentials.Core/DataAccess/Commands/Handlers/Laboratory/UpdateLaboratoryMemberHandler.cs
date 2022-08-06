@@ -70,7 +70,7 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         return new ()
         {
             Message = $"Laboratory member with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

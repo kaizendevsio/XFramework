@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
+using HealthEssentials.Domain.Generics.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Doctor;
 
@@ -16,6 +17,7 @@ public class GetDoctorConsultationJobOrderListHandler : QueryBaseHandler, IReque
             .Include(x => x.ConsultationJobOrder.PatientConsultations)
             .ThenInclude(i => i.Patient)
             .Include(x => x.Doctor)
+            .Where(i => request.Status.Contains((TransactionRecordType)i.ConsultationJobOrder.Status))
             .Where(i => i.Doctor.Guid == $"{request.DoctorGuid}")
             .Where(i => EF.Functions.ILike(i.ConsultationJobOrder.Remarks, $"%{request.SearchField}%")
                         || EF.Functions.ILike(i.ConsultationJobOrder.ReferenceNumber, $"%{request.SearchField}%")

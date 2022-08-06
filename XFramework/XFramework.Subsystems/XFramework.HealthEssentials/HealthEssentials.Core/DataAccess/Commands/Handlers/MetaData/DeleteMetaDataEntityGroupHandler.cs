@@ -30,7 +30,7 @@ public class DeleteMetaDataEntityGroupHandler : CommandBaseHandler, IRequestHand
         return new ()
         {
             Message = $"Meta Data Entity Group with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

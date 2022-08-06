@@ -44,7 +44,7 @@ public class UpdateMetaDataEntityHandler : CommandBaseHandler, IRequestHandler<U
         return new ()
         {
             Message = $"Entity with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
         
     }

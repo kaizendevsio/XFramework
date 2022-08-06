@@ -14,46 +14,20 @@
         <PackageReference Include="Mapster" Version="7.2.0" />
         <PackageReference Include="MediatR" Version="10.0.1" />
         <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="10.0.1" />
+        <PackageReference Include="RestSharp" Version="108.0.2-alpha.0.5" />
         <PackageReference Include="Sentry" Version="3.17.1" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.14.1" />
         <PackageReference Include="TypeSupport" Version="1.1.12" />
     </ItemGroup>
 
     <ItemGroup>
-        <Reference Include="IdentityServer.Domain.Generic">
-          <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
-        </Reference>
-        <Reference Include="SmsGateway.Domain.Generic">
-            <HintPath>..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\bin\Debug\net6.0\SmsGateway.Domain.Generic.dll</HintPath>
-        </Reference>
-        <Reference Include="SmsGateway.Integration">
-            <HintPath>..\..\XFramework.SmsGateway\SmsGateway.Integration\bin\Debug\net6.0\SmsGateway.Integration.dll</HintPath>
-        </Reference>
-        <Reference Include="Wallets.Domain.Generic">
-          <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
-        </Reference>
-        <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-            <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
-        </Reference>
-        <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-            <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
-        </Reference>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="DataAccess\Commands\Entity\Medicine" />
       <Folder Include="DataAccess\Commands\Entity\Tag" />
       <Folder Include="DataAccess\Commands\Entity\Unit" />
-      <Folder Include="DataAccess\Commands\Handlers\Medicine" />
       <Folder Include="DataAccess\Commands\Handlers\Tag" />
       <Folder Include="DataAccess\Commands\Handlers\Unit" />
       <Folder Include="DataAccess\Commands\Validations" />
-      <Folder Include="DataAccess\Query\Entity\Medicine" />
       <Folder Include="DataAccess\Query\Entity\Tag" />
-      <Folder Include="DataAccess\Query\Entity\Unit" />
-      <Folder Include="DataAccess\Query\Handlers\Medicine" />
       <Folder Include="DataAccess\Query\Handlers\Tag" />
-      <Folder Include="DataAccess\Query\Handlers\Unit" />
       <Folder Include="Validations\Consultation" />
       <Folder Include="Validations\Doctor" />
       <Folder Include="Validations\Laboratory" />
@@ -63,6 +37,13 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
       <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
       <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj" />
     </ItemGroup>

@@ -16,9 +16,7 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
     
     public async Task<CmdResponse<CreatePharmacyMemberCmd>> Handle(CreatePharmacyMemberCmd request, CancellationToken cancellationToken)
     {
-        var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.PharmacyGuid}", cancellationToken: cancellationToken);
-       
+        var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies.FirstOrDefaultAsync(i => i.Guid == $"{request.PharmacyGuid}", cancellationToken: cancellationToken);
         if (pharmacy is null)
         {
             return new ()
@@ -28,9 +26,7 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
             };
         }
         
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-       
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
         if (credential is null)
         {
             return new ()
@@ -40,9 +36,7 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
             };
         }
         
-        var pharmacyLocation = await _dataLayer.HealthEssentialsContext.PharmacyLocations
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.PharmacyLocationGuid}", cancellationToken: cancellationToken);
-
+        var pharmacyLocation = await _dataLayer.HealthEssentialsContext.PharmacyLocations.FirstOrDefaultAsync(i => i.Guid == $"{request.PharmacyLocationGuid}", cancellationToken: cancellationToken);
         if (pharmacyLocation is null)
         {
             return new ()
@@ -65,7 +59,8 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
         return new()
         {
             Message = $"Pharmacy Member with Guid {pharmacyMember.Guid} created successfully",
-            HttpStatusCode = HttpStatusCode.Accepted
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

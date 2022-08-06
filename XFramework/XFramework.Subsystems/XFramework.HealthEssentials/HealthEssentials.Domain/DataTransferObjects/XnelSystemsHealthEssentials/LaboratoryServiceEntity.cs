@@ -7,6 +7,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
     {
         public LaboratoryServiceEntity()
         {
+            ConsultationJobOrderLaboratories = new HashSet<ConsultationJobOrderLaboratory>();
             LaboratoryServices = new HashSet<LaboratoryService>();
         }
 
@@ -22,6 +23,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public int? SortOrder { get; set; }
 
         public virtual LaboratoryServiceEntityGroup Group { get; set; } = null!;
+        public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; set; }
         public virtual ICollection<LaboratoryService> LaboratoryServices { get; set; }
     }
 }

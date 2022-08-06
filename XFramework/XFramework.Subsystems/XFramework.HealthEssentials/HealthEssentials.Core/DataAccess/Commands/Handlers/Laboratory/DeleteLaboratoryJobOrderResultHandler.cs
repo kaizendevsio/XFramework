@@ -30,7 +30,7 @@ public class DeleteLaboratoryJobOrderResultHandler : CommandBaseHandler, IReques
         return new()
         {
             Message = $"Laboratory Job Order Result with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

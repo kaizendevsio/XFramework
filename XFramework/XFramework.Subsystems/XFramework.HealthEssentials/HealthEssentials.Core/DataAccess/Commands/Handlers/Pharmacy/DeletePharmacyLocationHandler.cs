@@ -11,9 +11,7 @@ public class DeletePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
     
     public async Task<CmdResponse<DeletePharmacyLocationCmd>> Handle(DeletePharmacyLocationCmd request, CancellationToken cancellationToken)
     {
-        var existingPharmacyLocation = await _dataLayer.HealthEssentialsContext.PharmacyLocations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var existingPharmacyLocation = await _dataLayer.HealthEssentialsContext.PharmacyLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingPharmacyLocation == null)
         {
             return new ()

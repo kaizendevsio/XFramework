@@ -30,7 +30,7 @@ public class DeleteLogisticEntityHandler : CommandBaseHandler, IRequestHandler<D
         return new()
         {
             Message = $"Logistic Entity with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

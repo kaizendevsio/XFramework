@@ -11,6 +11,28 @@ public class GetLaboratoryTagListHandler : QueryBaseHandler, IRequestHandler<Get
 
     public async Task<QueryResponse<List<LaboratoryTagResponse>>> Handle(GetLaboratoryTagListQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var tag = await _dataLayer.HealthEssentialsContext.LaboratoryTags
+            .Include(x => x.Tag)
+            .Include(x => x.Laboratory)
+            .OrderBy(x => x.CreatedAt)
+            .Take(request.PageSize)
+            .ToListAsync(CancellationToken.None);
+            
+        if (!tag.Any())
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No records found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Records found",
+            Response = tag.Adapt<List<LaboratoryTagResponse>>()
+        };
     }
 }

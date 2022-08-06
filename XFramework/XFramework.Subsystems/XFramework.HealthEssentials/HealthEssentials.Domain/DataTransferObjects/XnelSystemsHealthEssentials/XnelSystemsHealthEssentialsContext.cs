@@ -474,7 +474,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .WithMany(p => p.ConsultationJobOrderLaboratories)
                     .HasForeignKey(d => d.LaboratoryServiceId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("consultationjoborderlaboratory_laboratoryservice_id_fk");
+                    .HasConstraintName("consultationjoborderlaboratory_laboratoryserviceentity_id_fk");
 
                 entity.HasOne(d => d.SuggestedLaboratoryLocation)
                     .WithMany(p => p.ConsultationJobOrderLaboratories)
@@ -492,6 +492,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.Id).HasColumnName("ID");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Duration).HasPrecision(2);
 
                 entity.Property(e => e.Guid)
                     .HasColumnType("character varying")
@@ -514,6 +516,23 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .HasForeignKey(d => d.ConsultationJobOrderId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("consultationjobordermedicine_consultationjoborder_id_fk");
+
+                entity.HasOne(d => d.DosageUnit)
+                    .WithMany(p => p.ConsultationJobOrderMedicineDosageUnits)
+                    .HasForeignKey(d => d.DosageUnitId)
+                    .HasConstraintName("consultationjobordermedicine_unit_id_fk_3");
+
+                entity.HasOne(d => d.DurationUnit)
+                    .WithMany(p => p.ConsultationJobOrderMedicineDurationUnits)
+                    .HasForeignKey(d => d.DurationUnitId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("consultationjobordermedicine_unit_id_fk_2");
+
+                entity.HasOne(d => d.IntakeUnit)
+                    .WithMany(p => p.ConsultationJobOrderMedicineIntakeUnits)
+                    .HasForeignKey(d => d.IntakeUnitId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("consultationjobordermedicine_unit_id_fk");
 
                 entity.HasOne(d => d.Medicine)
                     .WithMany(p => p.ConsultationJobOrderMedicines)

@@ -28,7 +28,7 @@ public class UpdateConsultationEntityGroupHandler : CommandBaseHandler, IRequest
         return new ()
         {
             Message = $"Consultation entity group with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

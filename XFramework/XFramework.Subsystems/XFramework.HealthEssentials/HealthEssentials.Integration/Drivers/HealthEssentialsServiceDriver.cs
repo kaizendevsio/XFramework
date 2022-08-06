@@ -40,17 +40,20 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Get;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
 using HealthEssentials.Domain.Generics.Contracts.Responses.MetaData;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
 using HealthEssentials.Integration.Interfaces;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
@@ -279,6 +282,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<List<UnitResponse>>> GetUnitList(GetUnitListRequest request)
+    {
+        return await SendAsync<GetUnitListRequest, List<UnitResponse>>(request);
+    }
+
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request)
     {
         return await SendAsync<VerifyLogisticRiderRequest, IdentityValidationResponse>(request);
@@ -384,6 +392,236 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<CmdResponse<DeletePharmacyJobOrderRequest>> DeletePharmacyJobOrder(DeletePharmacyJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyEntityResponse>> GetPharmacyEntity(GetPharmacyEntityRequest request)
+    {
+        return await SendAsync<GetPharmacyEntityRequest, PharmacyEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyEntityResponse>>> GetPharmacyEntityList(GetPharmacyEntityListRequest request)
+    {
+        return await SendAsync<GetPharmacyEntityListRequest, List<PharmacyEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyEntityRequest>> CreatePharmacyEntity(CreatePharmacyEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyEntityRequest>> UpdatePharmacyEntity(UpdatePharmacyEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyEntityRequest>> DeletePharmacyEntity(DeletePharmacyEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyJobOrderConsultationJobOrderResponse>> GetPharmacyJobOrderConsultationJobOrder(GetPharmacyJobOrderConsultationJobOrderRequest request)
+    {
+        return await SendAsync<GetPharmacyJobOrderConsultationJobOrderRequest, PharmacyJobOrderConsultationJobOrderResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyJobOrderConsultationJobOrderResponse>>> GetPharmacyJobOrderConsultationJobOrderList(GetPharmacyJobOrderConsultationJobOrderListRequest request)
+    {
+        return await SendAsync<GetPharmacyJobOrderConsultationJobOrderListRequest, List<PharmacyJobOrderConsultationJobOrderResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyJobOrderConsultationJobOrderRequest>> CreatePharmacyJobOrderConsultationJobOrder(CreatePharmacyJobOrderConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyJobOrderConsultationJobOrderRequest>> UpdatePharmacyJobOrderConsultationJobOrder(UpdatePharmacyJobOrderConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyJobOrderConsultationJobOrderRequest>> DeletePharmacyJobOrderConsultationJobOrder(DeletePharmacyJobOrderConsultationJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyJobOrderMedicineResponse>> GetPharmacyJobOrderMedicine(GetPharmacyJobOrderMedicineRequest request)
+    {
+        return await SendAsync<GetPharmacyJobOrderMedicineRequest, PharmacyJobOrderMedicineResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyJobOrderMedicineResponse>>> GetPharmacyJobOrderMedicineList(GetPharmacyJobOrderMedicineListRequest request)
+    {
+        return await SendAsync<GetPharmacyJobOrderMedicineListRequest, List<PharmacyJobOrderMedicineResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyJobOrderMedicineRequest>> CreatePharmacyJobOrderMedicine(CreatePharmacyJobOrderMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyJobOrderMedicineRequest>> UpdatePharmacyJobOrderMedicine(UpdatePharmacyJobOrderMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyJobOrderMedicineRequest>> DeletePharmacyJobOrderMedicine(DeletePharmacyJobOrderMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyServiceEntityGroupResponse>> GetPharmacyServiceEntityGroup(GetPharmacyServiceEntityGroupRequest request)
+    {
+        return await SendAsync<GetPharmacyServiceEntityGroupRequest, PharmacyServiceEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyServiceEntityGroupResponse>>> GetPharmacyServiceEntityGroupList(GetPharmacyServiceEntityGroupListRequest request)
+    {
+        return await SendAsync<GetPharmacyServiceEntityGroupListRequest, List<PharmacyServiceEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyServiceEntityGroupRequest>> CreatePharmacyServiceEntityGroup(CreatePharmacyServiceEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyServiceEntityGroupRequest>> UpdatePharmacyServiceEntityGroup(UpdatePharmacyServiceEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyServiceEntityGroupRequest>> DeletePharmacyServiceEntityGroup(DeletePharmacyServiceEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyServiceEntityResponse>> GetPharmacyServiceEntity(GetPharmacyServiceEntityRequest request)
+    {
+        return await SendAsync<GetPharmacyServiceEntityRequest, PharmacyServiceEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyServiceEntityResponse>>> GetPharmacyServiceEntityList(GetPharmacyServiceEntityListRequest request)
+    {
+        return await SendAsync<GetPharmacyServiceEntityListRequest, List<PharmacyServiceEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyServiceEntityRequest>> CreatePharmacyServiceEntity(CreatePharmacyServiceEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyServiceEntityRequest>> UpdatePharmacyServiceEntity(UpdatePharmacyServiceEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyServiceEntityRequest>> DeletePharmacyServiceEntity(DeletePharmacyServiceEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyServiceResponse>> GetPharmacyService(GetPharmacyServiceRequest request)
+    {
+        return await SendAsync<GetPharmacyServiceRequest, PharmacyServiceResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyServiceResponse>>> GetPharmacyServiceList(GetPharmacyServiceListRequest request)
+    {
+        return await SendAsync<GetPharmacyServiceListRequest, List<PharmacyServiceResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyServiceRequest>> CreatePharmacyService(CreatePharmacyServiceRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyServiceRequest>> UpdatePharmacyService(UpdatePharmacyServiceRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyServiceRequest>> DeletePharmacyService(DeletePharmacyServiceRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyServiceTagResponse>> GetPharmacyServiceTag(GetPharmacyServiceTagRequest request)
+    {
+        return await SendAsync<GetPharmacyServiceTagRequest, PharmacyServiceTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyServiceTagResponse>>> GetPharmacyServiceTagList(GetPharmacyServiceTagListRequest request)
+    {
+        return await SendAsync<GetPharmacyServiceTagListRequest, List<PharmacyServiceTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyServiceTagRequest>> CreatePharmacyServiceTag(CreatePharmacyServiceTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyServiceTagRequest>> UpdatePharmacyServiceTag(UpdatePharmacyServiceTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyServiceTagRequest>> DeletePharmacyServiceTag(DeletePharmacyServiceTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyStockResponse>> GetPharmacyStock(GetPharmacyStockRequest request)
+    {
+        return await SendAsync<GetPharmacyStockRequest, PharmacyStockResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyStockResponse>>> GetPharmacyStockList(GetPharmacyStockListRequest request)
+    {
+        return await SendAsync<GetPharmacyStockListRequest, List<PharmacyStockResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyStockRequest>> CreatePharmacyStock(CreatePharmacyStockRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyStockRequest>> UpdatePharmacyStock(UpdatePharmacyStockRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyStockRequest>> DeletePharmacyStock(DeletePharmacyStockRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<PharmacyTagResponse>> GetPharmacyTag(GetPharmacyTagRequest request)
+    {
+        return await SendAsync<GetPharmacyTagRequest, PharmacyTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<PharmacyTagResponse>>> GetPharmacyTagList(GetPharmacyTagListRequest request)
+    {
+        return await SendAsync<GetPharmacyTagListRequest, List<PharmacyTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreatePharmacyTagRequest>> CreatePharmacyTag(CreatePharmacyTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdatePharmacyTagRequest>> UpdatePharmacyTag(UpdatePharmacyTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeletePharmacyTagRequest>> DeletePharmacyTag(DeletePharmacyTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyPatient(VerifyPatientRequest request)
     {
         return await SendAsync<VerifyPatientRequest, IdentityValidationResponse>(request);
@@ -432,6 +670,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     public async Task<QueryResponse<LaboratoryServiceResponse>> GetLaboratoryService(GetLaboratoryServiceRequest request)
     {
         return await SendAsync<GetLaboratoryServiceRequest, LaboratoryServiceResponse>(request);
+    }
+
+    public async Task<CmdResponse<ConcludeLiveConsultationRequest>> ConcludeLiveConsultation(ConcludeLiveConsultationRequest request)
+    {
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<ConsultationResponse>> GetConsultation(GetConsultationRequest request)
@@ -1105,6 +1348,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<CmdResponse<CommenceLiveConsultationRequest>> CommenceLiveConsultation(CommenceLiveConsultationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<ConsultationPaymentResponse>> GetConsultationPayment(GetConsultationPaymentRequest request)
     {
         return await SendAsync<GetConsultationPaymentRequest, ConsultationPaymentResponse>(request);
@@ -1185,6 +1433,11 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<List<MedicineResponse>>> GetMedicineAutoComplete(GetMedicineAutoCompleteRequest request)
+    {
+        return await SendAsync<GetMedicineAutoCompleteRequest, List<MedicineResponse>>(request);
+    }
+
     public async Task<QueryResponse<PharmacyResponse>> GetPharmacy(GetPharmacyRequest request)
     {
         return await SendAsync<GetPharmacyRequest, PharmacyResponse>(request);
@@ -1211,11 +1464,6 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<CreatePharmacyMemberRequest>> CreatePharmacyMember(CreatePharmacyMemberRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<CreateConsultationPaymentRequest>> CreateConsultationPayment(CreateConsultationPaymentRequest request)
     {
         return await SendAsync(request);
     }

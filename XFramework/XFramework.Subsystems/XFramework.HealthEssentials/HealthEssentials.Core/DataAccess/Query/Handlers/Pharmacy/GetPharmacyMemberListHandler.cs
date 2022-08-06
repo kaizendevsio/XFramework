@@ -12,7 +12,8 @@ public class GetPharmacyMemberListHandler : QueryBaseHandler, IRequestHandler<Ge
     public async Task<QueryResponse<List<PharmacyMemberResponse>>> Handle(GetPharmacyMemberListQuery request, CancellationToken cancellationToken)
     {
         var pharmacyMember = await _dataLayer.HealthEssentialsContext.PharmacyMembers
-            .Include(i => i.Pharmacy)
+            .Include(x => x.PharmacyLocation)
+            .ThenInclude(i => i.Pharmacy)
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)
             .Take(request.PageSize)

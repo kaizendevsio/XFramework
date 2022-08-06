@@ -29,7 +29,7 @@ public class DeleteLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRe
         return new ()
         {
             Message = $"Laboratory service entity group with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }
