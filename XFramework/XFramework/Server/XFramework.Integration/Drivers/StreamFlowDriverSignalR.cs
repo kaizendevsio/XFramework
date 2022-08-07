@@ -76,14 +76,24 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         await SignalRService.InvokeVoidAsync("Push", request);
     }
 
-    /*public async Task Subscribe(StreamFlowClientBO request)
+    public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request)
     {
-        await SignalRService.InvokeVoidAsync("Subscribe", request);
+        return SignalRService.InvokeVoidAsync("Subscribe", new()
+        {
+            CommandName = request.Name,
+            Data = null,
+            Message = null,
+            Recipient = null,
+            RequestGuid = default,
+            ConsumerGuid = null,
+            ResponseStatusCode = (HttpStatusCode) 0,
+            ExchangeType = MessageExchangeType.FanOut,
+            PriorityType = GenericPriorityType.Information
+        });
     }
-        
-    public async Task Unsubscribe(StreamFlowClientBO request)
-    {
-        await SignalRService.InvokeVoidAsync("Unsubscribe", BinaryConverter.Serialize(request));
-    }*/
 
+    public Task Unsubscribe(StreamFlowSubscriptionRequest request)
+    {
+        throw new NotImplementedException();
+    }
 }

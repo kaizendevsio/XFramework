@@ -77,11 +77,21 @@ public class SignalRService : ISignalRService
         Connection.On<string, string>("Ping", (intent, message) => { Console.WriteLine($"Message Received ({DateTime.Now}): [{intent}] {message}"); });
 
         Handle(_mediator);
+        HandleSubscriptionsEvent();
         HandleInvokeResponseEvent();
         HandleTelemetryCallEvent();
         HandleReconnectingEvent();
         HandleReconnectedEvent();
         HandleClosedEvent();
+    }
+
+    private async Task HandleSubscriptionsEvent()
+    {
+        var client = new StreamFlowClientBO()
+        {
+
+        };
+        await Connection.InvokeAsync<HttpStatusCode>("Subscribe", client);
     }
 
     private void HandleInvokeResponseEvent()

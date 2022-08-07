@@ -9,26 +9,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HostedService/InitializeMedicineListHostedService.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Pharmacy/Get/GetMedicineAutoComplete.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Entity/Medicine/InitializeMedicineListCmd.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Medicine/InitializeMedicineListHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Entity/Medicine/GetMedicineAutoCompleteQuery.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Medicine/GetMedicineAutoCompleteHandler.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Pharmacy/Get/GetMedicineAutoCompleteRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Contracts/Responses/DailyMedAutoCompleteResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Checkout_at_6_29_2022_2_55_PM_[Changes]/shelved.patch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Merge_at_7_22_2022_5_50_PM_[Changes]/shelved.patch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Merge_at_7_23_2022_2_06_PM_[Changes]/shelved.patch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Merge_at_7_23_2022_2_06_PM__Changes_.xml" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowSubscriptionRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Server.sln" beforeDir="false" afterPath="$PROJECT_DIR$/../../XFramework.Server.sln" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/Installers/HostedServiceInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/Installers/HostedServiceInstaller.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Pharmacy/Get/GetPharmacyJobOrderMedicineListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/SignalR/Handlers/Pharmacy/Get/GetPharmacyJobOrderMedicineListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Consultation/ConsultationJobOrderResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Consultation/ConsultationJobOrderResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/HealthEssentials.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/HealthEssentials.Domain.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceDriver.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Interfaces/IHealthEssentialsServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Interfaces/IHealthEssentialsServiceWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.StreamFlow/.idea/discord.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.StreamFlow/.idea/discord.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IMessageBusWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IMessageBusWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -75,6 +64,7 @@
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/CredentialResponse.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/IdentityResponse.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain.Generic/Contracts/Responses/IdentityRoleResponse.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Integration/Interfaces/ISmsGatewayServiceWrapper.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/FileUploadRequest.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/QueryableRequest.cs" root0="SKIP_HIGHLIGHTING" />
@@ -88,6 +78,7 @@
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/ICrudService.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/ProcessMonitorService.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/575c31ecc35a636b6f962cb71d53992552941a18982aae1c8e6c16305cc3761b/ExceptionDispatchInfo.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/f4708639776589f5ac2739f6fcbfc67343b1f9dac51cc1dbfdb003eef77cc1c/Monitor.CoreCLR.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
@@ -258,7 +249,13 @@
       <workItem from="1658959899864" duration="6004000" />
       <workItem from="1659065273358" duration="2999000" />
       <workItem from="1659142292894" duration="15208000" />
-      <workItem from="1659229011951" duration="3164000" />
+      <workItem from="1659229011951" duration="3365000" />
+      <workItem from="1659439230717" duration="3163000" />
+      <workItem from="1659511161199" duration="14669000" />
+      <workItem from="1659653720061" duration="17500000" />
+      <workItem from="1659754435414" duration="10944000" />
+      <workItem from="1659784172761" duration="627000" />
+      <workItem from="1659796632334" duration="3626000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>
@@ -407,7 +404,21 @@
       <option name="project" value="LOCAL" />
       <updated>1658902352895</updated>
     </task>
-    <option name="localTasksCounter" value="22" />
+    <task id="LOCAL-00022" summary="Updated project structure">
+      <created>1659763657618</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1659763657618</updated>
+    </task>
+    <task id="LOCAL-00023" summary="Updated health essentials service">
+      <created>1659829345071</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1659829345071</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -456,8 +467,34 @@
     <MESSAGE value="- Refactored consultation job orders get list&#10;- Added new Pharmacy Request" />
     <MESSAGE value="- Added Laboratory Create &amp; Update&#10;- Added Schedule CRUD" />
     <MESSAGE value="Safety Backup" />
-    <option name="LAST_COMMIT_MESSAGE" value="Safety Backup" />
+    <MESSAGE value="Updated project structure" />
+    <MESSAGE value="Updated health essentials service" />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated health essentials service" />
     <option name="GROUP_MULTIFILE_MERGE_BY_DIRECTORY" value="true" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="DotNet Breakpoints">
+          <url>file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Consultation/GetConsultationJobOrderListHandler.cs</url>
+          <line>30</line>
+          <properties documentPath="C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Core\DataAccess\Query\Handlers\Consultation\GetConsultationJobOrderListHandler.cs" initialLine="32" containingFunctionPresentation="method 'Handle'">
+            <startOffsets>
+              <option value="1566" />
+            </startOffsets>
+            <endOffsets>
+              <option value="1598" />
+            </endOffsets>
+          </properties>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+    <pin-to-top-manager>
+      <pinned-members>
+        <PinnedItemInfo parentTag="Type#HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials.ConsultationJobOrder" memberName="Guid" />
+      </pinned-members>
+    </pin-to-top-manager>
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
