@@ -78,18 +78,21 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
 
     public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request)
     {
-        return SignalRService.InvokeVoidAsync("Subscribe", new()
-        {
-            CommandName = request.Name,
-            Data = null,
-            Message = null,
-            Recipient = null,
-            RequestGuid = default,
-            ConsumerGuid = null,
-            ResponseStatusCode = (HttpStatusCode) 0,
-            ExchangeType = MessageExchangeType.FanOut,
-            PriorityType = GenericPriorityType.Information
-        });
+        SignalRService.Connection.On<StreamFlowContract>(request.Name,
+            async (response) =>
+            {
+                Console.WriteLine($"Notification Received: {request.Name}");
+                try
+                {
+                    var r = JsonSerializer.Deserialize<TResponse>(response.Data);
+                    request.OnInvoke?.Invoke(r);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Notification Received Exception: {e.Message} : {e.InnerException?.Message}");
+                }
+            });
+        return Task.CompletedTask;
     }
 
     public Task Unsubscribe(StreamFlowSubscriptionRequest request)

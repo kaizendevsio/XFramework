@@ -4,7 +4,7 @@ public class StreamFlowSubscriptionRequest<TResponse>
 {
     public string Name { get; set; }
     public TResponse Response { get; set; }
-    public Action OnInvoke { get; set; }
+    public Action<TResponse> OnInvoke { get; set; }
 }
 
 public class StreamFlowSubscriptionRequest

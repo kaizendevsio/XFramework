@@ -77,7 +77,6 @@ public class SignalRService : ISignalRService
         Connection.On<string, string>("Ping", (intent, message) => { Console.WriteLine($"Message Received ({DateTime.Now}): [{intent}] {message}"); });
 
         Handle(_mediator);
-        HandleSubscriptionsEvent();
         HandleInvokeResponseEvent();
         HandleTelemetryCallEvent();
         HandleReconnectingEvent();
@@ -85,13 +84,27 @@ public class SignalRService : ISignalRService
         HandleClosedEvent();
     }
 
-    private async Task HandleSubscriptionsEvent()
+    public async Task HandleSubscriptionsEvent(CredentialResponse credentialResponse)
     {
-        var client = new StreamFlowClientBO()
+        if (credentialResponse.Guid is null)
         {
-
+            throw new ArgumentException("Handle subscriptions event error: Credential guid is invalid");
+        }
+        
+        var client = new StreamFlowClientBO
+        {
+            Queue = new()
+            {
+                Guid = (Guid) credentialResponse.Guid,
+            },
         };
-        await Connection.InvokeAsync<HttpStatusCode>("Subscribe", client);
+        var r =  await Connection.InvokeAsync<HttpStatusCode>("Subscribe", client);
+        if (r is not HttpStatusCode.Accepted)
+        {
+            throw new ArgumentException("Handle subscriptions event error: Failed to subscribe for notifications");
+        }
+
+        Console.WriteLine("Started listening to notifications");
     }
 
     private void HandleInvokeResponseEvent()
