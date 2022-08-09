@@ -30,7 +30,7 @@ public class DeleteAilmentHandler : CommandBaseHandler, IRequestHandler<DeleteAi
         return new ()
         {
             Message = $"Ailment with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

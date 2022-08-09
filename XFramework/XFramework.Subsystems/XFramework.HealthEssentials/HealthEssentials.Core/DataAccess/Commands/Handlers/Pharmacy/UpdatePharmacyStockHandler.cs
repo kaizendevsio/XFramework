@@ -56,7 +56,7 @@ public class UpdatePharmacyStockHandler : CommandBaseHandler, IRequestHandler<Up
         return new ()
         {
             Message = $"Pharmacy Stock with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }

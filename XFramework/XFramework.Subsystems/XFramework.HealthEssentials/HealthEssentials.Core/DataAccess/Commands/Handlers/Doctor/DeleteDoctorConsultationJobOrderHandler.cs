@@ -30,7 +30,7 @@ public class DeleteDoctorConsultationJobOrderHandler : CommandBaseHandler, IRequ
         return new ()
         {
             Message = $"Doctor Consultation Job Order with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

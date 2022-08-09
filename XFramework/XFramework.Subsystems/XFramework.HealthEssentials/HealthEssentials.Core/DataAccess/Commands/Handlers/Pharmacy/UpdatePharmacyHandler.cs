@@ -29,7 +29,7 @@ public class UpdatePharmacyHandler : CommandBaseHandler, IRequestHandler<UpdateP
         return new()
         {
             Message = $"Pharmacy with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -28,7 +28,7 @@ public class UpdateDoctorEntityGroupHandler : CommandBaseHandler, IRequestHandle
         return new ()
         {
             Message = $"Doctor Entity Group with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

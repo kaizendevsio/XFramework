@@ -42,7 +42,7 @@ public class UpdateLaboratoryJobOrderResultHandler : CommandBaseHandler, IReques
             return new()
             {
                 Message = $"Laboratory Job Order Result with Guid {request.Guid} updated successfully",
-                HttpStatusCode = HttpStatusCode.OK
+                HttpStatusCode = HttpStatusCode.Accepted
             };
 
     }

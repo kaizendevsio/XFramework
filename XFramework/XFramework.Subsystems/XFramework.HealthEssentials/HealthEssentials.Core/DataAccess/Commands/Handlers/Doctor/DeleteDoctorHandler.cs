@@ -30,7 +30,7 @@ public class DeleteDoctorHandler : CommandBaseHandler, IRequestHandler<DeleteDoc
         return new()
         {
             Message = $"Doctor with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }

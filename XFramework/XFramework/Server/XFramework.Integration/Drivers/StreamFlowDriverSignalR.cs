@@ -76,14 +76,27 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         await SignalRService.InvokeVoidAsync("Push", request);
     }
 
-    /*public async Task Subscribe(StreamFlowClientBO request)
+    public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request)
     {
-        await SignalRService.InvokeVoidAsync("Subscribe", request);
+        SignalRService.Connection.On<StreamFlowContract>(request.Name,
+            async (response) =>
+            {
+                Console.WriteLine($"Notification Received: {request.Name}");
+                try
+                {
+                    var r = JsonSerializer.Deserialize<TResponse>(response.Data);
+                    request.OnInvoke?.Invoke(r);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Notification Received Exception: {e.Message} : {e.InnerException?.Message}");
+                }
+            });
+        return Task.CompletedTask;
     }
-        
-    public async Task Unsubscribe(StreamFlowClientBO request)
-    {
-        await SignalRService.InvokeVoidAsync("Unsubscribe", BinaryConverter.Serialize(request));
-    }*/
 
+    public Task Unsubscribe(StreamFlowSubscriptionRequest request)
+    {
+        throw new NotImplementedException();
+    }
 }

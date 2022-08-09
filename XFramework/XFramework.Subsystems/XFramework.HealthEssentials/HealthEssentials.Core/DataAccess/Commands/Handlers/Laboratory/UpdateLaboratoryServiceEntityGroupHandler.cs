@@ -27,7 +27,7 @@ public class UpdateLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRe
         return new ()
         {
             Message = $"Laboratory service entity group with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

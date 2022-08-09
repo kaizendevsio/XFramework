@@ -28,7 +28,7 @@ public class UpdatePharmacyServiceEntityGroupHandler : CommandBaseHandler, IRequ
         return new ()
         {
             Message = $"Pharmacy Service Entity Group with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

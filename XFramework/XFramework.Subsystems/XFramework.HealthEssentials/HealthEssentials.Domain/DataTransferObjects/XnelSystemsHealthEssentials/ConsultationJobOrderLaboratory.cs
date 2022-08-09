@@ -20,7 +20,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string Guid { get; set; } = null!;
 
         public virtual ConsultationJobOrder ConsultationJobOrder { get; set; } = null!;
-        public virtual LaboratoryService LaboratoryService { get; set; } = null!;
+        public virtual LaboratoryServiceEntity LaboratoryService { get; set; } = null!;
         public virtual LaboratoryLocation? SuggestedLaboratoryLocation { get; set; }
     }
 }

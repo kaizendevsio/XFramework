@@ -42,7 +42,7 @@ public class UpdateLaboratoryEntityHandler : CommandBaseHandler, IRequestHandler
         return new ()
         {
             Message = $"Laboratory Entity with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

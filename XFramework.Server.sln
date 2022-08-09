@@ -25,6 +25,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Integration", "X
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Tests", "XFramework\XFramework\Server\XFramework.Tests\XFramework.Tests.csproj", "{BE47E01F-4417-4861-9DF6-FD418668BBE1}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "_Dependencies", "_Dependencies", "{8CD1151F-9943-421D-A6C8-1DF138009724}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Domain.Generic", "XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj", "{8D9CA83A-3102-42ED-A316-C39052415789}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamFlow.Domain.Generic", "XFramework\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj", "{318F8BF9-D874-44C6-91EE-879F35956C12}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Domain.Generic", "XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj", "{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -63,6 +71,18 @@ Global
 		{BE47E01F-4417-4861-9DF6-FD418668BBE1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BE47E01F-4417-4861-9DF6-FD418668BBE1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BE47E01F-4417-4861-9DF6-FD418668BBE1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D9CA83A-3102-42ED-A316-C39052415789}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D9CA83A-3102-42ED-A316-C39052415789}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D9CA83A-3102-42ED-A316-C39052415789}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D9CA83A-3102-42ED-A316-C39052415789}.Release|Any CPU.Build.0 = Release|Any CPU
+		{318F8BF9-D874-44C6-91EE-879F35956C12}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{318F8BF9-D874-44C6-91EE-879F35956C12}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{318F8BF9-D874-44C6-91EE-879F35956C12}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{318F8BF9-D874-44C6-91EE-879F35956C12}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -79,5 +99,8 @@ Global
 		{7F3F2989-B7D3-4B7A-A4BF-9120158C0131} = {19CBDE44-59AA-47ED-894E-EEE4626E817F}
 		{7E04B9B6-E63D-4AAA-9118-8C25B516EA39} = {2BB0FE18-DE6E-4EF0-9D98-6431FFB91801}
 		{BE47E01F-4417-4861-9DF6-FD418668BBE1} = {2BB0FE18-DE6E-4EF0-9D98-6431FFB91801}
+		{8D9CA83A-3102-42ED-A316-C39052415789} = {8CD1151F-9943-421D-A6C8-1DF138009724}
+		{318F8BF9-D874-44C6-91EE-879F35956C12} = {8CD1151F-9943-421D-A6C8-1DF138009724}
+		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 	EndGlobalSection
 EndGlobal

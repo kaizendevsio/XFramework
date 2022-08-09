@@ -56,7 +56,7 @@ public class UpdateScheduleHandler : CommandBaseHandler, IRequestHandler<UpdateS
         return new()
         {
             Message = $"Schedule with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

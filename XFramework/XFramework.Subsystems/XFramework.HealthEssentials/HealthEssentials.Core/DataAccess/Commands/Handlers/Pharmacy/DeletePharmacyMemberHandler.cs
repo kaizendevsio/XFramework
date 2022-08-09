@@ -30,7 +30,7 @@ public class DeletePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<D
         return new()
         {
             Message = $"Pharmacy member with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

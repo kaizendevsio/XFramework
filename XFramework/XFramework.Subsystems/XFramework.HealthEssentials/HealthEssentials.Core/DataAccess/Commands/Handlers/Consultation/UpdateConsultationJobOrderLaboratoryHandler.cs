@@ -38,7 +38,7 @@ public class UpdateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
 
         if (request.LaboratoryServiceGuid is not null)
         {
-            var laboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryServiceGuid}", CancellationToken.None);
+            var laboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryServiceGuid}", CancellationToken.None);
             if (laboratoryService is null)
             {
                 return new ()
@@ -70,7 +70,7 @@ public class UpdateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
         return new()
         {
             Message = $"Consultation Job Order Laboratory with Guid {updatedJobOrderLaboratory.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

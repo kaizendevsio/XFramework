@@ -56,7 +56,7 @@ public class UpdateLogisticRiderTagHandler : CommandBaseHandler, IRequestHandler
         return new()
         {
             Message = $"Rider Tag with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

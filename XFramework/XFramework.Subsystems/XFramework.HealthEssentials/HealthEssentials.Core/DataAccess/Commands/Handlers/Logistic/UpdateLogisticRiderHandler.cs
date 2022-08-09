@@ -42,7 +42,7 @@ public class UpdateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Up
         return new()
         {
             Message = $"Logistic rider with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

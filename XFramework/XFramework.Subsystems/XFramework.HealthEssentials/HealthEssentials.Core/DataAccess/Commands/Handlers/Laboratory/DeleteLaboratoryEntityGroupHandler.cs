@@ -30,7 +30,7 @@ public class DeleteLaboratoryEntityGroupHandler : CommandBaseHandler, IRequestHa
         return new ()
         {
             Message = $"Laboratory Entity Group with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

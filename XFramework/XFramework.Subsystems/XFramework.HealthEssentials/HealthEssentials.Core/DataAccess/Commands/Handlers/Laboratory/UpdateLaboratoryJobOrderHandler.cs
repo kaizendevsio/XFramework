@@ -84,7 +84,7 @@ public class UpdateLaboratoryJobOrderHandler : CommandBaseHandler, IRequestHandl
         return new ()
         {
             Message = $"Laboratory Job Order with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

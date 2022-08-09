@@ -84,6 +84,29 @@ public class SignalRService : ISignalRService
         HandleClosedEvent();
     }
 
+    public async Task HandleSubscriptionsEvent(CredentialResponse credentialResponse)
+    {
+        if (credentialResponse.Guid is null)
+        {
+            throw new ArgumentException("Handle subscriptions event error: Credential guid is invalid");
+        }
+        
+        var client = new StreamFlowClientBO
+        {
+            Queue = new()
+            {
+                Guid = (Guid) credentialResponse.Guid,
+            },
+        };
+        var r =  await Connection.InvokeAsync<HttpStatusCode>("Subscribe", client);
+        if (r is not HttpStatusCode.Accepted)
+        {
+            throw new ArgumentException("Handle subscriptions event error: Failed to subscribe for notifications");
+        }
+
+        Console.WriteLine("Started listening to notifications");
+    }
+
     private void HandleInvokeResponseEvent()
     {
         Console.WriteLine($"InvokeResponseHandler Initialized");
@@ -291,20 +314,33 @@ public class SignalRService : ISignalRService
             new Timer(new((e) =>
                 {
                     methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
-                }), null, 30_000, 0);
+                }), null, 300_000, 0);
 
             Console.WriteLine($"Request Sent: '{args1.CommandName}', awaiting response...");
-            var streamFlowMessage = await response;
-
-            Stopwatch.Stop();
-            Console.WriteLine($"Response Received: '{args1.CommandName}' => {streamFlowMessage.ResponseStatusCode} ({(streamFlowMessage.IsResponseSuccessful ? "Success" : "Failed")}) ; took {Stopwatch.ElapsedMilliseconds}ms");
-
-            return new()
+            try
             {
-                HttpStatusCode = HttpStatusCode.Accepted,
-                Response = streamFlowMessage.Data,
-                Message = streamFlowMessage.Message
-            };
+                var streamFlowMessage = await response;
+                Stopwatch.Stop();
+                Console.WriteLine($"Response Received: '{args1.CommandName}' => {streamFlowMessage.ResponseStatusCode} ({(streamFlowMessage.IsResponseSuccessful ? "Success" : "Failed")}) ; took {Stopwatch.ElapsedMilliseconds}ms");
+
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.Accepted,
+                    Response = streamFlowMessage.Data,
+                    Message = streamFlowMessage.Message
+                };
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Exception while awaiting response: {e.Message} : {e.InnerException?.Message}");
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.RequestTimeout,
+                    Message = $"Error while awaiting response for method '{args1.CommandName}' on {args1.Recipient}"
+                };
+            }
+
+           
         }
         catch (Exception e)
         {

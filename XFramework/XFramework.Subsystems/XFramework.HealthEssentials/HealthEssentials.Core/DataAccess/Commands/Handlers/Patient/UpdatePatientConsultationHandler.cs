@@ -56,7 +56,7 @@ public class UpdatePatientConsultationHandler : CommandBaseHandler, IRequestHand
         return new ()
         {
             Message = $"Patient Consultation with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

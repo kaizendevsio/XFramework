@@ -28,7 +28,7 @@ public class UpdateAilmentEntityGroupHandler : CommandBaseHandler, IRequestHandl
         return new ()
         {
             Message = $"Ailment Entity Group with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

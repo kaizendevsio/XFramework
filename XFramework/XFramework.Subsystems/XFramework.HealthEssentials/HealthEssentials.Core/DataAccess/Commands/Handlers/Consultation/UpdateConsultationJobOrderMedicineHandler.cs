@@ -71,7 +71,7 @@ public class UpdateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
         return new()
         {
             Message = $"Consultation Job Order Medicine with Guid {updatedJobOrderMedicine.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

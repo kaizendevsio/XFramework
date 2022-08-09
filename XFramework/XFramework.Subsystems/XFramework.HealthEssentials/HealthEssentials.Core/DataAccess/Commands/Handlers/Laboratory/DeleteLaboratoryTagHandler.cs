@@ -30,7 +30,7 @@ public class DeleteLaboratoryTagHandler : CommandBaseHandler, IRequestHandler<De
         return new ()
         {
             Message = $"Laboratory Tag with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

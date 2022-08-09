@@ -30,19 +30,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
       <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
-      </Reference>
-      <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net6.0\StreamFlow.Domain.Generic.dll</HintPath>
-      </Reference>
-      <Reference Include="Wallets.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
-      </Reference>
     </ItemGroup>
 
 </Project>
