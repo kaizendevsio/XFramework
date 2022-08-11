@@ -55,8 +55,11 @@ public class ProcessMonitorService
                 Console.WriteLine("*** Warning: Memory usage is {0} MB, exceeding limit {1} MB. Application will be terminated.", memory.MegaBytes, _memoryLimit.MegaBytes);
                 _hostApplicationLifetime.StopApplication();
             }
-                
-            await Task.Delay(3000, CancellationToken.None);
+            
+            GC.Collect();
+            Console.WriteLine("Performed garbage collection. Memory usage is {0} MB.", memory.MegaBytes);
+            
+            await Task.Delay(TimeSpan.FromMinutes(15), CancellationToken.None);
         }
     }
 }
