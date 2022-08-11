@@ -11,6 +11,27 @@ public class GetLaboratoryEntityHandler : QueryBaseHandler, IRequestHandler<GetL
 
     public async Task<QueryResponse<LaboratoryEntityResponse>> Handle(GetLaboratoryEntityQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var entity = await _dataLayer.HealthEssentialsContext.LaboratoryEntities
+            .Include(x => x.Group)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (entity is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No data found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Data Found",
+            Response = entity.Adapt<LaboratoryEntityResponse>()
+        };
     }
 }

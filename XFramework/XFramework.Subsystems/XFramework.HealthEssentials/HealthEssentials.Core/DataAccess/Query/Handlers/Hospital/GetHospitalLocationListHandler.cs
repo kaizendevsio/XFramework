@@ -5,10 +5,11 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Hospital;
 
 public class GetHospitalLocationListHandler : QueryBaseHandler, IRequestHandler<GetHospitalLocationListQuery, QueryResponse<List<HospitalLocationResponse>>>
 {
-    public GetHospitalLocationListHandler()
+    public GetHospitalLocationListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<QueryResponse<List<HospitalLocationResponse>>> Handle(GetHospitalLocationListQuery request, CancellationToken cancellationToken)
     {
         var location = await _dataLayer.HealthEssentialsContext.HospitalLocations

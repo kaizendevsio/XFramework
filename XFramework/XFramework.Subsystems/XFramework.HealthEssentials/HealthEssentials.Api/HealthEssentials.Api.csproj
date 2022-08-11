@@ -54,6 +54,9 @@
       <Folder Include="SignalR\Handlers\Medicine\Verify" />
       <Folder Include="SignalR\Handlers\MetaData\Verify" />
       <Folder Include="SignalR\Handlers\Schedule\Verify" />
+      <Folder Include="SignalR\Handlers\Tag\Verify" />
+      <Folder Include="SignalR\Handlers\Unit\Verify" />
+      <Folder Include="SignalR\Handlers\Vendor\Verify" />
       <Folder Include="SignalR\Handlers\Tag" />
       <Folder Include="SignalR\Handlers\Vendor" />
     </ItemGroup>

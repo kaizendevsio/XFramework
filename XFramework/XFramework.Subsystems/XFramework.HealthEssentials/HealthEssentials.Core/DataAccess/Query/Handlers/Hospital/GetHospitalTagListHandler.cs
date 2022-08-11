@@ -5,10 +5,11 @@ namespace HealthEssentials.Core.DataAccess.Query.Handlers.Hospital;
 
 public class GetHospitalTagListHandler : QueryBaseHandler, IRequestHandler<GetHospitalTagListQuery, QueryResponse<List<HospitalTagResponse>>>
 {
-    public GetHospitalTagListHandler()
+    public GetHospitalTagListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<QueryResponse<List<HospitalTagResponse>>> Handle(GetHospitalTagListQuery request, CancellationToken cancellationToken)
     {
         var tag = await _dataLayer.HealthEssentialsContext.HospitalTags

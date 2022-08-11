@@ -13,7 +13,6 @@ public class GetLogisticRiderHandleListHandler : QueryBaseHandler, IRequestHandl
     {
         var logisticRiderHandle = await _dataLayer.HealthEssentialsContext.LogisticRiderHandles
             .Include(i => i.Logistic)
-            .ThenInclude(i => i.Entity)
             .Include(i => i.LogisticRider)
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)

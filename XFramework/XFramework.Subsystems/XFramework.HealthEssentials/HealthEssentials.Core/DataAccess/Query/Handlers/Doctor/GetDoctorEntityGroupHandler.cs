@@ -12,6 +12,25 @@ public class GetDoctorEntityGroupHandler : QueryBaseHandler, IRequestHandler<Get
     
     public async Task<QueryResponse<DoctorEntityGroupResponse>> Handle(GetDoctorEntityGroupQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var group = await _dataLayer.HealthEssentialsContext.DoctorEntityGroups
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (group is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No group found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Group found",
+            Response = group.Adapt<DoctorEntityGroupResponse>()
+        };
     }
 }

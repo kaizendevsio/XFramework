@@ -4,10 +4,11 @@ namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Hospital;
 
 public class CreateHospitalServiceEntityGroupHandler : CommandBaseHandler, IRequestHandler<CreateHospitalServiceEntityGroupCmd, CmdResponse<CreateHospitalServiceEntityGroupCmd>>
 {
-    public CreateHospitalServiceEntityGroupHandler()
+    public CreateHospitalServiceEntityGroupHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
+
     public async Task<CmdResponse<CreateHospitalServiceEntityGroupCmd>> Handle(CreateHospitalServiceEntityGroupCmd request, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
