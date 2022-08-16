@@ -4,7 +4,7 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Patient.Get;
 
 public class GetPatientConsultationListRequest : QueryableRequest
 {
-    public TransactionRecordType Status { get; set; }
+    public TransactionStatus Status { get; set; }
     public Guid? PatientGuid { get; set; }
 
 }

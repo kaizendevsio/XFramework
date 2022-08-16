@@ -2,6 +2,7 @@
 using HealthEssentials.Domain.Generics.Enums;
 using Messaging.Integration.Interfaces;
 using Microsoft.Extensions.Hosting;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 
@@ -60,7 +61,7 @@ public class ConcludeLiveConsultationHandler : CommandBaseHandler, IRequestHandl
         }
         
         jobOrder.CompletedAt = DateTime.UtcNow;
-        jobOrder.Status = (short?) TransactionRecordType.Completed;
+        jobOrder.Status = (short?) TransactionStatus.Completed;
         
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         

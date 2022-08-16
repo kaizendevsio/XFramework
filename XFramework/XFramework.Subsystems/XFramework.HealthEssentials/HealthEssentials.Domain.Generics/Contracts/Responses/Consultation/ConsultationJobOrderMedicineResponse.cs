@@ -9,7 +9,7 @@ public class ConsultationJobOrderMedicineResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public string? Quantity { get; set; }
+    public int Quantity { get; set; }
     public string? PrescriptionNote { get; set; }
     public string? Remarks { get; set; }
     public short? Status { get; set; }
