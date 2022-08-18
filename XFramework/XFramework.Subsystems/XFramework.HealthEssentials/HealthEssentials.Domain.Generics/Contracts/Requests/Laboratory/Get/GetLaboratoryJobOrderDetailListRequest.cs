@@ -4,5 +4,5 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
 
 public class GetLaboratoryJobOrderDetailListRequest : QueryableRequest
 {
-    public TransactionRecordType Status { get; set; }
+    public TransactionStatus Status { get; set; }
 }

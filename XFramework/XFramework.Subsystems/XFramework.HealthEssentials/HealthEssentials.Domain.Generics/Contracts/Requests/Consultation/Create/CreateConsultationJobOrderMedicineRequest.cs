@@ -9,7 +9,7 @@ public class CreateConsultationJobOrderMedicineRequest : RequestBase
     public Guid? DurationUnitGuid { get; set; }
     public Guid? DosageUnitGuid { get; set; }
     
-    public string? Quantity { get; set; }
+    public int Quantity { get; set; }
     public string? PrescriptionNote { get; set; }
     public string? Remarks { get; set; }
     public short? Status { get; set; }

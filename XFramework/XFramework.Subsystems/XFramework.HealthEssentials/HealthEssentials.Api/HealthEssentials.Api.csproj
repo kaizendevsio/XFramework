@@ -43,6 +43,10 @@
     <ItemGroup>
       <Folder Include="SignalR\Handlers\Ailment\Verify" />
       <Folder Include="SignalR\Handlers\Consultation\Verify" />
+      <Folder Include="SignalR\Handlers\Hospital\Create" />
+      <Folder Include="SignalR\Handlers\Hospital\Delete" />
+      <Folder Include="SignalR\Handlers\Hospital\Get" />
+      <Folder Include="SignalR\Handlers\Hospital\Update" />
       <Folder Include="SignalR\Handlers\Hospital\Verify" />
       <Folder Include="SignalR\Handlers\Medicine\Create" />
       <Folder Include="SignalR\Handlers\Medicine\Delete" />
@@ -50,6 +54,9 @@
       <Folder Include="SignalR\Handlers\Medicine\Verify" />
       <Folder Include="SignalR\Handlers\MetaData\Verify" />
       <Folder Include="SignalR\Handlers\Schedule\Verify" />
+      <Folder Include="SignalR\Handlers\Tag\Verify" />
+      <Folder Include="SignalR\Handlers\Unit\Verify" />
+      <Folder Include="SignalR\Handlers\Vendor\Verify" />
       <Folder Include="SignalR\Handlers\Tag" />
       <Folder Include="SignalR\Handlers\Vendor" />
     </ItemGroup>

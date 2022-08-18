@@ -13,7 +13,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public long PharmacyJobOrderId { get; set; }
         public long? MedicineId { get; set; }
         public long? MedicineIntakeId { get; set; }
-        public string? Quantity { get; set; }
+        public int Quantity { get; set; }
         public string? PrescriptionNote { get; set; }
         public string? Remarks { get; set; }
         public short? Status { get; set; }

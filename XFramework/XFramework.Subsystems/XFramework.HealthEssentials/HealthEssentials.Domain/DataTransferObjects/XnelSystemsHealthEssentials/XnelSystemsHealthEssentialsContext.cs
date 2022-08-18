@@ -507,8 +507,6 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.PrescriptionNote).HasColumnType("character varying");
 
-                entity.Property(e => e.Quantity).HasColumnType("character varying");
-
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
 
                 entity.HasOne(d => d.ConsultationJobOrder)
@@ -2798,8 +2796,6 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.PrescriptionNote).HasColumnType("character varying");
-
-                entity.Property(e => e.Quantity).HasColumnType("character varying");
 
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
 

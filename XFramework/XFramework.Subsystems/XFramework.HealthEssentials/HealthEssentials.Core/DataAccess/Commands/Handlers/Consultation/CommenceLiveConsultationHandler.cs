@@ -70,7 +70,7 @@ public class CommenceLiveConsultationHandler : CommandBaseHandler, IRequestHandl
         }
         
         jobOrder.StartedAt = DateTime.UtcNow;
-        jobOrder.Status = (short?) TransactionRecordType.OnGoing;
+        jobOrder.Status = (short?) TransactionStatus.OnGoing;
         
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         

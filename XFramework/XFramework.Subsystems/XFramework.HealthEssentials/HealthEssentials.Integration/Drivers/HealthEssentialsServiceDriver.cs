@@ -12,10 +12,6 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Verify;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Create;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Delete;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Get;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Get;
@@ -26,6 +22,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Medicine.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Medicine.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Medicine.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Medicine.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Get;
@@ -44,12 +44,23 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Tag.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Tag.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Tag.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Tag.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Vendor.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Vendor.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Vendor.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Vendor.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Get;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
-using HealthEssentials.Domain.Generics.Contracts.Responses.Hospital;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
@@ -59,6 +70,9 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Tag;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Vendor;
 using HealthEssentials.Integration.Interfaces;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.Extensions.Configuration;
@@ -187,281 +201,6 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
-    public async Task<QueryResponse<HospitalConsultationResponse>> GetHospitalConsultation(GetHospitalConsultationRequest request)
-    {
-        return await SendAsync<GetHospitalConsultationRequest, HospitalConsultationResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalConsultationResponse>>> GetHospitalConsultationList(GetHospitalConsultationListRequest request)
-    {
-        return await SendAsync<GetHospitalConsultationListRequest, List<HospitalConsultationResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalConsultationRequest>> CreateHospitalConsultation(CreateHospitalConsultationRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalConsultationRequest>> UpdateHospitalConsultation(UpdateHospitalConsultationRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalConsultationRequest>> DeleteHospitalConsultation(DeleteHospitalConsultationRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalEntityGroupResponse>> GetHospitalEntityGroup(GetHospitalEntityGroupRequest request)
-    {
-        return await SendAsync<GetHospitalEntityGroupRequest, HospitalEntityGroupResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalEntityGroupResponse>>> GetHospitalEntityGroupList(GetHospitalEntityGroupListRequest request)
-    {
-        return await SendAsync<GetHospitalEntityGroupListRequest, List<HospitalEntityGroupResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalEntityGroupRequest>> CreateHospitalEntityGroup(CreateHospitalEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalEntityGroupRequest>> UpdateHospitalEntityGroup(UpdateHospitalEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalEntityGroupRequest>> DeleteHospitalEntityGroup(DeleteHospitalEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalEntityResponse>> GetHospitalEntity(GetHospitalEntityRequest request)
-    {
-        return await SendAsync<GetHospitalEntityRequest, HospitalEntityResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalEntityResponse>>> GetHospitalEntityList(GetHospitalEntityListRequest request)
-    {
-        return await SendAsync<GetHospitalEntityListRequest, List<HospitalEntityResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalEntityRequest>> CreateHospitalEntity(CreateHospitalEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalEntityRequest>> UpdateHospitalEntity(UpdateHospitalEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalEntityRequest>> DeleteHospitalEntity(DeleteHospitalEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalResponse>> GetHospital(GetHospitalRequest request)
-    {
-        return await SendAsync<GetHospitalRequest, HospitalResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalResponse>>> GetHospitalList(GetHospitalListRequest request)
-    {
-        return await SendAsync<GetHospitalListRequest, List<HospitalResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalRequest>> CreateHospital(CreateHospitalRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalRequest>> UpdateHospital(UpdateHospitalRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalRequest>> DeleteHospital(DeleteHospitalRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalLaboratoryResponse>> GetHospitalLaboratory(GetHospitalLaboratoryRequest request)
-    {
-        return await SendAsync<GetHospitalLaboratoryRequest, HospitalLaboratoryResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalLaboratoryResponse>>> GetHospitalLaboratoryList(GetHospitalLaboratoryListRequest request)
-    {
-        return await SendAsync<GetHospitalLaboratoryListRequest, List<HospitalLaboratoryResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalLaboratoryRequest>> CreateHospitalLaboratory(CreateHospitalLaboratoryRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalLaboratoryRequest>> UpdateHospitalLaboratory(UpdateHospitalLaboratoryRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalLaboratoryRequest>> DeleteHospitalLaboratory(DeleteHospitalLaboratoryRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalLocationResponse>> GetHospitalLocation(GetHospitalLocationRequest request)
-    {
-        return await SendAsync<GetHospitalLocationRequest, HospitalLocationResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalLocationResponse>>> GetHospitalLocationList(GetHospitalLocationListRequest request)
-    {
-        return await SendAsync<GetHospitalLocationListRequest, List<HospitalLocationResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalLocationRequest>> CreateHospitalLocation(CreateHospitalLocationRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalLocationRequest>> UpdateHospitalLocation(UpdateHospitalLocationRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalLocationRequest>> DeleteHospitalLocation(DeleteHospitalLocationRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalServiceEntityGroupResponse>> GetHospitalServiceEntityGroup(GetHospitalServiceEntityGroupRequest request)
-    {
-        return await SendAsync<GetHospitalServiceEntityGroupRequest, HospitalServiceEntityGroupResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalServiceEntityGroupResponse>>> GetHospitalServiceEntityGroupList(GetHospitalServiceEntityGroupListRequest request)
-    {
-        return await SendAsync<GetHospitalServiceEntityGroupListRequest, List<HospitalServiceEntityGroupResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalServiceEntityGroupRequest>> CreateHospitalServiceEntityGroup(CreateHospitalServiceEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalServiceEntityGroupRequest>> UpdateHospitalServiceEntityGroup(UpdateHospitalServiceEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalServiceEntityGroupRequest>> DeleteHospitalServiceEntityGroup(DeleteHospitalServiceEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalServiceEntityResponse>> GetHospitalServiceEntity(GetHospitalServiceEntityRequest request)
-    {
-        return await SendAsync<GetHospitalServiceEntityRequest, HospitalServiceEntityResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalServiceEntityResponse>>> GetHospitalServiceEntityList(GetHospitalServiceEntityListRequest request)
-    {
-        return await SendAsync<GetHospitalServiceEntityListRequest, List<HospitalServiceEntityResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalServiceEntityRequest>> CreateHospitalServiceEntity(CreateHospitalServiceEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalServiceEntityRequest>> UpdateHospitalServiceEntity(UpdateHospitalServiceEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalServiceEntityRequest>> DeleteHospitalServiceEntity(DeleteHospitalServiceEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalServiceResponse>> GetHospitalService(GetHospitalServiceRequest request)
-    {
-        return await SendAsync<GetHospitalServiceRequest, HospitalServiceResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalServiceResponse>>> GetHospitalServiceList(GetHospitalServiceListRequest request)
-    {
-        return await SendAsync<GetHospitalServiceListRequest, List<HospitalServiceResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalServiceRequest>> CreateHospitalService(CreateHospitalServiceRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalServiceRequest>> UpdateHospitalService(UpdateHospitalServiceRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalServiceRequest>> DeleteHospitalService(DeleteHospitalServiceRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalServiceTagResponse>> GetHospitalServiceTag(GetHospitalServiceTagRequest request)
-    {
-        return await SendAsync<GetHospitalServiceTagRequest, HospitalServiceTagResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalServiceTagResponse>>> GetHospitalServiceTagList(GetHospitalServiceTagListRequest request)
-    {
-        return await SendAsync<GetHospitalServiceTagListRequest, List<HospitalServiceTagResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalServiceTagRequest>> CreateHospitalServiceTag(CreateHospitalServiceTagRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalServiceTagRequest>> UpdateHospitalServiceTag(UpdateHospitalServiceTagRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalServiceTagRequest>> DeleteHospitalServiceTag(DeleteHospitalServiceTagRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<HospitalTagResponse>> GetHospitalTag(GetHospitalTagRequest request)
-    {
-        return await SendAsync<GetHospitalTagRequest, HospitalTagResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<HospitalTagResponse>>> GetHospitalTagList(GetHospitalTagListRequest request)
-    {
-        return await SendAsync<GetHospitalTagListRequest, List<HospitalTagResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreateHospitalTagRequest>> CreateHospitalTag(CreateHospitalTagRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdateHospitalTagRequest>> UpdateHospitalTag(UpdateHospitalTagRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeleteHospitalTagRequest>> DeleteHospitalTag(DeleteHospitalTagRequest request)
-    {
-        return await SendAsync(request);
-    }
-
     public async Task<QueryResponse<MetaDataEntityGroupResponse>> GetMetaDataEntityGroup(GetMetaDataEntityGroupRequest request)
     {
         return await SendAsync<GetMetaDataEntityGroupRequest, MetaDataEntityGroupResponse>(request);
@@ -537,6 +276,81 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<VendorResponse>> GetVendor(GetVendorRequest request)
+    {
+        return await SendAsync<GetVendorRequest, VendorResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<VendorResponse>>> GetVendorList(GetVendorListRequest request)
+    {
+        return await SendAsync<GetVendorListRequest, List<VendorResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateVendorRequest>> CreateVendor(CreateVendorRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateVendorRequest>> UpdateVendor(UpdateVendorRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteVendorRequest>> DeleteVendor(DeleteVendorRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<VendorEntityResponse>> GetVendorEntity(GetVendorEntityRequest request)
+    {
+        return await SendAsync<GetVendorEntityRequest, VendorEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<VendorEntityResponse>>> GetVendorEntityList(GetVendorEntityListRequest request)
+    {
+        return await SendAsync<GetVendorEntityListRequest, List<VendorEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateVendorEntityRequest>> CreateVendorEntity(CreateVendorEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateVendorEntityRequest>> UpdateVendorEntity(UpdateVendorEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteVendorEntityRequest>> DeleteVendorEntity(DeleteVendorEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<VendorEntityGroupResponse>> GetVendorEntityGroup(GetVendorEntityGroupRequest request)
+    {
+        return await SendAsync<GetVendorEntityGroupRequest, VendorEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<VendorEntityGroupResponse>>> GetVendorEntityGroupList(GetVendorEntityGroupListRequest request)
+    {
+        return await SendAsync<GetVendorEntityGroupListRequest, List<VendorEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateVendorEntityGroupRequest>> CreateVendorEntityGroup(CreateVendorEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateVendorEntityGroupRequest>> UpdateVendorEntityGroup(UpdateVendorEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteVendorEntityGroupRequest>> DeleteVendorEntityGroup(DeleteVendorEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<ScheduleResponse>> GetSchedule(GetScheduleRequest request)
     {
         return await SendAsync<GetScheduleRequest, ScheduleResponse>(request);
@@ -562,9 +376,329 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<UnitResponse>> GetUnit(GetUnitRequest request)
+    {
+        return await SendAsync<GetUnitRequest, UnitResponse>(request);
+    }
+
     public async Task<QueryResponse<List<UnitResponse>>> GetUnitList(GetUnitListRequest request)
     {
         return await SendAsync<GetUnitListRequest, List<UnitResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateUnitRequest>> CreateUnit(CreateUnitRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateUnitRequest>> UpdateUnit(UpdateUnitRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteUnitRequest>> DeleteUnit(DeleteUnitRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<UnitEntityResponse>> GetUnitEntity(GetUnitEntityRequest request)
+    {
+        return await SendAsync<GetUnitEntityRequest, UnitEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<UnitEntityResponse>>> GetUnitEntityList(GetUnitEntityListRequest request)
+    {
+        return await SendAsync<GetUnitEntityListRequest, List<UnitEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateUnitEntityRequest>> CreateUnitEntity(CreateUnitEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateUnitEntityRequest>> UpdateUnitEntity(UpdateUnitEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteUnitEntityRequest>> DeleteUnitEntity(DeleteUnitEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<UnitEntityGroupResponse>> GetUnitEntityGroup(GetUnitEntityGroupRequest request)
+    {
+        return await SendAsync<GetUnitEntityGroupRequest, UnitEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<UnitEntityGroupResponse>>> GetUnitEntityGroupList(GetUnitEntityGroupListRequest request)
+    {
+        return await SendAsync<GetUnitEntityGroupListRequest, List<UnitEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateUnitEntityGroupRequest>> CreateUnitEntityGroup(CreateUnitEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateUnitEntityGroupRequest>> UpdateUnitEntityGroup(UpdateUnitEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteUnitEntityGroupRequest>> DeleteUnitEntityGroup(DeleteUnitEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<TagResponse>> GetTag(GetTagRequest request)
+    {
+        return await SendAsync<GetTagRequest, TagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<TagResponse>>> GetTagList(GetTagListRequest request)
+    {
+        return await SendAsync<GetTagListRequest, List<TagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateTagRequest>> CreateTag(CreateTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateTagRequest>> UpdateTag(UpdateTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteTagRequest>> DeleteTag(DeleteTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<TagEntityResponse>> GetTagEntity(GetTagEntityRequest request)
+    {
+        return await SendAsync<GetTagEntityRequest, TagEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<TagEntityResponse>>> GetTagEntityList(GetTagEntityListRequest request)
+    {
+        return await SendAsync<GetTagEntityListRequest, List<TagEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateTagEntityRequest>> CreateTagEntity(CreateTagEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateTagEntityRequest>> UpdateTagEntity(UpdateTagEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteTagEntityRequest>> DeleteTagEntity(DeleteTagEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<TagEntityGroupResponse>> GetTagEntityGroup(GetTagEntityGroupRequest request)
+    {
+        return await SendAsync<GetTagEntityGroupRequest, TagEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<TagEntityGroupResponse>>> GetTagEntityGroupList(GetTagEntityGroupListRequest request)
+    {
+        return await SendAsync<GetTagEntityGroupListRequest, List<TagEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateTagEntityGroupRequest>> CreateTagEntityGroup(CreateTagEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateTagEntityGroupRequest>> UpdateTagEntityGroup(UpdateTagEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteTagEntityGroupRequest>> DeleteTagEntityGroup(DeleteTagEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MedicineEntityGroupResponse>> GetMedicineEntityGroup(GetMedicineEntityGroupRequest request)
+    {
+        return await SendAsync<GetMedicineEntityGroupRequest, MedicineEntityGroupResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MedicineEntityGroupResponse>>> GetMedicineEntityGroupList(GetMedicineEntityGroupListRequest request)
+    {
+        return await SendAsync<GetMedicineEntityGroupListRequest, List<MedicineEntityGroupResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMedicineEntityGroupRequest>> CreateMedicineEntityGroup(CreateMedicineEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMedicineEntityGroupRequest>> UpdateMedicineEntityGroup(UpdateMedicineEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMedicineEntityGroupRequest>> DeleteMedicineEntityGroup(DeleteMedicineEntityGroupRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MedicineEntityResponse>> GetMedicineEntity(GetMedicineEntityRequest request)
+    {
+        return await SendAsync<GetMedicineEntityRequest, MedicineEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MedicineEntityResponse>>> GetMedicineEntityList(GetMedicineEntityListRequest request)
+    {
+        return await SendAsync<GetMedicineEntityListRequest, List<MedicineEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMedicineEntityRequest>> CreateMedicineEntity(CreateMedicineEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMedicineEntityRequest>> UpdateMedicineEntity(UpdateMedicineEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMedicineEntityRequest>> DeleteMedicineEntity(DeleteMedicineEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MedicineResponse>> GetMedicine(GetMedicineRequest request)
+    {
+        return await SendAsync<GetMedicineRequest, MedicineResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MedicineResponse>>> GetMedicineList(GetMedicineListRequest request)
+    {
+        return await SendAsync<GetMedicineListRequest, List<MedicineResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMedicineRequest>> CreateMedicine(CreateMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMedicineRequest>> UpdateMedicine(UpdateMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMedicineRequest>> DeleteMedicine(DeleteMedicineRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MedicineIntakeResponse>> GetMedicineIntake(GetMedicineIntakeRequest request)
+    {
+        return await SendAsync<GetMedicineIntakeRequest, MedicineIntakeResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MedicineIntakeResponse>>> GetMedicineIntakeList(GetMedicineIntakeListRequest request)
+    {
+        return await SendAsync<GetMedicineIntakeListRequest, List<MedicineIntakeResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMedicineIntakeRequest>> CreateMedicineIntake(CreateMedicineIntakeRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMedicineIntakeRequest>> UpdateMedicineIntake(UpdateMedicineIntakeRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMedicineIntakeRequest>> DeleteMedicineIntake(DeleteMedicineIntakeRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MedicineIntakeEntityResponse>> GetMedicineIntakeEntity(GetMedicineIntakeEntityRequest request)
+    {
+        return await SendAsync<GetMedicineIntakeEntityRequest, MedicineIntakeEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MedicineIntakeEntityResponse>>> GetMedicineIntakeEntityList(GetMedicineIntakeEntityListRequest request)
+    {
+        return await SendAsync<GetMedicineIntakeEntityListRequest, List<MedicineIntakeEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMedicineIntakeEntityRequest>> CreateMedicineIntakeEntity(CreateMedicineIntakeEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMedicineIntakeEntityRequest>> UpdateMedicineIntakeEntity(UpdateMedicineIntakeEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMedicineIntakeEntityRequest>> DeleteMedicineIntakeEntity(DeleteMedicineIntakeEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MedicineTagResponse>> GetMedicineTag(GetMedicineTagRequest request)
+    {
+        return await SendAsync<GetMedicineTagRequest, MedicineTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MedicineTagResponse>>> GetMedicineTagList(GetMedicineTagListRequest request)
+    {
+        return await SendAsync<GetMedicineTagListRequest, List<MedicineTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMedicineTagRequest>> CreateMedicineTag(CreateMedicineTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMedicineTagRequest>> UpdateMedicineTag(UpdateMedicineTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMedicineTagRequest>> DeleteMedicineTag(DeleteMedicineTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MedicineVendorResponse>> GetMedicineVendor(GetMedicineVendorRequest request)
+    {
+        return await SendAsync<GetMedicineVendorRequest, MedicineVendorResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MedicineVendorResponse>>> GetMedicineVendorList(GetMedicineVendorListRequest request)
+    {
+        return await SendAsync<GetMedicineVendorListRequest, List<MedicineVendorResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMedicineVendorRequest>> CreateMedicineVendor(CreateMedicineVendorRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMedicineVendorRequest>> UpdateMedicineVendor(UpdateMedicineVendorRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMedicineVendorRequest>> DeleteMedicineVendor(DeleteMedicineVendorRequest request)
+    {
+        return await SendAsync(request);
     }
 
     public async Task<QueryResponse<IdentityValidationResponse>> VerifyLogisticRider(VerifyLogisticRiderRequest request)
@@ -928,6 +1062,131 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<DeleteLogisticRiderRequest>> DeleteLogisticRider(DeleteLogisticRiderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LogisticEntityResponse>> GetLogisticEntity(GetLogisticEntityRequest request)
+    {
+        return await SendAsync<GetLogisticEntityRequest, LogisticEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LogisticEntityResponse>>> GetLogisticEntityList(GetLogisticEntityListRequest request)
+    {
+        return await SendAsync<GetLogisticEntityListRequest, List<LogisticEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLogisticEntityRequest>> CreateLogisticEntity(CreateLogisticEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLogisticEntityRequest>> UpdateLogisticEntity(UpdateLogisticEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLogisticEntityRequest>> DeleteLogisticEntity(DeleteLogisticEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LogisticJobOrderDetailResponse>> GetLogisticJobOrderDetail(GetLogisticJobOrderDetailRequest request)
+    {
+        return await SendAsync<GetLogisticJobOrderDetailRequest, LogisticJobOrderDetailResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LogisticJobOrderDetailResponse>>> GetLogisticJobOrderDetailList(GetLogisticJobOrderDetailListRequest request)
+    {
+        return await SendAsync<GetLogisticJobOrderDetailListRequest, List<LogisticJobOrderDetailResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLogisticJobOrderDetailRequest>> CreateLogisticJobOrderDetail(CreateLogisticJobOrderDetailRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLogisticJobOrderDetailRequest>> UpdateLogisticJobOrderDetail(UpdateLogisticJobOrderDetailRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLogisticJobOrderDetailRequest>> DeleteLogisticJobOrderDetail(DeleteLogisticJobOrderDetailRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LogisticJobOrderResponse>> GetLogisticJobOrder(GetLogisticJobOrderRequest request)
+    {
+        return await SendAsync<GetLogisticJobOrderRequest, LogisticJobOrderResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LogisticJobOrderResponse>>> GetLogisticJobOrderList(GetLogisticJobOrderListRequest request)
+    {
+        return await SendAsync<GetLogisticJobOrderListRequest, List<LogisticJobOrderResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLogisticJobOrderRequest>> CreateLogisticJobOrder(CreateLogisticJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLogisticJobOrderRequest>> UpdateLogisticJobOrder(UpdateLogisticJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLogisticJobOrderRequest>> DeleteLogisticJobOrder(DeleteLogisticJobOrderRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LogisticJobOrderLocationResponse>> GetLogisticJobOrderLocation(GetLogisticJobOrderLocationRequest request)
+    {
+        return await SendAsync<GetLogisticJobOrderLocationRequest, LogisticJobOrderLocationResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LogisticJobOrderLocationResponse>>> GetLogisticJobOrderLocationList(GetLogisticJobOrderLocationListRequest request)
+    {
+        return await SendAsync<GetLogisticJobOrderLocationListRequest, List<LogisticJobOrderLocationResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLogisticJobOrderLocationRequest>> CreateLogisticJobOrderLocation(CreateLogisticJobOrderLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLogisticJobOrderLocationRequest>> UpdateLogisticJobOrderLocation(UpdateLogisticJobOrderLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLogisticJobOrderLocationRequest>> DeleteLogisticJobOrderLocation(DeleteLogisticJobOrderLocationRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<LogisticRiderTagResponse>> GetLogisticRiderTag(GetLogisticRiderTagRequest request)
+    {
+        return await SendAsync<GetLogisticRiderTagRequest, LogisticRiderTagResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<LogisticRiderTagResponse>>> GetLogisticRiderTagList(GetLogisticRiderTagListRequest request)
+    {
+        return await SendAsync<GetLogisticRiderTagListRequest, List<LogisticRiderTagResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateLogisticRiderTagRequest>> CreateLogisticRiderTag(CreateLogisticRiderTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateLogisticRiderTagRequest>> UpdateLogisticRiderTag(UpdateLogisticRiderTagRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteLogisticRiderTagRequest>> DeleteLogisticRiderTag(DeleteLogisticRiderTagRequest request)
     {
         return await SendAsync(request);
     }
@@ -1709,181 +1968,6 @@ public class HealthEssentialsServiceDriver : DriverBase, IHealthEssentialsServic
     }
 
     public async Task<CmdResponse<DeletePatientConsultationRequest>> DeletePatientConsultation(DeletePatientConsultationRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<PatientAilmentDetailResponse>> GetPatientAilmentDetail(GetPatientAilmentDetailRequest request)
-    {
-        return await SendAsync<GetPatientAilmentDetailRequest, PatientAilmentDetailResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<PatientAilmentDetailResponse>>> GetPatientAilmentDetailList(GetPatientAilmentDetailListRequest request)
-    {
-        return await SendAsync<GetPatientAilmentDetailListRequest, List<PatientAilmentDetailResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreatePatientAilmentDetailRequest>> CreatePatientAilmentDetail(CreatePatientAilmentDetailRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdatePatientAilmentDetailRequest>> UpdatePatientAilmentDetail(UpdatePatientAilmentDetailRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeletePatientAilmentDetailRequest>> DeletePatientAilmentDetail(DeletePatientAilmentDetailRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<PatientAilmentResponse>> GetPatientAilment(GetPatientAilmentRequest request)
-    {
-        return await SendAsync<GetPatientAilmentRequest, PatientAilmentResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<PatientAilmentResponse>>> GetPatientAilmentList(GetPatientAilmentListRequest request)
-    {
-        return await SendAsync<GetPatientAilmentListRequest, List<PatientAilmentResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreatePatientAilmentRequest>> CreatePatientAilment(CreatePatientAilmentRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdatePatientAilmentRequest>> UpdatePatientAilment(UpdatePatientAilmentRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeletePatientAilmentRequest>> DeletePatientAilment(DeletePatientAilmentRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<PatientEntityGroupResponse>> GetPatientEntityGroup(GetPatientEntityGroupRequest request)
-    {
-        return await SendAsync<GetPatientEntityGroupRequest, PatientEntityGroupResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<PatientEntityGroupResponse>>> GetPatientEntityGroupList(GetPatientEntityGroupListRequest request)
-    {
-        return await SendAsync<GetPatientEntityGroupListRequest, List<PatientEntityGroupResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreatePatientEntityGroupRequest>> CreatePatientEntityGroup(CreatePatientEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdatePatientEntityGroupRequest>> UpdatePatientEntityGroup(UpdatePatientEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeletePatientEntityGroupRequest>> DeletePatientEntityGroup(DeletePatientEntityGroupRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<PatientEntityResponse>> GetPatientEntity(GetPatientEntityRequest request)
-    {
-        return await SendAsync<GetPatientEntityRequest, PatientEntityResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<PatientEntityResponse>>> GetPatientEntityList(GetPatientEntityListRequest request)
-    {
-        return await SendAsync<GetPatientEntityListRequest, List<PatientEntityResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreatePatientEntityRequest>> CreatePatientEntity(CreatePatientEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdatePatientEntityRequest>> UpdatePatientEntity(UpdatePatientEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeletePatientEntityRequest>> DeletePatientEntity(DeletePatientEntityRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<PatientLaboratoryResponse>> GetPatientLaboratory(GetPatientLaboratoryRequest request)
-    {
-        return await SendAsync<GetPatientLaboratoryRequest, PatientLaboratoryResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<PatientLaboratoryResponse>>> GetPatientLaboratoryList(GetPatientLaboratoryListRequest request)
-    {
-        return await SendAsync<GetPatientLaboratoryListRequest, List<PatientLaboratoryResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreatePatientLaboratoryRequest>> CreatePatientLaboratory(CreatePatientLaboratoryRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdatePatientLaboratoryRequest>> UpdatePatientLaboratory(UpdatePatientLaboratoryRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeletePatientLaboratoryRequest>> DeletePatientLaboratory(DeletePatientLaboratoryRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<PatientReminderResponse>> GetPatientReminder(GetPatientReminderRequest request)
-    {
-        return await SendAsync<GetPatientReminderRequest, PatientReminderResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<PatientReminderResponse>>> GetPatientReminderList(GetPatientReminderListRequest request)
-    {
-        return await SendAsync<GetPatientReminderListRequest, List<PatientReminderResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreatePatientReminderRequest>> CreatePatientReminder(CreatePatientReminderRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdatePatientReminderRequest>> UpdatePatientReminder(UpdatePatientReminderRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeletePatientReminderRequest>> DeletePatientReminder(DeletePatientReminderRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<QueryResponse<PatientTagResponse>> GetPatientTag(GetPatientTagRequest request)
-    {
-        return await SendAsync<GetPatientTagRequest, PatientTagResponse>(request);
-    }
-
-    public async Task<QueryResponse<List<PatientTagResponse>>> GetPatientTagList(GetPatientTagListRequest request)
-    {
-        return await SendAsync<GetPatientTagListRequest, List<PatientTagResponse>>(request);
-    }
-
-    public async Task<CmdResponse<CreatePatientTagRequest>> CreatePatientTag(CreatePatientTagRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<UpdatePatientTagRequest>> UpdatePatientTag(UpdatePatientTagRequest request)
-    {
-        return await SendAsync(request);
-    }
-
-    public async Task<CmdResponse<DeletePatientTagRequest>> DeletePatientTag(DeletePatientTagRequest request)
     {
         return await SendAsync(request);
     }

@@ -15,10 +15,6 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Verify;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Create;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Delete;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Get;
-using HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Delete;
@@ -31,6 +27,10 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Verify;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Medicine.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Medicine.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Medicine.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Medicine.Update;
 using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.MetaData.Get;
@@ -51,12 +51,22 @@ using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Create;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Get;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Schedule.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Tag.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Tag.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Tag.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Tag.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Delete;
 using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Unit.Update;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Vendor.Create;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Vendor.Delete;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Vendor.Get;
+using HealthEssentials.Domain.Generics.Contracts.Requests.Vendor.Update;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Ailment;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Common;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Doctor;
-using HealthEssentials.Domain.Generics.Contracts.Responses.Hospital;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
@@ -65,7 +75,9 @@ using HealthEssentials.Domain.Generics.Contracts.Responses.Patient;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Tag;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Unit;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Vendor;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -269,160 +281,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// Deletes the patient consultation.
     /// </summary>
     public Task<CmdResponse<DeletePatientConsultationRequest>> DeletePatientConsultation(DeletePatientConsultationRequest request);
-    #endregion
-    #region Patient Ailment Detail
-    /// <summary>
-    /// Gets the patient ailment detail.
-    /// </summary>
-    public Task<QueryResponse<PatientAilmentDetailResponse>> GetPatientAilmentDetail(GetPatientAilmentDetailRequest request);
-    /// <summary>
-    /// Gets the patient ailment detail list.
-    /// </summary>
-    public Task<QueryResponse<List<PatientAilmentDetailResponse>>> GetPatientAilmentDetailList(GetPatientAilmentDetailListRequest request);
-    /// <summary>
-    ///  Creates a new patient ailment detail.
-    /// </summary>
-    public Task<CmdResponse<CreatePatientAilmentDetailRequest>> CreatePatientAilmentDetail(CreatePatientAilmentDetailRequest request);
-    /// <summary>
-    ///  Updates the patient ailment detail.
-    /// </summary>
-    public Task<CmdResponse<UpdatePatientAilmentDetailRequest>> UpdatePatientAilmentDetail(UpdatePatientAilmentDetailRequest request);
-    /// <summary>
-    /// Deletes the patient ailment detail.
-    /// </summary>
-    public Task<CmdResponse<DeletePatientAilmentDetailRequest>> DeletePatientAilmentDetail(DeletePatientAilmentDetailRequest request);
-    #endregion
-    #region Patient Ailment
-    /// <summary>
-    /// Gets the patient ailment.
-    /// </summary>
-    public Task<QueryResponse<PatientAilmentResponse>> GetPatientAilment(GetPatientAilmentRequest request);
-    /// <summary>
-    /// Gets the patient ailment list.
-    /// </summary>
-    public Task<QueryResponse<List<PatientAilmentResponse>>> GetPatientAilmentList(GetPatientAilmentListRequest request);
-    /// <summary>
-    ///  Creates a new patient ailment.
-    /// </summary>
-    public Task<CmdResponse<CreatePatientAilmentRequest>> CreatePatientAilment(CreatePatientAilmentRequest request);
-    /// <summary>
-    ///  Updates the patient ailment.
-    /// </summary>
-    public Task<CmdResponse<UpdatePatientAilmentRequest>> UpdatePatientAilment(UpdatePatientAilmentRequest request);
-    /// <summary>
-    /// Deletes the patient ailment.
-    /// </summary>
-    public Task<CmdResponse<DeletePatientAilmentRequest>> DeletePatientAilment(DeletePatientAilmentRequest request);
-    #endregion
-    #region Patient Entity Group
-    /// <summary>
-    /// Gets the patient entity group.
-    /// </summary>
-    public Task<QueryResponse<PatientEntityGroupResponse>> GetPatientEntityGroup(GetPatientEntityGroupRequest request);
-    /// <summary>
-    /// Gets the patient entity group list.
-    /// </summary>
-    public Task<QueryResponse<List<PatientEntityGroupResponse>>> GetPatientEntityGroupList(GetPatientEntityGroupListRequest request);
-    /// <summary>
-    /// Creates a new patient entity group.
-    /// </summary>
-    public Task<CmdResponse<CreatePatientEntityGroupRequest>> CreatePatientEntityGroup(CreatePatientEntityGroupRequest request);
-    /// <summary>
-    /// Updates the patient entity group.
-    /// </summary>
-    public Task<CmdResponse<UpdatePatientEntityGroupRequest>> UpdatePatientEntityGroup(UpdatePatientEntityGroupRequest request);
-    /// <summary>
-    /// Deletes the patient entity group.
-    /// </summary>
-    public Task<CmdResponse<DeletePatientEntityGroupRequest>> DeletePatientEntityGroup(DeletePatientEntityGroupRequest request);
-    #endregion
-    #region Patient Entity
-    /// <summary>
-    /// Gets the patient entity.
-    /// </summary>
-    public Task<QueryResponse<PatientEntityResponse>> GetPatientEntity(GetPatientEntityRequest request);
-    /// <summary>
-    /// Gets the patient entity list.
-    /// </summary>
-    public Task<QueryResponse<List<PatientEntityResponse>>> GetPatientEntityList(GetPatientEntityListRequest request);
-    /// <summary>
-    /// Creates a new patient entity.
-    /// </summary>
-    public Task<CmdResponse<CreatePatientEntityRequest>> CreatePatientEntity(CreatePatientEntityRequest request);
-    /// <summary>
-    /// Updates the patient entity.
-    /// </summary>
-    public Task<CmdResponse<UpdatePatientEntityRequest>> UpdatePatientEntity(UpdatePatientEntityRequest request);
-    /// <summary>
-    /// Deletes the patient entity.
-    /// </summary>
-    public Task<CmdResponse<DeletePatientEntityRequest>> DeletePatientEntity(DeletePatientEntityRequest request);
-    #endregion
-    #region Patient Laboratory
-    /// <summary>
-    /// Gets the patient laboratory.
-    /// </summary>
-    public Task<QueryResponse<PatientLaboratoryResponse>> GetPatientLaboratory(GetPatientLaboratoryRequest request);
-    /// <summary>
-    /// Gets the patient laboratory list.
-    /// </summary>
-    public Task<QueryResponse<List<PatientLaboratoryResponse>>> GetPatientLaboratoryList(GetPatientLaboratoryListRequest request);
-    /// <summary>
-    /// Creates a new patient laboratory.
-    /// </summary>
-    public Task<CmdResponse<CreatePatientLaboratoryRequest>> CreatePatientLaboratory(CreatePatientLaboratoryRequest request);
-    /// <summary>
-    /// Updates the patient laboratory.
-    /// </summary>
-    public Task<CmdResponse<UpdatePatientLaboratoryRequest>> UpdatePatientLaboratory(UpdatePatientLaboratoryRequest request);
-    /// <summary>
-    /// Deletes the patient laboratory.
-    /// </summary>
-    public Task<CmdResponse<DeletePatientLaboratoryRequest>> DeletePatientLaboratory(DeletePatientLaboratoryRequest request);
-    #endregion
-    #region Patient Reminder
-    /// <summary>
-    /// Gets the patient reminder.
-    /// </summary>
-    public Task<QueryResponse<PatientReminderResponse>> GetPatientReminder(GetPatientReminderRequest request);
-    /// <summary>
-    /// Gets the patient reminder list.
-    /// </summary>
-    public Task<QueryResponse<List<PatientReminderResponse>>> GetPatientReminderList(GetPatientReminderListRequest request);
-    /// <summary>
-    /// Creates a new patient reminder.
-    /// </summary>
-    public Task<CmdResponse<CreatePatientReminderRequest>> CreatePatientReminder(CreatePatientReminderRequest request);
-    /// <summary>
-    /// Updates the patient reminder.
-    /// </summary>
-    public Task<CmdResponse<UpdatePatientReminderRequest>> UpdatePatientReminder(UpdatePatientReminderRequest request);
-    /// <summary>
-    /// Deletes the patient reminder.
-    /// </summary>
-    public Task<CmdResponse<DeletePatientReminderRequest>> DeletePatientReminder(DeletePatientReminderRequest request);
-    #endregion
-    #region Patient Tag
-    /// <summary>
-    /// Gets the patient tag.
-    /// </summary>
-    public Task<QueryResponse<PatientTagResponse>> GetPatientTag(GetPatientTagRequest request);
-    /// <summary>
-    /// Gets the patient tag list.
-    /// </summary>
-    public Task<QueryResponse<List<PatientTagResponse>>> GetPatientTagList(GetPatientTagListRequest request);
-    /// <summary>
-    /// Creates a new patient tag.
-    /// </summary>
-    public Task<CmdResponse<CreatePatientTagRequest>> CreatePatientTag(CreatePatientTagRequest request);
-    /// <summary>
-    /// Updates the patient tag.
-    /// </summary>
-    public Task<CmdResponse<UpdatePatientTagRequest>> UpdatePatientTag(UpdatePatientTagRequest request);
-    /// <summary>
-    /// Deletes the patient tag.
-    /// </summary>
-    public Task<CmdResponse<DeletePatientTagRequest>> DeletePatientTag(DeletePatientTagRequest request);
     #endregion
     #endregion
     
@@ -757,7 +615,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
 
     #region Logistic Portal
-
     #region Logistic
     /// <summary>
     /// Gets the logistic profile.
@@ -780,7 +637,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteLogisticRequest>> DeleteLogistic(DeleteLogisticRequest request);
     #endregion
-
     #region Logistic Rider Handle
     /// <summary>
     ///  Gets the logistic rider handle profile.
@@ -804,7 +660,6 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteLogisticRiderHandleRequest>> DeleteLogisticRiderHandle(DeleteLogisticRiderHandleRequest request);
     
     #endregion
-
     #region Logistic Rider
     /// <summary>
     /// Gets the logistic rider profile.
@@ -831,7 +686,118 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// </summary>
     public Task<CmdResponse<DeleteLogisticRiderRequest>> DeleteLogisticRider(DeleteLogisticRiderRequest request);
     #endregion
+    #region Logistic Entity
+    /// <summary>
+    /// Gets the logistic entity profile.
+    /// </summary>
+    public Task<QueryResponse<LogisticEntityResponse>> GetLogisticEntity(GetLogisticEntityRequest request);
+    /// <summary>
+    /// Get all logistic entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LogisticEntityResponse>>> GetLogisticEntityList(GetLogisticEntityListRequest request);
+    /// <summary>
+    ///  Creates a new logistic entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLogisticEntityRequest>> CreateLogisticEntity(CreateLogisticEntityRequest request);
+    /// <summary>
+    ///  Updates the logistic entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLogisticEntityRequest>> UpdateLogisticEntity(UpdateLogisticEntityRequest request);
+
+    /// <summary>
+    ///  Deletes the logistic entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLogisticEntityRequest>> DeleteLogisticEntity(DeleteLogisticEntityRequest request);
+    #endregion
+    #region Logistic Job Order Detail
+    /// <summary>
+    /// Gets the logistic job order detail profile.
+    /// </summary>
+    public Task<QueryResponse<LogisticJobOrderDetailResponse>> GetLogisticJobOrderDetail(GetLogisticJobOrderDetailRequest request);
+    /// <summary>
+    /// Get all logistic job order details in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LogisticJobOrderDetailResponse>>> GetLogisticJobOrderDetailList(GetLogisticJobOrderDetailListRequest request);
+    /// <summary>
+    /// Creates a new logistic job order detail in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLogisticJobOrderDetailRequest>> CreateLogisticJobOrderDetail(CreateLogisticJobOrderDetailRequest request);
+    /// <summary>
+    /// Updates the logistic job order detail profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLogisticJobOrderDetailRequest>> UpdateLogisticJobOrderDetail(UpdateLogisticJobOrderDetailRequest request);
+    /// <summary>
+    /// Deletes the logistic job order detail from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLogisticJobOrderDetailRequest>> DeleteLogisticJobOrderDetail(DeleteLogisticJobOrderDetailRequest request);
+    #endregion
+    #region Logistic Job Order
+    /// <summary>
+    /// Gets the logistic job order profile.
+    /// </summary>
+    public Task<QueryResponse<LogisticJobOrderResponse>> GetLogisticJobOrder(GetLogisticJobOrderRequest request);
+    /// <summary>
+    /// Get all logistic job orders in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LogisticJobOrderResponse>>> GetLogisticJobOrderList(GetLogisticJobOrderListRequest request);
+    /// <summary>
+    /// Creates a new logistic job order in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLogisticJobOrderRequest>> CreateLogisticJobOrder(CreateLogisticJobOrderRequest request);
+    /// <summary>
+    /// Updates the logistic job order profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLogisticJobOrderRequest>> UpdateLogisticJobOrder(UpdateLogisticJobOrderRequest request);
+    /// <summary>
+    /// Deletes the logistic job order from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLogisticJobOrderRequest>> DeleteLogisticJobOrder(DeleteLogisticJobOrderRequest request);
     
+    #endregion
+    #region Logistic Job Order Location
+    /// <summary>
+    /// Gets the logistic job order location profile.
+    /// </summary>
+    public Task<QueryResponse<LogisticJobOrderLocationResponse>> GetLogisticJobOrderLocation(GetLogisticJobOrderLocationRequest request);
+    /// <summary>
+    /// Get all logistic job locations in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LogisticJobOrderLocationResponse>>> GetLogisticJobOrderLocationList(GetLogisticJobOrderLocationListRequest request);
+    /// <summary>
+    /// Creates a new logistic job order location in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLogisticJobOrderLocationRequest>> CreateLogisticJobOrderLocation(CreateLogisticJobOrderLocationRequest request);
+    /// <summary>
+    /// Updates the logistic job order location profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLogisticJobOrderLocationRequest>> UpdateLogisticJobOrderLocation(UpdateLogisticJobOrderLocationRequest request);
+    /// <summary>
+    /// Deletes the logistic job order location from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLogisticJobOrderLocationRequest>> DeleteLogisticJobOrderLocation(DeleteLogisticJobOrderLocationRequest request);
+    #endregion
+    #region Logistic Rider Tag
+    /// <summary>
+    /// Gets the logistic rider tag profile.
+    /// </summary>
+    public Task<QueryResponse<LogisticRiderTagResponse>> GetLogisticRiderTag(GetLogisticRiderTagRequest request);
+    /// <summary>
+    /// Get all logistic rider tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<LogisticRiderTagResponse>>> GetLogisticRiderTagList(GetLogisticRiderTagListRequest request);
+    /// <summary>
+    /// Creates a new logistic rider tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateLogisticRiderTagRequest>> CreateLogisticRiderTag(CreateLogisticRiderTagRequest request);
+    /// <summary>
+    /// Updates the logistic rider tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateLogisticRiderTagRequest>> UpdateLogisticRiderTag(UpdateLogisticRiderTagRequest request);
+    /// <summary>
+    /// Deletes the logistic rider tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteLogisticRiderTagRequest>> DeleteLogisticRiderTag(DeleteLogisticRiderTagRequest request);
+    #endregion
     #endregion
 
     #region Laboratory Portal
@@ -1462,252 +1428,15 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     /// Deletes the ailment tag from the system.
     /// </summary>
     public Task<CmdResponse<DeleteAilmentTagRequest>> DeleteAilmentTag(DeleteAilmentTagRequest request);
+    
+
     #endregion
     #endregion
     
     #region Hospital Portal
-    #region Hospital Consultation
-    /// <summary>
-    /// Gets the hospital consultation profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalConsultationResponse>> GetHospitalConsultation(GetHospitalConsultationRequest request);
-    /// <summary>
-    /// Gets all hospital consultations in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalConsultationResponse>>> GetHospitalConsultationList(GetHospitalConsultationListRequest request);
-    /// <summary>
-    /// Creates a new hospital consultation in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalConsultationRequest>> CreateHospitalConsultation(CreateHospitalConsultationRequest request);
-    /// <summary>
-    /// Updates the hospital consultation profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalConsultationRequest>> UpdateHospitalConsultation(UpdateHospitalConsultationRequest request);
-    /// <summary>
-    /// Deletes the hospital consultation from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalConsultationRequest>> DeleteHospitalConsultation(DeleteHospitalConsultationRequest request);
-    #endregion
-    #region Hospital Entity Group
-    /// <summary>
-    /// Gets the hospital entity group profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalEntityGroupResponse>> GetHospitalEntityGroup(GetHospitalEntityGroupRequest request);
-    /// <summary>
-    /// Gets all hospital entity groups in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalEntityGroupResponse>>> GetHospitalEntityGroupList(GetHospitalEntityGroupListRequest request);
-    /// <summary>
-    /// Creates a new hospital entity group in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalEntityGroupRequest>> CreateHospitalEntityGroup(CreateHospitalEntityGroupRequest request);
-    /// <summary>
-    /// Updates the hospital entity group profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalEntityGroupRequest>> UpdateHospitalEntityGroup(UpdateHospitalEntityGroupRequest request);
-    /// <summary>
-    /// Deletes the hospital entity group from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalEntityGroupRequest>> DeleteHospitalEntityGroup(DeleteHospitalEntityGroupRequest request);
-    #endregion
-    #region Hospital Entity
-    /// <summary>
-    /// Gets the hospital entity profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalEntityResponse>> GetHospitalEntity(GetHospitalEntityRequest request);
-    /// <summary>
-    /// Gets all hospital entities in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalEntityResponse>>> GetHospitalEntityList(GetHospitalEntityListRequest request);
-    /// <summary>
-    /// Creates a new hospital entity in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalEntityRequest>> CreateHospitalEntity(CreateHospitalEntityRequest request);
-    /// <summary>
-    /// Updates the hospital entity profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalEntityRequest>> UpdateHospitalEntity(UpdateHospitalEntityRequest request);
-    /// <summary>
-    /// Deletes the hospital entity from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalEntityRequest>> DeleteHospitalEntity(DeleteHospitalEntityRequest request);
-    #endregion
-    #region Hospital
-    /// <summary>
-    /// Gets the hospital profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalResponse>> GetHospital(GetHospitalRequest request);
-    /// <summary>
-    /// Gets all hospitals in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalResponse>>> GetHospitalList(GetHospitalListRequest request);
-    /// <summary>
-    /// Creates a new hospital in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalRequest>> CreateHospital(CreateHospitalRequest request);
-    /// <summary>
-    /// Updates the hospital profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalRequest>> UpdateHospital(UpdateHospitalRequest request);
-    /// <summary>
-    /// Deletes the hospital from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalRequest>> DeleteHospital(DeleteHospitalRequest request);
-    #endregion
-    #region Hospital Laboratory
-    /// <summary>
-    /// Gets the hospital laboratory profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalLaboratoryResponse>> GetHospitalLaboratory(GetHospitalLaboratoryRequest request);
-    /// <summary>
-    /// Gets all hospital laboratories in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalLaboratoryResponse>>> GetHospitalLaboratoryList(GetHospitalLaboratoryListRequest request);
-    /// <summary>
-    /// Creates a new hospital laboratory in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalLaboratoryRequest>> CreateHospitalLaboratory(CreateHospitalLaboratoryRequest request);
-    /// <summary>
-    /// Updates the hospital laboratory profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalLaboratoryRequest>> UpdateHospitalLaboratory(UpdateHospitalLaboratoryRequest request);
-    /// <summary>
-    /// Deletes the hospital laboratory from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalLaboratoryRequest>> DeleteHospitalLaboratory(DeleteHospitalLaboratoryRequest request);
-    #endregion
-    #region Hospital Location
-    /// <summary>
-    /// Gets the hospital location profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalLocationResponse>> GetHospitalLocation(GetHospitalLocationRequest request);
-    /// <summary>
-    /// Gets all hospital locations in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalLocationResponse>>> GetHospitalLocationList(GetHospitalLocationListRequest request);
-    /// <summary>
-    /// Creates a new hospital location in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalLocationRequest>> CreateHospitalLocation(CreateHospitalLocationRequest request);
-    /// <summary>
-    /// Updates the hospital location profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalLocationRequest>> UpdateHospitalLocation(UpdateHospitalLocationRequest request);
-    /// <summary>
-    /// Deletes the hospital location from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalLocationRequest>> DeleteHospitalLocation(DeleteHospitalLocationRequest request);
-    #endregion
-    #region Hospital Service Entity Group
-    /// <summary>
-    /// Gets the hospital service entity group profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalServiceEntityGroupResponse>> GetHospitalServiceEntityGroup(GetHospitalServiceEntityGroupRequest request);
-    /// <summary>
-    /// Gets all hospital service entity groups in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalServiceEntityGroupResponse>>> GetHospitalServiceEntityGroupList(GetHospitalServiceEntityGroupListRequest request);
-    /// <summary>
-    /// Creates a new hospital service entity group in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalServiceEntityGroupRequest>> CreateHospitalServiceEntityGroup(CreateHospitalServiceEntityGroupRequest request);
-    /// <summary>
-    /// Updates the hospital service entity group profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalServiceEntityGroupRequest>> UpdateHospitalServiceEntityGroup(UpdateHospitalServiceEntityGroupRequest request);
-    /// <summary>
-    /// Deletes the hospital service entity group from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalServiceEntityGroupRequest>> DeleteHospitalServiceEntityGroup(DeleteHospitalServiceEntityGroupRequest request);
-    #endregion
-    #region Hospital Service Entity
-    /// <summary>
-    /// Gets the hospital service entity profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalServiceEntityResponse>> GetHospitalServiceEntity(GetHospitalServiceEntityRequest request);
-    /// <summary>
-    /// Gets all hospital service entities in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalServiceEntityResponse>>> GetHospitalServiceEntityList(GetHospitalServiceEntityListRequest request);
-    /// <summary>
-    /// Creates a new hospital service entity in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalServiceEntityRequest>> CreateHospitalServiceEntity(CreateHospitalServiceEntityRequest request);
-    /// <summary>
-    /// Updates the hospital service entity profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalServiceEntityRequest>> UpdateHospitalServiceEntity(UpdateHospitalServiceEntityRequest request);
-    /// <summary>
-    /// Deletes the hospital service entity from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalServiceEntityRequest>> DeleteHospitalServiceEntity(DeleteHospitalServiceEntityRequest request);
-    #endregion
-    #region Hospital Service
-    /// <summary>
-    /// Gets the hospital service profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalServiceResponse>> GetHospitalService(GetHospitalServiceRequest request);
-    /// <summary>
-    /// Gets all hospital services in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalServiceResponse>>> GetHospitalServiceList(GetHospitalServiceListRequest request);
-    /// <summary>
-    /// Creates a new hospital service in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalServiceRequest>> CreateHospitalService(CreateHospitalServiceRequest request);
-    /// <summary>
-    /// Updates the hospital service profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalServiceRequest>> UpdateHospitalService(UpdateHospitalServiceRequest request);
-    /// <summary>
-    /// Deletes the hospital service from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalServiceRequest>> DeleteHospitalService(DeleteHospitalServiceRequest request);
-    #endregion
-    #region Hospital Service Tag
-    /// <summary>
-    /// Gets the hospital service tag profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalServiceTagResponse>> GetHospitalServiceTag(GetHospitalServiceTagRequest request);
-    /// <summary>
-    /// Gets all hospital service tags in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalServiceTagResponse>>> GetHospitalServiceTagList(GetHospitalServiceTagListRequest request);
-    /// <summary>
-    /// Creates a new hospital service tag in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalServiceTagRequest>> CreateHospitalServiceTag(CreateHospitalServiceTagRequest request);
-    /// <summary>
-    /// Updates the hospital service tag profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalServiceTagRequest>> UpdateHospitalServiceTag(UpdateHospitalServiceTagRequest request);
-    /// <summary>
-    /// Deletes the hospital service tag from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalServiceTagRequest>> DeleteHospitalServiceTag(DeleteHospitalServiceTagRequest request);
-    #endregion
-    #region Hospital Tag
-    /// <summary>
-    /// Gets the hospital tag profile.
-    /// </summary>
-    public Task<QueryResponse<HospitalTagResponse>> GetHospitalTag(GetHospitalTagRequest request);
-    /// <summary>
-    /// Gets all hospital tags in the system.
-    /// </summary>
-    public Task<QueryResponse<List<HospitalTagResponse>>> GetHospitalTagList(GetHospitalTagListRequest request);
-    /// <summary>
-    /// Creates a new hospital tag in the system.
-    /// </summary>
-    public Task<CmdResponse<CreateHospitalTagRequest>> CreateHospitalTag(CreateHospitalTagRequest request);
-    /// <summary>
-    /// Updates the hospital tag profile.
-    /// </summary>
-    public Task<CmdResponse<UpdateHospitalTagRequest>> UpdateHospitalTag(UpdateHospitalTagRequest request);
-    /// <summary>
-    /// Deletes the hospital tag from the system.
-    /// </summary>
-    public Task<CmdResponse<DeleteHospitalTagRequest>> DeleteHospitalTag(DeleteHospitalTagRequest request);
-    #endregion
+
+    
+
     #endregion
     
     #region Meta Data Portal
@@ -1781,9 +1510,74 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     #endregion
     
     #region Vendor Portal
-
+    #region Vendor
+    /// <summary>
+    /// Gets the Vendor profile.
+    /// </summary>
+    public Task<QueryResponse<VendorResponse>> GetVendor(GetVendorRequest request);
+    /// <summary>
+    /// Gets all Vendors in the system.
+    /// </summary>
+    public Task<QueryResponse<List<VendorResponse>>> GetVendorList(GetVendorListRequest request);
+    /// <summary>
+    /// Creates a new Vendor in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateVendorRequest>> CreateVendor(CreateVendorRequest request);
+    /// <summary>
+    /// Updates the Vendor profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateVendorRequest>> UpdateVendor(UpdateVendorRequest request);
+    /// <summary>
+    /// Deletes the Vendor from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteVendorRequest>> DeleteVendor(DeleteVendorRequest request);
+    #endregion
+    #region Vendor Entity
+    /// <summary>
+    /// Gets the Vendor entity profile.
+    /// </summary>
+    public Task<QueryResponse<VendorEntityResponse>> GetVendorEntity(GetVendorEntityRequest request);
+    /// <summary>
+    /// Gets all Vendor entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<VendorEntityResponse>>> GetVendorEntityList(GetVendorEntityListRequest request);
+    /// <summary>
+    /// Creates a new Vendor entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateVendorEntityRequest>> CreateVendorEntity(CreateVendorEntityRequest request);
+    /// <summary>
+    /// Updates the Vendor entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateVendorEntityRequest>> UpdateVendorEntity(UpdateVendorEntityRequest request);
+    /// <summary>
+    /// Deletes the Vendor entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteVendorEntityRequest>> DeleteVendorEntity(DeleteVendorEntityRequest request);
+    #endregion
+    #region Vendor Entity Group
+    /// <summary>
+    /// Gets the vendor entity group profile.
+    /// </summary>
+    public Task<QueryResponse<VendorEntityGroupResponse>> GetVendorEntityGroup(GetVendorEntityGroupRequest request);
+    /// <summary>
+    /// Gets all vendor entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<VendorEntityGroupResponse>>> GetVendorEntityGroupList(GetVendorEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new vendor entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateVendorEntityGroupRequest>> CreateVendorEntityGroup(CreateVendorEntityGroupRequest request);
+    /// <summary>
+    ///  Updates the vendor entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateVendorEntityGroupRequest>> UpdateVendorEntityGroup(UpdateVendorEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the vendor entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteVendorEntityGroupRequest>> DeleteVendorEntityGroup(DeleteVendorEntityGroupRequest request);
     
 
+    #endregion
     #endregion
 
     #region Schedule Portal
@@ -1810,12 +1604,299 @@ public interface IHealthEssentialsServiceWrapper : IXFrameworkService
     public Task<CmdResponse<DeleteScheduleRequest>> DeleteSchedule(DeleteScheduleRequest request);
     #endregion
     #endregion
-    
+
+    #region Unit Portal
     #region Unit
     /// <summary>
-    /// Gets all schedules in the system.
+    /// Gets the unit profile.
+    /// </summary>
+    public Task<QueryResponse<UnitResponse>> GetUnit(GetUnitRequest request);
+    /// <summary>
+    /// Gets all units in the system.
     /// </summary>
     public Task<QueryResponse<List<UnitResponse>>> GetUnitList(GetUnitListRequest request);
-    
+    /// <summary>
+    /// Creates a new unit in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateUnitRequest>> CreateUnit(CreateUnitRequest request);
+    /// <summary>
+    /// Updates the unit profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateUnitRequest>> UpdateUnit(UpdateUnitRequest request);
+    /// <summary>
+    /// Deletes the unit from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteUnitRequest>> DeleteUnit(DeleteUnitRequest request);
+    #endregion
+    #region Unit Entity
+    /// <summary>
+    /// Gets the unit entity profile.
+    /// </summary>
+    public Task<QueryResponse<UnitEntityResponse>> GetUnitEntity(GetUnitEntityRequest request);
+    /// <summary>
+    /// Gets all unit entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<UnitEntityResponse>>> GetUnitEntityList(GetUnitEntityListRequest request);
+    /// <summary>
+    /// Creates a new unit entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateUnitEntityRequest>> CreateUnitEntity(CreateUnitEntityRequest request);
+    /// <summary>
+    /// Updates the unit entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateUnitEntityRequest>> UpdateUnitEntity(UpdateUnitEntityRequest request);
+    /// <summary>
+    /// Deletes the unit entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteUnitEntityRequest>> DeleteUnitEntity(DeleteUnitEntityRequest request);
+    #endregion
+    #region Unit Entity Group
+    /// <summary>
+    ///  Gets the unit entity group profile.
+    /// </summary>
+    public Task<QueryResponse<UnitEntityGroupResponse>> GetUnitEntityGroup(GetUnitEntityGroupRequest request);
+    /// <summary>
+    /// Gets all unit entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<UnitEntityGroupResponse>>> GetUnitEntityGroupList(GetUnitEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new unit entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateUnitEntityGroupRequest>> CreateUnitEntityGroup(CreateUnitEntityGroupRequest request);
+    /// <summary>
+    /// Updates the unit entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateUnitEntityGroupRequest>> UpdateUnitEntityGroup(UpdateUnitEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the unit entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteUnitEntityGroupRequest>> DeleteUnitEntityGroup(DeleteUnitEntityGroupRequest request);
+    #endregion
+    #endregion
+
+    #region Tag Portal
+    #region Tag
+    /// <summary>
+    /// Gets the Tag profile.
+    /// </summary>
+    public Task<QueryResponse<TagResponse>> GetTag(GetTagRequest request);
+    /// <summary>
+    /// Gets all Tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<TagResponse>>> GetTagList(GetTagListRequest request);
+    /// <summary>
+    /// Creates a new Tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateTagRequest>> CreateTag(CreateTagRequest request);
+    /// <summary>
+    /// Updates the Tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateTagRequest>> UpdateTag(UpdateTagRequest request);
+    /// <summary>
+    /// Deletes the Tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteTagRequest>> DeleteTag(DeleteTagRequest request);
+    #endregion
+    #region Tag Entity
+    /// <summary>
+    /// Gets the Tag entity profile.
+    /// </summary>
+    public Task<QueryResponse<TagEntityResponse>> GetTagEntity(GetTagEntityRequest request);
+    /// <summary>
+    /// Gets all Tag entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<TagEntityResponse>>> GetTagEntityList(GetTagEntityListRequest request);
+    /// <summary>
+    /// Creates a new Tag entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateTagEntityRequest>> CreateTagEntity(CreateTagEntityRequest request);
+    /// <summary>
+    /// Updates the Tag entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateTagEntityRequest>> UpdateTagEntity(UpdateTagEntityRequest request);
+    /// <summary>
+    /// Deletes the Tag entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteTagEntityRequest>> DeleteTagEntity(DeleteTagEntityRequest request);
+    #endregion
+    #region Tag Entity Group
+    /// <summary>
+    ///  Gets the tag entity group profile.
+    /// </summary>
+    public Task<QueryResponse<TagEntityGroupResponse>> GetTagEntityGroup(GetTagEntityGroupRequest request);
+    /// <summary>
+    /// Gets all tag entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<TagEntityGroupResponse>>> GetTagEntityGroupList(GetTagEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new tag entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateTagEntityGroupRequest>> CreateTagEntityGroup(CreateTagEntityGroupRequest request);
+    /// <summary>
+    /// Updates the tag entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateTagEntityGroupRequest>> UpdateTagEntityGroup(UpdateTagEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the tag entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteTagEntityGroupRequest>> DeleteTagEntityGroup(DeleteTagEntityGroupRequest request);
+    #endregion
+    #endregion
+
+    #region Medicine Portal
+    #region Medicine Entity Group
+    /// <summary>
+    ///  Gets the medicine entity group profile.
+    /// </summary>
+    public Task<QueryResponse<MedicineEntityGroupResponse>> GetMedicineEntityGroup(GetMedicineEntityGroupRequest request);
+    /// <summary>
+    /// Gets all medicine entity groups in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MedicineEntityGroupResponse>>> GetMedicineEntityGroupList(GetMedicineEntityGroupListRequest request);
+    /// <summary>
+    /// Creates a new medicine entity group in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMedicineEntityGroupRequest>> CreateMedicineEntityGroup(CreateMedicineEntityGroupRequest request);
+    /// <summary>
+    /// Updates the medicine entity group profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMedicineEntityGroupRequest>> UpdateMedicineEntityGroup(UpdateMedicineEntityGroupRequest request);
+    /// <summary>
+    /// Deletes the medicine entity group from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMedicineEntityGroupRequest>> DeleteMedicineEntityGroup(DeleteMedicineEntityGroupRequest request);
+    #endregion
+    #region Medicine Entity
+    /// <summary>
+    /// Gets the medicine entity profile.
+    /// </summary>
+    public Task<QueryResponse<MedicineEntityResponse>> GetMedicineEntity(GetMedicineEntityRequest request);
+    /// <summary>
+    /// Gets all medicine entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MedicineEntityResponse>>> GetMedicineEntityList(GetMedicineEntityListRequest request);
+    /// <summary>
+    /// Creates a new medicine entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMedicineEntityRequest>> CreateMedicineEntity(CreateMedicineEntityRequest request);
+    /// <summary>
+    /// Updates the medicine entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMedicineEntityRequest>> UpdateMedicineEntity(UpdateMedicineEntityRequest request);
+    /// <summary>
+    /// Deletes the medicine entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMedicineEntityRequest>> DeleteMedicineEntity(DeleteMedicineEntityRequest request);
+    #endregion
+    #region Medicine
+    /// <summary>
+    /// Gets the medicine profile.
+    /// </summary>
+    public Task<QueryResponse<MedicineResponse>> GetMedicine(GetMedicineRequest request);
+    /// <summary>
+    /// Gets all medicines in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MedicineResponse>>> GetMedicineList(GetMedicineListRequest request);
+    /// <summary>
+    /// Creates a new medicine in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMedicineRequest>> CreateMedicine(CreateMedicineRequest request);
+    /// <summary>
+    /// Updates the medicine profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMedicineRequest>> UpdateMedicine(UpdateMedicineRequest request);
+    /// <summary>
+    /// Deletes the medicine from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMedicineRequest>> DeleteMedicine(DeleteMedicineRequest request);
+    #endregion
+    #region Medicine Intake 
+    /// <summary>
+    /// Gets the medicine intake profile.
+    /// </summary>
+    public Task<QueryResponse<MedicineIntakeResponse>> GetMedicineIntake(GetMedicineIntakeRequest request);
+    /// <summary>
+    /// Gets all medicine intakes in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MedicineIntakeResponse>>> GetMedicineIntakeList(GetMedicineIntakeListRequest request);
+    /// <summary>
+    /// Creates a new medicine intake in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMedicineIntakeRequest>> CreateMedicineIntake(CreateMedicineIntakeRequest request);
+    /// <summary>
+    /// Updates the medicine intake profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMedicineIntakeRequest>> UpdateMedicineIntake(UpdateMedicineIntakeRequest request);
+    /// <summary>
+    /// Deletes the medicine intake from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMedicineIntakeRequest>> DeleteMedicineIntake(DeleteMedicineIntakeRequest request);
+    #endregion
+    #region Medicine Intake Entity
+    /// <summary>
+    /// Gets the medicine intake entity profile.
+    /// </summary>
+    public Task<QueryResponse<MedicineIntakeEntityResponse>> GetMedicineIntakeEntity(GetMedicineIntakeEntityRequest request);
+    /// <summary>
+    /// Gets all medicine intake entities in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MedicineIntakeEntityResponse>>> GetMedicineIntakeEntityList(GetMedicineIntakeEntityListRequest request);
+    /// <summary>
+    /// Creates a new medicine intake entity in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMedicineIntakeEntityRequest>> CreateMedicineIntakeEntity(CreateMedicineIntakeEntityRequest request);
+    /// <summary>
+    /// Updates the medicine intake entity profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMedicineIntakeEntityRequest>> UpdateMedicineIntakeEntity(UpdateMedicineIntakeEntityRequest request);
+    /// <summary>
+    /// Deletes the medicine intake entity from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMedicineIntakeEntityRequest>> DeleteMedicineIntakeEntity(DeleteMedicineIntakeEntityRequest request);
+    #endregion
+    #region Medicine Tag
+    /// <summary>
+    /// Gets the medicine tag profile.
+    /// </summary>
+    public Task<QueryResponse<MedicineTagResponse>> GetMedicineTag(GetMedicineTagRequest request);
+    /// <summary>
+    /// Gets all medicine tags in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MedicineTagResponse>>> GetMedicineTagList(GetMedicineTagListRequest request);
+    /// <summary>
+    /// Creates a new medicine tag in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMedicineTagRequest>> CreateMedicineTag(CreateMedicineTagRequest request);
+    /// <summary>
+    /// Updates the medicine tag profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMedicineTagRequest>> UpdateMedicineTag(UpdateMedicineTagRequest request);
+    /// <summary>
+    /// Deletes the medicine tag from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMedicineTagRequest>> DeleteMedicineTag(DeleteMedicineTagRequest request);
+    #endregion
+    #region Medicine Vendor
+    /// <summary>
+    /// Gets the medicine vendor profile.
+    /// </summary>
+    public Task<QueryResponse<MedicineVendorResponse>> GetMedicineVendor(GetMedicineVendorRequest request);
+    /// <summary>
+    /// Gets all medicine vendors in the system.
+    /// </summary>
+    public Task<QueryResponse<List<MedicineVendorResponse>>> GetMedicineVendorList(GetMedicineVendorListRequest request);
+    /// <summary>
+    /// Creates a new medicine vendor in the system.
+    /// </summary>
+    public Task<CmdResponse<CreateMedicineVendorRequest>> CreateMedicineVendor(CreateMedicineVendorRequest request);
+    /// <summary>
+    /// Updates the medicine vendor profile.
+    /// </summary>
+    public Task<CmdResponse<UpdateMedicineVendorRequest>> UpdateMedicineVendor(UpdateMedicineVendorRequest request);
+    /// <summary>
+    /// Deletes the medicine vendor from the system.
+    /// </summary>
+    public Task<CmdResponse<DeleteMedicineVendorRequest>> DeleteMedicineVendor(DeleteMedicineVendorRequest request);
+    #endregion
     #endregion
 }

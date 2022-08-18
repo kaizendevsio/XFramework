@@ -7,9 +7,9 @@ namespace XFramework.Domain.Generic.Enums
     {
         Pending = 0,
         Ok = 1,
-        Approved = 2,
+        Accepted = 2,
         Failed = 3,
-        Canceled = 4,
+        Cancelled = 4,
         Completed = 5,
         Rejected = 6,
         Refunded = 7,
@@ -17,5 +17,6 @@ namespace XFramework.Domain.Generic.Enums
         Reversed = 9,
         OnHold = 10,
         OnGoing = 11,
+        Scheduled = 12,
     }
 }
