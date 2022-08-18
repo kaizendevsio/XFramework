@@ -11,6 +11,26 @@ public class DeleteHospitalHandler : CommandBaseHandler, IRequestHandler<DeleteH
 
     public async Task<CmdResponse<DeleteHospitalCmd>> Handle(DeleteHospitalCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingHospital = await _dataLayer.HealthEssentialsContext.Hospitals.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        if (existingHospital is null)
+        {
+            return new ()
+            {
+                Message = $"Hospital with Guid {request.Guid} not found",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        existingHospital.IsDeleted = true;
+        existingHospital.IsEnabled = false;
+
+        _dataLayer.HealthEssentialsContext.Update(existingHospital);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(cancellationToken);
+        
+        return new ()
+        {
+            Message = $"Hospital with Guid {request.Guid} deleted successfully",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }

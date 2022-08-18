@@ -12,6 +12,25 @@ public class GetHospitalEntityGroupHandler : QueryBaseHandler, IRequestHandler<G
 
     public async Task<QueryResponse<HospitalEntityGroupResponse>> Handle(GetHospitalEntityGroupQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var group = await _dataLayer.HealthEssentialsContext.HospitalEntityGroups
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (group is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No record found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Record found",
+            Response = group.Adapt<HospitalEntityGroupResponse>()
+        };
     }
 }

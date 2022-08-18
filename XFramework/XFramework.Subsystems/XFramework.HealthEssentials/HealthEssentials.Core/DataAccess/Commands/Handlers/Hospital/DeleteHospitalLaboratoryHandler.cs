@@ -11,6 +11,26 @@ public class DeleteHospitalLaboratoryHandler : CommandBaseHandler, IRequestHandl
 
     public async Task<CmdResponse<DeleteHospitalLaboratoryCmd>> Handle(DeleteHospitalLaboratoryCmd request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var existingHospitalLaboratory = await _dataLayer.HealthEssentialsContext.HospitalLaboratories.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        if (existingHospitalLaboratory is null)
+        {
+            return new ()
+            {
+                Message = $"Hospital Laboratory with Guid {request.Guid} not found",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        existingHospitalLaboratory.IsDeleted = true;
+        existingHospitalLaboratory.IsEnabled = false;
+        
+        _dataLayer.HealthEssentialsContext.Update(existingHospitalLaboratory);
+        await _dataLayer.HealthEssentialsContext.SaveChangesAsync(cancellationToken);
+        
+        return new ()
+        {
+            Message = $"Hospital Laboratory with Guid {request.Guid} deleted successfully",
+            HttpStatusCode = HttpStatusCode.OK
+        };
     }
 }

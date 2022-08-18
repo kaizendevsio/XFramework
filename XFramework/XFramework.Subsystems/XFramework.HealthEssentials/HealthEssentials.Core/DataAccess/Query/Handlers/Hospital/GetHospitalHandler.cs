@@ -12,6 +12,28 @@ public class GetHospitalHandler : QueryBaseHandler, IRequestHandler<GetHospitalQ
 
     public async Task<QueryResponse<HospitalResponse>> Handle(GetHospitalQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var hospital = await _dataLayer.HealthEssentialsContext.Hospitals
+            .Include(x => x.Entity)
+            .ThenInclude(x => x.Group)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (hospital is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No record found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Record found",
+            Response = hospital.Adapt<HospitalResponse>()
+        };
     }
 }

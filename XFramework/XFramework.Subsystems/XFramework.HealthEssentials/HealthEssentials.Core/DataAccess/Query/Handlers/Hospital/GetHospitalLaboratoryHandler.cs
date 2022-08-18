@@ -12,6 +12,28 @@ public class GetHospitalLaboratoryHandler : QueryBaseHandler, IRequestHandler<Ge
 
     public async Task<QueryResponse<HospitalLaboratoryResponse>> Handle(GetHospitalLaboratoryQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var laboratory = await _dataLayer.HealthEssentialsContext.HospitalLaboratories
+            .Include(x => x.Hospital)
+            .Include(x => x.Laboratory)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (laboratory is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No record found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Record found",
+            Response = laboratory.Adapt<HospitalLaboratoryResponse>()
+        };
     }
 }
