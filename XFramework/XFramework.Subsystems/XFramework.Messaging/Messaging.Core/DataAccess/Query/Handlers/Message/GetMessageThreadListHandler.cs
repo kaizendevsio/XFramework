@@ -5,9 +5,9 @@ namespace Messaging.Core.DataAccess.Query.Handlers.Message;
 
 public class GetMessageThreadListHandler : QueryBaseHandler, IRequestHandler<GetMessageThreadListQuery, QueryResponse<List<MessageThreadResponse>>>
 {
-    public GetMessageThreadListHandler()
+    public GetMessageThreadListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<QueryResponse<List<MessageThreadResponse>>> Handle(GetMessageThreadListQuery request, CancellationToken cancellationToken)
     {

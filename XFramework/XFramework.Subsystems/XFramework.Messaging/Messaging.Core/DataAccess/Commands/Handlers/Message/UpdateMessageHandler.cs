@@ -4,9 +4,9 @@ namespace Messaging.Core.DataAccess.Commands.Handlers.Message;
 
 public class UpdateMessageHandler : CommandBaseHandler, IRequestHandler<UpdateMessageCmd, CmdResponse<UpdateMessageCmd>>
 {
-    public UpdateMessageHandler()
+    public UpdateMessageHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<CmdResponse<UpdateMessageCmd>> Handle(UpdateMessageCmd request, CancellationToken cancellationToken)
     {

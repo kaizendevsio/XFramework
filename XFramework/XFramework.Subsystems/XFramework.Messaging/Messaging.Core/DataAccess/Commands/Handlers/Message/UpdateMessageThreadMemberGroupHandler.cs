@@ -4,9 +4,9 @@ namespace Messaging.Core.DataAccess.Commands.Handlers.Message;
 
 public class UpdateMessageThreadMemberGroupHandler : CommandBaseHandler, IRequestHandler<UpdateMessageThreadMemberGroupCmd, CmdResponse<UpdateMessageThreadMemberGroupCmd>>
 {
-    public UpdateMessageThreadMemberGroupHandler()
+    public UpdateMessageThreadMemberGroupHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<CmdResponse<UpdateMessageThreadMemberGroupCmd>> Handle(UpdateMessageThreadMemberGroupCmd request, CancellationToken cancellationToken)
     {

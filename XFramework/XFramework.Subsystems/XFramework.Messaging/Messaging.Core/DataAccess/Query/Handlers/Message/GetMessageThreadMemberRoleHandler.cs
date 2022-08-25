@@ -5,9 +5,9 @@ namespace Messaging.Core.DataAccess.Query.Handlers.Message;
 
 public class GetMessageThreadMemberRoleHandler : QueryBaseHandler, IRequestHandler<GetMessageThreadMemberRoleQuery, QueryResponse<MessageThreadMemberRoleResponse>>
 {
-    public GetMessageThreadMemberRoleHandler()
+    public GetMessageThreadMemberRoleHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<QueryResponse<MessageThreadMemberRoleResponse>> Handle(GetMessageThreadMemberRoleQuery request, CancellationToken cancellationToken)
     {

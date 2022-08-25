@@ -49,8 +49,6 @@
 
     <ItemGroup>
       <Folder Include="Controllers" />
-      <Folder Include="SignalR\Handlers\Message\Delete" />
-      <Folder Include="SignalR\Handlers\Message\Update" />
     </ItemGroup>
 
 </Project>

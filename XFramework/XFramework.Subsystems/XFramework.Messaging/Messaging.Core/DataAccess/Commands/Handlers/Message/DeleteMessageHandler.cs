@@ -4,9 +4,9 @@ namespace Messaging.Core.DataAccess.Commands.Handlers.Message;
 
 public class DeleteMessageHandler : CommandBaseHandler, IRequestHandler<DeleteMessageCmd, CmdResponse<DeleteMessageCmd>>
 {
-    public DeleteMessageHandler()
+    public DeleteMessageHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<CmdResponse<DeleteMessageCmd>> Handle(DeleteMessageCmd request, CancellationToken cancellationToken)
     {

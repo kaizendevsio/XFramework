@@ -5,9 +5,9 @@ namespace Messaging.Core.DataAccess.Query.Handlers.Message;
 
 public class GetMessageThreadMemberGroupListHandler : QueryBaseHandler, IRequestHandler<GetMessageThreadMemberGroupListQuery, QueryResponse<List<MessageThreadMemberGroupResponse>>>
 {
-    public GetMessageThreadMemberGroupListHandler()
+    public GetMessageThreadMemberGroupListHandler(IDataLayer dataLayer)
     {
-        
+        _dataLayer = dataLayer;
     }
     public async Task<QueryResponse<List<MessageThreadMemberGroupResponse>>> Handle(GetMessageThreadMemberGroupListQuery request, CancellationToken cancellationToken)
     {
