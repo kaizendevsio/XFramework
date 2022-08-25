@@ -21,6 +21,7 @@ public class SignalRService : ISignalRService
     private readonly IMediator _mediator;
     protected bool _isRegistered;
     protected bool _isRegistering;
+    protected bool _subscriptionsEventHandle;
     protected List<(string, StreamFlowMessageBO)> _queueList = new();
     protected TaskCompletionSource TaskCompletionSource { get; set; } = new();
 
@@ -84,18 +85,16 @@ public class SignalRService : ISignalRService
         HandleClosedEvent();
     }
 
-    public async Task HandleSubscriptionsEvent(CredentialResponse credentialResponse)
+    public async Task StartEventListener(Guid? guid)
     {
-        if (credentialResponse.Guid is null)
-        {
-            throw new ArgumentException("Handle subscriptions event error: Credential guid is invalid");
-        }
+        if (_subscriptionsEventHandle) return;
+        if (guid is null) return;
         
         var client = new StreamFlowClientBO
         {
             Queue = new()
             {
-                Guid = (Guid) credentialResponse.Guid,
+                Guid = (Guid) guid,
             },
         };
         var r =  await Connection.InvokeAsync<HttpStatusCode>("Subscribe", client);
@@ -104,7 +103,7 @@ public class SignalRService : ISignalRService
             throw new ArgumentException("Handle subscriptions event error: Failed to subscribe for notifications");
         }
 
-        Console.WriteLine("Started listening to notifications");
+        Console.WriteLine("Notification listener started");
     }
 
     private void HandleInvokeResponseEvent()
@@ -283,26 +282,26 @@ public class SignalRService : ISignalRService
         return result;
     }
 
-    public async Task<SignalRResponse> InvokeAsync(StreamFlowMessageBO args1)
+    public async Task<SignalRResponse> InvokeAsync(StreamFlowMessageBO args)
     {
         Stopwatch.Restart();
         var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessageBO>();
 
         try
         {
-            if (!PendingMethodCalls.TryAdd(args1.RequestGuid, methodCallCompletionSource))
+            if (!PendingMethodCalls.TryAdd(args.RequestGuid, methodCallCompletionSource))
             {
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.InternalServerError,
-                    Message = $"Error while invoking method '{args1.CommandName}' on {args1.Recipient}"
+                    Message = $"Error while invoking method '{args.CommandName}' on {args.Recipient}"
                 };
             }
             var response = methodCallCompletionSource.Task.ConfigureAwait(false);
 
             ReSendRequest:
 
-            var signalRResponse = await InvokeVoidAsync("Push", args1);
+            var signalRResponse = await InvokeVoidAsync("Push", args);
             if (signalRResponse is HttpStatusCode.ServiceUnavailable or HttpStatusCode.NotFound)
             {
                 return new()
@@ -311,17 +310,17 @@ public class SignalRService : ISignalRService
                 };
             }
 
-            new Timer(new((e) =>
+            new Timer(((e) =>
                 {
                     methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out"));
                 }), null, 300_000, 0);
 
-            Console.WriteLine($"Request Sent: '{args1.CommandName}', awaiting response...");
+            Console.WriteLine($"Request Sent: '{args.CommandName}', awaiting response...");
             try
             {
                 var streamFlowMessage = await response;
                 Stopwatch.Stop();
-                Console.WriteLine($"Response Received: '{args1.CommandName}' => {streamFlowMessage.ResponseStatusCode} ({(streamFlowMessage.IsResponseSuccessful ? "Success" : "Failed")}) ; took {Stopwatch.ElapsedMilliseconds}ms");
+                Console.WriteLine($"Response Received: '{args.CommandName}' => {streamFlowMessage.ResponseStatusCode} ({(streamFlowMessage.IsResponseSuccessful ? "Success" : "Failed")}) ; took {Stopwatch.ElapsedMilliseconds}ms");
 
                 return new()
                 {
@@ -336,7 +335,7 @@ public class SignalRService : ISignalRService
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.RequestTimeout,
-                    Message = $"Error while awaiting response for method '{args1.CommandName}' on {args1.Recipient}"
+                    Message = $"Error while awaiting response for method '{args.CommandName}' on {args.Recipient}"
                 };
             }
 
@@ -348,7 +347,7 @@ public class SignalRService : ISignalRService
             return new()
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError,
-                Message = $"Error while invoking method '{args1.CommandName}' on {args1.Recipient}"
+                Message = $"Error while invoking method '{args.CommandName}' on {args.Recipient}"
             };
         }
     }

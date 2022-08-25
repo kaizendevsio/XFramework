@@ -60,7 +60,7 @@ public partial class SessionState
             var credentialGuid = Guid.NewGuid();
 
             // Send Create Identity Request
-            await ReportProgress("Creating identity..");
+            await ReportTask("Creating identity..");
             var identityRequest = CurrentState.RegisterVm.Adapt<CreateIdentityRequest>();
             identityRequest.Guid = identityGuid;
             
@@ -72,7 +72,7 @@ public partial class SessionState
             };;
             
             // Send Create Credential Request
-            await ReportProgress("Creating credential..");
+            await ReportTask("Creating credential..");
             var credentialRequest = CurrentState.RegisterVm.Adapt<CreateCredentialRequest>();
             credentialRequest.Guid = credentialGuid;
             credentialRequest.IdentityGuid = identityGuid;
@@ -87,7 +87,7 @@ public partial class SessionState
             // Send Create Phone Contact Request
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
             {
-                await ReportProgress("Creating contacts..");
+                await ReportTask("Creating contacts..");
                 var phoneContact = await IdentityServiceWrapper.CreateContact(new()
                 {
                     CredentialGuid = credentialGuid,
@@ -106,7 +106,7 @@ public partial class SessionState
             // Send Create Email Contact Request
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress))
             {
-                await ReportProgress("Creating contacts..");
+                await ReportTask("Creating contacts..");
                 var emailContact = await IdentityServiceWrapper.CreateContact(new()
                 {
                     CredentialGuid = credentialGuid,
@@ -124,7 +124,7 @@ public partial class SessionState
             // If WalletList property is provided, automatically create wallets
             if (action.WalletList is not null)
             {
-                await ReportProgress("Creating wallets..");
+                await ReportTask("Creating wallets..");
                 await CreateWallets(action.WalletList, credentialGuid);
             }
             
@@ -192,17 +192,17 @@ public partial class SessionState
         private async Task<bool> CheckDuplicateRecords(Register action)
         {
             // Check Identity Duplicates
-            await ReportProgress("Validating identity..");
+            await ReportTask("Validating identity..");
             var identityExistence = await IdentityServiceWrapper.CheckIdentityExistence(CurrentState.RegisterVm.Adapt<CheckIdentityExistenceRequest>());
             if (await HandleFailure(identityExistence, action)) return true;
 
             // Check Credential Duplicates
-            await ReportProgress("Validating credentials..");
+            await ReportTask("Validating credentials..");
             var credentialExistence = await IdentityServiceWrapper.CheckCredentialExistence(CurrentState.RegisterVm.Adapt<CheckCredentialExistenceRequest>());
             if (await HandleFailure(credentialExistence, action)) return true;
 
             // Check Phone Number Duplicates
-            await ReportProgress("Checking for duplicate phone numbers..");
+            await ReportTask("Checking for duplicate phone numbers..");
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
             {
                 var phoneExistence = await IdentityServiceWrapper.CheckContactExistence(new()
@@ -215,7 +215,7 @@ public partial class SessionState
             }
 
             // Check Email Address Duplicates
-            await ReportProgress("Checking for duplicate email address..");
+            await ReportTask("Checking for duplicate email address..");
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress))
             {
                 var emailExistence = await IdentityServiceWrapper.CheckContactExistence(new()

@@ -32,7 +32,6 @@ public class XLayoutBase : BlazorStateLayoutComponent
     public WalletState WalletState => GetState<WalletState>();
     public CryptocurrencyState CryptocurrencyState => GetState<CryptocurrencyState>();
 
-    
     public async Task NavigateTo(string path)
     {
         await Mediator.Send(new SessionState.NavigateToPath() {NavigationPath = path});
