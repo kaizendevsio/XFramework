@@ -40,6 +40,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Messaging.Domain\Messaging.Domain.csproj" />
-      <ProjectReference Include="..\Messaging.Domin.Generic\Messaging.Domin.Generic.csproj" />
+      <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj" />
     </ItemGroup>
 </Project>

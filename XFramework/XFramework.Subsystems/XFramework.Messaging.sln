@@ -10,7 +10,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Core", "XFramewor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Domain", "XFramework.Messaging\Messaging.Domain\Messaging.Domain.csproj", "{E1702B3E-B110-4227-804C-E7F607752C83}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Domin.Generic", "XFramework.Messaging\Messaging.Domin.Generic\Messaging.Domin.Generic.csproj", "{2C0F4C68-F054-41D5-9459-AE0E3196EFDE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Domain.Generic", "XFramework.Messaging\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj", "{2C0F4C68-F054-41D5-9459-AE0E3196EFDE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Api", "XFramework.Messaging\Messaging.Api\Messaging.Api.csproj", "{922A40F1-196B-46CE-A56F-F5C4A10A86BA}"
 EndProject

@@ -44,11 +44,13 @@
     <ItemGroup>
       <ProjectReference Include="..\Messaging.Core\Messaging.Core.csproj" />
       <ProjectReference Include="..\Messaging.Domain\Messaging.Domain.csproj" />
-      <ProjectReference Include="..\Messaging.Domin.Generic\Messaging.Domin.Generic.csproj" />
+      <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj" />
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="Controllers" />
+      <Folder Include="SignalR\Handlers\Message\Delete" />
+      <Folder Include="SignalR\Handlers\Message\Update" />
     </ItemGroup>
 
 </Project>
