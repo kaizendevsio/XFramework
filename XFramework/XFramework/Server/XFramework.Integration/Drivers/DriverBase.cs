@@ -16,24 +16,20 @@ public class DriverBase
     public IXLogger Logger { get; set; }
     public HubConnectionState ConnectionState => MessageBusDriver.ConnectionState;
 
-    public Guid? TargetClient
-    {
-        get => MessageBusDriver.TargetClient; 
-        set => MessageBusDriver.TargetClient = value;
-    }
-        
+    public Guid? TargetClient { get; set; }
+
     public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request) where TRequest : new()
     {
-        return await MessageBusDriver.SendVoidAsync(request);
+        return await MessageBusDriver.SendVoidAsync(request, TargetClient);
     }
     public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request) where TRequest : new()
     {
-        return await MessageBusDriver.SendAsync(request);
+        return await MessageBusDriver.SendAsync(request, TargetClient);
 
     }
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) where TRequest : new()
     {
-        return await MessageBusDriver.SendAsync<TRequest, TResponse>(request);
+        return await MessageBusDriver.SendAsync<TRequest, TResponse>(request, TargetClient);
     }
     
 }

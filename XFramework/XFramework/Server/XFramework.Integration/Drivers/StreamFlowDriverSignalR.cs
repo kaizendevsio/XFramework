@@ -15,7 +15,6 @@ namespace XFramework.Integration.Drivers;
 public class StreamFlowDriverSignalR : IMessageBusWrapper
 {
     public ISignalRService SignalRService { get; set; }
-    public Guid? TargetClient { get; set; }
     private IConfiguration Configuration { get; set; }
     private string ClientIpAddress { get; set; }
     private string ClientName { get; set; }
@@ -116,13 +115,13 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return SignalRService.StartEventListener(credentialGuid);
     }
 
-    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request) where TRequest : new()
+    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, Guid? recipient) where TRequest : new()
     {
         await SetRequestServer(request);
         var r = new StreamFlowMessageBO
         {
             ExchangeType = MessageExchangeType.Direct,
-            Recipient = TargetClient
+            Recipient = recipient
         };
         r.SetData(request);
 
@@ -130,13 +129,13 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return result.Response;
     }
 
-    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request) where TRequest : new()
+    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, Guid? recipient) where TRequest : new()
     {
         await SetRequestServer(request);
         var r = new StreamFlowMessageBO
         {
             ExchangeType = MessageExchangeType.Direct,
-            Recipient = TargetClient
+            Recipient = recipient
         };
         r.SetData(request);
 
@@ -144,13 +143,13 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return result.Response;
     }
 
-    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) where TRequest : new()
+    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, Guid? recipient) where TRequest : new()
     {
         await SetRequestServer(request);
         var r = new StreamFlowMessageBO
         {
             ExchangeType = MessageExchangeType.Direct,
-            Recipient = TargetClient
+            Recipient = recipient
         };
         r.SetData(request);
 

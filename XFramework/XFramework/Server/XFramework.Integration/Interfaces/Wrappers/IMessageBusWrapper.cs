@@ -8,7 +8,6 @@ namespace XFramework.Integration.Interfaces.Wrappers;
 
 public interface IMessageBusWrapper : IXFrameworkService
 {
-    public Guid? TargetClient { get; set; }
     public HubConnectionState ConnectionState { get; }
     public Action OnReconnected { get; set; }
     public Action OnReconnecting { get; set; }
@@ -16,9 +15,9 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task<bool> Connect();
     public Task StartClientEventListener(Guid? credentialGuid);
 
-    public Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request) where TRequest : new();
-    public Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request) where TRequest : new();
-    public Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) where TRequest : new();
+    public Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, Guid? recipient) where TRequest : new();
+    public Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, Guid? recipient) where TRequest : new();
+    public Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, Guid? recipient) where TRequest : new();
     public Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TResponse>(StreamFlowMessageBO request);
 
     public Task PublishAsync<TData>(string eventName, Guid? recipient, TData data);
