@@ -19,15 +19,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-            <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
-        </Reference>
-        <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-            <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
-        </Reference>
-    </ItemGroup>
-
-    <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\Community.Domain.Generic\Community.Domain.Generic.csproj" />
       <ProjectReference Include="..\Community.Domain\Community.Domain.csproj" />
     </ItemGroup>

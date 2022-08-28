@@ -38,6 +38,7 @@
       <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
       <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />

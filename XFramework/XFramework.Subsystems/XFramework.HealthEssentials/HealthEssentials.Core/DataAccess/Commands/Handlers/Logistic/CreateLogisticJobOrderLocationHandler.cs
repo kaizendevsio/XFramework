@@ -75,11 +75,11 @@ public class CreateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
         var location = request.Adapt<LogisticJobOrderLocation>();
         location.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         location.LogisticJobOrder = jobOrder;
-        location.Barangay = barangay.Id;
-        location.City = city.Id;
-        location.Region = region.Id;
-        location.Province = province.Id;
-        location.Country = country.Id;
+        location.BarangayGuid = barangay.Guid;
+        location.CityGuid = city.Guid;
+        location.RegionGuid = region.Guid;
+        location.ProvinceGuid = province.Guid;
+        location.CountryGuid = country.Guid;
         
         await _dataLayer.HealthEssentialsContext.LogisticJobOrderLocations.AddAsync(location, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

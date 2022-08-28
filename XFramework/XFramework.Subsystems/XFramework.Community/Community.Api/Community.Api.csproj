@@ -25,21 +25,4 @@
       <ProjectReference Include="..\Community.Domain.Generic\Community.Domain.Generic.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-        <Reference Include="StreamFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-            <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain\bin\Debug\net6.0\StreamFlow.Domain.dll</HintPath>
-        </Reference>
-        <Reference Include="StreamFlow.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-            <HintPath>..\..\XFramework.StreamFlow\StreamFlow.Domain.Generic\bin\Debug\net6.0\StreamFlow.Domain.Generic.dll</HintPath>
-        </Reference>
-        <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-            <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
-        </Reference>
-        <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-            <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
-        </Reference>
-    </ItemGroup>
-    
-    
-
 </Project>

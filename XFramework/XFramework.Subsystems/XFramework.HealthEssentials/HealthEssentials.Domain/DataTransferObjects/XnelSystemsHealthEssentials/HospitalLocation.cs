@@ -21,13 +21,13 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string? UnitNumber { get; set; }
         public string? Street { get; set; }
         public string? Building { get; set; }
-        public long? Barangay { get; set; }
-        public long? City { get; set; }
+        public string? BarangayGuid { get; set; }
+        public string? CityGuid { get; set; }
         public string? Subdivision { get; set; }
-        public long? Region { get; set; }
+        public string? RegionGuid { get; set; }
         public bool? MainAddress { get; set; }
-        public long? Province { get; set; }
-        public long? Country { get; set; }
+        public string? ProvinceGuid { get; set; }
+        public string? CountryGuid { get; set; }
         public string Guid { get; set; } = null!;
 
         public virtual Hospital Hospital { get; set; } = null!;

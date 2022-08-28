@@ -32,7 +32,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain.Generic",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Integration", "..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj", "{D118ACAF-23B4-4670-98EF-10F0842AA87B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Domin.Generic", "XFramework.Messaging\Messaging.Domin.Generic\Messaging.Domin.Generic.csproj", "{5B0A728C-EC56-4B20-AFD6-5C19C6B3AF97}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Domain.Generic", "XFramework.Messaging\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj", "{5B0A728C-EC56-4B20-AFD6-5C19C6B3AF97}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Integration", "XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj", "{DBD34A0E-7C03-4BC3-BA33-BDCDD6CFB10F}"
 EndProject

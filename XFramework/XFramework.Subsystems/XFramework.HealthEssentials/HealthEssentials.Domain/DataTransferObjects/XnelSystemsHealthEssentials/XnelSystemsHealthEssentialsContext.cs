@@ -966,7 +966,13 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Id).HasColumnName("ID");
 
+                entity.Property(e => e.BarangayGuid).HasColumnType("character varying");
+
                 entity.Property(e => e.Building).HasMaxLength(500);
+
+                entity.Property(e => e.CityGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.CountryGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
@@ -983,6 +989,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
+
+                entity.Property(e => e.ProvinceGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.RegionGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.Street).HasMaxLength(500);
 
@@ -1441,7 +1451,13 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.AlternativePhone).HasColumnType("character varying");
 
+                entity.Property(e => e.BarangayGuid).HasColumnType("character varying");
+
                 entity.Property(e => e.Building).HasMaxLength(500);
+
+                entity.Property(e => e.CityGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.CountryGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
@@ -1462,6 +1478,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
                 entity.Property(e => e.Phone).HasColumnType("character varying");
+
+                entity.Property(e => e.ProvinceGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.RegionGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.Status).HasDefaultValueSql("0");
 
@@ -1887,7 +1907,13 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.Id).HasColumnName("ID");
 
+                entity.Property(e => e.BarangayGuid).HasColumnType("character varying");
+
                 entity.Property(e => e.Building).HasMaxLength(500);
+
+                entity.Property(e => e.CityGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.CountryGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
@@ -1904,6 +1930,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
+
+                entity.Property(e => e.ProvinceGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.RegionGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.Street).HasMaxLength(500);
 
@@ -2827,7 +2857,13 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.AlternativePhone).HasColumnType("character varying");
 
+                entity.Property(e => e.BarangayGuid).HasColumnType("character varying");
+
                 entity.Property(e => e.Building).HasMaxLength(500);
+
+                entity.Property(e => e.CityGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.CountryGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
@@ -2848,6 +2884,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
                 entity.Property(e => e.Phone).HasColumnType("character varying");
+
+                entity.Property(e => e.ProvinceGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.RegionGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.Status).HasDefaultValueSql("0");
 

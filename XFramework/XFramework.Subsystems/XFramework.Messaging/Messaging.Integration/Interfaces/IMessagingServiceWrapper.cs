@@ -44,26 +44,31 @@ public interface IMessagingServiceWrapper : IXFrameworkService
     
 
     #endregion
+    
     #region Message Delivery Entity
 
     
 
     #endregion
+    
     #region Message Direct
 
     
 
     #endregion
+    
     #region Message Files
 
     
 
     #endregion
+    
     #region Message Reaction
 
     
 
     #endregion
+    
     #region Message Reaction Entity
 
 

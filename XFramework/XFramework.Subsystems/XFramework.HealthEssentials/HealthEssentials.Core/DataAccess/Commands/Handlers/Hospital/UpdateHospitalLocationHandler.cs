@@ -47,7 +47,7 @@ public class UpdateHospitalLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedHospitalLocation.Barangay = barangay.Id;
+            updatedHospitalLocation.BarangayGuid = barangay.Guid;
         }
 
         if (request.CityGuid is null)
@@ -61,7 +61,7 @@ public class UpdateHospitalLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedHospitalLocation.City = city.Id;
+            updatedHospitalLocation.CityGuid = city.Guid;
         }
 
         if (request.RegionGuid is null)
@@ -75,7 +75,7 @@ public class UpdateHospitalLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedHospitalLocation.Region = region.Id;
+            updatedHospitalLocation.RegionGuid = region.Guid;
         }
 
         if (request.ProvinceGuid is null)
@@ -89,7 +89,7 @@ public class UpdateHospitalLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedHospitalLocation.Province = province.Id;
+            updatedHospitalLocation.ProvinceGuid = province.Guid;
         }
 
         if (request.CountryGuid is null)
@@ -103,7 +103,7 @@ public class UpdateHospitalLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedHospitalLocation.Country = country.Id;
+            updatedHospitalLocation.CountryGuid = country.Guid;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedHospitalLocation);
