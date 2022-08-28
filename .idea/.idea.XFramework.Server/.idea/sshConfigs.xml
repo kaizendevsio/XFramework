@@ -23,6 +23,9 @@
       <sshConfig connectionConfig="{&quot;serverAliveInterval&quot;:10}" host="20.239.198.190" id="9fd9ad55-3654-4594-87a2-d163c1be01a3" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-production.pem" port="22" customName="XnelSystems-HealthEssentialsServer-Production" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
         <option name="customName" value="XnelSystems-HealthEssentialsServer-Production" />
       </sshConfig>
+      <sshConfig host="104.208.116.214" id="bce964c9-f014-45c7-a79d-ccbcf8486bd7" keyPath="C:\Old Files\Downloads\Development\Keys\xnelsystems-staging.pem" port="22" customName="XnelSystems-WebUI-Staging" nameFormat="CUSTOM" username="azureuser-xnel" useOpenSSHConfig="true">
+        <option name="customName" value="XnelSystems-WebUI-Staging" />
+      </sshConfig>
     </configs>
   </component>
 </project>
