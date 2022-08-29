@@ -55,6 +55,156 @@ public class MessagingServiceDriver : DriverBase, IMessagingServiceWrapper
         return await SendAsync(request);
     }
 
+    public async Task<QueryResponse<MessageDeliveryResponse>> GetMessageDelivery(GetMessageDeliveryRequest request)
+    {
+        return await SendAsync<GetMessageDeliveryRequest, MessageDeliveryResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MessageDeliveryResponse>>> GetMessageDeliveryList(GetMessageDeliveryListRequest request)
+    {
+        return await SendAsync<GetMessageDeliveryListRequest, List<MessageDeliveryResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMessageDeliveryRequest>> CreateMessageDelivery(CreateMessageDeliveryRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMessageDeliveryRequest>> UpdateMessageDelivery(UpdateMessageDeliveryRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMessageDeliveryRequest>> DeleteMessageDelivery(DeleteMessageDeliveryRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MessageDeliveryEntityResponse>> GetMessageDeliveryEntity(GetMessageDeliveryEntityRequest request)
+    {
+        return await SendAsync<GetMessageDeliveryEntityRequest, MessageDeliveryEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MessageDeliveryEntityResponse>>> GetMessageDeliveryEntityList(GetMessageDeliveryEntityListRequest request)
+    {
+        return await SendAsync<GetMessageDeliveryEntityListRequest, List<MessageDeliveryEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMessageDeliveryEntityRequest>> CreateMessageDeliveryEntity(CreateMessageDeliveryEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMessageDeliveryEntityRequest>> UpdateMessageDeliveryEntity(UpdateMessageDeliveryEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMessageDeliveryEntityRequest>> DeleteMessageDeliveryEntity(DeleteMessageDeliveryEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MessageDirectResponse>> GetMessageDirect(GetMessageDirectRequest request)
+    {
+        return await SendAsync<GetMessageDirectRequest, MessageDirectResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MessageDirectResponse>>> GetMessageDirectList(GetMessageDirectListRequest request)
+    {
+        return await SendAsync<GetMessageDirectListRequest, List<MessageDirectResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMessageDirectRequest>> CreateMessageDirect(CreateMessageDirectRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMessageDirectRequest>> UpdateMessageDirect(UpdateMessageDirectRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMessageDirectRequest>> DeleteMessageDirect(DeleteMessageDirectRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MessageFileResponse>> GetMessageFile(GetMessageFileRequest request)
+    {
+        return await SendAsync<GetMessageFileRequest, MessageFileResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MessageFileResponse>>> GetMessageFileList(GetMessageFileListRequest request)
+    {
+        return await SendAsync<GetMessageFileListRequest, List<MessageFileResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMessageFileRequest>> CreateMessageFile(CreateMessageFileRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMessageFileRequest>> UpdateMessageFile(UpdateMessageFileRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMessageFileRequest>> DeleteMessageFile(DeleteMessageFileRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MessageReactionResponse>> GetMessageReaction(GetMessageReactionRequest request)
+    {
+        return await SendAsync<GetMessageReactionRequest, MessageReactionResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MessageReactionResponse>>> GetMessageReactionList(GetMessageReactionListRequest request)
+    {
+        return await SendAsync<GetMessageReactionListRequest, List<MessageReactionResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMessageReactionRequest>> CreateMessageReaction(CreateMessageReactionRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMessageReactionRequest>> UpdateMessageReaction(UpdateMessageReactionRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMessageReactionRequest>> DeleteMessageReaction(DeleteMessageReactionRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MessageReactionEntityResponse>> GetMessageReactionEntity(GetMessageReactionEntityRequest request)
+    {
+        return await SendAsync<GetMessageReactionEntityRequest, MessageReactionEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MessageReactionEntityResponse>>> GetMessageReactionEntityList(GetMessageReactionEntityListRequest request)
+    {
+        return await SendAsync<GetMessageReactionEntityListRequest, List<MessageReactionEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMessageReactionEntityRequest>> CreateMessageReactionEntity(CreateMessageReactionEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMessageReactionEntityRequest>> UpdateMessageReactionEntity(UpdateMessageReactionEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMessageReactionEntityRequest>> DeleteMessageReactionEntity(DeleteMessageReactionEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
     public async Task<QueryResponse<MessageThreadResponse>> GetMessageThread(GetMessageThreadRequest request)
     {
         return await SendAsync<GetMessageThreadRequest, MessageThreadResponse>(request);
@@ -76,6 +226,31 @@ public class MessagingServiceDriver : DriverBase, IMessagingServiceWrapper
     }
 
     public async Task<CmdResponse<DeleteMessageThreadRequest>> DeleteMessageThread(DeleteMessageThreadRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MessageThreadEntityResponse>> GetMessageThreadEntity(GetMessageThreadEntityRequest request)
+    {
+        return await SendAsync<GetMessageThreadEntityRequest, MessageThreadEntityResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MessageThreadEntityResponse>>> GetMessageThreadEntityList(GetMessageThreadEntityListRequest request)
+    {
+        return await SendAsync<GetMessageThreadEntityListRequest, List<MessageThreadEntityResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMessageThreadEntityRequest>> CreateMessageThreadEntity(CreateMessageThreadEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMessageThreadEntityRequest>> UpdateMessageThreadEntity(UpdateMessageThreadEntityRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMessageThreadEntityRequest>> DeleteMessageThreadEntity(DeleteMessageThreadEntityRequest request)
     {
         return await SendAsync(request);
     }
@@ -151,6 +326,31 @@ public class MessagingServiceDriver : DriverBase, IMessagingServiceWrapper
     }
 
     public async Task<CmdResponse<DeleteMessageThreadMemberRoleRequest>> DeleteMessageThreadMemberRole(DeleteMessageThreadMemberRoleRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<QueryResponse<MessageTypeResponse>> GetMessageType(GetMessageTypeRequest request)
+    {
+        return await SendAsync<GetMessageTypeRequest, MessageTypeResponse>(request);
+    }
+
+    public async Task<QueryResponse<List<MessageTypeResponse>>> GetMessageTypeList(GetMessageTypeListRequest request)
+    {
+        return await SendAsync<GetMessageTypeListRequest, List<MessageTypeResponse>>(request);
+    }
+
+    public async Task<CmdResponse<CreateMessageTypeRequest>> CreateMessageType(CreateMessageTypeRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<UpdateMessageTypeRequest>> UpdateMessageType(UpdateMessageTypeRequest request)
+    {
+        return await SendAsync(request);
+    }
+
+    public async Task<CmdResponse<DeleteMessageTypeRequest>> DeleteMessageType(DeleteMessageTypeRequest request)
     {
         return await SendAsync(request);
     }

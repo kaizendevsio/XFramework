@@ -1,4 +1,6 @@
-﻿namespace Messaging.Domain.Generic.Contracts.Responses;
+﻿using Messaging.Domain.DataTransferObjects;
+
+namespace Messaging.Domain.Generic.Contracts.Responses;
 
 public class MessageThreadMemberRoleResponse
 {
@@ -9,5 +11,5 @@ public class MessageThreadMemberRoleResponse
     public string? Guid { get; set; }
 
     public MessageThreadMemberResponse? ThreadMember { get; set; }
-    public MessageThreadMemberRoleResponse? Role { get; set; }
+    public IdentityRole? Role { get; set; }
 }

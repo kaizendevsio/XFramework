@@ -9,6 +9,7 @@ public class GetMessageThreadMemberRoleHandler : QueryBaseHandler, IRequestHandl
     {
         _dataLayer = dataLayer;
     }
+    
     public async Task<QueryResponse<MessageThreadMemberRoleResponse>> Handle(GetMessageThreadMemberRoleQuery request, CancellationToken cancellationToken)
     {
         var role = await _dataLayer.MessageThreadMemberRoles
