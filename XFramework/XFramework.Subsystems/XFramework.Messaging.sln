@@ -16,7 +16,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Api", "XFramework
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Integration", "XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj", "{6BBEBC35-681A-4243-AB2B-2DC503687F21}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Tests", "XFramework.Messaging\Messaging.Tests\Messaging.Tests.csproj", "{8C28B664-3D3C-4FCF-9AD5-D2FA6CD8AD63}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "_Dependencies", "_Dependencies", "{76B46CFC-EA6D-4EBB-AEB6-64663336F725}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain.Generic", "..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj", "{C5EF5641-91D5-4E03-8687-D52F14727A23}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Integration", "..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj", "{15EA7B2D-AD3E-428A-8DF1-63FC994D9B51}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Integration", "XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj", "{7279B6B9-D970-4D0A-B9BB-5E30F4D26A74}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,7 +35,9 @@ Global
 		{2C0F4C68-F054-41D5-9459-AE0E3196EFDE} = {9C92A728-FD67-4A36-8C71-21E857001E7C}
 		{922A40F1-196B-46CE-A56F-F5C4A10A86BA} = {7962063E-6020-4E05-91B3-8312EF300E93}
 		{6BBEBC35-681A-4243-AB2B-2DC503687F21} = {20A25D80-B8D6-4E53-A8CC-7C75C619E177}
-		{8C28B664-3D3C-4FCF-9AD5-D2FA6CD8AD63} = {20A25D80-B8D6-4E53-A8CC-7C75C619E177}
+		{C5EF5641-91D5-4E03-8687-D52F14727A23} = {76B46CFC-EA6D-4EBB-AEB6-64663336F725}
+		{15EA7B2D-AD3E-428A-8DF1-63FC994D9B51} = {76B46CFC-EA6D-4EBB-AEB6-64663336F725}
+		{7279B6B9-D970-4D0A-B9BB-5E30F4D26A74} = {76B46CFC-EA6D-4EBB-AEB6-64663336F725}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{DCCA80D1-4AEB-4552-8966-47FFAB46980D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -52,9 +60,17 @@ Global
 		{6BBEBC35-681A-4243-AB2B-2DC503687F21}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6BBEBC35-681A-4243-AB2B-2DC503687F21}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6BBEBC35-681A-4243-AB2B-2DC503687F21}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8C28B664-3D3C-4FCF-9AD5-D2FA6CD8AD63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8C28B664-3D3C-4FCF-9AD5-D2FA6CD8AD63}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8C28B664-3D3C-4FCF-9AD5-D2FA6CD8AD63}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8C28B664-3D3C-4FCF-9AD5-D2FA6CD8AD63}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5EF5641-91D5-4E03-8687-D52F14727A23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5EF5641-91D5-4E03-8687-D52F14727A23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5EF5641-91D5-4E03-8687-D52F14727A23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5EF5641-91D5-4E03-8687-D52F14727A23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15EA7B2D-AD3E-428A-8DF1-63FC994D9B51}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15EA7B2D-AD3E-428A-8DF1-63FC994D9B51}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15EA7B2D-AD3E-428A-8DF1-63FC994D9B51}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15EA7B2D-AD3E-428A-8DF1-63FC994D9B51}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7279B6B9-D970-4D0A-B9BB-5E30F4D26A74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7279B6B9-D970-4D0A-B9BB-5E30F4D26A74}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7279B6B9-D970-4D0A-B9BB-5E30F4D26A74}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7279B6B9-D970-4D0A-B9BB-5E30F4D26A74}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

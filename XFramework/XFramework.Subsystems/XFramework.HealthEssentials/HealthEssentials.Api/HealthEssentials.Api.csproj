@@ -25,40 +25,13 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
-      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Domin.Generic\Messaging.Domin.Generic.csproj" />
       <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.StreamFlow\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
-      <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
       <ProjectReference Include="..\HealthEssentials.Core\HealthEssentials.Core.csproj" />
       <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
-      <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj" />
       <ProjectReference Include="..\HealthEssentials.Integration\HealthEssentials.Integration.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="SignalR\Handlers\Ailment\Verify" />
-      <Folder Include="SignalR\Handlers\Consultation\Verify" />
-      <Folder Include="SignalR\Handlers\Hospital\Create" />
-      <Folder Include="SignalR\Handlers\Hospital\Delete" />
-      <Folder Include="SignalR\Handlers\Hospital\Get" />
-      <Folder Include="SignalR\Handlers\Hospital\Update" />
-      <Folder Include="SignalR\Handlers\Hospital\Verify" />
-      <Folder Include="SignalR\Handlers\Medicine\Create" />
-      <Folder Include="SignalR\Handlers\Medicine\Delete" />
-      <Folder Include="SignalR\Handlers\Medicine\Update" />
-      <Folder Include="SignalR\Handlers\Medicine\Verify" />
-      <Folder Include="SignalR\Handlers\MetaData\Verify" />
-      <Folder Include="SignalR\Handlers\Schedule\Verify" />
-      <Folder Include="SignalR\Handlers\Tag\Verify" />
-      <Folder Include="SignalR\Handlers\Unit\Verify" />
-      <Folder Include="SignalR\Handlers\Vendor\Verify" />
-      <Folder Include="SignalR\Handlers\Tag" />
-      <Folder Include="SignalR\Handlers\Vendor" />
-    </ItemGroup>
     
 </Project>

@@ -1,5 +1,4 @@
-﻿using Messaging.Domain.DataTransferObjects;
-
+﻿
 namespace Messaging.Domain.Generic.Contracts.Responses;
 
 public class MessageThreadMemberResponse

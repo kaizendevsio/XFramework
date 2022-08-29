@@ -1,4 +1,4 @@
-﻿using Messaging.Domin.Generic.Enums;
+﻿using Messaging.Domain.Generic.Enums;
 using SmsGateway.Core.DataAccess.Commands.Entity.Sms;
 
 namespace SmsGateway.Core.DataAccess.Commands.Handlers.Sms;
@@ -23,7 +23,7 @@ public class CreateSmsMessageHandler : CommandBaseHandler, IRequestHandler<Creat
             Subject = request.Subject,
             Message = request.Message,
             Guid = $"{request.ClientReference}",
-            Status = (int) (request.IsScheduled ? MessageStatus.Scheduled : MessageStatus.Queued)
+            Status = (int)(request.IsScheduled ? MessageStatus.Scheduled : MessageStatus.Queued)
         });
         return new()
         {

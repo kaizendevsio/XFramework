@@ -75,11 +75,11 @@ public class CreateHospitalLocationHandler : CommandBaseHandler, IRequestHandler
         var hospitalLocation = request.Adapt<HospitalLocation>();
         hospitalLocation.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         hospitalLocation.Hospital = hospital;
-        hospitalLocation.Barangay = barangay.Id;
-        hospitalLocation.City = city.Id;
-        hospitalLocation.Region = region.Id;
-        hospitalLocation.Province = province.Id;
-        hospitalLocation.Country = country.Id;
+        hospitalLocation.BarangayGuid = barangay.Guid;
+        hospitalLocation.CityGuid = city.Guid;
+        hospitalLocation.RegionGuid = region.Guid;
+        hospitalLocation.ProvinceGuid = province.Guid;
+        hospitalLocation.CountryGuid = country.Guid;
         
         await _dataLayer.HealthEssentialsContext.HospitalLocations.AddAsync(hospitalLocation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

@@ -74,11 +74,11 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
         var pharmacyLocation = request.Adapt<PharmacyLocation>();
         pharmacyLocation.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         pharmacyLocation.PharmacyId = pharmacy.Id;
-        pharmacyLocation.BarangayId = barangay.Id;
-        pharmacyLocation.CityId = city.Id;
-        pharmacyLocation.RegionId = region.Id;
-        pharmacyLocation.ProvinceId = province.Id;
-        pharmacyLocation.CountryId = country.Id;
+        pharmacyLocation.BarangayGuid = barangay.Guid;
+        pharmacyLocation.CityGuid = city.Guid;
+        pharmacyLocation.RegionGuid = region.Guid;
+        pharmacyLocation.ProvinceGuid = province.Guid;
+        pharmacyLocation.CountryGuid = country.Guid;
 
         await _dataLayer.HealthEssentialsContext.PharmacyLocations.AddAsync(pharmacyLocation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

@@ -76,11 +76,11 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
         var laboratoryLocation = request.Adapt<LaboratoryLocation>();
         laboratoryLocation.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         laboratoryLocation.Laboratory = laboratory;
-        laboratoryLocation.BarangayId = barangay.Id;
-        laboratoryLocation.CityId = city.Id;
-        laboratoryLocation.RegionId = region.Id;
-        laboratoryLocation.ProvinceId = province.Id;
-        laboratoryLocation.CountryId = country.Id;
+        laboratoryLocation.BarangayGuid = barangay.Guid;
+        laboratoryLocation.CityGuid = city.Guid;
+        laboratoryLocation.RegionGuid = region.Guid;
+        laboratoryLocation.ProvinceGuid = province.Guid;
+        laboratoryLocation.CountryGuid = country.Guid;
         laboratoryLocation.Status = (int?) (request.Status is GenericStatusType.None ? GenericStatusType.Pending : request.Status);
 
         await _dataLayer.HealthEssentialsContext.LaboratoryLocations.AddAsync(laboratoryLocation, CancellationToken.None);

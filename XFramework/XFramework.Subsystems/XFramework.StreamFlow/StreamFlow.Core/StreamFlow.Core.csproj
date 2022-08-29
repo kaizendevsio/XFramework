@@ -17,17 +17,9 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
       <ProjectReference Include="..\StreamFlow.Domain\StreamFlow.Domain.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net6.0\XFramework.Domain.Generic.dll</HintPath>
-      </Reference>
-      <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
-      </Reference>
     </ItemGroup>
 
     <ItemGroup>

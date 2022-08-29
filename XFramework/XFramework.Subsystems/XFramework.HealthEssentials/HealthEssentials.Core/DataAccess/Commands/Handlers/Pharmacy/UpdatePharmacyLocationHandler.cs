@@ -47,7 +47,7 @@ public class UpdatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPharmacyLocation.BarangayId = barangay.Id;
+            updatedPharmacyLocation.BarangayGuid = barangay.Guid;
         }
 
         if (request.CityGuid is not null)
@@ -61,7 +61,7 @@ public class UpdatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPharmacyLocation.CityId = city.Id;
+            updatedPharmacyLocation.CityGuid = city.Guid;
         }
 
         if (request.RegionGuid is not null)
@@ -75,7 +75,7 @@ public class UpdatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPharmacyLocation.RegionId = region.Id;
+            updatedPharmacyLocation.RegionGuid = region.Guid;
         }
 
         if (request.ProvinceGuid is not null)
@@ -89,7 +89,7 @@ public class UpdatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPharmacyLocation.ProvinceId = province.Id;
+            updatedPharmacyLocation.ProvinceGuid = province.Guid;
         }
 
 
@@ -104,7 +104,7 @@ public class UpdatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPharmacyLocation.CountryId = country.Id;
+            updatedPharmacyLocation.CountryGuid = country.Guid;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedPharmacyLocation);

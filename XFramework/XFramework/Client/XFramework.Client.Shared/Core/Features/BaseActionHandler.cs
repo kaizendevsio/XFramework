@@ -874,7 +874,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     }
     public async Task ReportTask(string title, bool? isBusy = true)
     {
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressTitle = title});
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressMessage = title});
     }
     public async Task ReportTask(QueryableRequest action)
     {
