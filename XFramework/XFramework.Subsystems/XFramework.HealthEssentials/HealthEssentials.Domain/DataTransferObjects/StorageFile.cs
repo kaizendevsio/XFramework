@@ -23,6 +23,8 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public DateTime? ExpireAt { get; set; }
         public long? StorageFileIdentifierId { get; set; }
         public string? Hash { get; set; }
+        public string? Name { get; set; }
+        public string? ContentType { get; set; }
 
         public virtual StorageFileEntity Entity { get; set; } = null!;
         public virtual StorageFileIdentifier? StorageFileIdentifier { get; set; }

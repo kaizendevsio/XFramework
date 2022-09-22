@@ -10,7 +10,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public DateTime ModifiedAt { get; set; }
         public bool? IsEnabled { get; set; }
         public bool IsDeleted { get; set; }
-        public string CredentialId { get; set; } = null!;
+        public string CredentialGuid { get; set; } = null!;
         public long PharmacyId { get; set; }
         public string? Value { get; set; }
         public string Guid { get; set; } = null!;

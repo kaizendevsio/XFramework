@@ -1,4 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Logistic;
+using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Logistic;
 
@@ -25,11 +27,20 @@ public class GetLogisticRiderHandler : QueryBaseHandler, IRequestHandler<GetLogi
             };
         }
 
+        var response = rider.Adapt<LogisticRiderResponse>();
+        response.Files = _dataLayer.XnelSystemsContext.StorageFiles
+            .Where(i => i.IdentifierGuid == $"{response.Guid}")
+            .AsNoTracking()
+            .ToList()
+            .Adapt<List<StorageFileResponse>>();
+        
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            Message = "Record found",
-            Response = rider.Adapt<LogisticRiderResponse>()
-        };
+            Message = "Rider found",
+            IsSuccess = true,
+            Response = response
+        };        
     }
+    
 }

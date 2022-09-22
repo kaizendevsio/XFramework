@@ -26,6 +26,7 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public virtual DbSet<AuditHistory> AuditHistories { get; set; } = null!;
         public virtual DbSet<AuthorizationLog> AuthorizationLogs { get; set; } = null!;
         public virtual DbSet<CurrencyEntity> CurrencyEntities { get; set; } = null!;
+        public virtual DbSet<DepositRequest> DepositRequests { get; set; } = null!;
         public virtual DbSet<Enterprise> Enterprises { get; set; } = null!;
         public virtual DbSet<ExchangeRate> ExchangeRates { get; set; } = null!;
         public virtual DbSet<IdentityAddress> IdentityAddresses { get; set; } = null!;
@@ -64,6 +65,11 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public virtual DbSet<StorageFileEntity> StorageFileEntities { get; set; } = null!;
         public virtual DbSet<StorageFileIdentifier> StorageFileIdentifiers { get; set; } = null!;
         public virtual DbSet<StorageFileIdentifierGroup> StorageFileIdentifierGroups { get; set; } = null!;
+        public virtual DbSet<Wallet> Wallets { get; set; } = null!;
+        public virtual DbSet<WalletAddress> WalletAddresses { get; set; } = null!;
+        public virtual DbSet<WalletEntity> WalletEntities { get; set; } = null!;
+        public virtual DbSet<WalletTransaction> WalletTransactions { get; set; } = null!;
+        public virtual DbSet<WithdrawalRequest> WithdrawalRequests { get; set; } = null!;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -347,6 +353,60 @@ namespace HealthEssentials.Domain.DataTransferObjects
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasMaxLength(256);
+            });
+
+            modelBuilder.Entity<DepositRequest>(entity =>
+            {
+                entity.ToTable("DepositRequest", "Wallet");
+
+                entity.HasIndex(e => e.Guid, "tbl_userdepositrequest_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn()
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Address).HasMaxLength(10000);
+
+                entity.Property(e => e.Amount).HasPrecision(18, 10);
+
+                entity.Property(e => e.ConvenienceFee).HasPrecision(18, 10);
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Discount).HasPrecision(18, 10);
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.RawRequestData).HasMaxLength(10000);
+
+                entity.Property(e => e.RawResponseData).HasMaxLength(5000);
+
+                entity.Property(e => e.ReferenceNo).HasMaxLength(35);
+
+                entity.Property(e => e.Remarks).HasMaxLength(10000);
+
+                entity.Property(e => e.SystemFee).HasPrecision(18, 10);
+
+                entity.HasOne(d => d.IdentityCredential)
+                    .WithMany(p => p.DepositRequests)
+                    .HasForeignKey(d => d.IdentityCredentialId)
+                    .HasConstraintName("IdentityCredentialId");
+
+                entity.HasOne(d => d.SourceCurrency)
+                    .WithMany(p => p.DepositRequests)
+                    .HasForeignKey(d => d.SourceCurrencyId)
+                    .HasConstraintName("SourceCurrencyId");
+
+                entity.HasOne(d => d.TargetWalletType)
+                    .WithMany(p => p.DepositRequests)
+                    .HasForeignKey(d => d.TargetWalletTypeId)
+                    .HasConstraintName("TargetWalletTypeId");
             });
 
             modelBuilder.Entity<Enterprise>(entity =>
@@ -1427,6 +1487,8 @@ namespace HealthEssentials.Domain.DataTransferObjects
 
                 entity.Property(e => e.ContentPath).HasColumnType("character varying");
 
+                entity.Property(e => e.ContentType).HasColumnType("character varying");
+
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Guid)
@@ -1442,6 +1504,8 @@ namespace HealthEssentials.Domain.DataTransferObjects
                     .HasDefaultValueSql("true");
 
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Name).HasColumnType("character varying");
 
                 entity.HasOne(d => d.Entity)
                     .WithMany(p => p.StorageFiles)
@@ -1530,6 +1594,196 @@ namespace HealthEssentials.Domain.DataTransferObjects
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
+            });
+
+            modelBuilder.Entity<Wallet>(entity =>
+            {
+                entity.ToTable("Wallet", "Wallet");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Balance).HasPrecision(24, 8);
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.HasOne(d => d.IdentityCredential)
+                    .WithMany(p => p.Wallets)
+                    .HasForeignKey(d => d.IdentityCredentialId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_Wallets_IdentityCredentialId_fkey");
+
+                entity.HasOne(d => d.WalletEntity)
+                    .WithMany(p => p.Wallets)
+                    .HasForeignKey(d => d.WalletEntityId)
+                    .HasConstraintName("tbl_Wallets_WalletEntityId_fkey");
+            });
+
+            modelBuilder.Entity<WalletAddress>(entity =>
+            {
+                entity.ToTable("WalletAddress", "Wallet");
+
+                entity.HasIndex(e => e.Guid, "tbl_userwalletaddress_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn()
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Address).HasMaxLength(512);
+
+                entity.Property(e => e.Balance).HasPrecision(18, 10);
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Remarks).HasMaxLength(100);
+
+                entity.HasOne(d => d.Wallet)
+                    .WithMany(p => p.WalletAddresses)
+                    .HasForeignKey(d => d.WalletId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("walletaddress_wallet_id_fk");
+            });
+
+            modelBuilder.Entity<WalletEntity>(entity =>
+            {
+                entity.ToTable("WalletEntity", "Wallet");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn()
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.ApplicationId).HasDefaultValueSql("1");
+
+                entity.Property(e => e.Code).HasMaxLength(9);
+
+                entity.Property(e => e.CurrencyEntityId).HasColumnName("CurrencyEntityID");
+
+                entity.Property(e => e.Desc).HasMaxLength(500);
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.Name).HasMaxLength(20);
+
+                entity.HasOne(d => d.Application)
+                    .WithMany(p => p.WalletEntities)
+                    .HasForeignKey(d => d.ApplicationId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("tbl_walletentities_tbl_applications_id_fk");
+
+                entity.HasOne(d => d.CurrencyEntity)
+                    .WithMany(p => p.WalletEntities)
+                    .HasForeignKey(d => d.CurrencyEntityId)
+                    .HasConstraintName("CurrencyID");
+            });
+
+            modelBuilder.Entity<WalletTransaction>(entity =>
+            {
+                entity.ToTable("WalletTransaction", "Wallet");
+
+                entity.HasIndex(e => e.Guid, "tbl_userwallettransaction_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn()
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Amount).HasPrecision(24, 8);
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Description).HasMaxLength(10000);
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.PreviousBalance).HasPrecision(24, 8);
+
+                entity.Property(e => e.Remarks).HasMaxLength(10000);
+
+                entity.Property(e => e.RunningBalance).HasPrecision(24, 8);
+
+                entity.HasOne(d => d.IdentityCredential)
+                    .WithMany(p => p.WalletTransactions)
+                    .HasForeignKey(d => d.IdentityCredentialId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("UserAuthID");
+
+                entity.HasOne(d => d.SourceUserWallet)
+                    .WithMany(p => p.WalletTransactionSourceUserWallets)
+                    .HasForeignKey(d => d.SourceUserWalletId)
+                    .HasConstraintName("SourceUserWalletId");
+
+                entity.HasOne(d => d.TargetUserWallet)
+                    .WithMany(p => p.WalletTransactionTargetUserWallets)
+                    .HasForeignKey(d => d.TargetUserWalletId)
+                    .HasConstraintName("tbl_userwallettransaction_tbl_userwallet_id_fk");
+            });
+
+            modelBuilder.Entity<WithdrawalRequest>(entity =>
+            {
+                entity.ToTable("WithdrawalRequest", "Wallet");
+
+                entity.HasIndex(e => e.Guid, "tbl_userwithdrawalrequest_guid_uindex")
+                    .IsUnique();
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("ID")
+                    .UseIdentityAlwaysColumn()
+                    .HasIdentityOptions(null, null, null, 2147483647L);
+
+                entity.Property(e => e.Address).HasMaxLength(10000);
+
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Guid)
+                    .HasColumnType("character varying")
+                    .HasDefaultValueSql("(uuid_generate_v4())::text");
+
+                entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+
+                entity.Property(e => e.Remarks).HasColumnType("character varying");
+
+                entity.Property(e => e.TotalAmount).HasPrecision(18, 10);
+
+                entity.HasOne(d => d.IdentityCredential)
+                    .WithMany(p => p.WithdrawalRequests)
+                    .HasForeignKey(d => d.IdentityCredentialId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("IdentityCredentialId");
+
+                entity.HasOne(d => d.SourceWalletType)
+                    .WithMany(p => p.WithdrawalRequestSourceWalletTypes)
+                    .HasForeignKey(d => d.SourceWalletTypeId)
+                    .HasConstraintName("SourceWalletTypeId");
+
+                entity.HasOne(d => d.TargetCurrency)
+                    .WithMany(p => p.WithdrawalRequestTargetCurrencies)
+                    .HasForeignKey(d => d.TargetCurrencyId)
+                    .HasConstraintName("TargetCurrencyId");
             });
 
             OnModelCreatingPartial(modelBuilder);

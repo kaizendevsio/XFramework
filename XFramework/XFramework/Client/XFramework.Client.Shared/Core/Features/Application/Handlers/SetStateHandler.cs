@@ -68,6 +68,7 @@ public partial class ApplicationState
                         {
                             //Title = CurrentState.ProgressTitle,
                             Text = CurrentState.ProgressMessage,
+                            Backdrop = false,
                             Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
                             ShowConfirmButton = false,
                         });

@@ -108,7 +108,7 @@ public class SignalRService : ISignalRService
 
     private void HandleInvokeResponseEvent()
     {
-        Console.WriteLine($"InvokeResponseHandler Initialized");
+        //Console.WriteLine($"InvokeResponseHandler Initialized");
         Connection.On<StreamFlowContract>("InvokeResponseHandler",
             async (response) =>
             {

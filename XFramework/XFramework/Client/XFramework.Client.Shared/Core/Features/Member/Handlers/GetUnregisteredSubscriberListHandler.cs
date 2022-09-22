@@ -32,7 +32,7 @@ public partial class MemberState
         {
             ReportTask(action);
             var unregisteredSubscriberList = await IdentityServiceWrapper.GetUnregisteredSubscriberList(new());
-            ReportTaskCompleted();
+            ReportTaskCompleted(action);
 
             if (await HandleFailure(unregisteredSubscriberList, action, true)) return unregisteredSubscriberList.Adapt<CmdResponse>();
             await Mediator.Send(new SetState(){UnregisteredSubscriber = unregisteredSubscriberList.Response});

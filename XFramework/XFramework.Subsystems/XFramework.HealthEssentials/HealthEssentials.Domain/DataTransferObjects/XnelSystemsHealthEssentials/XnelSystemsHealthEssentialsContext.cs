@@ -593,7 +593,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
-                entity.Property(e => e.CredentialId).HasColumnType("character varying");
+                entity.Property(e => e.CredentialGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
@@ -1546,7 +1546,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
-                entity.Property(e => e.CredentialId).HasColumnType("character varying");
+                entity.Property(e => e.CredentialGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
@@ -1913,6 +1913,10 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CityGuid).HasColumnType("character varying");
 
+                entity.Property(e => e.ClientGuid).HasColumnType("character varying");
+
+                entity.Property(e => e.ClientName).HasColumnType("character varying");
+
                 entity.Property(e => e.CountryGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
@@ -1959,6 +1963,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
+                entity.Property(e => e.CredentialGuid).HasColumnType("character varying");
+
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
                 entity.Property(e => e.Guid)
@@ -1969,11 +1975,17 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
                     .IsRequired()
                     .HasDefaultValueSql("true");
 
+                entity.Property(e => e.LicenseNumber).HasColumnType("character varying");
+
                 entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
                 entity.Property(e => e.Name).HasColumnType("character varying");
 
+                entity.Property(e => e.PlateNumber).HasColumnType("character varying");
+
                 entity.Property(e => e.Remarks).HasColumnType("character varying");
+
+                entity.Property(e => e.VehicleType).HasColumnType("character varying");
             });
 
             modelBuilder.Entity<LogisticRiderHandle>(entity =>
@@ -2366,7 +2378,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
-                entity.Property(e => e.CredentialId).HasColumnType("character varying");
+                entity.Property(e => e.CredentialGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 
@@ -2917,7 +2929,7 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
 
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
 
-                entity.Property(e => e.CredentialId).HasColumnType("character varying");
+                entity.Property(e => e.CredentialGuid).HasColumnType("character varying");
 
                 entity.Property(e => e.Description).HasColumnType("character varying");
 

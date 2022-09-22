@@ -46,12 +46,12 @@ public class ConcludeLiveConsultationHandler : CommandBaseHandler, IRequestHandl
             .Include(i => i.IdentityContacts)
             .ThenInclude(i => i.Entity)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Guid == jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId, CancellationToken.None);
+            .FirstOrDefaultAsync(i => i.Guid == jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialGuid, CancellationToken.None);
         if (credential is null)
         {
             return new ()
             {
-                Message = $"Credential with Guid {jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId} not found",
+                Message = $"Credential with Guid {jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialGuid} not found",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -61,7 +61,7 @@ public class ConcludeLiveConsultationHandler : CommandBaseHandler, IRequestHandl
         {
             return new ()
             {
-                Message = $"Credential with Guid {jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId} has no phone contact",
+                Message = $"Credential with Guid {jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialGuid} has no phone contact",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }

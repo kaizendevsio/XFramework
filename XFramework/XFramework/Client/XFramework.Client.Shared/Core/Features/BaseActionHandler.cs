@@ -8,6 +8,7 @@ using XFramework.Client.Shared.Core.Features.Todo;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Client.Shared.Core.Services;
 using XFramework.Client.Shared.Entity.Enums;
+using XFramework.Client.Shared.Entity.Models.Requests.Common;
 using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Security;
 
@@ -21,6 +22,7 @@ public abstract class ActionHandler<TAction> : IRequestHandler<TAction>, IReques
     protected ISessionStorageService SessionStorageService { get; set; }
     public ILocalStorageService LocalStorageService { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
+    protected IWebAssemblyHostEnvironment HostEnvironment { get; set; }
     protected NavigationManager NavigationManager { get; set; }
     protected IHttpClient HttpClient { get; set; }
     protected HttpClient BaseHttpClient { get; set; }
@@ -317,6 +319,7 @@ public abstract class EventHandler<TAction> : INotificationHandler<TAction>
     protected ISessionStorageService SessionStorageService { get; set; }
     public ILocalStorageService LocalStorageService { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
+    protected IWebAssemblyHostEnvironment HostEnvironment { get; set; }
     protected NavigationManager NavigationManager { get; set; }
     protected IHttpClient HttpClient { get; set; }
     protected HttpClient BaseHttpClient { get; set; }
@@ -614,6 +617,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     public ILocalStorageService LocalStorageService { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
     protected NavigationManager NavigationManager { get; set; }
+    protected IWebAssemblyHostEnvironment HostEnvironment { get; set; }
     protected IHttpClient HttpClient { get; set; }
     protected HttpClient BaseHttpClient { get; set; }
     protected IJSRuntime JsRuntime { get; set; }
@@ -726,7 +730,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $"There was an error while trying to process your request: {response.Message}"
-                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
+                    : $"{customMessage}", SweetAlertIcon.Error);
                 break;
         }
 
@@ -751,7 +755,7 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
             case false:
                   SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
                     ? $"Success: {response.Message}"
-                    : $"{customMessage}: {response.Message}");
+                    : $"{customMessage}", SweetAlertIcon.Success);
                 break;
         }
         
@@ -892,6 +896,22 @@ public abstract class ActionHandler<TAction, TResponse> : IRequestHandler<TActio
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
     }
+    
+    public async Task ReportTaskCompleted(QueryableRequest action)
+    {
+        if (!action.Silent)
+        {
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+        }
+    }
+    public async Task ReportTaskCompleted(NavigableRequest action)
+    {
+        if (!action.Silent)
+        {
+            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+        }
+    }
+    
     public async Task NavigateTo(string path)
     {
         await Mediator.Send(new SessionState.NavigateToPath() {NavigationPath = path});

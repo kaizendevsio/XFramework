@@ -1,7 +1,10 @@
 @using XFramework.Client.Shared.Core.Services.Interface
 <CascadingValue Value="this">
     
-    @Body
+    @if (ApplicationState.StateRestored)
+    {
+        @Body
+    }
 
     @code
     {

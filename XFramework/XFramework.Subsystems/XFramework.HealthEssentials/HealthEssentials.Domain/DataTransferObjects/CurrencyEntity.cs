@@ -8,8 +8,10 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public CurrencyEntity()
         {
             AddressCountries = new HashSet<AddressCountry>();
+            DepositRequests = new HashSet<DepositRequest>();
             ExchangeRateSourceCurrencyEntities = new HashSet<ExchangeRate>();
             ExchangeRateTargetCurrencyEntities = new HashSet<ExchangeRate>();
+            WalletEntities = new HashSet<WalletEntity>();
         }
 
         public long Id { get; set; }
@@ -25,7 +27,9 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public string? Guid { get; set; }
 
         public virtual ICollection<AddressCountry> AddressCountries { get; set; }
+        public virtual ICollection<DepositRequest> DepositRequests { get; set; }
         public virtual ICollection<ExchangeRate> ExchangeRateSourceCurrencyEntities { get; set; }
         public virtual ICollection<ExchangeRate> ExchangeRateTargetCurrencyEntities { get; set; }
+        public virtual ICollection<WalletEntity> WalletEntities { get; set; }
     }
 }

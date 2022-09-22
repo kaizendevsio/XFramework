@@ -28,7 +28,7 @@ public class VerifyDoctorHandler : QueryBaseHandler, IRequestHandler<VerifyDocto
             };
         }
 
-        var identity = await _dataLayer.HealthEssentialsContext.Doctors.FirstOrDefaultAsync(i => i.CredentialId == credential.Guid, CancellationToken.None);
+        var identity = await _dataLayer.HealthEssentialsContext.Doctors.FirstOrDefaultAsync(i => i.CredentialGuid == credential.Guid, CancellationToken.None);
         if (identity is null)
         {
             return new ()

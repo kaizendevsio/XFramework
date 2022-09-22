@@ -27,6 +27,8 @@ namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssential
         public string Guid { get; set; } = null!;
         public short Priority { get; set; }
         public bool IsDestination { get; set; }
+        public string? ClientGuid { get; set; }
+        public string? ClientName { get; set; }
 
         public virtual LogisticJobOrder LogisticJobOrder { get; set; } = null!;
     }

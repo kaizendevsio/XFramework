@@ -2,7 +2,7 @@
 
 namespace Community.Domain.Generic.Contracts.Requests.Update;
 
-public class UpdateIdentityRequest : RequestBase
+public class UpdateCommunityIdentityRequest : RequestBase
 {
     public string? Alias { get; set; }
     public string? HandleName { get; set; }

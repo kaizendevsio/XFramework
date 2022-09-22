@@ -33,7 +33,7 @@ public class UpdateDoctorHandler : CommandBaseHandler, IRequestHandler<UpdateDoc
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedDoctor.CredentialId = credential.Guid;
+            updatedDoctor.CredentialGuid = credential.Guid;
         }
 
         if (request.EntityGuid is not null)

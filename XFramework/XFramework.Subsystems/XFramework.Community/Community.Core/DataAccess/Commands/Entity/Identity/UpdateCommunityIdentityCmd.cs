@@ -2,7 +2,7 @@
 
 namespace Community.Core.DataAccess.Commands.Entity.Identity;
 
-public class UpdateIdentityCmd : UpdateIdentityRequest, IRequest<CmdResponse>
+public class UpdateCommunityIdentityCmd : UpdateCommunityIdentityRequest, IRequest<CmdResponse>
 {
     
 }

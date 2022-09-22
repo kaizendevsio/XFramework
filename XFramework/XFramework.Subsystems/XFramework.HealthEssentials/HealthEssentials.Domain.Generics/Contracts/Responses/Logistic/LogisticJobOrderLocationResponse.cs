@@ -24,6 +24,8 @@ public class LogisticJobOrderLocationResponse
     public Guid? Guid { get; set; }
     public short Priority { get; set; }
     public bool IsDestination { get; set; }
+    public string? ClientGuid { get; set; }
+    public string? ClientName { get; set; }
 
     public LogisticJobOrderResponse? LogisticJobOrder { get; set; }
 }

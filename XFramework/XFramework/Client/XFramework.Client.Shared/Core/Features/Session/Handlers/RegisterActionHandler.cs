@@ -85,41 +85,35 @@ public partial class SessionState
             };
             
             // Send Create Phone Contact Request
-            if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
+            await ReportTask("Creating contacts..", null);
+            var phoneContact = await IdentityServiceWrapper.CreateContact(new()
             {
-                await ReportTask("Creating contacts..", null);
-                var phoneContact = await IdentityServiceWrapper.CreateContact(new()
-                {
-                    CredentialGuid = credentialGuid,
-                    ContactType = GenericContactType.Phone,
-                    Value = CurrentState.RegisterVm.PhoneNumber,
-                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
-                    SendOtp = !action.SkipVerification
-                });
-                if (await HandleFailure(phoneContact, action)) return new()
-                {
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
-                    IsSuccess = false
-                };
-            }
+                CredentialGuid = credentialGuid,
+                ContactType = GenericContactType.Phone,
+                Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber) ? CurrentState.RegisterVm.PhoneNumber : string.Empty,
+                GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
+                SendOtp = !action.SkipVerification
+            });
+            if (await HandleFailure(phoneContact, action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                IsSuccess = false
+            };
             
             // Send Create Email Contact Request
-            if (!string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress))
+            await ReportTask("Creating contacts..", null);
+            var emailContact = await IdentityServiceWrapper.CreateContact(new()
             {
-                await ReportTask("Creating contacts..", null);
-                var emailContact = await IdentityServiceWrapper.CreateContact(new()
-                {
-                    CredentialGuid = credentialGuid,
-                    ContactType = GenericContactType.Email,
-                    Value = CurrentState.RegisterVm.EmailAddress,
-                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767")
-                });
-                if (await HandleFailure(emailContact, action)) return new()
-                {
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
-                    IsSuccess = false
-                };
-            }
+                CredentialGuid = credentialGuid,
+                ContactType = GenericContactType.Email,
+                Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress) ? CurrentState.RegisterVm.EmailAddress : string.Empty,
+                GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767")
+            });
+            if (await HandleFailure(emailContact, action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                IsSuccess = false
+            };
 
             // If WalletList property is provided, automatically create wallets
             if (action.WalletList is not null)

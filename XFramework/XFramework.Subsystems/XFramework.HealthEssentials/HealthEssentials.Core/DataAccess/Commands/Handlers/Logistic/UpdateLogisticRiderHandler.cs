@@ -33,7 +33,7 @@ public class UpdateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Up
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLogisticRider.CredentialId = credential.Id;
+            updatedLogisticRider.CredentialGuid = credential.Guid;
         }
         
         _dataLayer.HealthEssentialsContext.LogisticRiders.Update(updatedLogisticRider);

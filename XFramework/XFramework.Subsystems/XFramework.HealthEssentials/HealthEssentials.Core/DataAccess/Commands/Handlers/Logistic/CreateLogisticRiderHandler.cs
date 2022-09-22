@@ -28,8 +28,9 @@ public class CreateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Cr
       
         var rider = request.Adapt<LogisticRider>();
         rider.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        rider.CredentialId = credential.Id;
+        rider.CredentialGuid = credential.Guid;
         rider.Status = (int) GenericStatusType.Pending;
+        rider.LicenseExpiry = request.LicenseExpiry?.ToUniversalTime();
 
         await _dataLayer.HealthEssentialsContext.LogisticRiders.AddAsync(rider, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

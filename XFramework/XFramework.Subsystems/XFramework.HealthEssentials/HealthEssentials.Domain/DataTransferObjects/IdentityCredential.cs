@@ -8,6 +8,7 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public IdentityCredential()
         {
             AuthorizationLogs = new HashSet<AuthorizationLog>();
+            DepositRequests = new HashSet<DepositRequest>();
             IdentityContacts = new HashSet<IdentityContact>();
             IdentityFavorites = new HashSet<IdentityFavorite>();
             IdentityRoles = new HashSet<IdentityRole>();
@@ -16,6 +17,9 @@ namespace HealthEssentials.Domain.DataTransferObjects
             MessageDirectSenderNavigations = new HashSet<MessageDirect>();
             MessageThreadMembers = new HashSet<MessageThreadMember>();
             SessionData = new HashSet<SessionDatum>();
+            WalletTransactions = new HashSet<WalletTransaction>();
+            Wallets = new HashSet<Wallet>();
+            WithdrawalRequests = new HashSet<WithdrawalRequest>();
         }
 
         public long Id { get; set; }
@@ -37,6 +41,7 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public virtual Application Application { get; set; } = null!;
         public virtual IdentityInformation? IdentityInfo { get; set; }
         public virtual ICollection<AuthorizationLog> AuthorizationLogs { get; set; }
+        public virtual ICollection<DepositRequest> DepositRequests { get; set; }
         public virtual ICollection<IdentityContact> IdentityContacts { get; set; }
         public virtual ICollection<IdentityFavorite> IdentityFavorites { get; set; }
         public virtual ICollection<IdentityRole> IdentityRoles { get; set; }
@@ -45,5 +50,8 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public virtual ICollection<MessageDirect> MessageDirectSenderNavigations { get; set; }
         public virtual ICollection<MessageThreadMember> MessageThreadMembers { get; set; }
         public virtual ICollection<SessionDatum> SessionData { get; set; }
+        public virtual ICollection<WalletTransaction> WalletTransactions { get; set; }
+        public virtual ICollection<Wallet> Wallets { get; set; }
+        public virtual ICollection<WithdrawalRequest> WithdrawalRequests { get; set; }
     }
 }

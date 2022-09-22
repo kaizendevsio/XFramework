@@ -12,6 +12,7 @@ namespace HealthEssentials.Domain.DataTransferObjects
             IdentityRoleEntities = new HashSet<IdentityRoleEntity>();
             Logs = new HashSet<Log>();
             RegistryConfigurations = new HashSet<RegistryConfiguration>();
+            WalletEntities = new HashSet<WalletEntity>();
         }
 
         public long Id { get; set; }
@@ -32,5 +33,6 @@ namespace HealthEssentials.Domain.DataTransferObjects
         public virtual ICollection<IdentityRoleEntity> IdentityRoleEntities { get; set; }
         public virtual ICollection<Log> Logs { get; set; }
         public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; set; }
+        public virtual ICollection<WalletEntity> WalletEntities { get; set; }
     }
 }

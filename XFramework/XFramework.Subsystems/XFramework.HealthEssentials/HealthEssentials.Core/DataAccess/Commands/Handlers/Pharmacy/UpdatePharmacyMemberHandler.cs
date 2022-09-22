@@ -34,7 +34,7 @@ public class UpdatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<U
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPharmacyMember.CredentialId = credential.Guid;
+            updatedPharmacyMember.CredentialGuid = credential.Guid;
         }
 
         if (request.PharmacyGuid is not null)

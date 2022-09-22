@@ -11,12 +11,11 @@ public partial class SessionState
     protected class LogInHandler : ActionHandler<Login, CmdResponse>
     {
         public ISignalRService SignalRService { get; }
-        public IWebAssemblyHostEnvironment HostEnvironment { get; }
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
         public bool VerificationRequired { get; set; }
         
-        public LogInHandler(ISignalRService signalRService, IWebAssemblyHostEnvironment hostEnvironment, IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public LogInHandler(ISignalRService signalRService, IWebAssemblyHostEnvironment hostEnvironment, IIdentityServiceWrapper identityServiceWrapper, IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
             SignalRService = signalRService;
             HostEnvironment = hostEnvironment;
