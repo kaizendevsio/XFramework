@@ -52,8 +52,8 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
-                throw;
+                Console.WriteLine($"Unable to get client IP address: {e.Message}");
+                ClientIpAddress = string.Empty;
             }
         }
 

@@ -53,7 +53,7 @@ public partial class SessionState
             });
             
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, false ,$"There was an error while trying to sign you in")) return new()
+            if(await HandleFailure(response, action, false ,$"{response.Message}")) return new()
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 IsSuccess = false
