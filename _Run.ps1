@@ -25,7 +25,7 @@ Start-Process powershell { dotnet run --project 'C:\Projects\Net Core\XFramework
 Start-Process powershell { dotnet run --project 'C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Messaging\Messaging.Api\Messaging.Api.csproj' } -WindowStyle Minimized
 Start-Process powershell { dotnet run --project 'C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj' } -WindowStyle Minimized
 Start-Process powershell { dotnet run --project 'C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.Community\Community.Api\Community.Api.csproj' } -WindowStyle Minimized
-#Start-Process powershell { dotnet run --project 'C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Api\HealthEssentials.Api.csproj' } -WindowStyle Minimized
+Start-Process powershell { dotnet run --project 'C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Api\HealthEssentials.Api.csproj' } -WindowStyle Minimized
 Start-Process powershell { dotnet run --project 'C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Stream\StreamFlow.Stream.csproj' } -NoNewWindow -Wait
 
 Write-Host ..

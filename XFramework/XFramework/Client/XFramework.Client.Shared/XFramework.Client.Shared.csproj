@@ -37,6 +37,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Core\Features\Base" />
       <Folder Include="Core\Features\Messaging\Handlers" />
       <Folder Include="Core\Features\Todo" />
       <Folder Include="Core\Wrappers" />
