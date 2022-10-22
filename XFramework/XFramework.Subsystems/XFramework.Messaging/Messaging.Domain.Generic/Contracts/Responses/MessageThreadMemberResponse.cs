@@ -15,6 +15,6 @@ public class MessageThreadMemberResponse
 
     public MessageThreadResponse? Thread { get; set; }
     public MessageThreadMemberGroupResponse? Group { get; set; }
-    /*public IdentityCredential? Credential { get; set; }*/
+    public IdentityCredential? Credential { get; set; }
 
 }

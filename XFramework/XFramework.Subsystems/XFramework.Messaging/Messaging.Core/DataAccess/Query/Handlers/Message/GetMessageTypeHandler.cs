@@ -1,25 +1,23 @@
 ﻿using Messaging.Core.DataAccess.Query.Entity.Message;
 using Messaging.Domain.Generic.Contracts.Responses;
+using TypeSupport.Extensions;
 
 namespace Messaging.Core.DataAccess.Query.Handlers.Message;
 
-public class GetMessageThreadMemberRoleHandler : QueryBaseHandler, IRequestHandler<GetMessageThreadMemberRoleQuery, QueryResponse<MessageThreadMemberRoleResponse>>
+public class GetMessageTypeHandler : QueryBaseHandler, IRequestHandler<GetMessageTypeQuery, QueryResponse<MessageTypeResponse>>
 {
-    public GetMessageThreadMemberRoleHandler(IDataLayer dataLayer)
+    public GetMessageTypeHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
-    
-    public async Task<QueryResponse<MessageThreadMemberRoleResponse>> Handle(GetMessageThreadMemberRoleQuery request, CancellationToken cancellationToken)
+
+    public async Task<QueryResponse<MessageTypeResponse>> Handle(GetMessageTypeQuery request, CancellationToken cancellationToken)
     {
-        var role = await _dataLayer.MessageThreadMemberRoles
-            .Include(x => x.MessageThreadMember)
-            .Include(x => x.Role)
-            .AsSplitQuery()
+        var type = await _dataLayer.MessageTypes
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         
-        if (role is null)
+        if (type is null)
         {
             return new()
             {
@@ -33,7 +31,8 @@ public class GetMessageThreadMemberRoleHandler : QueryBaseHandler, IRequestHandl
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data Found",
-            Response = role.Adapt<MessageThreadMemberRoleResponse>()
+            Response = type.Adapt<MessageTypeResponse>()
         };
+
     }
 }

@@ -3,23 +3,23 @@ using Messaging.Domain.Generic.Contracts.Responses;
 
 namespace Messaging.Core.DataAccess.Query.Handlers.Message;
 
-public class GetMessageThreadMemberRoleHandler : QueryBaseHandler, IRequestHandler<GetMessageThreadMemberRoleQuery, QueryResponse<MessageThreadMemberRoleResponse>>
+public class GetMessageFileHandler : QueryBaseHandler, IRequestHandler<GetMessageFileQuery, QueryResponse<MessageFileResponse>>
 {
-    public GetMessageThreadMemberRoleHandler(IDataLayer dataLayer)
+    public GetMessageFileHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
-    
-    public async Task<QueryResponse<MessageThreadMemberRoleResponse>> Handle(GetMessageThreadMemberRoleQuery request, CancellationToken cancellationToken)
+
+    public async Task<QueryResponse<MessageFileResponse>> Handle(GetMessageFileQuery request, CancellationToken cancellationToken)
     {
-        var role = await _dataLayer.MessageThreadMemberRoles
-            .Include(x => x.MessageThreadMember)
-            .Include(x => x.Role)
+        var file = await _dataLayer.MessageFiles
+            .Include(x => x.Message)
+            .Include(x => x.Storage)
             .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         
-        if (role is null)
+        if (file is null)
         {
             return new()
             {
@@ -33,7 +33,7 @@ public class GetMessageThreadMemberRoleHandler : QueryBaseHandler, IRequestHandl
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data Found",
-            Response = role.Adapt<MessageThreadMemberRoleResponse>()
+            Response = file.Adapt<MessageFileResponse>()
         };
     }
 }

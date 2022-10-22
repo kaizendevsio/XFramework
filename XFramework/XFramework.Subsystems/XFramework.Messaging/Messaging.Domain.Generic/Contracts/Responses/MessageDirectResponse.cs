@@ -14,7 +14,7 @@ public class MessageDirectResponse
     public string? Guid { get; set; }
     public short Status { get; set; }
 
-    public MessageResponse? ParentMessage { get; set; }
+    public MessageDirectResponse? ParentMessage { get; set; }
     public MessageTypeResponse? Type { get; set; }
     /*public SenderResponse? Sender { get; set; }
     public RecipientResponse? Recipient { get; set; }*/
