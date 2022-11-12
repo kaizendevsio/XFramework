@@ -1,5 +1,4 @@
-﻿using Messaging.Domain.DataTransferObjects;
-
+﻿
 namespace Messaging.Domain.Generic.Contracts.Responses;
 
 public class MessageFileResponse
@@ -11,5 +10,5 @@ public class MessageFileResponse
     public string? Guid { get; set; }
 
     public MessageResponse? Message { get; set; }
-    public StorageFile? Storage { get; set; }
+    /*public StorageFileResponse? Storage { get; set; }*/
 }

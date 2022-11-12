@@ -1,4 +1,6 @@
 ﻿
+using IdentityServer.Domain.Generic.Contracts.Responses;
+
 namespace Messaging.Domain.Generic.Contracts.Responses;
 
 public class MessageThreadMemberResponse
@@ -15,6 +17,6 @@ public class MessageThreadMemberResponse
 
     public MessageThreadResponse? Thread { get; set; }
     public MessageThreadMemberGroupResponse? Group { get; set; }
-    public IdentityCredential? Credential { get; set; }
+    public CredentialResponse? Credential { get; set; }
 
 }

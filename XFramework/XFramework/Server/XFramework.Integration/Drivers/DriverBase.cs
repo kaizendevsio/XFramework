@@ -13,7 +13,6 @@ public class DriverBase
 {
     protected IConfiguration Configuration { get; set; }
     public IMessageBusWrapper MessageBusDriver { get; set; }
-    public IXLogger Logger { get; set; }
     public HubConnectionState ConnectionState => MessageBusDriver.ConnectionState;
 
     public Guid? TargetClient { get; set; }
