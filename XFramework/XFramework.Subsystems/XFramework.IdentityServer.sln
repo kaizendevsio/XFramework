@@ -28,6 +28,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain.Generic",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Integration", "XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj", "{7D6DA6A8-3944-419F-9D27-94197343E3C5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Domain.Generic", "XFramework.Messaging\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj", "{F26D276D-389C-4170-A146-D1992FA07064}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamFlow.Domain.Generic", "XFramework.StreamFlow\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj", "{3341ACAC-563D-4A9A-8BAC-084632E94107}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +48,8 @@ Global
 		{61F0D5C7-DF4B-4510-A3F2-6BFD923997AD} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
 		{9EC95103-0398-4B73-9173-4CC2189ED7FB} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
 		{7D6DA6A8-3944-419F-9D27-94197343E3C5} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
+		{F26D276D-389C-4170-A146-D1992FA07064} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
+		{3341ACAC-563D-4A9A-8BAC-084632E94107} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{5812C495-8B5B-40D3-9F96-BF886E1C6CCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -94,5 +100,13 @@ Global
 		{7D6DA6A8-3944-419F-9D27-94197343E3C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D6DA6A8-3944-419F-9D27-94197343E3C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D6DA6A8-3944-419F-9D27-94197343E3C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F26D276D-389C-4170-A146-D1992FA07064}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F26D276D-389C-4170-A146-D1992FA07064}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F26D276D-389C-4170-A146-D1992FA07064}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F26D276D-389C-4170-A146-D1992FA07064}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3341ACAC-563D-4A9A-8BAC-084632E94107}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3341ACAC-563D-4A9A-8BAC-084632E94107}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3341ACAC-563D-4A9A-8BAC-084632E94107}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3341ACAC-563D-4A9A-8BAC-084632E94107}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

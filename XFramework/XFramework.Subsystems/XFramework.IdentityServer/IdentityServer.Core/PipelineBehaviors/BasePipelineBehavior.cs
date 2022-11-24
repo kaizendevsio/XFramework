@@ -16,7 +16,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         _validators = validators;
     }
 
-    public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         try
         {
@@ -109,4 +109,5 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
             
         await Task.FromResult(_response);
     }
+
 }

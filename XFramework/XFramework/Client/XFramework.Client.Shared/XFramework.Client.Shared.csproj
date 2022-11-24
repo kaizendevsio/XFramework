@@ -29,6 +29,7 @@
       <Folder Include="Core\Features\Todo" />
       <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Responses" />
+      <Folder Include="wwwroot" />
     </ItemGroup>
 
     <ItemGroup>

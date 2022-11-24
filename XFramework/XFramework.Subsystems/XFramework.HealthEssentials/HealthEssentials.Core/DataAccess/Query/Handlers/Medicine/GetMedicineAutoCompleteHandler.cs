@@ -2,7 +2,6 @@
 using HealthEssentials.Core.DataAccess.Query.Entity.Medicine;
 using HealthEssentials.Domain.Contracts.Responses;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Medicine;
-using RestSharp;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Medicine;
 

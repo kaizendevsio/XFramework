@@ -33,6 +33,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamFlow.Domain.Generic",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Domain.Generic", "XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj", "{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Integration", "XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj", "{C40842C6-528B-4180-95CE-ECF541C706D0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.Integration", "XFramework\XFramework.Subsystems\XFramework.Community\Community.Integration\Community.Integration.csproj", "{95BC8C34-3939-4AB6-8EED-EE537E0F5D68}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +87,14 @@ Global
 		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C40842C6-528B-4180-95CE-ECF541C706D0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C40842C6-528B-4180-95CE-ECF541C706D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C40842C6-528B-4180-95CE-ECF541C706D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C40842C6-528B-4180-95CE-ECF541C706D0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{95BC8C34-3939-4AB6-8EED-EE537E0F5D68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{95BC8C34-3939-4AB6-8EED-EE537E0F5D68}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{95BC8C34-3939-4AB6-8EED-EE537E0F5D68}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{95BC8C34-3939-4AB6-8EED-EE537E0F5D68}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -102,5 +114,7 @@ Global
 		{8D9CA83A-3102-42ED-A316-C39052415789} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 		{318F8BF9-D874-44C6-91EE-879F35956C12} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 		{1A0BEEC3-4800-485E-B227-D1F3E85FD6B5} = {8CD1151F-9943-421D-A6C8-1DF138009724}
+		{C40842C6-528B-4180-95CE-ECF541C706D0} = {8CD1151F-9943-421D-A6C8-1DF138009724}
+		{95BC8C34-3939-4AB6-8EED-EE537E0F5D68} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 	EndGlobalSection
 EndGlobal
