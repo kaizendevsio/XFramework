@@ -22,7 +22,7 @@ public class CreateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Create
             };
         }
 
-        var metaDatum = request.Adapt<MetaDatum>();
+        var metaDatum = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.MetaData>();
         metaDatum.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         metaDatum.Entity = entity;
         

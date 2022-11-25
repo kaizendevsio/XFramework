@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Folder Include="DataAccess\Commands\Entity\Application" />
+    <Folder Include="DataAccess\Commands\Entity\Events" />
+    <Folder Include="DataAccess\Commands\Handlers\Application" />
+    <Folder Include="DataAccess\Commands\Handlers\Events" />
     <Folder Include="DataAccess\Commands\Validations\Application\" />
     <Folder Include="DataAccess\Commands\Validations\Events\" />
     <Folder Include="DataAccess\Commands\Validations\UserWallet\" />

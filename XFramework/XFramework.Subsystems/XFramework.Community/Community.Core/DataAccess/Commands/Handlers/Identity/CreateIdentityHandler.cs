@@ -54,7 +54,7 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
             Status = (int) CommunityIdentityStatus.Active,
             LastActive = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc),
             Entity = communityIdentityEntity,
-            CommunityIdentityFiles = new List<CommunityIdentityFile>()
+            CommunityIdentityFiles =
             {
                 // Profile Photo
                 new()
