@@ -22,6 +22,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Integration", "X
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Integration", "XFramework\XFramework.Subsystems\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj", "{5E5C2672-D825-486D-88E2-FE73F2214C3D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Domain.Generic", "XFramework\XFramework.Subsystems\XFramework.Messaging\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj", "{D97181A3-97CE-486E-8A6E-5033E6336272}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -68,6 +70,10 @@ Global
 		{5E5C2672-D825-486D-88E2-FE73F2214C3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5E5C2672-D825-486D-88E2-FE73F2214C3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5E5C2672-D825-486D-88E2-FE73F2214C3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D97181A3-97CE-486E-8A6E-5033E6336272}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D97181A3-97CE-486E-8A6E-5033E6336272}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D97181A3-97CE-486E-8A6E-5033E6336272}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D97181A3-97CE-486E-8A6E-5033E6336272}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{7F546CB2-6D09-40D9-90BE-9DA78803C3B8} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
@@ -78,5 +84,6 @@ Global
 		{01440C3B-0387-4049-9F1B-1E5FD8EC20D1} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
 		{D6CE26C0-F0A0-4B5A-9795-41B95E51FDFF} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
 		{5E5C2672-D825-486D-88E2-FE73F2214C3D} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
+		{D97181A3-97CE-486E-8A6E-5033E6336272} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
 	EndGlobalSection
 EndGlobal

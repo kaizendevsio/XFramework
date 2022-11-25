@@ -1,23 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Community.Domain.DataTransferObjects
+namespace Community.Domain.DataTransferObjects;
+
+public partial class RegistryConfigurationGroup
 {
-    public partial class RegistryConfigurationGroup
-    {
-        public RegistryConfigurationGroup()
-        {
-            RegistryConfigurations = new HashSet<RegistryConfiguration>();
-        }
+    public long Id { get; set; }
 
-        public long Id { get; set; }
-        public string? Name { get; set; }
-        public string? Description { get; set; }
-        public DateTime? CreatedAt { get; set; }
-        public DateTime? ModifiedAt { get; set; }
-        public bool? IsDeleted { get; set; }
-        public string Guid { get; set; } = null!;
+    public string? Name { get; set; }
 
-        public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; set; }
-    }
+    public string? Description { get; set; }
+
+    public DateTime? CreatedAt { get; set; }
+
+    public DateTime? ModifiedAt { get; set; }
+
+    public bool? IsDeleted { get; set; }
+
+    public string Guid { get; set; } = null!;
+
+    public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; } = new List<RegistryConfiguration>();
 }

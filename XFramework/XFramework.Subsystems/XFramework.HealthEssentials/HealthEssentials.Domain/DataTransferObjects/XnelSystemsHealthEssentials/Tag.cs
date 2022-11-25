@@ -1,53 +1,57 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials
+namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+
+public partial class Tag
 {
-    public partial class Tag
-    {
-        public Tag()
-        {
-            AilmentTags = new HashSet<AilmentTag>();
-            ConsultationTags = new HashSet<ConsultationTag>();
-            DoctorTags = new HashSet<DoctorTag>();
-            HospitalServiceTags = new HashSet<HospitalServiceTag>();
-            HospitalTags = new HashSet<HospitalTag>();
-            LaboratoryLocationTags = new HashSet<LaboratoryLocationTag>();
-            LaboratoryServiceTags = new HashSet<LaboratoryServiceTag>();
-            LaboratoryTags = new HashSet<LaboratoryTag>();
-            LogisticRiderTags = new HashSet<LogisticRiderTag>();
-            MedicineTags = new HashSet<MedicineTag>();
-            PatientTags = new HashSet<PatientTag>();
-            PharmacyServiceTags = new HashSet<PharmacyServiceTag>();
-            PharmacyTags = new HashSet<PharmacyTag>();
-            ScheduleTags = new HashSet<ScheduleTag>();
-        }
+    public long Id { get; set; }
 
-        public long Id { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime ModifiedAt { get; set; }
-        public bool? IsEnabled { get; set; }
-        public bool IsDeleted { get; set; }
-        public long EntityId { get; set; }
-        public string? Name { get; set; }
-        public string? ShortName { get; set; }
-        public string? Description { get; set; }
-        public string Guid { get; set; } = null!;
+    public DateTime CreatedAt { get; set; }
 
-        public virtual TagEntity Entity { get; set; } = null!;
-        public virtual ICollection<AilmentTag> AilmentTags { get; set; }
-        public virtual ICollection<ConsultationTag> ConsultationTags { get; set; }
-        public virtual ICollection<DoctorTag> DoctorTags { get; set; }
-        public virtual ICollection<HospitalServiceTag> HospitalServiceTags { get; set; }
-        public virtual ICollection<HospitalTag> HospitalTags { get; set; }
-        public virtual ICollection<LaboratoryLocationTag> LaboratoryLocationTags { get; set; }
-        public virtual ICollection<LaboratoryServiceTag> LaboratoryServiceTags { get; set; }
-        public virtual ICollection<LaboratoryTag> LaboratoryTags { get; set; }
-        public virtual ICollection<LogisticRiderTag> LogisticRiderTags { get; set; }
-        public virtual ICollection<MedicineTag> MedicineTags { get; set; }
-        public virtual ICollection<PatientTag> PatientTags { get; set; }
-        public virtual ICollection<PharmacyServiceTag> PharmacyServiceTags { get; set; }
-        public virtual ICollection<PharmacyTag> PharmacyTags { get; set; }
-        public virtual ICollection<ScheduleTag> ScheduleTags { get; set; }
-    }
+    public DateTime ModifiedAt { get; set; }
+
+    public bool? IsEnabled { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public long EntityId { get; set; }
+
+    public string? Name { get; set; }
+
+    public string? ShortName { get; set; }
+
+    public string? Description { get; set; }
+
+    public string Guid { get; set; } = null!;
+
+    public virtual ICollection<AilmentTag> AilmentTags { get; } = new List<AilmentTag>();
+
+    public virtual ICollection<ConsultationTag> ConsultationTags { get; } = new List<ConsultationTag>();
+
+    public virtual ICollection<DoctorTag> DoctorTags { get; } = new List<DoctorTag>();
+
+    public virtual TagEntity Entity { get; set; } = null!;
+
+    public virtual ICollection<HospitalServiceTag> HospitalServiceTags { get; } = new List<HospitalServiceTag>();
+
+    public virtual ICollection<HospitalTag> HospitalTags { get; } = new List<HospitalTag>();
+
+    public virtual ICollection<LaboratoryLocationTag> LaboratoryLocationTags { get; } = new List<LaboratoryLocationTag>();
+
+    public virtual ICollection<LaboratoryServiceTag> LaboratoryServiceTags { get; } = new List<LaboratoryServiceTag>();
+
+    public virtual ICollection<LaboratoryTag> LaboratoryTags { get; } = new List<LaboratoryTag>();
+
+    public virtual ICollection<LogisticRiderTag> LogisticRiderTags { get; } = new List<LogisticRiderTag>();
+
+    public virtual ICollection<MedicineTag> MedicineTags { get; } = new List<MedicineTag>();
+
+    public virtual ICollection<PatientTag> PatientTags { get; } = new List<PatientTag>();
+
+    public virtual ICollection<PharmacyServiceTag> PharmacyServiceTags { get; } = new List<PharmacyServiceTag>();
+
+    public virtual ICollection<PharmacyTag> PharmacyTags { get; } = new List<PharmacyTag>();
+
+    public virtual ICollection<ScheduleTag> ScheduleTags { get; } = new List<ScheduleTag>();
 }

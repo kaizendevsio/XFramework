@@ -7,5 +7,6 @@ public class UpdatePatientConsultationHandler : BaseSignalRHandler, ISignalREven
 {
     public void Handle(HubConnection connection, IMediator mediator)
     {
-        HandleRequestCmd<UpdatePatientConsultationRequest, UpdatePatientConsultationCmd>(connection, mediator);    }
+        HandleRequestCmd<UpdatePatientConsultationRequest, UpdatePatientConsultationCmd>(connection, mediator);
+    }
 }

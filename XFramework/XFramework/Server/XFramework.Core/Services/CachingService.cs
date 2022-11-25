@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using XFramework.Core.Interfaces;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using XFramework.Core.Interfaces;
 
 namespace XFramework.Core.Services
 {

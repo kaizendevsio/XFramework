@@ -15,6 +15,8 @@ public class GetPatientConsultationListHandler : QueryBaseHandler, IRequestHandl
         var patientConsultation = await _dataLayer.HealthEssentialsContext.PatientConsultations
             .Include(x => x.ConsultationJobOrder.DoctorConsultationJobOrders)
             .ThenInclude(i => i.Doctor)
+            .Include(x => x.ConsultationJobOrder.ConsultationJobOrderLaboratories)
+            .Include(x => x.ConsultationJobOrder.ConsultationJobOrderMedicines)
             .Include(x => x.Patient)
             .Include(x => x.ConsultationJobOrder.Consultation)
             .Where(x => EF.Functions.ILike(x.ConsultationJobOrder.Remarks, $"%{request.SearchField}%")

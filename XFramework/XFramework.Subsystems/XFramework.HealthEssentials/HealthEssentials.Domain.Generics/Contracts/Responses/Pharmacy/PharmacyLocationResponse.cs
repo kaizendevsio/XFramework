@@ -16,13 +16,13 @@ public class PharmacyLocationResponse
     public string? UnitNumber { get; set; }
     public string? Street { get; set; }
     public string? Building { get; set; }
-    [JsonIgnore] public long? BarangayId { get; set; }
-    [JsonIgnore] public long? CityId { get; set; }
+    public Guid? BarangayGuid { get; set; }
+    public Guid? CityGuid { get; set; }
     public string? Subdivision { get; set; }
-    [JsonIgnore] public long? RegionId { get; set; }
+    public Guid? RegionGuid { get; set; }
     public bool? MainAddress { get; set; }
-    [JsonIgnore] public long? ProvinceId { get; set; }
-    [JsonIgnore] public long? CountryId { get; set; }
+    public Guid? ProvinceGuid { get; set; }
+    public Guid? CountryGuid { get; set; }
     public Guid? Guid { get; set; }
     public int? Status { get; set; }
     public string? Phone { get; set; }

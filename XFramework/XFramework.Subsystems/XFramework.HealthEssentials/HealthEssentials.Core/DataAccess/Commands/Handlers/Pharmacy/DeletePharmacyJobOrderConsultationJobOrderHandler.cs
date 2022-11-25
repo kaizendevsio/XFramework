@@ -30,7 +30,7 @@ public class DeletePharmacyJobOrderConsultationJobOrderHandler : CommandBaseHand
         return new ()
         {
             Message = $"Consultation Job Order with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

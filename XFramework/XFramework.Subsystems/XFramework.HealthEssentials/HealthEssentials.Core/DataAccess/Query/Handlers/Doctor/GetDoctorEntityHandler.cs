@@ -12,6 +12,28 @@ public class GetDoctorEntityHandler : QueryBaseHandler, IRequestHandler<GetDocto
     
     public async Task<QueryResponse<DoctorEntityResponse>> Handle(GetDoctorEntityQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var entity = await _dataLayer.HealthEssentialsContext.DoctorEntities
+            .Include(x => x.Group)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (entity is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No record found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Record found",
+            Response = entity.Adapt<DoctorEntityResponse>()
+        };
+
     }
 }

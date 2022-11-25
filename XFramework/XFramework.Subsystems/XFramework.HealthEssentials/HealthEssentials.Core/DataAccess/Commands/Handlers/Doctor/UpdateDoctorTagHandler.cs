@@ -56,7 +56,7 @@ public class UpdateDoctorTagHandler : CommandBaseHandler, IRequestHandler<Update
         return new ()
         {
             Message = $"Doctor Tag with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -56,7 +56,7 @@ public class UpdateLaboratoryTagHandler : CommandBaseHandler, IRequestHandler<Up
         return new ()
         {
             Message = $"Laboratory Tag with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

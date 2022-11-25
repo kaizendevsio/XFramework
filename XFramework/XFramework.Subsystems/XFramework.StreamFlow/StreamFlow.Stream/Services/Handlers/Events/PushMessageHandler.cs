@@ -73,7 +73,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                     await _hubContext.Clients.All.SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
                     break;
                 case MessageExchangeType.Direct:
-                    var currentClient = new StreamFlowClientBO();
+                    StreamFlowClientBO currentClient;
 
                     var availableClients = _cachingService.Clients.Where(x => x.Value.Guid == request.MessageQueue.Recipient).Select(i => i.Value).ToList();
                     var count = availableClients.Count;
@@ -83,7 +83,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                         var cachedClient = _cachingService.LatestClients.Select(i => i.Value).FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
                         if (cachedClient is null)
                         {
-                            var cc = availableClients.First();
+                            var cc = availableClients[0];
                             currentClient = cc;
                             
                             ReTryAddLatestClients:
@@ -96,8 +96,8 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                         {
                             var cachedClientIndex = availableClients.IndexOf(cachedClient);
                             currentClient = (cachedClientIndex + 1) >= count 
-                                ? availableClients.First()
-                                : availableClients.ElementAt(cachedClientIndex + 1);
+                                ? availableClients[0]
+                                : availableClients[cachedClientIndex + 1];
                             
                             ReTryRemoveLatestClients:
                             var tmpIndex = _cachingService.LatestClients.FirstOrDefault(i => i.Value.Guid == cachedClient.Guid);

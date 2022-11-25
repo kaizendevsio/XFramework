@@ -26,7 +26,7 @@ public class VerifyPharmacyMemberHandler : QueryBaseHandler, IRequestHandler<Ver
             };
         }
 
-        var identity = await _dataLayer.HealthEssentialsContext.PharmacyMembers.FirstOrDefaultAsync(i => i.CredentialId == credential.Guid, CancellationToken.None);
+        var identity = await _dataLayer.HealthEssentialsContext.PharmacyMembers.FirstOrDefaultAsync(i => i.CredentialGuid == credential.Guid, CancellationToken.None);
         if (identity is null)
         {
             return new ()

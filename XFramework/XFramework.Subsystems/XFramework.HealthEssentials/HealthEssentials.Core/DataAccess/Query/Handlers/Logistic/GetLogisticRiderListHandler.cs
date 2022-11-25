@@ -13,6 +13,7 @@ public class GetLogisticRiderListHandler : QueryBaseHandler, IRequestHandler<Get
     {
         var logisticRider = await _dataLayer.HealthEssentialsContext.LogisticRiders
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
+            .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)
             .Take(request.PageSize)
             .AsSplitQuery()

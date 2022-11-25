@@ -40,7 +40,7 @@ public class UpdateVendorHandler : CommandBaseHandler, IRequestHandler<UpdateVen
         return new ()
         {
             Message = $"Vendor Entity with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

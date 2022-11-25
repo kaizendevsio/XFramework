@@ -21,7 +21,7 @@ public interface ICommunityServiceWrapper : IXFrameworkService
     public Task<QueryResponse<List<CommunityIdentityResponse>>> GetIdentityList(GetIdentityListRequest request);
     public Task<QueryResponse<CommunityIdentityResponse>> GetIdentity(GetIdentityRequest request);
     public Task<CmdResponse> CreateIdentity(CreateIdentityRequest request);
-    public Task<CmdResponse> UpdateIdentity(UpdateIdentityRequest request);
+    public Task<CmdResponse> UpdateIdentity(UpdateCommunityIdentityRequest request);
     
     public Task<CmdResponse> CreateContent(CreateContentRequest request);
     public Task<CmdResponse> UpdateContent(UpdateContentRequest request);

@@ -3,7 +3,7 @@ using FluentValidation;
 
 namespace Community.Core.DataAccess.Commands.Validations.Identity;
 
-public class UpdateIdentityCmdValidator : AbstractValidator<UpdateIdentityCmd>
+public class UpdateIdentityCmdValidator : AbstractValidator<UpdateCommunityIdentityCmd>
 {
     public UpdateIdentityCmdValidator()
     {

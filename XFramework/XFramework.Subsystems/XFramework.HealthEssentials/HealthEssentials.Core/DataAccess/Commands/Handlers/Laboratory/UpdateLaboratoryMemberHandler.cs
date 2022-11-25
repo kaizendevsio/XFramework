@@ -33,7 +33,7 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLaboratoryMember.CredentialId = credential.Guid;
+            updatedLaboratoryMember.CredentialGuid = credential.Guid;
         }
 
         if (request.LaboratoryGuid is not null)
@@ -70,7 +70,7 @@ public class UpdateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         return new ()
         {
             Message = $"Laboratory member with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

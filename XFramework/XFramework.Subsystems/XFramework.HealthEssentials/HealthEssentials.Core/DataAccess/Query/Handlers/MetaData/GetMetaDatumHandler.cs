@@ -12,6 +12,28 @@ public class GetMetaDatumHandler : QueryBaseHandler, IRequestHandler<GetMetaDatu
     
     public async Task<QueryResponse<MetaDatumResponse>> Handle(GetMetaDatumQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var metaDatum = await _dataLayer.HealthEssentialsContext.MetaData
+            .Include(x => x.Entity)
+            .ThenInclude(x => x.Group)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
+        
+        if (metaDatum is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NoContent,
+                Message = "No record found",
+                IsSuccess = true
+            };
+        }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = "Record found",
+            Response = metaDatum.Adapt<MetaDatumResponse>()
+        };
     }
 }

@@ -16,5 +16,5 @@ public class ConsultationJobOrderLaboratoryResponse
     public Guid? Guid { get; set; }
     
     public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
-    public LaboratoryServiceResponse? LaboratoryService { get; set; }
+    public LaboratoryServiceEntityResponse? LaboratoryService { get; set; }
 }

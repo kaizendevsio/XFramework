@@ -1,4 +1,6 @@
-﻿namespace XFramework.Client.Shared.Core.Features.Wallet;
+﻿using Mapster;
+
+namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
@@ -45,7 +47,7 @@ public partial class WalletState
                 CurrentState.SendWalletVm.Action?.Invoke();
             }
             
-            await HandleFailure(result, action);
+            if (await HandleFailure(result, action, true)) return Unit.Value; 
             await HandleSuccess(result, action, false, "Payment Successful");
             
             return Unit.Value;
@@ -66,6 +68,15 @@ public partial class WalletState
             if (wallet.Balance <= 0)
             {
                 SweetAlertService.FireAsync("Error", "You don't have any balance");
+                {
+                    handle = Unit.Value;
+                    return true;
+                }
+            }
+            
+            if (wallet.Balance < CurrentState.SendWalletVm.Amount)
+            {
+                SweetAlertService.FireAsync("Error", "You don't have enough balance");
                 {
                     handle = Unit.Value;
                     return true;

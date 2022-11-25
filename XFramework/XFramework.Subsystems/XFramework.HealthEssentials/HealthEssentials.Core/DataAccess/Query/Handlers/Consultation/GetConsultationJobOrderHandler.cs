@@ -13,6 +13,16 @@ public class GetConsultationJobOrderHandler : QueryBaseHandler, IRequestHandler<
     {
         var consultationJobOrder = await _dataLayer.HealthEssentialsContext.ConsultationJobOrders
             .Include(x => x.Consultation)
+            .Include(x => x.ConsultationJobOrderMedicines)
+            .ThenInclude(x => x.Medicine)
+            .Include(x => x.ConsultationJobOrderMedicines)
+            .ThenInclude(x => x.DosageUnit)
+            .Include(x => x.ConsultationJobOrderMedicines)
+            .ThenInclude(x => x.DurationUnit)
+            .Include(x => x.ConsultationJobOrderMedicines)
+            .ThenInclude(x => x.IntakeUnit)
+            .Include(x => x.ConsultationJobOrderLaboratories)
+            .ThenInclude(x => x.LaboratoryService)
             .Include(x => x.Schedule)
             .Include(x => x.DoctorConsultationJobOrders)
             .ThenInclude(x => x.Doctor)

@@ -5,6 +5,6 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Doctor.Get;
 
 public class GetDoctorJobOrderListRequest : QueryableRequest
 {
-    public TransactionRecordType RecordType { get; set; }
+    public TransactionStatus RecordType { get; set; }
     public Guid? DoctorGuid { get; set; }
 }

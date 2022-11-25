@@ -1,5 +1,4 @@
 ﻿using FluentValidation;
-using XFramework.Core.DataAccess.Commands.Entity.Identity;
 
 namespace XFramework.Core.DataAccess.Commands.Validations.User
 {

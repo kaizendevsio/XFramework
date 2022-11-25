@@ -5,6 +5,6 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Logistic.Get;
 
 public class GetLogisticJobOrderListRequest : QueryableRequest
 {
-    public TransactionRecordType RecordType { get; set; }
+    public TransactionStatus RecordType { get; set; }
     public Guid? RiderGuid { get; set; }
 }

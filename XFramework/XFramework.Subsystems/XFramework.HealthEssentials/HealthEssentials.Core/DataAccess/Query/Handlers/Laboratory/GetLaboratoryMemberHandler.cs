@@ -31,7 +31,7 @@ public class GetLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<GetL
         }
         
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .Where(i => i.Guid == laboratoryMember.CredentialId)
+            .Where(i => i.Guid == laboratoryMember.CredentialGuid)
             .AsNoTracking()
             .FirstOrDefaultAsync(CancellationToken.None);
        
@@ -39,7 +39,7 @@ public class GetLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<GetL
         {
             return new ()
             {
-                Message = $"Credential with Guid {laboratoryMember.CredentialId} does not exist",
+                Message = $"Credential with Guid {laboratoryMember.CredentialGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }

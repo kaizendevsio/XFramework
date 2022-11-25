@@ -70,7 +70,7 @@ public class UpdatePharmacyJobOrderHandler : CommandBaseHandler, IRequestHandler
         return new ()
         {
             Message = $"Pharmacy Job Order with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }

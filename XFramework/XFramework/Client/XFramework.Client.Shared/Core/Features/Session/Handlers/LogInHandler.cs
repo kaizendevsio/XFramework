@@ -2,6 +2,7 @@
 using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
 using Mapster;
 using XFramework.Client.Shared.Core.Features.Wallet;
+using XFramework.Integration.Interfaces;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 
@@ -9,13 +10,14 @@ public partial class SessionState
 {
     protected class LogInHandler : ActionHandler<Login, CmdResponse>
     {
-        public IWebAssemblyHostEnvironment HostEnvironment { get; }
+        public ISignalRService SignalRService { get; }
         public IIdentityServiceWrapper IdentityServiceWrapper { get; }
         public SessionState CurrentState => Store.GetState<SessionState>();
         public bool VerificationRequired { get; set; }
         
-        public LogInHandler(IWebAssemblyHostEnvironment hostEnvironment, IIdentityServiceWrapper identityServiceWrapper ,IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
+        public LogInHandler(ISignalRService signalRService, IWebAssemblyHostEnvironment hostEnvironment, IIdentityServiceWrapper identityServiceWrapper, IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store) : base(configuration, sessionStorageService, localStorageService, sweetAlertService, navigationManager, endPoints, httpClient, baseHttpClient, jsRuntime, mediator, store)
         {
+            SignalRService = signalRService;
             HostEnvironment = hostEnvironment;
             IdentityServiceWrapper = identityServiceWrapper;
             Configuration = configuration;
@@ -43,8 +45,15 @@ public partial class SessionState
             // Send the request
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
             
+            // Broadcast login event
+            Mediator.Publish(new LoginEvent
+            {
+                StatusCode = response.HttpStatusCode,
+                Data = response.Response
+            });
+            
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, false ,$"There was an error while trying to sign you in")) return new()
+            if(await HandleFailure(response, action, false ,$"{response.Message}")) return new()
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 IsSuccess = false
@@ -91,7 +100,7 @@ public partial class SessionState
             
             // Inform UI About Not Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-            
+
             if (!HostEnvironment.IsProduction())
             {
                 // If Success URL property is provided, navigate to the given URL

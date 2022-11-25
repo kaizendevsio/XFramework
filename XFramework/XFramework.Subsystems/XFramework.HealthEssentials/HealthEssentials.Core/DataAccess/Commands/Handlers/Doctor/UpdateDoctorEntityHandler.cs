@@ -42,7 +42,7 @@ public class UpdateDoctorEntityHandler : CommandBaseHandler, IRequestHandler<Upd
         return new ()
         {
             Message = $"Doctor Entity with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

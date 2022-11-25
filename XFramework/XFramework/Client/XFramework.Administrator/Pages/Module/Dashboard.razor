@@ -2,4 +2,13 @@
 @inherits DashboardBase
 
 <h4>@TodoState.Text</h4>
+<h4>@_count</h4>
+
+<MudSlider @bind-Value="@_count" ValueLabel="true" Variant="Variant.Filled">Volume</MudSlider>
+
 <button onclick="@Display">Click me</button>
+
+@code
+{
+    double _count = 0;
+}

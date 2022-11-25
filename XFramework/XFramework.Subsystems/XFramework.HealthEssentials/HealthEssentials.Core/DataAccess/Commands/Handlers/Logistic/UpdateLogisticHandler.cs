@@ -30,7 +30,7 @@ public class UpdateLogisticHandler : CommandBaseHandler, IRequestHandler<UpdateL
         return new()
         {
             Message = $"Logistic with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

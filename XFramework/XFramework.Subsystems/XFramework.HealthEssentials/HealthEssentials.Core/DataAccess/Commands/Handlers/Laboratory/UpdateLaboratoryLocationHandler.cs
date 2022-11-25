@@ -48,7 +48,7 @@ public class UpdateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLaboratoryLocation.BarangayId = barangay.Id;
+            updatedLaboratoryLocation.BarangayGuid = barangay.Guid;
         }
 
 
@@ -63,7 +63,7 @@ public class UpdateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLaboratoryLocation.CityId = city.Id;
+            updatedLaboratoryLocation.CityGuid = city.Guid;
         }
 
         if (request.RegionGuid is not null)
@@ -77,7 +77,7 @@ public class UpdateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLaboratoryLocation.RegionId = region.Id;
+            updatedLaboratoryLocation.RegionGuid = region.Guid;
         }
         
         if (request.ProvinceGuid is not null )
@@ -91,7 +91,7 @@ public class UpdateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLaboratoryLocation.ProvinceId = province.Id;
+            updatedLaboratoryLocation.ProvinceGuid = province.Guid;
         }
 
         if (request.CountryGuid is not null)
@@ -105,7 +105,7 @@ public class UpdateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             } 
-            updatedLaboratoryLocation.CountryId = country.Id;
+            updatedLaboratoryLocation.CountryGuid = country.Guid;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedLaboratoryLocation);

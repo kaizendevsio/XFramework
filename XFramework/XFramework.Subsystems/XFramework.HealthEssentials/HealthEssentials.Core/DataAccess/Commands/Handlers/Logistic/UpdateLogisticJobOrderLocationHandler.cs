@@ -47,7 +47,7 @@ public class UpdateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLocation.Barangay = barangay.Id;
+            updatedLocation.BarangayGuid = barangay.Guid;
         }
 
         if (request.CityGuid is not null)
@@ -61,7 +61,7 @@ public class UpdateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLocation.City = city.Id;
+            updatedLocation.CityGuid = city.Guid;
         }
 
         if (request.RegionGuid is not null)
@@ -75,7 +75,7 @@ public class UpdateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLocation.Region = region.Id;
+            updatedLocation.RegionGuid = region.Guid;
         }
 
         if (request.ProvinceGuid is not null)
@@ -89,7 +89,7 @@ public class UpdateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLocation.Province = province.Id;
+            updatedLocation.ProvinceGuid = province.Guid;
         }
 
         if (request.CountryGuid is not null)
@@ -103,7 +103,7 @@ public class UpdateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLocation.Country = country.Id;
+            updatedLocation.CountryGuid = country.Guid;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedLocation);
@@ -112,7 +112,7 @@ public class UpdateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
         return new()
         {
             Message = $"Location with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

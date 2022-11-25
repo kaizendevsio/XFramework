@@ -1,0 +1,17 @@
+﻿using XFramework.Domain.Generic.Contracts.Requests;
+
+namespace Messaging.Domain.Generic.Contracts.Requests.Update;
+
+public class UpdateMessageDirectRequest : RequestBase
+{
+    public Guid? ParentMessageGuid { get; set; }
+    public Guid? TypeGuid { get; set; }
+    public Guid? SenderGuid { get; set; }
+    public Guid? RecipientGuid { get; set; }
+    public string? Sender { get; set; }
+    public string? Recipient { get; set; }
+    public string? Intent { get; set; }
+    public string? Subject { get; set; }
+    public string? Message { get; set; }
+    public short Status { get; set; }
+}

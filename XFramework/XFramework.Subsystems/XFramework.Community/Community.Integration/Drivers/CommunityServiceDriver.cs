@@ -47,7 +47,7 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
         return await SendVoidAsync(request);
     }
 
-    public async Task<CmdResponse> UpdateIdentity(UpdateIdentityRequest request)
+    public async Task<CmdResponse> UpdateIdentity(UpdateCommunityIdentityRequest request)
     {
         return await SendVoidAsync(request);
     }

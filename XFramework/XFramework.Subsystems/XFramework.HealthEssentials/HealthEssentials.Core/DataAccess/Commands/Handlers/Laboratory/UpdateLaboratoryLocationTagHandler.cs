@@ -56,7 +56,7 @@ public class UpdateLaboratoryLocationTagHandler : CommandBaseHandler, IRequestHa
         return new ()
         {
             Message = $"Laboratory Location Tag with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

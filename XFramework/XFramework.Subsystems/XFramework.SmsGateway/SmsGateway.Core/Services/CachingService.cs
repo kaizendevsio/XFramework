@@ -1,4 +1,4 @@
-﻿using Messaging.Domin.Generic.Enums;
+﻿using Messaging.Domain.Generic.Enums;
 using SmsGateway.Domain.Generic.Contracts.Responses.Sms;
 
 namespace SmsGateway.Core.Services;

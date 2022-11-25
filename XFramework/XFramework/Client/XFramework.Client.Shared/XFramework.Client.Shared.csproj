@@ -1,55 +1,41 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
-        <LangVersion>10</LangVersion>
+        <TargetFramework>net7.0</TargetFramework>
+        <LangVersion>11</LangVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>        
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Blazor-State" Version="5.0.3" />
-        <PackageReference Include="Blazored.LocalStorage" Version="4.1.5" />
+        <PackageReference Include="Blazor-State" Version="6.0.7" />
+        <PackageReference Include="Blazored.LocalStorage" Version="4.3.0" />
         <PackageReference Include="Blazored.SessionStorage" Version="2.2.0" />
-        <PackageReference Include="BlazorTransitionableRoute" Version="3.1.0" />
-        <PackageReference Include="CurrieTechnologies.Razor.SweetAlert2" Version="5.1.0" />
-        <PackageReference Include="FluentValidation" Version="10.3.6" />
-        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="10.3.6" />
-
-        <PackageReference Include="Humanizer.Core" Version="2.13.14" />
-        <PackageReference Include="Mapster" Version="7.2.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Blazor.HttpClient" Version="3.2.0-preview3.20168.3" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="6.0.1" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.2" />
-        <PackageReference Include="MudBlazor" Version="6.0.13" />
+        <PackageReference Include="BlazorTransitionableRoute" Version="4.0.0" />
+        <PackageReference Include="CurrieTechnologies.Razor.SweetAlert2" Version="5.3.0" />
+        
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="7.0.0" />
+        <PackageReference Include="MudBlazor" Version="6.0.18" />
         <PackageReference Include="Reshiru.Blazor.IndexedDB.Framework" Version="1.0.1" />
         <PackageReference Include="TG.Blazor.IndexedDB" Version="1.5.0-preview" />
-        <PackageReference Include="PPioli.FluentValidation.Blazor" Version="5.0.0" />
-        <PackageReference Include="System.Net.Http.Json" Version="6.0.0" />
-        <!--<PackageReference Include="BinaryPack" Version="1.0.3" />-->
-        <PackageReference Include="ByteSize" Version="2.1.1" />
-        <PackageReference Include="Bogus" Version="34.0.2" />
-
-
+        <PackageReference Include="PPioli.FluentValidation.Blazor" Version="11.1.0" />
+        <PackageReference Include="BlazorDownloadFile" Version="2.4.0.2" />
+        
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Core\Features\Base" />
       <Folder Include="Core\Features\Messaging\Handlers" />
       <Folder Include="Core\Features\Todo" />
       <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Responses" />
+      <Folder Include="wwwroot" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Community\Community.Domain.Generic\Community.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Community\Community.Integration\Community.Integration.csproj" />
-      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
-      <ProjectReference Include="..\..\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\Server\XFramework.Integration\XFramework.Integration.csproj" />
     </ItemGroup>
 </Project>

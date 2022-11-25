@@ -42,7 +42,7 @@ public class UpdateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Updat
         return new ()
         {
             Message = $"Laboratory with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

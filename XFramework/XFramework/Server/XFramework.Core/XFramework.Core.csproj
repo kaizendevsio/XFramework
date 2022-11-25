@@ -1,12 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>10</LangVersion>
+    <Nullable>enable</Nullable>
+    <LangVersion>11</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
+    <Folder Include="DataAccess\Commands\Entity\Application" />
+    <Folder Include="DataAccess\Commands\Entity\Events" />
+    <Folder Include="DataAccess\Commands\Handlers\Application" />
+    <Folder Include="DataAccess\Commands\Handlers\Events" />
     <Folder Include="DataAccess\Commands\Validations\Application\" />
     <Folder Include="DataAccess\Commands\Validations\Events\" />
     <Folder Include="DataAccess\Commands\Validations\UserWallet\" />
@@ -17,32 +22,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentValidation" Version="10.3.4" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="10.3.4" />
-    <PackageReference Include="Mapster" Version="7.2.0" />
-    <PackageReference Include="MediatR" Version="10.0.1" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.2" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
     <ProjectReference Include="..\XFramework.Domain\XFramework.Domain.csproj" />
     <ProjectReference Include="..\XFramework.Integration\XFramework.Integration.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="IdentityServer.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\bin\Debug\net6.0\IdentityServer.Domain.Generic.dll</HintPath>
-    </Reference>
-    <Reference Include="IdentityServer.Integration">
-      <HintPath>..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\bin\Debug\net6.0\IdentityServer.Integration.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Extensions.Configuration.Abstractions, Version=5.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60">
-      <HintPath>..\..\..\..\..\..\..\Program Files\dotnet\packs\Microsoft.AspNetCore.App.Ref\5.0.0\ref\net5.0\Microsoft.Extensions.Configuration.Abstractions.dll</HintPath>
-    </Reference>
-    <Reference Include="Wallets.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\bin\Debug\net6.0\Wallets.Domain.Generic.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
 </Project>

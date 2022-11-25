@@ -30,7 +30,7 @@ public class DeleteDoctorEntityGroupHandler : CommandBaseHandler, IRequestHandle
         return new ()
         {
             Message = $"Doctor Entity Group with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

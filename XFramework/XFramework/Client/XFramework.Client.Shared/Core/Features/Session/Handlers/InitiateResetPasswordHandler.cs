@@ -32,19 +32,32 @@ public partial class SessionState
         public override async Task<CmdResponse> Handle(InitiateResetPassword action, CancellationToken aCancellationToken)
         {
             await Mediator.Send(new ApplicationState.SetState(){IsBusy = true});
-            
-            CurrentState.ForgotPasswordVm.PhoneNumber = CurrentState.ForgotPasswordVm.PhoneNumber.ValidatePhoneNumber();
-            await Mediator.Send(new InitiateVerificationCode
+
+            try
             {
-                LocalVerification = true,
-                LocalToken = $"{HelperService.GenerateRandomNumber(111111, 999999)}",
-                ContactType = GenericContactType.Phone,
-                Contact = SessionState.ForgotPasswordVm.PhoneNumber.ValidatePhoneNumber(),
-                NavigateToOnSuccess = action.NavigateToOnSuccess,
-                NavigateToOnFailure = action.NavigateToOnFailure,
-                NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired,
-            });
-            
+                CurrentState.ForgotPasswordVm.PhoneNumber = CurrentState.ForgotPasswordVm.PhoneNumber.ValidatePhoneNumber();
+                await Mediator.Send(new InitiateVerificationCode
+                {
+                    LocalVerification = true,
+                    LocalToken = $"{HelperService.GenerateRandomNumber(111111, 999999)}",
+                    ContactType = GenericContactType.Phone,
+                    Contact = SessionState.ForgotPasswordVm.PhoneNumber,
+                    NavigateToOnSuccess = action.NavigateToOnSuccess,
+                    NavigateToOnFailure = action.NavigateToOnFailure,
+                    NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired,
+                });
+            }
+            catch (Exception e)
+            {
+                SweetAlertService.FireAsync("Error", $"{e.Message}", SweetAlertIcon.Error);
+                return new()
+                {
+                    IsSuccess = false,
+                    Message = e.Message,
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                };
+            }
+
             await Mediator.Send(new ApplicationState.SetState(){IsBusy = false});
             return new()
             {

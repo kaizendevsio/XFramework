@@ -54,17 +54,17 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
     {
         for (var index = 0; index < response.PharmacyLocations.Count; index++)
         {
-            var countryId = response.PharmacyLocations[index].CountryId;
-            var regionId = response.PharmacyLocations[index].RegionId;
-            var provinceId = response.PharmacyLocations[index].ProvinceId;
-            var cityId = response.PharmacyLocations[index].CityId;
-            var barangayId = response.PharmacyLocations[index].BarangayId;
+            var countryGuid = response.PharmacyLocations[index].CountryGuid;
+            var regionGuid = response.PharmacyLocations[index].RegionGuid;
+            var provinceGuid = response.PharmacyLocations[index].ProvinceGuid;
+            var cityGuid = response.PharmacyLocations[index].CityGuid;
+            var barangayGuid = response.PharmacyLocations[index].BarangayGuid;
 
-            var country = _dataLayer.XnelSystemsContext.AddressCountries.AsNoTracking().FirstOrDefaultAsync(i => i.Id == countryId, CancellationToken.None);
-            var region = _dataLayer2.XnelSystemsContext.AddressRegions.AsNoTracking().FirstOrDefaultAsync(i => i.Id == regionId, CancellationToken.None);
-            var province = _dataLayer3.XnelSystemsContext.AddressProvinces.AsNoTracking().FirstOrDefaultAsync(i => i.Id == provinceId, CancellationToken.None);
-            var city = _dataLayer4.XnelSystemsContext.AddressCities.AsNoTracking().FirstOrDefaultAsync(i => i.Id == cityId, CancellationToken.None);
-            var barangay = _dataLayer5.XnelSystemsContext.AddressBarangays.AsNoTracking().FirstOrDefaultAsync(i => i.Id == barangayId, CancellationToken.None);
+            var country = _dataLayer.XnelSystemsContext.AddressCountries.AsNoTracking().FirstOrDefaultAsync(x => x.Guid == $"{countryGuid}", CancellationToken.None);
+            var region = _dataLayer2.XnelSystemsContext.AddressRegions.AsNoTracking().FirstOrDefaultAsync(x => x.Guid == $"{regionGuid}", CancellationToken.None);
+            var province = _dataLayer3.XnelSystemsContext.AddressProvinces.AsNoTracking().FirstOrDefaultAsync(x => x.Guid == $"{provinceGuid}", CancellationToken.None);
+            var city = _dataLayer4.XnelSystemsContext.AddressCities.AsNoTracking().FirstOrDefaultAsync(x => x.Guid == $"{cityGuid}", CancellationToken.None);
+            var barangay = _dataLayer5.XnelSystemsContext.AddressBarangays.AsNoTracking().FirstOrDefaultAsync(x => x.Guid == $"{barangayGuid}", CancellationToken.None);
 
             await Task.WhenAll(country, region, province, city, barangay);
 
@@ -86,7 +86,7 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
                 .AsSplitQuery()
-                .Where(i => i.Guid == response.PharmacyMembers[index].CredentialId)
+                .Where(i => i.Guid == response.PharmacyMembers[index].CredentialGuid)
                 .FirstOrDefault()?
                 .Adapt<CredentialResponse>();
         }

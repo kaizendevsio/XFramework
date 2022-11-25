@@ -56,7 +56,7 @@ public class UpdateLaboratoryJobOrderResultFileHandler : CommandBaseHandler, IRe
         return new()
         {
             Message = $"Laboratory Job Order Result File with Guid {request.Guid} updated successfully",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
 
     }

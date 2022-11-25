@@ -1,5 +1,5 @@
 ﻿using Messaging.Core.DataAccess.Commands.Entity.Message;
-using Messaging.Domin.Generic.Enums;
+using Messaging.Domain.Generic.Enums;
 using SmsGateway.Domain.Generic.Contracts.Requests.Create;
 using SmsGateway.Integration.Interfaces;
 

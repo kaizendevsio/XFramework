@@ -28,7 +28,7 @@ public class DeleteVendorHandler : CommandBaseHandler, IRequestHandler<DeleteVen
         return new ()
         {
             Message = $"Vendor Entity with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }
