@@ -31,7 +31,7 @@ public class BaseSignalRHandler
     
     protected virtual void HandleRequestQuery<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator) where TRequest : new() where TResponse : new() where TQuery : IRequest<QueryResponse<TResponse>>
     {
-        Console.WriteLine($"{GetType().Name} Initialized");
+        //Console.WriteLine($"{GetType().Name} Initialized");
         connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, QueryResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
         //connection.On(HandlerName(), Handler<TRequest, TQuery, QueryResponse<TResponse>>(connection, mediator));
 
@@ -39,7 +39,7 @@ public class BaseSignalRHandler
     
     protected virtual void HandleRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse<TQuery>>
     {
-        Console.WriteLine($"{GetType().Name} Initialized");
+        //Console.WriteLine($"{GetType().Name} Initialized");
         connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse<TQuery>>(response, connection, mediator).ConfigureAwait(false));
         //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse<TQuery>>(connection, mediator));
 
@@ -47,7 +47,7 @@ public class BaseSignalRHandler
 
     protected virtual void HandleVoidRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse>
     {
-        Console.WriteLine($"{GetType().Name} Initialized");
+        //Console.WriteLine($"{GetType().Name} Initialized");
         connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse>(response, connection, mediator).ConfigureAwait(false));
         //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse>(connection, mediator));
     }

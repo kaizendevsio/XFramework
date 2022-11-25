@@ -5,5 +5,4 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Laboratory.Create;
 public class CreateLaboratoryServiceEntityGroupRequest : RequestBase
 {
     public string? Name { get; set; }
-
 }

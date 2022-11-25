@@ -1,6 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Community.Integration.Interfaces;
-using Microsoft.Extensions.Configuration;
+﻿using Community.Integration.Interfaces;
 
 namespace XFramework.Client.Shared.Core.Features.Community;
 

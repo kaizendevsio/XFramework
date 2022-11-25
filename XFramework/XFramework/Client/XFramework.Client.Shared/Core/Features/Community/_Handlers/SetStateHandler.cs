@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Community;
+﻿namespace XFramework.Client.Shared.Core.Features.Community;
 
 public partial class CommunityState
 {

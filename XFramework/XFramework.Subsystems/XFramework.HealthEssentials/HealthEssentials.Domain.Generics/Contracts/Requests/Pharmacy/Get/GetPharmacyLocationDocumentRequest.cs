@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
 
-public class GetPharmacyLocationDocumentRequest : QueryableRequest
+public class GetPharmacyLocationDocumentRequest : RequestBase
 {
     
 }

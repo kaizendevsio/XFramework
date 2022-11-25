@@ -1,4 +1,4 @@
-﻿using Messaging.Domin.Generic.Contracts.Requests.Update;
+﻿using Messaging.Domain.Generic.Contracts.Requests.Update;
 using Messaging.Integration.Interfaces;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;

@@ -11,9 +11,7 @@ public class CreatePatientHandler : CommandBaseHandler, IRequestHandler<CreatePa
     
     public async Task<CmdResponse<CreatePatientCmd>> Handle(CreatePatientCmd request, CancellationToken cancellationToken)
     {
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-       
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
         if (credential is null)
         {
             return new ()
@@ -23,9 +21,7 @@ public class CreatePatientHandler : CommandBaseHandler, IRequestHandler<CreatePa
             };
         }
 
-        var entity = await _dataLayer.HealthEssentialsContext.PatientEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var entity = await _dataLayer.HealthEssentialsContext.PatientEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (entity is null)
         {
             return new ()
@@ -38,20 +34,17 @@ public class CreatePatientHandler : CommandBaseHandler, IRequestHandler<CreatePa
         var patient = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Patient>();
         patient.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         patient.Entity = entity;
-        patient.CredentialId = credential.Id;
+        patient.CredentialGuid = credential.Guid;
         
         await _dataLayer.HealthEssentialsContext.Patients.AddAsync(patient,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(patient.Guid);
         return new()
         {
             Message = $"Patient with Guid {patient.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(patient.Guid)
-            }
         };
     }
 }

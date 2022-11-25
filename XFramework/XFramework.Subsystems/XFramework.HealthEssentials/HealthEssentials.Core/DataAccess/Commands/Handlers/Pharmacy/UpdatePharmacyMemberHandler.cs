@@ -34,7 +34,7 @@ public class UpdatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<U
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPharmacyMember.CredentialId = credential.Id;
+            updatedPharmacyMember.CredentialGuid = credential.Guid;
         }
 
         if (request.PharmacyGuid is not null)
@@ -68,15 +68,10 @@ public class UpdatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<U
         _dataLayer.HealthEssentialsContext.Update(updatedPharmacyMember);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
-        return new()
+        return new ()
         {
-            Message = $"Pharmacy member updated successfully",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(updatedPharmacyMember.Guid)
-            }
+            Message = $"Pharmacy member with Guid {request.Guid} updated successfully",
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

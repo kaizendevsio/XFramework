@@ -2,6 +2,6 @@
 
 namespace HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
 
-public class CreateConsultationTypeGroupCmd : CreateConsultationTypeGroupRequest, IRequest<CmdResponse<CreateConsultationTypeGroupCmd>>
+public class CreateConsultationTypeGroupCmd : CreateConsultationEntityGroupRequest, IRequest<CmdResponse<CreateConsultationTypeGroupCmd>>
 {
 }

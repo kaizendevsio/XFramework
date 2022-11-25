@@ -11,7 +11,6 @@ public class AilmentEntityResponse
     public string? Name { get; set; }
     public string? Description { get; set; }
     public Guid? Guid { get; set; }
-    public long GroupId { get; set; }
     public int? SortOrder { get; set; }
     
     public AilmentEntityGroupResponse? Group { get; set; }

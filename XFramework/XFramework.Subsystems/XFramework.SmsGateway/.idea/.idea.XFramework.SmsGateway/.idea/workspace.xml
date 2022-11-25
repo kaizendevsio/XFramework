@@ -82,9 +82,9 @@
       <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain/DataTransferObjects/StorageFileEntity.cs" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain/DataTransferObjects/XnelSystemsContext.cs" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domin.Generic/Contracts/Requests/Create/CreateDirectMessageRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domin.Generic/Contracts/Requests/Create/CreateMessageRequest.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domin.Generic/Contracts/Requests/Create/CreateMessageThreadRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain.Generic/Contracts/Requests/Create/CreateDirectMessageRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain.Generic/Contracts/Requests/Create/CreateMessageRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain.Generic/Contracts/Requests/Create/CreateMessageThreadRequest.cs" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Integration/Drivers/CommunityServiceDriver.cs" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Integration/Interfaces/ICommunityServiceWrapper.cs" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Integration/Messaging.Integration.csproj" afterDir="false" />
@@ -116,8 +116,8 @@
       <change beforePath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain/Class1.cs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain/Messaging.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain/Messaging.Domain.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domin.Generic/Class1.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domin.Generic/Messaging.Domin.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domin.Generic/Messaging.Domin.Generic.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain.Generic/Class1.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain.Generic/Messaging.Domain.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework.Messaging/Messaging.Domain.Generic/Messaging.Domain.Generic.csproj" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Actions/ClearState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/_Actions/ClearState.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/Actions/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/_Actions/SetState.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/CommunityState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../XFramework/Client/XFramework.Client.Shared/Core/Features/Community/CommunityState.cs" afterDir="false" />

@@ -1,5 +1,5 @@
 ﻿using Messaging.Core.DataAccess.Commands.Entity.Message;
-using Messaging.Domin.Generic.Enums;
+using Messaging.Domain.Generic.Enums;
 
 namespace Messaging.Core.DataAccess.Commands.Handlers.Message;
 

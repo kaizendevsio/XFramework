@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Story;
+﻿namespace XFramework.Client.Shared.Core.Features.Story;
 
 public partial class StoryState
 {

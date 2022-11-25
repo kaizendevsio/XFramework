@@ -11,4 +11,4 @@ global using Microsoft.EntityFrameworkCore;
 global using System.Text;
 global using XFramework.Domain.Generic.Enums;
 global using XFramework.Integration.Services.Helpers;
-global using Messaging.Domin.Generic.Contracts.Requests.Create;
+global using Messaging.Domain.Generic.Contracts.Requests.Create;

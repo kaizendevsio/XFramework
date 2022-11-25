@@ -64,27 +64,27 @@ public class GetLaboratoryLocationHandler : QueryBaseHandler, IRequestHandler<Ge
     }
     private async Task GetBranchAddressData(LaboratoryLocationResponse response)
     {
-        var countryId = response.CountryId;
-        var regionId = response.RegionId;
-        var provinceId = response.ProvinceId;
-        var cityId = response.CityId;
-        var barangayId = response.BarangayId;
+        var countryGuid = response.CountryGuid;
+        var regionGuid = response.RegionGuid;
+        var provinceGuid = response.ProvinceGuid;
+        var cityGuid = response.CityGuid;
+        var barangayGuid = response.BarangayGuid;
 
         var country = _dataLayer.XnelSystemsContext.AddressCountries
             .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == countryId, CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{countryGuid}", CancellationToken.None);
         var region = _dataLayer2.XnelSystemsContext.AddressRegions
             .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == regionId, CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{regionGuid}", CancellationToken.None);
         var province = _dataLayer3.XnelSystemsContext.AddressProvinces
             .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == provinceId, CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{provinceGuid}", CancellationToken.None);
         var city = _dataLayer4.XnelSystemsContext.AddressCities
             .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == cityId, CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{cityGuid}", CancellationToken.None);
         var barangay = _dataLayer5.XnelSystemsContext.AddressBarangays
             .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Id == barangayId, CancellationToken.None);
+            .FirstOrDefaultAsync(x => x.Guid == $"{barangayGuid}", CancellationToken.None);
 
         await Task.WhenAll(country, region, province, city, barangay);
 
@@ -104,7 +104,7 @@ public class GetLaboratoryLocationHandler : QueryBaseHandler, IRequestHandler<Ge
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
                 .ThenInclude(i => i.Entity)
-                .Where(i => i.Id == response.LaboratoryMembers[o].CredentialId)
+                .Where(i => i.Guid == response.LaboratoryMembers[o].CredentialGuid)
                 .AsSplitQuery()
                 .AsNoTracking()
                 .FirstOrDefault()?

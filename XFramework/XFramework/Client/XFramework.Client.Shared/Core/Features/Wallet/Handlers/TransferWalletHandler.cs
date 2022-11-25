@@ -1,6 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-using XFramework.Integration.Interfaces.Wrappers;
+﻿using Mapster;
 
 namespace XFramework.Client.Shared.Core.Features.Wallet;
 
@@ -30,22 +28,27 @@ public partial class WalletState
         public override async Task<Unit> Handle(TransferWallet action, CancellationToken aCancellationToken)
         {
             if (HandleValidation(out var handle)) return handle;
-
+            await Mediator.Send(new GetWalletList());
+            
             var result = await WalletServiceWrapper.TransferWallet(new()
             {
+                ClientReference = CurrentState.SendWalletVm.ClientReference,
                 CredentialGuid = SessionState.Credential.Guid,
+                WalletEntityGuid = CurrentState.SendWalletVm.WalletEntityGuid,
                 Recipient = CurrentState.SendWalletVm.Recipient,
                 Amount = CurrentState.SendWalletVm.Amount,
-                Remarks = CurrentState.SendWalletVm.Remarks
+                Remarks = CurrentState.SendWalletVm.Remarks,
+
             });
 
             if (result.HttpStatusCode is HttpStatusCode.Accepted)
             {
                 Mediator.Send(new GetWalletList());
+                CurrentState.SendWalletVm.Action?.Invoke();
             }
             
-            await HandleFailure(result, action);
-            await HandleSuccess(result, action);
+            if (await HandleFailure(result, action, true)) return Unit.Value; 
+            await HandleSuccess(result, action, false, "Payment Successful");
             
             return Unit.Value;
         }
@@ -65,6 +68,15 @@ public partial class WalletState
             if (wallet.Balance <= 0)
             {
                 SweetAlertService.FireAsync("Error", "You don't have any balance");
+                {
+                    handle = Unit.Value;
+                    return true;
+                }
+            }
+            
+            if (wallet.Balance < CurrentState.SendWalletVm.Amount)
+            {
+                SweetAlertService.FireAsync("Error", "You don't have enough balance");
                 {
                     handle = Unit.Value;
                     return true;

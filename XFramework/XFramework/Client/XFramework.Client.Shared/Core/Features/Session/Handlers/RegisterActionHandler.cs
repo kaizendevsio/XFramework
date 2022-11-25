@@ -1,12 +1,8 @@
-﻿using Blazored.LocalStorage;
-using IdentityServer.Domain.Generic.Contracts.Requests.Check;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
 using Mapster;
-using Microsoft.Extensions.Configuration;
-using XFramework.Client.Shared.Core.Features.Application;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Domain.Generic.Contracts.Responses;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 
@@ -64,7 +60,7 @@ public partial class SessionState
             var credentialGuid = Guid.NewGuid();
 
             // Send Create Identity Request
-            await ReportProgress("Creating identity..");
+            await ReportTask("Creating identity..", null);
             var identityRequest = CurrentState.RegisterVm.Adapt<CreateIdentityRequest>();
             identityRequest.Guid = identityGuid;
             
@@ -76,7 +72,7 @@ public partial class SessionState
             };;
             
             // Send Create Credential Request
-            await ReportProgress("Creating credential..");
+            await ReportTask("Creating credential..", null);
             var credentialRequest = CurrentState.RegisterVm.Adapt<CreateCredentialRequest>();
             credentialRequest.Guid = credentialGuid;
             credentialRequest.IdentityGuid = identityGuid;
@@ -89,53 +85,47 @@ public partial class SessionState
             };
             
             // Send Create Phone Contact Request
-            if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
+            await ReportTask("Creating contacts..", null);
+            var phoneContact = await IdentityServiceWrapper.CreateContact(new()
             {
-                await ReportProgress("Creating contacts..");
-                var phoneContact = await IdentityServiceWrapper.CreateContact(new()
-                {
-                    CredentialGuid = credentialGuid,
-                    ContactType = GenericContactType.Phone,
-                    Value = CurrentState.RegisterVm.PhoneNumber,
-                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
-                    SendOtp = !action.SkipVerification
-                });
-                if (await HandleFailure(phoneContact, action)) return new()
-                {
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
-                    IsSuccess = false
-                };
-            }
+                CredentialGuid = credentialGuid,
+                ContactType = GenericContactType.Phone,
+                Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber) ? CurrentState.RegisterVm.PhoneNumber : string.Empty,
+                GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
+                SendOtp = !action.SkipVerification
+            });
+            if (await HandleFailure(phoneContact, action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                IsSuccess = false
+            };
             
             // Send Create Email Contact Request
-            if (!string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress))
+            await ReportTask("Creating contacts..", null);
+            var emailContact = await IdentityServiceWrapper.CreateContact(new()
             {
-                await ReportProgress("Creating contacts..");
-                var emailContact = await IdentityServiceWrapper.CreateContact(new()
-                {
-                    CredentialGuid = credentialGuid,
-                    ContactType = GenericContactType.Email,
-                    Value = CurrentState.RegisterVm.EmailAddress,
-                    GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767")
-                });
-                if (await HandleFailure(emailContact, action)) return new()
-                {
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
-                    IsSuccess = false
-                };
-            }
+                CredentialGuid = credentialGuid,
+                ContactType = GenericContactType.Email,
+                Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress) ? CurrentState.RegisterVm.EmailAddress : string.Empty,
+                GroupGuid = Guid.Parse("b4bda700-03c1-4a8a-bf6d-6043704cf767")
+            });
+            if (await HandleFailure(emailContact, action)) return new()
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                IsSuccess = false
+            };
 
             // If WalletList property is provided, automatically create wallets
             if (action.WalletList is not null)
             {
-                await ReportProgress("Creating wallets..");
+                await ReportTask("Creating wallets..", null);
                 await CreateWallets(action.WalletList, credentialGuid);
             }
             
             // If AutoLogin property is true, automatically log the identity in
             if (action.AutoLogin)
             {
-                ReportTask("Logging In..");
+                ReportTask("Logging In..", null);
                 var username = string.Empty;
                 if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
                 {
@@ -196,17 +186,17 @@ public partial class SessionState
         private async Task<bool> CheckDuplicateRecords(Register action)
         {
             // Check Identity Duplicates
-            await ReportProgress("Validating identity..");
+            await ReportTask("Validating identity..", null);
             var identityExistence = await IdentityServiceWrapper.CheckIdentityExistence(CurrentState.RegisterVm.Adapt<CheckIdentityExistenceRequest>());
             if (await HandleFailure(identityExistence, action)) return true;
 
             // Check Credential Duplicates
-            await ReportProgress("Validating credentials..");
+            await ReportTask("Validating credentials..", null);
             var credentialExistence = await IdentityServiceWrapper.CheckCredentialExistence(CurrentState.RegisterVm.Adapt<CheckCredentialExistenceRequest>());
             if (await HandleFailure(credentialExistence, action)) return true;
 
             // Check Phone Number Duplicates
-            await ReportProgress("Checking for duplicate phone numbers..");
+            await ReportTask("Checking for duplicate phone numbers..", null);
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
             {
                 var phoneExistence = await IdentityServiceWrapper.CheckContactExistence(new()
@@ -219,7 +209,7 @@ public partial class SessionState
             }
 
             // Check Email Address Duplicates
-            await ReportProgress("Checking for duplicate email address..");
+            await ReportTask("Checking for duplicate email address..", null);
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress))
             {
                 var emailExistence = await IdentityServiceWrapper.CheckContactExistence(new()

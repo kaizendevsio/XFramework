@@ -12,10 +12,7 @@ public class CreateLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
     
     public async Task<CmdResponse<CreateLaboratoryServiceEntityCmd>> Handle(CreateLaboratoryServiceEntityCmd request, CancellationToken cancellationToken)
     {
-        var group = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", cancellationToken: cancellationToken);
-       
+        var group = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntityGroups.FirstOrDefaultAsync(i => i.Guid == $"{request.GroupGuid}", CancellationToken.None);
         if (group is null)
         {
             return new ()
@@ -32,15 +29,13 @@ public class CreateLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
         await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities.AddAsync(serviceEntity,CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
 
+        request.Guid = Guid.Parse(serviceEntity.Guid);
         return new()
         {
             Message = $"Laboratory service entity with Guid {serviceEntity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
-            {
-                Guid = Guid.Parse(serviceEntity.Guid)
-            }
+           
         };
     }
 }

@@ -1,6 +1,4 @@
-﻿
-
-using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
+﻿using HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Consultation;
 
@@ -18,5 +16,5 @@ public class ConsultationJobOrderLaboratoryResponse
     public Guid? Guid { get; set; }
     
     public ConsultationJobOrderResponse? ConsultationJobOrder { get; set; }
-    public LaboratoryServiceResponse? LaboratoryService { get; set; }
+    public LaboratoryServiceEntityResponse? LaboratoryService { get; set; }
 }

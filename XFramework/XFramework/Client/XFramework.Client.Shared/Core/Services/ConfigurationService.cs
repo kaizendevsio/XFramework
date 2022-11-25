@@ -16,11 +16,7 @@ namespace XFramework.Client.Shared.Core.Services
         public HttpClient HttpClient { get; set; }
         public IWebAssemblyHostEnvironment WebAssemblyHostEnvironment { get; }
         public ConfigurationModel ConfigurationModel { get; set; }
-        public ConfigurationModelEnvironment CurrentConfiguration
-        {
-            get => ConfigurationModel.Environment
-                .FirstOrDefault(i => i.Name == WebAssemblyHostEnvironment.Environment);
-        }
+        public ConfigurationModelEnvironment CurrentConfiguration => ConfigurationModel.Environment.FirstOrDefault(i => i.Name == WebAssemblyHostEnvironment.Environment);
 
         public async Task GetConfiguration()
         {

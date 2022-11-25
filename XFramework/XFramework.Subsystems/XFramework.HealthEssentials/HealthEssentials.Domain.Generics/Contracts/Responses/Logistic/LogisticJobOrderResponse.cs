@@ -1,6 +1,8 @@
 ﻿
 
+using HealthEssentials.Domain.Generics.Contracts.Responses.Pharmacy;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Schedule;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 
@@ -15,5 +17,7 @@ public class LogisticJobOrderResponse
     
     public LogisticRiderResponse? Rider { get; set; }
     public ScheduleResponse? Schedule { get; set; }
+    public virtual List<LogisticJobOrderDetailResponse>? LogisticJobOrderDetails { get; set; }
+    public virtual List<LogisticJobOrderLocationResponse>? LogisticJobOrderLocations { get; set; }
 
 }

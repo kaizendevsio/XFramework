@@ -5,6 +5,7 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Create;
 
 public class CreatePharmacyTagRequest : RequestBase
 {
-    public PharmacyTag Tag { get; set; }
-    public bool IsEnabled { get; set; }
+    public Guid? PharmacyGuid { get; set; }
+    public string? Value { get; set; }
+    public Guid? TagGuid { get; set; }
 }

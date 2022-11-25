@@ -21,6 +21,6 @@ public class CreateDoctorRequest : RequestBase
     public decimal? BaseFee { get; set; }
 
     public CreateAddressRequest? Address { get; set; }
-    public List<string> SupportedConsultationList { get; set; }
-    public List<FileUploadRequest> FileList { get; set; }
+    public List<string>? SupportedConsultationList { get; set; }
+    public List<FileUploadRequest>? FileList { get; set; }
 }

@@ -29,11 +29,11 @@ namespace StreamFlow.Stream.Hubs.V1
         {
             var client = _cachingService.Clients.FirstOrDefault(i => i.Value.StreamId == Context.ConnectionId);
             var cachedClient = _cachingService.LatestClients.FirstOrDefault(x => x.Value.StreamId == Context.ConnectionId);
-            _cachingService.Clients.Remove(client.Key, out _);
+            _cachingService.Clients.Remove(client.Key, out var a);
             _cachingService.LatestClients.Remove(cachedClient.Key, out _);
 
             await base.OnDisconnectedAsync(exception);
-            Console.WriteLine($"Connection Lost and Unregistered with ID {Context.ConnectionId} : {client.Value.Guid} : {client.Value.Name}");
+            Console.WriteLine($"Connection Lost and Unregistered with ID {Context.ConnectionId} : {a?.Guid} : {a?.Name}");
         }
 
         public StreamFlowInvokeResponse Invoke(StreamFlowMessageBO request)

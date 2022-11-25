@@ -1,7 +1,4 @@
-﻿using Blazored.LocalStorage;
-using Microsoft.Extensions.Configuration;
-
-namespace XFramework.Client.Shared.Core.Features.Cryptocurrency;
+﻿namespace XFramework.Client.Shared.Core.Features.Cryptocurrency;
 
 public partial class CryptocurrencyState
 {

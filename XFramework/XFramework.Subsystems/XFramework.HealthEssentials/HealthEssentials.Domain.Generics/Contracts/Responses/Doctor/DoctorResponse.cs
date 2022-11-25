@@ -9,8 +9,7 @@ public class DoctorResponse
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }
     public bool IsDeleted { get; set; }
-    public long EntityId { get; set; }
-    public long CredentialId { get; set; }
+    public string? CredentialGuid { get; set; }
     public string? Description { get; set; }
     public string? Remarks { get; set; }
     public Guid? Guid { get; set; }
@@ -26,6 +25,8 @@ public class DoctorResponse
     public int Status { get; set; }
     
     public DoctorEntityResponse? Entity { get; set; }
+    public List<DoctorTagResponse>? DoctorTags { get; set; }
+    public List<DoctorConsultationResponse>? DoctorConsultations { get; set; }
     public CredentialResponse? Credential { get; set; }
     public List<StorageFileResponse>? Files { get; set; }
 }

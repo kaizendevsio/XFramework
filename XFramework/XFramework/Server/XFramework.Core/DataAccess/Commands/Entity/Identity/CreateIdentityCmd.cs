@@ -1,9 +1,4 @@
-﻿using System;
-using IdentityServer.Domain.Generic.Enums;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Contracts.Requests.Create;
-using XFramework.Domain.Generic.Enums;
+﻿using XFramework.Domain.Generic.Contracts.Requests.Create;
 
 namespace XFramework.Core.DataAccess.Commands.Entity.Identity
 {

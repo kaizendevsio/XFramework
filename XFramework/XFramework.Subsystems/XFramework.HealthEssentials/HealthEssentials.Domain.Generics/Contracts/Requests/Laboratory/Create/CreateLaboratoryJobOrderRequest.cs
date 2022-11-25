@@ -11,7 +11,7 @@ public class CreateLaboratoryJobOrderRequest : RequestBase
     public string? ReferenceNumber { get; set; }
     public string? Remarks { get; set; }
     public TransactionStatus Status { get; set; }
-    public TransactionStatus PaymentStatus { get; set; }
+    public DepositStatus PaymentStatus { get; set; }
     public Guid? WalletTypeGuid { get; set; }
     public decimal? AmountDue { get; set; }
     public decimal? AmountPaid { get; set; }
@@ -21,5 +21,5 @@ public class CreateLaboratoryJobOrderRequest : RequestBase
     public DateTime? CompletedAt { get; set; }
     public Guid? ScheduleGuid { get; set; }
 
-    public List<LaboratoryJobOrderDetailResponse> DetailList { get; set; }
+    public List<LaboratoryJobOrderDetailResponse>? DetailList { get; set; }
 }

@@ -20,14 +20,12 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
     
     public async Task<CmdResponse<CreatePharmacyCmd>> Handle(CreatePharmacyCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.HealthEssentialsContext.PharmacyEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
-        
+        var entity = await _dataLayer.HealthEssentialsContext.PharmacyEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (entity is null)
         {
             return new ()
             {
-                Message = $"Pharmacy entity with Guid {request.Guid} does not exist",
+                Message = $"Pharmacy entity with Guid {request.EntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -43,8 +41,9 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         request.Guid = Guid.Parse(pharmacy.Guid);
         return new()
         {
-            Message = "Successfully created pharmacy",
-            HttpStatusCode = HttpStatusCode.Accepted
+            Message = $"Pharmacy with Guid {request.Guid} created successfully",
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

@@ -19,20 +19,19 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
     
     public async Task<CmdResponse<CreateLaboratoryCmd>> Handle(CreateLaboratoryCmd request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.HealthEssentialsContext.LaboratoryEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
-        
+        var entity = await _dataLayer.HealthEssentialsContext.LaboratoryEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.EntityGuid}", CancellationToken.None);
         if (entity is null)
         {
             return new ()
             {
-                Message = $"Laboratory entity with Guid {request.Guid} does not exist",
+                Message = $"Laboratory entity with Guid {request.EntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
 
         var laboratory = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Laboratory>();
         laboratory.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
+        laboratory.Status = (int) GenericStatusType.Pending;
         laboratory.Entity = entity;
         
         await _dataLayer.HealthEssentialsContext.Laboratories.AddAsync(laboratory, CancellationToken.None);
@@ -41,8 +40,9 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
         request.Guid = Guid.Parse(laboratory.Guid);
         return new()
         {
-            Message = $"Laboratory with Guid {laboratory.Guid} created successfully",
-            HttpStatusCode = HttpStatusCode.Accepted
+            Message = $"Laboratory entity with Guid {laboratory.Guid} created successfully",
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

@@ -10,7 +10,6 @@ public class UpdateCredentialHandler : CommandBaseHandler, IRequestHandler<Updat
     public async Task<CmdResponse<UpdateCredentialCmd>> Handle(UpdateCredentialCmd request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.IdentityCredentials
-            .Where(i => i.IdentityInfo.Guid == request.Guid.ToString())
             .Where(i => i.Guid == request.Guid.ToString())
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -18,7 +17,7 @@ public class UpdateCredentialHandler : CommandBaseHandler, IRequestHandler<Updat
         {
             return new CmdResponse<UpdateCredentialCmd>
             {
-                Message = $"Identity with data [UID: {request.Guid}, Username: {request.UserName}] does not exist",
+                Message = $"Identity with data [GUID: {request.Guid}, Username: {request.UserName}] does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }

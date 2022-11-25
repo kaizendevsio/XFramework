@@ -10,9 +10,7 @@ public class DeleteLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
     }
     public async Task<CmdResponse<DeleteLaboratoryServiceEntityCmd>> Handle(DeleteLaboratoryServiceEntityCmd request, CancellationToken cancellationToken)
     {
-        var existingLaboratoryServiceEntity = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var existingLaboratoryServiceEntity = await _dataLayer.HealthEssentialsContext.LaboratoryServiceEntities.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingLaboratoryServiceEntity == null)
         {
             return new()
@@ -28,11 +26,10 @@ public class DeleteLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
         _dataLayer.HealthEssentialsContext.Update(existingLaboratoryServiceEntity);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
         
-        return new()
+        return new ()
         {
-            Message = $"Laboratory  service entity with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            Message = $"Laboratory service entity with Guid {request.Guid} has been deleted",
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

@@ -8,7 +8,7 @@ public class UsersBase : PageBase
 {
   public UsersBase()
   {
-    View.Title = "HEHEHE";
+    View.Title = "Users";
   }
   
   protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -29,7 +29,7 @@ public class UsersBase : PageBase
         .RuleFor(x => x.Status, x => x.Random.Int(0, 3))
       ;
 
-    Model = model.GenerateBetween(1, 25);
+    Model = model.GenerateBetween(1, 5);
     StateHasChanged();
   }
   

@@ -27,7 +27,7 @@ public class VerifyLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<V
             };
         }
 
-        var identity = await _dataLayer.HealthEssentialsContext.LaboratoryMembers.FirstOrDefaultAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
+        var identity = await _dataLayer.HealthEssentialsContext.LaboratoryMembers.FirstOrDefaultAsync(i => i.CredentialGuid == credential.Guid, CancellationToken.None);
         if (identity is null)
         {
             return new ()

@@ -15,9 +15,7 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
     
     public async Task<CmdResponse<CreateLaboratoryMemberCmd>> Handle(CreateLaboratoryMemberCmd request, CancellationToken cancellationToken)
     {
-        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.LaboratoryGuid}", cancellationToken: cancellationToken);
-       
+        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(i => i.Guid == $"{request.LaboratoryGuid}", CancellationToken.None);
         if (laboratory is null)
         {
             return new ()
@@ -27,10 +25,7 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
             };
         }
         
-        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
-            .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);
-       
+        var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials.FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", CancellationToken.None);
         if (credential is null)
         {
             return new ()
@@ -40,14 +35,12 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
             };
         }
 
-        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryLocationGuid}", CancellationToken.None);
-        
+        var laboratoryLocation = await _dataLayer.HealthEssentialsContext.LaboratoryLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryLocationGuid}", CancellationToken.None);
         if (laboratoryLocation is null)
         {
             return new ()
             {
-                Message = $"Laboratory Location with Guid {request.Guid} does not exist",
+                Message = $"Laboratory Location with Guid {request.LaboratoryLocationGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
@@ -55,9 +48,8 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         var laboratoryMember = request.Adapt<LaboratoryMember>();
         laboratoryMember.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         laboratoryMember.Laboratory = laboratory;
-        laboratoryMember.CredentialId = credential.Id;
+        laboratoryMember.CredentialGuid = credential.Guid;
         laboratoryMember.LaboratoryLocation = laboratoryLocation;
-        laboratoryMember.Status = (int) (request.Status is GenericStatusType.None ? GenericStatusType.Pending : request.Status);
         
         await _dataLayer.HealthEssentialsContext.LaboratoryMembers.AddAsync(laboratoryMember, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
@@ -66,7 +58,8 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         return new()
         {
             Message = $"Laboratory member with Guid {laboratoryMember.Guid} has been created",
-            HttpStatusCode = HttpStatusCode.Accepted
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

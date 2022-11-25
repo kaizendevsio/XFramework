@@ -26,7 +26,7 @@ public class VerifyLogisticHandler : QueryBaseHandler, IRequestHandler<VerifyLog
             };
         }
 
-        var identity = await _dataLayer.HealthEssentialsContext.LogisticRiders.FirstOrDefaultAsync(i => i.CredentialId == credential.Id, CancellationToken.None);
+        var identity = await _dataLayer.HealthEssentialsContext.LogisticRiders.FirstOrDefaultAsync(i => i.CredentialGuid == credential.Guid, CancellationToken.None);
         if (identity is null)
         {
             return new ()

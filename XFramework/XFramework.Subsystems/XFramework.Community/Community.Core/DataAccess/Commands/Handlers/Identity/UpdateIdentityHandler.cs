@@ -3,14 +3,14 @@ using Community.Domain.Generic.Enums;
 
 namespace Community.Core.DataAccess.Commands.Handlers.Identity;
 
-public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateIdentityCmd, CmdResponse>
+public class UpdateIdentityHandler : CommandBaseHandler, IRequestHandler<UpdateCommunityIdentityCmd, CmdResponse>
 {
     public UpdateIdentityHandler(IDataLayer dataLayer)
     {
         _dataLayer = dataLayer;
     }
     
-    public async Task<CmdResponse> Handle(UpdateIdentityCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse> Handle(UpdateCommunityIdentityCmd request, CancellationToken cancellationToken)
     {
         var communityIdentity = await _dataLayer.CommunityIdentities.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken: cancellationToken);
         if (communityIdentity == null)

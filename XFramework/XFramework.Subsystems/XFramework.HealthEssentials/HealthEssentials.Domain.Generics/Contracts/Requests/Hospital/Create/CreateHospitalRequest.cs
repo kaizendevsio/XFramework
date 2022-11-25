@@ -4,6 +4,7 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Hospital.Create;
 
 public class CreateHospitalRequest : RequestBase
 {
+    public Guid? EntityGuid { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? Remarks { get; set; }

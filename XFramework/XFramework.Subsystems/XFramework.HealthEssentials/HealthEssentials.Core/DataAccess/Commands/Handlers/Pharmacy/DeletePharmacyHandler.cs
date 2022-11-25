@@ -11,9 +11,7 @@ public class DeletePharmacyHandler : CommandBaseHandler, IRequestHandler<DeleteP
 
     public async Task<CmdResponse<DeletePharmacyCmd>> Handle(DeletePharmacyCmd request, CancellationToken cancellationToken)
     {
-        var existingPharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
-
+        var existingPharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies.FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);
         if (existingPharmacy == null)
         {
             return new()
@@ -32,8 +30,7 @@ public class DeletePharmacyHandler : CommandBaseHandler, IRequestHandler<DeleteP
         return new()
         {
             Message = $"Pharmacy with Guid {request.Guid} has been deleted",
-            HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

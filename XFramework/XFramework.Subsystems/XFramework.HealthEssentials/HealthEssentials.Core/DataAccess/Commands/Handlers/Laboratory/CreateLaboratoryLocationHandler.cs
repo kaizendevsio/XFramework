@@ -13,21 +13,17 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
     
     public async Task<CmdResponse<CreateLaboratoryLocationCmd>> Handle(CreateLaboratoryLocationCmd request, CancellationToken cancellationToken)
     {
-        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryGuid}", CancellationToken.None);
-        
+        var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories.FirstOrDefaultAsync(x => x.Guid == $"{request.LaboratoryGuid}", CancellationToken.None);
         if (laboratory is null)
         {
             return new ()
             {
-                Message = $"Laboratory with Guid {request.Guid} does not exist",
+                Message = $"Laboratory with Guid {request.LaboratoryGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
         
-        var barangay = await _dataLayer.XnelSystemsContext.AddressBarangays
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.BarangayGuid}", CancellationToken.None);
-        
+        var barangay = await _dataLayer.XnelSystemsContext.AddressBarangays.FirstOrDefaultAsync(x => x.Guid == $"{request.BarangayGuid}", CancellationToken.None);
         if (barangay is null)
         {
             return new ()
@@ -37,9 +33,7 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
             };
         }
         
-        var city = await _dataLayer.XnelSystemsContext.AddressCities
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.CityGuid}", CancellationToken.None);
-
+        var city = await _dataLayer.XnelSystemsContext.AddressCities.FirstOrDefaultAsync(x => x.Guid == $"{request.CityGuid}", CancellationToken.None);
         if (city is null)
         {
             return new ()
@@ -49,9 +43,7 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
             };
         }
         
-        var region = await _dataLayer.XnelSystemsContext.AddressRegions
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.RegionGuid}", CancellationToken.None);
-
+        var region = await _dataLayer.XnelSystemsContext.AddressRegions.FirstOrDefaultAsync(x => x.Guid == $"{request.RegionGuid}", CancellationToken.None);
         if (region is null)
         {
             return new ()
@@ -61,9 +53,7 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
             };
         }
         
-        var province = await _dataLayer.XnelSystemsContext.AddressProvinces
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.ProvinceGuid}", CancellationToken.None);
-
+        var province = await _dataLayer.XnelSystemsContext.AddressProvinces.FirstOrDefaultAsync(x => x.Guid == $"{request.ProvinceGuid}", CancellationToken.None);
         if (province is null)
         {
             return new ()
@@ -73,9 +63,7 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
             };
         }
         
-        var country = await _dataLayer.XnelSystemsContext.AddressCountries
-            .FirstOrDefaultAsync(x => x.Guid == $"{request.CountryGuid}", CancellationToken.None);
-
+        var country = await _dataLayer.XnelSystemsContext.AddressCountries.FirstOrDefaultAsync(x => x.Guid == $"{request.CountryGuid}", CancellationToken.None);
         if (country is null)
         {
             return new ()
@@ -88,13 +76,12 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
         var laboratoryLocation = request.Adapt<LaboratoryLocation>();
         laboratoryLocation.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         laboratoryLocation.Laboratory = laboratory;
-        laboratoryLocation.BarangayId = barangay.Id;
-        laboratoryLocation.CityId = city.Id;
-        laboratoryLocation.RegionId = region.Id;
-        laboratoryLocation.ProvinceId = province.Id;
-        laboratoryLocation.CountryId = country.Id;
+        laboratoryLocation.BarangayGuid = barangay.Guid;
+        laboratoryLocation.CityGuid = city.Guid;
+        laboratoryLocation.RegionGuid = region.Guid;
+        laboratoryLocation.ProvinceGuid = province.Guid;
+        laboratoryLocation.CountryGuid = country.Guid;
         laboratoryLocation.Status = (int?) (request.Status is GenericStatusType.None ? GenericStatusType.Pending : request.Status);
-
 
         await _dataLayer.HealthEssentialsContext.LaboratoryLocations.AddAsync(laboratoryLocation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
@@ -103,7 +90,8 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
         return new ()
         {
             Message = $"Laboratory Location with Guid {laboratoryLocation.Guid} has been created",
-            HttpStatusCode = HttpStatusCode.Accepted
+            HttpStatusCode = HttpStatusCode.Accepted,
+            IsSuccess = true,
         };
     }
 }

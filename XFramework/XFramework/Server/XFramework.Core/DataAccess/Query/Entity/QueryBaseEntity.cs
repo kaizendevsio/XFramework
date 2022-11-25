@@ -1,6 +1,4 @@
-﻿using XFramework.Domain.Generic.BusinessObjects;
-
-namespace XFramework.Core.DataAccess.Query.Entity
+﻿namespace XFramework.Core.DataAccess.Query.Entity
 {
     public class QueryBaseEntity
     {

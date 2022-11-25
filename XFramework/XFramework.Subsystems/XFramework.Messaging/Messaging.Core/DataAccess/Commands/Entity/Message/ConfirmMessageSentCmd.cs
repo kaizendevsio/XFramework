@@ -1,4 +1,4 @@
-﻿using Messaging.Domin.Generic.Contracts.Requests.Update;
+﻿using Messaging.Domain.Generic.Contracts.Requests.Update;
 
 namespace Messaging.Core.DataAccess.Commands.Entity.Message;
 

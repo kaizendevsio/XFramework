@@ -14,16 +14,21 @@ public class GetLaboratoryJobOrderListHandler : QueryBaseHandler, IRequestHandle
 
     public async Task<QueryResponse<List<LaboratoryJobOrderResponse>>> Handle(GetLaboratoryJobOrderListQuery request, CancellationToken cancellationToken)
     {
-        var laboratory = await _dataLayer.HealthEssentialsContext.LaboratoryJobOrders
+        var laboratoryJobOrders = await _dataLayer.HealthEssentialsContext.LaboratoryJobOrders
+            .Include(i => i.ConsultationJobOrder)
+            .Include(x => x.Laboratory)
+            .Include(x => x.LaboratoryLocation)
+            .Include(x => x.Patient)
+            .Include(x => x.Schedule)
             .Where(i => EF.Functions.ILike(i.ReferenceNumber, $"%{request.SearchField}%"))
-            .Where(i => i.Status == (int) request.RecordType)
+            .Where(i => i.LaboratoryLocation.Guid == $"{request.LaboratoryLocationGuid}")
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
-            .AsNoTracking()
             .AsSplitQuery()
+            .AsNoTracking()
             .ToListAsync(CancellationToken.None);
 
-        if (!laboratory.Any())
+        if (!laboratoryJobOrders.Any())
         {
             return new()
             {
@@ -32,14 +37,12 @@ public class GetLaboratoryJobOrderListHandler : QueryBaseHandler, IRequestHandle
                 IsSuccess = true
             };
         }
-        
-        var response = laboratory.Adapt<List<LaboratoryJobOrderResponse>>();
+
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            Message = "Job Orders Found",
-            IsSuccess = true,
-            Response = response
+            Message = "Records found",
+            Response = laboratoryJobOrders.Adapt<List<LaboratoryJobOrderResponse>>()
         };
     }
 }

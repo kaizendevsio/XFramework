@@ -5,6 +5,6 @@ namespace HealthEssentials.Domain.Generics.Contracts.Requests.Pharmacy.Get;
 
 public class GetPharmacyJobOrderListRequest : QueryableRequest
 {
-    public TransactionRecordType RecordType { get; set; }
+    public TransactionStatus Status { get; set; }
     public Guid? PharmacyLocationGuid { get; set; }
 }

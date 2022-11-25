@@ -1,45 +1,63 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials
+namespace HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+
+public partial class PharmacyLocation
 {
-    public partial class PharmacyLocation
-    {
-        public PharmacyLocation()
-        {
-            PharmacyJobOrders = new HashSet<PharmacyJobOrder>();
-            PharmacyMembers = new HashSet<PharmacyMember>();
-            PharmacyServices = new HashSet<PharmacyService>();
-        }
+    public long Id { get; set; }
 
-        public long Id { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime ModifiedAt { get; set; }
-        public bool? IsEnabled { get; set; }
-        public bool IsDeleted { get; set; }
-        public long PharmacyId { get; set; }
-        public string? Name { get; set; }
-        public string? Description { get; set; }
-        public string? UnitNumber { get; set; }
-        public string? Street { get; set; }
-        public string? Building { get; set; }
-        public long? BarangayId { get; set; }
-        public long? CityId { get; set; }
-        public string? Subdivision { get; set; }
-        public long? RegionId { get; set; }
-        public bool? MainAddress { get; set; }
-        public long? ProvinceId { get; set; }
-        public long? CountryId { get; set; }
-        public string Guid { get; set; } = null!;
-        public int? Status { get; set; }
-        public string? Phone { get; set; }
-        public string? Email { get; set; }
-        public string? Website { get; set; }
-        public string? AlternativePhone { get; set; }
+    public DateTime CreatedAt { get; set; }
 
-        public virtual Pharmacy Pharmacy { get; set; } = null!;
-        public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; set; }
-        public virtual ICollection<PharmacyMember> PharmacyMembers { get; set; }
-        public virtual ICollection<PharmacyService> PharmacyServices { get; set; }
-    }
+    public DateTime ModifiedAt { get; set; }
+
+    public bool? IsEnabled { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public long PharmacyId { get; set; }
+
+    public string? Name { get; set; }
+
+    public string? Description { get; set; }
+
+    public string? UnitNumber { get; set; }
+
+    public string? Street { get; set; }
+
+    public string? Building { get; set; }
+
+    public string? BarangayGuid { get; set; }
+
+    public string? CityGuid { get; set; }
+
+    public string? Subdivision { get; set; }
+
+    public string? RegionGuid { get; set; }
+
+    public bool? MainAddress { get; set; }
+
+    public string? ProvinceGuid { get; set; }
+
+    public string? CountryGuid { get; set; }
+
+    public string Guid { get; set; } = null!;
+
+    public int? Status { get; set; }
+
+    public string? Phone { get; set; }
+
+    public string? Email { get; set; }
+
+    public string? Website { get; set; }
+
+    public string? AlternativePhone { get; set; }
+
+    public virtual Pharmacy Pharmacy { get; set; } = null!;
+
+    public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; } = new List<PharmacyJobOrder>();
+
+    public virtual ICollection<PharmacyMember> PharmacyMembers { get; } = new List<PharmacyMember>();
+
+    public virtual ICollection<PharmacyService> PharmacyServices { get; } = new List<PharmacyService>();
 }
