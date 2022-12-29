@@ -85,16 +85,16 @@ public class SignalRService : ISignalRService
         HandleClosedEvent();
     }
 
-    public async Task StartEventListener(Guid? guid)
+    public async Task StartEventListener(string topic)
     {
         if (_subscriptionsEventHandle) return;
-        if (guid is null) return;
+        if (string.IsNullOrEmpty(topic)) return;
         
         var client = new StreamFlowClientBO
         {
             Queue = new()
             {
-                Guid = (Guid) guid,
+                Name = topic
             },
         };
         var r =  await Connection.InvokeAsync<HttpStatusCode>("Subscribe", client);

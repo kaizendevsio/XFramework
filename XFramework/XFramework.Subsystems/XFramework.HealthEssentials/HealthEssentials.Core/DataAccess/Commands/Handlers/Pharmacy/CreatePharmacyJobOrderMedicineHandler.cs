@@ -32,7 +32,7 @@ public class CreatePharmacyJobOrderMedicineHandler : CommandBaseHandler, IReques
             };
         }
         
-        var medicineIntake = await _dataLayer.HealthEssentialsContext.MedicineIntakes.FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineIntakeGuid}", CancellationToken.None);
+        /*var medicineIntake = await _dataLayer.HealthEssentialsContext.MedicineIntakes.FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineIntakeGuid}", CancellationToken.None);
         if (medicineIntake is null)
         {
             return new ()
@@ -40,13 +40,13 @@ public class CreatePharmacyJobOrderMedicineHandler : CommandBaseHandler, IReques
                 Message = $"Medicine Intake with Guid {request.MedicineIntakeGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
-        }
+        }*/
 
         var jobOrderMedicine = request.Adapt<PharmacyJobOrderMedicine>();
         jobOrderMedicine.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         jobOrderMedicine.PharmacyJobOrder = jobOrder;
         jobOrderMedicine.Medicine = medicine;
-        jobOrderMedicine.MedicineIntake = medicineIntake;
+        //jobOrderMedicine.MedicineIntake = medicineIntake;
       
         await _dataLayer.HealthEssentialsContext.PharmacyJobOrderMedicines.AddAsync(jobOrderMedicine, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

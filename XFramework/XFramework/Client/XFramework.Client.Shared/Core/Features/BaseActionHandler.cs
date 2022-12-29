@@ -7,7 +7,6 @@ using XFramework.Client.Shared.Core.Features.Cryptocurrency;
 using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Member;
 using XFramework.Client.Shared.Core.Features.Session;
-using XFramework.Client.Shared.Core.Features.Todo;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Client.Shared.Core.Services;
 using XFramework.Client.Shared.Entity.Enums;
@@ -44,7 +43,6 @@ public class BaseActionHandler
     protected LayoutState LayoutState => Store.GetState<LayoutState>();
     protected CacheState CacheState => Store.GetState<CacheState>();
     protected WalletState WalletState => Store.GetState<WalletState>();
-    protected TodoState TodoState => Store.GetState<TodoState>();
     
     
     public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
@@ -405,5 +403,4 @@ public abstract class ActionHandler<TAction, TResponse> : BaseActionHandler, IRe
         Store = store;
     }
     public abstract Task<TResponse> Handle(TAction action, CancellationToken aCancellationToken);
-
 }

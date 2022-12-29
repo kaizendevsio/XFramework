@@ -19,6 +19,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     private string ClientIpAddress { get; set; }
     private string ClientName { get; set; }
     private Guid? ApplicationId { get; set; }
+    public List<string> TopicList { get; init; }
 
     public HubConnectionState ConnectionState => SignalRService.Connection.State;
 
@@ -110,9 +111,9 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         }
     }
 
-    public Task StartClientEventListener(Guid? credentialGuid)
+    public Task StartClientEventListener(string topic)
     {
-        return SignalRService.StartEventListener(credentialGuid);
+        return SignalRService.StartEventListener(topic);
     }
 
     public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, Guid? recipient) where TRequest : new()
@@ -205,13 +206,13 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return new();
     }
 
-    public async Task PublishAsync<TData>(string eventName, Guid? recipient, TData data)
+    public async Task PublishAsync<TData>(string eventName, string topic, TData data)
     {
         var options = new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles};
         var r = new StreamFlowMessageBO
         {
             ExchangeType = MessageExchangeType.Topic,
-            Recipient = recipient,
+            Topic = topic,
             CommandName = eventName,
             Data = JsonSerializer.Serialize(data, options)
         };

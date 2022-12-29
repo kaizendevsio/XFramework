@@ -27,7 +27,6 @@ public partial class ApplicationState
             try
             {
                 StateHelper.SetProperties(action,CurrentState);
-                await HandleProgressStatus(action);
                 Persist(CurrentState);
             }
             catch (Exception e)
@@ -36,48 +35,6 @@ public partial class ApplicationState
             }
 
             return Unit.Value;
-        }
-
-        private async Task HandleProgressStatus(SetState action)
-        {
-            if (!string.IsNullOrEmpty(action.ProgressTitle))
-            {
-                SweetAlertService.UpdateAsync(new()
-                {
-                    Title = action.ProgressTitle,
-                    Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
-                });
-            }
-            if (!string.IsNullOrEmpty(action.ProgressMessage))
-            {
-                SweetAlertService.UpdateAsync(new()
-                {
-                    //Title = CurrentState.ProgressTitle,
-                    Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div> <p>{action.ProgressMessage}</p>",
-                });
-            }
-            
-            switch (action.IsBusy)
-            {
-                case null:
-                    return;
-                case true:
-                    if (action.NoSpinner is false or null)
-                    {
-                        SweetAlertService.FireAsync(new()
-                        {
-                            //Title = CurrentState.ProgressTitle,
-                            Text = CurrentState.ProgressMessage,
-                            Backdrop = false,
-                            Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
-                            ShowConfirmButton = false,
-                        });
-                    }
-                    break;
-                case false:
-                    SweetAlertService.CloseAsync();
-                    break;
-            }
         }
     }
 }

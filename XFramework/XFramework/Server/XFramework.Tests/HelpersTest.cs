@@ -1,8 +1,13 @@
 using System;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using XFramework.Core.DataAccess.Commands.Handlers;
+using XFramework.Core.DataAccess.Commands.Handlers.Identity;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services;
 

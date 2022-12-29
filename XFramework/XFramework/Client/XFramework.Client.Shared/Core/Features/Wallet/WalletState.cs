@@ -10,6 +10,7 @@ public partial class WalletState : State<WalletState>
     }
     
     public List<WalletResponse> WalletList { get; set; }
+    public WalletResponse SelectedWallet { get; set; }
     public SendWalletRequest SendWalletVm { get; set; } = new();
     public SendWalletRequest CurrentTransactionVm { get; set; } = new();
     

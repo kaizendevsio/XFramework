@@ -151,7 +151,7 @@ namespace StreamFlow.Stream.Services.Handlers.Events
                    
                     break;
                 case MessageExchangeType.Topic:
-                    await _hubContext.Clients.Group(request.MessageQueue.Recipient.ToString()).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
+                    await _hubContext.Clients.Group(request.MessageQueue.Topic).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

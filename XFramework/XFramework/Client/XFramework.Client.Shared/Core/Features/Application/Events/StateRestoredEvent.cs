@@ -1,4 +1,4 @@
-﻿using XFramework.Client.Shared.Entity.Interfaces;
+﻿using XFramework.Client.Shared.Interfaces;
 
 namespace XFramework.Client.Shared.Core.Features.Application;
 

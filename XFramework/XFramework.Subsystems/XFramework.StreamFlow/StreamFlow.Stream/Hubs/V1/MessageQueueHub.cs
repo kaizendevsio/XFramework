@@ -68,7 +68,7 @@ namespace StreamFlow.Stream.Hubs.V1
         }
         public async Task<HttpStatusCode> Subscribe(StreamFlowClientBO request)
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, request.Queue.Guid.ToString());
+            await Groups.AddToGroupAsync(Context.ConnectionId, request.Queue.Name);
             return HttpStatusCode.Accepted;
         }
         public async Task<HttpStatusCode> Register(StreamFlowClientBO request)

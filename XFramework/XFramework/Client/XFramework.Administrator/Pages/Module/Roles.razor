@@ -1,28 +1,4 @@
 ﻿@page "/Roles"
 @inherits RolesBase
 
-<h1 class="text-center">Roles List</h1>
-<table class="table">
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Email</th>
-      <th>Phone</th>
-      <th>DOB</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody>
-   @foreach (var item in Model)
-   {
-     <tr>
-       <td>@item.Name</td>
-       <td>@item.Email</td>
-       <td>@item.Phone</td>
-       <td>@item.DateOfBirth</td>
-       <td>@item.Status</td>
-     </tr>
-   }
-   </tbody>
-</table>
 

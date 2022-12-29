@@ -8,14 +8,14 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Blazor-State" Version="6.0.7" />
+        <PackageReference Include="Blazor-State" Version="7.0.0" />
         <PackageReference Include="Blazored.LocalStorage" Version="4.3.0" />
         <PackageReference Include="Blazored.SessionStorage" Version="2.2.0" />
         <PackageReference Include="BlazorTransitionableRoute" Version="4.0.0" />
         <PackageReference Include="CurrieTechnologies.Razor.SweetAlert2" Version="5.3.0" />
         
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="7.0.0" />
-        <PackageReference Include="MudBlazor" Version="6.0.18" />
+        <PackageReference Include="MudBlazor" Version="6.1.6" />
         <PackageReference Include="Reshiru.Blazor.IndexedDB.Framework" Version="1.0.1" />
         <PackageReference Include="TG.Blazor.IndexedDB" Version="1.5.0-preview" />
         <PackageReference Include="PPioli.FluentValidation.Blazor" Version="11.1.0" />
@@ -26,10 +26,8 @@
     <ItemGroup>
       <Folder Include="Core\Features\Base" />
       <Folder Include="Core\Features\Messaging\Handlers" />
-      <Folder Include="Core\Features\Todo" />
       <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Responses" />
-      <Folder Include="wwwroot" />
     </ItemGroup>
 
     <ItemGroup>

@@ -44,14 +44,7 @@ public partial class SessionState
             
             // Send the request
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
-            
-            // Broadcast login event
-            Mediator.Publish(new LoginEvent
-            {
-                StatusCode = response.HttpStatusCode,
-                Data = response.Response
-            });
-            
+
             // Handle if the response is invalid or error
             if(await HandleFailure(response, action, false ,$"{response.Message}")) return new()
             {
@@ -96,6 +89,13 @@ public partial class SessionState
                 Identity = new(){Guid = response.Response.IdentityGuid},
                 Credential = new(){Guid = response.Response.CredentialGuid},
                 State = CurrentSessionState.Active
+            });
+            
+            // Broadcast login event
+            Mediator.Publish(new LoginEvent
+            {
+                StatusCode = response.HttpStatusCode,
+                Data = response.Response
             });
             
             // Inform UI About Not Busy State
