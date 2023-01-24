@@ -1588,12 +1588,10 @@ public partial class XnelSystemsHealthEssentialsContext : DbContext
 
             entity.HasOne(d => d.Rider).WithMany(p => p.LogisticJobOrders)
                 .HasForeignKey(d => d.RiderId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("logisticjoborder_logisticrider_id_fk");
 
             entity.HasOne(d => d.Schedule).WithMany(p => p.LogisticJobOrders)
                 .HasForeignKey(d => d.ScheduleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("logisticjoborder_schedule_id_fk");
         });
 
@@ -2378,15 +2376,34 @@ public partial class XnelSystemsHealthEssentialsContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+            entity.Property(e => e.Duration)
+                .HasPrecision(2)
+                .HasDefaultValueSql("1");
+            entity.Property(e => e.DurationUnitId).HasDefaultValueSql("1");
             entity.Property(e => e.Guid)
                 .HasDefaultValueSql("(uuid_generate_v4())::text")
                 .HasColumnType("character varying");
+            entity.Property(e => e.IntakeUnitId).HasDefaultValueSql("1");
             entity.Property(e => e.IsEnabled)
                 .IsRequired()
                 .HasDefaultValueSql("true");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
             entity.Property(e => e.PrescriptionNote).HasColumnType("character varying");
             entity.Property(e => e.Remarks).HasColumnType("character varying");
+
+            entity.HasOne(d => d.DosageUnit).WithMany(p => p.PharmacyJobOrderMedicineDosageUnits)
+                .HasForeignKey(d => d.DosageUnitId)
+                .HasConstraintName("pharmacyjobordermedicine_unit_id_fk_3");
+
+            entity.HasOne(d => d.DurationUnit).WithMany(p => p.PharmacyJobOrderMedicineDurationUnits)
+                .HasForeignKey(d => d.DurationUnitId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("pharmacyjobordermedicine_unit_id_fk_2");
+
+            entity.HasOne(d => d.IntakeUnit).WithMany(p => p.PharmacyJobOrderMedicineIntakeUnits)
+                .HasForeignKey(d => d.IntakeUnitId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("pharmacyjobordermedicine_unit_id_fk");
 
             entity.HasOne(d => d.Medicine).WithMany(p => p.PharmacyJobOrderMedicines)
                 .HasForeignKey(d => d.MedicineId)

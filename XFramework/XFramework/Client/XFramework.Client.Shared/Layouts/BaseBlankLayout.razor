@@ -1,5 +1,12 @@
 @using XFramework.Client.Shared.Core.Services.Interface
 <CascadingValue Value="this">
+    @if (ApplicationState.NotificationCount > 0)
+    {
+        for (int i = 0; i < ApplicationState.NotificationCount; i++)
+        {
+            <audio autoplay controls style="position: absolute; top: -100px"><source src="_content/XFramework.Client.Shared/media/notification.mp3" /></audio>
+        }
+    }
     
     @if (ApplicationState.StateRestored)
     {
@@ -8,11 +15,9 @@
 
     @code
     {
-        [Inject]
-        public IIdentityServiceWrapper IdentityServiceWrapper { get; set; }
+        [Inject] public IIdentityServiceWrapper IdentityServiceWrapper { get; set; }
 
-        [Inject]
-        public IBootstrapService BootstrapService { get; set; }
+        [Inject] public IBootstrapService BootstrapService { get; set; }
     }
 
 </CascadingValue>

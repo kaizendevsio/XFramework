@@ -58,12 +58,23 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             }
         }
 
-        ApplicationId ??= Guid.Parse(Configuration.GetValue<string>("Application:DefaultUID"));
+        var appId = Configuration.GetValue<string>("Application:DefaultUID");
+        var streamFlowClientId = Configuration.GetValue<string>("StreamFlowConfiguration:ClientName");
+        
+        if (string.IsNullOrEmpty(appId))
+        {
+            throw new ArgumentNullException(nameof(appId), "Application:DefaultUID is not set in appsettings.json");
+        }
+        if (string.IsNullOrEmpty(streamFlowClientId))
+        {
+            throw new ArgumentNullException(nameof(appId), "StreamFlowConfiguration:ClientName is not set in appsettings.json");
+        }
+        
+        ApplicationId ??= Guid.Parse(appId);
         ClientName = !string.IsNullOrEmpty(ClientName)
             ? ClientName
-            : Configuration.GetValue<string>("StreamFlowConfiguration:ClientName");
+            : streamFlowClientId;
 
-        var applicationId = ApplicationId;
         var requestId = Guid.NewGuid();
         var ipAddress = string.Empty;
         var deviceAgent = string.Empty;
@@ -73,7 +84,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         {
             var requestServer = request.GetPropertyValue("RequestServer").Adapt<RequestServerBO>();
 
-            applicationId = requestServer?.ApplicationId ?? applicationId;
+            ApplicationId = requestServer?.ApplicationId ?? ApplicationId;
             requestId = requestServer?.RequestId ?? requestId;
 
             clientName = !string.IsNullOrEmpty(requestServer?.Name)
@@ -87,7 +98,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return new()
         {
             DeviceAgent = deviceAgent,
-            ApplicationId = applicationId,
+            ApplicationId = ApplicationId,
             Name = clientName,
             IpAddress = ipAddress,
             RequestId = requestId

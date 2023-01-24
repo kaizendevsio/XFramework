@@ -9,5 +9,7 @@ public partial class ApplicationState
         public string ProgressTitle { get; set; }
         public string ProgressMessage { get; set; } = string.Empty;
         public bool? StateRestored { get; set; }
+        public int? NotificationCount { get; set; }
+
     }
 }

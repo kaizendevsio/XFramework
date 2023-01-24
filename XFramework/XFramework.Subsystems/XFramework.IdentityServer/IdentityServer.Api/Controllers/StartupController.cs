@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Runtime.Versioning;
+using IdentityServer.Integration.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityServer.Api.Controllers;
@@ -8,8 +9,11 @@ namespace IdentityServer.Api.Controllers;
 [ApiController]
 public class StartupController : ControllerBase
 {
-    public StartupController()
+    private readonly IIdentityServiceWrapper _identityServiceWrapper;
+
+    public StartupController(IIdentityServiceWrapper identityServiceWrapper)
     {
+        _identityServiceWrapper = identityServiceWrapper;
     }
         
     [HttpGet]
@@ -36,6 +40,11 @@ public class StartupController : ControllerBase
             Status = "Running"
         };
 
+        _identityServiceWrapper.AuthenticateCredential(new()
+        {
+            Username = null,
+            Password = null,
+        });
         return Ok(apiStatus);
     }
 }

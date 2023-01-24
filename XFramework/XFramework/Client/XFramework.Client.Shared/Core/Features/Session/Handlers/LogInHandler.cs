@@ -113,18 +113,17 @@ public partial class SessionState
             }
             
             // Fetch User Identity And Credential and Contact List
-            var identityResponse = IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});
             var credentialResponse = IdentityServiceWrapper.GetCredential(new() {Guid = response.Response.CredentialGuid});
             var contactListResponse = IdentityServiceWrapper.GetContactList(new() {CredentialGuid = response.Response.CredentialGuid});
 
-            await Task.WhenAll(identityResponse, credentialResponse, contactListResponse);
+            await Task.WhenAll(credentialResponse, contactListResponse);
             
             // Set State And Update UI
             await Mediator.Send(new SetState()
             {
-                Identity = identityResponse.Result.Response,
+                Identity = credentialResponse.Result.Response.IdentityInfo,
                 Credential = credentialResponse.Result.Response,
-                ContactList = contactListResponse.Result.Response
+                ContactList = contactListResponse.Result.Response,
             });
 
             // Reset Session Forms

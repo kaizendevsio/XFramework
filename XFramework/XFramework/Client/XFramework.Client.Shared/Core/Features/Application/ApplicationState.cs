@@ -11,5 +11,6 @@ public partial class ApplicationState : State<ApplicationState>
     public string ProgressTitle { get; set; }
     public string ProgressMessage { get; set; }
     public bool StateRestored { get; set; }
+    public int NotificationCount { get; set; }
        
 }

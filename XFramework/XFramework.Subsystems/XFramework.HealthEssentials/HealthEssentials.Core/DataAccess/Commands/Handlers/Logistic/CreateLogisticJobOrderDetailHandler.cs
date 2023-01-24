@@ -12,6 +12,8 @@ public class CreateLogisticJobOrderDetailHandler : CommandBaseHandler, IRequestH
     
     public async Task<CmdResponse<CreateLogisticJobOrderDetailCmd>> Handle(CreateLogisticJobOrderDetailCmd request, CancellationToken cancellationToken)
     {
+        var detail = request.Adapt<LogisticJobOrderDetail>();
+        
         var location = await _dataLayer.HealthEssentialsContext.LogisticJobOrderLocations.FirstOrDefaultAsync(x => x.Guid == $"{request.LocationGuid}", CancellationToken.None);
         if (location is null)
         {
@@ -22,14 +24,18 @@ public class CreateLogisticJobOrderDetailHandler : CommandBaseHandler, IRequestH
             };
         }
         
-        var unit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(x => x.Guid == $"{request.UnitGuid}", CancellationToken.None);
-        if (unit is null)
+        if (request.UnitGuid is not null)
         {
-            return new()
+            var unit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(x => x.Guid == $"{request.UnitGuid}", CancellationToken.None);
+            if (unit is null)
             {
-                Message = $"Unit with Guid {request.UnitGuid} not found",
-                HttpStatusCode = HttpStatusCode.NotFound
-            };
+                return new()
+                {
+                    Message = $"Unit with Guid {request.UnitGuid} not found",
+                    HttpStatusCode = HttpStatusCode.NotFound
+                };
+            }
+            detail.Unit = unit;
         }
 
         var jobOrder = await _dataLayer.HealthEssentialsContext.LogisticJobOrders.FirstOrDefaultAsync(x => x.Guid == $"{request.LogisticJobOrderGuid}", CancellationToken.None);
@@ -42,11 +48,9 @@ public class CreateLogisticJobOrderDetailHandler : CommandBaseHandler, IRequestH
             };
         }
         
-        var detail = request.Adapt<LogisticJobOrderDetail>();
         detail.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         detail.LogisticJobOrder = jobOrder;
         detail.LocationGuid = location.Guid;
-        detail.Unit = unit;
         
         await _dataLayer.HealthEssentialsContext.LogisticJobOrderDetails.AddAsync(detail, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

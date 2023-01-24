@@ -45,7 +45,7 @@ public class CreateFileHandler : CommandBaseHandler, IRequestHandler<CreateFileC
         var blobServiceClient = new BlobServiceClient(connectionConfig.RegistryConfigurations.FirstOrDefault(i => i.Key == "ConnectionString").Value);
 
         var client = blobServiceClient.GetBlobContainerClient(request.BlobContainer);
-        var blob = client.GetBlobClient(request.ContentPath);
+        var blob = client.GetBlobClient(request.ContentPath.Replace($"{request.BlobContainer}/", ""));
         await blob.UploadAsync(BinaryData.FromBytes(request.FileBytes), new BlobUploadOptions {HttpHeaders = new() {ContentType = request.ContentType}}, CancellationToken.None);
 
         var file = request.Adapt<StorageFile>();
