@@ -1,0 +1,81 @@
+﻿@page "/StreamFlowPublishTest"
+@using XFramework.Integration.Interfaces.Wrappers
+@using System.Diagnostics
+@using System.Text.Json
+
+<h3><b>StreamFlow Publish Test</b></h3>
+
+<button class="btn btn-success" @onclick="StartCanon">Start Canon</button>
+<button class="btn btn-danger" @onclick="StopCanon">Stop Canon</button>
+<br>
+<br>
+<div class="row">
+    <div class="col-12">
+        <h3>Sent / Received: @ReceivedTotal</h3>
+        <h3>Latency: @($"{Latency}ms")</h3>
+        <h3>RPS: @($"{Rps:n2}")</h3>
+    </div>
+</div>
+
+
+@code {
+
+    [Inject] public IMessageBusWrapper MessageBusWrapper { get; set; }
+    public TaskCompletionSource CompletionSource { get; set; } = new();
+    public Stopwatch Stopwatch { get; set; } = new();
+    public Stopwatch MasterStopwatch { get; set; } = new();
+    
+    Guid Id = new("c18c0835-5553-4011-9ebf-8a7ca7021c31");
+    int ReceivedTotal { get; set; }
+    decimal Rps { get; set; }
+    string Latency { get; set; }
+    bool IsRunning { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await MessageBusWrapper.Connect();
+            await MessageBusWrapper.StartClientEventListener(Id.ToString());
+            await StartListener();
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    async Task StartCanon()
+    {
+        MasterStopwatch.Restart();
+        IsRunning = true;
+        var prevSeconds = (int)MasterStopwatch.Elapsed.TotalSeconds;
+        while (IsRunning)
+        {
+            CompletionSource = new();
+
+            Task.Run(async () => await MessageBusWrapper.PublishAsync("TestCanon", Id.ToString(), DateTime.Now));
+
+            if (prevSeconds != (int)MasterStopwatch.Elapsed.TotalSeconds)
+            {
+                Rps = ReceivedTotal / (decimal)MasterStopwatch.Elapsed.TotalSeconds;
+                prevSeconds = (int)MasterStopwatch.Elapsed.TotalSeconds;
+                await Task.Delay(1);
+                StateHasChanged();
+            }
+            
+            }
+    }
+
+    async Task StopCanon()
+    {
+        IsRunning = false;
+        MasterStopwatch.Stop();
+    }
+
+    async Task StartListener()
+    {
+        await MessageBusWrapper.Subscribe<DateTime>(new ("TestCanon", (e) =>
+        {
+            ReceivedTotal++;
+            Latency = (DateTime.Now - e).TotalMilliseconds.ToString();
+        }));
+    }
+}

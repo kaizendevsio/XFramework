@@ -21,6 +21,7 @@
     <ItemGroup>
       <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.PaymentGateways\PaymentGateways.Integration\PaymentGateways.Integration.csproj" />
       <ProjectReference Include="..\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
       <ProjectReference Include="..\Wallets.Domain\Wallets.Domain.csproj" />
     </ItemGroup>

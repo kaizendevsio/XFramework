@@ -1,6 +1,5 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Create;
-using Mapster;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Domain.Generic.Contracts.Responses;
 

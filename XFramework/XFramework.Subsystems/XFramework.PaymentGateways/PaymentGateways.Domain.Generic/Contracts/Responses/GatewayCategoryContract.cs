@@ -15,6 +15,6 @@ namespace PaymentGateways.Domain.Generic.Contracts.Responses
         public DateTime? ModifiedOn { get; set; }
         public DateTime? ModifiedAt { get; set; }
         
-        public virtual ICollection<GatewayContract> TblGateways { get; set; }
+        public virtual ICollection<GatewayContract> Gateways { get; set; }
     }
 }

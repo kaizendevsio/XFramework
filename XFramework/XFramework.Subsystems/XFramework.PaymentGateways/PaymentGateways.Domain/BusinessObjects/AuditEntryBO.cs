@@ -1,9 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore.ChangeTracking;
-using PaymentGateways.Domain.DataTransferObjects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using PaymentGateways.Domain.DataTransferObjects;
 
 namespace PaymentGateways.Domain.BusinessObjects
 {
@@ -24,9 +24,9 @@ namespace PaymentGateways.Domain.BusinessObjects
 
         public bool HasTemporaryProperties => TemporaryProperties.Any();
 
-        public TblAuditHistory ToAudit()
+        public AuditHistory ToAudit()
         {
-            var audit = new TblAuditHistory();
+            var audit = new AuditHistory();
             audit.TableName = TableName;
             audit.CreatedAt = DateTime.UtcNow;
             audit.KeyValues = JsonSerializer.Serialize(KeyValues);

@@ -32,7 +32,37 @@ public class CreatePharmacyJobOrderMedicineHandler : CommandBaseHandler, IReques
             };
         }
         
-        var medicineIntake = await _dataLayer.HealthEssentialsContext.MedicineIntakes.FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineIntakeGuid}", CancellationToken.None);
+        var dosageUnit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(x => x.Guid == $"{request.DosageUnitGuid}", CancellationToken.None);
+        if (dosageUnit is null)
+        {
+            return new ()
+            {
+                Message = $"Dosage Unit with Guid {request.DosageUnitGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var durationUnit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(x => x.Guid == $"{request.DurationUnitGuid}", CancellationToken.None);
+        if (durationUnit is null)
+        {
+            return new ()
+            {
+                Message = $"Duration Unit with Guid {request.DurationUnitGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        var intakeUnit = await _dataLayer.HealthEssentialsContext.Units.FirstOrDefaultAsync(x => x.Guid == $"{request.IntakeUnitGuid}", CancellationToken.None);
+        if (intakeUnit is null)
+        {
+            return new ()
+            {
+                Message = $"Intake Unit with Guid {request.IntakeUnitGuid} does not exist",
+                HttpStatusCode = HttpStatusCode.NotFound
+            };
+        }
+        
+        /*var medicineIntake = await _dataLayer.HealthEssentialsContext.MedicineIntakes.FirstOrDefaultAsync(x => x.Guid == $"{request.MedicineIntakeGuid}", CancellationToken.None);
         if (medicineIntake is null)
         {
             return new ()
@@ -40,13 +70,16 @@ public class CreatePharmacyJobOrderMedicineHandler : CommandBaseHandler, IReques
                 Message = $"Medicine Intake with Guid {request.MedicineIntakeGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound
             };
-        }
+        }*/
 
         var jobOrderMedicine = request.Adapt<PharmacyJobOrderMedicine>();
         jobOrderMedicine.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         jobOrderMedicine.PharmacyJobOrder = jobOrder;
         jobOrderMedicine.Medicine = medicine;
-        jobOrderMedicine.MedicineIntake = medicineIntake;
+        //jobOrderMedicine.MedicineIntake = medicineIntake;
+        jobOrderMedicine.DosageUnit = dosageUnit;
+        jobOrderMedicine.DurationUnit = durationUnit;
+        jobOrderMedicine.IntakeUnit = intakeUnit;
       
         await _dataLayer.HealthEssentialsContext.PharmacyJobOrderMedicines.AddAsync(jobOrderMedicine, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

@@ -1,6 +1,7 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Pharmacy;
 using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using IdentityServer.Domain.Generic.Contracts.Responses;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Pharmacy;
 
@@ -18,9 +19,17 @@ public class GetPharmacyJobOrderListHandler : QueryBaseHandler, IRequestHandler<
             .Include(i => i.Schedule)
             .Include(x => x.Patient)
             .Include(x => x.PharmacyJobOrderMedicines)
+            .ThenInclude(x => x.Medicine)
+            .Include(x => x.PharmacyJobOrderMedicines)
+            .ThenInclude(x => x.MedicineIntake)
+            .ThenInclude(x => x.Unit)
+            .Include(x => x.PharmacyJobOrderMedicines)
+            .ThenInclude(x => x.DosageUnit)
+            .Include(x => x.PharmacyJobOrderMedicines)
+            .ThenInclude(x => x.IntakeUnit)
             .Where(i => EF.Functions.ILike(i.ReferenceNumber, $"%{request.SearchField}%"))
             .Where(i => i.PharmacyLocation.Guid == $"{request.PharmacyLocationGuid}")
-            .Where(i => i.Status == (int) request.Status)
+            .Where(i => request.Status.Contains((TransactionStatus)i.Status))
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()

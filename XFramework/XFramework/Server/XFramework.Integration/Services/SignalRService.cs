@@ -35,17 +35,9 @@ public class SignalRService : ISignalRService
     public SignalRService(StreamFlowConfiguration configuration)
     {
         StreamFlowConfiguration = configuration;
-
         Connection = new HubConnectionBuilder()
             .WithUrl(StreamFlowConfiguration.ServerUrls.First())
-            .WithAutomaticReconnect(new[]
-            {
-                TimeSpan.FromSeconds(2),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(10),
-                TimeSpan.FromSeconds(10),
-                TimeSpan.FromSeconds(10),
-            })
+            .WithAutomaticReconnect(Enumerable.Repeat(TimeSpan.FromSeconds(2), 2000).ToArray())
             .AddMessagePackProtocol()
             .Build();
 
@@ -61,7 +53,7 @@ public class SignalRService : ISignalRService
 
         Connection = new HubConnectionBuilder()
             .WithUrl(StreamFlowConfiguration.ServerUrls.First())
-            .WithAutomaticReconnect()
+            .WithAutomaticReconnect(Enumerable.Repeat(TimeSpan.FromSeconds(2), 2000).ToArray())
             .AddMessagePackProtocol()
             .Build();
 
@@ -85,16 +77,16 @@ public class SignalRService : ISignalRService
         HandleClosedEvent();
     }
 
-    public async Task StartEventListener(Guid? guid)
+    public async Task StartEventListener(string topic)
     {
         if (_subscriptionsEventHandle) return;
-        if (guid is null) return;
+        if (string.IsNullOrEmpty(topic)) return;
         
         var client = new StreamFlowClientBO
         {
             Queue = new()
             {
-                Guid = (Guid) guid,
+                Name = topic
             },
         };
         var r =  await Connection.InvokeAsync<HttpStatusCode>("Subscribe", client);
@@ -156,29 +148,24 @@ public class SignalRService : ISignalRService
         Connection.Reconnected += async connectionId =>
         {
             Debug.Assert(Connection.State == HubConnectionState.Connected);
-            var request = new StreamFlowClientBO()
+            
+            // Notify users the connection was reestablished.
+            // Start dequeuing messages queued while reconnecting if any.
+            
+            Console.WriteLine("Connection to StreamFlow server restored");
+
+            await RegisterConnection();
+
+            if (!_queueList.Any()) return;
+
+            Console.WriteLine($"Dequeuing items from cache..");
+            foreach (var valueTuple in _queueList)
             {
-                Guid = StreamFlowConfiguration.ClientGuid,
-                Name = StreamFlowConfiguration.ClientName
-            };
-            await Task.Run(() => Connection.InvokeAsync<HttpStatusCode>("Register", request)).ContinueWith(async m =>
-            {
-                _isRegistered = true;
-                // Notify users the connection was reestablished.
-                // Start dequeuing messages queued while reconnecting if any.
-                Console.WriteLine("Connection to StreamFlow server restored");
+                InvokeVoidAsync(valueTuple.Item1, valueTuple.Item2);
+            }
 
-                if (!_queueList.Any()) return;
-
-                Console.WriteLine($"Dequeuing items from cache..");
-                foreach (var valueTuple in _queueList)
-                {
-                    InvokeVoidAsync(valueTuple.Item1, valueTuple.Item2);
-                }
-
-                Console.WriteLine($"Dequeued {_queueList.Count} item(s) from cache");
-                _queueList.Clear();
-            });
+            Console.WriteLine($"Dequeued {_queueList.Count} item(s) from cache");
+            _queueList.Clear();
         };
     }
 
@@ -186,11 +173,15 @@ public class SignalRService : ISignalRService
     {
         Connection.Reconnecting += error =>
         {
-            Debug.Assert(Connection.State == HubConnectionState.Reconnecting);
-            _isRegistered = false;
             // Notify users the connection was lost and the client is reconnecting.
             // Start queuing or dropping messages.
+            Debug.Assert(Connection.State == HubConnectionState.Reconnecting);
+            _isRegistered = false;
+            _isRegistering = false;
+            
             Console.WriteLine("Connection to StreamFlow server lost, trying to reconnect..");
+            //EnsureConnection();
+            
             return Task.CompletedTask;
         };
     }
@@ -203,14 +194,17 @@ public class SignalRService : ISignalRService
         if (Connection.State is not HubConnectionState.Disconnected)
         {
             if (_isRegistered) return true;
-        } ;
+        }
 
         try
         {
             retry++;
-            if (Connection.State is HubConnectionState.Disconnected)
+            if (Connection.State is HubConnectionState.Disconnected or HubConnectionState.Reconnecting)
             {
                 StopWatch.Start("Connecting to StreamFlow server..");
+                
+                if (Connection.State is HubConnectionState.Reconnecting) return true;
+
                 await Connection.StartAsync();
                 StopWatch.Stop("Connected to StreamFlow server");
             }
@@ -218,26 +212,13 @@ public class SignalRService : ISignalRService
             if (_isRegistering)
             {
                 Console.WriteLine("Request Postponed, Awaiting Registration..");
-                await TaskCompletionSource.Task;
-                Console.WriteLine("Request Postponed, Awaiting Registration..");
                 return true;
             }
 
-            ;
-
-            Console.WriteLine("Registering Connection..");
-            _isRegistering = true;
-            var clientId = StreamFlowConfiguration.Anonymous ? Guid.NewGuid() : StreamFlowConfiguration.ClientGuid;
-            var request = new StreamFlowClientBO()
+            if (Connection.State is HubConnectionState.Connected)
             {
-                Guid = clientId,
-                Name = StreamFlowConfiguration.ClientName
-            };
-            await Connection.InvokeAsync<HttpStatusCode>("Register", request);
-            _isRegistered = true;
-            Console.WriteLine("Connection Registered");
-            TaskCompletionSource.SetResult();
-
+                await RegisterConnection();
+            }
             return true;
         }
         catch (Exception e)
@@ -245,41 +226,52 @@ public class SignalRService : ISignalRService
             Console.WriteLine($"Failed to connect to StreamFlow server: {e.Message} : {e.InnerException?.Message}");
             //if (retry >= StreamFlowConfiguration.MaxRetry) return false;
             Console.WriteLine($"Retrying in {StreamFlowConfiguration.ReconnectDelay}ms");
+            
             await Task.Delay(StreamFlowConfiguration.ReconnectDelay);
             goto RetryConnection;
         }
     }
 
+    private async Task RegisterConnection()
+    {
+        if(_isRegistered) return;
+        
+        _isRegistering = true;
+        Console.WriteLine("Registering Connection..");
+
+        var clientId = StreamFlowConfiguration.Anonymous ? Guid.NewGuid() : StreamFlowConfiguration.ClientGuid;
+        var request = new StreamFlowClientBO()
+        {
+            Guid = clientId,
+            Name = StreamFlowConfiguration.ClientName
+        };
+        await Connection.InvokeAsync<HttpStatusCode>("Register", request);
+        
+        _isRegistered = true;
+        _isRegistering = false;
+
+        Console.WriteLine("Connection Registered");
+    }
+
     public async Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessageBO args1)
     {
-        var result = HttpStatusCode.Created;
         StopWatch.Start();
-        
         try
         {
-            if (Connection.State == HubConnectionState.Reconnecting)
+            if (Connection.State is not HubConnectionState.Connected || _isRegistered is false || _isRegistering)
             {
                 Console.WriteLine($"Invoked Method '{methodName}' is queued, waiting for connection to be re-established");
                 _queueList.Add(new(methodName, args1));
                 return HttpStatusCode.Processing;
             }
 
-            if ((_isRegistered == false && methodName != "Register") ||
-                (Connection.State is not HubConnectionState.Connected && methodName != "Register"))
-            {
-                Console.WriteLine($"Method Name: {methodName}");
-                await EnsureConnection();
-            }
-
-            result = await Connection.InvokeAsync<HttpStatusCode>(methodName, args1);
+            return await Connection.InvokeAsync<HttpStatusCode>(methodName, args1);
         }
         catch (Exception e)
         {
             Console.WriteLine($"Invoked Method '{methodName}' resulted in Exception: {e.Message} : {e.InnerException?.Message}");
         }
-
-        //StopWatch.Stop($"Invoked Method '{methodName}' returned {result}");
-        return result;
+        return HttpStatusCode.InternalServerError;
     }
 
     public async Task<SignalRResponse> InvokeAsync(StreamFlowMessageBO args)

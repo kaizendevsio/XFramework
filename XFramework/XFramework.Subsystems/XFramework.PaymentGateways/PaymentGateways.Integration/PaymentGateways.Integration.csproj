@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="Wallets.Domain.Generic">
+        <HintPath>..\..\XFramework.Wallets\Wallets.Domain.Generic\bin\Debug\net7.0\Wallets.Domain.Generic.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

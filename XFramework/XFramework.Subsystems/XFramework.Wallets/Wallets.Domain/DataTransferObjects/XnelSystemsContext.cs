@@ -41,6 +41,14 @@ public partial class XnelSystemsContext : DbContext
 
     public virtual DbSet<ExchangeRate> ExchangeRates { get; set; }
 
+    public virtual DbSet<Gateway> Gateways { get; set; }
+
+    public virtual DbSet<GatewayCategory> GatewayCategories { get; set; }
+
+    public virtual DbSet<GatewayEndpoint> GatewayEndpoints { get; set; }
+
+    public virtual DbSet<GatewayEntity> GatewayEntities { get; set; }
+
     public virtual DbSet<IdentityAddress> IdentityAddresses { get; set; }
 
     public virtual DbSet<IdentityAddressEntity> IdentityAddressEntities { get; set; }
@@ -359,6 +367,10 @@ public partial class XnelSystemsContext : DbContext
             entity.Property(e => e.Remarks).HasMaxLength(10000);
             entity.Property(e => e.SystemFee).HasPrecision(18, 10);
 
+            entity.HasOne(d => d.Gateway).WithMany(p => p.DepositRequests)
+                .HasForeignKey(d => d.GatewayId)
+                .HasConstraintName("DepositRequest_Gateway_ID_fk");
+
             entity.HasOne(d => d.IdentityCredential).WithMany(p => p.DepositRequests)
                 .HasForeignKey(d => d.IdentityCredentialId)
                 .HasConstraintName("IdentityCredentialId");
@@ -417,6 +429,121 @@ public partial class XnelSystemsContext : DbContext
                 .HasForeignKey(d => d.TargetCurrencyEntityId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("TargetCurrencyID");
+        });
+
+        modelBuilder.Entity<Gateway>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbl_gateways_pk");
+
+            entity.ToTable("Gateway", "Integration.PaymentGateway");
+
+            entity.HasIndex(e => e.Id, "tbl_gateways_\"id\"_uindex").IsUnique();
+
+            entity.HasIndex(e => e.Guid, "tbl_gateways_guid_uindex").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('\"Integration.PaymentGateway\".\"tbl_Gateways_ID_seq\"'::regclass)")
+                .HasColumnName("ID");
+            entity.Property(e => e.ConvenienceFee).HasPrecision(10, 2);
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.Discount)
+                .HasPrecision(10, 2)
+                .HasDefaultValueSql("0");
+            entity.Property(e => e.GatewayCategoryId).HasColumnName("GatewayCategoryID");
+            entity.Property(e => e.Guid)
+                .HasDefaultValueSql("(uuid_generate_v4())::text")
+                .HasColumnType("character varying");
+            entity.Property(e => e.Image).HasColumnType("character varying");
+            entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
+            entity.Property(e => e.IsEnabled).HasDefaultValueSql("true");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+            entity.Property(e => e.ServiceCharge).HasPrecision(3, 2);
+
+            entity.HasOne(d => d.GatewayCategory).WithMany(p => p.Gateways)
+                .HasForeignKey(d => d.GatewayCategoryId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("tbl_gateways_tbl_gatewaycategories_id_fk");
+
+            entity.HasOne(d => d.ProviderEndpoint).WithMany(p => p.Gateways)
+                .HasForeignKey(d => d.ProviderEndpointId)
+                .HasConstraintName("tbl_gateways_tbl_providerendpoints_id_fk");
+        });
+
+        modelBuilder.Entity<GatewayCategory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbl_gatewaycategories_pk");
+
+            entity.ToTable("GatewayCategory", "Integration.PaymentGateway");
+
+            entity.HasIndex(e => e.Id, "tbl_gatewaycategories_\"id\"_uindex").IsUnique();
+
+            entity.HasIndex(e => e.Guid, "tbl_gatewaycategories_uuid_uindex").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('\"Integration.PaymentGateway\".\"tbl_GatewayCategories_ID_seq\"'::regclass)")
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.Guid)
+                .HasDefaultValueSql("(uuid_generate_v4())::text")
+                .HasColumnType("character varying");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValueSql("false")
+                .HasColumnName("isDeleted");
+            entity.Property(e => e.IsEnabled)
+                .HasDefaultValueSql("true")
+                .HasColumnName("isEnabled");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+        });
+
+        modelBuilder.Entity<GatewayEndpoint>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbl_gatewayendpoints_pk");
+
+            entity.ToTable("GatewayEndpoint", "Integration.PaymentGateway");
+
+            entity.HasIndex(e => e.Guid, "tbl_gatewayendpoints_guid_uindex").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('\"Integration.PaymentGateway\".\"tbl_GatewayEndpoints_ID_seq\"'::regclass)")
+                .HasColumnName("ID");
+            entity.Property(e => e.BaseUrlEndpoint).HasMaxLength(100);
+            entity.Property(e => e.GatewayId).HasColumnName("GatewayID");
+            entity.Property(e => e.Guid)
+                .HasDefaultValueSql("(uuid_generate_v4())::text")
+                .HasColumnType("character varying");
+            entity.Property(e => e.Name).HasMaxLength(100);
+            entity.Property(e => e.UrlEndpoint).HasMaxLength(100);
+
+            entity.HasOne(d => d.Gateway).WithMany(p => p.GatewayEndpoints)
+                .HasForeignKey(d => d.GatewayId)
+                .HasConstraintName("tbl_gatewayendpoints_tbl_gatewayentities_id_fk");
+        });
+
+        modelBuilder.Entity<GatewayEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("tbl_gatewayentities_pk");
+
+            entity.ToTable("GatewayEntity", "Integration.PaymentGateway");
+
+            entity.HasIndex(e => e.Id, "tbl_gatewayentities_id_uindex").IsUnique();
+
+            entity.HasIndex(e => e.Guid, "tbl_gatewayentities_uuid_uindex").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('\"Integration.PaymentGateway\".\"tbl_GatewayEntities_ID_seq\"'::regclass)")
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.Guid)
+                .HasDefaultValueSql("(uuid_generate_v4())::text")
+                .HasColumnType("character varying");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValueSql("false")
+                .HasColumnName("isDeleted");
+            entity.Property(e => e.IsEnabled)
+                .IsRequired()
+                .HasDefaultValueSql("true")
+                .HasColumnName("isEnabled");
+            entity.Property(e => e.Name).HasColumnType("character varying");
         });
 
         modelBuilder.Entity<IdentityAddress>(entity =>

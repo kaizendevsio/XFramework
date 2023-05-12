@@ -20,3 +20,4 @@ global using XFramework.Domain.Generic.Interfaces;
 global using Microsoft.AspNetCore.Authorization;
 global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.AspNetCore.OData.Query;
+global using Wallets.Integration.Interfaces;

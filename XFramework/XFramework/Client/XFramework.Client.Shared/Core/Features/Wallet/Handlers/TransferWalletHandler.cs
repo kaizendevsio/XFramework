@@ -1,6 +1,4 @@
-﻿using Mapster;
-
-namespace XFramework.Client.Shared.Core.Features.Wallet;
+﻿namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {

@@ -30,7 +30,7 @@ public partial class ApplicationState
 
         public override async Task Handle(StateRestoredEvent action, CancellationToken cancellationToken)
         {
-            await MessageBusWrapper.StartClientEventListener(CurrentState.Credential.Guid);
+            //await MessageBusWrapper.StartClientEventListener($"{CurrentState.Credential.Guid}");
         }
     }
 }

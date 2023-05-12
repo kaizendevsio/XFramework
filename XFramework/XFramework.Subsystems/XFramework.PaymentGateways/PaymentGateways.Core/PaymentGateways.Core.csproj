@@ -1,34 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
-        <LangVersion>9</LangVersion>
+        <TargetFramework>net7.0</TargetFramework>
     </PropertyGroup>
-
+    
     <ItemGroup>
-      <PackageReference Include="FluentValidation" Version="9.3.0" />
-      <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="9.3.0" />
-      <PackageReference Include="Mapster" Version="7.0.1" />
-      <PackageReference Include="MediatR" Version="9.0.0" />
-      <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="9.0.0" />
-      <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.7.1" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="IdentityServer.Integration">
-        <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Integration\bin\Debug\net6.0\IdentityServer.Integration.dll</HintPath>
-      </Reference>
-      <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
-      </Reference>
-      <Reference Include="XFramework.Integration, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net5.0\XFramework.Integration.dll</HintPath>
-      </Reference>
-    </ItemGroup>
-
-    <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
       <ProjectReference Include="..\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj" />
       <ProjectReference Include="..\PaymentGateways.Domain\PaymentGateways.Domain.csproj" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <PackageReference Include="RestSharp" Version="110.1.0" />
     </ItemGroup>
 
 </Project>

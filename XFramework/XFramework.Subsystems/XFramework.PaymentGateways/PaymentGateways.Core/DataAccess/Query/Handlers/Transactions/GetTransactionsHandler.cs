@@ -12,18 +12,18 @@ using PaymentGateways.Domain.Generic.Contracts.Responses;
 
 namespace PaymentGateways.Core.DataAccess.Query.Handlers.Transactions
 {
-    public class GetTransactionsHandler : QueryBaseHandler, IRequestHandler<GetTransactionsQuery, QueryResponseBO<List<UserDepositContract>>>
+    public class GetTransactionsHandler : QueryBaseHandler, IRequestHandler<GetTransactionsQuery, QueryResponse<List<UserDepositContract>>>
     {
         public GetTransactionsHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
         }
         
-        public virtual async Task<QueryResponseBO<List<UserDepositContract>>> Handle(GetTransactionsQuery request, CancellationToken cancellationToken)
+        public virtual async Task<QueryResponse<List<UserDepositContract>>> Handle(GetTransactionsQuery request, CancellationToken cancellationToken)
         {
-            var credential = await _dataLayer.TblIdentityCredentials
+            var credential = await _dataLayer.IdentityCredentials
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Cuid == request.Cuid.ToString(), cancellationToken: cancellationToken);
+                .FirstOrDefaultAsync(i => i.Guid == request.Cuid.ToString(), cancellationToken: cancellationToken);
             
             if (credential == null)
             {
@@ -34,11 +34,11 @@ namespace PaymentGateways.Core.DataAccess.Query.Handlers.Transactions
                 };
             }
             
-            var result = await _dataLayer.TblUserDepositRequests
+            var result = await _dataLayer.DepositRequests
                 .Include(i => i.Gateway)
-                .Include(i => i.Currency)
+                .Include(i => i.SourceCurrency)
                 .Include(i => i.TargetWalletType)
-                .Where(i => i.UserAuthId == credential.Id)
+                .Where(i => i.IdentityCredentialId == credential.Id)
                 .AsNoTracking()
                 .ToListAsync(cancellationToken);
             

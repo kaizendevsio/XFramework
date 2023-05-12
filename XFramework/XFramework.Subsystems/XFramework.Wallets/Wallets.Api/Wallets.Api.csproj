@@ -18,8 +18,8 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Wallets.Core\Wallets.Core.csproj" />
-      <ProjectReference Include="..\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
       <ProjectReference Include="..\Wallets.Domain\Wallets.Domain.csproj" />
+      <ProjectReference Include="..\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
     </ItemGroup>
 
 </Project>

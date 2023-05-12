@@ -1,6 +1,5 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
-using Mapster;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Integration.Interfaces;
 
@@ -44,14 +43,7 @@ public partial class SessionState
             
             // Send the request
             var response = await IdentityServiceWrapper.AuthenticateCredential(request);
-            
-            // Broadcast login event
-            Mediator.Publish(new LoginEvent
-            {
-                StatusCode = response.HttpStatusCode,
-                Data = response.Response
-            });
-            
+
             // Handle if the response is invalid or error
             if(await HandleFailure(response, action, false ,$"{response.Message}")) return new()
             {
@@ -98,6 +90,13 @@ public partial class SessionState
                 State = CurrentSessionState.Active
             });
             
+            // Broadcast login event
+            Mediator.Publish(new LoginEvent
+            {
+                StatusCode = response.HttpStatusCode,
+                Data = response.Response
+            });
+            
             // Inform UI About Not Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
 
@@ -113,18 +112,17 @@ public partial class SessionState
             }
             
             // Fetch User Identity And Credential and Contact List
-            var identityResponse = IdentityServiceWrapper.GetIdentity(new() {Guid = response.Response.IdentityGuid});
             var credentialResponse = IdentityServiceWrapper.GetCredential(new() {Guid = response.Response.CredentialGuid});
             var contactListResponse = IdentityServiceWrapper.GetContactList(new() {CredentialGuid = response.Response.CredentialGuid});
 
-            await Task.WhenAll(identityResponse, credentialResponse, contactListResponse);
+            await Task.WhenAll(credentialResponse, contactListResponse);
             
             // Set State And Update UI
             await Mediator.Send(new SetState()
             {
-                Identity = identityResponse.Result.Response,
+                Identity = credentialResponse.Result.Response.IdentityInfo,
                 Credential = credentialResponse.Result.Response,
-                ContactList = contactListResponse.Result.Response
+                ContactList = contactListResponse.Result.Response,
             });
 
             // Reset Session Forms

@@ -21,6 +21,7 @@ namespace StreamFlow.Domain.Generic.Contracts.Requests
             Data = JsonSerializer.Serialize(request, options);
         }
         
+        public string Topic { get; set; }
         public string CommandName { get; set; }
         public string Data { get; set; }
         public string Message { get; set; }

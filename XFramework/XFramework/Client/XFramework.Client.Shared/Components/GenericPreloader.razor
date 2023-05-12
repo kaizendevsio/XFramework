@@ -1,0 +1,30 @@
+﻿@using MudBlazor
+@inherits XComponentsBase
+
+@if (ApplicationState.IsBusy && !ApplicationState.NoSpinner)
+{
+    <MudPaper Class="pa-6 ma-2 generic-preloader" Elevation="3">
+        <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center">
+            @if (!string.IsNullOrEmpty(ApplicationState.ProgressMessage))
+            {
+                <MudText Typo="Typo.h6">@ApplicationState.ProgressMessage</MudText>
+            }
+            else
+            {
+                @if (TextOnly)
+                {
+                    <MudText Typo="Typo.h6">Loading..</MudText>
+                }
+                else
+                {
+                    <MudProgressCircular Size="Size.Large" Color="Color.Primary" Indeterminate="true" />
+                }
+            }
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public bool TextOnly { get; set; }
+}

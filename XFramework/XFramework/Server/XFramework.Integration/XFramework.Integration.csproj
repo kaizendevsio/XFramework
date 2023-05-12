@@ -22,8 +22,9 @@
         <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="11.0.0" />
         <PackageReference Include="MessagePack" Version="2.4.35" />
         <PackageReference Include="BinaryPack" Version="1.0.3" />
+        <PackageReference Include="Sentry.Extensions.Logging" Version="3.25.0" />
         <PackageReference Include="UnitsNet" Version="5.0.0-alpha006" />
-        <PackageReference Include="Sentry" Version="3.23.1" />
+        <PackageReference Include="Sentry" Version="3.25.0" />
         <PackageReference Include="TypeSupport" Version="1.1.12" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
         <PackageReference Include="FluentValidation" Version="11.3.0" />
@@ -43,6 +44,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.PaymentGateways\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
       <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />

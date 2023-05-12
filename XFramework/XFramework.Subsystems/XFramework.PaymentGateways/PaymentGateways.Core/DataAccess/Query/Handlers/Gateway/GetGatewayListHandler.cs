@@ -12,17 +12,17 @@ using PaymentGateways.Domain.Generic.Contracts.Responses;
 
 namespace PaymentGateways.Core.DataAccess.Query.Handlers.Gateway
 {
-    public class GetGatewayListHandler : QueryBaseHandler, IRequestHandler<GetGatewayListQuery, QueryResponseBO<List<GatewayCategoryContract>>>
+    public class GetGatewayListHandler : QueryBaseHandler, IRequestHandler<GetGatewayListQuery, QueryResponse<List<GatewayCategoryContract>>>
     {
         public GetGatewayListHandler(IDataLayer dataLayer)
         {
             _dataLayer = dataLayer;
         }
         
-        public async Task<QueryResponseBO<List<GatewayCategoryContract>>> Handle(GetGatewayListQuery request, CancellationToken cancellationToken)
+        public async Task<QueryResponse<List<GatewayCategoryContract>>> Handle(GetGatewayListQuery request, CancellationToken cancellationToken)
         {
-            var result = await _dataLayer.TblGatewayCategories
-                .Include(i => i.TblGateways)
+            var result = await _dataLayer.GatewayCategories
+                .Include(i => i.Gateways)
                 .AsNoTracking()
                 .ToListAsync(cancellationToken);
             

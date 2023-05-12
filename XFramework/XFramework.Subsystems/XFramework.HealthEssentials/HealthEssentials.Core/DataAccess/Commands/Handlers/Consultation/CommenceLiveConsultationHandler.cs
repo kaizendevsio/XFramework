@@ -1,18 +1,22 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
 using HealthEssentials.Domain.Generics.Enums;
+using HealthEssentials.Domain.Generics.Strings;
 using Messaging.Integration.Interfaces;
 using Microsoft.Extensions.Hosting;
 using XFramework.Domain.Generic.Enums;
+using XFramework.Integration.Interfaces.Wrappers;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 
 public class CommenceLiveConsultationHandler : CommandBaseHandler, IRequestHandler<CommenceLiveConsultationCmd, CmdResponse<CommenceLiveConsultationCmd>>
 {
+    private readonly IMessageBusWrapper _messageBusWrapper;
     private readonly IMessagingServiceWrapper _messagingServiceWrapper;
     private readonly IHostEnvironment _hostEnvironment;
 
-    public CommenceLiveConsultationHandler(IDataLayer dataLayer, IMessagingServiceWrapper messagingServiceWrapper, IHostEnvironment hostEnvironment)
+    public CommenceLiveConsultationHandler(IMessageBusWrapper messageBusWrapper, IDataLayer dataLayer, IMessagingServiceWrapper messagingServiceWrapper, IHostEnvironment hostEnvironment)
     {
+        _messageBusWrapper = messageBusWrapper;
         _messagingServiceWrapper = messagingServiceWrapper;
         _hostEnvironment = hostEnvironment;
         _dataLayer = dataLayer;
@@ -73,6 +77,8 @@ public class CommenceLiveConsultationHandler : CommandBaseHandler, IRequestHandl
         jobOrder.Status = (short?) TransactionStatus.OnGoing;
         
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        
+        _messageBusWrapper.PublishAsync(HealthEssentialsEvent.CommenceConsultation, credential.Guid, jobOrder.Adapt<ConsultationJobOrderResponse>());
         
         if (!_hostEnvironment.IsProduction())
         {
