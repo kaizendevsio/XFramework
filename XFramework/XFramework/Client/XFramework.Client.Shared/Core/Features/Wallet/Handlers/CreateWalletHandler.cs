@@ -1,5 +1,4 @@
-﻿using Mapster;
-using Wallets.Domain.Generic.Contracts.Requests.Create;
+﻿using Wallets.Domain.Generic.Contracts.Requests.Create;
 
 namespace XFramework.Client.Shared.Core.Features.Wallet;
 

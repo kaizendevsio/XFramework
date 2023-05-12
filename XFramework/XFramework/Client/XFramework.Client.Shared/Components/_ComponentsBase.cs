@@ -22,6 +22,7 @@ public class XComponentsBase : BlazorStateComponent
     [Inject] public IJSRuntime JsRuntime { get; set; }
     [Inject] public EndPointsModel EndPoints { get; set; }
     [Inject] public IDialogService DialogService { get; set; }
+    [Inject] public IMessageBusWrapper MessageBusWrapper { get; set; }
     
     // Initialize States
     public ApplicationState ApplicationState => GetState<ApplicationState>();

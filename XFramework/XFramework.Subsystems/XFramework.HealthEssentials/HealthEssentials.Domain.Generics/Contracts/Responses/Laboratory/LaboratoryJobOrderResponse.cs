@@ -6,6 +6,8 @@ namespace HealthEssentials.Domain.Generics.Contracts.Responses.Laboratory;
 
 public class LaboratoryJobOrderResponse
 {
+    public string TempAddress { get; set; }
+    public string TempDocName { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime ModifiedAt { get; set; }
     public bool? IsEnabled { get; set; }

@@ -50,7 +50,7 @@ public class AddSupportedConsultationHandler : CommandBaseHandler, IRequestHandl
             Message = $"Consultation with Guid {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             IsSuccess = true,
-            Request = new()
+            Response = new()
             {
                 Guid = Guid.Parse(entity.Guid)
             }

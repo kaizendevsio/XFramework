@@ -35,7 +35,7 @@ public partial class LogisticJobOrderDetail
 
     public long DiscountType { get; set; }
 
-    public string LocationGuid { get; set; } = null!;
+    public string? LocationGuid { get; set; }
 
     public virtual LogisticJobOrder LogisticJobOrder { get; set; } = null!;
 

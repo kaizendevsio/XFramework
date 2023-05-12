@@ -13,7 +13,7 @@ public interface ISignalRService : IXFrameworkService
 
     public Task<bool> EnsureConnection();
 
-    public Task StartEventListener(Guid? guid);
+    public Task StartEventListener(string topic);
     public Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessageBO args1);
     public Task<SignalRResponse> InvokeAsync(StreamFlowMessageBO args);
 }

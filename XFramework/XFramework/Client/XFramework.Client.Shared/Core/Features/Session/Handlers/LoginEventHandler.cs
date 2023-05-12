@@ -34,7 +34,17 @@ public partial class SessionState
         {
             if (action.StatusCode is HttpStatusCode.Accepted)
             {
-                await MessageBusWrapper.StartClientEventListener(CurrentState.Credential.Guid);
+                Console.WriteLine("Client event listener started");
+                try
+                {
+                    await MessageBusWrapper.StartClientEventListener($"{CurrentState.Credential.Guid}");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    throw;
+                }
+                Console.WriteLine("Client event listener success");
             }
         }
     }

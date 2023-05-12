@@ -1,7 +1,11 @@
-﻿@inherits TransitionableLayoutComponent
+﻿@using XFramework.Client.Shared.Core.Services.Interface
+@inherits TransitionableBlazorStateLayoutComponent
 
 <div class="transition @TransitioningClass @(Transition.IntoView ? "transitioned" : "transitioned_behind")">
-    @Body
+    @if (ApplicationState.StateRestored)
+    {
+        @Body
+    }
 </div>
 
 <style>
@@ -20,6 +24,12 @@
 </style>
 
 @code {
+
+    [Inject] public IIdentityServiceWrapper IdentityServiceWrapper { get; set; }
+
+    [Inject] public IBootstrapService BootstrapService { get; set; }
+    
+    private ApplicationState ApplicationState => GetState<ApplicationState>();
     
     private string TransitioningClass => Transition.FirstRender
         ? "" : $"animate__{TransitioningEffect()} animate__faster animate__animated";

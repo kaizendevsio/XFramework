@@ -70,6 +70,8 @@ public class ConcludeLiveConsultationHandler : CommandBaseHandler, IRequestHandl
         jobOrder.Status = (short?) TransactionStatus.Completed;
         
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+
+        _messageBusWrapper.PublishAsync(HealthEssentialsEvent.ConcludeConsultation, credential.Guid, jobOrder.Adapt<ConsultationJobOrderResponse>());
         
         if (!_hostEnvironment.IsProduction())
         {
@@ -80,7 +82,6 @@ public class ConcludeLiveConsultationHandler : CommandBaseHandler, IRequestHandl
             };
         }
 
-        _messageBusWrapper.PublishAsync(HealthEssentialsEvent.ConcludeConsultation, Guid.Parse(credential.Guid), jobOrder.Adapt<ConsultationJobOrderResponse>());
         _messagingServiceWrapper.CreateDirectMessage(new()
         {
             MessageType = Guid.Parse("f4fca110-790d-41d7-a0be-b5c699c9a9db"),

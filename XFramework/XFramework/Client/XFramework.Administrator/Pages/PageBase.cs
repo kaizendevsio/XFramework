@@ -6,5 +6,4 @@ namespace XFramework.Administrator.Pages;
 
 public class PageBase : XPageBase
 {
-   public List<SampleModel> Model { get; set; } = new();
 }

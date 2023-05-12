@@ -27,6 +27,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain.Generic",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Integration", "..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj", "{9F61AFF5-F9F7-4328-B310-677EB1C818FE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Integration", "XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj", "{A5141188-E95A-4E77-B3F3-E56D4F327CC7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentGateways.Integration", "XFramework.PaymentGateways\PaymentGateways.Integration\PaymentGateways.Integration.csproj", "{8CDB36AB-A1E3-4500-942B-3D376AA74300}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentGateways.Domain.Generic", "XFramework.PaymentGateways\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj", "{1C7ACF8F-26EA-4239-92BA-6E088D7529F3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -65,6 +71,18 @@ Global
 		{9F61AFF5-F9F7-4328-B310-677EB1C818FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9F61AFF5-F9F7-4328-B310-677EB1C818FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9F61AFF5-F9F7-4328-B310-677EB1C818FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5141188-E95A-4E77-B3F3-E56D4F327CC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5141188-E95A-4E77-B3F3-E56D4F327CC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5141188-E95A-4E77-B3F3-E56D4F327CC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5141188-E95A-4E77-B3F3-E56D4F327CC7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8CDB36AB-A1E3-4500-942B-3D376AA74300}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8CDB36AB-A1E3-4500-942B-3D376AA74300}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8CDB36AB-A1E3-4500-942B-3D376AA74300}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8CDB36AB-A1E3-4500-942B-3D376AA74300}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1C7ACF8F-26EA-4239-92BA-6E088D7529F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1C7ACF8F-26EA-4239-92BA-6E088D7529F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1C7ACF8F-26EA-4239-92BA-6E088D7529F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1C7ACF8F-26EA-4239-92BA-6E088D7529F3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -78,6 +96,9 @@ Global
 		{7F61DFF6-115C-407D-95E6-344866BE3CEE} = {CE422A75-50D7-46F1-8564-1F3233837962}
 		{6F7AF283-01BB-45F3-BD3D-A43591BF929A} = {CE422A75-50D7-46F1-8564-1F3233837962}
 		{9F61AFF5-F9F7-4328-B310-677EB1C818FE} = {CE422A75-50D7-46F1-8564-1F3233837962}
+		{A5141188-E95A-4E77-B3F3-E56D4F327CC7} = {DD689294-15A0-4930-B124-8C663BC0F25C}
+		{8CDB36AB-A1E3-4500-942B-3D376AA74300} = {CE422A75-50D7-46F1-8564-1F3233837962}
+		{1C7ACF8F-26EA-4239-92BA-6E088D7529F3} = {CE422A75-50D7-46F1-8564-1F3233837962}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E852611F-18A7-4E61-864A-E5E688626BA8}

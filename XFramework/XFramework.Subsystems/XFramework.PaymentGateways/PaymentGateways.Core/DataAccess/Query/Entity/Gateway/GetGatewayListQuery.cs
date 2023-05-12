@@ -4,7 +4,7 @@ using PaymentGateways.Domain.Generic.Contracts.Responses;
 
 namespace PaymentGateways.Core.DataAccess.Query.Entity.Gateway
 {
-    public class GetGatewayListQuery : QueryBaseEntity, IRequest<QueryResponseBO<List<GatewayCategoryContract>>>
+    public class GetGatewayListQuery : QueryBaseEntity, IRequest<QueryResponse<List<GatewayCategoryContract>>>
     {
         
     }

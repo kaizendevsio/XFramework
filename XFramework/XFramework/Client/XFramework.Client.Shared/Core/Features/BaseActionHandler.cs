@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using TypeSupport.Extensions;
 using XFramework.Client.Shared.Core.Features.Address;
 using XFramework.Client.Shared.Core.Features.Configuration;
@@ -7,7 +8,6 @@ using XFramework.Client.Shared.Core.Features.Cryptocurrency;
 using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Member;
 using XFramework.Client.Shared.Core.Features.Session;
-using XFramework.Client.Shared.Core.Features.Todo;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Client.Shared.Core.Services;
 using XFramework.Client.Shared.Entity.Enums;
@@ -44,7 +44,6 @@ public class BaseActionHandler
     protected LayoutState LayoutState => Store.GetState<LayoutState>();
     protected CacheState CacheState => Store.GetState<CacheState>();
     protected WalletState WalletState => Store.GetState<WalletState>();
-    protected TodoState TodoState => Store.GetState<TodoState>();
     
     
     public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
@@ -307,21 +306,38 @@ public class BaseActionHandler
                 throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null);
         }
     }
+    
+    public Task DisplayProgress(bool show)
+    {
+        if (show)
+        {
+            SweetAlertService.FireAsync(new()
+            {
+                Backdrop = false,
+                Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
+                ShowConfirmButton = false,
+            });
+            return Task.CompletedTask;
+        }
+        SweetAlertService.CloseAsync();
+        return Task.CompletedTask;
+    }
+    
     public async Task ReportTask(string title, bool? isBusy = true)
     {
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressMessage = title});
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressMessage = title, NoSpinner = false});
     }
     public async Task ReportTask(QueryableRequest action)
     {
-        if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true}); return;}
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+        if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, ProgressTitle = action.GetType().Name, NoSpinner = false});
     }
     public async Task ReportTask<T>(QueryableRequest action, IEnumerable<T> list)
     {
-        if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true}); return;}
+        if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
         if (list.TryGetNonEnumeratedCount(out var count) && count > 0) return;
         if (list.Any()) return;
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, ProgressTitle = action.GetType().Name, NoSpinner = false});
     }
     public async Task ReportTaskCompleted()
     {
@@ -405,5 +421,4 @@ public abstract class ActionHandler<TAction, TResponse> : BaseActionHandler, IRe
         Store = store;
     }
     public abstract Task<TResponse> Handle(TAction action, CancellationToken aCancellationToken);
-
 }

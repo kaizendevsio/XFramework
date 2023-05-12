@@ -9,41 +9,234 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.PaymentGateways/.idea/discord.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/shelf/Uncommitted_changes_before_Checkout_at_2_27_2023_8_31_AM_[Changes]/shelved.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/Providers/ComposeEcLinkTransactionCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/Providers/ComposePaynamicsCashInCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/Providers/ProcessEclinkCashInCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/Providers/ProcessPaynamicsCashInCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/Providers/ProcessUnionBankCashInCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/Providers/ProcessUnionBankCashOutCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/Providers/ComposeEcLinkTransactionHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/Providers/ComposePaynamicsCashInHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/Providers/ProcessEcLinkCashInHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/Providers/ProcessPaynamicsCashInHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/Providers/ProcessUnionBankCashInHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/Providers/ProcessUnionBankCashOutHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Entity/Transactions/HandleEcLinkResponseQuery.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/Transactions/HandleEcLinkResponseHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/GlobalUsings.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Requests/Create/CreateDepositRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Requests/Create/CreateWithdrawalRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/DepositResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/BusinessObjects/EcLink/ECPayConfiguration.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/BusinessObjects/Paynamics/PaynamicsConfiguration.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/BusinessObjects/Paynamics/PaynamicsSignature.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/BusinessObjects/TOC/TocAppId.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/BusinessObjects/TOC/TocAuthCredentials.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/BusinessObjects/TOC/TocCashOutRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Requests/EcLink/EcLinkCheckTransactionRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Requests/EcLink/EcLinkTransactionRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Requests/Paynamics/PaynamicsFormRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Requests/Paynamics/PaynamicsTransactionRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Requests/TOC/TocApiRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Requests/UnionBank/UnionBankInstaPayTransferRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Responses/EcLink/EcLinkCheckTransactionContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Responses/EcLink/EcLinkTransactionContract.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Responses/ProcessTransactionResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Responses/TOC/TocApiResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Responses/TOC/TocBankResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Responses/TOC/TocCashInResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Responses/UnionBank/UnionBankAccountTransactionResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Contracts/Responses/UnionBank/UnionBankTokenResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/AddressBarangay.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/AddressCity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/AddressCountry.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/AddressProvince.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/AddressRegion.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/Application.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/AuditField.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/AuditHistory.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/AuthorizationLog.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/CurrencyEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/DepositRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/Enterprise.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/ExchangeRate.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/Gateway.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/GatewayCategory.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/GatewayEndpoint.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/GatewayEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/GatewayInstruction.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/GatewayResponse.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/GatewayResponseStatusType.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/GatewayResponseType.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityAddress.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityAddressEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityContact.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityContactEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityContactGroup.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityCredential.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityFavorite.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityInformation.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityRole.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityRoleEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityRoleEntityGroup.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityVerification.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/IdentityVerificationEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/Log.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/RegistryConfiguration.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/RegistryConfigurationGroup.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/RegistryFavoriteEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/SessionDatum.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/SessionEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/Wallet.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/WalletAddress.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/WalletEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/WalletTransaction.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/WithdrawalRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/XnelSystemsContext.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Extentions/Utf8StringWriter.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Extentions/XmlTextWriterX.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Integration/Drivers/PaymentGatewayDriver.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Integration/Interfaces/IPaymentGatewayWrapper.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Integration/PaymentGateways.Integration.csproj" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/Identity/CreateDepositHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/Identity/CreateWithdrawalHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/CreateWalletDepositCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Entity/Wallets/Identity/CreateWalletWithdrawalCmd.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/CreateWalletDepositHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Handlers/Wallets/Identity/CreateWithdrawalHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/Gateway.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/GatewayCategory.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/GatewayEndpoint.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/GatewayEntity.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Integration/Interfaces/IWalletServiceWrapper.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Integration/Wallets.Integration.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../XFramework.Client.sln" beforeDir="false" afterPath="$PROJECT_DIR$/../../XFramework.Client.sln" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../XFramework.Server.sln" beforeDir="false" afterPath="$PROJECT_DIR$/../../XFramework.Server.sln" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Messaging/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/Community.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/Community.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Core/Community.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/Community.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Domain/Community.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Domain/Community.Domain.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/Program.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/Program.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Medicine/GetMedicineAutoCompleteHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Medicine/GetMedicineAutoCompleteHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/AddSupportedConsultationHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Commands/Handlers/Doctor/AddSupportedConsultationHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/HealthEssentials.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/HealthEssentials.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/HealthEssentials.Domain.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer.sln" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/Program.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/Program.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/IdentityServer.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain/IdentityServer.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Domain/IdentityServer.Domain.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Test/IdentityServer.Test.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Test/IdentityServer.Test.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Program.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/Program.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/Messaging.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/Messaging.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Domain/Messaging.Domain.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Address/CreateAddressHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Address/CreateAddressHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Address/DeleteAddressHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Address/DeleteAddressHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Address/UpdateAddressHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Handlers/Identity/Address/UpdateAddressHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways.sln" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Installers/DbInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/Installers/DbInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/PaymentGateways.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/PaymentGateways.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/SignalR/Handlers/AuthenticateHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Api/SignalR/Handlers/AuthenticateHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/NewTransactionCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Entity/Transactions/CreateDepositCmd.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/NewTransactionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Commands/Handlers/Transactions/CreateDepositHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/DataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/DataLayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Entity/Gateway/GetGatewayListQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Entity/Gateway/GetGatewayListQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Entity/Transactions/GetTransactionsQuery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Entity/Transactions/GetTransactionsQuery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/Gateway/GetGatewayListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/Gateway/GetGatewayListHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/QueryBaseHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/Transactions/GetTransactionsHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/DataAccess/Query/Handlers/Transactions/GetTransactionsHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Interfaces/ICachingService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Interfaces/ICachingService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Interfaces/IDataLayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Interfaces/IDataLayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/PaymentGateways.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/PaymentGateways.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Services/CachingService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Services/CachingService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Services/LoggerService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Core/Services/LoggerService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Requests/DepositRequest.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/GatewayCategoryContract.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/Contracts/Responses/GatewayCategoryContract.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/PaymentGateways.Domain.Generic.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain.Generic/PaymentGateways.Domain.Generic.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/BusinessObjects/AuditEntryBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/BusinessObjects/AuditEntryBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressBarangay.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressCity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressCountry.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressProvince.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAddressRegion.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblApplication.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblApplicationLog.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuditField.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuditHistory.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblAuthorizationLog.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblConfiguration.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblConfigurationGroup.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblCurrency.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblCurrencyEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblEnterprise.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblExchangeRate.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblGateway.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblGatewayCategory.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblGatewayEndpoint.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblGatewayEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityAddress.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityAddressEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityContact.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityContactEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityCredential.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityInfo.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityInformation.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityRole.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityRoleEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityVerification.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIdentityVerificationEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIncomeDistribution.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblIncomeEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblLog.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblSessionDatum.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblSessionEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserBillsPaymentTransaction.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserBinaryList.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserBusinessPackage.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserDepositRequest.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserEloadTransaction.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserIncomePartition.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserIncomeTransaction.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserMap.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserWallet.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserWalletAddress.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserWalletTransaction.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblUserWithdrawalRequest.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblVerificationType.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/TblWalletEntity.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/DataTransferObjects/XFrameworkContext.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Migrations/DbScaffolding.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/PaymentGateways.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.PaymentGateways/PaymentGateways.Domain/PaymentGateways.Domain.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets.sln" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/SignalR/Handlers/Wallets/Identity/CreateWalletDepositHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Entity/Wallets/Identity/CreateWalletDepositQuery.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Query/Handlers/Wallets/Identity/CreateWalletDepositHandler.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Wallets.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/Wallets.Core.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain.Generic/Contracts/Responses/WalletDepositResponse.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/DepositRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/DepositRequest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XnelSystemsContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/DataTransferObjects/XnelSystemsContext.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/Migrations/DbScaffolding.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Domain/Migrations/DbScaffolding.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetMemberListHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetUnregisteredSubscriberListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/GetUnregisteredSubscriberListHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberContactHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberContactHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberCredentialHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberInfoHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Member/Handlers/UpdateMemberInfoHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/InitiateVerificationCodeHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/InitiateVerificationCodeHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogInHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/LogInHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/RegisterActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/RegisterActionHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/ResetPasswordHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/ResetPasswordHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/UpdateContactHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/UpdateContactHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/UpdateCredentialHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/UpdateCredentialHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/UpdateIdentityInfoHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Handlers/UpdateIdentityInfoHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Handlers/CreateWalletHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Handlers/CreateWalletHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Handlers/TransferWalletHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Handlers/TransferWalletHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Extensions/InstallerExtensions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Extensions/InstallerExtensions.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/GlobalUsings.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/GlobalUsings.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/XFramework.Client.Shared.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/GlobalUsings.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/GlobalUsings.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Installers/WrapperInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/Installers/WrapperInstaller.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/XFramework.Api.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Api/XFramework.Api.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/PipelineBehaviors/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/PipelineBehaviors/BasePipelineBehavior.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Commands/Handlers/Identity/CreateIdentityHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/XFramework.Core.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/XFramework.Core.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/XFramework.Domain.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/XFramework.Domain.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponseBO.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/TransactionRequestBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/TransactionRequestBase.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/BaseSignalRHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/BaseSignalRHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/WalletServiceDriver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Integration/Drivers/WalletServiceDriver.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IClientWalletServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IClientWalletServiceWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/Wrappers/IWalletServiceWrapper.cs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/XFramework.Tests.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/XFramework.Tests.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -58,9 +251,10 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$/../.." value="Development" />
+        <entry key="$PROJECT_DIR$/../.." value="Development-Next" />
       </map>
     </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
   </component>
   <component name="GithubProjectSettings">
     <option name="branchProtectionPatterns">
@@ -76,6 +270,7 @@
     <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Consultation/GetConsultationListHandler.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Handlers/Unit/GetUnitListHandler.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Consultation/Get/GetConsultationListRequest.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Create/CreateDoctorEntityRequest.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Doctor/Create/CreateDoctorRequest.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/Laboratory/Get/GetLaboratoryResultListRequest.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Responses/Consultation/ConsultationJobOrderMedicineResponse.cs" root0="FORCE_HIGHLIGHTING" />
@@ -107,11 +302,17 @@
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/DriverBase.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Interfaces/ICrudService.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/ProcessMonitorService.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/2990516b1676498f8d3b3eaf687fc51d2c478/a0/822e890f/HubConnection.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/2990516b1676498f8d3b3eaf687fc51d2c478/f9/2fbb827a/HubConnectionExtensions.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/922bb94bfb3d43181cb5c4cf852e8cae441ffb873e8f57bfa0fe729a4a6325f6/HubConnectionExtensions.OnResult.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/9a22345af3778e6d675cfffd869c9619291a38b3e0b87e8cd28c4cc8f480db21/DefaultInterpolatedStringHandler.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/bd1d5c50194fea68ff3559c160230b0ab50f5acf4ce3061bffd6d62958e2182/ExceptionDispatchInfo.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/SourcesCache/f4708639776589f5ac2739f6fcbfc67343b1f9dac51cc1dbfdb003eef77cc1c/Monitor.CoreCLR.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
+  <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="Toolset" />
   </component>
@@ -144,7 +345,8 @@
     &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;XThreadsFramesViewSplitterKey&quot;: &quot;0.46871445&quot;,
+    &quot;XThreadsFramesViewSplitterKey&quot;: &quot;0.51785713&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Development&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Projects/Net Core/XFramework/XFramework/XFramework.Subsystems/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
@@ -153,6 +355,13 @@
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  },
+  &quot;keyToStringList&quot;: {
+    &quot;rider.external.source.directories&quot;: [
+      &quot;C:\\Users\\erald\\AppData\\Roaming\\JetBrains\\Rider2023.1\\resharper-host\\DecompilerCache&quot;,
+      &quot;C:\\Users\\erald\\AppData\\Roaming\\JetBrains\\Rider2023.1\\resharper-host\\SourcesCache&quot;,
+      &quot;C:\\Users\\erald\\AppData\\Local\\Symbols\\src&quot;
+    ]
   }
 }</component>
   <component name="RunManager" selected=".NET Launch Settings Profile.HealthEssentials.Api">
@@ -322,6 +531,28 @@
       <workItem from="1669208234738" duration="1529000" />
       <workItem from="1669275504409" duration="523000" />
       <workItem from="1669276078894" duration="10000" />
+      <workItem from="1669279243648" duration="17000" />
+      <workItem from="1669298092119" duration="333000" />
+      <workItem from="1669379547885" duration="2168000" />
+      <workItem from="1669447790033" duration="8555000" />
+      <workItem from="1669705400710" duration="1784000" />
+      <workItem from="1669790070102" duration="6279000" />
+      <workItem from="1669963759051" duration="6944000" />
+      <workItem from="1670029569728" duration="60000" />
+      <workItem from="1670029647289" duration="16000" />
+      <workItem from="1670177668642" duration="3757000" />
+      <workItem from="1672245042732" duration="2346000" />
+      <workItem from="1672258242955" duration="4951000" />
+      <workItem from="1672847415091" duration="3319000" />
+      <workItem from="1672937307780" duration="3455000" />
+      <workItem from="1672983784420" duration="10816000" />
+      <workItem from="1678693582789" duration="317000" />
+      <workItem from="1679056823516" duration="1170000" />
+      <workItem from="1679632391137" duration="595000" />
+      <workItem from="1680060270592" duration="1967000" />
+      <workItem from="1680244082128" duration="1823000" />
+      <workItem from="1682746685545" duration="323000" />
+      <workItem from="1682748849915" duration="2155000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>

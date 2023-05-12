@@ -24,6 +24,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Integration", "XF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messaging.Domain.Generic", "XFramework\XFramework.Subsystems\XFramework.Messaging\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj", "{D97181A3-97CE-486E-8A6E-5033E6336272}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{D4387B04-304D-4329-BB1A-8E6FC131E938}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Client.Test.UI", "XFramework\XFramework\Client\XFramework.Client.Test.UI\XFramework.Client.Test.UI.csproj", "{2245FEE8-C7DE-46FB-9532-280188E84D03}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Integration", "XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj", "{BE945D80-FBBD-4F85-A287-4ADB5BD3B205}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -74,6 +80,14 @@ Global
 		{D97181A3-97CE-486E-8A6E-5033E6336272}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D97181A3-97CE-486E-8A6E-5033E6336272}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D97181A3-97CE-486E-8A6E-5033E6336272}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2245FEE8-C7DE-46FB-9532-280188E84D03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2245FEE8-C7DE-46FB-9532-280188E84D03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2245FEE8-C7DE-46FB-9532-280188E84D03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2245FEE8-C7DE-46FB-9532-280188E84D03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE945D80-FBBD-4F85-A287-4ADB5BD3B205}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE945D80-FBBD-4F85-A287-4ADB5BD3B205}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE945D80-FBBD-4F85-A287-4ADB5BD3B205}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE945D80-FBBD-4F85-A287-4ADB5BD3B205}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{7F546CB2-6D09-40D9-90BE-9DA78803C3B8} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
@@ -85,5 +99,7 @@ Global
 		{D6CE26C0-F0A0-4B5A-9795-41B95E51FDFF} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
 		{5E5C2672-D825-486D-88E2-FE73F2214C3D} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
 		{D97181A3-97CE-486E-8A6E-5033E6336272} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
+		{2245FEE8-C7DE-46FB-9532-280188E84D03} = {D4387B04-304D-4329-BB1A-8E6FC131E938}
+		{BE945D80-FBBD-4F85-A287-4ADB5BD3B205} = {C56F3EF2-432E-4A94-ACEC-29B9AF1E5A1A}
 	EndGlobalSection
 EndGlobal

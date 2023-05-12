@@ -27,7 +27,7 @@ public class DeleteAddressHandler : CommandBaseHandler ,IRequestHandler<DeleteAd
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            Request = request
+            Response = request
         };
     }
 }

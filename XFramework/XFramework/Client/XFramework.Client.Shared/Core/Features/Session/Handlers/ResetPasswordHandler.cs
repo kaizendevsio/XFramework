@@ -1,6 +1,5 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update;
-using Mapster;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services;
 using XFramework.Integration.Services.Helpers;

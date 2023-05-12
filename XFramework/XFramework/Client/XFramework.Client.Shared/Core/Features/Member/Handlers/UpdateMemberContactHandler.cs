@@ -1,6 +1,4 @@
-﻿using Mapster;
-
-namespace XFramework.Client.Shared.Core.Features.Member;
+﻿namespace XFramework.Client.Shared.Core.Features.Member;
 
 public partial class MemberState
 {

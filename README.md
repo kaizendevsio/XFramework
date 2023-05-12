@@ -1,8 +1,8 @@
 # XFramework
 XFramework Version 1.0 Using Microsoft .Net Core Technologies
 
-Built with love using:
-✔ Microsoft DotNet 6 ❤
+Built using:
+✔ Microsoft .Net 7
 ✔ CQRS Architecture ❤
 ✔ MediatR ❤
 ✔ Fluent Validation ❤

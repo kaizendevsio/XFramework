@@ -1,6 +1,5 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
 using IdentityServer.Domain.Generic.Contracts.Requests.Update;
-using Mapster;
 using Messaging.Integration.Interfaces;
 using XFramework.Client.Shared.Entity.Models.Requests.Session;
 

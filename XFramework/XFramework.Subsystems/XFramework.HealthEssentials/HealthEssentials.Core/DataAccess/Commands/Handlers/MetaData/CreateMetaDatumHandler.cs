@@ -25,7 +25,7 @@ public class CreateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Create
         var metaDatum = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.MetaData>();
         metaDatum.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         metaDatum.Entity = entity;
-        
+         
         await _dataLayer.HealthEssentialsContext.MetaData.AddAsync(metaDatum, cancellationToken);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(cancellationToken);
         

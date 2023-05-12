@@ -11,7 +11,13 @@ public class GetWalletHandler : QueryBaseHandler, IRequestHandler<GetWalletQuery
         
     public async Task<QueryResponse<WalletResponse>> Handle(GetWalletQuery request, CancellationToken cancellationToken)
     {
-        var entity = await _dataLayer.Wallets.FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
+        var entity = await _dataLayer.Wallets
+            .Include(i => i.WalletEntity)
+            .Include(i => i.WalletTransactionSourceUserWallets)
+            .Include(i => i.WalletTransactionTargetUserWallets)
+            .AsNoTracking()
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(i => i.Guid == $"{request.Guid}", cancellationToken);
         if (entity == null)
         {
             return new ()

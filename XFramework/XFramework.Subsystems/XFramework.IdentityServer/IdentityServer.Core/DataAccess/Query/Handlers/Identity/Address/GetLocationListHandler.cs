@@ -13,7 +13,16 @@ public class GetLocationListHandler : QueryBaseHandler, IRequestHandler<GetLocat
     public async Task<QueryResponse<List<IdentityLocationResponse>>> Handle(GetLocationListQuery request, CancellationToken cancellationToken)
     {
         var entity = await _dataLayer.IdentityAddresses
-            .Include(i => i.AddressEntities)
+            .Include(i => i.AddressEntities.IdentityAddresses)
+            .ThenInclude(i => i.RegionNavigation)
+            .Include(i => i.AddressEntities.IdentityAddresses)
+            .ThenInclude(i => i.ProvinceNavigation)
+            .Include(i => i.AddressEntities.IdentityAddresses)
+            .ThenInclude(i => i.CityNavigation)
+            .Include(i => i.AddressEntities.IdentityAddresses)
+            .ThenInclude(i => i.BarangayNavigation)
+            .Include(i => i.AddressEntities.IdentityAddresses)
+            .ThenInclude(i => i.CountryNavigation)
             .Include(i => i.CountryNavigation)
             .ThenInclude(i => i.AddressRegions)
             .ThenInclude(i => i.AddressProvinces)

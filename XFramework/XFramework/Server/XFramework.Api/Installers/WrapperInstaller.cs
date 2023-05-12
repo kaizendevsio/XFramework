@@ -1,5 +1,6 @@
 ﻿using Community.Integration.Drivers;
 using Community.Integration.Interfaces;
+using Wallets.Integration.Drivers;
 using XFramework.Integration.Drivers;
 
 namespace XFramework.Api.Installers

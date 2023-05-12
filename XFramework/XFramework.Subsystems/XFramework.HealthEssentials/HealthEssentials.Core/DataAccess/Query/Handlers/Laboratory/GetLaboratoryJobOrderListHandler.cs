@@ -2,6 +2,7 @@
 using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses;
+using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;
 
@@ -22,6 +23,7 @@ public class GetLaboratoryJobOrderListHandler : QueryBaseHandler, IRequestHandle
             .Include(x => x.Schedule)
             .Where(i => EF.Functions.ILike(i.ReferenceNumber, $"%{request.SearchField}%"))
             .Where(i => i.LaboratoryLocation.Guid == $"{request.LaboratoryLocationGuid}")
+            .Where(i => request.Status.Contains((TransactionStatus)i.Status))
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()

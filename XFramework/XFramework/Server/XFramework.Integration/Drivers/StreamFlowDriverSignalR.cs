@@ -19,6 +19,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     private string ClientIpAddress { get; set; }
     private string ClientName { get; set; }
     private Guid? ApplicationId { get; set; }
+    public List<string> TopicList { get; init; }
 
     public HubConnectionState ConnectionState => SignalRService.Connection.State;
 
@@ -57,12 +58,23 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             }
         }
 
-        ApplicationId ??= Guid.Parse(Configuration.GetValue<string>("Application:DefaultUID"));
+        var appId = Configuration.GetValue<string>("Application:DefaultUID");
+        var streamFlowClientId = Configuration.GetValue<string>("StreamFlowConfiguration:ClientName");
+        
+        if (string.IsNullOrEmpty(appId))
+        {
+            throw new ArgumentNullException(nameof(appId), "Application:DefaultUID is not set in appsettings.json");
+        }
+        if (string.IsNullOrEmpty(streamFlowClientId))
+        {
+            throw new ArgumentNullException(nameof(appId), "StreamFlowConfiguration:ClientName is not set in appsettings.json");
+        }
+        
+        ApplicationId ??= Guid.Parse(appId);
         ClientName = !string.IsNullOrEmpty(ClientName)
             ? ClientName
-            : Configuration.GetValue<string>("StreamFlowConfiguration:ClientName");
+            : streamFlowClientId;
 
-        var applicationId = ApplicationId;
         var requestId = Guid.NewGuid();
         var ipAddress = string.Empty;
         var deviceAgent = string.Empty;
@@ -72,7 +84,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         {
             var requestServer = request.GetPropertyValue("RequestServer").Adapt<RequestServerBO>();
 
-            applicationId = requestServer?.ApplicationId ?? applicationId;
+            ApplicationId = requestServer?.ApplicationId ?? ApplicationId;
             requestId = requestServer?.RequestId ?? requestId;
 
             clientName = !string.IsNullOrEmpty(requestServer?.Name)
@@ -86,7 +98,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return new()
         {
             DeviceAgent = deviceAgent,
-            ApplicationId = applicationId,
+            ApplicationId = ApplicationId,
             Name = clientName,
             IpAddress = ipAddress,
             RequestId = requestId
@@ -110,9 +122,9 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         }
     }
 
-    public Task StartClientEventListener(Guid? credentialGuid)
+    public Task StartClientEventListener(string topic)
     {
-        return SignalRService.StartEventListener(credentialGuid);
+        return SignalRService.StartEventListener(topic);
     }
 
     public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, Guid? recipient) where TRequest : new()
@@ -205,13 +217,13 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return new();
     }
 
-    public async Task PublishAsync<TData>(string eventName, Guid? recipient, TData data)
+    public async Task PublishAsync<TData>(string eventName, string topic, TData data)
     {
         var options = new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles};
         var r = new StreamFlowMessageBO
         {
             ExchangeType = MessageExchangeType.Topic,
-            Recipient = recipient,
+            Topic = topic,
             CommandName = eventName,
             Data = JsonSerializer.Serialize(data, options)
         };

@@ -1,14 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
-        <LangVersion>9</LangVersion>
+        <TargetFramework>net7.0</TargetFramework>
+        
     </PropertyGroup>
 
     <ItemGroup>
       <Folder Include="BusinessObjects" />
       <Folder Include="Contracts" />
-      <Folder Include="DataTransferObjects" />
       <Folder Include="Enums" />
       <Folder Include="Migrations" />
     </ItemGroup>
@@ -25,7 +24,7 @@
 
     <ItemGroup>
       <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
+        <HintPath>..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net7.0\XFramework.Domain.Generic.dll</HintPath>
       </Reference>
     </ItemGroup>
 

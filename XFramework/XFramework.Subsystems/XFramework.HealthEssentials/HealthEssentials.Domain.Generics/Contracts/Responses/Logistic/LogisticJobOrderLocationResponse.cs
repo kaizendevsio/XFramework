@@ -1,5 +1,7 @@
 ﻿
 
+using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+
 namespace HealthEssentials.Domain.Generics.Contracts.Responses.Logistic;
 
 public class LogisticJobOrderLocationResponse
@@ -28,4 +30,9 @@ public class LogisticJobOrderLocationResponse
     public string? ClientName { get; set; }
 
     public LogisticJobOrderResponse? LogisticJobOrder { get; set; }
+    public AddressBarangayResponse? Barangay { get; set; }
+    public AddressCityResponse? City { get; set; }
+    public AddressRegionResponse? Region { get; set; }
+    public AddressProvinceResponse? Province { get; set; }
+    public AddressCountryResponse? Country { get; set; }
 }

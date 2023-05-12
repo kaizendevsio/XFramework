@@ -41,6 +41,12 @@ public partial class Unit
 
     public virtual ICollection<MedicineIntake> MedicineIntakes { get; } = new List<MedicineIntake>();
 
+    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicineDosageUnits { get; } = new List<PharmacyJobOrderMedicine>();
+
+    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicineDurationUnits { get; } = new List<PharmacyJobOrderMedicine>();
+
+    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicineIntakeUnits { get; } = new List<PharmacyJobOrderMedicine>();
+
     public virtual ICollection<PharmacyService> PharmacyServices { get; } = new List<PharmacyService>();
 
     public virtual ICollection<PharmacyStock> PharmacyStocks { get; } = new List<PharmacyStock>();

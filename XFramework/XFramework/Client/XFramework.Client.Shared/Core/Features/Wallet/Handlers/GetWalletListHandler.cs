@@ -44,11 +44,6 @@ public partial class WalletState
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(response, action, true);
 
-            await Mediator.Send(new SetState
-            {
-                WalletList = response.Response
-            });
-
             return Unit.Value;
         }
     }

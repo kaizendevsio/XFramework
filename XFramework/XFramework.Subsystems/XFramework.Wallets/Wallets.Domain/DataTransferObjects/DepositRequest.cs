@@ -51,6 +51,8 @@ public partial class DepositRequest
 
     public string Guid { get; set; } = null!;
 
+    public virtual Gateway? Gateway { get; set; }
+
     public virtual IdentityCredential? IdentityCredential { get; set; }
 
     public virtual CurrencyEntity? SourceCurrency { get; set; }
