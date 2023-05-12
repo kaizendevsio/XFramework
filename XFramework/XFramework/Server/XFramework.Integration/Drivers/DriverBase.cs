@@ -24,7 +24,6 @@ public class DriverBase
     public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request) where TRequest : new()
     {
         return await MessageBusDriver.SendAsync(request, TargetClient);
-
     }
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) where TRequest : new()
     {

@@ -23,7 +23,7 @@ namespace PaymentGateways.Core.PipelineBehaviors
             _dataLayer = dataLayer;
         }
 
-        public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
+        public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
         {
             try
             {
@@ -84,7 +84,7 @@ namespace PaymentGateways.Core.PipelineBehaviors
 
         private async Task PostHandler(TRequest request)
         {
-            if (_response.GetType() == typeof(CmdResponseBO<TRequest>))
+            if (_response.GetType() == typeof(CmdResponse<TRequest>))
             {
                 _response.GetType().GetProperty("Request")?.SetValue(_response, request, null);
             }

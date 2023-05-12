@@ -6,7 +6,7 @@ namespace XFramework.Domain.Generic.BusinessObjects
     {
         public HttpStatusCode HttpStatusCode { get; set; }
         public string Message { get; set; }
-        public T Request { get; set; }
+        public T Response { get; set; }
         public bool IsSuccess { get; set; }
     }
     

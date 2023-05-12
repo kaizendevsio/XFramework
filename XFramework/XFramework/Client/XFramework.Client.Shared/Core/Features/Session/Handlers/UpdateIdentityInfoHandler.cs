@@ -1,5 +1,4 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests.Update;
-using Mapster;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
 

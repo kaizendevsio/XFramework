@@ -26,7 +26,6 @@ public static class InstallerExtensions
 
         installers.ForEach(installer => installer.InstallServices<TApp>(services, configuration, mockedWebAssemblyHostEnvironment));
     }
-    
 }
 
 public class MockedWebAssemblyHostEnvironment : IWebAssemblyHostEnvironment

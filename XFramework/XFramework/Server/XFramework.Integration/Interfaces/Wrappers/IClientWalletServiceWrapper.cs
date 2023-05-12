@@ -1,4 +1,5 @@
-﻿using Wallets.Domain.Generic.Contracts.Requests.Create;
+﻿using PaymentGateways.Domain.Generic.Contracts.Responses;
+using Wallets.Domain.Generic.Contracts.Requests.Create;
 using Wallets.Domain.Generic.Contracts.Requests.Delete;
 using Wallets.Domain.Generic.Contracts.Requests.Get;
 using Wallets.Domain.Generic.Contracts.Requests.Update;
@@ -22,8 +23,8 @@ public interface IClientWalletServiceWrapper : IXFrameworkService
     public Task<QueryResponse<WalletResponse>> GetWallet(GetWalletRequest request);
     public Task<QueryResponse<List<WalletResponse>>> GetWalletList(GetWalletListRequest request);
         
-    public Task<QueryResponse<WalletDepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request);
-    public Task<QueryResponse<WalletDepositResponse>> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request);
+    public Task<QueryResponse<DepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request);
+    public Task<CmdResponse> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request);
 
     #endregion
 }

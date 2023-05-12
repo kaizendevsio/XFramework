@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Community\Community.Integration\Community.Integration.csproj" />
+    <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
     <ProjectReference Include="..\XFramework.Core\XFramework.Core.csproj" />
     <ProjectReference Include="..\XFramework.Domain\XFramework.Domain.csproj" />
     <ProjectReference Include="..\XFramework.Integration\XFramework.Integration.csproj" />

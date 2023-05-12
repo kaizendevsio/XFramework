@@ -42,7 +42,13 @@ public class BaseSignalRHandler
         //Console.WriteLine($"{GetType().Name} Initialized");
         connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse<TQuery>>(response, connection, mediator).ConfigureAwait(false));
         //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse<TQuery>>(connection, mediator));
-
+    }
+    
+    protected virtual void HandleRequestCmd<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse<TResponse>>
+    {
+        //Console.WriteLine($"{GetType().Name} Initialized");
+        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
+        //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse<TQuery>>(connection, mediator));
     }
 
     protected virtual void HandleVoidRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse>

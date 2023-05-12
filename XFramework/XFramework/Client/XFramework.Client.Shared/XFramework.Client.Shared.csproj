@@ -34,6 +34,7 @@
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Community\Community.Integration\Community.Integration.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
       <ProjectReference Include="..\..\Server\XFramework.Integration\XFramework.Integration.csproj" />
     </ItemGroup>
 </Project>
