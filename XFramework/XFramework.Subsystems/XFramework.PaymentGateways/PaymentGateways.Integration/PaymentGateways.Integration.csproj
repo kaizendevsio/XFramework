@@ -11,11 +11,5 @@
       <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj" />
     </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="Wallets.Domain.Generic">
-        <HintPath>..\..\XFramework.Wallets\Wallets.Domain.Generic\bin\Debug\net7.0\Wallets.Domain.Generic.dll</HintPath>
-      </Reference>
-    </ItemGroup>
-
+    
 </Project>
