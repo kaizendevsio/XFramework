@@ -39,6 +39,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.Integration", "XF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Integration", "XFramework\XFramework.Subsystems\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj", "{FB1B0EFB-BD2F-460D-86B0-8F8DC288806C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentGateways.Domain.Generic", "XFramework\XFramework.Subsystems\XFramework.PaymentGateways\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj", "{E82BFF25-541C-4CE7-BE38-94F4EC0FE86E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.Domain.Generic", "XFramework\XFramework.Subsystems\XFramework.Community\Community.Domain.Generic\Community.Domain.Generic.csproj", "{DEDAC7B9-0D2E-4230-986E-84A072D997B9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -101,6 +105,14 @@ Global
 		{FB1B0EFB-BD2F-460D-86B0-8F8DC288806C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FB1B0EFB-BD2F-460D-86B0-8F8DC288806C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FB1B0EFB-BD2F-460D-86B0-8F8DC288806C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E82BFF25-541C-4CE7-BE38-94F4EC0FE86E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E82BFF25-541C-4CE7-BE38-94F4EC0FE86E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E82BFF25-541C-4CE7-BE38-94F4EC0FE86E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E82BFF25-541C-4CE7-BE38-94F4EC0FE86E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DEDAC7B9-0D2E-4230-986E-84A072D997B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DEDAC7B9-0D2E-4230-986E-84A072D997B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DEDAC7B9-0D2E-4230-986E-84A072D997B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DEDAC7B9-0D2E-4230-986E-84A072D997B9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -123,5 +135,7 @@ Global
 		{C40842C6-528B-4180-95CE-ECF541C706D0} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 		{95BC8C34-3939-4AB6-8EED-EE537E0F5D68} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 		{FB1B0EFB-BD2F-460D-86B0-8F8DC288806C} = {8CD1151F-9943-421D-A6C8-1DF138009724}
+		{E82BFF25-541C-4CE7-BE38-94F4EC0FE86E} = {8CD1151F-9943-421D-A6C8-1DF138009724}
+		{DEDAC7B9-0D2E-4230-986E-84A072D997B9} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 	EndGlobalSection
 EndGlobal
