@@ -20,147 +20,146 @@ using StreamFlow.Stream.Services.Entity.Events;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
 
-namespace StreamFlow.Stream.Services.Handlers.Events
+namespace StreamFlow.Stream.Services.Handlers.Events;
+
+public class PushMessageHandler : CommandBaseHandler, IRequestHandler<PushMessageCmd, CmdResponse<PushMessageCmd>>
 {
-    public class PushMessageHandler : CommandBaseHandler, IRequestHandler<PushMessageCmd, CmdResponse<PushMessageCmd>>
+    public PushMessageHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
     {
-        public PushMessageHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
-        {
-            _streamFlowConfiguration = streamFlowConfiguration;
-            _hubContext = hubContext;
-            _cachingService = cachingService;
-        }
+        _streamFlowConfiguration = streamFlowConfiguration;
+        _hubContext = hubContext;
+        _cachingService = cachingService;
+    }
         
-        public async Task<CmdResponse<PushMessageCmd>> Handle(PushMessageCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<PushMessageCmd>> Handle(PushMessageCmd request, CancellationToken cancellationToken)
+    {
+        // Check if Client is Registered
+        var client = _cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == request.Context.ConnectionId);
+        if (client.Value == null)
         {
-            // Check if Client is Registered
-            var client = _cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == request.Context.ConnectionId);
-            if (client.Value == null)
+            Console.WriteLine($"Unknown or unauthorized client detected");
+            await _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
+            return new()
             {
-                Console.WriteLine($"Unknown or unauthorized client detected");
-                await _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
-                return new()
-                {
-                    HttpStatusCode = HttpStatusCode.Forbidden
-                };
-            }
-
-            request.RequestServer = new()
-            {
-                RequestId = client.Value.Guid,
-                Name = client.Value.Name
+                HttpStatusCode = HttpStatusCode.Forbidden
             };
+        }
 
-            var telemetry = new StreamFlowTelemetryBO
-            {
-                ClientGuid = client.Value.Guid,
-                RequestGuid = request.MessageQueue.RequestGuid,
-                ConsumerGuid = request.MessageQueue.ConsumerGuid,
-                ResponseStatusCode = request.MessageQueue.ResponseStatusCode
-            };
+        request.RequestServer = new()
+        {
+            RequestId = client.Value.Guid,
+            Name = client.Value.Name
+        };
 
-            var contract = new StreamFlowContract()
-            {
-                Data = request.MessageQueue.Data,
-                Message = request.MessageQueue.Message,
-                Telemetry = telemetry
-            };
+        var telemetry = new StreamFlowTelemetryBO
+        {
+            ClientGuid = client.Value.Guid,
+            RequestGuid = request.MessageQueue.RequestGuid,
+            ConsumerGuid = request.MessageQueue.ConsumerGuid,
+            ResponseStatusCode = request.MessageQueue.ResponseStatusCode
+        };
+
+        var contract = new StreamFlowContract()
+        {
+            Data = request.MessageQueue.Data,
+            Message = request.MessageQueue.Message,
+            Telemetry = telemetry
+        };
             
-            // Execute Sending Message
-            switch (request.MessageQueue.ExchangeType)
-            {
-                case MessageExchangeType.FanOut:
-                    await _hubContext.Clients.All.SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
-                    break;
-                case MessageExchangeType.Direct:
-                    StreamFlowClientBO currentClient;
+        // Execute Sending Message
+        switch (request.MessageQueue.ExchangeType)
+        {
+            case MessageExchangeType.FanOut:
+                await _hubContext.Clients.All.SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
+                break;
+            case MessageExchangeType.Direct:
+                StreamFlowClientBO currentClient;
 
-                    var availableClients = _cachingService.Clients.Where(x => x.Value.Guid == request.MessageQueue.Recipient).Select(i => i.Value).ToList();
-                    var count = availableClients.Count;
+                var availableClients = _cachingService.Clients.Where(x => x.Value.Guid == request.MessageQueue.Recipient).Select(i => i.Value).ToList();
+                var count = availableClients.Count;
                     
-                    if (count > 1)
+                if (count > 1)
+                {
+                    var cachedClient = _cachingService.LatestClients.Select(i => i.Value).FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
+                    if (cachedClient is null)
                     {
-                        var cachedClient = _cachingService.LatestClients.Select(i => i.Value).FirstOrDefault(x => x.Guid == request.MessageQueue.Recipient);
-                        if (cachedClient is null)
-                        {
-                            var cc = availableClients[0];
-                            currentClient = cc;
+                        var cc = availableClients[0];
+                        currentClient = cc;
                             
-                            ReTryAddLatestClients:
-                            if (!_cachingService.LatestClients.TryAdd(_cachingService.LatestClients.Count, currentClient))
-                            {
-                                goto ReTryAddLatestClients;
-                            }
-                        }
-                        else
+                        ReTryAddLatestClients:
+                        if (!_cachingService.LatestClients.TryAdd(_cachingService.LatestClients.Count, currentClient))
                         {
-                            var cachedClientIndex = availableClients.IndexOf(cachedClient);
-                            currentClient = (cachedClientIndex + 1) >= count 
-                                ? availableClients[0]
-                                : availableClients[cachedClientIndex + 1];
-                            
-                            ReTryRemoveLatestClients:
-                            var tmpIndex = _cachingService.LatestClients.FirstOrDefault(i => i.Value.Guid == cachedClient.Guid);
-                            if (!_cachingService.LatestClients.TryRemove(tmpIndex.Key, out _))
-                            {
-                                goto ReTryRemoveLatestClients;
-                            }
-                                
-                            ReTryAddLatestClients:
-                            if (!_cachingService.LatestClients.TryAdd(0, currentClient))
-                            {
-                                goto ReTryAddLatestClients;
-                            }
+                            goto ReTryAddLatestClients;
                         }
                     }
                     else
                     {
-                        currentClient = availableClients.FirstOrDefault();
-                    }
-
-                    if (currentClient != null)
-                    {
-                        Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {currentClient.Name} ({request.MessageQueue.ResponseStatusCode})");
-                        await _hubContext.Clients.Client(currentClient.StreamId).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken);
-                        break;
-                    }
-
-                    if (_cachingService.AbsoluteClients.All(x => x.Value.Guid != request.MessageQueue.Recipient))
-                    {
-                        Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
-                        return new()
+                        var cachedClientIndex = availableClients.IndexOf(cachedClient);
+                        currentClient = (cachedClientIndex + 1) >= count 
+                            ? availableClients[0]
+                            : availableClients[cachedClientIndex + 1];
+                            
+                        ReTryRemoveLatestClients:
+                        var tmpIndex = _cachingService.LatestClients.FirstOrDefault(i => i.Value.Guid == cachedClient.Guid);
+                        if (!_cachingService.LatestClients.TryRemove(tmpIndex.Key, out _))
                         {
-                            HttpStatusCode = HttpStatusCode.NotFound
-                        };
+                            goto ReTryRemoveLatestClients;
+                        }
+                                
+                        ReTryAddLatestClients:
+                        if (!_cachingService.LatestClients.TryAdd(0, currentClient))
+                        {
+                            goto ReTryAddLatestClients;
+                        }
                     }
+                }
+                else
+                {
+                    currentClient = availableClients.FirstOrDefault();
+                }
 
-                    if (!_streamFlowConfiguration.QueueMessages)
-                    {
-                        Console.WriteLine($"[Message Queue Disabled]; Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
-                        break;
-                    }
+                if (currentClient != null)
+                {
+                    Console.WriteLine($"Action: {request.MessageQueue.ExchangeType} | Request ID: {telemetry.RequestGuid} | {request.RequestServer.Name} -> {currentClient.Name} ({request.MessageQueue.ResponseStatusCode})");
+                    await _hubContext.Clients.Client(currentClient.StreamId).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken);
+                    break;
+                }
 
-                    if (_cachingService.QueuedMessages.Where(i => i.Value.Recipient == request.MessageQueue.Recipient).Count() > _streamFlowConfiguration.QueueDepth)
+                if (_cachingService.AbsoluteClients.All(x => x.Value.Guid != request.MessageQueue.Recipient))
+                {
+                    Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
+                    return new()
                     {
-                        Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} cannot be queued: Queue depth has been exhausted");
-                        break;
-                    }
+                        HttpStatusCode = HttpStatusCode.NotFound
+                    };
+                }
+
+                if (!_streamFlowConfiguration.QueueMessages)
+                {
+                    Console.WriteLine($"[Message Queue Disabled]; Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
+                    break;
+                }
+
+                if (_cachingService.QueuedMessages.Where(i => i.Value.Recipient == request.MessageQueue.Recipient).Count() > _streamFlowConfiguration.QueueDepth)
+                {
+                    Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} cannot be queued: Queue depth has been exhausted");
+                    break;
+                }
                     
-                    _cachingService.QueuedMessages.TryAdd(Guid.NewGuid(), request.MessageQueue);
-                    Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been queued; Recipient unavailable");
+                _cachingService.QueuedMessages.TryAdd(Guid.NewGuid(), request.MessageQueue);
+                Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been queued; Recipient unavailable");
                    
-                    break;
-                case MessageExchangeType.Topic:
-                    await _hubContext.Clients.Group(request.MessageQueue.Topic).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-
-            return new()
-            {
-                HttpStatusCode = HttpStatusCode.Accepted
-            };
+                break;
+            case MessageExchangeType.Topic:
+                await _hubContext.Clients.Group(request.MessageQueue.Topic).SendAsync(request.MessageQueue.CommandName, contract, cancellationToken: cancellationToken);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
         }
+
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted
+        };
     }
 }

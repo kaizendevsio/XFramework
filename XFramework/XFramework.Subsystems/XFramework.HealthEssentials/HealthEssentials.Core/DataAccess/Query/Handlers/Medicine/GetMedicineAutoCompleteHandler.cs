@@ -31,7 +31,7 @@ public class GetMedicineAutoCompleteHandler : QueryBaseHandler, IRequestHandler<
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No patient consultation found",
-                IsSuccess = true
+                
             };
         }
         
@@ -39,7 +39,7 @@ public class GetMedicineAutoCompleteHandler : QueryBaseHandler, IRequestHandler<
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Pharmacy found",
-            IsSuccess = true,
+            
             Response = medicines.Adapt<List<MedicineResponse>>()
         };        
     }

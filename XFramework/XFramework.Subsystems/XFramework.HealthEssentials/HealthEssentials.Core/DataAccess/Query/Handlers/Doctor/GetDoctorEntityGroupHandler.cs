@@ -22,7 +22,7 @@ public class GetDoctorEntityGroupHandler : QueryBaseHandler, IRequestHandler<Get
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No group found",
-                IsSuccess = true
+                
             };
         }
 

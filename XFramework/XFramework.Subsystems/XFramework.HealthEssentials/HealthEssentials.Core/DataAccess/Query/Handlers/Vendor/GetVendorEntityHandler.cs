@@ -23,7 +23,7 @@ public class GetVendorEntityHandler : QueryBaseHandler, IRequestHandler<GetVendo
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "Vendor Entity not found",
-                IsSuccess = true
+                
             };
         }
 

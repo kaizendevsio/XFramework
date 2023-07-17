@@ -2,11 +2,10 @@
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 
-namespace StreamFlow.Stream.Hubs
+namespace StreamFlow.Stream.Hubs;
+
+public class HubBase : Hub
 {
-    public class HubBase : Hub
-    {
-        public IMediator _mediator;
-        public ICachingService _cachingService;
-    }
+    public IMediator _mediator;
+    public ICachingService _cachingService;
 }

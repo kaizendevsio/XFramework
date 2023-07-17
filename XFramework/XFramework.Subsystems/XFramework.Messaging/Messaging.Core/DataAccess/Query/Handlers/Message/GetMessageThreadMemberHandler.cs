@@ -25,7 +25,7 @@ public class GetMessageThreadMemberHandler : QueryBaseHandler, IRequestHandler<G
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

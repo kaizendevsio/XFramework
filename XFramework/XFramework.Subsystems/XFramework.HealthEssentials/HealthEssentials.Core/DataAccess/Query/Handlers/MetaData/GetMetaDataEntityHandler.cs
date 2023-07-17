@@ -24,7 +24,7 @@ public class GetMetaDataEntityHandler : QueryBaseHandler, IRequestHandler<GetMet
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

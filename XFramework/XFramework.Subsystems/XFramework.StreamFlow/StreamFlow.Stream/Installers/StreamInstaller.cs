@@ -10,24 +10,23 @@ using StreamFlow.Stream.Hubs.V1;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
 
-namespace StreamFlow.Stream.Installers
+namespace StreamFlow.Stream.Installers;
+
+public class StreamInstaller : IInstaller
 {
-    public class StreamInstaller : IInstaller
+    public void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        public void InstallServices(IServiceCollection services, IConfiguration configuration)
+        services.AddSignalR(o => o.MaximumReceiveMessageSize = long.MaxValue)
+            .AddMessagePackProtocol(o => o.SerializerOptions.WithCompression(MessagePackCompression.Lz4BlockArray));
+            
+        services.AddResponseCompression(opts =>
         {
-            services.AddSignalR(o => o.MaximumReceiveMessageSize = long.MaxValue)
-                .AddMessagePackProtocol(o => o.SerializerOptions.WithCompression(MessagePackCompression.Lz4BlockArray));
+            opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+                new[] { "application/octet-stream" });
+        });
             
-            services.AddResponseCompression(opts =>
-            {
-                opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
-                    new[] { "application/octet-stream" });
-            });
-            
-            var streamFlowConfiguration = new StreamFlowConfiguration();
-            configuration.Bind(nameof(streamFlowConfiguration), streamFlowConfiguration);
-            services.AddSingleton(streamFlowConfiguration);
-        }
+        var streamFlowConfiguration = new StreamFlowConfiguration();
+        configuration.Bind(nameof(streamFlowConfiguration), streamFlowConfiguration);
+        services.AddSingleton(streamFlowConfiguration);
     }
 }

@@ -26,7 +26,7 @@ public class GetMessageListHandler : QueryBaseHandler, IRequestHandler<GetMessag
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No messages found",
-                IsSuccess = true
+                
             };
         }
 
@@ -34,7 +34,6 @@ public class GetMessageListHandler : QueryBaseHandler, IRequestHandler<GetMessag
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Messages found",
-            IsSuccess = true,
             Response = message.Adapt<List<MessageResponse>>()
         }; 
     }

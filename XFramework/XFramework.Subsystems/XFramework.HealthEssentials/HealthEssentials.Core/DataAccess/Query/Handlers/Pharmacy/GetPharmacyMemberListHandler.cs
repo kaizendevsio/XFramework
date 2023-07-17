@@ -27,7 +27,7 @@ public class GetPharmacyMemberListHandler : QueryBaseHandler, IRequestHandler<Ge
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Pharmacy Member Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetPharmacyMemberListHandler : QueryBaseHandler, IRequestHandler<Ge
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Pharmacy Member Found",
-            IsSuccess = true,
+            
             Response = pharmacyMember.Adapt<List<PharmacyMemberResponse>>()
         };
     }

@@ -45,7 +45,7 @@ public class CreatePharmacyServiceTagHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Pharmacy Service Tag with Guid {serviceTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

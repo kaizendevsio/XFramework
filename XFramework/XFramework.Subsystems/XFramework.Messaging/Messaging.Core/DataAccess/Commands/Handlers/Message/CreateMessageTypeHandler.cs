@@ -22,7 +22,6 @@ public class CreateMessageTypeHandler : CommandBaseHandler, IRequestHandler<Crea
         {
             Message = $"Message type with guid {type.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
     }
 }

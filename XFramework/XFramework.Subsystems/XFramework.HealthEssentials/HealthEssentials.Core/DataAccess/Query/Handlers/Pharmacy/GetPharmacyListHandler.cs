@@ -29,7 +29,7 @@ public class GetPharmacyListHandler : QueryBaseHandler, IRequestHandler<GetPharm
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Pharmacy Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -37,7 +37,7 @@ public class GetPharmacyListHandler : QueryBaseHandler, IRequestHandler<GetPharm
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Pharmacy Found",
-            IsSuccess = true,
+            
             Response = pharmacy.Adapt<List<PharmacyResponse>>()
         };
     }

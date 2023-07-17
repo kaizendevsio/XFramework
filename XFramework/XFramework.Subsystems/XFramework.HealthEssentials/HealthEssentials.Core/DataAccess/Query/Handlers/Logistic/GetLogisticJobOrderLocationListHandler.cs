@@ -26,7 +26,7 @@ public class GetLogisticJobOrderLocationListHandler : QueryBaseHandler, IRequest
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Logistic Job Order Location found",
-                IsSuccess = true
+                
             };
         }
         
@@ -34,7 +34,7 @@ public class GetLogisticJobOrderLocationListHandler : QueryBaseHandler, IRequest
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Logistic Job Order Location found",
-            IsSuccess = true,
+            
             Response = location.Adapt<List<LogisticJobOrderLocationResponse>>()
         };
     }

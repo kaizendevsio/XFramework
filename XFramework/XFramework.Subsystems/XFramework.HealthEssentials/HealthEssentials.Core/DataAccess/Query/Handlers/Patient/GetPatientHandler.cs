@@ -36,7 +36,7 @@ public class GetPatientHandler : QueryBaseHandler, IRequestHandler<GetPatientQue
             return new ()
             {
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false,
+                
                 Message = $"Patient with CredentialId {credential.Id} does not exist"
             };
         }
@@ -46,7 +46,7 @@ public class GetPatientHandler : QueryBaseHandler, IRequestHandler<GetPatientQue
         return new ()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
             Response = response
         };
     }

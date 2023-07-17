@@ -30,7 +30,7 @@ public partial class CommunityState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(DeleteGroupMemberRequest action, CancellationToken aCancellationToken)
+        public override async Task Handle(DeleteGroupMemberRequest action, CancellationToken aCancellationToken)
         {
             var result = await CommunityServiceWrapper.DeleteConnection(new()
             {
@@ -39,7 +39,7 @@ public partial class CommunityState
             
             await HandleFailure(result, action);
             await HandleSuccess(result, action);
-            return Unit.Value;
+            return;
         }
     }
 }

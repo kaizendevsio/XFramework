@@ -21,7 +21,7 @@ public class ConfirmMessageSentHandler : CommandBaseHandler, IRequestHandler<Con
             return new()
             {
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -42,7 +42,7 @@ public class ConfirmMessageSentHandler : CommandBaseHandler, IRequestHandler<Con
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

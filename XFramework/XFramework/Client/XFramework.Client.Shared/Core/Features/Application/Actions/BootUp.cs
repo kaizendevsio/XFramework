@@ -2,7 +2,7 @@
 
 public partial class ApplicationState
 {
-    public class BootUp : IAction
+    public class BootUp : BaseAction
     {
     }
 }

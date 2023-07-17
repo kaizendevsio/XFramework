@@ -43,7 +43,6 @@ public class CreateMessageThreadMemberRoleHandler : CommandBaseHandler, IRequest
         {
             Message = $"Message thread member role with guid {memberRole.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
 
     }

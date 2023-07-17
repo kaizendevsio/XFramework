@@ -45,7 +45,7 @@ public class CreatePharmacyJobOrderConsultationJobOrderHandler : CommandBaseHand
         {
             Message = $"Pharmacy Job Order Consultation Job Order with Guid {jobOrder.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
         
     }

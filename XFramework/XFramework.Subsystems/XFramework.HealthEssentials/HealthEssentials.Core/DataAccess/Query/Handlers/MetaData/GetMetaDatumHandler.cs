@@ -25,7 +25,7 @@ public class GetMetaDatumHandler : QueryBaseHandler, IRequestHandler<GetMetaDatu
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

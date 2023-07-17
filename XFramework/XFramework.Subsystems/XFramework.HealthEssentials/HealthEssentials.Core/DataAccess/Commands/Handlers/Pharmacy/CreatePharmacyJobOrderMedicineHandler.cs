@@ -89,7 +89,7 @@ public class CreatePharmacyJobOrderMedicineHandler : CommandBaseHandler, IReques
         {
             Message = $"Pharmacy Job Order Medicine with Guid {jobOrderMedicine.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

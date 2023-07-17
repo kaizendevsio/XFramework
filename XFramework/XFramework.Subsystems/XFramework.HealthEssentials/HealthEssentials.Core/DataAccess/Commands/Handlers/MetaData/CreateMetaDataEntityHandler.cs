@@ -34,7 +34,7 @@ public class CreateMetaDataEntityHandler : CommandBaseHandler, IRequestHandler<C
         {
             Message = $"Entity {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
 
     }

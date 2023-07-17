@@ -42,7 +42,7 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
         {
             Message = $"Laboratory entity with Guid {laboratory.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

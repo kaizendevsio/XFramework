@@ -32,7 +32,7 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = $"Pharmacy not found",
-                IsSuccess = true
+                
             };
         }
         
@@ -45,7 +45,7 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Pharmacy found",
-            IsSuccess = true,
+            
             Response = response
         };        
     }

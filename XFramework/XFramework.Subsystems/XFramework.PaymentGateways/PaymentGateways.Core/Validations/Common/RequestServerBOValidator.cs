@@ -1,14 +1,13 @@
 ﻿using FluentValidation;
 
-namespace PaymentGateways.Core.Validations.Common
+namespace PaymentGateways.Core.Validations.Common;
+
+public class RequestServerBoValidator : AbstractValidator<RequestServerBO>
 {
-    public class RequestServerBoValidator : AbstractValidator<RequestServerBO>
+    public RequestServerBoValidator()
     {
-        public RequestServerBoValidator()
-        {
-            RuleFor(x => x.ApplicationId)
-                .NotEmpty()
-                .WithMessage("Application Id is Required");
-        }
+        RuleFor(x => x.ApplicationId)
+            .NotEmpty()
+            .WithMessage("Application Id is Required");
     }
 }

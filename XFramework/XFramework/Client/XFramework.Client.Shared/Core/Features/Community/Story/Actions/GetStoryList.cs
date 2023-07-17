@@ -2,7 +2,7 @@
 
 public partial class StoryState
 {
-    public class GetStoryList : IAction
+    public class GetStoryList : BaseAction
     {
     }
 }

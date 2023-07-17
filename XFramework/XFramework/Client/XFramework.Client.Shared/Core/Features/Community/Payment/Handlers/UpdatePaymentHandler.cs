@@ -24,7 +24,7 @@ public partial class PaymentState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(UpdatePayment action, CancellationToken aCancellationToken)
+        public override async Task Handle(UpdatePayment action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

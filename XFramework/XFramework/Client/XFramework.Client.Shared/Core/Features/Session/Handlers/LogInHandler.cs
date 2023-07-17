@@ -48,7 +48,7 @@ public partial class SessionState
             if(await HandleFailure(response, action, false ,$"{response.Message}")) return new()
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
-                IsSuccess = false
+                
             };
             
             var checkVerification = new QueryResponse<IdentityVerificationSummaryResponse>();
@@ -65,7 +65,7 @@ public partial class SessionState
                     /*if(await HandleFailure(checkVerification, action, true ,"There was an error while trying to sign you in: Account verification failure. Please try again")) return new()
                     {
                         HttpStatusCode = HttpStatusCode.BadRequest,
-                        IsSuccess = false
+                        
                     };*/
                 }
 
@@ -160,7 +160,7 @@ public partial class SessionState
             return new()
             {
                 HttpStatusCode = VerificationRequired ? HttpStatusCode.PreconditionRequired : HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
     }

@@ -4,20 +4,19 @@ using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Contracts.Responses;
 using XFramework.Domain.Generic.BusinessObjects;
 
-namespace StreamFlow.Stream.Services.Entity.Events
-{
-    public class InvokeMethodQuery : CommandBaseEntity, IRequest<QueryResponse<StreamFlowInvokeResponse>>
-    {
-        public InvokeMethodQuery()
-        {
-            
-        }
+namespace StreamFlow.Stream.Services.Entity.Events;
 
-        public InvokeMethodQuery(StreamFlowMessageBO messageQueue)
-        {
-            MessageQueue = messageQueue;
-        }
-        
-        public StreamFlowMessageBO MessageQueue { get; set; }
+public class InvokeMethodQuery : CommandBaseEntity, IRequest<QueryResponse<StreamFlowInvokeResponse>>
+{
+    public InvokeMethodQuery()
+    {
+            
     }
+
+    public InvokeMethodQuery(StreamFlowMessageBO messageQueue)
+    {
+        MessageQueue = messageQueue;
+    }
+        
+    public StreamFlowMessageBO MessageQueue { get; set; }
 }

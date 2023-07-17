@@ -37,7 +37,7 @@ public class VerifyPharmacyMemberHandler : QueryBaseHandler, IRequestHandler<Ver
                     IsActivated = false
                 },
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
         
@@ -50,7 +50,7 @@ public class VerifyPharmacyMemberHandler : QueryBaseHandler, IRequestHandler<Ver
                 Guid = Guid.Parse(identity.Guid)
             },
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

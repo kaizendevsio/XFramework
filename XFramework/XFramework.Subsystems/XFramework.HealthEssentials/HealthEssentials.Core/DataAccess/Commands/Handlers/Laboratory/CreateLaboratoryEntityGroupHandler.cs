@@ -23,7 +23,7 @@ public class CreateLaboratoryEntityGroupHandler : CommandBaseHandler, IRequestHa
         {
             Message = $"Laboratory Entity Group with Guid {group.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

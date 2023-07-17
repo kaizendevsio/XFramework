@@ -28,7 +28,7 @@ public class GetVendorListHandler : QueryBaseHandler, IRequestHandler<GetVendorL
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
         
@@ -36,7 +36,7 @@ public class GetVendorListHandler : QueryBaseHandler, IRequestHandler<GetVendorL
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Records found",
-            IsSuccess = true,
+            
             Response = vendor.Adapt<List<VendorResponse>>()
         };
     }

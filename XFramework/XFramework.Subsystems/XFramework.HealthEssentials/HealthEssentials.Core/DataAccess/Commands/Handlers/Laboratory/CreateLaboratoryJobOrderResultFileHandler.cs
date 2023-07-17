@@ -46,7 +46,7 @@ public class CreateLaboratoryJobOrderResultFileHandler : CommandBaseHandler, IRe
         {
             Message = $"Laboratory Job Order Result File with Guid {resultFile.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
         
     }

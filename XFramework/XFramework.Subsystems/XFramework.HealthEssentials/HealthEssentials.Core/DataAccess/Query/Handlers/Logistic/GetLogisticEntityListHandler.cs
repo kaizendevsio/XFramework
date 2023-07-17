@@ -25,7 +25,7 @@ public class GetLogisticEntityListHandler : QueryBaseHandler, IRequestHandler<Ge
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Logistic Entities found",
-                IsSuccess = true
+                
             };
         }
         
@@ -33,7 +33,7 @@ public class GetLogisticEntityListHandler : QueryBaseHandler, IRequestHandler<Ge
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Logistic Entities found",
-            IsSuccess = true,
+            
             Response = entity.Adapt<List<LogisticEntityResponse>>()
         };
     }

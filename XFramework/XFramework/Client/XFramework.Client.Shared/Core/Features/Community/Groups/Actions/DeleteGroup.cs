@@ -2,7 +2,7 @@
 
 public partial class CommunityState
 {
-    public class DeleteGroup : IAction
+    public class DeleteGroup : BaseAction
     {
         public Guid? Guid { get; set; }
     }

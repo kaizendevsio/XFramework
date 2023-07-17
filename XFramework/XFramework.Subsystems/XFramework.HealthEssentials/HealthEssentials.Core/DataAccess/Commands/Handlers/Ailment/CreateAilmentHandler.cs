@@ -33,7 +33,7 @@ public class CreateAilmentHandler : CommandBaseHandler, IRequestHandler<CreateAi
         {
             Message = $"Ailment with Guid {ailment.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

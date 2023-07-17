@@ -45,7 +45,7 @@ public class CreateHospitalTagHandler : CommandBaseHandler, IRequestHandler<Crea
         {
             Message = $"Hospital Tag with Guid {hospitalTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

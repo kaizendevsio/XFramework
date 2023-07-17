@@ -31,7 +31,7 @@ public class DeleteConsultationEntityHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Consultation entity with Guid {request.Guid} has been deleted",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

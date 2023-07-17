@@ -28,7 +28,7 @@ public class GetScheduleListHandler : QueryBaseHandler, IRequestHandler<GetSched
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No schedule found",
-                IsSuccess = true
+                
             };
         }
 
@@ -36,7 +36,7 @@ public class GetScheduleListHandler : QueryBaseHandler, IRequestHandler<GetSched
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Schedule found",
-            IsSuccess = true,
+            
             Response = schedule.Adapt<List<ScheduleResponse>>()
         };
     }

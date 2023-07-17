@@ -23,7 +23,7 @@ public class CreateMetaDataEntityGroupHandler : CommandBaseHandler, IRequestHand
         {
             Message = $"Meta Data Entity Group with Guid {group.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
         
     }

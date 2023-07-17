@@ -45,7 +45,7 @@ public class CreateDoctorTagHandler : CommandBaseHandler, IRequestHandler<Create
         {
             Message = $"Doctor Tag with Guid {doctorTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

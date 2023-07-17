@@ -34,7 +34,7 @@ public class CreatePharmacyServiceEntityHandler : CommandBaseHandler, IRequestHa
         {
             Message = $"Pharmacy Service Entity with Guid {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

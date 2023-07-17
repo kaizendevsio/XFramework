@@ -18,7 +18,7 @@ public class UpdateReactionHandler : CommandBaseHandler, IRequestHandler<DeleteR
             {
                 Message = $"Content reaction with guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -30,7 +30,7 @@ public class UpdateReactionHandler : CommandBaseHandler, IRequestHandler<DeleteR
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

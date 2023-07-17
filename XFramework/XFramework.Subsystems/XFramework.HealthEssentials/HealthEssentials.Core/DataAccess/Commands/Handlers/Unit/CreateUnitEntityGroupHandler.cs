@@ -23,7 +23,7 @@ public class CreateUnitEntityGroupHandler : CommandBaseHandler, IRequestHandler<
         {
             Message = $"Unit Entity Group with Guid {group.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         }; 
     }
 }

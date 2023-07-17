@@ -97,7 +97,7 @@ public class ConcludeLiveConsultationHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Consultation Job Order with Guid {request.Guid} concluded successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

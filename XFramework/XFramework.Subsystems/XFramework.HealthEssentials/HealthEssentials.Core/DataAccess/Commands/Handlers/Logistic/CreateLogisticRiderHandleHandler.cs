@@ -46,7 +46,7 @@ public class CreateLogisticRiderHandleHandler : CommandBaseHandler, IRequestHand
         {
             Message = $"Logistic rider handle with Guid {handle.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

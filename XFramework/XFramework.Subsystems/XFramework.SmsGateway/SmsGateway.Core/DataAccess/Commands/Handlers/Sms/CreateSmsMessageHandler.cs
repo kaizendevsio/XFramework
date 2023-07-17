@@ -28,7 +28,7 @@ public class CreateSmsMessageHandler : CommandBaseHandler, IRequestHandler<Creat
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

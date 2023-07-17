@@ -37,7 +37,7 @@ public class VerifyLogisticHandler : QueryBaseHandler, IRequestHandler<VerifyLog
                     IsActivated = false
                 },
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
         
@@ -50,7 +50,7 @@ public class VerifyLogisticHandler : QueryBaseHandler, IRequestHandler<VerifyLog
                 Guid = Guid.Parse(identity.Guid)
             },
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

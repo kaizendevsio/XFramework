@@ -26,7 +26,7 @@ public partial class ApplicationState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(BootUp action, CancellationToken aCancellationToken)
+        public override async Task Handle(BootUp action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

@@ -2,7 +2,7 @@
 
 public partial class EventState
 {
-    public class UpdateEvent : IAction
+    public class UpdateEvent : BaseAction
     {
     }
 }

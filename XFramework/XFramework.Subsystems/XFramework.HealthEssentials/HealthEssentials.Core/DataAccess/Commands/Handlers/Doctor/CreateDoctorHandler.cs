@@ -54,7 +54,7 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
         {
             Message = $"Doctor with Guid {doctor.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            Response = doctor.Adapt<CreateDoctorCmd>()
         };
     }
 }

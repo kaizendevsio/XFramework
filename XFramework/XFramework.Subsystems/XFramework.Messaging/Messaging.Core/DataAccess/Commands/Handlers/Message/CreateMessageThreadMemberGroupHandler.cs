@@ -32,7 +32,6 @@ public class CreateMessageThreadMemberGroupHandler : CommandBaseHandler, IReques
         {
             Message = $"Message thread member group with guid {member.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
 
     }

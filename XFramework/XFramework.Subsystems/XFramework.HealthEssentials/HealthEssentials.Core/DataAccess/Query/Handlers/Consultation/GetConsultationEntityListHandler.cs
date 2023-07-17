@@ -27,7 +27,7 @@ public class GetConsultationEntityListHandler : QueryBaseHandler, IRequestHandle
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Consultation Entity Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetConsultationEntityListHandler : QueryBaseHandler, IRequestHandle
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Consultation Entity Found",
-            IsSuccess = true,
+            
             Response = consultationEntity.Adapt<List<ConsultationEntityResponse>>()
         };
     }

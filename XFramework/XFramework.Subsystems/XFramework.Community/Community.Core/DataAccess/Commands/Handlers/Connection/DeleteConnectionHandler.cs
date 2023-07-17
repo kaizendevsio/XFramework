@@ -19,7 +19,7 @@ public class DeleteConnectionHandler : CommandBaseHandler, IRequestHandler<Delet
             {
                 Message = $"Community connection with guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -31,7 +31,7 @@ public class DeleteConnectionHandler : CommandBaseHandler, IRequestHandler<Delet
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

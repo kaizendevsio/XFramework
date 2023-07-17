@@ -44,7 +44,7 @@ public class CreatePatientHandler : CommandBaseHandler, IRequestHandler<CreatePa
         {
             Message = $"Patient with Guid {patient.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

@@ -28,7 +28,7 @@ public class GetUnitListHandler : QueryBaseHandler, IRequestHandler<GetUnitListQ
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No unit found",
-                IsSuccess = true
+                
             };
         }
 
@@ -36,7 +36,7 @@ public class GetUnitListHandler : QueryBaseHandler, IRequestHandler<GetUnitListQ
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Unit found",
-            IsSuccess = true,
+            
             Response = unit.Adapt<List<UnitResponse>>()
         }; 
     }

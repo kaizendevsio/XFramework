@@ -1,9 +1,8 @@
-﻿namespace XFramework.Domain.Generic.Enums
+﻿namespace XFramework.Domain.Generic.Enums;
+
+public enum Gender
 {
-    public enum Gender
-    {
-        NotSpecified = 0,
-        Male = 1,
-        Female = 2
-    }
+    NotSpecified = 0,
+    Male = 1,
+    Female = 2
 }

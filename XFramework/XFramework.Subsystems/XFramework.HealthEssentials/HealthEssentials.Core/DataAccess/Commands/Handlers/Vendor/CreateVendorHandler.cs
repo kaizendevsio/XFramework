@@ -31,7 +31,7 @@ public class CreateVendorHandler : CommandBaseHandler, IRequestHandler<CreateVen
         {
             Message = $"Vendor with Guid {vendor.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

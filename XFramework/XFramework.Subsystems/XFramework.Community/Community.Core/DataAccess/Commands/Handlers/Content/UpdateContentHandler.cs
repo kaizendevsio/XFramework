@@ -19,7 +19,7 @@ public class UpdateContentHandler : CommandBaseHandler, IRequestHandler<UpdateCo
             {
                 Message = $"Content with guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -34,7 +34,7 @@ public class UpdateContentHandler : CommandBaseHandler, IRequestHandler<UpdateCo
                 {
                     Message = $"Community identity with guid {request.SocialMediaIdentityGuid} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound,
-                    IsSuccess = false
+                    
                 };
             }
         }
@@ -51,7 +51,7 @@ public class UpdateContentHandler : CommandBaseHandler, IRequestHandler<UpdateCo
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

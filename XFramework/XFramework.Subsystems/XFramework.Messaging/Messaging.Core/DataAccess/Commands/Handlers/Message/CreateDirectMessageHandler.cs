@@ -25,7 +25,7 @@ public class CreateDirectMessageHandler : CommandBaseHandler ,IRequestHandler<Cr
             {
                 Message = $"Message type with guid {request.MessageType} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -97,7 +97,7 @@ public class CreateDirectMessageHandler : CommandBaseHandler ,IRequestHandler<Cr
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
 
     }

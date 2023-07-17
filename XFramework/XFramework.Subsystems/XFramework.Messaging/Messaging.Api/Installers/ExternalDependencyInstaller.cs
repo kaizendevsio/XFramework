@@ -10,7 +10,7 @@ public class ExternalDependencyInstaller : IInstaller
     public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
         // MediatR
-        services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+        services.AddMediatR(o => o.RegisterServicesFromAssemblyContaining<CommandBaseHandler>());
             
         // FluentValidation
         services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);

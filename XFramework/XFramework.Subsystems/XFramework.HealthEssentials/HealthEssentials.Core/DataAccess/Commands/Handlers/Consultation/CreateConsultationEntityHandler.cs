@@ -33,7 +33,7 @@ public class CreateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Consultation entity with Guid {consultationEntity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

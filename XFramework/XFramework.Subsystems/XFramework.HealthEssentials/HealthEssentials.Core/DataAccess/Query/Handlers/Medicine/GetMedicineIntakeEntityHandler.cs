@@ -22,7 +22,7 @@ public class GetMedicineIntakeEntityHandler : QueryBaseHandler, IRequestHandler<
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

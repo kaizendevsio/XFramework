@@ -47,7 +47,7 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Doctor Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -55,7 +55,7 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Doctor Found",
-            IsSuccess = true,
+            
             Response = mappedDoctors
         };
     }

@@ -24,7 +24,7 @@ public class GetVendorHandler : QueryBaseHandler, IRequestHandler<GetVendorQuery
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "Vendor not found",
-                IsSuccess = true
+                
             };
         }
 

@@ -29,7 +29,7 @@ public class GetDoctorHandler : QueryBaseHandler, IRequestHandler<GetDoctorQuery
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = $"No doctor found with the given guid {request.Guid}",
-                IsSuccess = true
+                
             };
         }
         
@@ -44,7 +44,7 @@ public class GetDoctorHandler : QueryBaseHandler, IRequestHandler<GetDoctorQuery
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory Found",
-            IsSuccess = true,
+            
             Response = response
         };        
     }

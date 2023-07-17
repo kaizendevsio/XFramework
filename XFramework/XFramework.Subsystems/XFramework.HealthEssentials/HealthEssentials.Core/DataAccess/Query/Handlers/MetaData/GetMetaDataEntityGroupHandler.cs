@@ -22,7 +22,7 @@ public class GetMetaDataEntityGroupHandler : QueryBaseHandler, IRequestHandler<G
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

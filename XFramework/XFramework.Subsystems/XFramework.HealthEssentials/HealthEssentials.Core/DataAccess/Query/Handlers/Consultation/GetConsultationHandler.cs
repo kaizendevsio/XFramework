@@ -23,7 +23,7 @@ public class GetConsultationHandler : QueryBaseHandler, IRequestHandler<GetConsu
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

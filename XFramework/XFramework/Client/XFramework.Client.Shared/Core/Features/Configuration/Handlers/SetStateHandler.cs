@@ -22,7 +22,7 @@ public partial class ConfigurationState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(SetState action, CancellationToken aCancellationToken)
+        public override async Task Handle(SetState action, CancellationToken aCancellationToken)
         {
             try
             {
@@ -32,7 +32,7 @@ public partial class ConfigurationState
             {
                 Console.WriteLine(e);
             }
-            return Unit.Value;
+            return;
         }
     }
 }

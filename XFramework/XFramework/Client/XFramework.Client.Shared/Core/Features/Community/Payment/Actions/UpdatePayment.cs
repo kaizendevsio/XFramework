@@ -2,7 +2,7 @@
 
 public partial class PaymentState
 {
-    public class UpdatePayment : IAction
+    public class UpdatePayment : BaseAction
     {
     }
 }

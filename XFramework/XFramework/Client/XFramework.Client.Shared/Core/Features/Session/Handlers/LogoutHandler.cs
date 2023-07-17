@@ -24,7 +24,7 @@ public partial class SessionState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(Logout action, CancellationToken aCancellationToken)
+        public override async Task Handle(Logout action, CancellationToken aCancellationToken)
         {
             if (action.ResetAllStates)
             {
@@ -64,7 +64,7 @@ public partial class SessionState
                 action.NavigateTo = "/";
             }
             NavigationManager.NavigateTo(action.NavigateTo);
-            return Unit.Value;
+            return;
         }
     }
 }

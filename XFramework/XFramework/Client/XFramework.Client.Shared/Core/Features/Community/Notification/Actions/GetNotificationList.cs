@@ -2,7 +2,7 @@
 
 public partial class NotificationState
 {
-    public class GetNotificationList : IAction
+    public class GetNotificationList : BaseAction
     {
     }
 }

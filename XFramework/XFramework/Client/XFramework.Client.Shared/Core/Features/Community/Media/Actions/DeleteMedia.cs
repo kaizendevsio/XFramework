@@ -2,7 +2,7 @@
 
 public partial class MediaState
 {
-    public class DeleteMedia : IAction
+    public class DeleteMedia : BaseAction
     {
     }
 }

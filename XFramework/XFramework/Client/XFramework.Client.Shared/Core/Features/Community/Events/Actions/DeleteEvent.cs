@@ -2,7 +2,7 @@
 
 public partial class EventState
 {
-    public class DeleteEvent : IAction
+    public class DeleteEvent : BaseAction
     {
     }
 }
