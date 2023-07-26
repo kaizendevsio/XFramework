@@ -89,7 +89,7 @@ public class CreateHospitalLocationHandler : CommandBaseHandler, IRequestHandler
         {
             Message = $"Hospital Location with Guid {hospitalLocation.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

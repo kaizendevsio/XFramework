@@ -1,6 +1,5 @@
-﻿namespace XFramework.Domain.Generic.Contracts.Responses
+﻿namespace XFramework.Domain.Generic.Contracts.Responses;
+
+public class ExistenceResponse
 {
-    public class ExistenceResponse
-    {
-    }
 }

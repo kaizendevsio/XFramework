@@ -45,7 +45,7 @@ public class CreateAilmentTagHandler : CommandBaseHandler, IRequestHandler<Creat
         {
             Message = $"Ailment Tag with Guid {ailmentTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
 
     }

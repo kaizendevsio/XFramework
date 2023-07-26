@@ -23,7 +23,7 @@ public class CreateTagEntityGroupHandler : CommandBaseHandler, IRequestHandler<C
         {
             Message = $"Tag Entity Group {group.Name} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

@@ -2,15 +2,14 @@
 using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
 
-namespace StreamFlow.Core.Validations.Common
+namespace StreamFlow.Core.Validations.Common;
+
+public class RequestServerBoValidator : AbstractValidator<RequestServerBO>
 {
-    public class RequestServerBoValidator : AbstractValidator<RequestServerBO>
+    public RequestServerBoValidator()
     {
-        public RequestServerBoValidator()
-        {
-            RuleFor(x => x.ApplicationId)
-                .NotEmpty()
-                .WithMessage("Application Id is Required");
-        }
+        RuleFor(x => x.ApplicationId)
+            .NotEmpty()
+            .WithMessage("Application Id is Required");
     }
 }

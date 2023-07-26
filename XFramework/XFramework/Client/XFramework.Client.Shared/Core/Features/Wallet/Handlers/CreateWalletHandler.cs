@@ -24,7 +24,7 @@ public partial class WalletState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(CreateWallet action, CancellationToken aCancellationToken)
+        public override async Task Handle(CreateWallet action, CancellationToken aCancellationToken)
         {
             // Inform UI About Busy State
             if (!action.Silent)
@@ -36,7 +36,7 @@ public partial class WalletState
             if (SessionState.State is not CurrentSessionState.Active && action.CredentialGuid is null)
             {
                 SweetAlertService.FireAsync("Error", "Could not create wallet, credentials not provided");
-                return Unit.Value;
+                return;
             }
             
             // Map view model to request object
@@ -49,7 +49,7 @@ public partial class WalletState
             if (!action.Silent)
             {
                 // Handle if the response is invalid or error
-                if (await HandleFailure(response, action, true, "There was an error while trying to create your wallet. Please check your internet connection and try again")) return Unit.Value;
+                if (await HandleFailure(response, action, true, "There was an error while trying to create your wallet. Please check your internet connection and try again")) return;
 
                 // If Success URL property is provided, navigate to the given URL
                 await HandleSuccess(response, action, true);
@@ -67,7 +67,7 @@ public partial class WalletState
                 ReportTask("Done", false);
             }
 
-            return Unit.Value;
+            return;
 
         }
     }

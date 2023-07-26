@@ -24,7 +24,7 @@ public partial class LocationState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(UpdateLocation action, CancellationToken aCancellationToken)
+        public override async Task Handle(UpdateLocation action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

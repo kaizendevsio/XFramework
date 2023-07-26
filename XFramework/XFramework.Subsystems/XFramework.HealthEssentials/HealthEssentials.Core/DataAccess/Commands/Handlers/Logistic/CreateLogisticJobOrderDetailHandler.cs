@@ -60,7 +60,7 @@ public class CreateLogisticJobOrderDetailHandler : CommandBaseHandler, IRequestH
         {
             Message = $"Logistic Job Order Detail with Guid {detail.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

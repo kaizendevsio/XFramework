@@ -9,4 +9,5 @@ public class CreateDoctorConsultationRequest : RequestBase
     public decimal? Price { get; set; }
     public decimal? MaxDiscount { get; set; }
     public int Quantity { get; set; }
+    public bool IsEnabled { get; set; }
 }

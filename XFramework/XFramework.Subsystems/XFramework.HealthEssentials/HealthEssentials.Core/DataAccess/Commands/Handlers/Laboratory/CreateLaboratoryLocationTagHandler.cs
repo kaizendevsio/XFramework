@@ -45,7 +45,7 @@ public class CreateLaboratoryLocationTagHandler : CommandBaseHandler, IRequestHa
         {
             Message = $"Laboratory Location Tag with Guid {locationTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

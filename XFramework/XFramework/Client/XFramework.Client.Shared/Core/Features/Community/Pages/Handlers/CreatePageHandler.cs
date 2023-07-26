@@ -24,7 +24,7 @@ public partial class PageState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(CreatePage action, CancellationToken aCancellationToken)
+        public override async Task Handle(CreatePage action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

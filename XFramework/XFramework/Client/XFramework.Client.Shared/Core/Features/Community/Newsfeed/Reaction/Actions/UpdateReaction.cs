@@ -2,7 +2,7 @@
 
 public partial class CommunityState
 {
-    public class UpdateReaction : IAction
+    public class UpdateReaction : BaseAction
     {
         public Guid? Guid { get; set; }
         public Guid? ContentGuid { get; set; }

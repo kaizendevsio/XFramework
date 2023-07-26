@@ -24,7 +24,7 @@ public class GetPharmacyJobOrderConsultationJobOrderHandler : QueryBaseHandler, 
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

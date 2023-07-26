@@ -38,7 +38,7 @@ public class VerifyLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<V
                     IsActivated = false
                 },
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
         
@@ -51,7 +51,7 @@ public class VerifyLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<V
                 Guid = Guid.Parse(identity.Guid)
             },
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

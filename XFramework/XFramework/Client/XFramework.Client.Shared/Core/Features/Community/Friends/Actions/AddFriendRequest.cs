@@ -2,7 +2,7 @@
 
 public partial class CommunityState
 {
-    public class AddFriendRequest : IAction
+    public class AddFriendRequest : BaseAction
     {
         public Guid? CommunityIdentityGuid { get; set; }
     }

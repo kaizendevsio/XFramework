@@ -22,7 +22,7 @@ public class GetConsultationEntityGroupHandler : QueryBaseHandler, IRequestHandl
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

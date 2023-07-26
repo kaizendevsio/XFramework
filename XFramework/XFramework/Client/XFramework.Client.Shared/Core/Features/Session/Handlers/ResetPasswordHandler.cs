@@ -49,7 +49,7 @@ public partial class SessionState
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.InternalServerError,
-                    IsSuccess = false
+                    
                 };
             };
             
@@ -60,7 +60,7 @@ public partial class SessionState
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
 

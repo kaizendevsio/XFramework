@@ -25,7 +25,7 @@ public class GetMedicineTagHandler : QueryBaseHandler, IRequestHandler<GetMedici
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

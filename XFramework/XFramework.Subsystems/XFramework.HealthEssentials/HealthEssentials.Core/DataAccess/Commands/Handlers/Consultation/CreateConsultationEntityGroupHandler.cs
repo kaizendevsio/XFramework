@@ -22,7 +22,7 @@ public class CreateConsultationEntityGroupHandler : CommandBaseHandler, IRequest
         {
             Message = $"Consultation entity group with Guid {group.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

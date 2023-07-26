@@ -24,7 +24,7 @@ public class CreateLogisticHandler : CommandBaseHandler, IRequestHandler<CreateL
         {
             Message = $"Logistic with Guid {logistic.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

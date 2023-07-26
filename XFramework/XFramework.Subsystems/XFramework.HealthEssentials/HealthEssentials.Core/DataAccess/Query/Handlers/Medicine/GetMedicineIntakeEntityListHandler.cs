@@ -26,7 +26,7 @@ public class GetMedicineIntakeEntityListHandler : QueryBaseHandler, IRequestHand
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
         
@@ -34,7 +34,7 @@ public class GetMedicineIntakeEntityListHandler : QueryBaseHandler, IRequestHand
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data found",
-            IsSuccess = true,
+            
             Response = intake.Adapt<List<MedicineIntakeEntityResponse>>()
         };
     }

@@ -42,7 +42,7 @@ public partial class SessionState
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Accepted,
-                    IsSuccess = true
+                    
                 };
             }
              
@@ -70,7 +70,7 @@ public partial class SessionState
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
     }

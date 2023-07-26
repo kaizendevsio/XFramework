@@ -2,7 +2,7 @@
 
 public partial class ContactState
 {
-    public class UpdateContact : IAction
+    public class UpdateContact : BaseAction
     {
     }
 }

@@ -67,7 +67,7 @@ public class CreateHospitalServiceHandler : CommandBaseHandler, IRequestHandler<
         {
             Message = $"Hospital Service {service.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
 
 

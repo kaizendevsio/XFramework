@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Member;
 
 public partial class MemberState
 {
-    public class SetState : IAction
+    public class SetState : BaseAction
     {
         public List<SubscriptionResponse>? UnregisteredSubscriber { get; set; }
         public List<CredentialResponse>? MemberList { get; set; }

@@ -27,7 +27,7 @@ public class GetHospitalConsultationListHandler : QueryBaseHandler, IRequestHand
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetHospitalConsultationListHandler : QueryBaseHandler, IRequestHand
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Records found",
-            IsSuccess = true,
+            
             Response = hospitalConsultation.Adapt<List<HospitalConsultationResponse>>()
         };
     }

@@ -24,7 +24,7 @@ public partial class ContactState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(DeleteContact action, CancellationToken aCancellationToken)
+        public override async Task Handle(DeleteContact action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

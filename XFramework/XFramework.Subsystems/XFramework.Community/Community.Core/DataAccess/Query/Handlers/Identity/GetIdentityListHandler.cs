@@ -22,7 +22,7 @@ public class GetIdentityListHandler : QueryBaseHandler, IRequestHandler<GetIdent
             {
                 Message = $"Community identity entity with guid {request.CommunityIdentityEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -38,7 +38,6 @@ public class GetIdentityListHandler : QueryBaseHandler, IRequestHandler<GetIdent
             return new()
             {
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = true,
                 Message = "No community identities found"
             };
         }
@@ -46,7 +45,6 @@ public class GetIdentityListHandler : QueryBaseHandler, IRequestHandler<GetIdent
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
             Response = communityIdentityList.Adapt<List<CommunityIdentityResponse>>()
         };
     }

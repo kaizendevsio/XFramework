@@ -33,7 +33,7 @@ public partial class SessionState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(NavigateToPath action, CancellationToken cancellationToken)
+        public override async Task Handle(NavigateToPath action, CancellationToken cancellationToken)
         {
             SessionState.NavigationHistoryList.Add(NavigationManager.Uri);
             NavigationManager.NavigateTo(action.NavigationPath);
@@ -43,7 +43,7 @@ public partial class SessionState
                 SessionState.NavigationHistoryList.Clear();
             }
             await Mediator.Send(new SetState() {NavigationHistoryList = SessionState.NavigationHistoryList});
-            return Unit.Value;
+            return;
         }
 
         

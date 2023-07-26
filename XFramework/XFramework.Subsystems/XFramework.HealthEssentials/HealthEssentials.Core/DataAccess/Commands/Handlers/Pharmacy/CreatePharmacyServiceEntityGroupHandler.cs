@@ -23,7 +23,7 @@ public class CreatePharmacyServiceEntityGroupHandler : CommandBaseHandler, IRequ
         {
             Message = $"Pharmacy Service Entity Group with Guid {group.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

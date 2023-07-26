@@ -22,7 +22,7 @@ public class GetTagEntityGroupHandler : QueryBaseHandler, IRequestHandler<GetTag
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No group found",
-                IsSuccess = true
+                
             };
         }
 

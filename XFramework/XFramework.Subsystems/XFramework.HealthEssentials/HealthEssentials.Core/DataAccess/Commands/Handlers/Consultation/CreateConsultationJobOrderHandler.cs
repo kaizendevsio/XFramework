@@ -45,7 +45,7 @@ public class CreateConsultationJobOrderHandler : CommandBaseHandler, IRequestHan
         {
             Message = $"Consultation job order with Guid {jobOrder.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

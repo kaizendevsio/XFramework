@@ -60,7 +60,7 @@ public class CreatePharmacyMemberHandler : CommandBaseHandler, IRequestHandler<C
         {
             Message = $"Pharmacy Member with Guid {pharmacyMember.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

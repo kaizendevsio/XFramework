@@ -26,7 +26,7 @@ public partial class ApplicationState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(RestoreStates action, CancellationToken aCancellationToken)
+        public override async Task Handle(RestoreStates action, CancellationToken aCancellationToken)
         {
             try
             { 
@@ -51,7 +51,7 @@ public partial class ApplicationState
                 throw;
             }
             
-            return Unit.Value;
+            return;
         }
     }
 }

@@ -17,7 +17,7 @@ public class CreateConnectionHandler : CommandBaseHandler, IRequestHandler<Creat
             {
                 Message = $"Community identity with guid {request.SourceCommunityIdentityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -32,7 +32,7 @@ public class CreateConnectionHandler : CommandBaseHandler, IRequestHandler<Creat
             {
                 Message = $"Community identity with guid {request.TargetCommunityIdentityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -47,7 +47,7 @@ public class CreateConnectionHandler : CommandBaseHandler, IRequestHandler<Creat
             {
                 Message = $"Connection entity with guid {request.CommunityConnectionEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -64,7 +64,7 @@ public class CreateConnectionHandler : CommandBaseHandler, IRequestHandler<Creat
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

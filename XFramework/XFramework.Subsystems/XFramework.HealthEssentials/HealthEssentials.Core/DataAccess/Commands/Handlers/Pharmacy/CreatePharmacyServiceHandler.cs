@@ -67,7 +67,7 @@ public class CreatePharmacyServiceHandler : CommandBaseHandler, IRequestHandler<
         {
             Message = $"Pharmacy Service with Guid {service.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

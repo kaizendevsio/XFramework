@@ -24,7 +24,7 @@ public class GetLaboratoryTagListHandler : QueryBaseHandler, IRequestHandler<Get
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
 

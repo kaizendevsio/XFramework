@@ -34,7 +34,7 @@ public class CreateUnitEntityHandler : CommandBaseHandler, IRequestHandler<Creat
         {
             Message = $"Unit entity with guid {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         }; 
     }
 }

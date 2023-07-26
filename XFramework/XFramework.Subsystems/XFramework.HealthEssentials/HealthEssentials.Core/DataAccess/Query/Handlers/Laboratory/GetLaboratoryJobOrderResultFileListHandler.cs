@@ -27,7 +27,7 @@ public class GetLaboratoryJobOrderResultFileListHandler : QueryBaseHandler, IReq
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
 

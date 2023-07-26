@@ -24,7 +24,7 @@ public class GetLaboratoryMemberListHandler : QueryBaseHandler, IRequestHandler<
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Laboratory Member Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -32,7 +32,7 @@ public class GetLaboratoryMemberListHandler : QueryBaseHandler, IRequestHandler<
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory Member Found",
-            IsSuccess = true,
+            
             Response = laboratoryMember.Adapt<List<LaboratoryMemberResponse>>()
         };
     }

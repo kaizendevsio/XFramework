@@ -19,12 +19,12 @@ public partial class LayoutState
             Store = store;
         }
             
-        public override async Task<Unit> Handle(UpdateSidebarItems a, CancellationToken aCancellationToken)
+        public override async Task Handle(UpdateSidebarItems a, CancellationToken aCancellationToken)
         {
             /*var newSidebarItems = SessionState.TenantAccountPersonaRole.Value.Select(item => new SidebarItemInfo() { Text = item.PersonaBubbleModule.BubbleModule.Name }).ToList();
             await Mediator.Send(new SetState() { SidebarInfo = new SidebarInfo() { Items = newSidebarItems } });*/
 
-            return Unit.Value;
+            return;
         }
 
         

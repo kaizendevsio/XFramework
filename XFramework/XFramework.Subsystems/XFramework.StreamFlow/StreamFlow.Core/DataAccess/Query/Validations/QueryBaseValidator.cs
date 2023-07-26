@@ -1,15 +1,14 @@
 ﻿using FluentValidation;
 using StreamFlow.Core.Validations.Common;
 
-namespace StreamFlow.Core.DataAccess.Query.Validations
-{
-    public class QueryBaseValidator<T> : AbstractValidator<T>
-    {
-        public RequestServerBoValidator RequestServerValidator { get; set; }
+namespace StreamFlow.Core.DataAccess.Query.Validations;
 
-        public QueryBaseValidator()
-        {
-            RequestServerValidator = new RequestServerBoValidator();
-        }
+public class QueryBaseValidator<T> : AbstractValidator<T>
+{
+    public RequestServerBoValidator RequestServerValidator { get; set; }
+
+    public QueryBaseValidator()
+    {
+        RequestServerValidator = new RequestServerBoValidator();
     }
 }

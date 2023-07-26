@@ -24,7 +24,7 @@ public class GetTagEntityHandler : QueryBaseHandler, IRequestHandler<GetTagEntit
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No entity found",
-                IsSuccess = true
+                
             };
         }
 

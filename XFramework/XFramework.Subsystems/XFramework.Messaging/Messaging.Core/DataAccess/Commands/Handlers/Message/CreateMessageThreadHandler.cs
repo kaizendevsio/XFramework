@@ -32,7 +32,6 @@ public class CreateMessageThreadHandler : CommandBaseHandler, IRequestHandler<Cr
         {
             Message = $"Message thread with guid {thread.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
     }
 }

@@ -25,7 +25,7 @@ public class GetScheduleHandler : QueryBaseHandler, IRequestHandler<GetScheduleQ
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No schedule found",
-                IsSuccess = true
+                
             };
         }
 

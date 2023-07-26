@@ -43,7 +43,7 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
         {
             Message = $"Pharmacy with Guid {request.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

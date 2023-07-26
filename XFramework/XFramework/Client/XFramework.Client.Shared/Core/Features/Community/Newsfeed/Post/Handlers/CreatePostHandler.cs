@@ -30,7 +30,7 @@ public partial class CommunityState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(CreatePost action, CancellationToken aCancellationToken)
+        public override async Task Handle(CreatePost action, CancellationToken aCancellationToken)
         {
             Console.WriteLine(CurrentState.Identity.Guid);
             var result = await CommunityServiceWrapper.CreateContent(new()
@@ -43,13 +43,13 @@ public partial class CommunityState
             });
 
             await HandleFailure(result, action);
-            if (result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
+            if (result.HttpStatusCode is not HttpStatusCode.Accepted) return;
 
             CurrentState.CurrentCommunityContent = new();
             
             await Mediator.Send(new SetState(){CurrentCommunityContent = CurrentState.CurrentCommunityContent});
             await Mediator.Send(new GetPostList());
-            return Unit.Value;
+            return;
         }
     }
 }

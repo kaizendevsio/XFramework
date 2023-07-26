@@ -18,7 +18,7 @@ public class GetPendingSmsMessageListHandler : QueryBaseHandler, IRequestHandler
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
             Response = messageDirectResponses
         };
     }

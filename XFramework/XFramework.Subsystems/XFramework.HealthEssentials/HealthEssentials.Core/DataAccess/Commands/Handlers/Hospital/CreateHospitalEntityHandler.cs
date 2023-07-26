@@ -34,7 +34,7 @@ public class CreateHospitalEntityHandler : CommandBaseHandler, IRequestHandler<C
         {
             Message = $"Hospital Entity {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

@@ -1,11 +1,10 @@
 using System;
 
-namespace XFramework.Domain.Generic.Enums
+namespace XFramework.Domain.Generic.Enums;
+
+[Flags]
+public enum IncomeDistributionType: int
 {
-    [Flags]
-    public enum IncomeDistributionType: int
-    {
-        Fixed = 0,
-        Percentage = 1
-    }
+    Fixed = 0,
+    Percentage = 1
 }

@@ -33,7 +33,6 @@ public class CreateMessageThreadEntityHandler : CommandBaseHandler, IRequestHand
         {
             Message = $"Message thread entity with guid {entity.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
     }
 }

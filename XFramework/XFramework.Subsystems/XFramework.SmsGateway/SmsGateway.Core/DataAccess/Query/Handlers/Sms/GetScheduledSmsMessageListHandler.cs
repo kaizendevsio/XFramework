@@ -18,7 +18,7 @@ public class GetScheduledSmsMessageListHandler : QueryBaseHandler, IRequestHandl
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
             Response = messageDirectResponses
         };
     }

@@ -26,7 +26,7 @@ public class ConfirmMessageSentHandler : CommandBaseHandler, IRequestHandler<Con
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

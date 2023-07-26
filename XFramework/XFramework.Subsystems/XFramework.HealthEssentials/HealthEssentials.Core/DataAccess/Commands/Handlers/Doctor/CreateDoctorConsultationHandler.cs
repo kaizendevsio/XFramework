@@ -45,7 +45,7 @@ public class CreateDoctorConsultationHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Doctor Consultation with Guid {doctorConsultation.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

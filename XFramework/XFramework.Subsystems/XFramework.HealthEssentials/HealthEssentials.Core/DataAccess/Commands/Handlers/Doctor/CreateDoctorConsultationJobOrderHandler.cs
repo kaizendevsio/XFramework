@@ -45,7 +45,7 @@ public class CreateDoctorConsultationJobOrderHandler : CommandBaseHandler, IRequ
         {
             Message = $"Doctor Consultation Job Order with Guid {doctorConsultationJobOrder.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

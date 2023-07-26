@@ -19,7 +19,7 @@ public class DeleteContentHandler : CommandBaseHandler, IRequestHandler<DeleteCo
             {
                 Message = $"Content with guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -32,7 +32,7 @@ public class DeleteContentHandler : CommandBaseHandler, IRequestHandler<DeleteCo
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

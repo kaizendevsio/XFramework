@@ -101,11 +101,6 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
                 _response.SetPropertyValue("HttpStatusCode", HttpStatusCode.Accepted);
             }
         }
-
-        if (_response.ContainsProperty("IsSuccess"))
-        {
-            _response.SetPropertyValue("IsSuccess", true);
-        }
             
         await Task.FromResult(_response);
     }

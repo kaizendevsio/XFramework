@@ -34,7 +34,7 @@ public class CreateAilmentEntityHandler : CommandBaseHandler, IRequestHandler<Cr
         {
             Message = $"Ailment entity with Guid {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

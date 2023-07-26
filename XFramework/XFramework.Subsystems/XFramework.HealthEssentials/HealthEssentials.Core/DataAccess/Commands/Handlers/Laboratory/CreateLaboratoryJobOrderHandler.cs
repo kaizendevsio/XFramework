@@ -67,7 +67,7 @@ public class CreateLaboratoryJobOrderHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Laboratory Job Order with Guid {jobOrder.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

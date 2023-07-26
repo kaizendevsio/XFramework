@@ -27,7 +27,7 @@ public class GetHospitalServiceTagListHandler : QueryBaseHandler, IRequestHandle
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Hospital Service Tag Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetHospitalServiceTagListHandler : QueryBaseHandler, IRequestHandle
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Hospital Service Tag Found",
-            IsSuccess = true,
+            
             Response = serviceTag.Adapt<List<HospitalServiceTagResponse>>()
         };
     }

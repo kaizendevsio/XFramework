@@ -1,7 +1,6 @@
-﻿namespace HealthEssentials.Core.Interfaces
+﻿namespace HealthEssentials.Core.Interfaces;
+
+public interface ICachingService : IXFrameworkService
 {
-    public interface ICachingService : IXFrameworkService
-    {
         
-    }
 }

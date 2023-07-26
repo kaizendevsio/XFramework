@@ -45,7 +45,7 @@ public class CreateMedicineIntakeHandler : CommandBaseHandler, IRequestHandler<C
         {
             Message = $"Medicine Intake with Guid {intake.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
         
     }

@@ -43,7 +43,7 @@ public partial class CommunityState
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.InternalServerError,
-                    IsSuccess = false
+                    
                 };
             };
 
@@ -61,7 +61,7 @@ public partial class CommunityState
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
     }

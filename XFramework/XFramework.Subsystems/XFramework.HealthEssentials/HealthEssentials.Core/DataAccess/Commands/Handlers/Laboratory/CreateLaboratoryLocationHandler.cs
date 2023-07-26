@@ -91,7 +91,7 @@ public class CreateLaboratoryLocationHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Laboratory Location with Guid {laboratoryLocation.Guid} has been created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

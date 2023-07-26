@@ -2,7 +2,7 @@
 
 public partial class CryptocurrencyState
 {
-    public class GetAssetList : IAction
+    public class GetAssetList : BaseAction
     {
     }
 }

@@ -2,7 +2,7 @@
 
 public partial class MediaState
 {
-    public class CreateMedia : IAction
+    public class CreateMedia : BaseAction
     {
     }
 }

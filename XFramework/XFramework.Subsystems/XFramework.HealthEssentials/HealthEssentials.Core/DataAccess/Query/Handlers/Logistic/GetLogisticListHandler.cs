@@ -27,7 +27,7 @@ public class GetLogisticListHandler : QueryBaseHandler, IRequestHandler<GetLogis
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Logistic Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetLogisticListHandler : QueryBaseHandler, IRequestHandler<GetLogis
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Logistic Found",
-            IsSuccess = true,
+            
             Response = logistic.Adapt<List<LogisticResponse>>()
         };
     }

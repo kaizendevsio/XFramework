@@ -26,7 +26,7 @@ public class GetVendorEntityGroupListHandler : QueryBaseHandler, IRequestHandler
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
         
@@ -34,7 +34,7 @@ public class GetVendorEntityGroupListHandler : QueryBaseHandler, IRequestHandler
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Records found",
-            IsSuccess = true,
+            
             Response = group.Adapt<List<VendorEntityGroupResponse>>()
         };
     }

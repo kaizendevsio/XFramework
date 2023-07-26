@@ -56,7 +56,7 @@ public class CreatePharmacyJobOrderHandler : CommandBaseHandler, IRequestHandler
         {
             Message = $"Pharmacy Job Order with Guid {jobOrder.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
         
     }

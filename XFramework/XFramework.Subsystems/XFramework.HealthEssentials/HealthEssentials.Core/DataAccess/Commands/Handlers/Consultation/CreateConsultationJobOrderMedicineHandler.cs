@@ -92,7 +92,7 @@ public class CreateConsultationJobOrderMedicineHandler : CommandBaseHandler, IRe
         {
             Message = $"Consultation Job Order Medicine with Guid {consultationJobOrderMedicine.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

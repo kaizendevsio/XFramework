@@ -28,7 +28,7 @@ public class GetDoctorConsultationJobOrderHandler : QueryBaseHandler, IRequestHa
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No consultation job order found",
-                IsSuccess = true
+                
             };
         }
 

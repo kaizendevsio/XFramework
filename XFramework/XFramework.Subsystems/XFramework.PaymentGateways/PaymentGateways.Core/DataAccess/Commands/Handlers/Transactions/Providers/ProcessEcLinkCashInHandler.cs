@@ -65,7 +65,7 @@ public class ProcessEcLinkCashInHandler : CommandBaseHandler,
                 RawResponseData = rawResponse,
                 ReferenceNumber = request.ReferenceNumber,
             },
-            IsSuccess = false
+            
         };
     }
 

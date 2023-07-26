@@ -22,7 +22,7 @@ public class CreateVendorEntityGroupHandler : CommandBaseHandler, IRequestHandle
         {
             Message = $"Vendor Entity Group {group.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

@@ -1,9 +1,8 @@
-﻿namespace XFramework.Domain.Generic.Enums
+﻿namespace XFramework.Domain.Generic.Enums;
+
+public enum RecordType
 {
-    public enum RecordType
-    {
-        None = 0,
-        Authentication = 1,
-        SystemLog = 2,
-    }
+    None = 0,
+    Authentication = 1,
+    SystemLog = 2,
 }

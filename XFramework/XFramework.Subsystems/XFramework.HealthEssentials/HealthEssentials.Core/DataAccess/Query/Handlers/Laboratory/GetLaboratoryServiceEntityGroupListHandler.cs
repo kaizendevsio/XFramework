@@ -25,7 +25,7 @@ public class GetLaboratoryServiceEntityGroupListHandler : QueryBaseHandler, IReq
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Laboratory Service Entity Group Found",
-                IsSuccess = true
+                
             };
         }
         

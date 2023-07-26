@@ -30,7 +30,7 @@ public class ProcessPaynamicsCashInHandler : CommandBaseHandler, IRequestHandler
                 RawRequestData = transactionRequest.Response,
                 RawResponseData = ""
             },
-            IsSuccess = false
+            
         };
     }
 }

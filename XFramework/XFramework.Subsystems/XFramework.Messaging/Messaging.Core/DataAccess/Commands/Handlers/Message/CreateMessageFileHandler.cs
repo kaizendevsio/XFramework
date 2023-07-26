@@ -45,7 +45,6 @@ public class CreateMessageFileHandler : CommandBaseHandler, IRequestHandler<Crea
         {
             Message = $"Message file with guid {file.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
     }
 }

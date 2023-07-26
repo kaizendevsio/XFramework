@@ -36,7 +36,7 @@ public class VerifyPatientHandler : QueryBaseHandler, IRequestHandler<VerifyPati
                     IsActivated = false
                 },
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
         
@@ -48,7 +48,7 @@ public class VerifyPatientHandler : QueryBaseHandler, IRequestHandler<VerifyPati
                 IsActivated = identity.IsEnabled
             },
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

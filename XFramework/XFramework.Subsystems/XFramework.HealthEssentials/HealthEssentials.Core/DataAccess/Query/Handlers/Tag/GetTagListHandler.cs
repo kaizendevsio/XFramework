@@ -28,7 +28,7 @@ public class GetTagListHandler : QueryBaseHandler, IRequestHandler<GetTagListQue
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No tag found",
-                IsSuccess = true
+                
             };
         }
         
@@ -36,7 +36,7 @@ public class GetTagListHandler : QueryBaseHandler, IRequestHandler<GetTagListQue
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Tag found",
-            IsSuccess = true,
+            
             Response = tag.Adapt<List<TagResponse>>()
         };
     }

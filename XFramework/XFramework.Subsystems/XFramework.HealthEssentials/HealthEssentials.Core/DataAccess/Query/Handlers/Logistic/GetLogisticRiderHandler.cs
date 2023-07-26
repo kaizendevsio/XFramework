@@ -23,7 +23,7 @@ public class GetLogisticRiderHandler : QueryBaseHandler, IRequestHandler<GetLogi
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 
@@ -38,7 +38,7 @@ public class GetLogisticRiderHandler : QueryBaseHandler, IRequestHandler<GetLogi
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Rider found",
-            IsSuccess = true,
+            
             Response = response
         };        
     }

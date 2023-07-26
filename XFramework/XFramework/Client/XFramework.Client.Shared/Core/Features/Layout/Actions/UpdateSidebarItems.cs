@@ -2,7 +2,7 @@ namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
 {
-    public class UpdateSidebarItems : IAction
+    public class UpdateSidebarItems : BaseAction
     {
     }
 }

@@ -27,7 +27,7 @@ public class GetMetaDatumListHandler : QueryBaseHandler, IRequestHandler<GetMeta
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetMetaDatumListHandler : QueryBaseHandler, IRequestHandler<GetMeta
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Success",
-            IsSuccess = true,
+            
             Response = metaDatum.Adapt<List<MetaDatumResponse>>()
         };
     }

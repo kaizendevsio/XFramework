@@ -29,7 +29,7 @@ public class GetMessageDirectListHandler : QueryBaseHandler, IRequestHandler<Get
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 
@@ -37,7 +37,6 @@ public class GetMessageDirectListHandler : QueryBaseHandler, IRequestHandler<Get
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data found",
-            IsSuccess = true,
             Response = direct.Adapt<List<MessageDirectResponse>>()
         }; 
 

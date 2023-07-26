@@ -27,7 +27,7 @@ public class GetPharmacyServiceHandler : QueryBaseHandler, IRequestHandler<GetPh
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

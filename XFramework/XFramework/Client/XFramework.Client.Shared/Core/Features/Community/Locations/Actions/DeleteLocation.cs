@@ -2,7 +2,7 @@
 
 public partial class LocationState
 {
-    public class DeleteLocation : IAction
+    public class DeleteLocation : BaseAction
     {
     }
 }

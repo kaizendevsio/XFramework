@@ -27,7 +27,7 @@ public class GetDoctorTagListHandler : QueryBaseHandler, IRequestHandler<GetDoct
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
 

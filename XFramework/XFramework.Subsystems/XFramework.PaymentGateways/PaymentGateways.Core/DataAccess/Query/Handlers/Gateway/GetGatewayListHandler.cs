@@ -10,38 +10,37 @@ using PaymentGateways.Core.DataAccess.Query.Entity.Gateway;
 using PaymentGateways.Core.Interfaces;
 using PaymentGateways.Domain.Generic.Contracts.Responses;
 
-namespace PaymentGateways.Core.DataAccess.Query.Handlers.Gateway
+namespace PaymentGateways.Core.DataAccess.Query.Handlers.Gateway;
+
+public class GetGatewayListHandler : QueryBaseHandler, IRequestHandler<GetGatewayListQuery, QueryResponse<List<GatewayCategoryContract>>>
 {
-    public class GetGatewayListHandler : QueryBaseHandler, IRequestHandler<GetGatewayListQuery, QueryResponse<List<GatewayCategoryContract>>>
+    public GetGatewayListHandler(IDataLayer dataLayer)
     {
-        public GetGatewayListHandler(IDataLayer dataLayer)
-        {
-            _dataLayer = dataLayer;
-        }
+        _dataLayer = dataLayer;
+    }
         
-        public async Task<QueryResponse<List<GatewayCategoryContract>>> Handle(GetGatewayListQuery request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<List<GatewayCategoryContract>>> Handle(GetGatewayListQuery request, CancellationToken cancellationToken)
+    {
+        var result = await _dataLayer.GatewayCategories
+            .Include(i => i.Gateways)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+            
+        if (!result.Any())
         {
-            var result = await _dataLayer.GatewayCategories
-                .Include(i => i.Gateways)
-                .AsNoTracking()
-                .ToListAsync(cancellationToken);
-            
-            if (!result.Any())
+            return new()
             {
-                return new()
-                {
-                    Message = $"No gateway records exist",
-                    HttpStatusCode = HttpStatusCode.NoContent
-                };
-            }
-            
-            var r = result.Adapt<List<GatewayCategoryContract>>();
-            return new ()
-            {
-                HttpStatusCode = HttpStatusCode.Accepted,
-                Response = r
-            };    
-            
+                Message = $"No gateway records exist",
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
         }
+            
+        var r = result.Adapt<List<GatewayCategoryContract>>();
+        return new ()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Response = r
+        };    
+            
     }
 }

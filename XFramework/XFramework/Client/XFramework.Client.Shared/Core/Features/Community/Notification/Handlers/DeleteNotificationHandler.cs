@@ -24,7 +24,7 @@ public partial class NotificationState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(DeleteNotification action, CancellationToken aCancellationToken)
+        public override async Task Handle(DeleteNotification action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

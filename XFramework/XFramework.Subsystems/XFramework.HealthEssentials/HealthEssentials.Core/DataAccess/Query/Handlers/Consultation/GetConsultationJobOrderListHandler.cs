@@ -34,7 +34,7 @@ public class GetConsultationJobOrderListHandler : QueryBaseHandler, IRequestHand
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No consultation job order found",
-                IsSuccess = true
+                
             };
         }
 
@@ -42,7 +42,7 @@ public class GetConsultationJobOrderListHandler : QueryBaseHandler, IRequestHand
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "No consultation job order found",
-            IsSuccess = true,
+            
             Response = consultationJobOrder.Adapt<List<ConsultationJobOrderResponse>>()
         };
     }

@@ -23,7 +23,7 @@ public class GetLogisticJobOrderLocationHandler : QueryBaseHandler, IRequestHand
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

@@ -2,7 +2,7 @@
 
 public partial class WalletState
 {
-    public class CreateWallet : IAction
+    public class CreateWallet : BaseAction
     {
         public bool ReloadWalletList { get; set; }
         public Guid WalletEntityGuid { get; set; }

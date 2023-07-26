@@ -23,32 +23,32 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
             // Pre Validation
             await PreValidation(request);
             // Post Validation
-            
+
             // Pre Handler
             _response = await next();
             // Post Handler
 
-            await PostHandler(request);                
+            await PostHandler(request);
             return _response;
         }
         catch (Exception e)
         {
             SentrySdk.CaptureMessage(e.ToString());
             var responseInstance = Activator.CreateInstance(next.GetType().GenericTypeArguments[0]);
-                
+
             responseInstance?.GetType().GetProperty("Message")?
                 .SetValue(responseInstance, $"Error: {e.Message};", null);
-                
+
             if (e.InnerException != null)
             {
                 responseInstance?.GetType().GetProperty("Message")?
                     .SetValue(responseInstance, $"{responseInstance?.GetType().GetProperty("Message")?.GetValue(responseInstance)} Inner Exception: {e.InnerException?.Message}", null);
             }
-                
+
             responseInstance?.GetType().GetProperty("HttpStatusCode")?
                 .SetValue(responseInstance, HttpStatusCode.InternalServerError, null);
-                
-            return (TResponse) responseInstance;
+
+            return (TResponse)responseInstance;
         }
     }
 
@@ -86,7 +86,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
                 _response.SetPropertyValue("Message", $"{HttpStatusCode.Accepted}");
             }
         }
-        
+
         if (_response.ContainsProperty("HttpStatusCode"))
         {
             if (_response.GetPropertyValue("HttpStatusCode")?.ToString() == "0")
@@ -94,12 +94,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
                 _response.SetPropertyValue("HttpStatusCode", HttpStatusCode.Accepted);
             }
         }
-
-        if (_response.ContainsProperty("IsSuccess"))
-        {
-            _response.SetPropertyValue("IsSuccess", true);
-        }
-            
+        
         await Task.FromResult(_response);
     }
 }

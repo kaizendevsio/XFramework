@@ -38,7 +38,7 @@ public class GetDoctorConsultationJobOrderListHandler : QueryBaseHandler, IReque
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
 
