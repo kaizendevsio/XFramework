@@ -22,7 +22,6 @@ public class GetDoctorHandler : QueryBaseHandler, IRequestHandler<GetDoctorQuery
             .AsSplitQuery()
             .FirstOrDefaultAsync(CancellationToken.None);
         
-        
         if (doctor is null)
         {
             return new()
@@ -44,7 +43,6 @@ public class GetDoctorHandler : QueryBaseHandler, IRequestHandler<GetDoctorQuery
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory Found",
-            
             Response = response
         };        
     }

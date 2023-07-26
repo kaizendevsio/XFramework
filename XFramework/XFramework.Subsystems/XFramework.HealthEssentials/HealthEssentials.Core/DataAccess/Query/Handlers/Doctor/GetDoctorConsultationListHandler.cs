@@ -13,6 +13,7 @@ public class GetDoctorConsultationListHandler : QueryBaseHandler, IRequestHandle
     public async Task<QueryResponse<List<DoctorConsultationResponse>>> Handle(GetDoctorConsultationListQuery request, CancellationToken cancellationToken)
     {
         var doctorConsultation = await _dataLayer.HealthEssentialsContext.DoctorConsultations
+            .Where(i => i.Doctor.Guid == $"{request.DoctorGuid}")
             .Include(x => x.Consultation)
             .ThenInclude(x => x.Entity)
             .Include(x => x.Doctor)
