@@ -4,7 +4,7 @@ namespace XFramework.Client.Shared.Core.Features.Cryptocurrency;
 
 public partial class CryptocurrencyState
 {
-    public class SetState : IAction
+    public class SetState : BaseAction
     {
         public List<AssetResponse> AssetList { get; set; }
         public AssetResponse SelectedAsset { get; set; }

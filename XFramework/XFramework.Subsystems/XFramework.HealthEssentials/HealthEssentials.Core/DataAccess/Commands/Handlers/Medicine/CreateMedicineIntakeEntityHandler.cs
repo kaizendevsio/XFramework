@@ -23,7 +23,7 @@ public class CreateMedicineIntakeEntityHandler : CommandBaseHandler, IRequestHan
         {
             Message = $"Medicine Intake Entity with Guid {intakeEntity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

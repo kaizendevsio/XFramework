@@ -24,7 +24,7 @@ public class GetHospitalEntityHandler : QueryBaseHandler, IRequestHandler<GetHos
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

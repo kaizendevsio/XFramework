@@ -40,7 +40,7 @@ public class CreateLogisticRiderHandler : CommandBaseHandler, IRequestHandler<Cr
         {
             Message = $"Rider with guid {rider.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

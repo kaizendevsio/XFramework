@@ -38,7 +38,7 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Laboratory Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -49,7 +49,7 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory Found",
-            IsSuccess = true,
+            
             Response = response
         };
     }

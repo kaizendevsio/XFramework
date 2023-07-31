@@ -37,7 +37,7 @@ public partial class SessionState
             
             return new()
             {
-                IsSuccess = true,
+                
                 Message = "Success",
                 HttpStatusCode = HttpStatusCode.Accepted,
             };

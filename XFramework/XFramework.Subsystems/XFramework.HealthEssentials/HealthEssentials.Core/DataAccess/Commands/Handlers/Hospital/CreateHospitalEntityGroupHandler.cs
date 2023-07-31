@@ -23,7 +23,7 @@ public class CreateHospitalEntityGroupHandler : CommandBaseHandler, IRequestHand
         {
             Message = $"Hospital Entity Group {group.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

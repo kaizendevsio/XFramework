@@ -24,7 +24,7 @@ public class GetUnitEntityHandler : QueryBaseHandler, IRequestHandler<GetUnitEnt
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No entity found",
-                IsSuccess = true
+                
             };
         }
 

@@ -3,17 +3,16 @@ using System.Collections.Generic;
 
 #nullable disable
 
-namespace PaymentGateways.Domain.DataTransferObjects
+namespace PaymentGateways.Domain.DataTransferObjects;
+
+public partial class AuditField
 {
-    public partial class AuditField
-    {
-        public long Id { get; set; }
-        public bool IsEnabled { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public long? CreatedBy { get; set; }
-        public DateTime? ModifiedAt { get; set; }
-        public long? ModifiedBy { get; set; }
-        public bool IsDeleted { get; set; }
-        public string Guid { get; set; }
-    }
+    public long Id { get; set; }
+    public bool IsEnabled { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public long? CreatedBy { get; set; }
+    public DateTime? ModifiedAt { get; set; }
+    public long? ModifiedBy { get; set; }
+    public bool IsDeleted { get; set; }
+    public string Guid { get; set; }
 }

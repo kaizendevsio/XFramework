@@ -23,7 +23,7 @@ public class GetLaboratoryJobOrderResultHandler : QueryBaseHandler, IRequestHand
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No result found",
-                IsSuccess = true
+                
             };
         }
 

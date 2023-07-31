@@ -26,7 +26,7 @@ public class GetConsultationTagListHandler : QueryBaseHandler, IRequestHandler<G
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No consultation tag found",
-                IsSuccess = true
+                
             };
         }
 
@@ -34,7 +34,7 @@ public class GetConsultationTagListHandler : QueryBaseHandler, IRequestHandler<G
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "No consultation tag found",
-            IsSuccess = true,
+            
             Response = consultationTag.Adapt<List<ConsultationTagResponse>>()
         };
     }

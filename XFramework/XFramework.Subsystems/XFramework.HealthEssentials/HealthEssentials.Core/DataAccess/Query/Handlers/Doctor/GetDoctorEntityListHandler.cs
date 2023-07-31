@@ -27,7 +27,7 @@ public class GetDoctorEntityListHandler : QueryBaseHandler, IRequestHandler<GetD
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
 

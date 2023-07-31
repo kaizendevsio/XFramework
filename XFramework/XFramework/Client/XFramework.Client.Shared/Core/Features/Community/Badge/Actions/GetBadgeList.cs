@@ -2,7 +2,7 @@
 
 public partial class BadgeState
 {
-    public class GetBadgeList : IAction
+    public class GetBadgeList : BaseAction
     {
     }
 }

@@ -24,7 +24,7 @@ public partial class MediaState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(GetMediaList action, CancellationToken aCancellationToken)
+        public override async Task Handle(GetMediaList action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

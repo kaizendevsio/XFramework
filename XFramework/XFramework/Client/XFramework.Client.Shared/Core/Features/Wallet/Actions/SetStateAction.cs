@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class SetState : IAction
+    public class SetState : BaseAction
     {
         public List<WalletResponse> WalletList { get; set; }
         public WalletResponse SelectedWallet { get; set; }

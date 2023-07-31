@@ -25,7 +25,7 @@ public class GetLaboratoryLocationTagListHandler : QueryBaseHandler, IRequestHan
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
 

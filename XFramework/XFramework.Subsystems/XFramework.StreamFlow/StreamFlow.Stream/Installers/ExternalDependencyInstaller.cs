@@ -7,20 +7,19 @@ using StreamFlow.Core.DataAccess.Commands.Handlers;
 using StreamFlow.Core.PipelineBehaviors;
 using CommandBaseHandler = StreamFlow.Stream.Services.Handlers.CommandBaseHandler;
 
-namespace StreamFlow.Stream.Installers
+namespace StreamFlow.Stream.Installers;
+
+public class ExternalDependencyInstaller : IInstaller
 {
-    public class ExternalDependencyInstaller : IInstaller
+    public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
-        {
-            // MediatR
-            services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
-            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
+        // MediatR
+        services.AddMediatR(o => o.RegisterServicesFromAssemblyContaining<CommandBaseHandler>());
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
 
-            // FluentValidation
-            services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+        // FluentValidation
+        services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
 
 
-        }
     }
 }

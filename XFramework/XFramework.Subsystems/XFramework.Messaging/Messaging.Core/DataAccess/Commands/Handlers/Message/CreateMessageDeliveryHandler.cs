@@ -55,7 +55,6 @@ public class CreateMessageDeliveryHandler : CommandBaseHandler, IRequestHandler<
         {
             Message = $"Message Delivery with Guid {delivery.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
     }
 }

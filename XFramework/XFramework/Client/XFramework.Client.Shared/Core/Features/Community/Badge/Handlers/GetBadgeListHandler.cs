@@ -24,7 +24,7 @@ public partial class BadgeState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(GetBadgeList action, CancellationToken aCancellationToken)
+        public override async Task Handle(GetBadgeList action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

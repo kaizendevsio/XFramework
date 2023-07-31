@@ -26,7 +26,7 @@ public class GetLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<GetL
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = $"Laboratory member with guid {request.Guid} not found",
-                IsSuccess = true
+                
             };
         }
         
@@ -51,7 +51,7 @@ public class GetLaboratoryMemberHandler : QueryBaseHandler, IRequestHandler<GetL
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory member found",
-            IsSuccess = true,
+            
             Response = response
         };        
     }

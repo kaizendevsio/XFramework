@@ -1,11 +1,10 @@
 ﻿
-namespace StreamFlow.Domain.Enums
+namespace StreamFlow.Domain.Enums;
+
+public enum SessionState
 {
-    public enum SessionState
-    {
-        Inactive = 0,
-        Active = 1,
-        Expired = 2,
-        Suspended = 3
-    }
+    Inactive = 0,
+    Active = 1,
+    Expired = 2,
+    Suspended = 3
 }

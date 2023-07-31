@@ -26,7 +26,7 @@ public class GetPharmacyJobOrderConsultationJobOrderListHandler : QueryBaseHandl
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No consultation job order found",
-                IsSuccess = true
+                
             };
         }
 
@@ -34,7 +34,7 @@ public class GetPharmacyJobOrderConsultationJobOrderListHandler : QueryBaseHandl
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "No consultation job order found",
-            IsSuccess = true,
+            
             Response = consultationJobOrder.Adapt<List<PharmacyJobOrderConsultationJobOrderResponse>>()
         };
     }

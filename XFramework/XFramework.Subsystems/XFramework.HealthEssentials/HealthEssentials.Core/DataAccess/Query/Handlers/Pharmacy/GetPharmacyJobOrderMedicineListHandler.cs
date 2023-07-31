@@ -28,7 +28,7 @@ public class GetPharmacyJobOrderMedicineListHandler : QueryBaseHandler, IRequest
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
         
@@ -36,7 +36,7 @@ public class GetPharmacyJobOrderMedicineListHandler : QueryBaseHandler, IRequest
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Records found",
-            IsSuccess = true,
+            
             Response = jobOrderMedicine.Adapt<List<PharmacyJobOrderMedicineResponse>>()
         };
     }

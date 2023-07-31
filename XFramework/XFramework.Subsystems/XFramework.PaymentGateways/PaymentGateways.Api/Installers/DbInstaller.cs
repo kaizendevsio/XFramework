@@ -6,14 +6,13 @@ using PaymentGateways.Core.Interfaces;
 using PaymentGateways.Domain.DataTransferObjects;
 
 
-namespace PaymentGateways.Api.Installers
+namespace PaymentGateways.Api.Installers;
+
+public class DbInstaller : IInstaller
 {
-    public class DbInstaller : IInstaller
+    public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
-        {
-            services.AddDbContext<XnelSystemsContext>(options => options.UseNpgsql(configuration.GetConnectionString("DatabaseConnection")));
-            services.AddScoped<IDataLayer, DataLayer>();
-        }
+        services.AddDbContext<XnelSystemsContext>(options => options.UseNpgsql(configuration.GetConnectionString("DatabaseConnection")));
+        services.AddScoped<IDataLayer, DataLayer>();
     }
 }

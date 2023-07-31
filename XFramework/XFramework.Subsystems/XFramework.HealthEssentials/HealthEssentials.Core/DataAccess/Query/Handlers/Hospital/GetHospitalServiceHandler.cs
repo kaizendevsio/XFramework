@@ -29,7 +29,7 @@ public class GetHospitalServiceHandler : QueryBaseHandler, IRequestHandler<GetHo
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

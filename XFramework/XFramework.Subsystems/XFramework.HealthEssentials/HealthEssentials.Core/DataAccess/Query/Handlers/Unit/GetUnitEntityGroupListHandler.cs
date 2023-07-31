@@ -26,7 +26,7 @@ public class GetUnitEntityGroupListHandler : QueryBaseHandler, IRequestHandler<G
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No group found",
-                IsSuccess = true
+                
             };
         }
 
@@ -34,7 +34,7 @@ public class GetUnitEntityGroupListHandler : QueryBaseHandler, IRequestHandler<G
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Group found",
-            IsSuccess = true,
+            
             Response = group.Adapt<List<UnitEntityGroupResponse>>()
         };
     }

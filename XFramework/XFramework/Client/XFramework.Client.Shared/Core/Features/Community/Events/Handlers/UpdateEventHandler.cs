@@ -24,7 +24,7 @@ public partial class EventState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(UpdateEvent action, CancellationToken aCancellationToken)
+        public override async Task Handle(UpdateEvent action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

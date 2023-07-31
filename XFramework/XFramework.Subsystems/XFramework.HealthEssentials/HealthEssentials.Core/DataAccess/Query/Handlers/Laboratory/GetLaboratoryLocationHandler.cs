@@ -35,7 +35,7 @@ public class GetLaboratoryLocationHandler : QueryBaseHandler, IRequestHandler<Ge
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = $"Laboratory with the Guid '{request.Guid}' does not exist",
-                IsSuccess = true
+                
             };
         }
         
@@ -49,7 +49,7 @@ public class GetLaboratoryLocationHandler : QueryBaseHandler, IRequestHandler<Ge
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory Found",
-            IsSuccess = true,
+            
             Response = response
         };        
     }

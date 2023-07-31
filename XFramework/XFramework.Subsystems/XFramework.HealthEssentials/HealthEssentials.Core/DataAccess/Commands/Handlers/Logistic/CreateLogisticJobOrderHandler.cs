@@ -53,7 +53,7 @@ public class CreateLogisticJobOrderHandler : CommandBaseHandler, IRequestHandler
         {
             Message = $"Logistic job order with guid {jobOrder.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

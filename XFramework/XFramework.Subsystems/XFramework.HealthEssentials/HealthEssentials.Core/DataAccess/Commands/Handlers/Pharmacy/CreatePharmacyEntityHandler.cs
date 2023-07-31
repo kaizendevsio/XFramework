@@ -23,7 +23,7 @@ public class CreatePharmacyEntityHandler : CommandBaseHandler, IRequestHandler<C
         {
             Message = $"Pharmacy Entity with Id {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

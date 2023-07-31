@@ -25,7 +25,7 @@ public class GetPatientLaboratoryHandler : QueryBaseHandler, IRequestHandler<Get
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
         

@@ -1,12 +1,11 @@
-﻿namespace XFramework.Domain.Generic.Enums
+﻿namespace XFramework.Domain.Generic.Enums;
+
+public enum AuthorizeBy
 {
-    public enum AuthorizeBy
-    {
-        Default = 0,
-        UsernameEmailPhone = 1,
-        Username = 2,
-        Email = 3,
-        Phone = 4,
-        Token = 5
-    }
+    Default = 0,
+    UsernameEmailPhone = 1,
+    Username = 2,
+    Email = 3,
+    Phone = 4,
+    Token = 5
 }

@@ -21,13 +21,13 @@ public partial class CryptocurrencyState
             JsRuntime = jsRuntime;
         }
 
-        public override async Task<Unit> Handle(GetAssetList action, CancellationToken aCancellationToken)
+        public override async Task Handle(GetAssetList action, CancellationToken aCancellationToken)
         {
             var result = await HttpClient.GetJsonAsync<AssetListResponse>("https://api.coincap.io/v2/assets?limit=50", false);
-            if (!result.IsSuccess) return Unit.Value;
+            if (!result.IsSuccess) return;
 
             await Mediator.Send(new SetState() {AssetList = result.Response.Data});
-            return Unit.Value;
+            return;
         }
     }
 }

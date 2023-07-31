@@ -27,16 +27,16 @@ public partial class WalletState
             Store = store;
         }
  
-        public override async Task<Unit> Handle(GetWallet action, CancellationToken aCancellationToken)
+        public override async Task Handle(GetWallet action, CancellationToken aCancellationToken)
         {
-            if(SessionState.State is not CurrentSessionState.Active) return Unit.Value;
+            if(SessionState.State is not CurrentSessionState.Active) return;
             var response = await WalletServiceWrapper.GetWallet(new()
             {
                 Guid = action.WalletGuid
             });
 
             // Handle if the response is invalid or error
-            if (await HandleFailure(response, action, true)) return Unit.Value;
+            if (await HandleFailure(response, action, true)) return;
 
             // Set Session State To Active
             await Mediator.Send(new SetState() {SelectedWallet = response.Response});
@@ -44,7 +44,7 @@ public partial class WalletState
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(response, action, true);
 
-            return Unit.Value;
+            return;
         }
     }
 }

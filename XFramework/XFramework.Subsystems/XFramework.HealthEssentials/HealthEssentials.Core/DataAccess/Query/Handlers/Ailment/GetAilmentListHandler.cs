@@ -28,7 +28,7 @@ public class GetAilmentListHandler : QueryBaseHandler, IRequestHandler<GetAilmen
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Ailment Found",
-                IsSuccess = true
+                
             };
         }
 
@@ -36,7 +36,7 @@ public class GetAilmentListHandler : QueryBaseHandler, IRequestHandler<GetAilmen
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Ailment Found",
-            IsSuccess = true,
+            
             Response = ailment.Adapt<List<AilmentResponse>>()
         };
     }

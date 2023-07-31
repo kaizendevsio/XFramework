@@ -27,7 +27,7 @@ public class GetAvailabilityListHandler : QueryBaseHandler, IRequestHandler<GetA
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Availability Found",
-                IsSuccess = true
+                
             };
         }
 
@@ -35,7 +35,7 @@ public class GetAvailabilityListHandler : QueryBaseHandler, IRequestHandler<GetA
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Availability Found",
-            IsSuccess = true,
+            
             Response = availability.Adapt<List<AvailabilityResponse>>()
         };
     }

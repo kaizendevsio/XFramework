@@ -22,7 +22,7 @@ public class GetUnitEntityGroupHandler : QueryBaseHandler, IRequestHandler<GetUn
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No group found",
-                IsSuccess = true
+                
             };
         }
 

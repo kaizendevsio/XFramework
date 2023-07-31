@@ -27,7 +27,7 @@ public class GetLaboratoryJobOrderHandler : QueryBaseHandler, IRequestHandler<Ge
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Laboratory Job Order Found",
-                IsSuccess = true
+                
             };
         }
 

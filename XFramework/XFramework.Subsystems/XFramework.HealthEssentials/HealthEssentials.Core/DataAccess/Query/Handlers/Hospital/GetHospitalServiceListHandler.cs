@@ -30,7 +30,7 @@ public class GetHospitalServiceListHandler : QueryBaseHandler, IRequestHandler<G
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Hospital Service found",
-                IsSuccess = true
+                
             };
         }
         
@@ -38,7 +38,7 @@ public class GetHospitalServiceListHandler : QueryBaseHandler, IRequestHandler<G
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Hospital Service Found",
-            IsSuccess = true,
+            
             Response = service.Adapt<List<HospitalServiceResponse>>()
         };
     }

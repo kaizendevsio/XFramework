@@ -33,7 +33,7 @@ public class CreateUnitHandler : CommandBaseHandler, IRequestHandler<CreateUnitC
         {
             Message = $"Unit with Guid {unit.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         }; 
     }
 }

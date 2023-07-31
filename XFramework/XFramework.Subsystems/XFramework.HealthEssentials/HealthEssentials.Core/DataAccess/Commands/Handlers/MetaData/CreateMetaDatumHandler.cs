@@ -34,7 +34,7 @@ public class CreateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Create
         {
             Message = $"MetaDatum with Guid {metaDatum.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

@@ -18,7 +18,7 @@ public class CreateReactionHandler : CommandBaseHandler, IRequestHandler<CreateR
             {
                 Message = $"Community identity with guid {request.CommunityIdentityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -29,7 +29,7 @@ public class CreateReactionHandler : CommandBaseHandler, IRequestHandler<CreateR
             {
                 Message = $"Content with guid {request.ContentGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -40,7 +40,7 @@ public class CreateReactionHandler : CommandBaseHandler, IRequestHandler<CreateR
             {
                 Message = $"Reaction entity with guid {request.ReactionEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -57,7 +57,7 @@ public class CreateReactionHandler : CommandBaseHandler, IRequestHandler<CreateR
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

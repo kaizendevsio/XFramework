@@ -24,7 +24,7 @@ public partial class ShopState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(UpdateShop action, CancellationToken aCancellationToken)
+        public override async Task Handle(UpdateShop action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

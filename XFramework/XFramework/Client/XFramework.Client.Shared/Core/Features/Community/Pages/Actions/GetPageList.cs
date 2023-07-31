@@ -2,7 +2,7 @@
 
 public partial class PageState
 {
-    public class GetPageList : IAction
+    public class GetPageList : BaseAction
     {
     }
 }

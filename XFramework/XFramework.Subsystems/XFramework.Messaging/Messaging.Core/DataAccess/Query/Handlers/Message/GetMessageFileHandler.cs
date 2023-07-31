@@ -25,7 +25,7 @@ public class GetMessageFileHandler : QueryBaseHandler, IRequestHandler<GetMessag
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

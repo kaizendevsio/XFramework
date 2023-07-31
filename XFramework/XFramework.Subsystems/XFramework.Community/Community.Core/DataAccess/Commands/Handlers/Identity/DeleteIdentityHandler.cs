@@ -18,7 +18,7 @@ public class DeleteIdentityHandler : CommandBaseHandler, IRequestHandler<DeleteI
             {
                 Message = $"Community identity with guid {request.Guid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -30,7 +30,7 @@ public class DeleteIdentityHandler : CommandBaseHandler, IRequestHandler<DeleteI
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

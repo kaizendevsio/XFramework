@@ -2,7 +2,7 @@
 
 public partial class CommunityState
 {
-    public class UpdateGroup : IAction
+    public class UpdateGroup : BaseAction
     {
         public Guid? Guid { get; set; }
         public string Name { get; set; }

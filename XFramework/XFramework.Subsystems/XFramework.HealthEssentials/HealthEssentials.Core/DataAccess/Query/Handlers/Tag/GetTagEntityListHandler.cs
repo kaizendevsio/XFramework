@@ -27,7 +27,7 @@ public class GetTagEntityListHandler : QueryBaseHandler, IRequestHandler<GetTagE
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No tag entity found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetTagEntityListHandler : QueryBaseHandler, IRequestHandler<GetTagE
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Tag entity found",
-            IsSuccess = true,
+            
             Response = entity.Adapt<List<TagEntityResponse>>()
         };
     }

@@ -32,7 +32,7 @@ public class UpdateVerificationHandler : CommandBaseHandler, IRequestHandler<Upd
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

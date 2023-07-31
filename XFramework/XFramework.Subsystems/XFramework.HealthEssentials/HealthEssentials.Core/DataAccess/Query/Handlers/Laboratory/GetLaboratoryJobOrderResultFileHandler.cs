@@ -24,7 +24,7 @@ public class GetLaboratoryJobOrderResultFileHandler : QueryBaseHandler, IRequest
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No result file found",
-                IsSuccess = true
+                
             };
         }
 

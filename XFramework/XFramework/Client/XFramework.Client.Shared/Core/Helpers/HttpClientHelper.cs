@@ -39,7 +39,7 @@ public class HttpClientHelper : IHttpClient
         var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
         return new QueryResponse<TResponse>()
         {
-            IsSuccess = response.IsSuccessStatusCode,
+            
             HttpStatusCode = response.StatusCode,
             Response = responseModel
         };
@@ -79,7 +79,7 @@ public class HttpClientHelper : IHttpClient
             var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
             return new QueryResponse<TResponse>()
             {
-                IsSuccess = response.IsSuccessStatusCode,
+                
                 HttpStatusCode = response.StatusCode,
                 Response = responseModel
             };
@@ -124,7 +124,7 @@ public class HttpClientHelper : IHttpClient
                 Console.WriteLine($"{response.ReasonPhrase}; {await response.Content.ReadAsStringAsync()}");
                 return new QueryResponse<TResponse>()
                 {
-                    IsSuccess = response.IsSuccessStatusCode,
+                    
                     HttpStatusCode = response.StatusCode,
                     Response = Activator.CreateInstance<TResponse>()
                 };
@@ -135,7 +135,7 @@ public class HttpClientHelper : IHttpClient
             var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
             return new QueryResponse<TResponse>()
             {
-                IsSuccess = response.IsSuccessStatusCode,
+                
                 HttpStatusCode = response.StatusCode,
                 Response = responseModel
             };
@@ -170,7 +170,7 @@ public class HttpClientHelper : IHttpClient
                 Console.WriteLine($"{response.ReasonPhrase}; {await response.Content.ReadAsStringAsync()}");
                 return new()
                 {
-                    IsSuccess = response.IsSuccessStatusCode,
+                    
                     HttpStatusCode = response.StatusCode,
                 };
             }
@@ -178,7 +178,7 @@ public class HttpClientHelper : IHttpClient
             if (string.IsNullOrEmpty(await response.Content.ReadAsStringAsync())) return Activator.CreateInstance<CmdResponse>();
             return new ()
             {
-                IsSuccess = response.IsSuccessStatusCode,
+                
                 HttpStatusCode = response.StatusCode,
             };
         }
@@ -222,7 +222,7 @@ public class HttpClientHelper : IHttpClient
                 Console.WriteLine($"{response.ReasonPhrase}; {await response.Content.ReadAsStringAsync()}");
                 return new ()
                 {
-                    IsSuccess = response.IsSuccessStatusCode,
+                    
                     HttpStatusCode = response.StatusCode
                 };
             }
@@ -231,7 +231,7 @@ public class HttpClientHelper : IHttpClient
             
             return new ()
             {
-                IsSuccess = response.IsSuccessStatusCode,
+                
                 HttpStatusCode = response.StatusCode
             };
         }
@@ -281,7 +281,7 @@ public class HttpClientHelper : IHttpClient
 
             return new CmdResponse()
             {
-                IsSuccess = response.IsSuccessStatusCode,
+                
                 HttpStatusCode = response.StatusCode,
             };
         }
@@ -290,7 +290,7 @@ public class HttpClientHelper : IHttpClient
             Console.WriteLine(e);
             return new CmdResponse()
             {
-                IsSuccess = false,
+                
                 HttpStatusCode = HttpStatusCode.InternalServerError,
             };
         }
@@ -325,7 +325,7 @@ public class HttpClientHelper : IHttpClient
             var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
             return new QueryResponse<TResponse>()
             {
-                IsSuccess = response.IsSuccessStatusCode,
+                
                 HttpStatusCode = response.StatusCode,
                 Response = responseModel
             };
@@ -374,7 +374,7 @@ public class HttpClientHelper : IHttpClient
             var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
             return new QueryResponse<TResponse>()
             {
-                IsSuccess = response.IsSuccessStatusCode,
+                
                 HttpStatusCode = response.StatusCode,
                 Response = responseModel
             };
@@ -425,7 +425,7 @@ public class HttpClientHelper : IHttpClient
             var responseModel = await response.Content.ReadAsStringAsync();
             return new()
             {
-                IsSuccess = response.IsSuccessStatusCode,
+                
                 HttpStatusCode = response.StatusCode,
                 Message = responseModel
             };

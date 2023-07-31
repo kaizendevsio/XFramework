@@ -25,7 +25,7 @@ public class GetPharmacyServiceEntityGroupListHandler : QueryBaseHandler, IReque
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
         
@@ -33,7 +33,7 @@ public class GetPharmacyServiceEntityGroupListHandler : QueryBaseHandler, IReque
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data found",
-            IsSuccess = true,
+            
             Response = group.Adapt<List<PharmacyServiceEntityGroupResponse>>()
         };
     }

@@ -39,7 +39,7 @@ public class VerifyDoctorHandler : QueryBaseHandler, IRequestHandler<VerifyDocto
                     IsActivated = false
                 },
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
         
@@ -52,7 +52,7 @@ public class VerifyDoctorHandler : QueryBaseHandler, IRequestHandler<VerifyDocto
                 Guid = Guid.Parse(identity.Guid)
             },
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

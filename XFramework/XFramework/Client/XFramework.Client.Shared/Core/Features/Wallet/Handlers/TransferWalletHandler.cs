@@ -23,9 +23,9 @@ public partial class WalletState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(TransferWallet action, CancellationToken aCancellationToken)
+        public override async Task Handle(TransferWallet action, CancellationToken aCancellationToken)
         {
-            if (HandleValidation(out var handle)) return handle;
+            if (HandleValidation(out var handle)) return;
             await Mediator.Send(new GetWalletList());
             
             var result = await WalletServiceWrapper.TransferWallet(new()
@@ -45,10 +45,10 @@ public partial class WalletState
                 CurrentState.SendWalletVm.Action?.Invoke();
             }
             
-            if (await HandleFailure(result, action, true)) return Unit.Value; 
+            if (await HandleFailure(result, action, true)) return; 
             await HandleSuccess(result, action, false, "Payment Successful");
             
-            return Unit.Value;
+            return;
         }
         
         private bool HandleValidation(out Unit handle)

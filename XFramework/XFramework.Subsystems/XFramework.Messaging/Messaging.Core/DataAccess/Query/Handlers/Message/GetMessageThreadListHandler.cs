@@ -26,7 +26,7 @@ public class GetMessageThreadListHandler : QueryBaseHandler, IRequestHandler<Get
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Message Threads Found",
-                IsSuccess = true
+                
             };
         }
 
@@ -34,7 +34,6 @@ public class GetMessageThreadListHandler : QueryBaseHandler, IRequestHandler<Get
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Message Threads Found",
-            IsSuccess = true,
             Response = thread.Adapt<List<MessageThreadResponse>>()
         }; 
     }

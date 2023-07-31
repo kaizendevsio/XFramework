@@ -23,7 +23,7 @@ public class GetLogisticHandler : QueryBaseHandler, IRequestHandler<GetLogisticQ
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

@@ -25,7 +25,7 @@ public class GetPatientConsultationHandler : QueryBaseHandler, IRequestHandler<G
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No consultation found",
-                IsSuccess = true
+                
             };
         }
         

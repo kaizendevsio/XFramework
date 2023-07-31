@@ -45,7 +45,7 @@ public class CreatePatientReminderHandler : CommandBaseHandler, IRequestHandler<
         {
             Message = $"Patient Reminder with Guid {reminder.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
 
 

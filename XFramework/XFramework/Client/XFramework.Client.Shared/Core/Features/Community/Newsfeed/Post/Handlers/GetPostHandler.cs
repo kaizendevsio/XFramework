@@ -25,7 +25,7 @@ public partial class CommunityState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(GetPost action, CancellationToken aCancellationToken)
+        public override async Task Handle(GetPost action, CancellationToken aCancellationToken)
         {
             var result = await CommunityServiceWrapper.GetContent(new()
             {
@@ -33,10 +33,10 @@ public partial class CommunityState
             });
 
             await HandleFailure(result, action);
-            if (result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
+            if (result.HttpStatusCode is not HttpStatusCode.Accepted) return;
             
             await Mediator.Send(new SetState() {CurrentCommunityContent = result.Response});
-            return Unit.Value;
+            return;
         }
     }
 }

@@ -45,7 +45,7 @@ public class CreateLogisticRiderTagHandler : CommandBaseHandler, IRequestHandler
         {
             Message = $"Logistic Rider Tag with Guid {riderTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

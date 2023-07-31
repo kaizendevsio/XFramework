@@ -26,7 +26,7 @@ public class GetMessageTypeListHandler : QueryBaseHandler, IRequestHandler<GetMe
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data Found",
-                IsSuccess = true
+                
             };
         }
 
@@ -34,7 +34,6 @@ public class GetMessageTypeListHandler : QueryBaseHandler, IRequestHandler<GetMe
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data Found",
-            IsSuccess = true,
             Response = type.Adapt<List<MessageTypeResponse>>()
         }; 
     }

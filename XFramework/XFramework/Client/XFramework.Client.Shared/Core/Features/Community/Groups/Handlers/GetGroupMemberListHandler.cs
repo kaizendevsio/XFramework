@@ -30,7 +30,7 @@ public partial class CommunityState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(GetGroupMemberList action, CancellationToken aCancellationToken)
+        public override async Task Handle(GetGroupMemberList action, CancellationToken aCancellationToken)
         {
             var result = await CommunityServiceWrapper.GetConnectionList(new()
             {
@@ -44,12 +44,12 @@ public partial class CommunityState
             
             await HandleFailure(result, action);
             
-            if(result.HttpStatusCode is not HttpStatusCode.Accepted) return Unit.Value;
+            if(result.HttpStatusCode is not HttpStatusCode.Accepted) return;
             CurrentState.CurrentCommunityGroup.ConnectionList ??= new();
             CurrentState.CurrentCommunityGroup.ConnectionList?.AddRange(result.Response);
             
             await Mediator.Send(new SetState(){CurrentCommunityGroup = CurrentState.CurrentCommunityGroup});
-            return Unit.Value;
+            return;
         }
     }
 }

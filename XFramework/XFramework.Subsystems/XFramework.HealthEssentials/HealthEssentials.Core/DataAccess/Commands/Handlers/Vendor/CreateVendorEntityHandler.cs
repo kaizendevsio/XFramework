@@ -33,7 +33,7 @@ public class CreateVendorEntityHandler : CommandBaseHandler, IRequestHandler<Cre
         {
             Message = $"Entity {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

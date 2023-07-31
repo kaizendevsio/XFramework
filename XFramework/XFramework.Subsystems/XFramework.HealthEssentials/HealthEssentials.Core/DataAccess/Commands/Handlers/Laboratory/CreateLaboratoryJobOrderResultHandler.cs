@@ -34,7 +34,7 @@ public class CreateLaboratoryJobOrderResultHandler : CommandBaseHandler, IReques
         {
             Message = $"Laboratory Job Order Result with Guid {result.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

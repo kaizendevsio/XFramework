@@ -88,7 +88,7 @@ public class CreatePharmacyLocationHandler : CommandBaseHandler, IRequestHandler
         {
             Message = $"Pharmacy Location with Guid {pharmacyLocation.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

@@ -36,7 +36,7 @@ public class CheckVerificationHandler : QueryBaseHandler, IRequestHandler<CheckV
             {
                 Message = $"Verification type with guid {request.VerificationTypeGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -52,7 +52,6 @@ public class CheckVerificationHandler : QueryBaseHandler, IRequestHandler<CheckV
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true,
                 Response = new ()
                 {
                     IsVerified = true
@@ -74,14 +73,13 @@ public class CheckVerificationHandler : QueryBaseHandler, IRequestHandler<CheckV
             {
                 Message = $"Verification with type {request.VerificationTypeGuid} has no records",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
             Response = new ()
             {
                 IsVerified = false,

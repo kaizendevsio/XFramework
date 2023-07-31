@@ -1,12 +1,11 @@
 ﻿using System;
 
-namespace XFramework.Domain.Generic.Enums
+namespace XFramework.Domain.Generic.Enums;
+
+[Flags]
+public enum ApplicationStatus
 {
-    [Flags]
-    public enum ApplicationStatus
-    {
-        Disabled = 0,
-        Active = 1,
-        Suspended = 2
-    }
+    Disabled = 0,
+    Active = 1,
+    Suspended = 2
 }

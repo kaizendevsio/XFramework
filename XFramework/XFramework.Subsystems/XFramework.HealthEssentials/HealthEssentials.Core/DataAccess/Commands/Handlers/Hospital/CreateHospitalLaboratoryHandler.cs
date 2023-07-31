@@ -46,7 +46,7 @@ public class CreateHospitalLaboratoryHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Hospital Laboratory with Guid {hospitalLaboratory.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

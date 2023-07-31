@@ -1,11 +1,10 @@
-﻿namespace XFramework.Domain.Generic.Enums
+﻿namespace XFramework.Domain.Generic.Enums;
+
+public enum GenericPriorityType
 {
-    public enum GenericPriorityType
-    {
-        Information = 0,
-        Warning = 1,
-        Critical = 2,
-        Notice = 3,
-        Success = 4
-    }
+    Information = 0,
+    Warning = 1,
+    Critical = 2,
+    Notice = 3,
+    Success = 4
 }

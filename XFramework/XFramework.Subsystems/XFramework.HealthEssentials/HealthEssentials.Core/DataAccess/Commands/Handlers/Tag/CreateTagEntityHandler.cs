@@ -34,7 +34,7 @@ public class CreateTagEntityHandler : CommandBaseHandler, IRequestHandler<Create
         {
             Message = $"Tag entity with guid {entity.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

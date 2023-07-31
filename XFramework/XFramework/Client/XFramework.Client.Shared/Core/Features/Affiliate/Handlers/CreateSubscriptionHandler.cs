@@ -58,7 +58,7 @@ public partial class AffiliateState
                 SweetAlertService.FireAsync("Error", $"{e.Message}", SweetAlertIcon.Error);
                 return new()
                 {
-                    IsSuccess = false,
+                    
                     Message = e.Message
                 };
             }
@@ -68,7 +68,7 @@ public partial class AffiliateState
             {
                 return new()
                 {
-                    IsSuccess = false,
+                    
                     Message = response.Message
                 };
             }
@@ -89,7 +89,7 @@ public partial class AffiliateState
             //await HandleSuccess(response, action, true);
             return new()
             {
-                IsSuccess = true,
+                
                 HttpStatusCode = HttpStatusCode.Accepted,
                 Message = response.Message
             };

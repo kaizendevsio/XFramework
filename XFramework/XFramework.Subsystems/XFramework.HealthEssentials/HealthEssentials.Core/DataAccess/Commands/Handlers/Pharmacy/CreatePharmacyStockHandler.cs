@@ -45,7 +45,7 @@ public class CreatePharmacyStockHandler : CommandBaseHandler, IRequestHandler<Cr
         {
             Message = $"Pharmacy Stock with Guid {pharmacyStock.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

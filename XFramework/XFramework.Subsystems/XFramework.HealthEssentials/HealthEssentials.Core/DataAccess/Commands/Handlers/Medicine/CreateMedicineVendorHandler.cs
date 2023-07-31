@@ -46,7 +46,7 @@ public class CreateMedicineVendorHandler : CommandBaseHandler, IRequestHandler<C
         {
             Message = $"Medicine Vendor with Guid {medicineVendor.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
 
         

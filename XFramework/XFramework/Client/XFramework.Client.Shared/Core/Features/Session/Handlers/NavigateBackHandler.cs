@@ -34,12 +34,12 @@ public partial class SessionState
         }
         
 
-        public override async Task<Unit> Handle(NavigateBack action, CancellationToken cancellationToken)
+        public override async Task Handle(NavigateBack action, CancellationToken cancellationToken)
         {
             NavigationManager.NavigateTo(SessionState.NavigationHistoryList.Last());
             SessionState.NavigationHistoryList.Remove(SessionState.NavigationHistoryList.Last());
             await Mediator.Send(new SetState() {NavigationHistoryList = SessionState.NavigationHistoryList});
-            return Unit.Value;
+            return;
         }
 
         

@@ -24,7 +24,7 @@ public class GetLogisticRiderTagHandler : QueryBaseHandler, IRequestHandler<GetL
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

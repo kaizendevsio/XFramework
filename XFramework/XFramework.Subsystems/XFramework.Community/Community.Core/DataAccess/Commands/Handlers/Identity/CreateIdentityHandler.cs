@@ -24,7 +24,7 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
             {
                 Message = $"Credential with guid {request.CredentialGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -37,7 +37,7 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
             {
                 Message = $"Community identity entity with guid {request.CommunityEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -85,7 +85,7 @@ public class CreateIdentityHandler : CommandBaseHandler, IRequestHandler<CreateI
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

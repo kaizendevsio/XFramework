@@ -29,6 +29,7 @@ public class GetSupportedConsultationListHandler : QueryBaseHandler, IRequestHan
             .Where(i => EF.Functions.ILike(i.Consultation.Name, $"%{request.SearchField}%"))
             .Where(i => i.DoctorId == doctor.Id)
             .Include(i => i.Consultation)
+            .ThenInclude(i => i.Entity)
             .OrderBy(i => i.CreatedAt)
             .Take(request.PageSize)
             .AsSplitQuery()
@@ -41,7 +42,7 @@ public class GetSupportedConsultationListHandler : QueryBaseHandler, IRequestHan
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No consultation found",
-                IsSuccess = true
+                
             };
         }
         
@@ -49,7 +50,7 @@ public class GetSupportedConsultationListHandler : QueryBaseHandler, IRequestHan
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Records Found",
-            IsSuccess = true,
+            
             Response = consultations.Adapt<List<DoctorConsultationResponse>>()
         };
     }

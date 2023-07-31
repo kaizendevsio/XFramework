@@ -28,7 +28,7 @@ public class GetMessageDirectHandler : QueryBaseHandler, IRequestHandler<GetMess
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

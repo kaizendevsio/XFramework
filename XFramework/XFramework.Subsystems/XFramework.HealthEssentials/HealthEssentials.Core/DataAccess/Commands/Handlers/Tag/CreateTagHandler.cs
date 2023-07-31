@@ -33,7 +33,7 @@ public class CreateTagHandler : CommandBaseHandler, IRequestHandler<CreateTagCmd
         {
             Message = $"Tag with Guid {tag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
 
 

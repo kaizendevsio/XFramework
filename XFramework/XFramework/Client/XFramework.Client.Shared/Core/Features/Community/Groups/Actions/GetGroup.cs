@@ -2,7 +2,7 @@
 
 public partial class CommunityState
 {
-    public class GetGroup : IAction
+    public class GetGroup : BaseAction
     {
     }
 }

@@ -20,7 +20,7 @@ public partial class MemberState
             Mediator = mediator;
             Store = store;
         }
-        public override async Task<Unit> Handle(SetState state, CancellationToken aCancellationToken)
+        public override async Task Handle(SetState state, CancellationToken aCancellationToken)
         {
             try
             {
@@ -31,7 +31,7 @@ public partial class MemberState
             {
                 Console.WriteLine(e);
             }
-            return Unit.Value;
+            return;
         }
     }
 }

@@ -24,7 +24,7 @@ public class GetPharmacyServiceTagListHandler : QueryBaseHandler, IRequestHandle
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
         
@@ -32,7 +32,7 @@ public class GetPharmacyServiceTagListHandler : QueryBaseHandler, IRequestHandle
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data found",
-            IsSuccess = true,
+            
             Response = serviceTag.Adapt<List<PharmacyServiceTagResponse>>()
         };
     }

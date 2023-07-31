@@ -27,7 +27,7 @@ public class GetHospitalEntityGroupListHandler : QueryBaseHandler, IRequestHandl
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Hospital Entity Group Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetHospitalEntityGroupListHandler : QueryBaseHandler, IRequestHandl
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Hospital Entity Group Found",
-            IsSuccess = true,
+            
             Response = entityGroup.Adapt<List<HospitalEntityGroupResponse>>()
         };
 

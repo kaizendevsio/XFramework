@@ -1,8 +1,7 @@
-﻿namespace XFramework.Domain.Generic.BusinessObjects
+﻿namespace XFramework.Domain.Generic.BusinessObjects;
+
+public class JwtTokenBO
 {
-    public class JwtTokenBO
-    {
-        public string AccessToken  { get; set; }
-        public string RefreshToken  { get; set; }
-    }
+    public string AccessToken  { get; set; }
+    public string RefreshToken  { get; set; }
 }

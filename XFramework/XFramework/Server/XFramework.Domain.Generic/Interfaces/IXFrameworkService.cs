@@ -1,7 +1,6 @@
-﻿namespace XFramework.Domain.Generic.Interfaces
+﻿namespace XFramework.Domain.Generic.Interfaces;
+
+public interface IXFrameworkService
 {
-    public interface IXFrameworkService
-    {
         
-    }
 }

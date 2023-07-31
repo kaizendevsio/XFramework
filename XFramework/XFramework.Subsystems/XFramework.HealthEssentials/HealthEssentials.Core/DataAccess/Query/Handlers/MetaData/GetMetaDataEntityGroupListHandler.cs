@@ -26,7 +26,7 @@ public class GetMetaDataEntityGroupListHandler : QueryBaseHandler, IRequestHandl
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
         
@@ -34,7 +34,7 @@ public class GetMetaDataEntityGroupListHandler : QueryBaseHandler, IRequestHandl
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Success",
-            IsSuccess = true,
+            
             Response = group.Adapt<List<MetaDataEntityGroupResponse>>()
         };
 

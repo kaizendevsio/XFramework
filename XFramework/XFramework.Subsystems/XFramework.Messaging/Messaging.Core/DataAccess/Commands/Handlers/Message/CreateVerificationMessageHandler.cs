@@ -26,7 +26,6 @@ public class CreateVerificationMessageHandler : CommandBaseHandler, IRequestHand
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Conflict,
-                IsSuccess = true,
                 Message = "Unable to send message: OTP message template could not be found"
             };
         }
@@ -58,7 +57,6 @@ public class CreateVerificationMessageHandler : CommandBaseHandler, IRequestHand
             return new()
             {
                 HttpStatusCode = HttpStatusCode.BadGateway,
-                IsSuccess = false,
                 Message = "Unable to send message: Contact number is empty"
             };
         }
@@ -66,7 +64,7 @@ public class CreateVerificationMessageHandler : CommandBaseHandler, IRequestHand
         return new(){
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Message sent successfully",
-            IsSuccess = true
+            
         };
     }
 }

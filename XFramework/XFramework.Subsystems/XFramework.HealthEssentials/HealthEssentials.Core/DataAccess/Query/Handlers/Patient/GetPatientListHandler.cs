@@ -27,7 +27,7 @@ public class GetPatientListHandler : QueryBaseHandler, IRequestHandler<GetPatien
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Patient Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetPatientListHandler : QueryBaseHandler, IRequestHandler<GetPatien
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Patient Found",
-            IsSuccess = true,
+            
             Response = patient.Adapt<List<PatientResponse>>()
         };
     }

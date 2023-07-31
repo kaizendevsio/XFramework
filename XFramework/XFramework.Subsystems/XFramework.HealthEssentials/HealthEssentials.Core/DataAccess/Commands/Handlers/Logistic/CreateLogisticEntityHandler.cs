@@ -23,7 +23,7 @@ public class CreateLogisticEntityHandler : CommandBaseHandler, IRequestHandler<C
         {
             Message = $"Logistic Entity {entity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
 
         

@@ -28,7 +28,7 @@ public class CreateAffiliateSubscriptionHandler : CommandBaseHandler, IRequestHa
             return new(){
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 Message = "Subscription entity not found",
-                IsSuccess = false
+                
             };
         }
 
@@ -38,7 +38,7 @@ public class CreateAffiliateSubscriptionHandler : CommandBaseHandler, IRequestHa
             return new(){
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 Message = "This contact is already registered. Please login to your account instead.",
-                IsSuccess = false
+                
             };
         }
 
@@ -51,7 +51,7 @@ public class CreateAffiliateSubscriptionHandler : CommandBaseHandler, IRequestHa
             return new(){
                 HttpStatusCode = HttpStatusCode.BadRequest,
                 Message = "Subscription already exists",
-                IsSuccess = false
+                
             };
         }*/
 
@@ -71,7 +71,7 @@ public class CreateAffiliateSubscriptionHandler : CommandBaseHandler, IRequestHa
         return new(){
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Subscription created",
-            IsSuccess = true
+            
         };
     }
 }

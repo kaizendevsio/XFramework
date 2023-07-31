@@ -27,7 +27,7 @@ public class GetConsultationJobOrderMedicineListHandler : QueryBaseHandler, IReq
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No consultation job order medicine found",
-                IsSuccess = true
+                
             };
         }
 
@@ -35,7 +35,7 @@ public class GetConsultationJobOrderMedicineListHandler : QueryBaseHandler, IReq
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "No consultation job order medicine found",
-            IsSuccess = true,
+            
             Response = consultationJobOrderMedicine.Adapt<List<ConsultationJobOrderMedicineResponse>>()
         };
 

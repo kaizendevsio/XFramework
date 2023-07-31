@@ -27,7 +27,7 @@ public class GetUnitEntityListHandler : QueryBaseHandler, IRequestHandler<GetUni
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No entity found",
-                IsSuccess = true
+                
             };
         }
 
@@ -35,7 +35,7 @@ public class GetUnitEntityListHandler : QueryBaseHandler, IRequestHandler<GetUni
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Entity found",
-            IsSuccess = true,
+            
             Response = entity.Adapt<List<UnitEntityResponse>>()
         };
     }

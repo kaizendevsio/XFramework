@@ -33,7 +33,6 @@ public class GetIdentityHandler : QueryBaseHandler, IRequestHandler<GetIdentityQ
             return new()
             {
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = true,
                 Message = "Community identity not found"
             };
         }
@@ -41,7 +40,6 @@ public class GetIdentityHandler : QueryBaseHandler, IRequestHandler<GetIdentityQ
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
             Response = communityIdentity.Adapt<CommunityIdentityResponse>()
         };
     }

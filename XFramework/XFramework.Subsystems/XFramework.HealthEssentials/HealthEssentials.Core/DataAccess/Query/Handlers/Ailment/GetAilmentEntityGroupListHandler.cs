@@ -26,7 +26,7 @@ public class GetAilmentEntityGroupListHandler : QueryBaseHandler, IRequestHandle
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Ailment Entity Group Found",
-                IsSuccess = true
+                
             }; 
         }
         
@@ -34,7 +34,7 @@ public class GetAilmentEntityGroupListHandler : QueryBaseHandler, IRequestHandle
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Ailment Entity Group Found",
-            IsSuccess = true,
+            
             Response = ailmentEntityGroup.Adapt<List<AilmentEntityGroupResponse>>()
         };
     }

@@ -23,7 +23,7 @@ public partial class WalletState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(ConvertWallet action, CancellationToken aCancellationToken)
+        public override async Task Handle(ConvertWallet action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

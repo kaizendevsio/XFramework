@@ -21,7 +21,7 @@ public class GetLogisticEntityHandler : QueryBaseHandler, IRequestHandler<GetLog
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

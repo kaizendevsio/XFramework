@@ -104,7 +104,7 @@ public class CommenceLiveConsultationHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Consultation Job Order with Guid {request.Guid} has been commenced",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

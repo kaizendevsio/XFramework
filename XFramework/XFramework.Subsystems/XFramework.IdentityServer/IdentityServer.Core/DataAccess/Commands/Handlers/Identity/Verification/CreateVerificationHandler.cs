@@ -27,7 +27,7 @@ public class CreateVerificationHandler : CommandBaseHandler, IRequestHandler<Cre
             {
                 Message = $"Verification type with guid {request.VerificationTypeGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -59,7 +59,6 @@ public class CreateVerificationHandler : CommandBaseHandler, IRequestHandler<Cre
                     return new()
                     {
                         HttpStatusCode = HttpStatusCode.Conflict,
-                        IsSuccess = true,
                         Message = "Unable to send message: OTP message template could not be found"
                     };
                 }
@@ -73,7 +72,6 @@ public class CreateVerificationHandler : CommandBaseHandler, IRequestHandler<Cre
                     return new()
                     {
                         HttpStatusCode = HttpStatusCode.BadGateway,
-                        IsSuccess = false,
                         Message = $"Credential with guid {request.CredentialGuid} does not have a phone number"
                     };
                 }
@@ -106,7 +104,7 @@ public class CreateVerificationHandler : CommandBaseHandler, IRequestHandler<Cre
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true
+            
         };
     }
 }

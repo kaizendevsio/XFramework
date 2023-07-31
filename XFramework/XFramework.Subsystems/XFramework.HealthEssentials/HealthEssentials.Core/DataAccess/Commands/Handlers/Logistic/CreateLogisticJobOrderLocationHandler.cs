@@ -89,7 +89,7 @@ public class CreateLogisticJobOrderLocationHandler : CommandBaseHandler, IReques
         {
             Message = $"Logistic Job Order Location with Guid {location.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
         
 

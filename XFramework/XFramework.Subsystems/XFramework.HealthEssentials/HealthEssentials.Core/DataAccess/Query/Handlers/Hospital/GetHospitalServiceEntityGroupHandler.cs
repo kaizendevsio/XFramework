@@ -22,7 +22,7 @@ public class GetHospitalServiceEntityGroupHandler : QueryBaseHandler, IRequestHa
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

@@ -45,7 +45,7 @@ public class CreatePatientTagHandler : CommandBaseHandler, IRequestHandler<Creat
         {
             Message = $"Patient Tag with Guid {patientTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

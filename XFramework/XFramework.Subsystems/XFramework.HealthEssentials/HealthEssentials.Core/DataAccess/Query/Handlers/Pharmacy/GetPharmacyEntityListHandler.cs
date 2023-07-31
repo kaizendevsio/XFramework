@@ -25,7 +25,7 @@ public class GetPharmacyEntityListHandler : QueryBaseHandler, IRequestHandler<Ge
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Pharmacy Entities found",
-                IsSuccess = true
+                
             };
         }
         
@@ -33,7 +33,7 @@ public class GetPharmacyEntityListHandler : QueryBaseHandler, IRequestHandler<Ge
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Pharmacy Entities found",
-            IsSuccess = true,
+            
             Response = entity.Adapt<List<PharmacyEntityResponse>>()
         };
     }

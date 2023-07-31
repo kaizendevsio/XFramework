@@ -2,7 +2,7 @@
 
 public partial class LocationState
 {
-    public class CreateLocation : IAction
+    public class CreateLocation : BaseAction
     {
     }
 }

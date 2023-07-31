@@ -27,7 +27,7 @@ public class GetPatientTagListHandler : QueryBaseHandler, IRequestHandler<GetPat
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetPatientTagListHandler : QueryBaseHandler, IRequestHandler<GetPat
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data found",
-            IsSuccess = true,
+            
             Response = tag.Adapt<List<PatientTagResponse>>()
         }; 
     }

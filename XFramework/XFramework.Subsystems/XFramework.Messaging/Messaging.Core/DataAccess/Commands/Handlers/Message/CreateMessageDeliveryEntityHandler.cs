@@ -22,7 +22,6 @@ public class CreateMessageDeliveryEntityHandler : CommandBaseHandler, IRequestHa
         {
             Message = $"Message Delivery Entity with guid {entity.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
     }
 }

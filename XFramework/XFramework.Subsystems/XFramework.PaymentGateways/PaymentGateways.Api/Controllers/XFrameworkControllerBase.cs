@@ -2,14 +2,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 
-namespace PaymentGateways.Api.Controllers
-{
-    public class XFrameworkControllerBase : ControllerBase
-    {
-        public IConfiguration _configuration;
-        public IMediator _mediator;
+namespace PaymentGateways.Api.Controllers;
 
-        public bool RequestResult { get; set; }
-        public static string RequestResponseString { get; set; }
-    }
+public class XFrameworkControllerBase : ControllerBase
+{
+    public IConfiguration _configuration;
+    public IMediator _mediator;
+
+    public bool RequestResult { get; set; }
+    public static string RequestResponseString { get; set; }
 }

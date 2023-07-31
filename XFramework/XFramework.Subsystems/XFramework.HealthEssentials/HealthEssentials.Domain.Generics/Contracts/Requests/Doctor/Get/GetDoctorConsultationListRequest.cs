@@ -2,4 +2,5 @@
 
 public class GetDoctorConsultationListRequest : QueryableRequest
 {
+    public Guid? DoctorGuid { get; set; }
 }

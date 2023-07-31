@@ -44,7 +44,7 @@ public partial class SessionState
                     return new()
                     {
                         HttpStatusCode = HttpStatusCode.BadRequest,
-                        IsSuccess = false
+                        
                     };
                 }
                 await NavigateTo(action.NavigateToOnSuccess);
@@ -62,7 +62,7 @@ public partial class SessionState
                     return new()
                     {
                         HttpStatusCode = HttpStatusCode.BadRequest,
-                        IsSuccess = false
+                        
                     };
                 }
                 await HandleSuccess(response, action, true);
@@ -74,7 +74,7 @@ public partial class SessionState
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
     }

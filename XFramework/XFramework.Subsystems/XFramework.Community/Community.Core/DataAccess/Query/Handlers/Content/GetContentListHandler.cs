@@ -21,7 +21,7 @@ public class GetContentListHandler : QueryBaseHandler, IRequestHandler<GetConten
             {
                 Message = $"Community identity with guid {request.CommunityIdentityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -33,7 +33,7 @@ public class GetContentListHandler : QueryBaseHandler, IRequestHandler<GetConten
             {
                 Message = $"Content entity with guid {request.ContentEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -106,7 +106,6 @@ public class GetContentListHandler : QueryBaseHandler, IRequestHandler<GetConten
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
             Response = communityContents
         };
     }

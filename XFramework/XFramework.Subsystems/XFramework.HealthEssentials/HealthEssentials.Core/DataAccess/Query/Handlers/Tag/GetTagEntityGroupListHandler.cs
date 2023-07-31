@@ -26,7 +26,7 @@ public class GetTagEntityGroupListHandler : QueryBaseHandler, IRequestHandler<Ge
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No tag entity group found",
-                IsSuccess = true
+                
             };
         }
         
@@ -34,7 +34,7 @@ public class GetTagEntityGroupListHandler : QueryBaseHandler, IRequestHandler<Ge
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Tag entity group found",
-            IsSuccess = true,
+            
             Response = group.Adapt<List<TagEntityGroupResponse>>()
         };
     }

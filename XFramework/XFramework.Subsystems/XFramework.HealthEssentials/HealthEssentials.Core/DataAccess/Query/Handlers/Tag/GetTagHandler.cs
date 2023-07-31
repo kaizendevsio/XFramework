@@ -25,7 +25,7 @@ public class GetTagHandler : QueryBaseHandler, IRequestHandler<GetTagQuery, Quer
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "Tag not found",
-                IsSuccess = true
+                
             };
         }
 

@@ -67,7 +67,7 @@ public class CreateLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
         {
             Message = $"Laboratory service with Guid {service.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

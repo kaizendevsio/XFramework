@@ -1,10 +1,9 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace StreamFlow.Stream.Installers
+namespace StreamFlow.Stream.Installers;
+
+public interface IInstaller
 {
-    public interface IInstaller
-    {
-        void InstallServices(IServiceCollection services, IConfiguration configuration);
-    }
+    void InstallServices(IServiceCollection services, IConfiguration configuration);
 }

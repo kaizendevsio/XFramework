@@ -2,7 +2,7 @@
 
 public partial class CommunityState
 {
-    public class GetGroupMemberRequestList : IAction
+    public class GetGroupMemberRequestList : BaseAction
     {
         public int Limit { get; set; }
     }

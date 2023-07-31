@@ -2,7 +2,7 @@
 
 public partial class PageState
 {
-    public class CreatePage : IAction
+    public class CreatePage : BaseAction
     {
     }
 }

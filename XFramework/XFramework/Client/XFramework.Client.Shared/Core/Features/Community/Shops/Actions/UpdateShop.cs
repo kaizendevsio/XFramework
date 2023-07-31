@@ -2,7 +2,7 @@
 
 public partial class ShopState
 {
-    public class UpdateShop : IAction
+    public class UpdateShop : BaseAction
     {
     }
 }

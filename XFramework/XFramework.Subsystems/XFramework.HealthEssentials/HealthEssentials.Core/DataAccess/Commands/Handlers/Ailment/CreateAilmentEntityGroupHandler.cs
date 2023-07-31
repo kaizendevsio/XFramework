@@ -22,7 +22,7 @@ public class CreateAilmentEntityGroupHandler : CommandBaseHandler, IRequestHandl
         {
             Message = $"Ailment Entity Group with Guid {ailmentEntityGroup.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
         
     }

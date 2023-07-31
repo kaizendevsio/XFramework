@@ -12,57 +12,56 @@ using StreamFlow.Stream.Services.Entity.Events;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
 
-namespace StreamFlow.Stream.Services.Handlers.Events
+namespace StreamFlow.Stream.Services.Handlers.Events;
+
+public class RegisterClientHandler : CommandBaseHandler, IRequestHandler<RegisterClientCmd, CmdResponse<RegisterClientCmd>>
 {
-    public class RegisterClientHandler : CommandBaseHandler, IRequestHandler<RegisterClientCmd, CmdResponse<RegisterClientCmd>>
+    private Random _rnd;
+    public RegisterClientHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
     {
-        private Random _rnd;
-        public RegisterClientHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
-        {
-            _cachingService = cachingService;
-            _hubContext = hubContext;
-            _streamFlowConfiguration = streamFlowConfiguration;
-            _rnd = new Random();
-        }
+        _cachingService = cachingService;
+        _hubContext = hubContext;
+        _streamFlowConfiguration = streamFlowConfiguration;
+        _rnd = new Random();
+    }
         
-        public async Task<CmdResponse<RegisterClientCmd>> Handle(RegisterClientCmd request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<RegisterClientCmd>> Handle(RegisterClientCmd request, CancellationToken cancellationToken)
+    {
+        Again:
+        var y = _cachingService.Clients.TryAdd(_rnd.Next(100000000,999999999), new()
         {
-            Again:
-            var y = _cachingService.Clients.TryAdd(_rnd.Next(100000000,999999999), new()
+            StreamId = request.Context.ConnectionId,
+            Guid = request.Client.Guid,
+            Name = request.Client.Name
+        });
+        if (!y)
+        {
+            goto Again;
+        }
+        RememberClient(request);
+
+        Console.WriteLine($"Connection Registered with ID {request.Context.ConnectionId} : {request.Client.Guid} [{request.Context.Features.Get<IHttpTransportFeature>()?.TransportType.ToString()}] : {request.Client.Name}");
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted
+        };
+
+    }
+    private async Task RememberClient(RegisterClientCmd request)
+    {
+        if (_cachingService.AbsoluteClients.All(i => i.Value.Guid != request.Client.Guid))
+        {
+            _cachingService.AbsoluteClients.TryAdd(_cachingService.AbsoluteClients.Count , new()
             {
                 StreamId = request.Context.ConnectionId,
                 Guid = request.Client.Guid,
                 Name = request.Client.Name
             });
-            if (!y)
-            {
-                goto Again;
-            }
-            RememberClient(request);
-
-            Console.WriteLine($"Connection Registered with ID {request.Context.ConnectionId} : {request.Client.Guid} [{request.Context.Features.Get<IHttpTransportFeature>()?.TransportType.ToString()}] : {request.Client.Name}");
-            return new()
-            {
-                HttpStatusCode = HttpStatusCode.Accepted
-            };
-
         }
-        private async Task RememberClient(RegisterClientCmd request)
+        else
         {
-            if (_cachingService.AbsoluteClients.All(i => i.Value.Guid != request.Client.Guid))
-            {
-                _cachingService.AbsoluteClients.TryAdd(_cachingService.AbsoluteClients.Count , new()
-                {
-                    StreamId = request.Context.ConnectionId,
-                    Guid = request.Client.Guid,
-                    Name = request.Client.Name
-                });
-            }
-            else
-            {
-                var client = _cachingService.AbsoluteClients.FirstOrDefault(i => i.Value.Guid != request.Client.Guid);
-                client.Value.StreamId = request.Context.ConnectionId;
-            }
+            var client = _cachingService.AbsoluteClients.FirstOrDefault(i => i.Value.Guid != request.Client.Guid);
+            client.Value.StreamId = request.Context.ConnectionId;
         }
     }
 }

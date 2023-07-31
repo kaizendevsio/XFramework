@@ -25,7 +25,7 @@ public class GetHospitalTagHandler : QueryBaseHandler, IRequestHandler<GetHospit
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

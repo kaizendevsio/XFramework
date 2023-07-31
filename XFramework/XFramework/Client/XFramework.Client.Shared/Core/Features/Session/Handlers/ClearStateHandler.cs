@@ -22,7 +22,7 @@ public partial class SessionState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(ClearState state, CancellationToken aCancellationToken)
+        public override async Task Handle(ClearState state, CancellationToken aCancellationToken)
         {
             try
             {
@@ -33,7 +33,7 @@ public partial class SessionState
             {
                 Console.WriteLine(e);
             }
-            return Unit.Value;
+            return;
         }
     }
 }

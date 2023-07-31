@@ -43,7 +43,7 @@ public partial class MemberState
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
                 Message = "Success",
-                IsSuccess = true,
+                
             };
         }
     }

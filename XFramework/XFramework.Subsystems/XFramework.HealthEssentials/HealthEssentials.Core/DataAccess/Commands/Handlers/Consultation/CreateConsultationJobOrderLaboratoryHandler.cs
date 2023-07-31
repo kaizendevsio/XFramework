@@ -59,7 +59,7 @@ public class CreateConsultationJobOrderLaboratoryHandler : CommandBaseHandler, I
         {
             Message = $"Consultation Job Order Laboratory with Guid {consultationJobOrderLaboratory.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

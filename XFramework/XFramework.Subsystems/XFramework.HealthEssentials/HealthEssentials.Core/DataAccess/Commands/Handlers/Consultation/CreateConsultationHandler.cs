@@ -33,7 +33,7 @@ public class CreateConsultationHandler : CommandBaseHandler, IRequestHandler<Cre
         {
             Message = $"Consultation with Guid {consultation.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

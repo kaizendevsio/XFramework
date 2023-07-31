@@ -26,7 +26,7 @@ public class GetConsultationJobOrderLaboratoryListHandler : QueryBaseHandler, IR
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No consultation job order laboratory found",
-                IsSuccess = true
+                
             };
         }
         
@@ -34,7 +34,7 @@ public class GetConsultationJobOrderLaboratoryListHandler : QueryBaseHandler, IR
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Consultation job order laboratory found",
-            IsSuccess = true,
+            
             Response = consultationJobOrderLaboratory.Adapt<List<ConsultationJobOrderLaboratoryResponse>>()
         };
     }

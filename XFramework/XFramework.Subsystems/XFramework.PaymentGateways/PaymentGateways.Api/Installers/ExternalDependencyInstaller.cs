@@ -6,20 +6,19 @@ using System.Reflection;
 using PaymentGateways.Core.DataAccess.Commands.Handlers;
 using PaymentGateways.Core.PipelineBehaviors;
 
-namespace PaymentGateways.Api.Installers
+namespace PaymentGateways.Api.Installers;
+
+public class ExternalDependencyInstaller : IInstaller
 {
-    public class ExternalDependencyInstaller : IInstaller
+    public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
-        {
-            // MediatR
-            services.AddMediatR(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+        // MediatR
+        services.AddMediatR(o => o.RegisterServicesFromAssemblyContaining<CommandBaseHandler>());
 
-            // FluentValidation
-            services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
-            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
+        // FluentValidation
+        services.AddValidatorsFromAssembly(typeof(CommandBaseHandler).GetTypeInfo().Assembly);
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
 
 
-        }
     }
 }

@@ -25,7 +25,7 @@ public class GetUnitHandler : QueryBaseHandler, IRequestHandler<GetUnitQuery, Qu
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No unit found",
-                IsSuccess = true
+                
             };
         }
 

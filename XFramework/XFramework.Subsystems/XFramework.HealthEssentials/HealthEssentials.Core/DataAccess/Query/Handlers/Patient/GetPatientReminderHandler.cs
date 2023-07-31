@@ -25,7 +25,7 @@ public class GetPatientReminderHandler : QueryBaseHandler, IRequestHandler<GetPa
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
         

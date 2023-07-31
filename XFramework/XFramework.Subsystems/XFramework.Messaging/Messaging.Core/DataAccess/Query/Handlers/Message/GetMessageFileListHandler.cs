@@ -27,7 +27,7 @@ public class GetMessageFileListHandler : QueryBaseHandler, IRequestHandler<GetMe
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 
@@ -35,7 +35,6 @@ public class GetMessageFileListHandler : QueryBaseHandler, IRequestHandler<GetMe
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data found",
-            IsSuccess = true,
             Response = file.Adapt<List<MessageFileResponse>>()
         }; 
 

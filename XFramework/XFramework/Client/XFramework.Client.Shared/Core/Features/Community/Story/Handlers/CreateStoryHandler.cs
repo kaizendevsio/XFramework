@@ -24,7 +24,7 @@ public partial class StoryState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(CreateStory action, CancellationToken aCancellationToken)
+        public override async Task Handle(CreateStory action, CancellationToken aCancellationToken)
         {
             throw new NotImplementedException();
         }

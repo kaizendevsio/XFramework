@@ -45,7 +45,7 @@ public class CreateScheduleHandler : CommandBaseHandler, IRequestHandler<CreateS
         {
             Message = $"Schedule with Guid {schedule.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

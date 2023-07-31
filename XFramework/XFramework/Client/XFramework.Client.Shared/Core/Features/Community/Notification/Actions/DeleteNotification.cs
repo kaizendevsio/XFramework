@@ -2,7 +2,7 @@
 
 public partial class NotificationState
 {
-    public class DeleteNotification : IAction
+    public class DeleteNotification : BaseAction
     {
     }
 }

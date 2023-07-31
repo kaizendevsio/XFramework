@@ -26,7 +26,7 @@ public class GetLogisticRiderTagListHandler : QueryBaseHandler, IRequestHandler<
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Logistic rider tag found",
-                IsSuccess = true
+                
             };
         }
         
@@ -34,7 +34,7 @@ public class GetLogisticRiderTagListHandler : QueryBaseHandler, IRequestHandler<
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Logistic rider tag found",
-            IsSuccess = true,
+            
             Response = riderTag.Adapt<List<LogisticRiderTagResponse>>()
         };
     }

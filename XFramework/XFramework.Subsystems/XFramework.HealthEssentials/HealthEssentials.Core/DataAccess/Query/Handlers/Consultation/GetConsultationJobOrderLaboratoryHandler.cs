@@ -24,7 +24,7 @@ public class GetConsultationJobOrderLaboratoryHandler : QueryBaseHandler, IReque
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

@@ -362,7 +362,7 @@ public class BaseActionHandler
     }
 }
 
-public abstract class ActionHandler<TAction> : BaseActionHandler, IRequestHandler<TAction>, IRequestHandler<TAction, Unit>
+public abstract class ActionHandler<TAction> : BaseActionHandler, IRequestHandler<TAction>
     where TAction : IAction
 {
     protected ActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store)
@@ -379,7 +379,7 @@ public abstract class ActionHandler<TAction> : BaseActionHandler, IRequestHandle
         Mediator = mediator;
         Store = store;
     }
-    public abstract Task<Unit> Handle(TAction action, CancellationToken aCancellationToken);
+    public abstract Task Handle(TAction action, CancellationToken aCancellationToken);
 }
 
 public abstract class EventHandler<TAction> : BaseActionHandler, INotificationHandler<TAction>

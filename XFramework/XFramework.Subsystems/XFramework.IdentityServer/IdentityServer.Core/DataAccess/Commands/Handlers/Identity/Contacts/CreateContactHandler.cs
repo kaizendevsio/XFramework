@@ -108,7 +108,6 @@ public class CreateContactHandler : CommandBaseHandler, IRequestHandler<CreateCo
                     return new()
                     {
                         HttpStatusCode = HttpStatusCode.Conflict,
-                        IsSuccess = true,
                         Message = "Unable to send message: OTP message template could not be found"
                     };
                 }

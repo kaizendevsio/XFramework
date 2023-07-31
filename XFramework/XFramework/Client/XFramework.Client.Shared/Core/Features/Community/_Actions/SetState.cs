@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Community;
 
 public partial class CommunityState
 {
-    public class SetState : IAction
+    public class SetState : BaseAction
     {
         public DateTime LastPull { get; set; }
         public List<CommunityContentResponse> ProfileWallContentList { get; set; }

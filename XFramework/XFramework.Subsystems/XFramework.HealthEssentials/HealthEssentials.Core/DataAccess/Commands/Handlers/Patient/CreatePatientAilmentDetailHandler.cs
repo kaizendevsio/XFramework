@@ -45,7 +45,7 @@ public class CreatePatientAilmentDetailHandler : CommandBaseHandler, IRequestHan
         {
             Message = $"Patient Ailment Detail with Guid {detail.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

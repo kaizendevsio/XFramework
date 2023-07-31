@@ -45,7 +45,7 @@ public class CreateLaboratoryTagHandler : CommandBaseHandler, IRequestHandler<Cr
         {
             Message = $"Laboratory Tag with Guid {laboratoryTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
 
     }

@@ -6,19 +6,18 @@ using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.BusinessObjects;
 
-namespace StreamFlow.Stream.Services.Entity.Events
-{
-    public class PushMessageCmd : CommandBaseEntity, IRequest<CmdResponse<PushMessageCmd>>
-    {
-        public PushMessageCmd()
-        {
-            
-        }
+namespace StreamFlow.Stream.Services.Entity.Events;
 
-        public PushMessageCmd(StreamFlowMessageBO messageQueue)
-        {
-            MessageQueue = messageQueue;
-        }
-        public StreamFlowMessageBO MessageQueue { get; set; }
+public class PushMessageCmd : CommandBaseEntity, IRequest<CmdResponse<PushMessageCmd>>
+{
+    public PushMessageCmd()
+    {
+            
     }
+
+    public PushMessageCmd(StreamFlowMessageBO messageQueue)
+    {
+        MessageQueue = messageQueue;
+    }
+    public StreamFlowMessageBO MessageQueue { get; set; }
 }

@@ -1,7 +1,6 @@
-﻿namespace PaymentGateways.Core.DataAccess.Query.Entity
+﻿namespace PaymentGateways.Core.DataAccess.Query.Entity;
+
+public class QueryBaseEntity
 {
-    public class QueryBaseEntity
-    {
-        public RequestServerBO RequestServer { get; set; }
-    }
+    public RequestServerBO RequestServer { get; set; }
 }

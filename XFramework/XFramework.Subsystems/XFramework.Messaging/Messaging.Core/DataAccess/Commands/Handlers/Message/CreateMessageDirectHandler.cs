@@ -44,7 +44,6 @@ public class CreateMessageDirectHandler : CommandBaseHandler, IRequestHandler<Cr
         {
             Message = $"Message with guid {direct.Guid} created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
         };
     }
 }

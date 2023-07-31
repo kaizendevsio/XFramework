@@ -21,7 +21,7 @@ public class GetPharmacyServiceEntityGroupHandler : QueryBaseHandler, IRequestHa
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 

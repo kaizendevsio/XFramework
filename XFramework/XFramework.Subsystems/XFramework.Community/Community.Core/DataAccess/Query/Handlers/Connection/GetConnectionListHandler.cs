@@ -20,7 +20,7 @@ public class GetConnectionListHandler : QueryBaseHandler, IRequestHandler<GetCon
             {
                 Message = $"Connection entity with guid {request.ConnectionEntityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
         
@@ -31,7 +31,7 @@ public class GetConnectionListHandler : QueryBaseHandler, IRequestHandler<GetCon
             {
                 Message = $"Community identity with guid {request.CommunityIdentityGuid} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
-                IsSuccess = false
+                
             };
         }
 
@@ -62,14 +62,13 @@ public class GetConnectionListHandler : QueryBaseHandler, IRequestHandler<GetCon
             {
                 Message = $"No connections exist",
                 HttpStatusCode = HttpStatusCode.NoContent,
-                IsSuccess = false
+                
             };
         }
         
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
             Response = connectionList
         };
     }

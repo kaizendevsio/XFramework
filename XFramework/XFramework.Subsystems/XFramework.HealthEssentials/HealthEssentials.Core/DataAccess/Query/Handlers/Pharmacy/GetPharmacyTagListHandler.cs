@@ -26,7 +26,7 @@ public class GetPharmacyTagListHandler : QueryBaseHandler, IRequestHandler<GetPh
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
         
@@ -34,7 +34,7 @@ public class GetPharmacyTagListHandler : QueryBaseHandler, IRequestHandler<GetPh
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data found",
-            IsSuccess = true,
+            
             Response = pharmacyTag.Adapt<List<PharmacyTagResponse>>()
         };
     }

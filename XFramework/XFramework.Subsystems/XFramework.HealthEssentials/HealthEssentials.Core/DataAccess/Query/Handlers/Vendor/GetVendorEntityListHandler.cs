@@ -27,7 +27,7 @@ public class GetVendorEntityListHandler : QueryBaseHandler, IRequestHandler<GetV
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetVendorEntityListHandler : QueryBaseHandler, IRequestHandler<GetV
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Records found",
-            IsSuccess = true,
+            
             Response = entity.Adapt<List<VendorEntityResponse>>()
         };
     }

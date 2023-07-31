@@ -33,7 +33,7 @@ public class CreateHospitalHandler : CommandBaseHandler, IRequestHandler<CreateH
         {
             Message = $"Hospital {hospital.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

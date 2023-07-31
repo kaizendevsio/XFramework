@@ -34,7 +34,7 @@ public class CreateLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
         {
             Message = $"Laboratory service entity with Guid {serviceEntity.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
            
         };
     }

@@ -22,7 +22,7 @@ public partial class AddressState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(SetState action, CancellationToken aCancellationToken)
+        public override async Task Handle(SetState action, CancellationToken aCancellationToken)
         {
             try
             {
@@ -33,7 +33,7 @@ public partial class AddressState
             {
                 Console.WriteLine(e);
             }
-            return Unit.Value;
+            return;
         }
     }
 }

@@ -2,7 +2,7 @@
 
 public partial class ShopState
 {
-    public class DeleteShop : IAction
+    public class DeleteShop : BaseAction
     {
     }
 }

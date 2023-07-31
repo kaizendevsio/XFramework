@@ -40,7 +40,7 @@ public partial class SessionState
             if (await CheckDuplicateRecords(action)) return new()
             {
                 HttpStatusCode = HttpStatusCode.NotAcceptable,
-                IsSuccess = false
+                
             };
 
             // Check If Passwords Are Correct
@@ -50,7 +50,7 @@ public partial class SessionState
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.BadRequest,
-                    IsSuccess = false
+                    
                 };
             }
             
@@ -67,7 +67,7 @@ public partial class SessionState
             if (await HandleFailure(identity, action)) return new()
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError,
-                IsSuccess = false
+                
             };;
             
             // Send Create Credential Request
@@ -80,7 +80,7 @@ public partial class SessionState
             if (await HandleFailure(credential, action)) return new()
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError,
-                IsSuccess = false
+                
             };
             
             // Send Create Phone Contact Request
@@ -96,7 +96,7 @@ public partial class SessionState
             if (await HandleFailure(phoneContact, action)) return new()
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError,
-                IsSuccess = false
+                
             };
             
             // Send Create Email Contact Request
@@ -111,7 +111,7 @@ public partial class SessionState
             if (await HandleFailure(emailContact, action)) return new()
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError,
-                IsSuccess = false
+                
             };
 
             // If WalletList property is provided, automatically create wallets
@@ -151,7 +151,7 @@ public partial class SessionState
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Accepted,
-                    IsSuccess = true
+                    
                 };
             }
             
@@ -164,7 +164,7 @@ public partial class SessionState
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };;
         }
 

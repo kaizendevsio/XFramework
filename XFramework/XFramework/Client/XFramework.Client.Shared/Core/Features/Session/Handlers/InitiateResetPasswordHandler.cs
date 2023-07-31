@@ -52,7 +52,7 @@ public partial class SessionState
                 SweetAlertService.FireAsync("Error", $"{e.Message}", SweetAlertIcon.Error);
                 return new()
                 {
-                    IsSuccess = false,
+                    
                     Message = e.Message,
                     HttpStatusCode = HttpStatusCode.InternalServerError,
                 };
@@ -62,7 +62,7 @@ public partial class SessionState
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
-                IsSuccess = true
+                
             };
         }
     }

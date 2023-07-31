@@ -1,11 +1,10 @@
 ﻿using System.Net;
 
-namespace StreamFlow.Domain.Generic.Contracts.Responses
+namespace StreamFlow.Domain.Generic.Contracts.Responses;
+
+public class StreamFlowInvokeResponse
 {
-    public class StreamFlowInvokeResponse
-    {
-        public HttpStatusCode HttpStatusCode { get; set; }
-        public string Message { get; set; }
-        public string Response { get; set; }   
-    }
+    public HttpStatusCode HttpStatusCode { get; set; }
+    public string Message { get; set; }
+    public string Response { get; set; }   
 }

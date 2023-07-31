@@ -30,7 +30,7 @@ public partial class CommunityState
             Store = store;
         }
 
-        public override async Task<Unit> Handle(AddGroupMemberRequest action, CancellationToken aCancellationToken)
+        public override async Task Handle(AddGroupMemberRequest action, CancellationToken aCancellationToken)
         {
             var result = await CommunityServiceWrapper.CreateConnection(new()
             {
@@ -41,7 +41,7 @@ public partial class CommunityState
             
             await HandleFailure(result, action);
             await HandleSuccess(result, action);
-            return Unit.Value;
+            return;
         }
     }
 }

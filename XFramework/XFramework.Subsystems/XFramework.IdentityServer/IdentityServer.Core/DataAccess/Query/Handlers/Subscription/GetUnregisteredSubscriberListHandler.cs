@@ -20,7 +20,6 @@ public class GetUnregisteredSubscriberListHandler : QueryBaseHandler, IRequestHa
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No subscriptions found",
-                IsSuccess = true,
             };
         }
 
@@ -28,7 +27,6 @@ public class GetUnregisteredSubscriberListHandler : QueryBaseHandler, IRequestHa
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Subscriptions found",
-            IsSuccess = true,
             Response = subscriptions.Adapt<List<SubscriptionResponse>>()
         };
     }

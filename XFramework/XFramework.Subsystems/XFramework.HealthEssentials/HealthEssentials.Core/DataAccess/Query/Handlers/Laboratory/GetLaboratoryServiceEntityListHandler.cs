@@ -26,7 +26,7 @@ public class GetLaboratoryServiceEntityListHandler : QueryBaseHandler, IRequestH
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Laboratory Service Entity Found",
-                IsSuccess = true
+                
             };
         }
         

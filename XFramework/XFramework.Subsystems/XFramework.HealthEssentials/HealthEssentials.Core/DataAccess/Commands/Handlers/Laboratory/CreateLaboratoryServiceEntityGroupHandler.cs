@@ -23,7 +23,7 @@ public class CreateLaboratoryServiceEntityGroupHandler : CommandBaseHandler, IRe
         {
             Message = $"Laboratory service entity group with Guid {serviceEntityGroup.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

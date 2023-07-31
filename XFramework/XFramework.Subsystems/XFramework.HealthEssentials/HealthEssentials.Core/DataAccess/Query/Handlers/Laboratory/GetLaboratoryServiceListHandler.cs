@@ -30,7 +30,7 @@ public class GetLaboratoryServiceListHandler : QueryBaseHandler, IRequestHandler
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No records found",
-                IsSuccess = true
+                
             };
         }
         

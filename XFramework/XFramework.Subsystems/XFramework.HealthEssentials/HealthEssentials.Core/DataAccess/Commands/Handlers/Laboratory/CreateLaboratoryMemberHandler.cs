@@ -59,7 +59,7 @@ public class CreateLaboratoryMemberHandler : CommandBaseHandler, IRequestHandler
         {
             Message = $"Laboratory member with Guid {laboratoryMember.Guid} has been created",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

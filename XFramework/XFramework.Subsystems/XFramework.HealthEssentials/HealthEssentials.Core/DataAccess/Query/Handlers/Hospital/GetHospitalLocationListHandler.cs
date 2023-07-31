@@ -27,7 +27,7 @@ public class GetHospitalLocationListHandler : QueryBaseHandler, IRequestHandler<
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No hospital location found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetHospitalLocationListHandler : QueryBaseHandler, IRequestHandler<
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Hospital location found",
-            IsSuccess = true,
+            
             Response = location.Adapt<List<HospitalLocationResponse>>()
         };
     }

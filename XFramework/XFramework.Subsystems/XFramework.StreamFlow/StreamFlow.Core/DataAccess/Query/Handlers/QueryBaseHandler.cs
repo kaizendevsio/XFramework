@@ -4,17 +4,16 @@ using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Interfaces;
 
-namespace StreamFlow.Core.DataAccess.Query.Handlers
+namespace StreamFlow.Core.DataAccess.Query.Handlers;
+
+public class QueryBaseHandler
 {
-    public class QueryBaseHandler
-    {
-        public IDataLayer _dataLayer;
-        public ICachingService _cachingService;
-        public IHelperService _helperService;
-        public IConfiguration _configuration;
-        public IJwtService _jwtService;
-        public JwtOptionsBO _jwtOptions;
+    public IDataLayer _dataLayer;
+    public ICachingService _cachingService;
+    public IHelperService _helperService;
+    public IConfiguration _configuration;
+    public IJwtService _jwtService;
+    public JwtOptionsBO _jwtOptions;
 
 
-    }
 }

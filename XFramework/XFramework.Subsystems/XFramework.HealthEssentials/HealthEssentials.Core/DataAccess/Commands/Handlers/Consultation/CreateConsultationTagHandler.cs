@@ -45,7 +45,7 @@ public class CreateConsultationTagHandler : CommandBaseHandler, IRequestHandler<
         {
             Message = $"Consultation Tag with Guid {consultationTag.Guid} created successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            IsSuccess = true,
+            
         };
     }
 }

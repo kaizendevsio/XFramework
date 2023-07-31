@@ -25,7 +25,7 @@ public class GetMessageThreadMemberGroupListHandler : QueryBaseHandler, IRequest
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Message Thread Member Groups Found",
-                IsSuccess = true
+                
             };
         }
 
@@ -33,7 +33,6 @@ public class GetMessageThreadMemberGroupListHandler : QueryBaseHandler, IRequest
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Message Thread Member Groups Found",
-            IsSuccess = true,
             Response = group.Adapt<List<MessageThreadMemberGroupResponse>>()
         }; 
     }

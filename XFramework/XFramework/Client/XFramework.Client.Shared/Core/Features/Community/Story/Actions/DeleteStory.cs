@@ -2,7 +2,7 @@
 
 public partial class StoryState
 {
-    public class DeleteStory : IAction
+    public class DeleteStory : BaseAction
     {
     }
 }

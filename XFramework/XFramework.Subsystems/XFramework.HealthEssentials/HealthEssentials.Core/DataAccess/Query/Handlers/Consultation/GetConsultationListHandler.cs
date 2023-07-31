@@ -27,7 +27,7 @@ public class GetConsultationListHandler : QueryBaseHandler, IRequestHandler<GetC
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Consultation Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetConsultationListHandler : QueryBaseHandler, IRequestHandler<GetC
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Consultation Found",
-            IsSuccess = true,
+            
             Response = consultation.Adapt<List<ConsultationResponse>>()
         };
     }

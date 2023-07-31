@@ -27,7 +27,7 @@ public class GetHospitalLaboratoryListHandler : QueryBaseHandler, IRequestHandle
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No Hospital Laboratory Found",
-                IsSuccess = true
+                
             };
         }
         
@@ -35,7 +35,7 @@ public class GetHospitalLaboratoryListHandler : QueryBaseHandler, IRequestHandle
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Hospital Laboratory Found",
-            IsSuccess = true,
+            
             Response = laboratory.Adapt<List<HospitalLaboratoryResponse>>()
         };
         

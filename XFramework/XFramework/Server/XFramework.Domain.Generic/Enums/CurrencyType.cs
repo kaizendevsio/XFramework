@@ -1,8 +1,7 @@
-﻿namespace XFramework.Domain.Generic.Enums
+﻿namespace XFramework.Domain.Generic.Enums;
+
+public enum CurrencyType
 {
-    public enum CurrencyType
-    {
-        Fiat = 1,
-        Crypto = 2
-    }
+    Fiat = 1,
+    Crypto = 2
 }

@@ -2,7 +2,7 @@
 
 public partial class CommunityState
 {
-    public class UpdatePost : IAction
+    public class UpdatePost : BaseAction
     {
     }
 }

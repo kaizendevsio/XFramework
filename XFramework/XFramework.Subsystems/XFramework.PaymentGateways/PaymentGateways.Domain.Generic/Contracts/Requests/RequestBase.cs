@@ -1,9 +1,8 @@
 ﻿using XFramework.Domain.Generic.BusinessObjects;
 
-namespace PaymentGateways.Domain.Generic.Contracts.Requests
+namespace PaymentGateways.Domain.Generic.Contracts.Requests;
+
+public class RequestBase
 {
-    public class RequestBase
-    {
-        public RequestServerBO RequestServer { get; set; }
-    }
+    public RequestServerBO RequestServer { get; set; }
 }

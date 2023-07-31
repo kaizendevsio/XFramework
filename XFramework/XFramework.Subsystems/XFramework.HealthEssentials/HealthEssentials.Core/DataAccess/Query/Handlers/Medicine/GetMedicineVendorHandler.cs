@@ -25,7 +25,7 @@ public class GetMedicineVendorHandler : QueryBaseHandler, IRequestHandler<GetMed
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No record found",
-                IsSuccess = true
+                
             };
         }
 

@@ -46,7 +46,7 @@ public class GetPendingRegistrationCompletionListHandler : QueryBaseHandler, IRe
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No pending registration completion found",
-                IsSuccess = false,
+                
             };
         }
 
@@ -67,7 +67,7 @@ public class GetPendingRegistrationCompletionListHandler : QueryBaseHandler, IRe
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Pending registration completion found",
-            IsSuccess = true,
+            
             Response = pendingRegistrationCompletion.Adapt<List<CredentialResponse>>()
         };
     }

@@ -26,7 +26,7 @@ public class GetMessageDeliveryEntityListHandler : QueryBaseHandler, IRequestHan
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
 
@@ -34,7 +34,6 @@ public class GetMessageDeliveryEntityListHandler : QueryBaseHandler, IRequestHan
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Data found",
-            IsSuccess = true,
             Response = entity.Adapt<List<MessageDeliveryEntityResponse>>()
         }; 
 

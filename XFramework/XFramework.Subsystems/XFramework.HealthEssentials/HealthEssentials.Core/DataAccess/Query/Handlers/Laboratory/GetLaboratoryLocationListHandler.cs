@@ -29,7 +29,7 @@ public class GetLaboratoryLocationListHandler : QueryBaseHandler, IRequestHandle
             {
                 HttpStatusCode = HttpStatusCode.NoContent,
                 Message = "No data found",
-                IsSuccess = true
+                
             };
         }
         
@@ -37,7 +37,7 @@ public class GetLaboratoryLocationListHandler : QueryBaseHandler, IRequestHandle
         {
             HttpStatusCode = HttpStatusCode.Accepted,
             Message = "Laboratory location found",
-            IsSuccess = true,
+            
             Response = laboratoryLocation.Adapt<List<LaboratoryLocationResponse>>()
         };
     }

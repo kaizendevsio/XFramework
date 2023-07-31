@@ -2,7 +2,7 @@
 
 public partial class PageState
 {
-    public class DeletePage : IAction
+    public class DeletePage : BaseAction
     {
     }
 }
