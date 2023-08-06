@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Tag;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Tag;
 
@@ -22,7 +22,7 @@ public class CreateTagEntityHandler : CommandBaseHandler, IRequestHandler<Create
             };
         }
 
-        var entity = request.Adapt<TagEntity>();
+        var entity = request.Adapt<TagType>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.Group = group;
         

@@ -21,9 +21,9 @@ public class CreateTagHandler : CommandBaseHandler, IRequestHandler<CreateTagCmd
             };
         }
 
-        var tag = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Tag>();
+        var tag = request.Adapt<Domain.Generics.Contracts.Tag>();
         tag.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        tag.Entity = entity;
+        tag.Type = entity;
         
         await _dataLayer.HealthEssentialsContext.Tags.AddAsync(tag, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

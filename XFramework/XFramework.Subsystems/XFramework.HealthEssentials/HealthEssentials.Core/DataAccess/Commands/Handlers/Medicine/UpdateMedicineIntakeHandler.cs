@@ -33,7 +33,7 @@ public class UpdateMedicineIntakeHandler : CommandBaseHandler, IRequestHandler<U
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedIntake.Entity = entity;
+            updatedIntake.Type = entity;
         }
 
         if (request.UnitGuid is null)

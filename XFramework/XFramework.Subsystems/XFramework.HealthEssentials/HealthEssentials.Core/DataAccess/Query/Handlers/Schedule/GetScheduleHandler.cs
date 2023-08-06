@@ -13,7 +13,7 @@ public class GetScheduleHandler : QueryBaseHandler, IRequestHandler<GetScheduleQ
     public async Task<QueryResponse<ScheduleResponse>> Handle(GetScheduleQuery request, CancellationToken cancellationToken)
     {
         var schedule = await _dataLayer.HealthEssentialsContext.Schedules
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .Include(x => x.Priority)
             .AsSplitQuery()
             .AsNoTracking()

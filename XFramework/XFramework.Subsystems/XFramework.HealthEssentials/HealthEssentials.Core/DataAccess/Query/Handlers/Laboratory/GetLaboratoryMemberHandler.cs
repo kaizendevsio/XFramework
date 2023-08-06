@@ -1,5 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Laboratory;

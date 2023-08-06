@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Hospital;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Hospital;
 
@@ -12,7 +12,7 @@ public class CreateHospitalServiceEntityGroupHandler : CommandBaseHandler, IRequ
 
     public async Task<CmdResponse<CreateHospitalServiceEntityGroupCmd>> Handle(CreateHospitalServiceEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var group = request.Adapt<HospitalServiceEntityGroup>();
+        var group = request.Adapt<HospitalServiceTypeGroup>();
         group.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         
         await _dataLayer.HealthEssentialsContext.HospitalServiceEntityGroups.AddAsync(group, CancellationToken.None);

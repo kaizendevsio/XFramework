@@ -13,7 +13,7 @@ public class GetTagListHandler : QueryBaseHandler, IRequestHandler<GetTagListQue
     public async Task<QueryResponse<List<TagResponse>>> Handle(GetTagListQuery request, CancellationToken cancellationToken)
     {
         var tag = await _dataLayer.HealthEssentialsContext.Tags
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)

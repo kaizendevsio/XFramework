@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
-using HealthEssentials.Domain.DataTransferObjects;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using XFramework.Domain.Generic.Contracts;
 using XFramework.Integration.Converters;
 
 namespace HealthEssentials.Domain.BusinessObjects;

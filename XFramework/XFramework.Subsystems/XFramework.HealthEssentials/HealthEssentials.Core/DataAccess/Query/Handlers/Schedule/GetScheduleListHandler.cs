@@ -13,7 +13,7 @@ public class GetScheduleListHandler : QueryBaseHandler, IRequestHandler<GetSched
     public async Task<QueryResponse<List<ScheduleResponse>>> Handle(GetScheduleListQuery request, CancellationToken cancellationToken)
     {
         var schedule = await _dataLayer.HealthEssentialsContext.Schedules
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .Include(x => x.Priority)
             .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)

@@ -44,7 +44,7 @@ public class ConcludeLiveConsultationHandler : CommandBaseHandler, IRequestHandl
 
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
             .Include(i => i.IdentityContacts)
-            .ThenInclude(i => i.Entity)
+            .ThenInclude(i => i.Type)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialGuid, CancellationToken.None);
         if (credential is null)
@@ -56,7 +56,7 @@ public class ConcludeLiveConsultationHandler : CommandBaseHandler, IRequestHandl
             };
         }
         
-        var contact = credential.IdentityContacts.FirstOrDefault(i => i.Entity?.Name == "Phone")?.Value;
+        var contact = credential.IdentityContacts.FirstOrDefault(i => i.Type?.Name == "Phone")?.Value;
         if (contact is null)
         {
             return new ()

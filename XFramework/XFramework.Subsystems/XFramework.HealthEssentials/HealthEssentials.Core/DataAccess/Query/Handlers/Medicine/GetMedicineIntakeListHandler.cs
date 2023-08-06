@@ -13,7 +13,7 @@ public class GetMedicineIntakeListHandler : QueryBaseHandler, IRequestHandler<Ge
     public async Task<QueryResponse<List<MedicineIntakeResponse>>> Handle(GetMedicineIntakeListQuery request, CancellationToken cancellationToken)
     {
         var intake = await _dataLayer.HealthEssentialsContext.MedicineIntakes
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .Include(x => x.Unit)
             .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)

@@ -14,7 +14,7 @@ public class GetHospitalServiceHandler : QueryBaseHandler, IRequestHandler<GetHo
     public async Task<QueryResponse<HospitalServiceResponse>> Handle(GetHospitalServiceQuery request, CancellationToken cancellationToken)
     {
         var service = await _dataLayer.HealthEssentialsContext.HospitalServices
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Include(x => x.HospitalLocation)
             .ThenInclude(x => x.Hospital)

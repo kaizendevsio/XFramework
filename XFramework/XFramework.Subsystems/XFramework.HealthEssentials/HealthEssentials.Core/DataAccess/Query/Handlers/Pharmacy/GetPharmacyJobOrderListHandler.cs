@@ -1,5 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Pharmacy;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using XFramework.Domain.Generic.Enums;
 
@@ -66,7 +65,7 @@ public class GetPharmacyJobOrderListHandler : QueryBaseHandler, IRequestHandler<
                 .AsNoTracking()
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
-                .ThenInclude(i => i.Entity)
+                .ThenInclude(i => i.Type)
                 .AsSplitQuery()
                 .Where(i => i.Guid == response[index].Patient.CredentialGuid)
                 .FirstOrDefault()?

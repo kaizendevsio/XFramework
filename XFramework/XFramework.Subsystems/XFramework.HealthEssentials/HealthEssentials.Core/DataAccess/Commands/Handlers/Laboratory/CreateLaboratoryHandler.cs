@@ -1,7 +1,6 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 
@@ -29,10 +28,10 @@ public class CreateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Creat
             };
         }
 
-        var laboratory = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Laboratory>();
+        var laboratory = request.Adapt<Domain.Generics.Contracts.Laboratory>();
         laboratory.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         laboratory.Status = (int) GenericStatusType.Pending;
-        laboratory.Entity = entity;
+        laboratory.Type = entity;
         
         await _dataLayer.HealthEssentialsContext.Laboratories.AddAsync(laboratory, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

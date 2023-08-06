@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Logistic;
 
@@ -12,7 +12,7 @@ public class CreateLogisticEntityHandler : CommandBaseHandler, IRequestHandler<C
     
     public async Task<CmdResponse<CreateLogisticEntityCmd>> Handle(CreateLogisticEntityCmd request, CancellationToken cancellationToken)
     {
-        var entity = request.Adapt<LogisticEntity>();
+        var entity = request.Adapt<LogisticType>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
 
         await _dataLayer.HealthEssentialsContext.LogisticEntities.AddAsync(entity, CancellationToken.None);

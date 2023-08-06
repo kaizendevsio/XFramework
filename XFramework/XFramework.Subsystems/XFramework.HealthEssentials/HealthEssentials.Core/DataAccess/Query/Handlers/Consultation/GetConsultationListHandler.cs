@@ -12,7 +12,7 @@ public class GetConsultationListHandler : QueryBaseHandler, IRequestHandler<GetC
     public async Task<QueryResponse<List<ConsultationResponse>>> Handle(GetConsultationListQuery request, CancellationToken cancellationToken)
     {
         var consultation = await _dataLayer.HealthEssentialsContext.Consultations
-            .Include(i => i.Entity)
+            .Include(i => i.Type)
             .ThenInclude(i => i.Group)
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .OrderBy(i => i.Name)

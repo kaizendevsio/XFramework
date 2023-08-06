@@ -6,11 +6,4 @@
         <Nullable>enable</Nullable>
         <LangVersion>11</LangVersion>
     </PropertyGroup>
-
-    <ItemGroup>
-      <Folder Include="Contracts\Requests\Check" />
-      <Folder Include="Contracts\Requests\Delete" />
-      <Folder Include="Contracts\Requests\Get" />
-      <Folder Include="Contracts\Requests\Update" />
-    </ItemGroup>
 </Project>

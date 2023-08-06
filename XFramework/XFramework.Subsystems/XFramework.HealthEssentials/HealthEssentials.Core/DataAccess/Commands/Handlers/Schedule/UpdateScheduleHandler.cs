@@ -33,7 +33,7 @@ public class UpdateScheduleHandler : CommandBaseHandler, IRequestHandler<UpdateS
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedSchedule.Entity = entity;
+            updatedSchedule.Type = entity;
         }
 
         if (request.PriorityGuid is null)

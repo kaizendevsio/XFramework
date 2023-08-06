@@ -32,7 +32,7 @@ public class UpdateLaboratoryServiceHandler : CommandBaseHandler, IRequestHandle
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLaboratoryService.Entity = serviceEntity;
+            updatedLaboratoryService.Type = serviceEntity;
         }
 
         if (request.LaboratoryGuid is null)

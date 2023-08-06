@@ -1,4 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 
@@ -11,7 +12,7 @@ public class CreateConsultationEntityGroupHandler : CommandBaseHandler, IRequest
     
     public async Task<CmdResponse<CreateConsultationEntityGroupCmd>> Handle(CreateConsultationEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var group = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.ConsultationEntityGroup>();
+        var group = request.Adapt<ConsultationTypeGroup>();
         group.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         
         await _dataLayer.HealthEssentialsContext.ConsultationEntityGroups.AddAsync(group,CancellationToken.None);

@@ -11,7 +11,7 @@ public class GetConsultationHandler : QueryBaseHandler, IRequestHandler<GetConsu
     public async Task<QueryResponse<ConsultationResponse>> Handle(GetConsultationQuery request, CancellationToken cancellationToken)
     {
         var consultation = await _dataLayer.HealthEssentialsContext.Consultations
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .AsSplitQuery()
             .AsNoTracking()

@@ -33,7 +33,7 @@ public class UpdateLaboratoryHandler : CommandBaseHandler, IRequestHandler<Updat
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedLaboratory.Entity = entity;
+            updatedLaboratory.Type = entity;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedLaboratory);

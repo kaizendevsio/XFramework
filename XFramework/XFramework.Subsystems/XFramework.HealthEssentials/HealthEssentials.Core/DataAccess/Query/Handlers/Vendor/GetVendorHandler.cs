@@ -12,7 +12,7 @@ public class GetVendorHandler : QueryBaseHandler, IRequestHandler<GetVendorQuery
     public async Task<QueryResponse<VendorResponse>> Handle(GetVendorQuery request, CancellationToken cancellationToken)
     {
         var vendor = await _dataLayer.HealthEssentialsContext.Vendors
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .AsSplitQuery()
             .AsNoTracking()

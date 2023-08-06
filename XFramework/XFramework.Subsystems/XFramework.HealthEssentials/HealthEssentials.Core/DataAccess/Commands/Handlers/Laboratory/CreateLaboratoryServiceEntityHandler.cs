@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
@@ -22,7 +23,7 @@ public class CreateLaboratoryServiceEntityHandler : CommandBaseHandler, IRequest
             };
         }
 
-        var serviceEntity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.LaboratoryServiceEntity>();
+        var serviceEntity = request.Adapt<LaboratoryServiceType>();
         serviceEntity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         serviceEntity.Group = group;
         

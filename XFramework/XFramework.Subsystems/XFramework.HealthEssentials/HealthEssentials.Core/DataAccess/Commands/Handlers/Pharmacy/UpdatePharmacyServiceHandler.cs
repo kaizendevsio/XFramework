@@ -34,7 +34,7 @@ public class UpdatePharmacyServiceHandler : CommandBaseHandler, IRequestHandler<
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedService.Entity = entity;
+            updatedService.Type = entity;
         }
 
         if (request.PharmacyLocationGuid is null)

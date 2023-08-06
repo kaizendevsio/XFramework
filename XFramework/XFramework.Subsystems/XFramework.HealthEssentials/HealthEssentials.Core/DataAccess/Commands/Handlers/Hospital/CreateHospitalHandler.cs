@@ -21,9 +21,9 @@ public class CreateHospitalHandler : CommandBaseHandler, IRequestHandler<CreateH
             };
         }
 
-        var hospital = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Hospital>();
+        var hospital = request.Adapt<Domain.Generics.Contracts.Hospital>();
         hospital.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        hospital.Entity = entity;
+        hospital.Type = entity;
         
         await _dataLayer.HealthEssentialsContext.Hospitals.AddAsync(hospital, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

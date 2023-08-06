@@ -2,7 +2,6 @@
 using Azure.Storage.Blobs.Models;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 
@@ -30,10 +29,10 @@ public class CreatePharmacyHandler : CommandBaseHandler, IRequestHandler<CreateP
             };
         }
         
-        var pharmacy = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Pharmacy>();
+        var pharmacy = request.Adapt<Domain.Generics.Contracts.Pharmacy>();
         pharmacy.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         pharmacy.Status = (int) GenericStatusType.Pending;
-        pharmacy.Entity = entity;
+        pharmacy.Type = entity;
 
         await _dataLayer.HealthEssentialsContext.Pharmacies.AddAsync(pharmacy, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
 
@@ -57,7 +57,7 @@ public class CreatePharmacyServiceHandler : CommandBaseHandler, IRequestHandler<
         service.PharmacyLocation = location;
         service.Pharmacy = pharmacy;
         service.Unit = unit;
-        service.Entity = entity;
+        service.Type = entity;
         
         await _dataLayer.HealthEssentialsContext.PharmacyServices.AddAsync(service, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

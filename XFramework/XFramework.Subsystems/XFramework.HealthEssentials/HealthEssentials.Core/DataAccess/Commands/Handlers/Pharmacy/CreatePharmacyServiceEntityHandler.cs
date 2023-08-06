@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
 
@@ -22,7 +22,7 @@ public class CreatePharmacyServiceEntityHandler : CommandBaseHandler, IRequestHa
             };
         }
 
-        var entity = request.Adapt<PharmacyServiceEntity>();
+        var entity = request.Adapt<PharmacyServiceType>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.Group = group;
         

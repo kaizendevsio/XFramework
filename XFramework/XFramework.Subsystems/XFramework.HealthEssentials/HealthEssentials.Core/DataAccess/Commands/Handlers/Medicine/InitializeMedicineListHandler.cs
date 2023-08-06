@@ -49,7 +49,7 @@ public class InitializeMedicineListHandler : CommandBaseHandler, IRequestHandler
                 goto retry;
             }
             
-            var list = response.Data.Select(o => new Domain.DataTransferObjects.XnelSystemsHealthEssentials.Medicine
+            var list = response.Data.Select(o => new Domain.Generics.Contracts.Medicine
             {
                 EntityId = 1,
                 Name = o.Value,

@@ -13,7 +13,7 @@ public class GetMetaDatumListHandler : QueryBaseHandler, IRequestHandler<GetMeta
     public async Task<QueryResponse<List<MetaDatumResponse>>> Handle(GetMetaDatumListQuery request, CancellationToken cancellationToken)
     {
         var metaDatum = await _dataLayer.HealthEssentialsContext.MetaData
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .OrderBy(x => x.CreatedAt)
             .Take(request.PageSize)

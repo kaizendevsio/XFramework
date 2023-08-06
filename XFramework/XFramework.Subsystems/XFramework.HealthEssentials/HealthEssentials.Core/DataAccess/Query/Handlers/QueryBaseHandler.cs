@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Core.DataAccess.Query.Handlers;
+﻿using XFramework.Domain.Generic.Contracts;
+
+namespace HealthEssentials.Core.DataAccess.Query.Handlers;
 
 public class QueryBaseHandler
 {
@@ -8,7 +10,7 @@ public class QueryBaseHandler
     public IDataLayer _dataLayer4;
     public IDataLayer _dataLayer5;
         
-    public async Task<Domain.DataTransferObjects.Application> GetApplication(Guid? guid)
+    public async Task<Application> GetApplication(Guid? guid)
     {
         if (guid is null) return null;
         var entity = await _dataLayer.XnelSystemsContext.Applications

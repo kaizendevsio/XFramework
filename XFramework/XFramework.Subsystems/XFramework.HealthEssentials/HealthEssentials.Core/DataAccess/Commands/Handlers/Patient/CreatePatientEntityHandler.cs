@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Patient;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Patient;
 
@@ -22,7 +22,7 @@ public class CreatePatientEntityHandler : CommandBaseHandler, IRequestHandler<Cr
             };
         }
 
-        var entity = request.Adapt<PatientEntity>();
+        var entity = request.Adapt<PatientType>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.Group = group;
         

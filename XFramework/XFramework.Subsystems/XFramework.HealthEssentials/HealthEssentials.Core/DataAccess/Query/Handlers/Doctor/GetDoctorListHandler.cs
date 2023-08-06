@@ -32,7 +32,7 @@ public class GetDoctorListHandler : QueryBaseHandler, IRequestHandler<GetDoctorL
         {
            var a = await _dataLayer.XnelSystemsContext.IdentityCredentials
                 .Include(i => i.IdentityContacts)
-                .ThenInclude(i => i.Entity)
+                .ThenInclude(i => i.Type)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(i => i.Guid == item.CredentialGuid, CancellationToken.None);
 

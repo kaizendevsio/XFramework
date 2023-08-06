@@ -33,7 +33,7 @@ public class UpdateConsultationHandler : CommandBaseHandler, IRequestHandler<Upd
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedConsultation.Entity = consultationEntity;
+            updatedConsultation.Type = consultationEntity;
         }
         
         _dataLayer.HealthEssentialsContext.Update(updatedConsultation);

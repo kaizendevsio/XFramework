@@ -15,12 +15,12 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Folder Include="DataTransferObjects" />
         <Folder Include="Enums" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
     </ItemGroup>
     
 </Project>

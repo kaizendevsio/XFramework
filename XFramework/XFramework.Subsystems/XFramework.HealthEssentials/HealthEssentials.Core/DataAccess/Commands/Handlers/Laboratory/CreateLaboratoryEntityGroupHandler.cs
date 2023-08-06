@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Laboratory;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Laboratory;
 
@@ -12,7 +12,7 @@ public class CreateLaboratoryEntityGroupHandler : CommandBaseHandler, IRequestHa
     
     public async Task<CmdResponse<CreateLaboratoryEntityGroupCmd>> Handle(CreateLaboratoryEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var group = request.Adapt<LaboratoryEntityGroup>();
+        var group = request.Adapt<LaboratoryTypeGroup>();
         group.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
 
         await _dataLayer.HealthEssentialsContext.LaboratoryEntityGroups.AddAsync(group, CancellationToken.None);

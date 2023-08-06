@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
 
@@ -12,7 +12,7 @@ public class CreatePharmacyEntityHandler : CommandBaseHandler, IRequestHandler<C
 
     public async Task<CmdResponse<CreatePharmacyEntityCmd>> Handle(CreatePharmacyEntityCmd request, CancellationToken cancellationToken)
     {
-        var entity = request.Adapt<PharmacyEntity>();
+        var entity = request.Adapt<PharmacyType>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         
         await _dataLayer.HealthEssentialsContext.PharmacyEntities.AddAsync(entity, CancellationToken.None);

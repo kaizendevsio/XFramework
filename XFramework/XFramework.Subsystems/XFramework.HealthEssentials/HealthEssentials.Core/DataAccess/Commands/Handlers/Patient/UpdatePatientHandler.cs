@@ -46,7 +46,7 @@ public class UpdatePatientHandler : CommandBaseHandler, IRequestHandler<UpdatePa
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedPatient.Entity = entity;
+            updatedPatient.Type = entity;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedPatient);

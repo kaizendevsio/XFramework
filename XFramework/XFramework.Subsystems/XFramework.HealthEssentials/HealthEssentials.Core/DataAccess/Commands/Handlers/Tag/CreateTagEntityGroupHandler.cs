@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Tag;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Tag;
 
@@ -12,7 +12,7 @@ public class CreateTagEntityGroupHandler : CommandBaseHandler, IRequestHandler<C
 
     public async Task<CmdResponse<CreateTagEntityGroupCmd>> Handle(CreateTagEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var group = request.Adapt<TagEntityGroup>();
+        var group = request.Adapt<TagTypeGroup>();
         group.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
 
         await _dataLayer.HealthEssentialsContext.TagEntityGroups.AddAsync(group, CancellationToken.None);

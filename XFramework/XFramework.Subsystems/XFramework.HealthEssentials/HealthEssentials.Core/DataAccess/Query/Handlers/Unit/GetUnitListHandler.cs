@@ -13,7 +13,7 @@ public class GetUnitListHandler : QueryBaseHandler, IRequestHandler<GetUnitListQ
     public async Task<QueryResponse<List<UnitResponse>>> Handle(GetUnitListQuery request, CancellationToken cancellationToken)
     {
         var unit = await _dataLayer.HealthEssentialsContext.Units
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)

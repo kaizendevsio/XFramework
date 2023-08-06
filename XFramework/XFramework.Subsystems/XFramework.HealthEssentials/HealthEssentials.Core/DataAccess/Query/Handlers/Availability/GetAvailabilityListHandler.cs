@@ -13,7 +13,7 @@ public class GetAvailabilityListHandler : QueryBaseHandler, IRequestHandler<GetA
     public async Task<QueryResponse<List<AvailabilityResponse>>> Handle(GetAvailabilityListQuery request, CancellationToken cancellationToken)
     {
         var availability = await _dataLayer.HealthEssentialsContext.Availabilities
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .Where(x => EF.Functions.ILike(x.Name, $"{request.SearchField}"))
             .OrderBy(x => x.Name)
             .Take(request.PageSize)

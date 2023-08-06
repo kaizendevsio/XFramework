@@ -12,7 +12,7 @@ public class CreateLogisticHandler : CommandBaseHandler, IRequestHandler<CreateL
     
     public async Task<CmdResponse<CreateLogisticCmd>> Handle(CreateLogisticCmd request, CancellationToken cancellationToken)
     {
-        var logistic = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Logistic>();
+        var logistic = request.Adapt<Domain.Generics.Contracts.Logistic>();
         logistic.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         logistic.Status = (int) GenericStatusType.Pending;
 

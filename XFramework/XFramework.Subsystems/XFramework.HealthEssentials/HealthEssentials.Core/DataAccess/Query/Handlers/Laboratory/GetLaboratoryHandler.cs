@@ -94,7 +94,7 @@ public class GetLaboratoryHandler : QueryBaseHandler, IRequestHandler<GetLaborat
             response.LaboratoryMembers[index].Credential = _dataLayer.XnelSystemsContext.IdentityCredentials
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
-                .ThenInclude(i => i.Entity)
+                .ThenInclude(i => i.Type)
                 .Where(i => i.Guid == response.LaboratoryMembers[index].CredentialGuid)
                 .AsSplitQuery()
                 .AsNoTracking()

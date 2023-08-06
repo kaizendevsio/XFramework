@@ -21,9 +21,9 @@ public class CreateAilmentHandler : CommandBaseHandler, IRequestHandler<CreateAi
             };
         }
 
-        var ailment = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Ailment>();
+        var ailment = request.Adapt<Domain.Generics.Contracts.Ailment>();
         ailment.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        ailment.Entity = ailmentEntity;
+        ailment.Type = ailmentEntity;
 
         await _dataLayer.HealthEssentialsContext.Ailments.AddAsync(ailment, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

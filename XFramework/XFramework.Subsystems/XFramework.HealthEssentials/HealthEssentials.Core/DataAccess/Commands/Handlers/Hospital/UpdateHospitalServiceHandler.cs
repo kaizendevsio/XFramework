@@ -33,7 +33,7 @@ public class UpdateHospitalServiceHandler : CommandBaseHandler, IRequestHandler<
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedService.Entity = entity;
+            updatedService.Type = entity;
         }
 
         if (request.HospitalGuid is null)

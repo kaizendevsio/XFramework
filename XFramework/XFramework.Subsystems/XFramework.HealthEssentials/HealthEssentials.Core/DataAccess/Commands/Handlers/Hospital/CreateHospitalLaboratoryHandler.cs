@@ -1,6 +1,6 @@
 ﻿using System.Security.AccessControl;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Hospital;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Hospital;
 

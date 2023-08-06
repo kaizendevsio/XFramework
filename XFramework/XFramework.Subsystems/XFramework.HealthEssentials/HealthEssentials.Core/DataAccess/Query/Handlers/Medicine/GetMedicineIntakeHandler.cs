@@ -13,7 +13,7 @@ public class GetMedicineIntakeHandler : QueryBaseHandler, IRequestHandler<GetMed
     public async Task<QueryResponse<MedicineIntakeResponse>> Handle(GetMedicineIntakeQuery request, CancellationToken cancellationToken)
     {
         var intake = await _dataLayer.HealthEssentialsContext.MedicineIntakes
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .Include(x => x.Unit)
             .AsSplitQuery()
             .AsNoTracking()

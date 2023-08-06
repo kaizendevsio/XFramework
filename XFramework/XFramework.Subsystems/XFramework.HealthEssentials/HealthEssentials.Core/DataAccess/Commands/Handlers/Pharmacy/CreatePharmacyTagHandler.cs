@@ -1,6 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Pharmacy;
 using HealthEssentials.Domain.Generics.Enums;
-using PharmacyTag = HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials.PharmacyTag;
+using PharmacyTag = HealthEssentials.Domain.Generics.Contracts.PharmacyTag;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Pharmacy;
 

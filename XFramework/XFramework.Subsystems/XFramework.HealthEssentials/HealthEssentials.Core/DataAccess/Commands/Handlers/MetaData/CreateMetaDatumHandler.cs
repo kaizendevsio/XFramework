@@ -1,5 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.MetaData;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.MetaData;
 
@@ -22,9 +21,9 @@ public class CreateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Create
             };
         }
 
-        var metaDatum = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.MetaData>();
+        var metaDatum = request.Adapt<Domain.Generics.Contracts.MetaData>();
         metaDatum.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        metaDatum.Entity = entity;
+        metaDatum.Type = entity;
          
         await _dataLayer.HealthEssentialsContext.MetaData.AddAsync(metaDatum, cancellationToken);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(cancellationToken);

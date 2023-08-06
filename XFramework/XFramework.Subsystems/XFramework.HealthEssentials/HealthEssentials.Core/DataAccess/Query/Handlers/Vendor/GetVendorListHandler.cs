@@ -13,7 +13,7 @@ public class GetVendorListHandler : QueryBaseHandler, IRequestHandler<GetVendorL
     public async Task<QueryResponse<List<VendorResponse>>> Handle(GetVendorListQuery request, CancellationToken cancellationToken)
     {
         var vendor = await _dataLayer.HealthEssentialsContext.Vendors
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)

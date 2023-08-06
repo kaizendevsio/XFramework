@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.MetaData;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.MetaData;
 
@@ -22,7 +22,7 @@ public class CreateMetaDataEntityHandler : CommandBaseHandler, IRequestHandler<C
             };
         }
 
-        var entity = request.Adapt<MetaDataEntity>();
+        var entity = request.Adapt<MetaDataType>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.Group = entityGroup;
         

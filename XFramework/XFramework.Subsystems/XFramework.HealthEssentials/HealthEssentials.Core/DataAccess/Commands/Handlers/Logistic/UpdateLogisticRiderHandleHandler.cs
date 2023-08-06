@@ -1,5 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using XFramework.Domain.Generic.Enums;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Logistic;

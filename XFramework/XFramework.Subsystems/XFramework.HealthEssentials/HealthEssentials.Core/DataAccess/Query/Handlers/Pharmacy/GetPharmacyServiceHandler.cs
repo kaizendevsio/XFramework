@@ -12,7 +12,7 @@ public class GetPharmacyServiceHandler : QueryBaseHandler, IRequestHandler<GetPh
     public async Task<QueryResponse<PharmacyServiceResponse>> Handle(GetPharmacyServiceQuery request, CancellationToken cancellationToken)
     {
         var service = await _dataLayer.HealthEssentialsContext.PharmacyServices
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Include(x => x.PharmacyLocation)
             .ThenInclude(x => x.Pharmacy)

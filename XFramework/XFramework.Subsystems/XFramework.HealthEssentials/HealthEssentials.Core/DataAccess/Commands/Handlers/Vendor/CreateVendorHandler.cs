@@ -19,9 +19,9 @@ public class CreateVendorHandler : CommandBaseHandler, IRequestHandler<CreateVen
             };
         }
 
-        var vendor = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Vendor>();
+        var vendor = request.Adapt<Domain.Generics.Contracts.Vendor>();
         vendor.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        vendor.Entity = entity;
+        vendor.Type = entity;
         
         await _dataLayer.HealthEssentialsContext.Vendors.AddAsync(vendor, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

@@ -31,7 +31,7 @@ public class UpdateVendorHandler : CommandBaseHandler, IRequestHandler<UpdateVen
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedVendor.Entity = entity;
+            updatedVendor.Type = entity;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedVendor);

@@ -33,7 +33,7 @@ public class UpdateAilmentHandler : CommandBaseHandler, IRequestHandler<UpdateAi
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedAilment.Entity = ailmentEntity;
+            updatedAilment.Type = ailmentEntity;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedAilment);

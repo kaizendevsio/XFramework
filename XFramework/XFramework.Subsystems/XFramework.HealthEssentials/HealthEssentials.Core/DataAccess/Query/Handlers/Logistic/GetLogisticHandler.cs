@@ -12,7 +12,7 @@ public class GetLogisticHandler : QueryBaseHandler, IRequestHandler<GetLogisticQ
     public async Task<QueryResponse<LogisticResponse>> Handle(GetLogisticQuery request, CancellationToken cancellationToken)
     {
         var logistic = await _dataLayer.HealthEssentialsContext.Logistics
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Guid == $"{request.Guid}", CancellationToken.None);

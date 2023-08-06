@@ -13,7 +13,7 @@ public class GetTagHandler : QueryBaseHandler, IRequestHandler<GetTagQuery, Quer
     public async Task<QueryResponse<TagResponse>> Handle(GetTagQuery request, CancellationToken cancellationToken)
     {
         var tag = await _dataLayer.HealthEssentialsContext.Tags
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .AsSplitQuery()
             .AsNoTracking()

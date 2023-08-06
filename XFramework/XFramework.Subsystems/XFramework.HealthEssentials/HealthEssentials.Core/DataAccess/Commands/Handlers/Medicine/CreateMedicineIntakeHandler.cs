@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Medicine;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Medicine;
 
@@ -35,7 +35,7 @@ public class CreateMedicineIntakeHandler : CommandBaseHandler, IRequestHandler<C
         var intake = request.Adapt<MedicineIntake>();
         intake.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         intake.Unit = unit;
-        intake.Entity = entity;
+        intake.Type = entity;
         
         await _dataLayer.HealthEssentialsContext.MedicineIntakes.AddAsync(intake, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

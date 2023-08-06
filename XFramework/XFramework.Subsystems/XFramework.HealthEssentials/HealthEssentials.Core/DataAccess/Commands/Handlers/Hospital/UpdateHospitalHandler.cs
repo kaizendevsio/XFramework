@@ -33,7 +33,7 @@ public class UpdateHospitalHandler : CommandBaseHandler, IRequestHandler<UpdateH
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedHospital.Entity = entity;
+            updatedHospital.Type = entity;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedHospital);

@@ -103,7 +103,7 @@ public class GetLaboratoryLocationHandler : QueryBaseHandler, IRequestHandler<Ge
             response.LaboratoryMembers[o].Credential = _dataLayer.XnelSystemsContext.IdentityCredentials
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
-                .ThenInclude(i => i.Entity)
+                .ThenInclude(i => i.Type)
                 .Where(i => i.Guid == response.LaboratoryMembers[o].CredentialGuid)
                 .AsSplitQuery()
                 .AsNoTracking()

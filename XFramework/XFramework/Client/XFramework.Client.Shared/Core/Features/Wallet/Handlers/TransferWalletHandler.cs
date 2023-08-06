@@ -27,7 +27,8 @@ public partial class WalletState
         {
             if (HandleValidation(out var handle)) return;
             await Mediator.Send(new GetWalletList());
-            
+
+            action.OnSuccess = CurrentState.SendWalletVm.Action;
             var result = await WalletServiceWrapper.TransferWallet(new()
             {
                 ClientReference = CurrentState.SendWalletVm.ClientReference,
@@ -36,13 +37,11 @@ public partial class WalletState
                 Recipient = CurrentState.SendWalletVm.Recipient,
                 Amount = CurrentState.SendWalletVm.Amount,
                 Remarks = CurrentState.SendWalletVm.Remarks,
-
             });
 
             if (result.HttpStatusCode is HttpStatusCode.Accepted)
             {
                 Mediator.Send(new GetWalletList());
-                CurrentState.SendWalletVm.Action?.Invoke();
             }
             
             if (await HandleFailure(result, action, true)) return; 

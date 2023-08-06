@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Ailment;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Ailment;
 
@@ -11,7 +11,7 @@ public class CreateAilmentEntityGroupHandler : CommandBaseHandler, IRequestHandl
     }
     public async Task<CmdResponse<CreateAilmentEntityGroupCmd>> Handle(CreateAilmentEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var ailmentEntityGroup = request.Adapt<AilmentEntityGroup>();
+        var ailmentEntityGroup = request.Adapt<AilmentTypeGroup>();
         ailmentEntityGroup.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
 
         await _dataLayer.HealthEssentialsContext.AilmentEntityGroups.AddAsync(ailmentEntityGroup, CancellationToken.None);

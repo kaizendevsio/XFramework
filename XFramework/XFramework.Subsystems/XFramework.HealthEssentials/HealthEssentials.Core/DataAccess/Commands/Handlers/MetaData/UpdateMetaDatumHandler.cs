@@ -33,7 +33,7 @@ public class UpdateMetaDatumHandler : CommandBaseHandler, IRequestHandler<Update
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedMetaDatum.Entity = entity;
+            updatedMetaDatum.Type = entity;
         }
         
         _dataLayer.HealthEssentialsContext.Update(updatedMetaDatum);

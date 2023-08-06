@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Vendor;
 
@@ -21,7 +21,7 @@ public class CreateVendorEntityHandler : CommandBaseHandler, IRequestHandler<Cre
             };
         }
 
-        var entity = request.Adapt<VendorEntity>();
+        var entity = request.Adapt<VendorType>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.Group = group;
         

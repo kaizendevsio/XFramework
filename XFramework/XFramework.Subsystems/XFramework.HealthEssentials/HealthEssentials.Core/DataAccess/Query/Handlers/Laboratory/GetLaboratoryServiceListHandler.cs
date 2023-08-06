@@ -12,7 +12,7 @@ public class GetLaboratoryServiceListHandler : QueryBaseHandler, IRequestHandler
     public async Task<QueryResponse<List<LaboratoryServiceResponse>>> Handle(GetLaboratoryServiceListQuery request, CancellationToken cancellationToken)
     {
         var laboratoryService = await _dataLayer.HealthEssentialsContext.LaboratoryServices
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Include(x => x.LaboratoryLocation)
             .ThenInclude(x => x.Laboratory)

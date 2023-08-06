@@ -12,7 +12,7 @@ public class GetLogisticListHandler : QueryBaseHandler, IRequestHandler<GetLogis
     public async Task<QueryResponse<List<LogisticResponse>>> Handle(GetLogisticListQuery request, CancellationToken cancellationToken)
     {
         var logistic = await _dataLayer.HealthEssentialsContext.Logistics
-            .Include(i => i.Entity)
+            .Include(i => i.Type)
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)

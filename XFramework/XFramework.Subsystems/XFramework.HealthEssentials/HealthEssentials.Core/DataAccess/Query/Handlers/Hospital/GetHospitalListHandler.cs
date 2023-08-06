@@ -13,7 +13,7 @@ public class GetHospitalListHandler : QueryBaseHandler, IRequestHandler<GetHospi
     public async Task<QueryResponse<List<HospitalResponse>>> Handle(GetHospitalListQuery request, CancellationToken cancellationToken)
     {
         var hospital = await _dataLayer.HealthEssentialsContext.Hospitals
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)

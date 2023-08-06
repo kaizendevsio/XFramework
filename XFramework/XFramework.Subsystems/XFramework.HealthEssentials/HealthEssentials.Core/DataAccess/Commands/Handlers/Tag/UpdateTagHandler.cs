@@ -33,7 +33,7 @@ public class UpdateTagHandler : CommandBaseHandler, IRequestHandler<UpdateTagCmd
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
-            updatedTag.Entity = entity;
+            updatedTag.Type = entity;
         }
 
         _dataLayer.HealthEssentialsContext.Update(updatedTag);

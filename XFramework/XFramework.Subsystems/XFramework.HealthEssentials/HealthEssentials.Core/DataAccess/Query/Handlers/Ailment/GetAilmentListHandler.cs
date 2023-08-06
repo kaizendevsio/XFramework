@@ -13,7 +13,7 @@ public class GetAilmentListHandler : QueryBaseHandler, IRequestHandler<GetAilmen
     public async Task<QueryResponse<List<AilmentResponse>>> Handle(GetAilmentListQuery request, CancellationToken cancellationToken)
     {
         var ailment = await _dataLayer.HealthEssentialsContext.Ailments
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)

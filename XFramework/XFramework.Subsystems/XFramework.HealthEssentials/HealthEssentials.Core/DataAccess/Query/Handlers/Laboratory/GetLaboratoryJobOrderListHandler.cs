@@ -1,5 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
-using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using XFramework.Domain.Generic.Enums;

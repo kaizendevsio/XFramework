@@ -1,0 +1,43 @@
+﻿namespace XFramework.Domain.Generic.Contracts;
+
+public partial class StorageFile
+{
+    public Guid Id { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime ModifiedAt { get; set; }
+
+    public bool? IsEnabled { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public string ContentPath { get; set; } = null!;
+
+    public Guid TypeId { get; set; }
+
+    
+    public string? IdentifierGuid { get; set; }
+
+    public decimal? FileSize { get; set; }
+
+    public DateTime? ExpireAt { get; set; }
+
+    public long? StorageFileIdentifierId { get; set; }
+
+    public string? Hash { get; set; }
+
+    public string? Name { get; set; }
+
+    public string? ContentType { get; set; }
+
+    public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; } = new List<CommunityContentFile>();
+
+    public virtual ICollection<CommunityIdentityFile> CommunityIdentityFiles { get; } = new List<CommunityIdentityFile>();
+
+    public virtual StorageFileType Type { get; set; } = null!;
+
+    public virtual ICollection<MessageFile> MessageFiles { get; } = new List<MessageFile>();
+
+    public virtual StorageFileIdentifier? StorageFileIdentifier { get; set; }
+}

@@ -1,7 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Doctor;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Logistic;
-using HealthEssentials.Domain.DataTransferObjects;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Services.Helpers;
 

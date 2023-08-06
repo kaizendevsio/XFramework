@@ -1,5 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Laboratory;
-using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.Generics.Contracts.Responses.Storage;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Contracts.Responses.Address;
@@ -21,7 +20,7 @@ public class GetLaboratoryListHandler : QueryBaseHandler, IRequestHandler<GetLab
     public async Task<QueryResponse<List<LaboratoryResponse>>> Handle(GetLaboratoryListQuery request, CancellationToken cancellationToken)
     {
         var laboratory = await _dataLayer.HealthEssentialsContext.Laboratories
-            .Include(i => i.Entity) 
+            .Include(i => i.Type) 
             .ThenInclude(i => i.Group)
             .Include(i => i.LaboratoryLocations) 
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))

@@ -1,5 +1,4 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
-using HealthEssentials.Domain.DataTransferObjects;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 

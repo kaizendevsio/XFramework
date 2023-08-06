@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Hospital;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Hospital;
 
@@ -57,7 +57,7 @@ public class CreateHospitalServiceHandler : CommandBaseHandler, IRequestHandler<
         service.Hospital = hospital;
         service.HospitalLocation = hospitalLocation;
         service.Unit = unit;
-        service.Entity = entity;
+        service.Type = entity;
         
         await _dataLayer.HealthEssentialsContext.HospitalServices.AddAsync(service, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

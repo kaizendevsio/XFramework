@@ -1,8 +1,6 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using HealthEssentials.Core.DataAccess.Commands.Entity.Doctor;
-using HealthEssentials.Domain.DataTransferObjects;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
 using XFramework.Domain.Generic.Enums;
 using XFramework.Integration.Interfaces;
 using XFramework.Integration.Services.Helpers;
@@ -40,9 +38,9 @@ public class CreateDoctorHandler : CommandBaseHandler, IRequestHandler<CreateDoc
             };
         }
 
-        var doctor = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Doctor>();
+        var doctor = request.Adapt<Domain.Generics.Contracts.Doctor>();
         doctor.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        doctor.Entity = entity;
+        doctor.Type = entity;
         doctor.CredentialGuid = credential.Guid;
         doctor.Status = (int) GenericStatusType.Pending;
         

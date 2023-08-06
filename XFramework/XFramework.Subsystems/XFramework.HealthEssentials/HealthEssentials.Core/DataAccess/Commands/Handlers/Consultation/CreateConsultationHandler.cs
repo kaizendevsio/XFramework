@@ -21,9 +21,9 @@ public class CreateConsultationHandler : CommandBaseHandler, IRequestHandler<Cre
             };
         }
 
-        var consultation = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Consultation>();
+        var consultation = request.Adapt<Domain.Generics.Contracts.Consultation>();
         consultation.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        consultation.Entity = consultationEntity;
+        consultation.Type = consultationEntity;
         
         await _dataLayer.HealthEssentialsContext.Consultations.AddAsync(consultation, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

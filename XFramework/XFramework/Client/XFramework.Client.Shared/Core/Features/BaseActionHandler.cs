@@ -69,19 +69,7 @@ public class BaseActionHandler
         // Display error to the console
         Console.WriteLine($"Error from response: {response.Message}");
 
-        // If Fail URL property is provided, navigate to the given URL
-        if (!action.ContainsProperty("NavigateToOnFailure")) return true;
-        
-        var s = action.GetPropertyValue("NavigateToOnFailure");
-        if (s is null) return true;
-        NavigationManager.NavigateTo(s.ToString());
-        
-        var onFailure = action.GetPropertyValue("OnFailure");
-        if (onFailure is null) return true;
-        
-        var onFailureAction = onFailure as Action;
-        onFailureAction?.Invoke();
-
+        HandleFailureHooks(action);
         return true;
     }
     public async Task<bool> HandleFailure<TAction, TRequest>(CmdResponse<TRequest> response, TAction action, bool silent = false,  string customMessage = "")
@@ -107,19 +95,7 @@ public class BaseActionHandler
         // Display error to the console
         Console.WriteLine($"Error from response: {response.Message}");
 
-        // If Fail URL property is provided, navigate to the given URL
-        if (!action.ContainsProperty("NavigateToOnFailure")) return true;
-        
-        var s = action.GetPropertyValue("NavigateToOnFailure");
-        if (s is null) return true;
-        NavigationManager.NavigateTo(s.ToString());
-        
-        var onFailure = action.GetPropertyValue("OnFailure");
-        if (onFailure is null) return true;
-        
-        var onFailureAction = onFailure as Action;
-        onFailureAction?.Invoke();
-
+        HandleFailureHooks(action);
         return true;
     }
     public async Task<bool> HandleFailure<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false,  string customMessage = "")
@@ -145,18 +121,7 @@ public class BaseActionHandler
         // Display error to the console
         Console.WriteLine($"Error from response: {response.Message}");
 
-        // If Fail URL property is provided, navigate to the given URL
-        if (!action.ContainsProperty("NavigateToOnFailure")) return true;
-
-        var s = action.GetPropertyValue("NavigateToOnFailure");
-        if (s is null) return true;
-        NavigationManager.NavigateTo(s.ToString());
-        
-        var onFailure = action.GetPropertyValue("OnFailure");
-        if (onFailure is null) return true;
-        
-        var onFailureAction = onFailure as Action;
-        onFailureAction?.Invoke();
+        HandleFailureHooks(action);
         return true;
     }
     public async Task HandleSuccess<TAction>(CmdResponse response, TAction action, bool silent = false, string customMessage = "")
@@ -172,18 +137,7 @@ public class BaseActionHandler
                     : $"{customMessage}", SweetAlertIcon.Success);
                 break;
         }
-        
-        // If Success URL property is provided, navigate to the given URL
-        if (!action.ContainsProperty("NavigateToOnSuccess")) return;
-        var s = action.GetPropertyValue("NavigateToOnSuccess");
-        if (s is null) return;
-        NavigationManager.NavigateTo(s.ToString());
-        
-        var onSuccess = action.GetPropertyValue("OnSuccess");
-        if (onSuccess is null) return;
-        
-        var onSuccessAction = onSuccess as Action;
-        onSuccessAction?.Invoke();
+        HandleSuccessHooks(action);
     }
     public async Task HandleSuccess<TAction, TRequest>(CmdResponse<TRequest> response, TAction action, bool silent = false, string customMessage = "")
     {
@@ -199,17 +153,7 @@ public class BaseActionHandler
                 break;
         }
         
-        // If Success URL property is provided, navigate to the given URL
-        if (!action.ContainsProperty("NavigateToOnSuccess")) return;
-        var s = action.GetPropertyValue("NavigateToOnSuccess");
-        if (s is null) return;
-        NavigationManager.NavigateTo(s.ToString());
-        
-        var onSuccess = action.GetPropertyValue("OnSuccess");
-        if (onSuccess is null) return;
-        
-        var onSuccessAction = onSuccess as Action;
-        onSuccessAction?.Invoke();
+        HandleSuccessHooks(action);
     }
     public async Task HandleSuccess<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false, string customMessage = "")
     {
@@ -225,19 +169,46 @@ public class BaseActionHandler
                 break;
         }
       
-         // If Success URL property is provided, navigate to the given URL
-        if (!action.ContainsProperty("NavigateToOnSuccess")) return;
-        var s = action.GetPropertyValue("NavigateToOnSuccess");
-        if (s is null) return;
-        NavigationManager.NavigateTo(s.ToString());
-        
-        var onSuccess = action.GetPropertyValue("OnSuccess");
-        if (onSuccess is null) return;
-        
-        var onSuccessAction = onSuccess as Action;
-        onSuccessAction?.Invoke(); 
+        HandleSuccessHooks(action);
     }
 
+    private void HandleSuccessHooks<TAction>(TAction action)
+    {
+        if (action.ContainsProperty("NavigateToOnSuccess"))
+        {
+            var s = action.GetPropertyValue("NavigateToOnSuccess");
+            if (s is not null)
+            {
+                NavigationManager.NavigateTo(s.ToString());
+            }
+        }
+        
+        var onSuccess = action.GetPropertyValue("OnSuccess");
+        if (onSuccess is not null)
+        {
+            var onSuccessAction = onSuccess as Action;
+            onSuccessAction?.Invoke();
+        }
+    }
+    private void HandleFailureHooks<TAction>(TAction action)
+    {
+        if (action.ContainsProperty("NavigateToOnFailure"))
+        {
+            var s = action.GetPropertyValue("NavigateToOnFailure");
+            if (s is not null)
+            {
+                NavigationManager.NavigateTo(s.ToString());
+            }
+        }
+        
+        var onFailure = action.GetPropertyValue("OnFailure");
+        if (onFailure is not null)
+        {
+            var failureAction = onFailure as Action;
+            failureAction?.Invoke();
+        }
+    }
+    
     public async Task Persist<TState>(TState state)
     {
         var statePersistenceFromAppSettings = Configuration.GetValue<string>("Application:Persistence:State:Driver");

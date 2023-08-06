@@ -13,7 +13,7 @@ public class GetUnitHandler : QueryBaseHandler, IRequestHandler<GetUnitQuery, Qu
     public async Task<QueryResponse<UnitResponse>> Handle(GetUnitQuery request, CancellationToken cancellationToken)
     {
         var unit = await _dataLayer.HealthEssentialsContext.Units
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .AsSplitQuery()
             .AsNoTracking()

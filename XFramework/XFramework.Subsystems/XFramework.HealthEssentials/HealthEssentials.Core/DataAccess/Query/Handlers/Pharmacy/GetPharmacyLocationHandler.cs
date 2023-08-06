@@ -91,7 +91,7 @@ public class GetPharmacyLocationHandler : QueryBaseHandler, IRequestHandler<GetP
             response.PharmacyMembers[o].Credential = _dataLayer.XnelSystemsContext.IdentityCredentials
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
-                .ThenInclude(i => i.Entity)
+                .ThenInclude(i => i.Type)
                 .Where(i => i.Guid == response.PharmacyMembers[o].CredentialGuid)
                 .AsSplitQuery()
                 .AsNoTracking()

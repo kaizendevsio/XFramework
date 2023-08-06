@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.MetaData;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.MetaData;
 
@@ -12,7 +12,7 @@ public class CreateMetaDataEntityGroupHandler : CommandBaseHandler, IRequestHand
     
     public async Task<CmdResponse<CreateMetaDataEntityGroupCmd>> Handle(CreateMetaDataEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var group = request.Adapt<MetaDataEntityGroup>();
+        var group = request.Adapt<MetaDataTypeGroup>();
         group.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         
         await _dataLayer.HealthEssentialsContext.MetaDataEntityGroups.AddAsync(group, CancellationToken.None);

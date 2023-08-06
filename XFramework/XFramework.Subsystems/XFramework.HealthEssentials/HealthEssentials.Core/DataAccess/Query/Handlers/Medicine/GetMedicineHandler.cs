@@ -13,7 +13,7 @@ public class GetMedicineHandler : QueryBaseHandler, IRequestHandler<GetMedicineQ
     public async Task<QueryResponse<MedicineResponse>> Handle(GetMedicineQuery request, CancellationToken cancellationToken)
     {
         var medicine = await _dataLayer.HealthEssentialsContext.Medicines
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .AsSplitQuery()
             .AsNoTracking()

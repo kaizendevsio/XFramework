@@ -1,7 +1,7 @@
 ﻿using HealthEssentials.Core.DataAccess.Query.Entity.Administrator;
-using HealthEssentials.Domain.DataTransferObjects;
 using HealthEssentials.Domain.Generics.Strings;
 using IdentityServer.Domain.Generic.Contracts.Responses;
+using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Query.Handlers.Administrator;
 
@@ -26,16 +26,16 @@ public class GetPendingRegistrationCompletionListHandler : QueryBaseHandler, IRe
         var credentials = await _dataLayer.XnelSystemsContext.IdentityCredentials
             .Include(i => i.IdentityInfo)
             .Include(i => i.IdentityContacts)
-            .ThenInclude(i => i.Entity)
+            .ThenInclude(i => i.Type)
             .Include(i => i.IdentityRoles)
-            .ThenInclude(i => i.RoleEntity)
+            .ThenInclude(i => i.RoleType)
             .Where(c => c.Application == application)
             .Where(i => i.IdentityRoles.Any(p =>
-                p.RoleEntity.Guid == $"{IdentityRoleStrings.Doctor}" ||
-                p.RoleEntity.Guid == $"{IdentityRoleStrings.Pharmacy}" ||
-                p.RoleEntity.Guid == $"{IdentityRoleStrings.Logistics}" ||
-                p.RoleEntity.Guid == $"{IdentityRoleStrings.Hospital}" ||
-                p.RoleEntity.Guid == $"{IdentityRoleStrings.Laboratory}"))
+                p.RoleType.Guid == $"{IdentityRoleStrings.Doctor}" ||
+                p.RoleType.Guid == $"{IdentityRoleStrings.Pharmacy}" ||
+                p.RoleType.Guid == $"{IdentityRoleStrings.Logistics}" ||
+                p.RoleType.Guid == $"{IdentityRoleStrings.Hospital}" ||
+                p.RoleType.Guid == $"{IdentityRoleStrings.Laboratory}"))
             .AsNoTracking()
             .AsSplitQuery()
             .ToListAsync(CancellationToken.None);

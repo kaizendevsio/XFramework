@@ -1,4 +1,4 @@
-﻿using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Vendor;
 
@@ -11,7 +11,7 @@ public class CreateVendorEntityGroupHandler : CommandBaseHandler, IRequestHandle
     
     public async Task<CmdResponse<CreateVendorEntityGroupCmd>> Handle(CreateVendorEntityGroupCmd request, CancellationToken cancellationToken)
     {
-        var group = request.Adapt<VendorEntityGroup>();
+        var group = request.Adapt<VendorTypeGroup>();
         group.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
 
         await _dataLayer.HealthEssentialsContext.VendorEntityGroups.AddAsync(group, CancellationToken.None);

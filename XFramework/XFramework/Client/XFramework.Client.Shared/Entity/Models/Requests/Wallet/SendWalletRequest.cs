@@ -9,9 +9,9 @@ public class SendWalletRequest : NavigableRequest
     public string? Recipient { get; set; }
     public CredentialResponse? SelectedRecipient { get; set; }
     public Guid? WalletEntityGuid { get; set; }
-    public decimal? BaseAmount { get; set; }
-    public decimal? Amount { get; set; }
-    public decimal? Fee { get; set; }
+    public decimal BaseAmount { get; set; }
+    public decimal Amount { get; set; }
+    public decimal Fee { get; set; }
     public string? Remarks { get; set; }
     public string? ClientReference { get; set; }
     public Action? Action { get; set; }

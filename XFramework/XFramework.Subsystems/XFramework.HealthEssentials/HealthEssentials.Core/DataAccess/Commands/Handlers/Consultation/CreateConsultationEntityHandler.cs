@@ -1,4 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Consultation;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Consultation;
 
@@ -21,7 +22,7 @@ public class CreateConsultationEntityHandler : CommandBaseHandler, IRequestHandl
             };
         }
 
-        var consultationEntity = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.ConsultationEntity>();
+        var consultationEntity = request.Adapt<ConsultationType>();
         consultationEntity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         consultationEntity.Group = entityGroup;
         

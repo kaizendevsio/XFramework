@@ -14,7 +14,7 @@ public class GetMedicineListHandler : QueryBaseHandler, IRequestHandler<GetMedic
         CancellationToken cancellationToken)
     {
         var medicine = await _dataLayer.HealthEssentialsContext.Medicines
-            .Include(x => x.Entity)
+            .Include(x => x.Type)
             .ThenInclude(x => x.Group)
             .Where(x => EF.Functions.ILike(x.Name, $"%{request.SearchField}%"))
             .OrderBy(x => x.Name)

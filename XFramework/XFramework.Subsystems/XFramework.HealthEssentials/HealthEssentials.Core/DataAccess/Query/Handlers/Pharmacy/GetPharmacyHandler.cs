@@ -19,7 +19,7 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
     public async Task<QueryResponse<PharmacyResponse>> Handle(GetPharmacyQuery request, CancellationToken cancellationToken)
     {
         var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
-            .Include(i => i.Entity)
+            .Include(i => i.Type)
             .Include(i => i.PharmacyLocations)
             .Include(i => i.PharmacyMembers)
             .AsNoTracking()
@@ -84,7 +84,7 @@ public class GetPharmacyHandler : QueryBaseHandler, IRequestHandler<GetPharmacyQ
                 .AsNoTracking()
                 .Include(i => i.IdentityInfo)
                 .Include(i => i.IdentityContacts)
-                .ThenInclude(i => i.Entity)
+                .ThenInclude(i => i.Type)
                 .AsSplitQuery()
                 .Where(i => i.Guid == response.PharmacyMembers[index].CredentialGuid)
                 .FirstOrDefault()?

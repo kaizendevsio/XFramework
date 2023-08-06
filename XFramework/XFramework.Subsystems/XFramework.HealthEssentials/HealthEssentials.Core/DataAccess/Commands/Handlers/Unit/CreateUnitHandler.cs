@@ -21,9 +21,9 @@ public class CreateUnitHandler : CommandBaseHandler, IRequestHandler<CreateUnitC
             };
         }
 
-        var unit = request.Adapt<Domain.DataTransferObjects.XnelSystemsHealthEssentials.Unit>();
+        var unit = request.Adapt<Domain.Generics.Contracts.Unit>();
         unit.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
-        unit.Entity = entity;
+        unit.Type = entity;
 
         await _dataLayer.HealthEssentialsContext.Units.AddAsync(unit, CancellationToken.None);
         await _dataLayer.HealthEssentialsContext.SaveChangesAsync(CancellationToken.None);

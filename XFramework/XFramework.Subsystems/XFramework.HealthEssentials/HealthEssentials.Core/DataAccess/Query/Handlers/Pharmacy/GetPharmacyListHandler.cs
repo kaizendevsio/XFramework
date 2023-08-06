@@ -14,7 +14,7 @@ public class GetPharmacyListHandler : QueryBaseHandler, IRequestHandler<GetPharm
         var pharmacy = await _dataLayer.HealthEssentialsContext.Pharmacies
             .Include(i => i.PharmacyLocations)
             .ThenInclude(i => i.PharmacyMembers)
-            .Include(i => i.Entity)
+            .Include(i => i.Type)
             .Where(i => EF.Functions.ILike(i.Name, $"%{request.SearchField}%"))
             .Where(i => i.Status == (int) request.Status)
             .OrderBy(i => i.Name)

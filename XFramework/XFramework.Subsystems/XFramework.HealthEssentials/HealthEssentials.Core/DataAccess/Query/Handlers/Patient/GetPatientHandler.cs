@@ -16,7 +16,7 @@ public class GetPatientHandler : QueryBaseHandler, IRequestHandler<GetPatientQue
         var credential = await _dataLayer.XnelSystemsContext.IdentityCredentials
             .Include(i => i.IdentityInfo)
             .Include(i => i.IdentityContacts)
-            .ThenInclude(i => i.Entity)
+            .ThenInclude(i => i.Type)
             .AsNoTracking()
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Guid == $"{request.CredentialGuid}", cancellationToken: cancellationToken);

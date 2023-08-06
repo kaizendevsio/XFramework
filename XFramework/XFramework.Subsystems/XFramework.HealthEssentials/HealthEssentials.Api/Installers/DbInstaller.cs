@@ -1,7 +1,6 @@
 ﻿using HealthEssentials.Core.DataAccess;
 using HealthEssentials.Core.Interfaces;
-using HealthEssentials.Domain.DataTransferObjects;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Contexts;
 
 namespace HealthEssentials.Api.Installers;
 

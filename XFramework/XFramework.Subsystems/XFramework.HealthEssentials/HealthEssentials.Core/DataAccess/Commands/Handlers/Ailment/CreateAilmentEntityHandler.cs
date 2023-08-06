@@ -1,5 +1,5 @@
 ﻿using HealthEssentials.Core.DataAccess.Commands.Entity.Ailment;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+using HealthEssentials.Domain.Generics.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Handlers.Ailment;
 
@@ -22,7 +22,7 @@ public class CreateAilmentEntityHandler : CommandBaseHandler, IRequestHandler<Cr
             };
         }
 
-        var entity = request.Adapt<AilmentEntity>();
+        var entity = request.Adapt<AilmentType>();
         entity.Guid = request.Guid is null ? $"{Guid.NewGuid()}" : $"{request.Guid}";
         entity.Group = ailmentEntityGroup;
         
