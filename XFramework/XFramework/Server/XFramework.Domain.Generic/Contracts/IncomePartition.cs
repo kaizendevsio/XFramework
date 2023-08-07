@@ -14,7 +14,7 @@ public partial class IncomePartition
 
     public long? ModifiedBy { get; set; }
 
-    public long? IdentityRoleId { get; set; }
+    public Guid IdentityRoleId { get; set; }
 
     public Guid? IncomeTypeId { get; set; }
 

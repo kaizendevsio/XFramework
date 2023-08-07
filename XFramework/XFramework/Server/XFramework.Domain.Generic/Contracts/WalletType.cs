@@ -30,21 +30,17 @@ public partial class WalletType
 
     public decimal? MaxTransfer { get; set; }
 
-    public string? Guid { get; set; }
-
     public bool IsDeleted { get; set; }
 
-    public long ApplicationId { get; set; }
+    public Guid ApplicationId { get; set; }
 
     public virtual Application Application { get; set; } = null!;
 
     public virtual CurrencyType? CurrencyType { get; set; }
 
     public virtual ICollection<DepositRequest> DepositRequests { get; } = new List<DepositRequest>();
+    public virtual ICollection<WithdrawalRequest> WithdrawalRequests { get; } = new List<WithdrawalRequest>();
 
     public virtual ICollection<Wallet> Wallets { get; } = new List<Wallet>();
 
-    public virtual ICollection<WithdrawalRequest> WithdrawalRequestSourceWalletTypes { get; } = new List<WithdrawalRequest>();
-
-    public virtual ICollection<WithdrawalRequest> WithdrawalRequestTargetCurrencies { get; } = new List<WithdrawalRequest>();
 }

@@ -4,7 +4,7 @@ public partial class Log
 {
     public Guid Id { get; set; }
 
-    public long? ApplicationId { get; set; }
+    public Guid ApplicationId { get; set; }
 
     public short? Severity { get; set; }
 
@@ -21,8 +21,6 @@ public partial class Log
     public string? Name { get; set; }
 
     public bool? Seen { get; set; }
-
-    public string? Guid { get; set; }
 
     public virtual Application? Application { get; set; }
 }

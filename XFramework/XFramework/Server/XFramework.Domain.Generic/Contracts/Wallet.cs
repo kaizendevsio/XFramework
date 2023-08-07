@@ -14,7 +14,7 @@ public partial class Wallet
 
     public long? ModifiedBy { get; set; }
 
-    public long IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public Guid? WalletTypeId { get; set; }
 
@@ -22,15 +22,13 @@ public partial class Wallet
 
     public bool? IsDeleted { get; set; }
 
-    public string? Guid { get; set; }
-
-    public virtual IdentityCredential IdentityCredential { get; set; } = null!;
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
     public virtual ICollection<WalletAddress> WalletAddresses { get; } = new List<WalletAddress>();
 
     public virtual WalletType? WalletType { get; set; }
 
-    public virtual ICollection<WalletTransaction> WalletTransactionSourceUserWallets { get; } = new List<WalletTransaction>();
+    public virtual ICollection<WalletTransaction> WalletTransactions { get; } = new List<WalletTransaction>();
+    public virtual ICollection<WithdrawalRequest> WithdrawalRequests { get; } = new List<WithdrawalRequest>();
 
-    public virtual ICollection<WalletTransaction> WalletTransactionTargetUserWallets { get; } = new List<WalletTransaction>();
 }

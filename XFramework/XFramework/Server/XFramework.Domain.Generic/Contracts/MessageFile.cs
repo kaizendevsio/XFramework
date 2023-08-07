@@ -12,9 +12,9 @@ public partial class MessageFile
 
     public bool IsDeleted { get; set; }
 
-    public long MessageId { get; set; }
+    public Guid MessageId { get; set; }
 
-    public long StorageId { get; set; }
+    public Guid StorageId { get; set; }
 
     
     public virtual Message Message { get; set; } = null!;

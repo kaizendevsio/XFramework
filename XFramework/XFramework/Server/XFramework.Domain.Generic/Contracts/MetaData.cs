@@ -14,7 +14,7 @@ public partial class MetaData
 
     public Guid TypeId { get; set; }
 
-    public long? KeyId { get; set; }
+    public Guid KeyId { get; set; }
 
     public string? Value { get; set; }
 

@@ -15,9 +15,9 @@ public partial class Message
     public string Text { get; set; } = null!;
 
     
-    public long MessageThreadId { get; set; }
+    public Guid MessageThreadId { get; set; }
 
-    public long MessageThreadMemberId { get; set; }
+    public Guid MessageThreadMemberId { get; set; }
 
     public virtual ICollection<MessageDelivery> MessageDeliveries { get; } = new List<MessageDelivery>();
 

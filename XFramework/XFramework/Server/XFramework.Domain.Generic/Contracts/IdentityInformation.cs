@@ -35,7 +35,7 @@ public partial class IdentityInformation
 
     public short? CivilStatus { get; set; }
 
-    public long ApplicationId { get; set; }
+    public Guid ApplicationId { get; set; }
 
     public virtual Application Application { get; set; } = null!;
 

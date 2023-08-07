@@ -20,14 +20,14 @@ public partial class IdentityContact
 
     public string Value { get; set; } = null!;
 
-    public long? UserCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     
-    public long GroupId { get; set; }
+    public Guid GroupId { get; set; }
 
     public virtual IdentityContactType? Type { get; set; }
 
     public virtual IdentityContactGroup Group { get; set; } = null!;
 
-    public virtual IdentityCredential? UserCredential { get; set; }
+    public virtual IdentityCredential Credential { get; set; } = null!;
 }

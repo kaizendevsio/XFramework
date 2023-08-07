@@ -23,7 +23,7 @@ public partial class CommunityContent
     public Guid? ParentContentId { get; set; }
 
     
-    public Guid? CommunityGroupId { get; set; }
+    public Guid CommunityGroupId { get; set; }
 
     public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; } = new List<CommunityContentFile>();
 

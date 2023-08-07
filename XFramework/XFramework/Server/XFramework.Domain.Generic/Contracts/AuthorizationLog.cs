@@ -14,7 +14,7 @@ public partial class AuthorizationLog
 
     public long? ModifiedBy { get; set; }
 
-    public long IdentityCredentialsId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public string? Ipaddress { get; set; }
 

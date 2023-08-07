@@ -12,9 +12,9 @@ public partial class CommunityContentFile
 
     public bool IsDeleted { get; set; }
 
-    public long ContentId { get; set; }
+    public Guid ContentId { get; set; }
 
-    public long StorageId { get; set; }
+    public Guid StorageId { get; set; }
 
     
     public virtual CommunityContent Content { get; set; } = null!;

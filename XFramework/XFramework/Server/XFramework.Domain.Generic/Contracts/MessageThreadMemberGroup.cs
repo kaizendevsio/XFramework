@@ -21,7 +21,7 @@ public partial class MessageThreadMemberGroup
     public string Description { get; set; } = null!;
 
     
-    public long MessageThreadId { get; set; }
+    public Guid MessageThreadId { get; set; }
 
     public virtual MessageThread MessageThread { get; set; } = null!;
 

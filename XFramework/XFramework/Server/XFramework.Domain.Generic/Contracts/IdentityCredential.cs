@@ -16,7 +16,7 @@ public partial class IdentityCredential
 
     public bool IsDeleted { get; set; }
 
-    public long? IdentityInfoId { get; set; }
+    public Guid IdentityInfoId { get; set; }
 
     public string? UserName { get; set; }
 
@@ -26,7 +26,7 @@ public partial class IdentityCredential
 
     public byte[]? PasswordByte { get; set; }
 
-    public long ApplicationId { get; set; }
+    public Guid ApplicationId { get; set; }
 
     public string? Token { get; set; }
 

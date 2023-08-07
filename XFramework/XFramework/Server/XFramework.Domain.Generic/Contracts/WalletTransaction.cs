@@ -14,11 +14,11 @@ public partial class WalletTransaction
 
     public long? ModifiedBy { get; set; }
 
-    public long IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
-    public long? SourceUserWalletId { get; set; }
+    public Guid WalletId { get; set; }
 
-    public decimal? Amount { get; set; }
+    public decimal Amount { get; set; }
 
     public string? Remarks { get; set; }
 
@@ -26,14 +26,10 @@ public partial class WalletTransaction
 
     public string? Description { get; set; }
 
-    public long? TargetUserWalletId { get; set; }
-
-    public decimal? PreviousBalance { get; set; }
+    public decimal PreviousBalance { get; set; }
 
     
-    public virtual IdentityCredential IdentityCredential { get; set; } = null!;
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
-    public virtual Wallet? SourceUserWallet { get; set; }
-
-    public virtual Wallet? TargetUserWallet { get; set; }
+    public virtual Wallet? Wallet { get; set; }
 }

@@ -14,7 +14,7 @@ public partial class Subscription
 
     public Guid TypeId { get; set; }
 
-    public long? CredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public string? Value { get; set; }
 
@@ -25,7 +25,7 @@ public partial class Subscription
     public DateTime? CompletedAt { get; set; }
 
     
-    public virtual IdentityCredential? Credential { get; set; }
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
     public virtual SubscriptionType Type { get; set; } = null!;
 }

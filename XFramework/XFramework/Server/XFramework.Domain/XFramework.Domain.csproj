@@ -15,14 +15,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
     <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
   </ItemGroup>
 
+
   <ItemGroup>
-    <Folder Include="BusinessObjects" />
-    <Folder Include="Contracts" />
-    <Folder Include="Enums" />
+    <Folder Include="BusinessObjects\" />
     <Folder Include="Migrations\" />
+    <Folder Include="Migrations\XnelSystems\" />
   </ItemGroup>
 
 </Project>

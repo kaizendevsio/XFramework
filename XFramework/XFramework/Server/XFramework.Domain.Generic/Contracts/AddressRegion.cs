@@ -15,7 +15,7 @@ public partial class AddressRegion
     public DateTime? UpdatedAt { get; set; }
 
     
-    public long? CountryId { get; set; }
+    public Guid CountryId { get; set; }
 
     public virtual ICollection<AddressProvince> AddressProvinces { get; } = new List<AddressProvince>();
 

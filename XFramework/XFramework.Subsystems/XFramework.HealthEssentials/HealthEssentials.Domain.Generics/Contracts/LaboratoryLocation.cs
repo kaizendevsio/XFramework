@@ -24,20 +24,19 @@ public partial class LaboratoryLocation
 
     public string? Building { get; set; }
 
-    public string? BarangayGuid { get; set; }
+    public Guid BarangayId { get; set; }
 
-    public string? CityGuid { get; set; }
+    public Guid CityId { get; set; }
 
     public string? Subdivision { get; set; }
 
-    public string? RegionGuid { get; set; }
+    public Guid RegionId { get; set; }
 
     public bool? MainAddress { get; set; }
 
-    public string? ProvinceGuid { get; set; }
+    public Guid ProvinceId { get; set; }
 
-    public string? CountryGuid { get; set; }
-
+    public Guid CountryId { get; set; }
     
     public int? Status { get; set; }
 

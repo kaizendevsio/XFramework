@@ -8,7 +8,7 @@ public partial class AddressCity
 
     public string? Description { get; set; }
 
-    public long ProvCode { get; set; }
+    public long ProvCodeId { get; set; }
 
     public long Code { get; set; }
 
@@ -23,5 +23,5 @@ public partial class AddressCity
 
     public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();
 
-    public virtual AddressProvince ProvCodeNavigation { get; set; } = null!;
+    public virtual AddressProvince ProvCode { get; set; } = null!;
 }

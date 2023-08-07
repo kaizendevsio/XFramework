@@ -22,8 +22,6 @@ public partial class CurrencyType
 
     public short? Type { get; set; }
 
-    public string? Guid { get; set; }
-
     public virtual ICollection<AddressCountry> AddressCountries { get; } = new List<AddressCountry>();
 
     public virtual ICollection<DepositRequest> DepositRequests { get; } = new List<DepositRequest>();

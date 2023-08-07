@@ -14,7 +14,7 @@ public partial class IncomeTransaction
 
     public long? ModifiedBy { get; set; }
 
-    public Guid? IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public Guid? IncomeTypeId { get; set; }
 
@@ -22,20 +22,20 @@ public partial class IncomeTransaction
 
     public short? TransactionType { get; set; }
 
-    public long? SourceMapId { get; set; }
+    public Guid SourceMapId { get; set; }
 
     public short? IncomeStatus { get; set; }
 
     public string? Remarks { get; set; }
 
-    public long? TargetMapId { get; set; }
+    public Guid TargetMapId { get; set; }
 
-    public long? PairMapId { get; set; }
+    public Guid PairMapId { get; set; }
 
     
     public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; } = new List<BillsPaymentTransaction>();
 
-    public virtual IdentityCredential? IdentityCredential { get; set; }
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
     public virtual IncomeType? IncomeType { get; set; }
 

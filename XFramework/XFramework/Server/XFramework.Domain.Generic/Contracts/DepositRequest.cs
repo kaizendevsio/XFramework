@@ -14,11 +14,11 @@ public partial class DepositRequest
 
     public long? ModifiedBy { get; set; }
 
-    public long? IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
-    public long? SourceCurrencyId { get; set; }
+    public Guid? SourceCurrencyId { get; set; }
 
-    public Guid? TargetWalletTypeId { get; set; }
+    public Guid? WalletTypeId { get; set; }
 
     public string? Address { get; set; }
 
@@ -44,16 +44,16 @@ public partial class DepositRequest
 
     public int? DiscountType { get; set; }
 
-    public long? GatewayId { get; set; }
+    public Guid GatewayId { get; set; }
 
     
     public virtual ICollection<BusinessPackage> BusinessPackages { get; } = new List<BusinessPackage>();
 
-    public virtual PaymentGateway? Gateway { get; set; }
+    public virtual PaymentGateway? PaymentGateway { get; set; }
 
-    public virtual IdentityCredential? IdentityCredential { get; set; }
+    public virtual IdentityCredential? Credential { get; set; }
 
     public virtual CurrencyType? SourceCurrency { get; set; }
 
-    public virtual WalletType? TargetWalletType { get; set; }
+    public virtual WalletType? WalletType { get; set; }
 }

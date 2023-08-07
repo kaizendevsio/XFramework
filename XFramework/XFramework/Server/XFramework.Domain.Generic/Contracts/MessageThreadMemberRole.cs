@@ -13,9 +13,9 @@ public partial class MessageThreadMemberRole
     public bool IsDeleted { get; set; }
 
     
-    public long MessageThreadMemberId { get; set; }
+    public Guid MessageThreadMemberId { get; set; }
 
-    public long RoleId { get; set; }
+    public Guid RoleId { get; set; }
 
     public virtual MessageThreadMember MessageThreadMember { get; set; } = null!;
 

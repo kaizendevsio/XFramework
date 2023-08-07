@@ -16,7 +16,7 @@ public partial class IdentityAddress
 
     public bool IsDeleted { get; set; }
 
-    public long? IdentityInfoId { get; set; }
+    public Guid IdentityInfoId { get; set; }
 
     public string? UnitNumber { get; set; }
 
@@ -24,34 +24,34 @@ public partial class IdentityAddress
 
     public string? Building { get; set; }
 
-    public long? Barangay { get; set; }
+    public Guid BarangayId { get; set; }
 
-    public long? City { get; set; }
+    public Guid CityId { get; set; }
 
     public string? Subdivision { get; set; }
 
-    public long? Region { get; set; }
+    public Guid RegionId { get; set; }
 
     public Guid? AddressTypeId { get; set; }
 
     public bool? DefaultAddress { get; set; }
 
-    public long? Province { get; set; }
+    public Guid ProvinceId { get; set; }
 
-    public long? Country { get; set; }
+    public Guid CountryId { get; set; }
 
     
     public virtual IdentityAddressType? AddressType { get; set; }
 
-    public virtual AddressBarangay? BarangayNavigation { get; set; }
+    public virtual AddressBarangay? Barangay { get; set; }
 
-    public virtual AddressCity? CityNavigation { get; set; }
+    public virtual AddressCity? City { get; set; }
 
-    public virtual AddressCountry? CountryNavigation { get; set; }
+    public virtual AddressCountry? Country { get; set; }
 
     public virtual IdentityInformation? IdentityInfo { get; set; }
 
-    public virtual AddressProvince? ProvinceNavigation { get; set; }
+    public virtual AddressProvince? Province { get; set; }
 
-    public virtual AddressRegion? RegionNavigation { get; set; }
+    public virtual AddressRegion? Region { get; set; }
 }

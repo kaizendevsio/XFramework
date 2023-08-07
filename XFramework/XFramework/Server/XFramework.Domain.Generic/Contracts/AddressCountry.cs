@@ -26,7 +26,7 @@ public partial class AddressCountry
 
     public string? PhoneCountryCode { get; set; }
 
-    public long? CurrencyId { get; set; }
+    public Guid CurrencyId { get; set; }
 
     
     public virtual ICollection<AddressRegion> AddressRegions { get; } = new List<AddressRegion>();

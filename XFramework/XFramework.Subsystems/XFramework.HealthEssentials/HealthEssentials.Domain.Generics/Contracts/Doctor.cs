@@ -14,7 +14,7 @@ public partial class Doctor
 
     public Guid TypeId { get; set; }
 
-    public string CredentialGuid { get; set; } = null!;
+    public Guid CredentialId { get; set; }
 
     public string? Description { get; set; }
 

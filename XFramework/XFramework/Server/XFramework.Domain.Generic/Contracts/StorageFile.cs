@@ -17,13 +17,13 @@ public partial class StorageFile
     public Guid TypeId { get; set; }
 
     
-    public string? IdentifierGuid { get; set; }
+    public Guid Identifier { get; set; }
 
     public decimal? FileSize { get; set; }
 
     public DateTime? ExpireAt { get; set; }
 
-    public long? StorageFileIdentifierId { get; set; }
+    public Guid StorageFileIdentifierId { get; set; }
 
     public string? Hash { get; set; }
 

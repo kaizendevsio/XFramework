@@ -20,11 +20,9 @@ public partial class IdentityRoleType
 
     public short? RoleLevel { get; set; }
 
-    public string? Guid { get; set; }
+    public Guid ApplicationId { get; set; }
 
-    public long ApplicationId { get; set; }
-
-    public long? GroupId { get; set; }
+    public Guid GroupId { get; set; }
 
     public virtual Application Application { get; set; } = null!;
 

@@ -21,15 +21,15 @@ public partial class MessageThreadMember
     public string Description { get; set; } = null!;
 
     
-    public long MessageThreadId { get; set; }
+    public Guid MessageThreadId { get; set; }
 
-    public long IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
-    public long GroupId { get; set; }
+    public Guid GroupId { get; set; }
 
     public virtual MessageThreadMemberGroup Group { get; set; } = null!;
 
-    public virtual IdentityCredential IdentityCredential { get; set; } = null!;
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
     public virtual ICollection<MessageDelivery> MessageDeliveries { get; } = new List<MessageDelivery>();
 

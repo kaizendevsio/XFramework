@@ -8,7 +8,7 @@ public partial class EloadTransaction
 
     public decimal? Discount { get; set; }
 
-    public long? IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public string? SenderNumber { get; set; }
 
@@ -38,8 +38,8 @@ public partial class EloadTransaction
 
     public string? Amount { get; set; }
 
-    
-    public virtual IdentityCredential? IdentityCredential { get; set; }
+
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
     public virtual EloadProductCode? EloadProductCode { get; set; }
 }

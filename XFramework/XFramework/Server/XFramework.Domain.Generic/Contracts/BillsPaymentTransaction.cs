@@ -10,7 +10,7 @@ public partial class BillsPaymentTransaction
 
     public DateTime ModifiedAt { get; set; }
     
-    public Guid? IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public Guid? BillerId { get; set; }
 
@@ -40,7 +40,7 @@ public partial class BillsPaymentTransaction
 
     public virtual Biller? Biller { get; set; }
 
-    public virtual IdentityCredential? IdentityCredential { get; set; }
+    public virtual IdentityCredential Credential { get; set; }
 
     public virtual IncomeTransaction? IncomeTransaction { get; set; }
 }

@@ -12,19 +12,18 @@ public partial class BusinessPackageUpgradeTransaction
 
     public DateTime ModifiedAt { get; set; }
 
-    public Guid IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
-    public long UserBusinessPackageId { get; set; }
+    public Guid UserBusinessPackageId { get; set; }
     
-    public long? CurrentBusinessPackageId { get; set; }
+    public Guid CurrentBusinessPackageId { get; set; }
 
-    public long PreviousBusinessPackageId { get; set; }
+    public Guid PreviousBusinessPackageId { get; set; }
 
     public int? Status { get; set; }
 
-    public virtual IdentityCredential IdentityCredential { get; set; } = null!;
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
     public virtual BusinessPackage CurrentBusinessPackage { get; set; } = null!;
     
-    public virtual BusinessPackage PreviousBusinessPackage { get; set; } = null!;
 }

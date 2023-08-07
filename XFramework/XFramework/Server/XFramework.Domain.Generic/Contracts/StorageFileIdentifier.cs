@@ -17,7 +17,7 @@ public partial class StorageFileIdentifier
     public string? Description { get; set; }
 
     
-    public long GroupId { get; set; }
+    public Guid GroupId { get; set; }
 
     public virtual StorageFileIdentifierGroup Group { get; set; } = null!;
 

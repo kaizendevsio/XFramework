@@ -12,7 +12,7 @@ public partial class LaboratoryMember
 
     public bool IsDeleted { get; set; }
 
-    public string CredentialGuid { get; set; } = null!;
+    public Guid CredentialId { get; set; }
 
     public Guid LaboratoryId { get; set; }
 

@@ -6,7 +6,7 @@ public partial class IdentityFavorite
 
     public Guid? FavoriteTypeId { get; set; }
 
-    public long? IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public string? Data { get; set; }
 
@@ -21,5 +21,5 @@ public partial class IdentityFavorite
     
     public virtual RegistryFavoriteType? FavoriteType { get; set; }
 
-    public virtual IdentityCredential? IdentityCredential { get; set; }
+    public virtual IdentityCredential Credential { get; set; } = null!;
 }

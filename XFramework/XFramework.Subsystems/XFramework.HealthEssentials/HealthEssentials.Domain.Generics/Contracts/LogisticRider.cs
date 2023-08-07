@@ -12,7 +12,7 @@ public partial class LogisticRider
 
     public bool IsDeleted { get; set; }
 
-    public string CredentialGuid { get; set; } = null!;
+    public Guid CredentialId { get; set; }
 
     public string? Name { get; set; }
 

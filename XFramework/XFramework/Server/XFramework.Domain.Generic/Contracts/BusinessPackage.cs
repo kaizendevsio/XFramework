@@ -14,7 +14,7 @@ public partial class BusinessPackage
 
     public long? ModifiedBy { get; set; }
 
-    public Guid? IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public short? PackageStatus { get; set; }
 
@@ -26,13 +26,13 @@ public partial class BusinessPackage
 
     public DateTime? ActivationDate { get; set; }
 
-    public Guid? RecipientIdentityCredentialId { get; set; }
+    public Guid? RecipientCredentialId { get; set; }
 
     public string? CodeString { get; set; }
 
-    public long? ConsumedBy { get; set; }
+    public Guid? ConsumedById { get; set; }
 
-    public int? PackageType { get; set; }
+    public Guid TypeId { get; set; }
 
     public string? CodeHash { get; set; }
 
@@ -42,13 +42,15 @@ public partial class BusinessPackage
     public virtual BinaryMap? BinaryMap { get; set; }
 
     public virtual ICollection<BusinessPackageUpgradeTransaction> BusinessPackageUpgradeTransactions { get; } = new List<BusinessPackageUpgradeTransaction>();
+    public virtual ICollection<BusinessPackageInclusion> BusinessPackageInclusions { get; } = new List<BusinessPackageInclusion>();
     public virtual ICollection<IncomeDistribution> IncomeDistributions { get; } = new List<IncomeDistribution>();
 
     public virtual ICollection<CommissionDeductionRequest> CommissionDeductionRequests { get; } = new List<CommissionDeductionRequest>();
 
-    public virtual IdentityCredential? ConsumedByNavigation { get; set; }
+    public virtual IdentityCredential? ConsumedBy { get; set; }
 
-    public virtual IdentityCredential? IdentityCredential { get; set; }
+    public virtual IdentityCredential Credential { get; set; } = null!;
+    public virtual BusinessPackageType Type { get; set; } = null!;
 
     public virtual IdentityCredential? RecipientIdentityCredential { get; set; }
 

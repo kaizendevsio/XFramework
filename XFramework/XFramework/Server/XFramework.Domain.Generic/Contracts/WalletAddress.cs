@@ -21,7 +21,7 @@ public partial class WalletAddress
     public string? Remarks { get; set; }
 
     
-    public long WalletId { get; set; }
+    public Guid WalletId { get; set; }
 
     public virtual Wallet Wallet { get; set; } = null!;
 }

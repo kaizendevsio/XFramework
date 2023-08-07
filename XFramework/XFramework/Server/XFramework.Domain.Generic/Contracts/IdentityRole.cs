@@ -16,19 +16,17 @@ public partial class IdentityRole
 
     public bool IsDeleted { get; set; }
 
-    public long? UserCredId { get; set; }
+    public Guid CredentialId { get; set; }
 
-    public Guid? RoleTypeId { get; set; }
+    public Guid? TypeId { get; set; }
 
     public DateTime RoleExpiration { get; set; }
-
-    public string? Guid { get; set; }
 
     public virtual ICollection<IncomePartition> IncomePartitions { get; } = new List<IncomePartition>();
 
     public virtual ICollection<MessageThreadMemberRole> MessageThreadMemberRoles { get; } = new List<MessageThreadMemberRole>();
 
-    public virtual IdentityRoleType? RoleType { get; set; }
+    public virtual IdentityRoleType? Type { get; set; }
 
-    public virtual IdentityCredential? UserCred { get; set; }
+    public virtual IdentityCredential Credential { get; set; } = null!;
 }

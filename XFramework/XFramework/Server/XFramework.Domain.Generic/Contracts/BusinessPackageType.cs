@@ -17,5 +17,8 @@ public partial class BusinessPackageType
     public string? Name { get; set; }
 
     public string? Description { get; set; }
+    
+    public virtual ICollection<BusinessPackage> BusinessPackages { get; } = new List<BusinessPackage>();
+
 
 }

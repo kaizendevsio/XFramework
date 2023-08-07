@@ -12,13 +12,13 @@ public partial class MessageDirect
 
     public bool IsDeleted { get; set; }
 
-    public long? ParentMessageId { get; set; }
+    public Guid ParentMessageId { get; set; }
 
     public Guid TypeId { get; set; }
 
-    public long SenderId { get; set; }
+    public Guid SenderId { get; set; }
 
-    public long? RecipientId { get; set; }
+    public Guid RecipientId { get; set; }
 
     public string Sender { get; set; } = null!;
 

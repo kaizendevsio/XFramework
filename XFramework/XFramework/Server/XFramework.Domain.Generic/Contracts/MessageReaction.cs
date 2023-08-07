@@ -12,7 +12,7 @@ public partial class MessageReaction
 
     public bool IsDeleted { get; set; }
 
-    public long MessageId { get; set; }
+    public Guid MessageId { get; set; }
 
     public Guid TypeId { get; set; }
 

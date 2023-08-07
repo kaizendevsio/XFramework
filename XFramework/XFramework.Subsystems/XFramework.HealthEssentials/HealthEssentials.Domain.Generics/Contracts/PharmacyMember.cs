@@ -12,7 +12,7 @@ public partial class PharmacyMember
 
     public bool IsDeleted { get; set; }
 
-    public string CredentialGuid { get; set; } = null!;
+    public Guid CredentialId { get; set; }
 
     public Guid PharmacyId { get; set; }
 

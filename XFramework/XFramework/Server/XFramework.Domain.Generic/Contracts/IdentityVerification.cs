@@ -16,7 +16,7 @@ public partial class IdentityVerification
 
     public bool? IsDeleted { get; set; }
 
-    public long? IdentityCredId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public Guid? VerificationTypeId { get; set; }
 
@@ -28,8 +28,8 @@ public partial class IdentityVerification
 
     public DateTime? Expiry { get; set; }
 
-    
-    public virtual IdentityCredential? IdentityCred { get; set; }
+
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
     public virtual IdentityVerificationType? VerificationType { get; set; }
 }

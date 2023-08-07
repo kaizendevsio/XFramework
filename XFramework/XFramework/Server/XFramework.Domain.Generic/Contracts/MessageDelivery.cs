@@ -13,9 +13,9 @@ public partial class MessageDelivery
     public bool IsDeleted { get; set; }
 
     
-    public long MessageThreadMemberId { get; set; }
+    public Guid MessageThreadMemberId { get; set; }
 
-    public long MessageId { get; set; }
+    public Guid MessageId { get; set; }
 
     public Guid TypeId { get; set; }
 

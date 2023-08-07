@@ -12,7 +12,7 @@ public partial class CommunityIdentity
 
     public bool IsDeleted { get; set; }
 
-    public Guid? IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public string? HandleName { get; set; }
 
@@ -40,5 +40,5 @@ public partial class CommunityIdentity
 
     public virtual CommunityIdentityType Type { get; set; } = null!;
 
-    public virtual IdentityCredential? IdentityCredential { get; set; }
+    public virtual IdentityCredential Credential { get; set; } = null!;
 }

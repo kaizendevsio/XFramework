@@ -26,8 +26,6 @@ public partial class ExchangeRate
 
     public DateTime? ExpiryDate { get; set; }
 
-    public string? Guid { get; set; }
-
     public virtual CurrencyType SourceCurrencyType { get; set; } = null!;
 
     public virtual CurrencyType TargetCurrencyType { get; set; } = null!;

@@ -15,11 +15,11 @@ public partial class Application
 
     public DateTime? AvailabilityDate { get; set; }
 
-    public long? ParentAppId { get; set; }
+    public Guid? ParentAppId { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
-    public long EnterpriseId { get; set; }
+    public Guid EnterpriseId { get; set; }
 
     public decimal Version { get; set; }
 

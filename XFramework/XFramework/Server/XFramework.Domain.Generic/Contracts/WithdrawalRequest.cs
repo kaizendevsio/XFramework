@@ -14,7 +14,7 @@ public partial class WithdrawalRequest
 
     public long? ModifiedBy { get; set; }
 
-    public long IdentityCredentialId { get; set; }
+    public Guid CredentialId { get; set; }
 
     public string? Address { get; set; }
 
@@ -24,14 +24,14 @@ public partial class WithdrawalRequest
 
     public string? Remarks { get; set; }
 
-    public Guid? SourceWalletTypeId { get; set; }
-
-    public long? TargetCurrencyId { get; set; }
-
+    public Guid WalletId { get; set; }
     
-    public virtual IdentityCredential IdentityCredential { get; set; } = null!;
+    public Guid WalletTypeId { get; set; }
+    
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
-    public virtual WalletType? SourceWalletType { get; set; }
+    public virtual WalletType? WalletType { get; set; }
 
-    public virtual WalletType? TargetCurrency { get; set; }
+    public virtual Wallet? Wallet { get; set; }
+
 }

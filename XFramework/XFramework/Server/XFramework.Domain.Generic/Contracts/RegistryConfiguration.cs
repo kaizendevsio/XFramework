@@ -4,7 +4,7 @@ public partial class RegistryConfiguration
 {
     public Guid Id { get; set; }
 
-    public long ApplicationId { get; set; }
+    public Guid ApplicationId { get; set; }
 
     public string Key { get; set; } = null!;
 
@@ -16,7 +16,7 @@ public partial class RegistryConfiguration
 
     public bool IsDeleted { get; set; }
 
-    public long? GroupId { get; set; }
+    public Guid GroupId { get; set; }
 
     public string? Unit { get; set; }
 
