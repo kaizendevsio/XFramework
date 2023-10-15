@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class HospitalService
+public partial class HospitalService : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid TypeId { get; set; }
 
     public Guid HospitalLocationId { get; set; }
@@ -32,7 +22,7 @@ public partial class HospitalService
 
     public Guid UnitId { get; set; }
 
-    
+
     public virtual HospitalServiceType Type { get; set; } = null!;
 
     public virtual Hospital Hospital { get; set; } = null!;

@@ -1,15 +1,8 @@
-﻿using Community.Domain.Generic.Contracts.Requests.Create;
-using Community.Domain.Generic.Contracts.Requests.Delete;
-using Community.Domain.Generic.Contracts.Requests.Get;
-using Community.Domain.Generic.Contracts.Requests.Update;
-using Community.Domain.Generic.Contracts.Responses.Connection;
-using Community.Domain.Generic.Contracts.Responses.Content;
-using Community.Domain.Generic.Contracts.Responses.Identity;
-using Community.Integration.Interfaces;
+﻿using Community.Integration.Interfaces;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace Community.Integration.Drivers;
 
@@ -22,7 +15,7 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
         TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:CommunityService"));
     }
     
-    public async Task<QueryResponse<CommunityContentResponse>> GetContent(GetContentRequest request)
+    /*public async Task<QueryResponse<CommunityContentResponse>> GetContent(GetContentRequest request)
     {
         return await SendAsync<GetContentRequest, CommunityContentResponse>(request);
     }
@@ -95,5 +88,5 @@ public class CommunityServiceDriver : DriverBase, ICommunityServiceWrapper
     public async Task<CmdResponse> DeleteConnection(DeleteConnectionRequest request)
     {
         return await SendVoidAsync(request);
-    }
+    }*/
 }   

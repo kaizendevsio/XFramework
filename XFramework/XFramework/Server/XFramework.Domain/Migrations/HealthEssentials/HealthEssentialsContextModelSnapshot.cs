@@ -31,10 +31,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -42,13 +48,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -85,21 +90,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("AilmentId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -128,10 +138,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -142,13 +158,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -176,21 +191,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -213,6 +233,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -222,6 +245,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("DateStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
@@ -236,13 +262,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -279,10 +304,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -290,13 +321,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -336,6 +366,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationId")
                         .HasColumnType("uuid");
 
@@ -343,6 +376,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Diagnosis")
                         .HasColumnType("character varying");
@@ -356,8 +392,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -366,7 +401,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .IsRequired()
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -419,6 +454,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationJobOrderId")
                         .HasColumnType("uuid");
 
@@ -427,11 +465,13 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -439,7 +479,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryServiceId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -479,6 +519,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationJobOrderId")
                         .HasColumnType("uuid");
 
@@ -486,6 +529,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("Dosage")
                         .HasColumnType("integer");
@@ -509,8 +555,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -521,7 +566,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("MedicineIntakeId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -564,6 +609,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationId")
                         .HasColumnType("uuid");
 
@@ -572,16 +620,18 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -610,10 +660,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -624,13 +680,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -658,21 +713,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -704,6 +764,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("ClinicAddress")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -712,6 +775,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("CredentialId")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -722,13 +788,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -775,6 +840,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationId")
                         .HasColumnType("uuid");
 
@@ -783,14 +851,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("DoctorId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -800,7 +870,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("numeric")
                         .HasDefaultValueSql("0");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -833,6 +903,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationJobOrderId")
                         .HasColumnType("uuid");
 
@@ -841,19 +914,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("DoctorId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -876,10 +951,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("DoctorId")
                         .HasColumnType("uuid");
@@ -887,13 +968,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -922,10 +1002,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -936,13 +1022,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -970,21 +1055,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1007,10 +1097,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -1021,8 +1117,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1030,7 +1125,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("Logo")
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1068,6 +1163,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationId")
                         .HasColumnType("uuid");
 
@@ -1076,19 +1174,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("HospitalId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1111,10 +1211,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("HospitalId")
                         .HasColumnType("uuid");
@@ -1122,8 +1228,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1131,7 +1236,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1164,6 +1269,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("CityId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid");
 
@@ -1171,6 +1279,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -1181,8 +1292,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1190,7 +1300,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool?>("MainAddress")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1232,10 +1342,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -1249,8 +1365,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1258,7 +1373,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<decimal?>("MaxDiscount")
                         .HasColumnType("numeric");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1304,10 +1419,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("HospitalServiceId")
                         .HasColumnType("uuid");
@@ -1315,13 +1436,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1350,10 +1470,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -1364,13 +1490,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1398,21 +1523,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1435,10 +1565,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("HospitalId")
                         .HasColumnType("uuid");
@@ -1446,13 +1582,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1481,10 +1616,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -1495,13 +1636,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1529,21 +1669,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1566,10 +1711,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -1580,8 +1731,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1589,7 +1739,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("Logo")
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1638,6 +1788,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationJobOrderId")
                         .HasColumnType("uuid");
 
@@ -1645,6 +1798,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal?>("Discount")
                         .HasColumnType("numeric");
@@ -1655,8 +1811,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1667,7 +1822,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryLocationId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1723,16 +1878,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1743,7 +1903,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryServiceId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1781,10 +1941,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -1792,8 +1958,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1801,7 +1966,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryJobOrderId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1834,16 +1999,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1851,7 +2021,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryJobOrderResultId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1888,6 +2058,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("CityId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid");
 
@@ -1895,6 +2068,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -1905,8 +2081,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1917,7 +2092,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool?>("MainAddress")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1970,16 +2145,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1987,7 +2167,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryLocationId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2016,6 +2196,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -2025,14 +2208,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2043,7 +2228,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryLocationId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2076,10 +2261,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -2087,8 +2278,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2102,7 +2292,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<decimal?>("MaxDiscount")
                         .HasColumnType("numeric");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2148,16 +2338,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2165,7 +2360,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryServiceId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2194,10 +2389,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -2208,13 +2409,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2242,21 +2442,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2279,16 +2484,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2296,7 +2506,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2325,10 +2535,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -2339,13 +2555,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2373,21 +2588,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2410,10 +2630,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -2424,8 +2650,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2433,7 +2658,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("Logo")
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2473,21 +2698,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2519,10 +2749,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -2537,8 +2773,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2549,7 +2784,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LogisticJobOrderId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2604,6 +2839,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("ClientName")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid");
 
@@ -2611,6 +2849,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -2621,8 +2862,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDestination")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2633,7 +2873,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool?>("MainAddress")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2681,6 +2921,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -2690,14 +2933,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2708,7 +2953,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("LicenseNumber")
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2742,16 +2987,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2764,7 +3014,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("uuid")
                         .HasColumnName("LogisticRiderID");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2790,16 +3040,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -2807,7 +3062,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LogisticRiderId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2836,10 +3091,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -2847,13 +3108,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2882,10 +3142,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("ChemicalComponent")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -2893,13 +3159,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2932,10 +3197,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -2943,13 +3214,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2987,21 +3257,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3027,16 +3302,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3044,7 +3324,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("MedicineId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3073,10 +3353,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
@@ -3084,13 +3370,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3118,21 +3403,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3155,16 +3445,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3172,7 +3467,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("MedicineId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3198,16 +3493,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3215,7 +3515,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("KeyId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3242,10 +3542,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
@@ -3253,13 +3559,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3287,21 +3592,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3324,6 +3634,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -3333,19 +3646,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3376,21 +3691,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("AilmentId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3419,6 +3739,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationJobOrderId")
                         .HasColumnType("uuid");
 
@@ -3427,19 +3750,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("DoctorName")
                         .HasColumnType("character varying");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3471,6 +3796,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationJobOrderId")
                         .HasColumnType("uuid");
 
@@ -3479,16 +3807,18 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3514,16 +3844,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3531,7 +3866,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("LaboratoryJobOrderId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3557,6 +3892,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationJobOrderId")
                         .HasColumnType("uuid");
 
@@ -3565,11 +3903,13 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3577,7 +3917,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsSeen")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3606,21 +3946,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3652,10 +3997,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -3666,13 +4017,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3700,21 +4050,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3740,10 +4095,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("ChemicalComponent")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -3754,8 +4115,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3763,7 +4123,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<string>("Logo")
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3814,10 +4174,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal?>("Discount")
                         .HasColumnType("numeric");
@@ -3828,13 +4194,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3889,6 +4254,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ConsultationJobOrderId")
                         .HasColumnType("uuid");
 
@@ -3897,16 +4265,18 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3938,10 +4308,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("Dosage")
                         .HasColumnType("integer");
@@ -3967,8 +4343,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3979,7 +4354,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("MedicineIntakeId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4038,6 +4413,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("CityId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid");
 
@@ -4045,6 +4423,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4055,8 +4436,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -4064,7 +4444,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool?>("MainAddress")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4120,6 +4500,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -4129,19 +4512,21 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4180,10 +4565,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4191,8 +4582,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -4200,7 +4590,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<decimal?>("MaxDiscount")
                         .HasColumnType("numeric");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4252,21 +4642,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4298,10 +4693,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4312,13 +4713,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4346,21 +4746,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4386,6 +4791,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("AvailableQuantity")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -4394,11 +4802,13 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("CriticalQuantity")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -4417,7 +4827,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("MinQuantity")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4448,21 +4858,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4494,21 +4909,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4537,10 +4957,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4551,13 +4977,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4600,10 +5025,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4611,13 +5042,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4648,10 +5078,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4659,13 +5095,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4691,21 +5126,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4737,10 +5177,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4751,13 +5197,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4785,21 +5230,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4822,10 +5272,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4833,13 +5289,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4870,10 +5325,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4884,13 +5345,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4918,21 +5378,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4955,10 +5420,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4966,13 +5437,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -5003,10 +5473,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -5017,13 +5493,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -5051,21 +5526,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -5088,10 +5568,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -5099,8 +5585,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -5108,7 +5593,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool?>("IsGenericProvider")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -5136,10 +5621,16 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
@@ -5147,13 +5638,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -5181,21 +5671,26 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");

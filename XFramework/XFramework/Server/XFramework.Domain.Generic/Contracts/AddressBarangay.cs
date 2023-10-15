@@ -1,9 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class AddressBarangay
+public partial record AddressBarangay : BaseModel
 {
-    public Guid Id { get; set; }
-
     public long? Code { get; set; }
 
     public string? Description { get; set; }
@@ -14,11 +12,7 @@ public partial class AddressBarangay
 
     public int? ProvCode { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
 
-    public DateTime? UpdatedAt { get; set; }
-
-    
     public virtual AddressCity? CityCode { get; set; }
 
     public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();

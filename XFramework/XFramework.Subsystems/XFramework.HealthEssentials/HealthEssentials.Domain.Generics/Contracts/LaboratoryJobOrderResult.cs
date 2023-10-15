@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class LaboratoryJobOrderResult
+public partial class LaboratoryJobOrderResult : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid LaboratoryJobOrderId { get; set; }
 
     public string? Name { get; set; }
@@ -26,8 +16,9 @@ public partial class LaboratoryJobOrderResult
 
     public DateTime? CompletedAt { get; set; }
 
-    
+
     public virtual LaboratoryJobOrder LaboratoryJobOrder { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryJobOrderResultFile> LaboratoryJobOrderResultFiles { get; } = new List<LaboratoryJobOrderResultFile>();
+    public virtual ICollection<LaboratoryJobOrderResultFile> LaboratoryJobOrderResultFiles { get; } =
+        new List<LaboratoryJobOrderResultFile>();
 }

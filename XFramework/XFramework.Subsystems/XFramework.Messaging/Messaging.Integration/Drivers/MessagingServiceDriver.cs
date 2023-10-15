@@ -6,8 +6,8 @@ using Messaging.Domain.Generic.Contracts.Responses;
 using Messaging.Integration.Interfaces;
 using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace Messaging.Integration.Drivers;
 

@@ -1,17 +1,6 @@
-namespace XFramework.Api
-{
-    public class Program
+XApplication
+    .Build<Program>()
+    .GenerateMinimalApi(new[]
     {
-        public static void Main(string[] args)
-        {
-            CreateHostBuilder(args).Build().Run();
-        }
-
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder.UseStartup<Startup>();
-                });
-    }
-}
+        typeof(Tenant),
+    }).Run();

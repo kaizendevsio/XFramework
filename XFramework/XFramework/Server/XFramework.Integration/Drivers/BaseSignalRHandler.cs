@@ -1,86 +1,94 @@
-﻿using System.Diagnostics;
-using System.Text.Json;
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
-using StreamFlow.Domain.Generic.BusinessObjects;
+using Microsoft.Extensions.Logging;
 using StreamFlow.Domain.Generic.Contracts.Requests;
-using TypeSupport.Extensions;
+using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Drivers;
 
 public class BaseSignalRHandler
 {
-    public Guid? Guid { get; set; }
-    public Stopwatch Stopwatch { get; set; } = new();
+    public ILogger<BaseSignalRHandler> Logger { get; }
+    public MetricsMonitor MetricsMonitor { get; }
+    public Guid? Id { get; set; }
 
-    public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, StreamFlowTelemetryBO telemetry, TResult data) where TResult : new()
+    public BaseSignalRHandler(ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor)
     {
-        var request = new StreamFlowMessageBO()
+        Logger = logger;
+        MetricsMonitor = metricsMonitor;
+    }
+    
+    public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, Guid requestId, Guid clientId, TResult data) 
+        where TResult : IBaseResponse, new()
+    {
+        var request = new StreamFlowMessage<TResult>(data)
         {
-            RequestGuid = telemetry.RequestGuid,
-            Recipient = telemetry.ClientGuid,
+            RequestId = requestId,
+            RecipientId = clientId,
             ExchangeType = MessageExchangeType.Direct,
-            ResponseStatusCode = data.GetPropertyValue<HttpStatusCode>("HttpStatusCode")
+            ResponseStatusCode = data.HttpStatusCode,
+            CommandName = "InvokeResponseHandler"
         };
-        request.SetData(data);
-        request.CommandName = "InvokeResponseHandler";
         
-        return await connection.InvokeAsync<HttpStatusCode>("Push",request);
-    }
-    
-    protected virtual void HandleRequestQuery<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator) where TRequest : new() where TResponse : new() where TQuery : IRequest<QueryResponse<TResponse>>
-    {
-        //Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, QueryResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
-        //connection.On(HandlerName(), Handler<TRequest, TQuery, QueryResponse<TResponse>>(connection, mediator));
-
-    }
-    
-    protected virtual void HandleRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse<TQuery>>
-    {
-        //Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse<TQuery>>(response, connection, mediator).ConfigureAwait(false));
-        //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse<TQuery>>(connection, mediator));
-    }
-    
-    protected virtual void HandleRequestCmd<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse<TResponse>>
-    {
-        //Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
-        //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse<TQuery>>(connection, mediator));
+        return await connection.InvokeAsync<HttpStatusCode>("Push", request);
     }
 
-    protected virtual void HandleVoidRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse>
+    protected virtual void HandleRequestQuery<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator)
+        where TRequest : class, new() 
+        where TResponse : new() 
+        where TQuery : class, IRequest<QueryResponse<TResponse>>
     {
-        //Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse>(response, connection, mediator).ConfigureAwait(false));
-        //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse>(connection, mediator));
+        connection.On(HandlerName(), (StreamFlowMessage<TRequest> response) => Handler<TRequest, TQuery, QueryResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
     }
 
-    private async Task Handler<TRequest, TQuery, TResponse>(StreamFlowContract response, HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<TResponse> where TResponse : new()
+    protected virtual void HandleRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator)
+        where TRequest : class, new() 
+        where TQuery : class, IRequest<CmdResponse<TQuery>>
     {
-        /*Task.Run(async () =>
-            {*/
-        Stopwatch.Restart();
+        connection.On(HandlerName(), (StreamFlowMessage<TRequest> response) => Handler<TRequest, TQuery, CmdResponse<TQuery>>(response, connection, mediator).ConfigureAwait(false));
+    }
+    
+    protected virtual void HandleRequestCmd<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator) 
+        where TRequest : class, new() 
+        where TQuery : class, IRequest<CmdResponse<TResponse>>
+    {
+        connection.On(HandlerName(), (StreamFlowMessage<TRequest> response) => Handler<TRequest, TQuery, CmdResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
+    }
+
+    protected virtual void HandleVoidRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) 
+        where TRequest : class, new() 
+        where TQuery : class, IRequest<CmdResponse>
+    {
+        connection.On(HandlerName(), (StreamFlowMessage<TRequest> response) => Handler<TRequest, TQuery, CmdResponse>(response, connection, mediator).ConfigureAwait(false));
+    }
+
+    private async Task Handler<TRequest, TQuery, TResponse>(StreamFlowMessage<TRequest> response, HubConnection connection, IMediator mediator) 
+        where TRequest : class, new() 
+        where TQuery : class, IRequest<TResponse> 
+        where TResponse : IBaseResponse, new()
+    {
+        using var metricLogger = MetricsMonitor.Start();
         try
         {
             var r = response.Data.AsMediatorCmd<TRequest, TQuery, TResponse>();
             var result = await mediator.Send(r).ConfigureAwait(false);
-            Stopwatch.Stop();
 
-            Console.WriteLine(result.GetPropertyValue("HttpStatusCode").ToString() == $"{HttpStatusCode.InternalServerError}"
-                ? $"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{result.GetType().GetProperty("Message")?.GetValue(result)}] in {Stopwatch.ElapsedMilliseconds}ms"
-                : $"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.GetType().GetProperty("HttpStatusCode")?.GetValue(result)} in {Stopwatch.ElapsedMilliseconds}ms");
-
-            await RespondToInvoke(connection, response.Telemetry, result);
+            if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
+            {
+                metricLogger.Failed($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{result.Message}]");
+            }
+            else
+            {
+                metricLogger.Completed($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode}");
+            }
+            
+            await RespondToInvoke(connection, response.RequestId, response.ClientId, result);
         }
         catch (Exception e)
         {
-            Stopwatch.Stop();
-            Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}] in {Stopwatch.ElapsedMilliseconds}ms");
+            metricLogger.Failed($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}]");
         }
-        /*});*/
     }
 
     private string HandlerName()

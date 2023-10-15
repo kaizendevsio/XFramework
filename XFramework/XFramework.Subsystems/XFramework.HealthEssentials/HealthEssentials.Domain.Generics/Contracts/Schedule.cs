@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class Schedule
+public partial class Schedule : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid TypeId { get; set; }
 
     public string? Name { get; set; }
@@ -30,7 +20,7 @@ public partial class Schedule
 
     public DateTime? CompletedAt { get; set; }
 
-    
+
     public virtual ICollection<ConsultationJobOrder> ConsultationJobOrders { get; } = new List<ConsultationJobOrder>();
 
     public virtual ScheduleType Type { get; set; } = null!;

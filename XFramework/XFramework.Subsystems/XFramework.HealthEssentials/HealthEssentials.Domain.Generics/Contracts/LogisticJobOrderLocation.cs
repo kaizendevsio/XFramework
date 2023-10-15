@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class LogisticJobOrderLocation
+public partial class LogisticJobOrderLocation : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid LogisticJobOrderId { get; set; }
 
     public short Status { get; set; }
@@ -40,7 +30,7 @@ public partial class LogisticJobOrderLocation
 
     public Guid CountryId { get; set; }
 
-    
+
     public short Priority { get; set; }
 
     public bool IsDestination { get; set; }

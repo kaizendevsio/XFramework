@@ -1,18 +1,13 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class Log
+public partial record Log : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public Guid ApplicationId { get; set; }
+    public Guid TenantId { get; set; }
 
     public short? Severity { get; set; }
 
     public string? Message { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
-
-    public bool IsDeleted { get; set; }
 
     public string? Initiator { get; set; }
 
@@ -22,5 +17,5 @@ public partial class Log
 
     public bool? Seen { get; set; }
 
-    public virtual Application? Application { get; set; }
+    public virtual Tenant? Application { get; set; }
 }

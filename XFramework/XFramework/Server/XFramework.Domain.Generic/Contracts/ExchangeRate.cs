@@ -1,19 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class ExchangeRate
+public partial record ExchangeRate : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public DateTime? CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime? ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
     public Guid SourceCurrencyTypeId { get; set; }
 
     public Guid TargetCurrencyTypeId { get; set; }

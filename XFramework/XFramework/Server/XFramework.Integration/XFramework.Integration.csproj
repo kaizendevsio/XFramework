@@ -2,9 +2,9 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -19,9 +19,11 @@
         <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
         <PackageReference Include="Mapster" Version="7.3.0" />
         <PackageReference Include="MediatR" Version="12.0.1" />
-        <PackageReference Include="MessagePack" Version="2.4.35" />
         <PackageReference Include="BinaryPack" Version="1.0.3" />
         <PackageReference Include="Sentry.Extensions.Logging" Version="3.25.0" />
+        <PackageReference Include="Serilog" Version="3.0.1" />
+        <PackageReference Include="Serilog.Extensions.Logging" Version="7.0.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
         <PackageReference Include="UnitsNet" Version="5.0.0-alpha006" />
         <PackageReference Include="Sentry" Version="3.25.0" />
         <PackageReference Include="TypeSupport" Version="1.1.12" />
@@ -45,7 +47,6 @@
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.PaymentGateways\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.StreamFlow\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
-      <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
       <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
     </ItemGroup>
 

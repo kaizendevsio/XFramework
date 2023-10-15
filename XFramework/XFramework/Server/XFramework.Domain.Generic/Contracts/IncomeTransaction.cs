@@ -1,19 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class IncomeTransaction
+public partial record IncomeTransaction : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
     public Guid CredentialId { get; set; }
 
     public Guid? IncomeTypeId { get; set; }
@@ -32,8 +20,9 @@ public partial class IncomeTransaction
 
     public Guid PairMapId { get; set; }
 
-    
-    public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; } = new List<BillsPaymentTransaction>();
+
+    public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; } =
+        new List<BillsPaymentTransaction>();
 
     public virtual IdentityCredential Credential { get; set; } = null!;
 

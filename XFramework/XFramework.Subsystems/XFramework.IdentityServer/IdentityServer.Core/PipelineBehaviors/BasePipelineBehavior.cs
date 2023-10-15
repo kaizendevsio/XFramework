@@ -8,7 +8,6 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     where TRequest : IRequest<TResponse>
 {
     private readonly IEnumerable<IValidator<TRequest>> _validators;
-    private readonly IDataLayer _dataLayer;
     private TResponse _response;
 
     public BasePipelineBehavior(IEnumerable<IValidator<TRequest>> validators)
@@ -21,7 +20,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         try
         {
             // Pre Validation
-            await PreValidation(request);
+            await ValidateRequest(request);
             // Post Validation
             
             // Create data layer transaction
@@ -33,7 +32,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
 
             // Commit data layer transaction
             //await transaction.CommitAsync(cancellationToken);
-            await PostHandler(request);                
+            await ErrorHandler(request, next);                
 
             return _response;
         }
@@ -59,7 +58,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         }
     }
 
-    private async Task PreValidation(TRequest request)
+    private async Task ValidateRequest(TRequest request)
     {
         var context = new ValidationContext<TRequest>(request);
         var failures = _validators
@@ -76,7 +75,7 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         await Task.FromResult(new Unit());
     }
 
-    private async Task PostHandler(TRequest request)
+    private async Task ErrorHandler(TRequest request, RequestHandlerDelegate<TResponse> next)
     {
         if (_response.GetType() == typeof(CmdResponse<TRequest>))
         {

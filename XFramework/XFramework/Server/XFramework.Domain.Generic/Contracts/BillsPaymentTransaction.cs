@@ -1,15 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class BillsPaymentTransaction
+public partial record BillsPaymentTransaction : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool? IsDeleted { get; set; }
-
-    public DateTime? CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-    
     public Guid CredentialId { get; set; }
 
     public Guid? BillerId { get; set; }

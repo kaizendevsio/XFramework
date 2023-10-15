@@ -1,9 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Net;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Net;
 using Mapster;
 using MediatR;
 using Microsoft.AspNetCore.SignalR;
@@ -11,31 +6,30 @@ using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Domain.Generic.Contracts.Responses;
-using StreamFlow.Stream.Hubs.V1;
+using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Services.Entity.Events;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
-using XFramework.Integration.Interfaces;
+using XFramework.Integration.Services.Helpers;
 
 namespace StreamFlow.Stream.Services.Handlers.Events;
 
-public class InvokeMethodHandler : CommandBaseHandler, IRequestHandler<InvokeMethodQuery, QueryResponse<StreamFlowInvokeResponse>>
+public class InvokeMethodHandler(
+        ICachingService cachingService,
+        IHubContext<MessageQueueHub> hubContext,
+        StreamFlowConfiguration streamFlowConfiguration,
+        MetricsMonitor metricsMonitor,
+        IHelperService helperService)
+    : IRequestHandler<InvokeMethodQuery, QueryResponse<StreamFlowInvokeResponse>>
 {
-    public InvokeMethodHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration, IHelperService helperService)
-    {
-        _helperService = helperService;
-        _cachingService = cachingService;
-        _hubContext = hubContext;
-        _streamFlowConfiguration = streamFlowConfiguration;
-    }
     public async Task<QueryResponse<StreamFlowInvokeResponse>> Handle(InvokeMethodQuery request, CancellationToken cancellationToken)
     {
         // Check if Client is Registered
-        var client = _cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == request.Context.ConnectionId);
+        var client = cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == request.Context.ConnectionId);
         if (client.Value == null)
         {
             Console.WriteLine($"Unknown or unauthorized client detected");
-            await _hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
+            await hubContext.Clients.Client(request.Context.ConnectionId).SendAsync("TelemetryCall","Client Unknown or Unauthorized");
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Forbidden
@@ -48,33 +42,33 @@ public class InvokeMethodHandler : CommandBaseHandler, IRequestHandler<InvokeMet
             Name = client.Value.Name
         };
 
-        var telemetry = new StreamFlowTelemetryBO
+        var telemetry = new StreamFlowTelemetry
         {
-            ClientGuid = client.Value.Guid,
-            RequestGuid = request.MessageQueue.RequestGuid,
-            ConsumerGuid = request.MessageQueue.ConsumerGuid
+            ClientGuid = client.Value.Guid
         };
             
-        var c = _cachingService.Clients.FirstOrDefault(x => x.Value.Guid == request.MessageQueue.Recipient);
+        var c = cachingService.Clients.FirstOrDefault(x => x.Value.Guid == request.MessageQueue.RecipientId);
 
         if (c.Value != null)
         {
-            _helperService.StopWatch.Start("Invoked Method");
-            var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessageBO>();
+            using var metricLogger = metricsMonitor.Start($"Invoking method '{request.MessageQueue.CommandName}'");
+            
+            var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage>();
             //methodCallCompletionSource.RunContinuationsAsynchronously();
-            if (!_cachingService.PendingMethodCalls.TryAdd(request.MessageQueue.RequestGuid,methodCallCompletionSource))
+            if (!cachingService.PendingMethodCalls.TryAdd(request.MessageQueue.RequestId,methodCallCompletionSource))
             {
+                metricLogger.Failed($"Error while invoking method '{request.MessageQueue.CommandName}' on {request.MessageQueue.RecipientId}");
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.InternalServerError,
-                    Message = $"Error while invoking method '{request.MessageQueue.CommandName}' on {request.MessageQueue.Recipient}"
+                    Message = $"Error while invoking method '{request.MessageQueue.CommandName}' on {request.MessageQueue.RecipientId}"
                 };
             }
                 
-            await _hubContext.Clients.Client(c.Value.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
+            await hubContext.Clients.Client(c.Value.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
             var response = await methodCallCompletionSource.Task.ConfigureAwait(false);
 
-            _helperService.StopWatch.Stop("Invoke Response Received");
+            metricLogger.Completed($"Invoked method '{request.MessageQueue.CommandName}'");
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,
@@ -87,7 +81,7 @@ public class InvokeMethodHandler : CommandBaseHandler, IRequestHandler<InvokeMet
 
         }
 
-        if (_cachingService.AbsoluteClients.All(x => x.Value.Guid != request.MessageQueue.Recipient))
+        if (cachingService.AbsoluteClients.All(x => x.Value.Guid != request.MessageQueue.RecipientId))
         {
             Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
             return new()

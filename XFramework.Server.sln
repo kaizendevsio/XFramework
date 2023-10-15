@@ -45,6 +45,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.Domain.Generic", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HealthEssentials.Domain.Generics", "XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj", "{583EED20-6703-4F96-9D54-E2DE087DA536}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.SourceGenerators", "XFramework\XFramework\Server\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj", "{329F932B-D12B-4322-9076-21828D4857E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -119,6 +121,10 @@ Global
 		{583EED20-6703-4F96-9D54-E2DE087DA536}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{583EED20-6703-4F96-9D54-E2DE087DA536}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{583EED20-6703-4F96-9D54-E2DE087DA536}.Release|Any CPU.Build.0 = Release|Any CPU
+		{329F932B-D12B-4322-9076-21828D4857E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{329F932B-D12B-4322-9076-21828D4857E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{329F932B-D12B-4322-9076-21828D4857E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{329F932B-D12B-4322-9076-21828D4857E0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -144,5 +150,6 @@ Global
 		{E82BFF25-541C-4CE7-BE38-94F4EC0FE86E} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 		{DEDAC7B9-0D2E-4230-986E-84A072D997B9} = {8CD1151F-9943-421D-A6C8-1DF138009724}
 		{583EED20-6703-4F96-9D54-E2DE087DA536} = {8CD1151F-9943-421D-A6C8-1DF138009724}
+		{329F932B-D12B-4322-9076-21828D4857E0} = {2BB0FE18-DE6E-4EF0-9D98-6431FFB91801}
 	EndGlobalSection
 EndGlobal

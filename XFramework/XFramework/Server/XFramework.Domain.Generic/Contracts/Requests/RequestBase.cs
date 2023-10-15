@@ -2,8 +2,8 @@
 
 namespace XFramework.Domain.Generic.Contracts.Requests;
 
-public class RequestBase
+public record RequestBase : IHasRequestServer
 {
-    public RequestServerBO RequestServer { get; set; } = new ();
-    public Guid? Guid { get; set; }
+    public RequestServer Metadata { get; set; } = new ();
+    public Guid RequestId { get; set; }
 }

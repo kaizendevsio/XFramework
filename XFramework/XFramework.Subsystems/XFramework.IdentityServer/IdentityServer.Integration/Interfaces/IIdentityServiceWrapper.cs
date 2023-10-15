@@ -1,27 +1,4 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
-using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Address;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Location;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Storage;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Subscription;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
-using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
-using IdentityServer.Domain.Generic.Contracts.Requests.Delete.Address;
-using IdentityServer.Domain.Generic.Contracts.Requests.Delete.Location;
-using IdentityServer.Domain.Generic.Contracts.Requests.Get;
-using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
-using IdentityServer.Domain.Generic.Contracts.Requests.Get.Location;
-using IdentityServer.Domain.Generic.Contracts.Requests.Get.Subscription;
-using IdentityServer.Domain.Generic.Contracts.Requests.Update;
-using IdentityServer.Domain.Generic.Contracts.Requests.Update.Address;
-using IdentityServer.Domain.Generic.Contracts.Requests.Update.Location;
-using IdentityServer.Domain.Generic.Contracts.Requests.Update.Verification;
-using IdentityServer.Domain.Generic.Contracts.Responses;
-using IdentityServer.Domain.Generic.Contracts.Responses.Address;
-using IdentityServer.Domain.Generic.Contracts.Responses.Subscription;
-using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Contracts.Responses;
 using XFramework.Domain.Generic.Interfaces;
@@ -32,7 +9,7 @@ public interface IIdentityServiceWrapper : IXFrameworkService
 {
     public HubConnectionState ConnectionState { get; }
         
-    public Task<QueryResponse<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request);
+    /*public Task<QueryResponse<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request);
     public Task<QueryResponse<CredentialResponse>> GetCredential(GetCredentialRequest request);
     public Task<QueryResponse<CredentialResponse>> GetCredentialByContact(GetCredentialByContactRequest request);
     public Task<QueryResponse<List<CredentialResponse>>> LegacyGetCredentialList(GetCredentialListRequest request);
@@ -81,5 +58,5 @@ public interface IIdentityServiceWrapper : IXFrameworkService
     public Task<CmdResponse> CreateVerification(CreateVerificationRequest request);
     public Task<CmdResponse> UpdateVerification(UpdateVerificationRequest request);
     public Task<CmdResponse> CreateAffiliateSubscription(CreateAffiliateSubscriptionRequest request);
-    public Task<QueryResponse<List<SubscriptionResponse>>> GetUnregisteredSubscriberList(GetUnregisteredSubscriberListRequest request);
+    public Task<QueryResponse<List<SubscriptionResponse>>> GetUnregisteredSubscriberList(GetUnregisteredSubscriberListRequest request);*/
 }

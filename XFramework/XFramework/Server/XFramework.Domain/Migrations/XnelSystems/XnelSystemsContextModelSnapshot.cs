@@ -10,7 +10,7 @@ using XFramework.Domain.Contexts;
 
 namespace XFramework.Domain.Migrations.XnelSystems
 {
-    [DbContext(typeof(XnelSystemsContext))]
+    [DbContext(typeof(AppDbContext))]
     partial class XnelSystemsContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
@@ -37,20 +37,32 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<long?>("Code")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("ProvCode")
                         .HasColumnType("integer");
 
                     b.Property<int?>("RegCode")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id")
                         .HasName("addresses_refbrgy_pk");
@@ -74,11 +86,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<long>("Code")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("ProvCodeId")
                         .HasColumnType("bigint");
@@ -88,9 +115,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<int?>("RegCode")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id")
                         .HasName("tbl_addresscity_pk");
@@ -111,17 +135,23 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("CreatedOn")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("CurrencyId")
                         .HasColumnType("uuid")
                         .HasColumnName("CurrencyID");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<string>("IsoCode2")
@@ -136,13 +166,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<DateTime?>("LastChanged")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("ModifiedOn")
+                    b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -172,20 +196,32 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<long>("Code")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("PsgcCode")
                         .HasColumnType("bigint");
 
                     b.Property<long>("RegCodeId")
                         .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id")
                         .HasName("tbl_addressprovince_pk");
@@ -209,21 +245,33 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<long>("Code")
                         .HasColumnType("bigint");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid")
                         .HasColumnName("CountryID");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("PsgcCode")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id")
                         .HasName("tbl_addressregions_pk");
@@ -250,7 +298,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime?>("AvailabilityDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
@@ -261,6 +315,15 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("EnterpriseID");
 
                     b.Property<DateTime?>("Expiration")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ParentAppId")
@@ -293,16 +356,19 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<short?>("AuthStatus")
                         .HasColumnType("smallint");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DeviceName")
                         .HasMaxLength(50)
@@ -313,7 +379,10 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("character varying(18)")
                         .HasColumnName("IPAddress");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<bool?>("IsSuccess")
@@ -323,13 +392,10 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityAuthorizationLogs");
@@ -351,11 +417,17 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("BillerCategoryID");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("ConvenienceFee")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
@@ -371,20 +443,17 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Image")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -416,28 +485,31 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isDeleted")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isEnabled")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -468,28 +540,31 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("BillerID");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isDeleted")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isEnabled")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -527,19 +602,25 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid?>("BillerId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal?>("ConvenienceFee")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)")
                         .HasDefaultValueSql("0");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal?>("Discount")
                         .HasPrecision(10, 2)
@@ -548,10 +629,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid?>("IncomeTransactionId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -606,18 +690,27 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<int?>("Level")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -657,12 +750,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid?>("BusinessPackageId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<long?>("LeftCount")
@@ -671,7 +773,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<long?>("Level")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -705,19 +807,22 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<long?>("BinaryRight")
                         .HasColumnType("bigint");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime?>("LastChanged")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<long>("LeftLegCount")
                         .HasColumnType("bigint");
@@ -731,13 +836,10 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<long?>("Level")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<short?>("Position")
                         .HasColumnType("smallint");
@@ -795,6 +897,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ConsumedById")
                         .HasColumnType("uuid");
 
@@ -803,25 +908,25 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<short?>("PackageStatus")
                         .HasColumnType("smallint");
@@ -868,23 +973,23 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("BusinessPackageID");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime?>("LastChanged")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("StringValue")
                         .HasMaxLength(100)
@@ -920,11 +1025,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(5)
                         .HasColumnType("character varying(5)");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
@@ -933,20 +1041,17 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("IconImage")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<bool?>("IsNumericValue")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime?>("LastChanged")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -970,24 +1075,27 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .HasMaxLength(100)
@@ -1007,6 +1115,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1018,16 +1129,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("CurrentBusinessPackageId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1066,6 +1179,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid?>("BusinessPackageId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1075,18 +1191,20 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1114,21 +1232,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1162,21 +1285,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1202,21 +1330,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("CommunityGroupId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1258,6 +1391,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ContentId")
                         .HasColumnType("uuid");
 
@@ -1266,16 +1402,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1301,6 +1439,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ContentId")
                         .HasColumnType("uuid");
 
@@ -1309,16 +1450,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1349,10 +1492,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Emoji")
                         .IsRequired()
@@ -1361,13 +1510,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1390,21 +1538,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1430,6 +1583,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Alias")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1438,14 +1594,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("HandleName")
                         .HasColumnType("character varying");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -1455,7 +1613,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1487,10 +1645,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("IdentityId")
                         .HasColumnType("uuid");
@@ -1498,13 +1662,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1535,21 +1698,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1572,21 +1740,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -1609,32 +1782,35 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("CurrencyIsoCode3")
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .HasMaxLength(256)
@@ -1665,6 +1841,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal?>("ConvenienceFee")
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
@@ -1674,11 +1853,11 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<short?>("DepositStatus")
                         .HasColumnType("smallint");
@@ -1696,16 +1875,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("GatewayId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("RawRequestData")
                         .HasMaxLength(10000)
@@ -1755,27 +1934,30 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Gateway")
                         .HasMaxLength(13)
                         .HasColumnType("character varying(13)");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("TelcoTypeId")
@@ -1805,7 +1987,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Code")
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
@@ -1815,21 +2003,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("TelcoCodePromosID");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isDeleted")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -1860,22 +2045,25 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -1895,19 +2083,22 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Prefix")
@@ -1936,7 +2127,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
@@ -1946,16 +2143,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -1978,6 +2172,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Amount")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1993,6 +2190,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(13)
                         .HasColumnType("character varying(13)");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<decimal?>("Discount")
                         .HasColumnType("numeric");
 
@@ -2000,19 +2200,19 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("TelcoProductCodeID");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isDeleted")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isEnabled")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2061,11 +2261,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2075,9 +2278,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .HasMaxLength(500)
@@ -2097,13 +2297,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("EffectivityDate")
                         .HasColumnType("timestamp with time zone");
@@ -2115,16 +2318,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<Guid>("SourceCurrencyTypeId")
                         .HasColumnType("uuid")
@@ -2170,17 +2373,20 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("CityId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<bool?>("DefaultAddress")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("IdentityInfoId")
                         .HasColumnType("uuid")
@@ -2194,9 +2400,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<Guid>("ProvinceId")
                         .HasColumnType("uuid");
@@ -2244,11 +2447,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2258,9 +2464,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .HasMaxLength(500)
@@ -2280,15 +2483,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid")
                         .HasColumnName("CredentialID");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
@@ -2301,9 +2507,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<Guid?>("TypeId")
                         .HasColumnType("uuid");
@@ -2332,21 +2535,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2369,11 +2577,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2383,9 +2594,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .HasColumnType("character varying");
@@ -2408,11 +2616,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ApplicationID");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("IdentityInfoId")
                         .HasColumnType("uuid")
@@ -2429,9 +2640,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<byte[]>("PasswordByte")
                         .HasColumnType("bytea");
@@ -2469,6 +2677,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -2481,21 +2692,24 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(5000)
                         .HasColumnType("character varying(5000)");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("FavoriteTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("FavoriteTypeID");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2528,11 +2742,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<short?>("CivilStatus")
                         .HasColumnType("smallint");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("FirstName")
                         .HasMaxLength(100)
@@ -2569,9 +2786,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
-
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityInfo");
 
@@ -2588,15 +2802,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid")
                         .HasColumnName("UserCredID");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2606,9 +2823,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<DateTime>("RoleExpiration")
                         .HasColumnType("timestamp with time zone");
@@ -2638,11 +2852,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("ApplicationId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
@@ -2655,9 +2872,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .HasMaxLength(100)
@@ -2684,10 +2898,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -2696,13 +2916,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -2725,30 +2944,30 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid")
                         .HasColumnName("CredentialID");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("Expiry")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<short?>("Status")
                         .HasColumnType("smallint");
@@ -2781,19 +3000,22 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long?>("DefaultExpiry")
                         .HasColumnType("bigint");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
@@ -2824,13 +3046,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("BusinessPackageID");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("DistributionType")
                         .HasColumnType("bigint");
@@ -2839,11 +3064,11 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("IncomeTypeID");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime?>("LastChanged")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<long?>("MaxLimit")
                         .HasColumnType("bigint");
@@ -2853,9 +3078,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<decimal>("Value")
                         .HasPrecision(18, 10)
@@ -2879,13 +3101,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("IdentityRoleId")
                         .HasColumnType("uuid");
@@ -2893,16 +3118,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid?>("IncomeTypeId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<decimal?>("Percentage")
                         .HasPrecision(18, 8)
@@ -2926,16 +3151,19 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<short?>("IncomeStatus")
                         .HasColumnType("smallint");
@@ -2947,16 +3175,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<Guid>("PairMapId")
                         .HasColumnType("uuid");
@@ -2998,13 +3226,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("IncomeTypeDescription")
                         .HasMaxLength(500)
@@ -3019,7 +3250,10 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<bool?>("IsReward")
@@ -3029,9 +3263,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.HasKey("Id")
                         .HasName("tbl_IncomeType_pkey");
@@ -3051,7 +3282,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ApplicationID");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Initiator")
@@ -3060,8 +3297,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Message")
                         .HasColumnType("character varying");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .HasColumnType("character varying");
@@ -3093,16 +3336,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3113,7 +3361,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("MessageThreadMemberId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3140,16 +3388,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3160,7 +3413,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("MessageThreadMemberId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3188,21 +3441,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3225,10 +3483,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Intent")
                         .IsRequired()
@@ -3237,8 +3501,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3247,7 +3510,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3301,16 +3564,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3318,7 +3586,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3344,16 +3612,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3361,7 +3634,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3387,10 +3660,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Emoji")
                         .IsRequired()
@@ -3399,13 +3678,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3428,10 +3706,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -3440,13 +3724,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3478,6 +3761,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -3485,6 +3771,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -3500,8 +3789,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3509,7 +3797,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("MessageThreadId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3541,10 +3829,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -3557,8 +3851,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3566,7 +3859,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("MessageThreadId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3590,16 +3883,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3607,7 +3905,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("MessageThreadMemberId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3633,16 +3931,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3650,7 +3953,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("MessageTypeId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3675,21 +3978,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3715,16 +4023,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -3732,7 +4045,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("KeyId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3759,10 +4072,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
@@ -3770,13 +4089,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3804,21 +4122,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -3841,11 +4164,17 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("ConvenienceFee")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
@@ -3865,20 +4194,17 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Image")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -3910,28 +4236,31 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isDeleted")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isEnabled")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -3956,14 +4285,23 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("GatewayId")
                         .HasColumnType("uuid")
                         .HasColumnName("GatewayID");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
@@ -3991,7 +4329,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ExampleText")
@@ -4002,6 +4346,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<string>("InstructionText")
                         .HasColumnType("character varying");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4032,10 +4382,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -4047,8 +4403,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -4057,7 +4412,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4087,21 +4442,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4128,10 +4488,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("GatewayTypeId")
                         .HasColumnType("uuid");
@@ -4139,13 +4505,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4170,29 +4535,31 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isDeleted")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isEnabled")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -4217,10 +4584,19 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
@@ -4254,29 +4630,31 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isDeleted")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasColumnName("isEnabled")
                         .HasDefaultValueSql("true");
 
                     b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -4301,13 +4679,22 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ApplicationID");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Key")
@@ -4342,14 +4729,23 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
@@ -4373,21 +4769,27 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
@@ -4413,15 +4815,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid")
                         .HasColumnName("CredentialID");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -4431,9 +4836,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("SessionData")
                         .HasMaxLength(2000)
@@ -4461,11 +4863,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -4475,9 +4880,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .HasColumnType("character varying");
@@ -4496,6 +4898,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ContentPath")
                         .IsRequired()
                         .HasColumnType("character varying");
@@ -4507,6 +4912,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("ExpireAt")
                         .HasColumnType("timestamp with time zone");
@@ -4523,13 +4931,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4561,10 +4968,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4575,13 +4988,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4606,21 +5018,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4643,21 +5060,26 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4683,6 +5105,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -4692,19 +5117,21 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("CredentialID");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("ExpireAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4737,10 +5164,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
@@ -4748,13 +5181,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
-                        .IsRequired()
+                    b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
@@ -4781,32 +5213,32 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(24, 8)
                         .HasColumnType("numeric(24,8)");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool?>("IsDeleted")
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("false");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<Guid?>("WalletTypeId")
                         .HasColumnType("uuid");
@@ -4837,24 +5269,27 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Remarks")
                         .HasMaxLength(100)
@@ -4883,31 +5318,34 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(24, 8)
                         .HasColumnType("numeric(24,8)");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<decimal>("PreviousBalance")
                         .HasPrecision(24, 8)
@@ -4950,15 +5388,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(9)
                         .HasColumnType("character varying(9)");
 
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CurrencyTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("CurrencyTypeID");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Desc")
                         .HasMaxLength(500)
@@ -4967,11 +5408,8 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastChanged")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal?>("MaxTransfer")
                         .HasColumnType("numeric");
@@ -4981,9 +5419,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -5015,27 +5450,30 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<long?>("CreatedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool?>("IsEnabled")
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("ModifiedAt")
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("ModifiedBy")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Remarks")
                         .HasColumnType("character varying");

@@ -1,21 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class IdentityRole
+public partial record IdentityRole : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool IsEnabled { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime? ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid CredentialId { get; set; }
 
     public Guid? TypeId { get; set; }
@@ -24,7 +10,8 @@ public partial class IdentityRole
 
     public virtual ICollection<IncomePartition> IncomePartitions { get; } = new List<IncomePartition>();
 
-    public virtual ICollection<MessageThreadMemberRole> MessageThreadMemberRoles { get; } = new List<MessageThreadMemberRole>();
+    public virtual ICollection<MessageThreadMemberRole> MessageThreadMemberRoles { get; } =
+        new List<MessageThreadMemberRole>();
 
     public virtual IdentityRoleType? Type { get; set; }
 

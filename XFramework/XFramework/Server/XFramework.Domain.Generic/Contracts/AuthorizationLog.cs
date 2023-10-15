@@ -1,19 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class AuthorizationLog
+public partial record AuthorizationLog : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
     public Guid CredentialId { get; set; }
 
     public string? Ipaddress { get; set; }
@@ -26,6 +14,6 @@ public partial class AuthorizationLog
 
     public string? DeviceName { get; set; }
 
-    
+
     public virtual IdentityCredential IdentityCredentials { get; set; } = null!;
 }

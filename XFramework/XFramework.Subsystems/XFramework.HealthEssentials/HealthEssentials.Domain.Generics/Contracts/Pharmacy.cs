@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class Pharmacy
+public partial class Pharmacy : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid TypeId { get; set; }
 
     public string? Name { get; set; }
@@ -24,7 +14,7 @@ public partial class Pharmacy
 
     public string? ChemicalComponent { get; set; }
 
-    
+
     public string? Phone { get; set; }
 
     public string? Email { get; set; }

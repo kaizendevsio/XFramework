@@ -1,21 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class IdentityAddress
+public partial record IdentityAddress : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool IsEnabled { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime? ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid IdentityInfoId { get; set; }
 
     public string? UnitNumber { get; set; }
@@ -40,7 +26,7 @@ public partial class IdentityAddress
 
     public Guid CountryId { get; set; }
 
-    
+
     public virtual IdentityAddressType? AddressType { get; set; }
 
     public virtual AddressBarangay? Barangay { get; set; }

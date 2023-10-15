@@ -1,20 +1,10 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class Message
+public partial record Message : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public string Text { get; set; } = null!;
 
-    
+
     public Guid MessageThreadId { get; set; }
 
     public Guid MessageThreadMemberId { get; set; }

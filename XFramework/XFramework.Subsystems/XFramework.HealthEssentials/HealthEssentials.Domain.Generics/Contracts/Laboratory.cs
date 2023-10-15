@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class Laboratory
+public partial class Laboratory : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid TypeId { get; set; }
 
     public string? Name { get; set; }
@@ -20,7 +10,7 @@ public partial class Laboratory
 
     public string? Description { get; set; }
 
-    
+
     public string? Phone { get; set; }
 
     public string? Email { get; set; }

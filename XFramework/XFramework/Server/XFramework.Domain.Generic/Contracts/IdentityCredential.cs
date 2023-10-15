@@ -1,21 +1,10 @@
-﻿namespace XFramework.Domain.Generic.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
-public partial class IdentityCredential
+namespace XFramework.Domain.Generic.Contracts;
+
+public partial record IdentityCredential : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool IsEnabled { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime? ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid IdentityInfoId { get; set; }
 
     public string? UserName { get; set; }
@@ -24,26 +13,35 @@ public partial class IdentityCredential
 
     public short? LogInStatus { get; set; }
 
+    [JsonIgnore]
     public byte[]? PasswordByte { get; set; }
+    
+    [NotMapped]
+    public string? Password { get; set; }
 
-    public Guid ApplicationId { get; set; }
+    public Guid TenantId { get; set; }
 
     public string? Token { get; set; }
 
-    
-    public virtual Application Application { get; set; } = null!;
+
+    public virtual Tenant Tenant { get; set; } = null!;
 
     public virtual ICollection<AuthorizationLog> AuthorizationLogs { get; } = new List<AuthorizationLog>();
 
-    public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; } = new List<BillsPaymentTransaction>();
+    public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; } =
+        new List<BillsPaymentTransaction>();
 
-    public virtual ICollection<BusinessPackage> BusinessPackageConsumedByNavigations { get; } = new List<BusinessPackage>();
+    public virtual ICollection<BusinessPackage> BusinessPackageConsumedByNavigations { get; } =
+        new List<BusinessPackage>();
 
-    public virtual ICollection<BusinessPackage> BusinessPackageIdentityCredentials { get; } = new List<BusinessPackage>();
+    public virtual ICollection<BusinessPackage> BusinessPackageIdentityCredentials { get; } =
+        new List<BusinessPackage>();
 
-    public virtual ICollection<BusinessPackage> BusinessPackageRecipientIdentityCredentials { get; } = new List<BusinessPackage>();
+    public virtual ICollection<BusinessPackage> BusinessPackageRecipientIdentityCredentials { get; } =
+        new List<BusinessPackage>();
 
-    public virtual ICollection<BusinessPackageUpgradeTransaction> BusinessPackageUpgradeTransactions { get; } = new List<BusinessPackageUpgradeTransaction>();
+    public virtual ICollection<BusinessPackageUpgradeTransaction> BusinessPackageUpgradeTransactions { get; } =
+        new List<BusinessPackageUpgradeTransaction>();
 
     public virtual ICollection<CommunityIdentity> CommunityIdentities { get; } = new List<CommunityIdentity>();
 

@@ -1,21 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class AddressCountry
+public partial record AddressCountry : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public DateTime? CreatedOn { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime? ModifiedOn { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
-    public DateTime? LastChanged { get; set; }
-
     public string? IsoCode2 { get; set; }
 
     public string? IsoCode3 { get; set; }
@@ -28,7 +14,7 @@ public partial class AddressCountry
 
     public Guid CurrencyId { get; set; }
 
-    
+
     public virtual ICollection<AddressRegion> AddressRegions { get; } = new List<AddressRegion>();
 
     public virtual CurrencyType? Currency { get; set; }

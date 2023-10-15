@@ -1,17 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class MetaData
+public partial record MetaData : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid TypeId { get; set; }
 
     public Guid KeyId { get; set; }

@@ -1,22 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class BinaryMap
+public partial record BinaryMap : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
-    public DateTime? LastChanged { get; set; }
-
-    
     public Guid? SponsorUserId { get; set; }
 
     public Guid? UplineUserId { get; set; }

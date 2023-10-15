@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using StreamFlow.Core.Interfaces;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using StreamFlow.Domain.BusinessObjects;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 
@@ -15,9 +11,9 @@ public class CachingService : ICachingService
     {
     }
 
-    public ConcurrentDictionary<int, StreamFlowClientBO> Clients { get; set; } = new();
-    public ConcurrentDictionary<int, StreamFlowClientBO> LatestClients { get; set; } = new();
-    public ConcurrentDictionary<int, StreamFlowClientBO> AbsoluteClients { get; set; } = new();
-    public ConcurrentDictionary<Guid, StreamFlowMessageBO> QueuedMessages { get; set; } = new();
-    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; } = new();
+    public ConcurrentDictionary<int, StreamFlowClient> Clients { get; set; } = new();
+    public ConcurrentDictionary<int, StreamFlowClient> LatestClients { get; set; } = new();
+    public ConcurrentDictionary<int, StreamFlowClient> AbsoluteClients { get; set; } = new();
+    public ConcurrentDictionary<Guid, StreamFlowMessage> QueuedMessages { get; set; } = new();
+    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessage>> PendingMethodCalls { get; set; } = new();
 }

@@ -1,4 +1,5 @@
 ﻿using XFramework.Domain.Generic.Enums;
+using XFramework.Integration.Abstractions.Wrappers;
 
 namespace XFramework.Integration.Drivers;
 
@@ -15,7 +16,7 @@ public class RecordsDriver : ILoggerWrapper
     {
         guid ??= Guid.NewGuid();
             
-        /*await MessageBusWrapper.Push(new StreamFlowMessageBO()
+        /*await MessageBusWrapper.Push(new StreamFlowMessage()
         {
             StreamFlowService = new StreamFlowServiceBO()
             {
@@ -27,7 +28,7 @@ public class RecordsDriver : ILoggerWrapper
         return guid;
     }
 
-    public Task<Guid?> NewLog(string name, string message, string initiator, RequestServerBO requestServer, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
+    public Task<Guid?> NewLog(string name, string message, string initiator, RequestServer requestServer, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
     {
         throw new NotImplementedException();
     }

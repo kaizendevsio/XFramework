@@ -1,17 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class MessageThreadMemberGroup
+public partial record MessageThreadMemberGroup : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public short Status { get; set; }
 
     public string Emoji { get; set; } = null!;
@@ -20,7 +10,7 @@ public partial class MessageThreadMemberGroup
 
     public string Description { get; set; } = null!;
 
-    
+
     public Guid MessageThreadId { get; set; }
 
     public virtual MessageThread MessageThread { get; set; } = null!;

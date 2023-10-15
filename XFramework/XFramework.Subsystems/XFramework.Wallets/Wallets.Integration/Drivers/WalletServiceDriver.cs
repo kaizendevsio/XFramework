@@ -1,19 +1,13 @@
 ﻿using Mapster;
 using Microsoft.Extensions.Configuration;
-using PaymentGateways.Domain.Generic.Contracts.Responses;
-using Wallets.Domain.Generic.Contracts.Requests.Create;
-using Wallets.Domain.Generic.Contracts.Requests.Delete;
-using Wallets.Domain.Generic.Contracts.Requests.Get;
-using Wallets.Domain.Generic.Contracts.Requests.Update;
-using Wallets.Domain.Generic.Contracts.Responses;
 using Wallets.Integration.Interfaces;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
-using XFramework.Integration.Interfaces.Wrappers;
 
 namespace Wallets.Integration.Drivers;
 
-public class WalletServiceDriver : DriverBase, IWalletServiceWrapper, IClientWalletServiceWrapper
+public class WalletServiceDriver : DriverBase, IWalletServiceWrapper
 {
     public WalletServiceDriver(IMessageBusWrapper messageBusDriver, IConfiguration configuration)
     {
@@ -22,7 +16,7 @@ public class WalletServiceDriver : DriverBase, IWalletServiceWrapper, IClientWal
         TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:WalletService"));
     }
 
-    public async Task<QueryResponse<WalletEntityResponse>> GetWalletEntity(GetWalletEntityRequest request)
+    /*public async Task<QueryResponse<WalletEntityResponse>> GetWalletEntity(GetWalletEntityRequest request)
     {
         return await SendAsync<GetWalletEntityRequest, WalletEntityResponse>(request);
     }
@@ -110,5 +104,5 @@ public class WalletServiceDriver : DriverBase, IWalletServiceWrapper, IClientWal
     public async Task<CmdResponse> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request)
     {
         return await SendVoidAsync(request);
-    }
+    }*/
 }

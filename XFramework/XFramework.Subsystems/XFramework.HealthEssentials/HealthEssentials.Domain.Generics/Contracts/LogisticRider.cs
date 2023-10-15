@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class LogisticRider
+public partial class LogisticRider : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid CredentialId { get; set; }
 
     public string? Name { get; set; }
@@ -22,7 +12,7 @@ public partial class LogisticRider
 
     public short Status { get; set; }
 
-    
+
     public string? VehicleType { get; set; }
 
     public string? PlateNumber { get; set; }

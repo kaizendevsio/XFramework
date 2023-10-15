@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class ConsultationJobOrderMedicine
+public partial class ConsultationJobOrderMedicine : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid ConsultationJobOrderId { get; set; }
 
     public Guid MedicineId { get; set; }
@@ -26,7 +16,7 @@ public partial class ConsultationJobOrderMedicine
 
     public short? Status { get; set; }
 
-    
+
     public int IntakeRepetition { get; set; }
 
     public Guid IntakeUnitId { get; set; }

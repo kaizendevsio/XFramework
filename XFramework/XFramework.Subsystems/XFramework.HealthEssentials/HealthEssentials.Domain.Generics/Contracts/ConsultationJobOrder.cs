@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class ConsultationJobOrder
+public partial class ConsultationJobOrder : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid ConsultationId { get; set; }
 
     public string? ReferenceNumber { get; set; }
@@ -38,7 +28,7 @@ public partial class ConsultationJobOrder
 
     public string? Prescription { get; set; }
 
-    
+
     public Guid ScheduleId { get; set; }
 
     public string? Diagnosis { get; set; }
@@ -51,11 +41,14 @@ public partial class ConsultationJobOrder
 
     public virtual Consultation Consultation { get; set; } = null!;
 
-    public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; } = new List<ConsultationJobOrderLaboratory>();
+    public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; } =
+        new List<ConsultationJobOrderLaboratory>();
 
-    public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; } = new List<ConsultationJobOrderMedicine>();
+    public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; } =
+        new List<ConsultationJobOrderMedicine>();
 
-    public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; } = new List<DoctorConsultationJobOrder>();
+    public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; } =
+        new List<DoctorConsultationJobOrder>();
 
     public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; } = new List<LaboratoryJobOrder>();
 
@@ -65,7 +58,8 @@ public partial class ConsultationJobOrder
 
     public virtual ICollection<PatientReminder> PatientReminders { get; } = new List<PatientReminder>();
 
-    public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; } = new List<PharmacyJobOrderConsultationJobOrder>();
+    public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; } =
+        new List<PharmacyJobOrderConsultationJobOrder>();
 
     public virtual Schedule Schedule { get; set; } = null!;
 }

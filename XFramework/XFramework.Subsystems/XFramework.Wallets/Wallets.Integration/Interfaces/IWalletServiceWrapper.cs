@@ -1,17 +1,11 @@
-﻿using PaymentGateways.Domain.Generic.Contracts.Responses;
-using Wallets.Domain.Generic.Contracts.Requests.Create;
-using Wallets.Domain.Generic.Contracts.Requests.Delete;
-using Wallets.Domain.Generic.Contracts.Requests.Get;
-using Wallets.Domain.Generic.Contracts.Requests.Update;
-using Wallets.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Interfaces;
 
 namespace Wallets.Integration.Interfaces;
 
 public interface IWalletServiceWrapper : IXFrameworkService
 {
-    #region Wallet Entity
+    /*#region Wallet Entity
 
     public Task<CmdResponse> CreateWalletEntity(CreateWalletEntityRequest request);
     public Task<QueryResponse<WalletEntityResponse>> GetWalletEntity(GetWalletEntityRequest request);
@@ -36,5 +30,5 @@ public interface IWalletServiceWrapper : IXFrameworkService
     public Task<QueryResponse<DepositResponse>> CreateDepositRequest(CreateWalletDepositRequest request);
     public Task<CmdResponse> CreateWithdrawalRequest(CreateWalletWithdrawalRequest request);
 
-    #endregion
+    #endregion*/
 }

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace XFramework.Domain.Contexts;
 
-public partial class HealthEssentialsContext : DbContext
+public partial class HealthEssentialsContext : Microsoft.EntityFrameworkCore.DbContext
 {
     public HealthEssentialsContext()
     {

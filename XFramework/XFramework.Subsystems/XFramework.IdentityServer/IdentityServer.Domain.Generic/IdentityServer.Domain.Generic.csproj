@@ -2,9 +2,9 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -12,7 +12,12 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
+      <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
     </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+    </ItemGroup>
+
 
 </Project>

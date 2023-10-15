@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class LaboratoryLocation
+public partial class LaboratoryLocation : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid LaboratoryId { get; set; }
 
     public string? Name { get; set; }
@@ -37,7 +27,7 @@ public partial class LaboratoryLocation
     public Guid ProvinceId { get; set; }
 
     public Guid CountryId { get; set; }
-    
+
     public int? Status { get; set; }
 
     public string? Phone { get; set; }
@@ -48,13 +38,15 @@ public partial class LaboratoryLocation
 
     public string? AlternativePhone { get; set; }
 
-    public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; } = new List<ConsultationJobOrderLaboratory>();
+    public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; } =
+        new List<ConsultationJobOrderLaboratory>();
 
     public virtual Laboratory Laboratory { get; set; } = null!;
 
     public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; } = new List<LaboratoryJobOrder>();
 
-    public virtual ICollection<LaboratoryLocationTag> LaboratoryLocationTags { get; } = new List<LaboratoryLocationTag>();
+    public virtual ICollection<LaboratoryLocationTag> LaboratoryLocationTags { get; } =
+        new List<LaboratoryLocationTag>();
 
     public virtual ICollection<LaboratoryMember> LaboratoryMembers { get; } = new List<LaboratoryMember>();
 

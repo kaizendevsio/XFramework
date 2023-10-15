@@ -1,32 +1,9 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Requests.Check;
-using IdentityServer.Domain.Generic.Contracts.Requests.Check.Verification;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Address;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Location;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Storage;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Subscription;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Verification;
-using IdentityServer.Domain.Generic.Contracts.Requests.Delete;
-using IdentityServer.Domain.Generic.Contracts.Requests.Delete.Address;
-using IdentityServer.Domain.Generic.Contracts.Requests.Delete.Location;
-using IdentityServer.Domain.Generic.Contracts.Requests.Get;
-using IdentityServer.Domain.Generic.Contracts.Requests.Get.Address;
-using IdentityServer.Domain.Generic.Contracts.Requests.Get.Location;
-using IdentityServer.Domain.Generic.Contracts.Requests.Get.Subscription;
-using IdentityServer.Domain.Generic.Contracts.Requests.Update;
-using IdentityServer.Domain.Generic.Contracts.Requests.Update.Address;
-using IdentityServer.Domain.Generic.Contracts.Requests.Update.Location;
-using IdentityServer.Domain.Generic.Contracts.Requests.Update.Verification;
-using IdentityServer.Domain.Generic.Contracts.Responses;
-using IdentityServer.Domain.Generic.Contracts.Responses.Address;
-using IdentityServer.Domain.Generic.Contracts.Responses.Subscription;
-using IdentityServer.Domain.Generic.Contracts.Responses.Verification;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Contracts.Responses;
 using XFramework.Integration.Drivers;
-using XFramework.Integration.Interfaces.Wrappers;
 using IdentityServer.Integration.Interfaces;
+using XFramework.Integration.Abstractions.Wrappers;
 
 namespace IdentityServer.Integration.Drivers;
 
@@ -39,7 +16,7 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
         TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:IdentityServerService"));
     }
 
-    public async Task<QueryResponse<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request)
+    /*public async Task<QueryResponse<AuthorizeIdentityResponse>> AuthenticateCredential(AuthenticateCredentialRequest request)
     {
         return await SendAsync<AuthenticateCredentialRequest, AuthorizeIdentityResponse>(request);
     }
@@ -257,5 +234,5 @@ public class IdentityServerDriver : DriverBase, IIdentityServiceWrapper
     public async Task<QueryResponse<ExistenceResponse>> CheckContactExistence(CheckContactExistenceRequest request)
     {
         return await SendAsync<CheckContactExistenceRequest, ExistenceResponse>(request);
-    }
+    }*/
 }

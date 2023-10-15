@@ -1,65 +1,51 @@
 ﻿using System.Diagnostics;
 using ByteSizeLib;
-using MediatR;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace XFramework.Integration.Services;
 
-public class ProcessMonitorService
+public class ProcessMonitorOptions
 {
-    private readonly IHostApplicationLifetime _hostApplicationLifetime;
-    private readonly IConfiguration _configuration;
-    private ByteSize _memoryLimit;
+    public string MemoryLimit { get; set; }
+}
 
-    public ProcessMonitorService(IHostApplicationLifetime hostApplicationLifetime, IConfiguration configuration)
+public class ProcessMonitorService(IHostApplicationLifetime hostApplicationLifetime, IOptions<ProcessMonitorOptions> options, ILogger<ProcessMonitorService> logger)
+{
+    private  ByteSize _memoryLimit;
+
+    public async Task ProcessMonitor(CancellationToken cancellationToken)
     {
-        _hostApplicationLifetime = hostApplicationLifetime;
-        _configuration = configuration;
-    }
-    
-    public async Task ProcessMonitor()
-    {
-        var tryParse = ByteSize.TryParse(_configuration.GetValue<string>("Application:MemoryLimit"), out _memoryLimit);
+        var tryParse = ByteSize.TryParse(options.Value.MemoryLimit, out _memoryLimit);
         if (!tryParse)
         {
             _memoryLimit = ByteSize.FromMegaBytes(500);
+            logger.LogWarning("Invalid or missing MemoryLimit configuration. Defaulting to {DefaultMemoryLimit} MB", _memoryLimit.MegaBytes);
         }
         
-        Console.WriteLine("*** Process Monitor Service Started with PID: {0}; Memory Limit: {1}MB", Environment.ProcessId, _memoryLimit.MegaBytes);
+        logger.LogInformation("Process Monitor Service Started with PID: {ProcessId}; Memory Limit: {MemoryLimit}MB", Environment.ProcessId, _memoryLimit.MegaBytes);
         
-        _hostApplicationLifetime.ApplicationStopping.Register(() =>
-        {
-            Console.WriteLine("*** Application is shutting down...");
-        }, true);
-    
-        _hostApplicationLifetime.ApplicationStopped.Register(() =>
-        {
-            Console.WriteLine("*** Application terminated...");
-        }, true);
+        hostApplicationLifetime.ApplicationStopping.Register(() => logger.LogInformation("Application is shutting down..."));
+        hostApplicationLifetime.ApplicationStopped.Register(() => logger.LogInformation("Application terminated..."));
         
-        while (true)
+        while (!cancellationToken.IsCancellationRequested)
         {
             var process = Process.GetCurrentProcess();
             var memory = ByteSize.FromBytes(process.PrivateMemorySize64);
-            //var cpu = process.TotalProcessorTime.TotalMilliseconds;
-            //var cpuUsage = cpu / memory;
-            //var memoryUsage = memory / cpu;
 
             if (memory.MegaBytes > (_memoryLimit.MegaBytes - 10))
             {
-                Console.WriteLine("*** Warning: Memory usage is {0} MB, getting closer to {1} MB limit. Application will be terminated when memory usage exceeds the limit.", memory.MegaBytes, _memoryLimit.MegaBytes);
+                logger.LogInformation("Warning: Memory usage is {MemoryUsage} MB, getting closer to {MemoryLimit} MB limit. Application will be terminated when memory usage exceeds the limit", memory.MegaBytes, _memoryLimit.MegaBytes);
             }
             
             if (memory.MegaBytes > _memoryLimit.MegaBytes)
             {
-                Console.WriteLine("*** Warning: Memory usage is {0} MB, exceeding limit {1} MB. Application will be terminated.", memory.MegaBytes, _memoryLimit.MegaBytes);
-                _hostApplicationLifetime.StopApplication();
+                logger.LogInformation("Warning: Memory usage is {MemoryUsage} MB, exceeding limit {MemoryLimit} MB. Application will be terminated", memory.MegaBytes, _memoryLimit.MegaBytes);
+                hostApplicationLifetime.StopApplication();
             }
             
-            GC.Collect();
-            Console.WriteLine("Performed garbage collection. Memory usage is {0} MB.", memory.MegaBytes);
-            
-            await Task.Delay(TimeSpan.FromMinutes(15), CancellationToken.None);
+            await Task.Delay(TimeSpan.FromMinutes(15), cancellationToken);
         }
     }
 }

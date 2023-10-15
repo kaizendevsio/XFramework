@@ -1,17 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class MessageDirect
+public partial record MessageDirect : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid ParentMessageId { get; set; }
 
     public Guid TypeId { get; set; }
@@ -30,7 +20,7 @@ public partial class MessageDirect
 
     public string Message { get; set; } = null!;
 
-    
+
     public short Status { get; set; }
 
     public virtual ICollection<MessageDirect> InverseParentMessage { get; } = new List<MessageDirect>();

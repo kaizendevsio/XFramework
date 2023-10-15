@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class LaboratoryService
+public partial class LaboratoryService : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid TypeId { get; set; }
 
     public Guid LaboratoryLocationId { get; set; }
@@ -32,12 +22,13 @@ public partial class LaboratoryService
 
     public Guid UnitId { get; set; }
 
-    
+
     public virtual LaboratoryServiceType Type { get; set; } = null!;
 
     public virtual Laboratory Laboratory { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryJobOrderDetail> LaboratoryJobOrderDetails { get; } = new List<LaboratoryJobOrderDetail>();
+    public virtual ICollection<LaboratoryJobOrderDetail> LaboratoryJobOrderDetails { get; } =
+        new List<LaboratoryJobOrderDetail>();
 
     public virtual LaboratoryLocation LaboratoryLocation { get; set; } = null!;
 

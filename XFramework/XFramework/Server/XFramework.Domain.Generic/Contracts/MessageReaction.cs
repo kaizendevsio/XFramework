@@ -1,17 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class MessageReaction
+public partial record MessageReaction : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid MessageId { get; set; }
 
     public Guid TypeId { get; set; }

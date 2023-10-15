@@ -1,9 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class Biller
+public partial record Biller : BaseModel
 {
-    public Guid Id { get; set; }
-
     public Guid BillerCategoryId { get; set; }
 
     public string Name { get; set; } = null!;
@@ -14,15 +12,6 @@ public partial class Biller
 
     public string? Image { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool? IsDeleted { get; set; }
-
-    public DateTime? ModifiedOn { get; set; }
-
-    public DateTime? ModifiedAt { get; set; }
 
     public Guid? ProviderEndpointId { get; set; }
 
@@ -30,12 +19,13 @@ public partial class Biller
 
     public decimal ConvenienceFee { get; set; }
 
-    
+
     public virtual BillerCategory BillerCategory { get; set; } = null!;
 
     public virtual ICollection<BillerField> BillerFields { get; } = new List<BillerField>();
 
-    public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; } = new List<BillsPaymentTransaction>();
+    public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; } =
+        new List<BillsPaymentTransaction>();
 
     public virtual ProviderEndpoint? ProviderEndpoint { get; set; }
 }

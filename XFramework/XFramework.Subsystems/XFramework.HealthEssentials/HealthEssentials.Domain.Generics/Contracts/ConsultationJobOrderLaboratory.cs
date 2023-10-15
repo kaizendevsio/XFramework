@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class ConsultationJobOrderLaboratory
+public partial class ConsultationJobOrderLaboratory : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid ConsultationJobOrderId { get; set; }
 
     public Guid LaboratoryServiceId { get; set; }
@@ -26,7 +16,7 @@ public partial class ConsultationJobOrderLaboratory
 
     public short? Status { get; set; }
 
-    
+
     public virtual ConsultationJobOrder ConsultationJobOrder { get; set; } = null!;
 
     public virtual LaboratoryServiceType LaboratoryService { get; set; } = null!;

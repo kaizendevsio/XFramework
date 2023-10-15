@@ -2,21 +2,26 @@
 
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>11</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="DataAccess\Commands\" />
-    <Folder Include="DataAccess\Query\" />
+    <PackageReference Include="Asp.Versioning.Http" Version="7.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="7.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.OData" Version="8.2.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.10" />
+    <PackageReference Include="Serilog.AspNetCore" Version="7.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+  
+  <ItemGroup>
     <Folder Include="Validations\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
-    <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
     <ProjectReference Include="..\XFramework.Domain\XFramework.Domain.csproj" />
     <ProjectReference Include="..\XFramework.Integration\XFramework.Integration.csproj" />
   </ItemGroup>

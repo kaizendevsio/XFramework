@@ -1,21 +1,12 @@
-﻿namespace XFramework.Domain.Generic.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 
-public partial class StorageFile
+namespace XFramework.Domain.Generic.Contracts;
+
+public partial record StorageFile : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public string ContentPath { get; set; } = null!;
 
     public Guid TypeId { get; set; }
-
     
     public Guid Identifier { get; set; }
 
@@ -30,6 +21,11 @@ public partial class StorageFile
     public string? Name { get; set; }
 
     public string? ContentType { get; set; }
+    
+    public string? BlobContainer { get; set; }
+
+    [NotMapped]
+    public byte[]? FileBytes { get; set; }
 
     public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; } = new List<CommunityContentFile>();
 

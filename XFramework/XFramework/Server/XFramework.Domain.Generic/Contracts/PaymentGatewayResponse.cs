@@ -1,17 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class PaymentGatewayResponse
+public partial record PaymentGatewayResponse : BaseModel
 {
-    public Guid Id { get; set; }
-    
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public string Code { get; set; } = null!;
 
     public string Message { get; set; } = null!;

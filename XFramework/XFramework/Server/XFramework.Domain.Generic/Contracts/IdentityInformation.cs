@@ -1,22 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class IdentityInformation
+public partial record IdentityInformation : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool IsEnabled { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime? ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
-    public bool IsDeleted { get; set; }
-
-    
     public string? FirstName { get; set; }
 
     public string? MiddleName { get; set; }
@@ -35,9 +20,9 @@ public partial class IdentityInformation
 
     public short? CivilStatus { get; set; }
 
-    public Guid ApplicationId { get; set; }
+    public Guid TenantId { get; set; }
 
-    public virtual Application Application { get; set; } = null!;
+    public virtual Tenant Tenant { get; set; } = null!;
 
     public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();
 

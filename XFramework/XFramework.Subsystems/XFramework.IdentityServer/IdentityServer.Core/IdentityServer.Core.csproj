@@ -2,27 +2,23 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
+        
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Commands\Entity\Address" />
-      <Folder Include="DataAccess\Commands\Entity\Application" />
-      <Folder Include="DataAccess\Commands\Entity\Events" />
-      <Folder Include="DataAccess\Commands\Handlers\Application" />
-      <Folder Include="DataAccess\Commands\Handlers\Events" />
-      <Folder Include="DataAccess\Commands\Handlers\Identity\Location" />
-      <Folder Include="DataAccess\Query\Entity\Events" />
-      <Folder Include="DataAccess\Query\Handlers\Events" />
+      <Folder Include="DataAccess\Query\" />
+      <Folder Include="Validations\" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-      <ProjectReference Include="..\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
-      <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Core\XFramework.Core.csproj"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj"/>
+        <ProjectReference Include="..\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
     </ItemGroup>
 
     <ItemGroup>

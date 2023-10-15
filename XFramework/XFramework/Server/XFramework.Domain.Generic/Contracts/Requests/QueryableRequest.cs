@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts.Requests;
 
-public class QueryableRequest : RequestBase
+public record QueryableRequest : RequestBase
 {
     public Action? OnSuccess { get; set; }
     public Action? OnFailure { get; set; }

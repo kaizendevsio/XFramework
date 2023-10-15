@@ -1,19 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class DepositRequest
+public partial record DepositRequest : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
     public Guid CredentialId { get; set; }
 
     public Guid? SourceCurrencyId { get; set; }
@@ -46,7 +34,7 @@ public partial class DepositRequest
 
     public Guid GatewayId { get; set; }
 
-    
+
     public virtual ICollection<BusinessPackage> BusinessPackages { get; } = new List<BusinessPackage>();
 
     public virtual PaymentGateway? PaymentGateway { get; set; }

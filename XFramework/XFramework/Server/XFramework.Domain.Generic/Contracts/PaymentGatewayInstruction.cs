@@ -1,13 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class PaymentGatewayInstruction
+public partial record PaymentGatewayInstruction : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime? CreatedAt { get; set; }
-
-    public DateTime? ModifiedAt { get; set; }
-
     public Guid? GatewayId { get; set; }
 
     public string? InstructionText { get; set; }

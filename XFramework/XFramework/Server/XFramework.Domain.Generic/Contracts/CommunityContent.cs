@@ -1,17 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class CommunityContent
+public partial record CommunityContent : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public string? Title { get; set; }
 
     public string? Text { get; set; }
@@ -22,12 +12,13 @@ public partial class CommunityContent
 
     public Guid? ParentContentId { get; set; }
 
-    
+
     public Guid CommunityGroupId { get; set; }
 
     public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; } = new List<CommunityContentFile>();
 
-    public virtual ICollection<CommunityContentReaction> CommunityContentReactions { get; } = new List<CommunityContentReaction>();
+    public virtual ICollection<CommunityContentReaction> CommunityContentReactions { get; } =
+        new List<CommunityContentReaction>();
 
     public virtual CommunityIdentity? CommunityGroup { get; set; }
 

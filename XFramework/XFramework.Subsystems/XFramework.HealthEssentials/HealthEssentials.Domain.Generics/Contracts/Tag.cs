@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class Tag
+public partial class Tag : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid TypeId { get; set; }
 
     public string? Name { get; set; }
@@ -20,7 +10,7 @@ public partial class Tag
 
     public string? Description { get; set; }
 
-    
+
     public virtual ICollection<AilmentTag> AilmentTags { get; } = new List<AilmentTag>();
 
     public virtual ICollection<ConsultationTag> ConsultationTags { get; } = new List<ConsultationTag>();
@@ -33,7 +23,8 @@ public partial class Tag
 
     public virtual ICollection<HospitalTag> HospitalTags { get; } = new List<HospitalTag>();
 
-    public virtual ICollection<LaboratoryLocationTag> LaboratoryLocationTags { get; } = new List<LaboratoryLocationTag>();
+    public virtual ICollection<LaboratoryLocationTag> LaboratoryLocationTags { get; } =
+        new List<LaboratoryLocationTag>();
 
     public virtual ICollection<LaboratoryServiceTag> LaboratoryServiceTags { get; } = new List<LaboratoryServiceTag>();
 

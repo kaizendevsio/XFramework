@@ -14,7 +14,7 @@ public class HttpHelper
     {
         Configuration = configuration;
     }
-    public async Task<HttpResponseBO<T>> PostAsync<T>(Uri baseUrl, string url, object param, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
+    public async Task<HttpResponse<T>> PostAsync<T>(Uri baseUrl, string url, object param, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
     {
         try
         {
@@ -41,7 +41,7 @@ public class HttpHelper
             CookieCollection responseCookies = cookies.GetCookies(baseUrl);
             var stringContent = x.Content.ReadAsStringAsync();
             
-            var response = new HttpResponseBO<T>
+            var response = new HttpResponse<T>
             {
                 StatusCode = x.StatusCode,
                 IsSuccess = x.IsSuccessStatusCode,
@@ -59,7 +59,7 @@ public class HttpHelper
             throw;
         }
     }
-    public async Task<HttpResponseBO<T>> GetAsync<T>(Uri baseUrl, string url, object param = null, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
+    public async Task<HttpResponse<T>> GetAsync<T>(Uri baseUrl, string url, object param = null, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
     {
         try
         {
@@ -92,7 +92,7 @@ public class HttpHelper
             }
             catch (Exception e)
             {
-                return new HttpResponseBO<T>
+                return new HttpResponse<T>
                 {
                     StatusCode = HttpStatusCode.BadRequest,
                     ReasonPhrase = $"{e.Message} : {e.InnerException?.Message}",
@@ -100,7 +100,7 @@ public class HttpHelper
                 };
             }
             CookieCollection responseCookies = cookies.GetCookies(baseUrl);
-            var response = new HttpResponseBO<T>
+            var response = new HttpResponse<T>
             {
                 StatusCode = x.StatusCode,
                 ReasonPhrase = x.ReasonPhrase,
@@ -120,7 +120,7 @@ public class HttpHelper
         }
        
     }
-    public async Task<HttpResponseBO<T>> SecurePostJsonAsync<T, TContent>(string requestUri, EncryptedRequestBase<TContent> requestContent,CookieCollection cookieCollection = null)
+    public async Task<HttpResponse<T>> SecurePostJsonAsync<T, TContent>(string requestUri, EncryptedRequestBase<TContent> requestContent,CookieCollection cookieCollection = null)
     {
         var encryptionSecret = Configuration.GetValue<string>("Application:PaddedEncryptionSecret");
         var keyString = $"{encryptionSecret}{DateTime.UtcNow:yyyyMMddHHmm}";

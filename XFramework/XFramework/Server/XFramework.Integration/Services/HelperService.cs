@@ -1,6 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using XFramework.Integration.Interfaces;
+using XFramework.Integration.Abstractions;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Services;
@@ -52,6 +52,4 @@ public class HelperService : IHelperService
         var uniqueId = ans.ToString("x").ToUpper();
         return uniqueId;
     }
-
-    public StopWatchHelper StopWatch { get; set; } = new();
 }

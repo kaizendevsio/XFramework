@@ -11,7 +11,7 @@ using XFramework.Domain.Contexts;
 
 namespace XFramework.Domain.Migrations.XnelSystems
 {
-    [DbContext(typeof(XnelSystemsContext))]
+    [DbContext(typeof(AppDbContext))]
     [Migration("20230807175539_Initial")]
     partial class Initial
     {

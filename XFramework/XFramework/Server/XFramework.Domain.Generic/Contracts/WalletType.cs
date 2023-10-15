@@ -1,21 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class WalletType
+public partial record WalletType : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public DateTime? CreatedAt { get; set; }
-
-    public long? CreatedBy { get; set; }
-
-    public DateTime? ModifiedAt { get; set; }
-
-    public long? ModifiedBy { get; set; }
-
-    public DateTime? LastChanged { get; set; }
-
     public string Code { get; set; } = null!;
 
     public string Name { get; set; } = null!;
@@ -30,11 +16,10 @@ public partial class WalletType
 
     public decimal? MaxTransfer { get; set; }
 
-    public bool IsDeleted { get; set; }
 
-    public Guid ApplicationId { get; set; }
+    public Guid TenantId { get; set; }
 
-    public virtual Application Application { get; set; } = null!;
+    public virtual Tenant Tenant { get; set; } = null!;
 
     public virtual CurrencyType? CurrencyType { get; set; }
 
@@ -42,5 +27,4 @@ public partial class WalletType
     public virtual ICollection<WithdrawalRequest> WithdrawalRequests { get; } = new List<WithdrawalRequest>();
 
     public virtual ICollection<Wallet> Wallets { get; } = new List<Wallet>();
-
 }

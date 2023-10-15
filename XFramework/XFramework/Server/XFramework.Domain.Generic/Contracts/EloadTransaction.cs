@@ -1,9 +1,7 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial class EloadTransaction
+public partial record EloadTransaction : BaseModel
 {
-    public Guid Id { get; set; }
-
     public Guid? EloadProductCodeId { get; set; }
 
     public decimal? Discount { get; set; }
@@ -26,13 +24,6 @@ public partial class EloadTransaction
 
     public string? RawResponse { get; set; }
 
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool? IsDeleted { get; set; }
 
     public int? Status { get; set; }
 

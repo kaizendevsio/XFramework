@@ -1,11 +1,6 @@
-﻿using System.Net.Http.Json;
-using System.Text.Json;
-using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using StreamFlow.Domain.Generic.Contracts.Requests;
-using TypeSupport.Extensions;
-using XFramework.Domain.Generic.Enums;
+﻿using Microsoft.AspNetCore.SignalR.Client;
+using XFramework.Domain.Generic.Contracts.Base;
+using XFramework.Integration.Abstractions.Wrappers;
 
 namespace XFramework.Integration.Drivers;
 
@@ -17,15 +12,18 @@ public class DriverBase
 
     public Guid? TargetClient { get; set; }
 
-    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request) where TRequest : new()
+    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request) 
+        where TRequest : IHasRequestServer, new()
     {
-        return await MessageBusDriver.SendVoidAsync(request, TargetClient);
+        return await MessageBusDriver.SendVoidAsync<TRequest>(request, TargetClient);
     }
-    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request) where TRequest : new()
+    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request) 
+        where TRequest : IHasRequestServer, new()
     {
         return await MessageBusDriver.SendAsync(request, TargetClient);
     }
-    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) where TRequest : new()
+    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) 
+        where TRequest : IHasRequestServer, new()
     {
         return await MessageBusDriver.SendAsync<TRequest, TResponse>(request, TargetClient);
     }

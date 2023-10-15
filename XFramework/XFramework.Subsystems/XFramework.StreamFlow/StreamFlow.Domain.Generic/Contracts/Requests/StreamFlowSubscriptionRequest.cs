@@ -2,10 +2,7 @@
 
 public class StreamFlowSubscriptionRequest<TResponse>
 {
-    public StreamFlowSubscriptionRequest()
-    {
-        
-    }
+    public StreamFlowSubscriptionRequest() { }
     public StreamFlowSubscriptionRequest(string name, Action<TResponse> onInvoke)
     {
         Name = name;

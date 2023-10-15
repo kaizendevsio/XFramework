@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class PharmacyStock
+public partial class PharmacyStock : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid PharmacyId { get; set; }
 
     public Guid MedicineId { get; set; }
@@ -28,7 +18,7 @@ public partial class PharmacyStock
 
     public Guid Unit { get; set; }
 
-    
+
     public virtual Medicine Medicine { get; set; } = null!;
 
     public virtual Pharmacy Pharmacy { get; set; } = null!;

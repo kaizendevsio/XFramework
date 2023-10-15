@@ -1,17 +1,7 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class PharmacyJobOrder
+public partial class PharmacyJobOrder : BaseModel
 {
-    public Guid Id { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime ModifiedAt { get; set; }
-
-    public bool? IsEnabled { get; set; }
-
-    public bool IsDeleted { get; set; }
-
     public Guid PharmacyLocationId { get; set; }
 
     public string? ReferenceNumber { get; set; }
@@ -38,16 +28,18 @@ public partial class PharmacyJobOrder
 
     public string? PrescriptionNote { get; set; }
 
-    
+
     public Guid ScheduleId { get; set; }
 
     public Guid PatientId { get; set; }
 
     public virtual Patient? Patient { get; set; }
 
-    public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; } = new List<PharmacyJobOrderConsultationJobOrder>();
+    public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; } =
+        new List<PharmacyJobOrderConsultationJobOrder>();
 
-    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; } = new List<PharmacyJobOrderMedicine>();
+    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; } =
+        new List<PharmacyJobOrderMedicine>();
 
     public virtual PharmacyLocation PharmacyLocation { get; set; } = null!;
 
