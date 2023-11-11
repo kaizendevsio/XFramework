@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityRoleType : BaseModel
+public partial class IdentityRoleType : BaseModel
 {
     public string? Name { get; set; }
 

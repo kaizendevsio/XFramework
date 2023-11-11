@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record BusinessPackageInclusionType : BaseModel
+public partial class BusinessPackageInclusionType : BaseModel
 {
     public string Name { get; set; } = null!;
 

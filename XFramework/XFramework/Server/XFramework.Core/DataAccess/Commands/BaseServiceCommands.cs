@@ -2,11 +2,6 @@
 
 namespace XFramework.Core.DataAccess.Commands;
 
-public record Create<T>(T Model) : RequestBase, IRequest<CmdResponse<T>>;
-public record Patch<T>(T Model) : RequestBase, IRequest<CmdResponse<T>>;
-public record Replace<T>(T Model) : RequestBase, IRequest<CmdResponse<T>>;
-public record Delete<T>(T Model) : RequestBase, IRequest<CmdResponse<T>>;
-
 public static class XCommand
 {
     public static Create<TModel> Create<TModel>(TModel model) 

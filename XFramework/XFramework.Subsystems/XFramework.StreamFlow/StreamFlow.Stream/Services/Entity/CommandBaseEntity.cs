@@ -4,6 +4,6 @@ namespace StreamFlow.Stream.Services.Entity;
 
 public class CommandBaseEntity
 {
-    public RequestServer RequestServer { get; set; }
+    public RequestMetadata RequestMetadata { get; set; }
     public HubCallerContext Context { get; set; }
 }

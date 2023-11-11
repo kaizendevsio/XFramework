@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
+using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Entity.Contracts.Responses;
@@ -15,19 +16,19 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task StartClientEventListener(string topic);
 
     public Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, Guid? recipient) 
-        where TRequest : IHasRequestServer, new();
+        where TRequest : class, IHasRequestServer;
     public Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, Guid? recipient) 
-        where TRequest : IHasRequestServer, new();
+        where TRequest : class, IHasRequestServer;
     public Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, Guid? recipient) 
-        where TRequest : IHasRequestServer, new();
+        where TRequest : class, IHasRequestServer;
     public Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TModel,TResponse>(StreamFlowMessage<TModel> request) 
-        where TModel : new()
-        where TResponse : IBaseResponse, new();
+        where TModel : class, IHasRequestServer
+        where TResponse : class, IBaseResponse;
     public Task PublishAsync<TModel>(string eventName, string topic, TModel data) 
-        where TModel : IHasRequestServer, new();
+        where TModel : class, IHasRequestServer;
     public Task PushAsync<TModel>(StreamFlowMessage<TModel> request) 
-        where TModel : new();
+        where TModel : class, IHasRequestServer;
     public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request) 
-        where TResponse : new();
+        where TResponse : class, IHasRequestServer;
     public Task Unsubscribe(StreamFlowSubscriptionRequest request);
 }

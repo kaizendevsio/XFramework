@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts.Base;
 
-public abstract record BaseModel : ISoftDeletable, IHasId, IHasConcurrencyStamp, IAuditable, IHasTenantId
+public abstract class BaseModel : ISoftDeletable, IHasId, IHasConcurrencyStamp, IAuditable, IHasTenantId
 {
     public Guid Id { get; set; }
     public bool IsEnabled { get; set; }

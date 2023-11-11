@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityContactType : BaseModel
+public partial class IdentityContactType : BaseModel
 {
     public string? Name { get; set; }
 

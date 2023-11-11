@@ -3,13 +3,9 @@ using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Core.DataAccess.Query;
 
-public record GetList<T>(int PageSize, int PageNumber, Guid TenantId, bool? IncludeNavigations = false, Expression<Func<T, bool>>? Filter = null) : RequestBase, IRequest<QueryResponse<PaginatedResult<T>>>;
-public record Get<T>(Guid Id, Guid TenantId, bool? IncludeNavigations = null) : RequestBase, IRequest<QueryResponse<T>>;
-
-
 public static class XQuery
 {
-    public static GetList<TModel> GetList<TModel>(Guid tenantId, int pageNumber = 1, int pageSize = 100, bool? includeNavigations = false, Expression<Func<TModel, bool>>? filter = null) 
+    public static GetList<TModel> GetList<TModel>(Guid tenantId, int pageNumber = 1, int pageSize = 100, bool? includeNavigations = false, List<QueryFilter>? filter = null) 
         where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
     {
         return new GetList<TModel>(pageSize, pageNumber, tenantId, includeNavigations, filter);

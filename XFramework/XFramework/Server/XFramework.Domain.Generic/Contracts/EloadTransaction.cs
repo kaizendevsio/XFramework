@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record EloadTransaction : BaseModel
+public partial class EloadTransaction : BaseModel
 {
     public Guid? EloadProductCodeId { get; set; }
 

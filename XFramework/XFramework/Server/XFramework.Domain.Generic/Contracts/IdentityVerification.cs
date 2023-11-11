@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityVerification : BaseModel
+public partial class IdentityVerification : BaseModel
 {
     public Guid CredentialId { get; set; }
 

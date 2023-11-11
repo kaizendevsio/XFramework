@@ -104,9 +104,12 @@ public static class InstallerExtensions
         });
     }
 
-    public static void InstallStandardServices(this IServiceCollection services, IConfiguration configuration)
+    public static void InstallStandardServices<T>(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddMediatR(o => o.RegisterServicesFromAssemblyContaining<XFrameworkCore>());
+        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
+            typeof(XFrameworkCore).Assembly,
+            typeof(T).Assembly
+        ));
         services.AddValidatorsFromAssembly(typeof(RequestBase).GetTypeInfo().Assembly);
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
         services.AddTransient<MetricsMonitor>();
@@ -117,13 +120,14 @@ public static class InstallerExtensions
         services.AddMemoryCache();
 
         var loggerConfiguration = new LoggerConfiguration()
+            .MinimumLevel.Debug()
             .Enrich.FromLogContext() // This will ensure SourceContext is populated
             .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} => {Message:lj}{NewLine}{Exception}");
         
         Log.Logger = loggerConfiguration.CreateLogger();
         services.AddSingleton(Log.Logger);
         
-        HelperExtensions.LoadMapsterDefaults();
+        XFrameworkExtensions.LoadMapsterDefaults();
     }
     public static void InstallRuntimeServices(this IServiceCollection services, IConfiguration configuration)
     {

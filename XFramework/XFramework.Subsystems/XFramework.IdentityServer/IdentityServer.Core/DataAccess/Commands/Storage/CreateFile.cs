@@ -1,19 +1,15 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using ByteSizeLib;
-using Microsoft.Extensions.Logging;
-using XFramework.Core.DataAccess.Commands;
-using XFramework.Domain.Contexts;
-using XFramework.Domain.Generic.Contracts;
 
 namespace IdentityServer.Core.DataAccess.Commands.Storage;
 
 public class CreateFile(
         AppDbContext appDbContext,
         ILogger<CreateFile> logger,
-        IEnumerable<IRequestHandler<Create<StorageFile>, CmdResponse<StorageFile>>> requestHandlers
+        IRequestHandler<Create<StorageFile>, CmdResponse<StorageFile>> baseHandler
     ) 
-    : ICreateHandler<StorageFile>
+    : ICreateHandler<StorageFile>, IDecorator
 {
     public async Task<CmdResponse<StorageFile>> Handle(Create<StorageFile> request, CancellationToken cancellationToken)
     {
@@ -53,7 +49,7 @@ public class CreateFile(
         file.StorageFileIdentifier = fileIdentifier;
         file.FileSize = (decimal?) ByteSize.FromBytes(request.Model.FileBytes.Length).KiloBytes;
         
-        await requestHandlers.First().Handle(new Create<StorageFile>(file), cancellationToken);
+        await baseHandler.Handle(new Create<StorageFile>(file), cancellationToken);
         
         //await appDbContext.SaveChangesAsync(CancellationToken.None);
         

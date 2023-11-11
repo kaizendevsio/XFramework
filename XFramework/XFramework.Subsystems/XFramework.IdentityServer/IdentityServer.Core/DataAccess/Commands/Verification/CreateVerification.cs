@@ -1,8 +1,4 @@
 ﻿using Messaging.Integration.Interfaces;
-using Microsoft.Extensions.Logging;
-using XFramework.Core.DataAccess.Commands;
-using XFramework.Domain.Contexts;
-using XFramework.Domain.Generic.Contracts;
 using XFramework.Integration.Abstractions;
 
 namespace IdentityServer.Core.DataAccess.Commands.Verification;
@@ -12,9 +8,9 @@ public class CreateVerification(
         IHelperService helperService, 
         ILogger<CreateVerification> logger,
         IMessagingServiceWrapper messagingServiceWrapper,
-        IEnumerable<IRequestHandler<Create<IdentityVerification>, CmdResponse<IdentityVerification>>> requestHandlers
+        IRequestHandler<Create<IdentityVerification>, CmdResponse<IdentityVerification>> baseHandler
     ) 
-    : ICreateHandler<IdentityVerification>
+    : ICreateHandler<IdentityVerification>, IDecorator
 {
     public async Task<CmdResponse<IdentityVerification>> Handle(Create<IdentityVerification> request, CancellationToken cancellationToken)
     {
@@ -76,7 +72,7 @@ public class CreateVerification(
                     };
                 }
                 
-                await requestHandlers.First().Handle(new Create<IdentityVerification>(new()
+                await baseHandler.Handle(new Create<IdentityVerification>(new()
                 {
                     Status = (short?)GenericStatusType.Pending,
                     StatusUpdatedOn = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc),

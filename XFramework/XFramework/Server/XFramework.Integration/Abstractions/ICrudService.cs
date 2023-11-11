@@ -1,4 +1,6 @@
-﻿namespace XFramework.Integration.Abstractions;
+﻿using System.Linq.Expressions;
+
+namespace XFramework.Integration.Abstractions;
 
 public interface ICrudService<T> : IXFrameworkService 
     where T : class
@@ -8,7 +10,7 @@ public interface ICrudService<T> : IXFrameworkService
     Task<CmdResponse<T>> Replace(T entity);
     Task<CmdResponse> Delete(T entity);
     
-    Task<QueryResponse<PaginatedResult<T>>> GetList(bool includeNavigations, IQueryable<T> filter);
-    Task<QueryResponse<T>> Get(bool includeNavigations, Guid id);
+    Task<QueryResponse<PaginatedResult<T>>> GetList(int pageSize, int pageNumber, Guid? tenantId = null, bool? includeNavigations = false, List<QueryFilter>? filter = null);
+    Task<QueryResponse<T>> Get(Guid id, Guid? tenantId = null, bool? includeNavigations = null);
     
 }

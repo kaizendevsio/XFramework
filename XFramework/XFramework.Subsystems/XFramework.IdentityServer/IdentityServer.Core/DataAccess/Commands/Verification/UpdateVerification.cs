@@ -1,16 +1,11 @@
-﻿using Microsoft.Extensions.Logging;
-using XFramework.Core.DataAccess.Commands;
-using XFramework.Domain.Contexts;
-using XFramework.Domain.Generic.Contracts;
-
-namespace IdentityServer.Core.DataAccess.Commands.Verification;
+﻿namespace IdentityServer.Core.DataAccess.Commands.Verification;
 
 public class UpdateVerification(
         AppDbContext appDbContext,
         ILogger<UpdateVerification> logger,
-        IEnumerable<IRequestHandler<Patch<IdentityVerification>, CmdResponse<IdentityVerification>>> requestHandlers
+        IRequestHandler<Patch<IdentityVerification>, CmdResponse<IdentityVerification>> baseHandler
     ) 
-    : IPatchHandler<IdentityVerification>
+    : IPatchHandler<IdentityVerification>, IDecorator
 {
     public async Task<CmdResponse<IdentityVerification>> Handle(Patch<IdentityVerification> request, CancellationToken cancellationToken)
     {
@@ -29,7 +24,7 @@ public class UpdateVerification(
 
         verification.Status = (short?) GenericStatusType.Approved;
 
-        await requestHandlers.First().Handle(new Patch<IdentityVerification>(verification) , cancellationToken);
+        await baseHandler.Handle(new Patch<IdentityVerification>(verification) , cancellationToken);
         
         return new ()
         {

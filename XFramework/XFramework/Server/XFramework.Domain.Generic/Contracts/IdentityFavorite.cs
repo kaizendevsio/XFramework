@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityFavorite : BaseModel
+public partial class IdentityFavorite : BaseModel
 {
     public Guid? FavoriteTypeId { get; set; }
 

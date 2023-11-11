@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record BinaryListMultiplex : BaseModel
+public partial class BinaryListMultiplex : BaseModel
 {
     public Guid? BusinessPackageId { get; set; }
 

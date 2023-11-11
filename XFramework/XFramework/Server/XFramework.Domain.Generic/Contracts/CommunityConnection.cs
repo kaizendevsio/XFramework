@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommunityConnection : BaseModel
+public partial class CommunityConnection : BaseModel
 {
     public Guid SourceSocialMediaIdentityId { get; set; }
 

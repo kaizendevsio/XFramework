@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record StorageFileType : BaseModel
+public partial class StorageFileType : BaseModel
 {
     public string Name { get; set; } = null!;
 

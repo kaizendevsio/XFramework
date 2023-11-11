@@ -1,15 +1,13 @@
 ﻿using System.Net.Http.Json;
-using MessagePack;
+using System.Text;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
-using Serilog;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Entity.Contracts.Responses;
-using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Drivers;
 
@@ -25,6 +23,8 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     private string? ClientName { get; set; }
     private Guid? TenantId { get; set; }
     public List<string> TopicList { get; init; }
+    public static Dictionary<Type, string> TypeFriendlyNameCache = new();
+
 
     public HubConnectionState ConnectionState => SignalRService.Connection.State;
 
@@ -44,6 +44,58 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         SignalRService.Connection.Reconnected += async (e) => OnReconnected?.Invoke();
         SignalRService.Connection.Reconnecting += async (e) => OnReconnecting?.Invoke();
         SignalRService.Connection.Closed += async (e) => OnDisconnected?.Invoke();
+    }
+    
+    private static string GetRequestFriendlyName(Type type)
+    {
+        if (TypeFriendlyNameCache.TryGetValue(type, out var cachedName))
+        {
+            return cachedName;
+        }
+
+        if (type.IsGenericParameter)
+        {
+            return type.Name;
+        }
+
+        if (!type.IsGenericType)
+        {
+            return type.FullName ?? type.Name;
+        }
+
+        var nameSpan = type.Name.AsSpan();
+        var index = nameSpan.IndexOf('`');
+        var prefix = index == -1 ? nameSpan : nameSpan.Slice(0, index);
+
+        var builder = new StringBuilder();
+        builder.Append(prefix).Append('<');
+        var first = true;
+        foreach (var arg in type.GetGenericArguments())
+        {
+            if (!first)
+            {
+                builder.Append(',');
+            }
+
+            var argName = arg.Name;  // Start with simple name
+
+            // Check if arg's FullName contains namespaces, and if so, just use the simple name.
+            if (arg.FullName != null && arg.FullName.Contains('.'))
+            {
+                builder.Append(argName);
+            }
+            else
+            {
+                builder.Append(GetRequestFriendlyName(arg));
+            }
+
+            first = false;
+        }
+        builder.Append('>');
+
+        var friendlyName = builder.ToString();
+        TypeFriendlyNameCache[type] = friendlyName;
+        return friendlyName;
     }
     
     public async Task<bool> Connect()
@@ -83,7 +135,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return await SignalRService.EnsureConnection();
     }
 
-    private async Task<RequestServer> GetRequestServer<TRequest>(TRequest request)
+    private async Task<RequestMetadata> GetRequestServer<TRequest>(TRequest request)
         where TRequest : IHasRequestServer
     {
         // Retrieving Client IP address
@@ -117,7 +169,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         // Extracting properties from request
         var requestServer = request.Metadata;
 
-        return new RequestServer
+        return new RequestMetadata
         {
             DeviceAgent = DeviceAgentProvider.Name,
             TenantId = requestServer?.TenantId ?? TenantId,
@@ -128,7 +180,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     }
     
     private async Task SetRequestServer<TRequest>(TRequest request)
-        where TRequest : IHasRequestServer, new()
+        where TRequest : class, IHasRequestServer
     {
         var rs = await GetRequestServer(request);
         request.Metadata = rs;
@@ -140,13 +192,14 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     }
 
     public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, Guid? recipient) 
-        where TRequest : IHasRequestServer, new()
+        where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
         var r = new StreamFlowMessage<TRequest>(request)
         {
             ExchangeType = MessageExchangeType.Direct,
-            RecipientId = recipient
+            RecipientId = recipient,
+            CommandName = GetRequestFriendlyName(typeof(TRequest))
         };
 
         Logger.LogInformation("Sending request: {@Request}", r);
@@ -163,13 +216,14 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     }
 
     public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, Guid? recipient)
-        where TRequest : IHasRequestServer, new()
+        where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
         var r = new StreamFlowMessage<TRequest>(request)
         {
             ExchangeType = MessageExchangeType.Direct,
-            RecipientId = recipient
+            RecipientId = recipient,
+            CommandName = GetRequestFriendlyName(typeof(TRequest))
         };
 
         Logger.LogInformation("Sending request: {@Request}", r);
@@ -186,13 +240,14 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     }
 
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, Guid? recipient) 
-        where TRequest : IHasRequestServer, new()
+        where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
         var r = new StreamFlowMessage<TRequest>(request)
         {
             ExchangeType = MessageExchangeType.Direct,
-            RecipientId = recipient
+            RecipientId = recipient,
+            CommandName = GetRequestFriendlyName(typeof(TRequest))
         };
         
         Logger.LogInformation("Sending request: {@Request}", r);
@@ -209,10 +264,12 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     }
 
     public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TModel, TResponse>(StreamFlowMessage<TModel> request) 
-        where TModel : new()
-        where TResponse : IBaseResponse, new()
+        where TModel : class, IHasRequestServer
+        where TResponse : class, IBaseResponse
     {
-        var signalRResponse = await SignalRService.InvokeAsync(request);
+        var i = new StreamFlowMessage ();
+        var invokeRequest = i.Adapt(request); 
+        var signalRResponse = await SignalRService.InvokeAsync(invokeRequest);
         var tResponse = Activator.CreateInstance<TResponse>();
         
         switch (signalRResponse.ResponseStatusCode)
@@ -241,7 +298,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Accepted,
-                    Response = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data)
+                    Response = signalRResponse.Data as TResponse
                 };
                 break;
         }
@@ -249,7 +306,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     }
 
     public async Task PublishAsync<TRequest>(string eventName, string topic, TRequest request) 
-        where TRequest : IHasRequestServer, new()
+        where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
         var r = new StreamFlowMessage<TRequest>(request)
@@ -268,13 +325,15 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         await PushAsync(r);
     }
 
-    public async Task PushAsync<TModel>(StreamFlowMessage<TModel> request) where TModel : new()
+    public async Task PushAsync<TModel>(StreamFlowMessage<TModel> request) 
+        where TModel : class, IHasRequestServer
     {
         //request.Recipient ??= TargetClient;
-        await SignalRService.InvokeVoidAsync(nameof(IStreamFlow.Push), request);
+        await SignalRService.InvokeVoidAsync(nameof(IStreamFlow.Push), request as StreamFlowMessage );
     }
 
-    public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request) where TResponse : new()
+    public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request) 
+        where TResponse : class, IHasRequestServer
     {
         SignalRService.Connection.On<StreamFlowMessage<TResponse>>(request.Name,
             async (response) =>
@@ -282,7 +341,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 Logger.LogInformation("Notification Received: {RequestName}", request.Name);
                 try
                 {
-                    var r = MessagePackSerializer.Deserialize<TResponse>(response.Data);
+                    var r = response.Data as TResponse;
                     request.OnInvoke?.Invoke(r);
                 }
                 catch (Exception e)

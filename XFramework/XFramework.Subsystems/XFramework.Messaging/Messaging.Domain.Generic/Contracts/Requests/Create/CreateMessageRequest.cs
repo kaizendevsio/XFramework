@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateMessageRequest : RequestBase
+public record CreateMessageRequest : RequestBase
 {
     public string? Text { get; set; }
     public Guid? MessageThreadGuid { get; set; }

@@ -1,11 +1,8 @@
 ﻿using System.Net;
-using MediatR;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.BusinessObjects;
-using StreamFlow.Domain.Generic.Contracts.Requests;
-using StreamFlow.Domain.Generic.Contracts.Responses;
 using StreamFlow.Stream.Services.Entity.Events;
 
 namespace StreamFlow.Stream.Hubs;

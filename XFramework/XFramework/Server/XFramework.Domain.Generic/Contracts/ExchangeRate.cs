@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record ExchangeRate : BaseModel
+public partial class ExchangeRate : BaseModel
 {
     public Guid SourceCurrencyTypeId { get; set; }
 

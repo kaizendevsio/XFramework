@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record PaymentGatewayType : BaseModel
+public partial class PaymentGatewayType : BaseModel
 {
     public string Name { get; set; } = null!;
 

@@ -1,8 +1,4 @@
-﻿using MediatR;
-using StreamFlow.Domain.Generic.Contracts.Requests;
-using XFramework.Domain.Generic.BusinessObjects;
-
-namespace StreamFlow.Stream.Services.Entity.Events;
+﻿namespace StreamFlow.Stream.Services.Entity.Events;
 
 public class PushMessageCmd : CommandBaseEntity, IRequest<CmdResponse<PushMessageCmd>>
 {
@@ -10,5 +6,5 @@ public class PushMessageCmd : CommandBaseEntity, IRequest<CmdResponse<PushMessag
     {
             
     }
-    public StreamFlowMessage? Message { get; set; }
+    public StreamFlowMessage ? Message { get; set; }
 }

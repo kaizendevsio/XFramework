@@ -1,6 +1,7 @@
-﻿namespace XFramework.Domain.Generic.BusinessObjects;
+﻿
+namespace XFramework.Domain.Generic.BusinessObjects;
 
-public class RequestServer
+public class RequestMetadata
 {
     public Guid? TenantId { get; set; }
     public string Name { get; set; }

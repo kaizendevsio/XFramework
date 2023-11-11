@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record RegistryConfigurationGroup : BaseModel
+public partial class RegistryConfigurationGroup : BaseModel
 {
     public string? Name { get; set; }
 

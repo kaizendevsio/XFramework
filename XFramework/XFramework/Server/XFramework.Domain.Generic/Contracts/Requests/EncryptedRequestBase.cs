@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace XFramework.Domain.Generic.Contracts.Requests;
 
-public record EncryptedRequestBase<T>
+public class EncryptedRequestBase<T>
 {
     public EncryptedRequestBase(T content)
     {
@@ -25,7 +25,7 @@ public record EncryptedRequestBase<T>
     } 
 }
     
-public record EncryptedHttpRequest
+public class EncryptedHttpRequest
 {
     [JsonPropertyName("aspNetCoreSession")]
     public string AspNetCoreSession { get; set; }

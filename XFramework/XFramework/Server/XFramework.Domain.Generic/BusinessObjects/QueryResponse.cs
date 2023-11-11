@@ -3,7 +3,7 @@ using System.Net;
 
 namespace XFramework.Domain.Generic.BusinessObjects;
 
-public class QueryResponse<T> : IBaseResponse
+public class QueryResponse<T> : IBaseResponse, IHasRequestServer
 {
     [Key]
     public Guid ResponseId { get; set; } = Guid.NewGuid();
@@ -11,4 +11,5 @@ public class QueryResponse<T> : IBaseResponse
     public string Message { get; set; }
     public bool IsSuccess => (int)HttpStatusCode >= 200 && (int)HttpStatusCode < 300;
     public T Response { get; set; }
+    public RequestMetadata? Metadata { get; set; }
 }

@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record ProviderType : BaseModel
+public partial class ProviderType : BaseModel
 {
     public string Name { get; set; } = null!;
 

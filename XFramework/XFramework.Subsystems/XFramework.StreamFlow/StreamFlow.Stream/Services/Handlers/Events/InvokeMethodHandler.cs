@@ -1,14 +1,10 @@
 ﻿using System.Net;
 using Mapster;
-using MediatR;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Generic.BusinessObjects;
-using StreamFlow.Domain.Generic.Contracts.Requests;
-using StreamFlow.Domain.Generic.Contracts.Responses;
 using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Services.Entity.Events;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
 using XFramework.Integration.Services.Helpers;
 
@@ -36,7 +32,7 @@ public class InvokeMethodHandler(
             };
         }
 
-        request.RequestServer = new()
+        request.RequestMetadata = new()
         {
             RequestId = client.Value.Guid,
             Name = client.Value.Name
@@ -53,7 +49,7 @@ public class InvokeMethodHandler(
         {
             using var metricLogger = metricsMonitor.Start($"Invoking method '{request.MessageQueue.CommandName}'");
             
-            var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage>();
+            var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage >();
             //methodCallCompletionSource.RunContinuationsAsynchronously();
             if (!cachingService.PendingMethodCalls.TryAdd(request.MessageQueue.RequestId,methodCallCompletionSource))
             {
@@ -83,7 +79,7 @@ public class InvokeMethodHandler(
 
         if (cachingService.AbsoluteClients.All(x => x.Value.Guid != request.MessageQueue.RecipientId))
         {
-            Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
+            Console.WriteLine($"Connection with ID {request.RequestMetadata.RequestId} : {request.RequestMetadata.Name} has invalid recipient");
             return new()
             {
                 HttpStatusCode = HttpStatusCode.NotFound,
@@ -95,7 +91,7 @@ public class InvokeMethodHandler(
         }
 
 
-        Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
+        Console.WriteLine($"Message from connection with ID {request.RequestMetadata.RequestId} : {request.RequestMetadata.Name} has been dropped; Recipient unavailable");
         return new()
         {
             HttpStatusCode = HttpStatusCode.ServiceUnavailable,

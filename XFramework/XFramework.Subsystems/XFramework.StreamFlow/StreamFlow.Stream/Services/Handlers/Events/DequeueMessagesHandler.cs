@@ -1,10 +1,8 @@
 ﻿using System.Net;
-using MediatR;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Services.Entity.Events;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
 
 namespace StreamFlow.Stream.Services.Handlers.Events;

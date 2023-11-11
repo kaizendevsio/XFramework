@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IncomeDistribution : BaseModel
+public partial class IncomeDistribution : BaseModel
 {
     public Guid BusinessPackageId { get; set; }
 

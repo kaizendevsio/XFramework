@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record SessionType : BaseModel
+public partial class SessionType : BaseModel
 {
     public string? Name { get; set; }
 

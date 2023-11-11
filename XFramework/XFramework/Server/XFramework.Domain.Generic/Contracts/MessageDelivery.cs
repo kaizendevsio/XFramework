@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record MessageDelivery : BaseModel
+public partial class MessageDelivery : BaseModel
 {
     public Guid MessageThreadMemberId { get; set; }
 

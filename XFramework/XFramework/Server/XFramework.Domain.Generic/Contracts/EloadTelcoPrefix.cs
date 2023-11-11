@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record EloadTelcoPrefix : BaseModel
+public partial class EloadTelcoPrefix : BaseModel
 {
     public Guid? TelcoTypeId { get; set; }
 

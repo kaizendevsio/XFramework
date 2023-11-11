@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record MetaDataTypeGroup : BaseModel
+public partial class MetaDataTypeGroup : BaseModel
 {
     public string Name { get; set; } = null!;
 

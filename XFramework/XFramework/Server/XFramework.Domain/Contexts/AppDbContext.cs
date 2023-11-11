@@ -1535,7 +1535,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.MiddleName).HasMaxLength(100);
 
             entity.HasOne(d => d.Tenant).WithMany(p => p.IdentityInformations)
-                .HasForeignKey(d => d.ApplicationId)
+                .HasForeignKey(d => d.TenantId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("identityinformation_application_id_fk");
         });
@@ -1577,12 +1577,12 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Id)
                 .HasColumnName("ID")
                 .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.ApplicationId);
+            entity.Property(e => e.TenantId);
 
             entity.Property(e => e.Name).HasMaxLength(100);
 
             entity.HasOne(d => d.Tenant).WithMany(p => p.IdentityRoleTypes)
-                .HasForeignKey(d => d.ApplicationId)
+                .HasForeignKey(d => d.TenantId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbl_identityroleTypes_tbl_applications_id_fk");
 
@@ -1767,12 +1767,12 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
 
             entity.ToTable("Log", "Audit");
 
-            entity.HasIndex(e => e.ApplicationId, "IX_tbl_ApplicationLogs_AppID");
+            entity.HasIndex(e => e.TenantId, "IX_tbl_ApplicationLogs_AppID");
 
             entity.Property(e => e.Id)
                 .HasColumnName("ID")
                 .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.ApplicationId).HasColumnName("ApplicationID");
+            entity.Property(e => e.TenantId).HasColumnName("ApplicationId");
 
             entity.Property(e => e.Initiator).HasColumnType("character varying");
             entity.Property(e => e.Message).HasColumnType("character varying");
@@ -1780,7 +1780,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Seen).HasDefaultValueSql("false");
 
             entity.HasOne(d => d.Application).WithMany(p => p.Logs)
-                .HasForeignKey(d => d.ApplicationId)
+                .HasForeignKey(d => d.TenantId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("tbl_applogs_appid_fk");
         });
@@ -2241,7 +2241,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Id)
                 .HasColumnName("ID")
                 .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.TenantId).HasColumnName("ApplicationID");
+            entity.Property(e => e.TenantId).HasColumnName("ApplicationId");
 
             entity.Property(e => e.Key).HasColumnType("character varying");
             entity.Property(e => e.Unit).HasMaxLength(100);
@@ -2627,7 +2627,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Id)
                 .HasColumnName("ID")
                 .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.ApplicationId);
+            entity.Property(e => e.TenantId);
             entity.Property(e => e.Code).HasMaxLength(9);
             entity.Property(e => e.CurrencyTypeId).HasColumnName("CurrencyTypeID");
             entity.Property(e => e.Desc).HasMaxLength(500);
@@ -2635,7 +2635,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Name).HasMaxLength(20);
 
             entity.HasOne(d => d.Tenant).WithMany(p => p.WalletTypes)
-                .HasForeignKey(d => d.ApplicationId)
+                .HasForeignKey(d => d.TenantId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbl_walletTypes_tbl_applications_id_fk");
 

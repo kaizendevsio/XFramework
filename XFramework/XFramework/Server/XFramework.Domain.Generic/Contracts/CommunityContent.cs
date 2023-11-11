@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommunityContent : BaseModel
+public partial class CommunityContent : BaseModel
 {
     public string? Title { get; set; }
 

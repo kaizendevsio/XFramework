@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record AddressRegion : BaseModel
+public partial class AddressRegion : BaseModel
 {
     public int PsgcCode { get; set; }
 

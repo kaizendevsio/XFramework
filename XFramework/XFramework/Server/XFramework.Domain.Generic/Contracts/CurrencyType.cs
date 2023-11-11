@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CurrencyType : BaseModel
+public partial class CurrencyType : BaseModel
 {
     public string? Name { get; set; }
 

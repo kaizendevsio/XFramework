@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record BinaryMap : BaseModel
+public partial class BinaryMap : BaseModel
 {
     public Guid? SponsorUserId { get; set; }
 

@@ -7,7 +7,6 @@ global using Microsoft.Extensions.Configuration;
 global using XFramework.Domain.Generic.BusinessObjects;
 global using XFramework.Domain.Generic.Contracts.Responses;
 global using IdentityServer.Integration.Drivers;
-global using IdentityServer.Integration.Interfaces;
 global using XFramework.Domain.Generic.Interfaces;
 global using Microsoft.AspNetCore.Authorization;
 global using Microsoft.AspNetCore.Mvc;

@@ -1,5 +1,4 @@
-﻿using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Interfaces;
+﻿using XFramework.Domain.Generic.Interfaces;
 
 namespace Wallets.Integration.Interfaces;
 

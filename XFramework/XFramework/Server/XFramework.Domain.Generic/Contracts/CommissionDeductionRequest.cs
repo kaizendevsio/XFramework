@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommissionDeductionRequest : BaseModel
+public partial class CommissionDeductionRequest : BaseModel
 {
     public Guid? BusinessPackageId { get; set; }
 

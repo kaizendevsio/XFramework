@@ -3,11 +3,11 @@ using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Core.Validations.Common;
 
-public class RequestServerValidator : AbstractValidator<RequestServer>
+public class RequestServerValidator : AbstractValidator<RequestMetadata>
 {
     public RequestServerValidator()
     {
-        RuleFor(x => x.ApplicationId)
+        RuleFor(x => x.TenantId)
             .NotEmpty()
             .WithMessage("Application Id is Required");
     }

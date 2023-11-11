@@ -1,6 +1,5 @@
 XApplication
     .Build<Program>()
-    .GenerateMinimalApi(new[]
-    {
-        typeof(Tenant),
-    }).Run();
+    .GenerateMinimalApi()
+    .Run();
+Serilog.Log.Information("Application started");

@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record DepositRequest : BaseModel
+public partial class DepositRequest : BaseModel
 {
     public Guid CredentialId { get; set; }
 

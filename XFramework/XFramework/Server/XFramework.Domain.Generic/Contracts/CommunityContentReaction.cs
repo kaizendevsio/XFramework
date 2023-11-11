@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommunityContentReaction : BaseModel
+public partial class CommunityContentReaction : BaseModel
 {
     public Guid ContentId { get; set; }
 

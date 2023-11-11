@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Text;
+﻿using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
@@ -15,56 +14,29 @@ public class MediatRRegistrationGenerator : ISourceGenerator
 
     public void Execute(GeneratorExecutionContext context)
     {
-        // Retrieve classes with the 'GenerateApiFrom' attribute.
-        var classWithAttribute = context.Compilation.SyntaxTrees
-            .SelectMany(tree => tree.GetRoot().DescendantNodes()
-                .OfType<ClassDeclarationSyntax>())
-            .FirstOrDefault(m => m.AttributeLists
-                .Any(a => a.Attributes
-                    .Any(attr => attr.Name.ToString().Contains("GenerateApiFromNamespace"))));
+        var serviceName = context.Compilation.AssemblyName?.Split(".").First();
+        var models = GetModels(context);
+        var codeBuilder = new StringBuilder();
 
-        if (classWithAttribute is null)
+        if (models.Count == 0)
         {
             return;
         }
         
-        var attributeSyntax = classWithAttribute.AttributeLists
-            .SelectMany(a => a.Attributes)
-            .First(attr => attr.Name.ToString().Contains("GenerateApiFromNamespace"));
-        
-        var namespaceArgument = attributeSyntax.ArgumentList?.Arguments.FirstOrDefault();
-        var namespaceStr = namespaceArgument.Expression.NormalizeWhitespace().ToFullString().Trim('"');
-
-        var currentNamespace = context.Compilation.GlobalNamespace;
-        var namespaceParts = namespaceStr.Split('.');
-
-        foreach (var part in namespaceParts)
-        {
-            currentNamespace = currentNamespace.GetNamespaceMembers().FirstOrDefault(i => i.Name == part);
-            if (currentNamespace == null) break; // Exit if any namespace part is not found
-        }
-        
-        var models = currentNamespace?
-            .GetMembers()
-            .Where(i => i.IsType)
-            .Select(i => i.Name)
-            .ToList();
-
-        var codeBuilder = new StringBuilder();
-
-        codeBuilder.AppendLine(@"
+        codeBuilder.AppendLine($@"
         using MediatR;
         using Microsoft.Extensions.DependencyInjection;
         using XFramework.Core.DataAccess.Commands;
         using XFramework.Core.DataAccess.Query;
         using XFramework.Domain.Generic.Contracts;
+        using XFramework.Domain.Generic.Contracts.Requests;
 
-        namespace XFramework.Api.Extensions
-        {
+        namespace {serviceName}.Api.Extensions
+        {{
             public static class MediatRServiceExtensions
-            {
+            {{
                 public static void AddMediatRHandlers(this IServiceCollection services)
-                {
+                {{
                     ");
 
         foreach (var model in models)
@@ -92,5 +64,55 @@ public class MediatRRegistrationGenerator : ISourceGenerator
         }");
 
         context.AddSource("MediatRServiceExtensions.g.cs", SourceText.From(codeBuilder.ToString(), Encoding.UTF8));
+    }
+    
+    private static List<string> GetModels(GeneratorExecutionContext context)
+    {
+        List<string> models = new();
+
+        foreach (var syntaxTree in context.Compilation.SyntaxTrees)
+        {
+            var semanticModel = context.Compilation.GetSemanticModel(syntaxTree);
+            var classNodes = syntaxTree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>();
+
+            
+            foreach (var classNode in classNodes)
+            {
+                var classSymbol = semanticModel.GetDeclaredSymbol(classNode);
+                var attributeSyntax = classNode.AttributeLists
+                    .SelectMany(a => a.Attributes)
+                    .FirstOrDefault(attr => attr.Name.ToString().Contains("GenerateApiFromNamespace"));
+
+                if (attributeSyntax != null)
+                {
+                    var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[0];
+                    var typesArgumentSyntax = attributeSyntax.ArgumentList.Arguments[1];
+
+                    var namespaceValue = namespaceArgumentSyntax.Expression.NormalizeWhitespace().ToFullString();
+                    var typesArraySyntax = typesArgumentSyntax.Expression as ImplicitArrayCreationExpressionSyntax;
+
+                    if (typesArraySyntax != null)
+                    {
+                        foreach (var typeArgumentSyntax in typesArraySyntax.Initializer.Expressions)
+                        {
+                            if (typeArgumentSyntax is InvocationExpressionSyntax invocationExpression &&
+                                invocationExpression.Expression is IdentifierNameSyntax identifierName &&
+                                identifierName.Identifier.Text == "nameof")
+                            {
+                                var nameofArgument = invocationExpression.ArgumentList.Arguments[0].Expression;
+                                if (nameofArgument is IdentifierNameSyntax identifierArgument)
+                                {
+                                    var typeValue = identifierArgument.Identifier.Text;
+                                    models.Add(typeValue);
+                                    // Do something with typeValue
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return models;
     }
 }

@@ -1,8 +1,8 @@
 ﻿using Info.Blockchain.API.Client;
 using Info.Blockchain.API.Wallet;
 using Info.Blockchain.API.Models;
-using XFramework.External.Models;
 using Newtonsoft.Json;
+using XFramework.External.Models;
 
 namespace XFramework.External;
 

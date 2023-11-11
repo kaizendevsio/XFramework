@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record SubscriptionType : BaseModel
+public partial class SubscriptionType : BaseModel
 {
     public string Name { get; set; } = null!;
 

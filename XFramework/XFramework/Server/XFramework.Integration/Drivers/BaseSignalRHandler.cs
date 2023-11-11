@@ -1,26 +1,18 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
+using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Contracts.Base;
+using XFramework.Integration.Extensions;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Drivers;
 
-public class BaseSignalRHandler
+public abstract class BaseSignalRHandler
 {
-    public ILogger<BaseSignalRHandler> Logger { get; }
-    public MetricsMonitor MetricsMonitor { get; }
-    public Guid? Id { get; set; }
-
-    public BaseSignalRHandler(ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor)
-    {
-        Logger = logger;
-        MetricsMonitor = metricsMonitor;
-    }
-    
     public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, Guid requestId, Guid clientId, TResult data) 
-        where TResult : IBaseResponse, new()
+        where TResult : class, IBaseResponse, IHasRequestServer
     {
         var request = new StreamFlowMessage<TResult>(data)
         {
@@ -28,50 +20,36 @@ public class BaseSignalRHandler
             RecipientId = clientId,
             ExchangeType = MessageExchangeType.Direct,
             ResponseStatusCode = data.HttpStatusCode,
-            CommandName = "InvokeResponseHandler"
+            CommandName = nameof(IStreamFlow.InvokeResponseHandler)
         };
         
-        return await connection.InvokeAsync<HttpStatusCode>("Push", request);
+        return await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Push), request);
     }
 
-    protected virtual void HandleRequestQuery<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator)
-        where TRequest : class, new() 
-        where TResponse : new() 
-        where TQuery : class, IRequest<QueryResponse<TResponse>>
+    protected virtual void HandleRequestQuery<TQuery, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor)
+        where TResponse : class
+        where TQuery : class, IRequest<QueryResponse<TResponse>>, IHasRequestServer
     {
-        connection.On(HandlerName(), (StreamFlowMessage<TRequest> response) => Handler<TRequest, TQuery, QueryResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
-    }
-
-    protected virtual void HandleRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator)
-        where TRequest : class, new() 
-        where TQuery : class, IRequest<CmdResponse<TQuery>>
-    {
-        connection.On(HandlerName(), (StreamFlowMessage<TRequest> response) => Handler<TRequest, TQuery, CmdResponse<TQuery>>(response, connection, mediator).ConfigureAwait(false));
+        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TQuery).GetTypeFullName());
+        connection.On(typeof(TQuery).GetTypeFullName(), (StreamFlowMessage<TQuery> response) => Handler<TQuery, QueryResponse<TResponse>>(response, connection, mediator, metricsMonitor).ConfigureAwait(false));
     }
     
-    protected virtual void HandleRequestCmd<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator) 
-        where TRequest : class, new() 
-        where TQuery : class, IRequest<CmdResponse<TResponse>>
+    protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor) 
+        where TResponse : class
+        where TCmd : class, IRequest<CmdResponse<TResponse>>, IHasRequestServer
     {
-        connection.On(HandlerName(), (StreamFlowMessage<TRequest> response) => Handler<TRequest, TQuery, CmdResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
+        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
+        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => Handler<TCmd, CmdResponse<TResponse>>(response, connection, mediator, metricsMonitor).ConfigureAwait(false));
     }
 
-    protected virtual void HandleVoidRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) 
-        where TRequest : class, new() 
-        where TQuery : class, IRequest<CmdResponse>
+    private async Task Handler<TQuery, TResponse>(StreamFlowMessage<TQuery> response, HubConnection connection, IMediator mediator, MetricsMonitor metricsMonitor) 
+        where TQuery : class, IRequest<TResponse>, IHasRequestServer
+        where TResponse : class, IBaseResponse, IHasRequestServer
     {
-        connection.On(HandlerName(), (StreamFlowMessage<TRequest> response) => Handler<TRequest, TQuery, CmdResponse>(response, connection, mediator).ConfigureAwait(false));
-    }
-
-    private async Task Handler<TRequest, TQuery, TResponse>(StreamFlowMessage<TRequest> response, HubConnection connection, IMediator mediator) 
-        where TRequest : class, new() 
-        where TQuery : class, IRequest<TResponse> 
-        where TResponse : IBaseResponse, new()
-    {
-        using var metricLogger = MetricsMonitor.Start();
+        using var metricLogger = metricsMonitor.Start();
         try
         {
-            var r = response.Data.AsMediatorCmd<TRequest, TQuery, TResponse>();
+            var r = response.Data.AsMediatorCmd<TQuery, TResponse>();
             var result = await mediator.Send(r).ConfigureAwait(false);
 
             if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
@@ -89,10 +67,5 @@ public class BaseSignalRHandler
         {
             metricLogger.Failed($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}]");
         }
-    }
-
-    private string HandlerName()
-    {
-        return GetType().Name.Replace("Handler", string.Empty);
     }
 }

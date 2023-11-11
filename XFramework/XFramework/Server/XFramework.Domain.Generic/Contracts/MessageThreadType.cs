@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record MessageThreadType : BaseModel
+public partial class MessageThreadType : BaseModel
 {
     public string Name { get; set; } = null!;
 

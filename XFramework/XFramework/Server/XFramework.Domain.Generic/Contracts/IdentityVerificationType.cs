@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityVerificationType : BaseModel
+public partial class IdentityVerificationType : BaseModel
 {
     public string? Name { get; set; }
 

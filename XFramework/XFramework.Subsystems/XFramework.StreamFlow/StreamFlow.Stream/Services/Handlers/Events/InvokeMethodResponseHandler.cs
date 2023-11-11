@@ -1,12 +1,9 @@
 ﻿using System.Net;
-using MediatR;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Generic.BusinessObjects;
-using StreamFlow.Domain.Generic.Contracts.Requests;
 using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Services.Entity.Events;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
 using XFramework.Integration.Services.Helpers;
 
@@ -34,7 +31,7 @@ public class InvokeMethodResponseHandler(
             };
         }
 
-        request.RequestServer = new()
+        request.RequestMetadata = new()
         {
             RequestId = client.Value.Guid,
             Name = client.Value.Name
@@ -49,7 +46,7 @@ public class InvokeMethodResponseHandler(
 
         if (c.Value != null)
         {
-            if (cachingService.PendingMethodCalls.TryRemove(request.MessageQueue.RequestId, out TaskCompletionSource<StreamFlowMessage> methodCallCompletionSource))
+            if (cachingService.PendingMethodCalls.TryRemove(request.MessageQueue.RequestId, out TaskCompletionSource<StreamFlowMessage > methodCallCompletionSource))
             {
                 await Task.Run(() => methodCallCompletionSource.SetResult(request.MessageQueue), cancellationToken);
             }
@@ -63,24 +60,24 @@ public class InvokeMethodResponseHandler(
             
         if (cachingService.AbsoluteClients.All(x => x.Value.Guid != request.MessageQueue.RecipientId))
         {
-            Console.WriteLine($"Connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has invalid recipient");
+            Console.WriteLine($"Connection with ID {request.RequestMetadata.RequestId} : {request.RequestMetadata.Name} has invalid recipient");
             goto returnYield;
         }
 
         if (!streamFlowConfiguration.QueueMessages)
         {
-            Console.WriteLine($"[Message Queue Disabled]; Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been dropped; Recipient unavailable");
+            Console.WriteLine($"[Message Queue Disabled]; Message from connection with ID {request.RequestMetadata.RequestId} : {request.RequestMetadata.Name} has been dropped; Recipient unavailable");
             goto returnYield;
         }
 
         if (cachingService.QueuedMessages.Where(i => i.Value.RecipientId == request.MessageQueue.RecipientId).Count() > streamFlowConfiguration.QueueDepth)
         {
-            Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} cannot be queued: Queue depth has been exhausted");
+            Console.WriteLine($"Message from connection with ID {request.RequestMetadata.RequestId} : {request.RequestMetadata.Name} cannot be queued: Queue depth has been exhausted");
             goto returnYield;
         }
                     
         cachingService.QueuedMessages.TryAdd(Guid.NewGuid() , request.MessageQueue);
-        Console.WriteLine($"Message from connection with ID {request.RequestServer.RequestId} : {request.RequestServer.Name} has been queued; Recipient unavailable");
+        Console.WriteLine($"Message from connection with ID {request.RequestMetadata.RequestId} : {request.RequestMetadata.Name} has been queued; Recipient unavailable");
 
         returnYield:
 

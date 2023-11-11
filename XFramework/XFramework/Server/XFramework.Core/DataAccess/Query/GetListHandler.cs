@@ -2,6 +2,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using XFramework.Domain.Generic.Contracts.Requests;
+using XFramework.Integration.Extensions;
 
 namespace XFramework.Core.DataAccess.Query;
 
@@ -38,7 +40,8 @@ public class GetListHandler<TModel>(
 
         if (request.Filter != null)
         {
-            query = query.Where(request.Filter);
+            var expression = request.Filter.ToExpression<TModel>();
+            query = query.Where(expression);
         }
 
         query = query.AsSplitQuery();

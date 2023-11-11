@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommunityIdentityFile : BaseModel
+public partial class CommunityIdentityFile : BaseModel
 {
     public Guid IdentityId { get; set; }
 

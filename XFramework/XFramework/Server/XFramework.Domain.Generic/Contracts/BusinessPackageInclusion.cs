@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record BusinessPackageInclusion : BaseModel
+public partial class BusinessPackageInclusion : BaseModel
 {
     public Guid BusinessPackageId { get; set; }
 

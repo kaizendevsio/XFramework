@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record WalletAddress : BaseModel
+public partial class WalletAddress : BaseModel
 {
     public string? Address { get; set; }
 

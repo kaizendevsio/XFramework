@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityInformation : BaseModel
+public partial class IdentityInformation : BaseModel
 {
     public string? FirstName { get; set; }
 
@@ -20,7 +20,6 @@ public partial record IdentityInformation : BaseModel
 
     public short? CivilStatus { get; set; }
 
-    public Guid TenantId { get; set; }
 
     public virtual Tenant Tenant { get; set; } = null!;
 

@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record AuthorizationLog : BaseModel
+public partial class AuthorizationLog : BaseModel
 {
     public Guid CredentialId { get; set; }
 

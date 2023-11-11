@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record MessageReactionType : BaseModel
+public partial class MessageReactionType : BaseModel
 {
     public string Name { get; set; } = null!;
 

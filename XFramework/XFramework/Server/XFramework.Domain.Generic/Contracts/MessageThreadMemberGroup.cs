@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record MessageThreadMemberGroup : BaseModel
+public partial class MessageThreadMemberGroup : BaseModel
 {
     public short Status { get; set; }
 

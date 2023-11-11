@@ -28,7 +28,7 @@ public class RecordsDriver : ILoggerWrapper
         return guid;
     }
 
-    public Task<Guid?> NewLog(string name, string message, string initiator, RequestServer requestServer, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
+    public Task<Guid?> NewLog(string name, string message, string initiator, RequestMetadata requestMetadata, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
     {
         throw new NotImplementedException();
     }

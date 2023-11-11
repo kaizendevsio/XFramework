@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record Log : BaseModel
+public partial class Log : BaseModel
 {
     public Guid TenantId { get; set; }
 

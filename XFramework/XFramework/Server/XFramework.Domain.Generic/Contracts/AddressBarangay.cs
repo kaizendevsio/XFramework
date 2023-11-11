@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record AddressBarangay : BaseModel
+public partial class AddressBarangay : BaseModel
 {
     public long? Code { get; set; }
 

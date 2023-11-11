@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record BusinessPackageUpgradeTransaction : BaseModel
+public partial class BusinessPackageUpgradeTransaction : BaseModel
 {
     public Guid CredentialId { get; set; }
 

@@ -3,7 +3,7 @@
   "profiles": {
     "Generators": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "../ConsoleTest/ConsoleTest.csproj"
+      "targetProject": "../XFramework.Api/XFramework.Api.csproj"
     }
   }
 }

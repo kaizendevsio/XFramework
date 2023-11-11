@@ -2,7 +2,8 @@
 
 namespace IdentityServer.Domain.Generic.Contracts.Responses;
 
-public record CheckVerificationResponse(
-    bool IsVerified = default,
-    IdentityVerification? LastVerification = default
-);
+public record CheckVerificationResponse
+{
+    public bool IsVerified { get; init; }
+    public IdentityVerification LastVerification { get; set; }
+};

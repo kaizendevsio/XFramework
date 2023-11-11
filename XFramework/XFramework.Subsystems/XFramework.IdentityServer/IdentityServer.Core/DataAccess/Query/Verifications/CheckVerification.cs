@@ -1,8 +1,5 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests;
 using IdentityServer.Domain.Generic.Contracts.Responses;
-using Microsoft.Extensions.Logging;
-using XFramework.Domain.Contexts;
-using XFramework.Domain.Generic.Contracts;
 
 namespace IdentityServer.Core.DataAccess.Query.Verifications;
 

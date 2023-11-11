@@ -2,7 +2,7 @@
 
 namespace XFramework.Domain.Generic.Contracts.Responses;
 
-public record JsonIpResponse
+public class JsonIpResponse
 {
     [JsonPropertyName("ip")]
     public string? IpAddress { get; set; }

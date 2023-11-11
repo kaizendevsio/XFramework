@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record StorageFileIdentifier : BaseModel
+public partial class StorageFileIdentifier : BaseModel
 {
     public string Name { get; set; } = null!;
 

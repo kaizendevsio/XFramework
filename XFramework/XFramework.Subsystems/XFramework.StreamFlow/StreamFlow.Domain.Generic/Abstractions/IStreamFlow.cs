@@ -8,4 +8,5 @@ public interface IStreamFlow
     Task Push();
     Task<bool> Ping();
     Task<bool> InvokeResponse();
+    Task<bool> InvokeResponseHandler();
 }

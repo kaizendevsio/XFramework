@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record RegistryFavoriteType : BaseModel
+public partial class RegistryFavoriteType : BaseModel
 {
     public string? Name { get; set; }
 

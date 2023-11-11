@@ -51,7 +51,7 @@ public partial class Data
 
 public partial class CoinProperty
 {
-    public static CoinProperty FromJson(string json) => JsonConvert.DeserializeObject<CoinProperty>(json, XFramework.External.Models.Converter.Settings);
+    public static CoinProperty FromJson(string json) => JsonConvert.DeserializeObject<CoinProperty>(json, Converter.Settings);
 }
 
 internal class ParseStringConverter : JsonConverter

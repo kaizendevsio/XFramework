@@ -2,7 +2,7 @@
 
 namespace XFramework.Domain.Generic.Contracts;
 
-public partial record StorageFile : BaseModel
+public partial class StorageFile : BaseModel
 {
     public string ContentPath { get; set; } = null!;
 

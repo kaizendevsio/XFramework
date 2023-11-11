@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityContact : BaseModel
+public partial class IdentityContact : BaseModel
 {
     public Guid? TypeId { get; set; }
 

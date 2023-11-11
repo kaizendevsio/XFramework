@@ -1,9 +1,9 @@
+using Newtonsoft.Json;
+using System.Reflection;
 using XFramework.External;
 using XFramework.External.Models;
 using XFramework.Integrity.Entity.BO;
-using Newtonsoft.Json;
 using XFramework.Integrity.Entity.Enums;
-using System.Reflection;
 
 namespace XFramework.Integrity;
 

@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record MetaData : BaseModel
+public partial class MetaData : BaseModel
 {
     public Guid TypeId { get; set; }
 

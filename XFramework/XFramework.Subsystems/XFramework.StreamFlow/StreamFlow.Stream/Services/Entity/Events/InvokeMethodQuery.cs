@@ -1,9 +1,4 @@
-﻿using MediatR;
-using StreamFlow.Domain.Generic.Contracts.Requests;
-using StreamFlow.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.BusinessObjects;
-
-namespace StreamFlow.Stream.Services.Entity.Events;
+﻿namespace StreamFlow.Stream.Services.Entity.Events;
 
 public class InvokeMethodQuery : CommandBaseEntity, IRequest<QueryResponse<StreamFlowInvokeResponse>>
 {

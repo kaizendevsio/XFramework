@@ -1,5 +1,5 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record AuditField : BaseModel
+public partial class AuditField : BaseModel
 {
 }

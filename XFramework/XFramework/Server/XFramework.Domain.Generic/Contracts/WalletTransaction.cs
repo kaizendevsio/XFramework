@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record WalletTransaction : BaseModel
+public partial class WalletTransaction : BaseModel
 {
     public Guid CredentialId { get; set; }
 

@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommunityConnectionType : BaseModel
+public partial class CommunityConnectionType : BaseModel
 {
     public string Name { get; set; } = null!;
 

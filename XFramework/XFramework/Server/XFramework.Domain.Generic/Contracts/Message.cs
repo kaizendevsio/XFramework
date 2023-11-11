@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record Message : BaseModel
+public partial class Message : BaseModel
 {
     public string Text { get; set; } = null!;
 

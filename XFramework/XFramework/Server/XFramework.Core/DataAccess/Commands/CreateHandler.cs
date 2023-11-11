@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Core.DataAccess.Commands;
 

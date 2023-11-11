@@ -1,13 +1,7 @@
-﻿using IdentityServer.Domain.Generic.Contracts;
-using IdentityServer.Domain.Generic.Contracts.Requests;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Enums;
-using Microsoft.Extensions.Logging;
-using XFramework.Domain.Contexts;
-using XFramework.Domain.Generic.Contracts;
-using XFramework.Domain.Generic.Contracts.Responses;
 using XFramework.Integration.Abstractions;
-using XFramework.Integration.Abstractions.Wrappers;
 
 namespace IdentityServer.Core.DataAccess.Query.Credential;
 

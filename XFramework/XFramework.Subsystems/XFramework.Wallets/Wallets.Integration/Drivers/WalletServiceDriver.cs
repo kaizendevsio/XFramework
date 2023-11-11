@@ -1,7 +1,5 @@
-﻿using Mapster;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Wallets.Integration.Interfaces;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
 

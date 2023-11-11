@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record ProviderEndpoint : BaseModel
+public partial class ProviderEndpoint : BaseModel
 {
     public Guid? ProviderId { get; set; }
 

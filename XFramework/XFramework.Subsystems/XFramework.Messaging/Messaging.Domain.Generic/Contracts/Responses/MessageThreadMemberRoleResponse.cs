@@ -1,7 +1,7 @@
 ﻿
 namespace Messaging.Domain.Generic.Contracts.Responses;
 
-public class MessageThreadMemberRoleResponse
+public record MessageThreadMemberRoleResponse
 {
     public DateTime CreatedAt { get; set; }
     public DateTime ModifiedAt { get; set; }

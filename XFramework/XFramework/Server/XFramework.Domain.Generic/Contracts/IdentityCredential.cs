@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityCredential : BaseModel
+public partial class IdentityCredential : BaseModel
 {
     public Guid IdentityInfoId { get; set; }
 

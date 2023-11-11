@@ -12,10 +12,7 @@ public static class ApplicationBuilderExtension
     
     public static WebApplication UseSignalRHubEndpoints(this WebApplication app)
     {
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapHub<MessageQueueHub>("/stream-flow/queue");
-        });
+        app.MapHub<MessageQueueHub>("/stream-flow/queue");
         return app;
     }
 }

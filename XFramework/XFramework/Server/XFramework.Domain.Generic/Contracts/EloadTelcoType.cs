@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record EloadTelcoType : BaseModel
+public partial class EloadTelcoType : BaseModel
 {
     public string? Name { get; set; }
 

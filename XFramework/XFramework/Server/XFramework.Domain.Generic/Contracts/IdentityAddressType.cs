@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityAddressType : BaseModel
+public partial class IdentityAddressType : BaseModel
 {
     public string? Name { get; set; }
 

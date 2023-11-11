@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record Biller : BaseModel
+public partial class Biller : BaseModel
 {
     public Guid BillerCategoryId { get; set; }
 

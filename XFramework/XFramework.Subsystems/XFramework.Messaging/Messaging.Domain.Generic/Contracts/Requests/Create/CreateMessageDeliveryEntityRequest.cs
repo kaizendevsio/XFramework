@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateMessageDeliveryEntityRequest : RequestBase
+public record CreateMessageDeliveryEntityRequest : RequestBase
 {
     public string? Name { get; set; }
 }

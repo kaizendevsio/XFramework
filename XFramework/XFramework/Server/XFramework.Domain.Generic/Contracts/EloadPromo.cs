@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record EloadPromo : BaseModel
+public partial class EloadPromo : BaseModel
 {
     public string? Name { get; set; }
 

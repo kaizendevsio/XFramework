@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommunityContentReactionType : BaseModel
+public partial class CommunityContentReactionType : BaseModel
 {
     public string Name { get; set; } = null!;
 

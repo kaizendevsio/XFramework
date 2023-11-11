@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Update;
 
-public class ConfirmMessageSentRequest : RequestBase
+public record ConfirmMessageSentRequest : RequestBase
 {
     public Guid? Guid { get; set; }
 }

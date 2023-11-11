@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record BusinessPackageType : BaseModel
+public partial class BusinessPackageType : BaseModel
 {
     public string? Name { get; set; }
 

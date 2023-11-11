@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IncomeType : BaseModel
+public partial class IncomeType : BaseModel
 {
     public string IncomeTypeName { get; set; } = null!;
 

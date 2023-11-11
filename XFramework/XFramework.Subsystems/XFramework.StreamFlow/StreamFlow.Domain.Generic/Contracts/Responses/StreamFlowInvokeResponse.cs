@@ -6,5 +6,5 @@ public class StreamFlowInvokeResponse
 {
     public HttpStatusCode HttpStatusCode { get; set; }
     public string Message { get; set; }
-    public byte[] Response { get; set; }
+    public object Response { get; set; }
 }

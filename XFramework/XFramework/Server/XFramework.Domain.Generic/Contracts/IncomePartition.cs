@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IncomePartition : BaseModel
+public partial class IncomePartition : BaseModel
 {
     public Guid IdentityRoleId { get; set; }
 

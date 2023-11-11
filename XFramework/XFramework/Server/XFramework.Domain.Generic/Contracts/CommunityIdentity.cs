@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommunityIdentity : BaseModel
+public partial class CommunityIdentity : BaseModel
 {
     public Guid CredentialId { get; set; }
 

@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record MessageDirect : BaseModel
+public partial class MessageDirect : BaseModel
 {
     public Guid ParentMessageId { get; set; }
 

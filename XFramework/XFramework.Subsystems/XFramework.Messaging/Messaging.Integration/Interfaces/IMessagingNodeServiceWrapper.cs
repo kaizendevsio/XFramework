@@ -1,5 +1,4 @@
-﻿using Messaging.Domain.Generic.Contracts.Requests.Create;
-using Messaging.Domain.Generic.Contracts.Requests.Update;
+﻿using Messaging.Domain.Generic.Contracts.Requests.Update;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Interfaces;

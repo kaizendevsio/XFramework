@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityContactGroup : BaseModel
+public partial class IdentityContactGroup : BaseModel
 {
     public string Name { get; set; } = null!;
 

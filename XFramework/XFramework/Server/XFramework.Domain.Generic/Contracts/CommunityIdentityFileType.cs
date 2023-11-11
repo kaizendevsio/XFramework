@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record CommunityIdentityFileType : BaseModel
+public partial class CommunityIdentityFileType : BaseModel
 {
     public string Name { get; set; } = null!;
 

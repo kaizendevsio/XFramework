@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record WalletType : BaseModel
+public partial class WalletType : BaseModel
 {
     public string Code { get; set; } = null!;
 

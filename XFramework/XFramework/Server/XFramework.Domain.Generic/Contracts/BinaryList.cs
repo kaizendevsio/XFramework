@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record BinaryList : BaseModel
+public partial class BinaryList : BaseModel
 {
     public Guid? TargetUserMapId { get; set; }
 

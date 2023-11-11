@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record WithdrawalRequest : BaseModel
+public partial class WithdrawalRequest : BaseModel
 {
     public Guid CredentialId { get; set; }
 

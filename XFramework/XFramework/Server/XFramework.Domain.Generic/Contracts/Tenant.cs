@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record Tenant : BaseModel
+public partial class Tenant : BaseModel
 {
     public string? Name { get; set; }
 

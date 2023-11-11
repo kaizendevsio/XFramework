@@ -1,16 +1,11 @@
-﻿using Microsoft.Extensions.Logging;
-using XFramework.Core.DataAccess.Commands;
-using XFramework.Domain.Contexts;
-using XFramework.Domain.Generic.Contracts;
-
-namespace IdentityServer.Core.DataAccess.Commands.Credential;
+﻿namespace IdentityServer.Core.DataAccess.Commands.Credential;
 
 public class UpdateCredential(
         AppDbContext appDbContext,
         ILogger<UpdateCredential> logger,
-        IEnumerable<IRequestHandler<Patch<IdentityCredential>, CmdResponse<IdentityCredential>>> requestHandlers
+        IRequestHandler<Patch<IdentityCredential>, CmdResponse<IdentityCredential>> baseHandler
     )
-    : IRequestHandler<Patch<IdentityCredential>, CmdResponse<IdentityCredential>>
+    : IPatchHandler<IdentityCredential>, IDecorator
 {
     public async Task<CmdResponse<IdentityCredential>> Handle(Patch<IdentityCredential> request, CancellationToken cancellationToken)
     {
@@ -36,7 +31,7 @@ public class UpdateCredential(
         var hashPasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: request.Model.Password, workFactor:11));
         request.Model.PasswordByte = hashPasswordByte;
 
-        await requestHandlers.First().Handle(request, cancellationToken);
+        await baseHandler.Handle(request, cancellationToken);
         
         return new ()
         {

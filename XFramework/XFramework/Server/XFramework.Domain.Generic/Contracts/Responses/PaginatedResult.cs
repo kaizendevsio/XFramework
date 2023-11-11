@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts.Responses;
 
-public record PaginatedResult<T>
+public class PaginatedResult<T>
 (
     long TotalItems,
     int PageIndex,

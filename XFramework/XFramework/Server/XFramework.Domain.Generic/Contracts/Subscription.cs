@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record Subscription : BaseModel
+public partial class Subscription : BaseModel
 {
     public Guid TypeId { get; set; }
 

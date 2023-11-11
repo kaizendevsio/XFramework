@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.SignalR.Client;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Interfaces;
+﻿using XFramework.Domain.Generic.Interfaces;
 
 namespace Community.Integration.Interfaces;
 

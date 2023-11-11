@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record AddressCountry : BaseModel
+public partial class AddressCountry : BaseModel
 {
     public string? IsoCode2 { get; set; }
 

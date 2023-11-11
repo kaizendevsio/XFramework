@@ -14,7 +14,7 @@ public static class XApplication
         services.InstallSwagger(configuration);
         services.InstallOData(configuration);
         services.InstallJwt(configuration);
-        services.InstallStandardServices(configuration);
+        services.InstallStandardServices<T>(configuration);
         services.InstallRuntimeServices(configuration);
         
         var app = builder.Build();

@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record AuditHistory : BaseModel
+public partial class AuditHistory : BaseModel
 {
     public string? TableName { get; set; }
 

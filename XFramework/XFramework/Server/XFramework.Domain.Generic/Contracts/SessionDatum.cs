@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record SessionDatum : BaseModel
+public partial class SessionDatum : BaseModel
 {
     public Guid? SessionTypeId { get; set; }
 

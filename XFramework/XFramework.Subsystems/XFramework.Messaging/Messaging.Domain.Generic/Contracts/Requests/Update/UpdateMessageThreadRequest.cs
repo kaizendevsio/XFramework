@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Update;
 
-public class UpdateMessageThreadRequest : RequestBase
+public record UpdateMessageThreadRequest : RequestBase
 {
     public string? Name { get; set; }
     public string? Description { get; set; }

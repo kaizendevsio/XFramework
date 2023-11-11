@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record MessageReaction : BaseModel
+public partial class MessageReaction : BaseModel
 {
     public Guid MessageId { get; set; }
 

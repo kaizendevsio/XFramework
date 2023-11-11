@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Domain.Generic.Contracts;
 
-public partial record IdentityAddress : BaseModel
+public partial class IdentityAddress : BaseModel
 {
     public Guid IdentityInfoId { get; set; }
 

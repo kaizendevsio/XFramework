@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Domain.Generic.BusinessObjects;
 
-public class IdentitySession
+public class Session
 {
     public string Token { get; set; }
     public Guid Guid { get; set; }
@@ -11,5 +11,5 @@ public class IdentitySession
     public TimeSpan MaxSessionTimeSpan { get; set; }
     public CurrentSessionState SessionState { get; set; }
     public IPAddress ClientIpAddress { get; set; }
-    public RequestServer RequestServer { get; set; }
+    public RequestMetadata RequestMetadata { get; set; }
 }

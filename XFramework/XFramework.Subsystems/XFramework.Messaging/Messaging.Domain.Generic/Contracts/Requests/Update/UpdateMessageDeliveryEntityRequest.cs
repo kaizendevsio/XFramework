@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Update;
 
-public class UpdateMessageDeliveryEntityRequest : RequestBase
+public record UpdateMessageDeliveryEntityRequest : RequestBase
 {
     public string? Name { get; set; }
 }
