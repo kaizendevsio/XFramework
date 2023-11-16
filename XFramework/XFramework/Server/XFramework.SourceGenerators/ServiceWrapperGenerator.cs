@@ -40,6 +40,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
                              using System.Linq.Expressions;
                              using Serilog;
                              using System;
+                             using System.Net;
 
                  
                              namespace {{serviceName}}.Integration.Drivers
@@ -92,9 +93,9 @@ public class ServiceWrapperGenerator : ISourceGenerator
                                        var t = await SendAsync(new Create<{{model}}>(entity));
                                        return new CmdResponse<{{model}}>
                                        {
-                                           HttpStatusCode = t.HttpStatusCode,
-                                           Message = t.Message,
-                                           Response = t.Response?.Model
+                                           HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
+                                           Message = t?.Message,
+                                           Response = t?.Response?.Model
                                        };
                                    }
                                
@@ -103,9 +104,9 @@ public class ServiceWrapperGenerator : ISourceGenerator
                                        var t = await SendAsync(new Patch<{{model}}>(entity));
                                        return new CmdResponse<{{model}}>
                                        {
-                                           HttpStatusCode = t.HttpStatusCode,
-                                           Message = t.Message,
-                                           Response = t.Response?.Model
+                                           HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
+                                           Message = t?.Message,
+                                           Response = t?.Response?.Model
                                        };
                                    }
                                
@@ -114,9 +115,9 @@ public class ServiceWrapperGenerator : ISourceGenerator
                                        var t = await SendAsync(new Replace<{{model}}>(entity));
                                        return new CmdResponse<{{model}}>
                                        {
-                                           HttpStatusCode = t.HttpStatusCode,
-                                           Message = t.Message,
-                                           Response = t.Response?.Model
+                                           HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
+                                           Message = t?.Message,
+                                           Response = t?.Response?.Model
                                        };
                                    }
                                
@@ -125,8 +126,8 @@ public class ServiceWrapperGenerator : ISourceGenerator
                                        var t = await SendAsync(new Delete<{{model}}>(entity));
                                        return new CmdResponse
                                        {
-                                           HttpStatusCode = t.HttpStatusCode,
-                                           Message = t.Message
+                                           HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
+                                           Message = t?.Message
                                        };
                                    }
                                
@@ -135,8 +136,8 @@ public class ServiceWrapperGenerator : ISourceGenerator
                                        var t = await SendAsync(new GetList<{{model}}>(pageSize, pageNumber, tenantId, includeNavigations, filter));
                                        return new QueryResponse<PaginatedResult<{{model}}>>
                                        {
-                                           HttpStatusCode = t.HttpStatusCode,
-                                           Message = t.Message
+                                           HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
+                                           Message = t?.Message
                                        };
                                    }
                                
@@ -145,8 +146,8 @@ public class ServiceWrapperGenerator : ISourceGenerator
                                        var t = await SendAsync(new Get<{{model}}>(id, tenantId, includeNavigations));
                                        return new QueryResponse<{{model}}>
                                        {
-                                           HttpStatusCode = t.HttpStatusCode,
-                                           Message = t.Message
+                                           HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
+                                           Message = t?.Message
                                        };
                                    }
                                }

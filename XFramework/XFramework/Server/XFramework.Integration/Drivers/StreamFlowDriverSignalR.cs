@@ -235,7 +235,11 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             var serviceRequestLog = new ServiceRequestLog<TRequest, CmdResponse<TRequest>>(Request: request, Response: result.Response);
             Logger.LogInformation("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
         });
-        
+
+        if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
+        {
+            throw new Exception(result.Message);
+        }
         return result.Response;
     }
 
@@ -267,9 +271,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         where TModel : class, IHasRequestServer
         where TResponse : class, IBaseResponse
     {
-        var i = new StreamFlowMessage ();
-        var invokeRequest = i.Adapt(request); 
-        var signalRResponse = await SignalRService.InvokeAsync(invokeRequest);
+        var signalRResponse = await SignalRService.InvokeAsync(request);
         var tResponse = Activator.CreateInstance<TResponse>();
         
         switch (signalRResponse.ResponseStatusCode)
@@ -292,6 +294,15 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 {
                     HttpStatusCode = tResponse.HttpStatusCode,
                     Response = tResponse
+                };
+            }
+            case HttpStatusCode.InternalServerError:
+            {
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    Message = signalRResponse.Message,
+                    Response = signalRResponse.Data as TResponse
                 };
             }
             default:

@@ -120,7 +120,6 @@ public static class InstallerExtensions
         services.AddMemoryCache();
 
         var loggerConfiguration = new LoggerConfiguration()
-            .MinimumLevel.Debug()
             .Enrich.FromLogContext() // This will ensure SourceContext is populated
             .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} => {Message:lj}{NewLine}{Exception}");
         
@@ -233,6 +232,7 @@ public static class InstallerExtensions
             c.SwaggerEndpoint("/swagger/v3/swagger.json", "XFramework API v3");
             // If you have more versions or groups, add them similarly:
             // c.SwaggerEndpoint("/swagger/v2/swagger.json", "Version 2 of My API");
+            c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.None);
         });
 
         return app;

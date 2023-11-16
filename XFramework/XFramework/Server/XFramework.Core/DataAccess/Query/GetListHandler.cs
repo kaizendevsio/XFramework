@@ -28,6 +28,15 @@ public class GetListHandler<TModel>(
                 Response = cachedResult
             };
         }
+
+        if (request.TenantId is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = "TenantId is required"
+            };
+        }
         
         var tenant = await GetTenant(request.TenantId);
 

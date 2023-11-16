@@ -14,7 +14,7 @@ public interface ISignalRService : IXFrameworkService
     Task<bool> EnsureConnection();
     Task StartEventListener(string topic);
 
-    Task<int> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage);
+    Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage);
 
     Task<StreamFlowMessage> InvokeAsync(StreamFlowMessage sfMessage);
 }

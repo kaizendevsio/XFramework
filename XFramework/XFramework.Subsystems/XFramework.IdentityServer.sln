@@ -36,6 +36,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain", "..\XFr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.SourceGenerators", "..\XFramework\Server\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj", "{4BFEC7FE-5F52-4048-8AD2-03B0DD31A6FF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HealthEssentials.Domain.Generics", "XFramework.HealthEssentials\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj", "{BF9E86CC-E7E1-4FA8-97D5-7D351EED550B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,7 @@ Global
 		{0F782341-BB1B-42B2-88D6-3EEAC130FCE5} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
 		{03C921E8-09BA-4516-91CA-8988564FFEEB} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
 		{4BFEC7FE-5F52-4048-8AD2-03B0DD31A6FF} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
+		{BF9E86CC-E7E1-4FA8-97D5-7D351EED550B} = {6D1BF780-9A51-48AB-BE43-A9D5FBCD6C36}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{5812C495-8B5B-40D3-9F96-BF886E1C6CCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -122,5 +125,9 @@ Global
 		{4BFEC7FE-5F52-4048-8AD2-03B0DD31A6FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4BFEC7FE-5F52-4048-8AD2-03B0DD31A6FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4BFEC7FE-5F52-4048-8AD2-03B0DD31A6FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF9E86CC-E7E1-4FA8-97D5-7D351EED550B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF9E86CC-E7E1-4FA8-97D5-7D351EED550B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF9E86CC-E7E1-4FA8-97D5-7D351EED550B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF9E86CC-E7E1-4FA8-97D5-7D351EED550B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -9,7 +9,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
     {
     }
 
-    public AppDbContext(DbContextOptions<AppDbContext> options)
+    public AppDbContext(DbContextOptions options)
         : base(options)
     {
     }
