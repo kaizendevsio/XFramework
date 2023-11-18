@@ -1,6 +1,4 @@
 ﻿using StreamFlow.Core.Services;
-using XFramework.Core.Interfaces;
-using XFramework.Integration.Services;
 using ICachingService = StreamFlow.Core.Interfaces.ICachingService;
 
 namespace StreamFlow.Stream.Installers;

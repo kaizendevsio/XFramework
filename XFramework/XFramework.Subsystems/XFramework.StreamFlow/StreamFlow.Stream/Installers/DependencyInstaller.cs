@@ -1,6 +1,4 @@
-﻿using XFramework.Core.Interfaces;
-
-namespace StreamFlow.Stream.Installers;
+﻿namespace StreamFlow.Stream.Installers;
 
 public class DependencyInstaller : IInstaller
 {

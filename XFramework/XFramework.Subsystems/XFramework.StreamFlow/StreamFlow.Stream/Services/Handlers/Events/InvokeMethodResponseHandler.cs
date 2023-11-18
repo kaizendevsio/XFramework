@@ -1,18 +1,15 @@
-﻿using System.Net;
-using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Services.Entity.Events;
 using XFramework.Domain.Generic.Configurations;
-using XFramework.Integration.Services.Helpers;
 
 namespace StreamFlow.Stream.Services.Handlers.Events;
 
 public class InvokeMethodResponseHandler(
         ICachingService cachingService,
         IHubContext<MessageQueueHub> hubContext,
-        MetricsMonitor metricsMonitor,
         ILogger<InvokeMethodResponseHandler> logger,
         StreamFlowConfiguration streamFlowConfiguration)
     : IRequestHandler<InvokeMethodResponseCmd, CmdResponse<InvokeMethodResponseCmd>>

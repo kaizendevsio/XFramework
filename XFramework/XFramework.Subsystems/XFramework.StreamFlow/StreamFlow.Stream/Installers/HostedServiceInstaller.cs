@@ -1,7 +1,4 @@
-﻿using XFramework.Core.Interfaces;
-using XFramework.Core.Services;
-
-namespace StreamFlow.Stream.Installers;
+﻿namespace StreamFlow.Stream.Installers;
 
 public class HostedServiceInstaller : IInstaller
 {

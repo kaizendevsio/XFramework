@@ -112,7 +112,6 @@ public static class InstallerExtensions
         ));
         services.AddValidatorsFromAssembly(typeof(RequestBase).GetTypeInfo().Assembly);
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
-        services.AddTransient<MetricsMonitor>();
         services.AddSingleton<ISignalRService, SignalRService>();
         services.AddSingleton<IHelperService, HelperService>();
         services.AddSingleton<IJwtService, JwtService>();
@@ -121,13 +120,14 @@ public static class InstallerExtensions
 
         var loggerConfiguration = new LoggerConfiguration()
             .Enrich.FromLogContext() // This will ensure SourceContext is populated
-            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} => {Message:lj}{NewLine}{Exception}");
+            .WriteTo.Async(a => a.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} => {Message:lj}{NewLine}{Exception}"));
         
         Log.Logger = loggerConfiguration.CreateLogger();
         services.AddSingleton(Log.Logger);
         
         XFrameworkExtensions.LoadMapsterDefaults();
     }
+    
     public static void InstallRuntimeServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton(o => new DeviceAgentProvider(Environment.MachineName));

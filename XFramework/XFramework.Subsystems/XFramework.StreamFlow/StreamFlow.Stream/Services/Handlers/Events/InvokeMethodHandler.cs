@@ -1,12 +1,9 @@
-﻿using System.Net;
-using Mapster;
-using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Services.Entity.Events;
 using XFramework.Domain.Generic.Configurations;
-using XFramework.Integration.Services.Helpers;
 
 namespace StreamFlow.Stream.Services.Handlers.Events;
 
@@ -14,7 +11,6 @@ public class InvokeMethodHandler(
         ICachingService cachingService,
         IHubContext<MessageQueueHub> hubContext,
         StreamFlowConfiguration streamFlowConfiguration,
-        MetricsMonitor metricsMonitor,
         IHelperService helperService)
     : IRequestHandler<InvokeMethodQuery, QueryResponse<StreamFlowInvokeResponse>>
 {
@@ -47,13 +43,13 @@ public class InvokeMethodHandler(
 
         if (c.Value != null)
         {
-            using var metricLogger = metricsMonitor.Start($"Invoking method '{request.MessageQueue.CommandName}'");
+            //using var metricLogger = metricsMonitor.Start($"Invoking method '{request.MessageQueue.CommandName}'");
             
             var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage >();
             //methodCallCompletionSource.RunContinuationsAsynchronously();
             if (!cachingService.PendingMethodCalls.TryAdd(request.MessageQueue.RequestId,methodCallCompletionSource))
             {
-                metricLogger.Failed($"Error while invoking method '{request.MessageQueue.CommandName}' on {request.MessageQueue.RecipientId}");
+                //metricLogger.Failed($"Error while invoking method '{request.MessageQueue.CommandName}' on {request.MessageQueue.RecipientId}");
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.InternalServerError,
@@ -64,7 +60,7 @@ public class InvokeMethodHandler(
             await hubContext.Clients.Client(c.Value.StreamId).SendAsync(request.MessageQueue.CommandName, request.MessageQueue.Data, request.MessageQueue.Message, telemetry, cancellationToken);
             var response = await methodCallCompletionSource.Task.ConfigureAwait(false);
 
-            metricLogger.Completed($"Invoked method '{request.MessageQueue.CommandName}'");
+            //metricLogger.Completed($"Invoked method '{request.MessageQueue.CommandName}'");
             return new()
             {
                 HttpStatusCode = HttpStatusCode.Accepted,

@@ -62,9 +62,9 @@ public class SignalRHandlerGenerator : ISourceGenerator
             
             codeBuilder.AppendLine($"                        public class Get{model}ListHandler : BaseSignalRHandler, ISignalREventHandler");
             codeBuilder.AppendLine("                         {");
-            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory)");
+            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)");
             codeBuilder.AppendLine("                             {");
-            codeBuilder.AppendLine($"                                 HandleRequestQuery<GetList<{model}>, PaginatedResult<{model}>>(connection, mediator, logger, metricsMonitor, scopeFactory);");
+            codeBuilder.AppendLine($"                                 HandleRequestQuery<GetList<{model}>, PaginatedResult<{model}>>(connection, mediator, logger, scopeFactory);");
             codeBuilder.AppendLine("                             }");
             codeBuilder.AppendLine("                         }");
             
@@ -73,9 +73,9 @@ public class SignalRHandlerGenerator : ISourceGenerator
             
             codeBuilder.AppendLine($"                        public class Get{model}Handler : BaseSignalRHandler, ISignalREventHandler");
             codeBuilder.AppendLine("                         {");
-            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory)");
+            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)");
             codeBuilder.AppendLine("                             {");
-            codeBuilder.AppendLine($"                                 HandleRequestQuery<Get<{model}>, {model}>(connection, mediator, logger, metricsMonitor, scopeFactory);");
+            codeBuilder.AppendLine($"                                 HandleRequestQuery<Get<{model}>, {model}>(connection, mediator, logger, scopeFactory);");
             codeBuilder.AppendLine("                             }");
             codeBuilder.AppendLine("                         }");
             
@@ -84,9 +84,9 @@ public class SignalRHandlerGenerator : ISourceGenerator
             
             codeBuilder.AppendLine($"                        public class Create{model}Handler : BaseSignalRHandler, ISignalREventHandler");
             codeBuilder.AppendLine("                         {");
-            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory)");
+            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)");
             codeBuilder.AppendLine("                             {");
-            codeBuilder.AppendLine($"                                 HandleRequestCmd<Create<{model}>, {model}>(connection, mediator, logger, metricsMonitor, scopeFactory);");
+            codeBuilder.AppendLine($"                                 HandleRequestCmd<Create<{model}>, {model}>(connection, mediator, logger, scopeFactory);");
             codeBuilder.AppendLine("                             }");
             codeBuilder.AppendLine("                         }");
 
@@ -94,9 +94,9 @@ public class SignalRHandlerGenerator : ISourceGenerator
             
             codeBuilder.AppendLine($"                        public class Replace{model}Handler : BaseSignalRHandler, ISignalREventHandler");
             codeBuilder.AppendLine("                         {");
-            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory)");
+            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)");
             codeBuilder.AppendLine("                             {");
-            codeBuilder.AppendLine($"                                 HandleRequestCmd<Replace<{model}>, {model}>(connection, mediator, logger, metricsMonitor, scopeFactory);");
+            codeBuilder.AppendLine($"                                 HandleRequestCmd<Replace<{model}>, {model}>(connection, mediator, logger, scopeFactory);");
             codeBuilder.AppendLine("                             }");
             codeBuilder.AppendLine("                         }");
 
@@ -104,9 +104,9 @@ public class SignalRHandlerGenerator : ISourceGenerator
             
             codeBuilder.AppendLine($"                        public class Patch{model}Handler : BaseSignalRHandler, ISignalREventHandler");
             codeBuilder.AppendLine("                         {");
-            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory)");
+            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)");
             codeBuilder.AppendLine("                             {");
-            codeBuilder.AppendLine($"                                 HandleRequestCmd<Patch<{model}>, {model}>(connection, mediator, logger, metricsMonitor, scopeFactory);");
+            codeBuilder.AppendLine($"                                 HandleRequestCmd<Patch<{model}>, {model}>(connection, mediator, logger, scopeFactory);");
             codeBuilder.AppendLine("                             }");
             codeBuilder.AppendLine("                         }");
 
@@ -114,9 +114,9 @@ public class SignalRHandlerGenerator : ISourceGenerator
             
             codeBuilder.AppendLine($"                        public class Delete{model}Handler : BaseSignalRHandler, ISignalREventHandler");
             codeBuilder.AppendLine("                         {");
-            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory)");
+            codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)");
             codeBuilder.AppendLine("                             {");
-            codeBuilder.AppendLine($"                                 HandleRequestCmd<Delete<{model}>, {model}>(connection, mediator, logger, metricsMonitor, scopeFactory);");
+            codeBuilder.AppendLine($"                                 HandleRequestCmd<Delete<{model}>, {model}>(connection, mediator, logger, scopeFactory);");
             codeBuilder.AppendLine("                             }");
             codeBuilder.AppendLine("                         }");
             

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Serilog;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Contracts.Base;
@@ -12,6 +13,7 @@ namespace XFramework.Integration.Drivers;
 
 public abstract class BaseSignalRHandler
 {
+    
     public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, Guid requestId, Guid clientId, TResult data) 
         where TResult : class, IBaseResponse, IHasRequestServer
     {
@@ -27,27 +29,28 @@ public abstract class BaseSignalRHandler
         return await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Push), request);
     }
 
-    protected virtual void HandleRequestQuery<TQuery, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory)
+    protected virtual void HandleRequestQuery<TQuery, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
         where TResponse : class
         where TQuery : class, IRequest<QueryResponse<TResponse>>, IHasRequestServer
     {
         logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TQuery).GetTypeFullName());
-        connection.On(typeof(TQuery).GetTypeFullName(), (StreamFlowMessage<TQuery> response) => Handler<TQuery, QueryResponse<TResponse>>(response, connection, mediator, metricsMonitor, scopeFactory).ConfigureAwait(false));
+        connection.On(typeof(TQuery).GetTypeFullName(), (StreamFlowMessage<TQuery> response) => StreamflowRequestHandler<TQuery, QueryResponse<TResponse>>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
     }
     
-    protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory) 
+    protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
         where TResponse : class
         where TCmd : class, IRequest<CmdResponse<TResponse>>, IHasRequestServer
     {
         logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
-        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => Handler<TCmd, CmdResponse<TResponse>>(response, connection, mediator, metricsMonitor, scopeFactory).ConfigureAwait(false));
+        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse<TResponse>>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
     }
 
-    private async Task Handler<TQuery, TResponse>(StreamFlowMessage<TQuery> response, HubConnection connection, IMediator mediator, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory) 
+    private async Task StreamflowRequestHandler<TQuery, TResponse>(StreamFlowMessage<TQuery> response, HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
         where TQuery : class, IRequest<TResponse>, IHasRequestServer
         where TResponse : class, IBaseResponse, IHasRequestServer
     {
-        using var metricLogger = metricsMonitor.Start();
+        logger.LogInformation("[{Caller}] Request received, Invoking '{Request}'", nameof(StreamflowRequestHandler), GetType().Name);
+
         try
         {
             using var scope = scopeFactory.CreateScope();
@@ -57,18 +60,19 @@ public abstract class BaseSignalRHandler
 
             if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
             {
-                metricLogger.Failed($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{result.Message}]");
+                logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}", nameof(StreamflowRequestHandler), GetType().Name, result.Message);
             }
             else
             {
-                metricLogger.Completed($"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.HttpStatusCode}");
+                logger.LogInformation("[{Caller}] Invoking {Request}' returned {HttpStatusCode}", nameof(StreamflowRequestHandler), GetType().Name, result.HttpStatusCode);
+
             }
 
             await RespondToInvoke(connection, response.RequestId, response.ClientId, result);
         }
         catch (Exception e)
         {
-            metricLogger.Failed($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}]");
+            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}", nameof(StreamflowRequestHandler), GetType().Name, e.Message);
         }
     }
 }

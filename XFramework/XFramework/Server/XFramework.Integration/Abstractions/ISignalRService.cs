@@ -8,7 +8,7 @@ namespace XFramework.Integration.Abstractions;
 
 public interface ISignalRService : IXFrameworkService
 {
-    HubConnection Connection { get; set; }
+    HubConnection? Connection { get; set; }
     StreamFlowConfiguration StreamFlowConfiguration { get; set; }
 
     Task<bool> EnsureConnection();

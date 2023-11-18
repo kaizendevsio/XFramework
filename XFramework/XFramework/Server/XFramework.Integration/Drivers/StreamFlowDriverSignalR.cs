@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
 using System.Text;
+using MessagePack;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using StreamFlow.Domain.Generic.Abstractions;
@@ -302,14 +303,14 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 {
                     HttpStatusCode = HttpStatusCode.InternalServerError,
                     Message = signalRResponse.Message,
-                    Response = signalRResponse.Data as TResponse
+                    Response = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance))
                 };
             }
             default:
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Accepted,
-                    Response = signalRResponse.Data as TResponse
+                    Response = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance))
                 };
                 break;
         }

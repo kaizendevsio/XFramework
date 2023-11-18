@@ -1,6 +1,5 @@
 ﻿using MessagePack;
 using Microsoft.AspNetCore.ResponseCompression;
-using XFramework.Core.Interfaces;
 using XFramework.Domain.Generic.Configurations;
 
 namespace StreamFlow.Stream.Installers;

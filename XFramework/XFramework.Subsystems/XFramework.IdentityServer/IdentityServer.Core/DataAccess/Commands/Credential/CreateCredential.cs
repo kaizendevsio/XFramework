@@ -1,4 +1,7 @@
-﻿namespace IdentityServer.Core.DataAccess.Commands.Credential;
+﻿using XFramework.Core.DataAccess.Query;
+using XFramework.Domain.Generic.Contracts.Responses;
+
+namespace IdentityServer.Core.DataAccess.Commands.Credential;
 
 public class CreateCredential(
         AppDbContext appDbContext,
@@ -17,6 +20,24 @@ public class CreateCredential(
         return new ()
         {
             Response = request.Model,
+            HttpStatusCode = HttpStatusCode.OK
+        };
+    }
+} 
+
+
+public class GetCredentialList(
+        AppDbContext appDbContext,
+        ILogger<GetCredentialList> logger,
+        IRequestHandler<GetList<IdentityCredential>, QueryResponse<PaginatedResult<IdentityCredential>>> baseHandler
+    ) 
+    :  IGetListHandler<IdentityCredential>, IDecorator
+{
+    public async Task<QueryResponse<PaginatedResult<IdentityCredential>>> Handle(GetList<IdentityCredential> request, CancellationToken cancellationToken)
+    {
+        return new()
+        {
+            Response = null,
             HttpStatusCode = HttpStatusCode.OK
         };
     }

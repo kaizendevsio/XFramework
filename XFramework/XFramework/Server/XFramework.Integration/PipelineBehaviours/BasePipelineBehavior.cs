@@ -1,15 +1,17 @@
 ﻿using System.Diagnostics;
 using FluentValidation;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using XFramework.Domain.Generic.Contracts.Base;
+using XFramework.Integration.Extensions;
 
 namespace XFramework.Integration.PipelineBehaviours;
 
 public class BasePipelineBehavior<TRequest, TResponse>
     (
         IEnumerable<IValidator<TRequest>> validators,
-        ILogger log
+        ILogger<BasePipelineBehavior<TRequest, TResponse>> log
     )
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
@@ -70,10 +72,8 @@ public class BasePipelineBehavior<TRequest, TResponse>
     private async Task HandleResponse(TRequest request, TResponse response, RequestHandlerDelegate<TResponse> next)
     {
         _stopwatch.Stop();
-        
-        log.ForContext(next.Method.DeclaringType);
-        log.Information("Invoked {HandlerName} in {ElapsedTime}ms with response: {StatusCode}:{Message}", 
-            next.Method.Name, 
+        log.LogInformation("Invoked {HandlerName} in {ElapsedTime}ms with response: {StatusCode}:{Message}", 
+            typeof(TRequest).GetTypeFullName(), 
             _stopwatch.ElapsedMilliseconds,
             response.HttpStatusCode,
             response.Message

@@ -1,0 +1,16 @@
+2023-11-17 17:50:11.590 +08:00 [INF] [ThreadId:1] NBomber 5.3.0 started a new session: 2023-11-17_09.50.55_session_99f56a98
+2023-11-17 17:50:11.619 +08:00 [INF] [ThreadId:1] NBomber started as single node
+2023-11-17 17:50:11.620 +08:00 [INF] [ThreadId:1] License validation....
+2023-11-17 17:50:11.621 +08:00 [WRN] [ThreadId:1] THIS VERSION IS FREE ONLY FOR PERSONAL USE. You can't use it for an organization.
+2023-11-17 17:50:11.628 +08:00 [INF] [ThreadId:1] Reports folder: C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Tests\bin\Debug\net7.0\reports\empty session
+2023-11-17 17:50:11.630 +08:00 [INF] [ThreadId:1] Plugins: no plugins were loaded
+2023-11-17 17:50:11.630 +08:00 [INF] [ThreadId:1] Reporting sinks: no reporting sinks were loaded
+2023-11-17 17:50:11.630 +08:00 [INF] [ThreadId:1] Starting init...
+2023-11-17 17:50:11.635 +08:00 [INF] [ThreadId:1] Target scenarios: http_scenario
+2023-11-17 17:50:11.636 +08:00 [INF] [ThreadId:1] Init finished
+2023-11-17 17:50:11.645 +08:00 [INF] [ThreadId:1] Starting warm up...
+2023-11-17 17:50:11.646 +08:00 [INF] [ThreadId:1] Warm up for scenarios: http_scenario
+2023-11-17 17:50:11.648 +08:00 [INF] [ThreadId:1] Warm up duration: 00:00:30
+2023-11-17 17:50:18.990 +08:00 [WRN] [ThreadId:21] Stopping test early: stop command activated by CLI
+2023-11-17 17:50:19.047 +08:00 [INF] [ThreadId:20] Reports saved in folder: C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Tests\reports\2023-11-17_09.50.55_session_99f56a98
+2023-11-17 17:50:19.047 +08:00 [WRN] [ThreadId:20] THIS VERSION IS FREE ONLY FOR PERSONAL USE. You can't use it for an organization.

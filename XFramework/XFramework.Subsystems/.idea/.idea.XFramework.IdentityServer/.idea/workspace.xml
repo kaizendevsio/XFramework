@@ -11,25 +11,92 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="409723ac-d59d-499a-9f6f-0d22e3f077ee" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/Program.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.13.89_session_82e8c2fe/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.13.89_session_82e8c2fe/nbomber_report_2023-11-17--09-14-40.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.13.89_session_82e8c2fe/nbomber_report_2023-11-17--09-14-40.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.13.89_session_82e8c2fe/nbomber_report_2023-11-17--09-14-40.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.13.89_session_82e8c2fe/nbomber_report_2023-11-17--09-14-40.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.15.61_session_2dadb1c2/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.15.61_session_2dadb1c2/nbomber_report_2023-11-17--09-16-55.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.15.61_session_2dadb1c2/nbomber_report_2023-11-17--09-16-55.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.15.61_session_2dadb1c2/nbomber_report_2023-11-17--09-16-55.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.15.61_session_2dadb1c2/nbomber_report_2023-11-17--09-16-55.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.18.46_session_38444732/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.18.46_session_38444732/nbomber_report_2023-11-17--09-19-41.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.18.46_session_38444732/nbomber_report_2023-11-17--09-19-41.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.18.46_session_38444732/nbomber_report_2023-11-17--09-19-41.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.18.46_session_38444732/nbomber_report_2023-11-17--09-19-41.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.20.95_session_47867b02/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.20.95_session_47867b02/nbomber_report_2023-11-17--09-22-18.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.20.95_session_47867b02/nbomber_report_2023-11-17--09-22-18.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.20.95_session_47867b02/nbomber_report_2023-11-17--09-22-18.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.20.95_session_47867b02/nbomber_report_2023-11-17--09-22-18.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.27.81_session_6bd8cb5b/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.27.81_session_6bd8cb5b/nbomber_report_2023-11-17--09-28-30.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.27.81_session_6bd8cb5b/nbomber_report_2023-11-17--09-28-30.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.27.81_session_6bd8cb5b/nbomber_report_2023-11-17--09-28-30.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.27.81_session_6bd8cb5b/nbomber_report_2023-11-17--09-28-30.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.29.45_session_11540a76/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.29.45_session_11540a76/nbomber_report_2023-11-17--09-30-55.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.29.45_session_11540a76/nbomber_report_2023-11-17--09-30-55.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.29.45_session_11540a76/nbomber_report_2023-11-17--09-30-55.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.29.45_session_11540a76/nbomber_report_2023-11-17--09-30-55.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.38.37_session_88fb4cf0/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.38.37_session_88fb4cf0/nbomber_report_2023-11-17--09-39-25.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.38.37_session_88fb4cf0/nbomber_report_2023-11-17--09-39-25.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.38.37_session_88fb4cf0/nbomber_report_2023-11-17--09-39-25.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.38.37_session_88fb4cf0/nbomber_report_2023-11-17--09-39-25.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.46.32_session_b1d2451c/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.46.32_session_b1d2451c/nbomber_report_2023-11-17--09-46-58.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.46.32_session_b1d2451c/nbomber_report_2023-11-17--09-46-58.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.46.32_session_b1d2451c/nbomber_report_2023-11-17--09-46-58.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.46.32_session_b1d2451c/nbomber_report_2023-11-17--09-46-58.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.48.48_session_89a52166/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.48.48_session_89a52166/nbomber_report_2023-11-17--09-48-22.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.48.48_session_89a52166/nbomber_report_2023-11-17--09-48-22.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.48.48_session_89a52166/nbomber_report_2023-11-17--09-48-22.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.48.48_session_89a52166/nbomber_report_2023-11-17--09-48-22.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.50.55_session_99f56a98/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.50.55_session_99f56a98/nbomber_report_2023-11-17--09-50-18.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.50.55_session_99f56a98/nbomber_report_2023-11-17--09-50-18.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.50.55_session_99f56a98/nbomber_report_2023-11-17--09-50-18.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.50.55_session_99f56a98/nbomber_report_2023-11-17--09-50-18.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.51.07_session_4cca5d9b/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.51.07_session_4cca5d9b/nbomber_report_2023-11-17--09-53-05.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.51.07_session_4cca5d9b/nbomber_report_2023-11-17--09-53-05.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.51.07_session_4cca5d9b/nbomber_report_2023-11-17--09-53-05.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.51.07_session_4cca5d9b/nbomber_report_2023-11-17--09-53-05.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.59.32_session_6bf19db1/nbomber-log-20231117.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.59.32_session_6bf19db1/nbomber_report_2023-11-17--10-00-53.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.59.32_session_6bf19db1/nbomber_report_2023-11-17--10-00-53.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.59.32_session_6bf19db1/nbomber_report_2023-11-17--10-00-53.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/reports/2023-11-17_09.59.32_session_6bf19db1/nbomber_report_2023-11-17--10-00-53.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer.sln" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer.sln" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessage.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Domain.Generic/Contracts/Requests/StreamFlowMessage.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Credential/CreateCredential.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Credential/CreateCredential.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/MessageQueueHub.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Hubs/MessageQueueHub.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/DependencyInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/DependencyInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/HostedServiceInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/HostedServiceInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/ServicesInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/ServicesInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/StreamInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Installers/StreamInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Entity/Events/DequeueMessagesCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Entity/Events/DequeueMessagesCmd.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Entity/Events/RegisterClientCmd.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Entity/Events/RegisterClientCmd.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/DequeueMessagesHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/DequeueMessagesHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodResponseHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/InvokeMethodResponseHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.StreamFlow/StreamFlow.Stream/Services/Handlers/Events/PushMessageHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/Abstractions/InstallerExtensions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/Abstractions/InstallerExtensions.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Query/GetListHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Core/DataAccess/Query/GetListHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/CmdResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/QueryResponse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/BusinessObjects/QueryResponse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Base/IHasRequestServer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Base/IHasRequestServer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Requests/RequestBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/PaginatedResult.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Responses/PaginatedResult.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/Contexts/AppDbContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/Contexts/AppDbContext.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Abstractions/ISignalREventHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Abstractions/ISignalREventHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Abstractions/ISignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Abstractions/ISignalRService.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/BaseSignalRHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/BaseSignalRHandler.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Drivers/StreamFlowDriverSignalR.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/StreamFlowHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/StreamFlowHelper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/PipelineBehaviours/BasePipelineBehavior.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/PipelineBehaviours/BasePipelineBehavior.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/Helpers/MetricsMonitor.cs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/Services/SignalRService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.SourceGenerators/ServiceWrapperGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.SourceGenerators/ServiceWrapperGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/XFramework.Integration.csproj" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.SourceGenerators/SignalRHandlerGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.SourceGenerators/SignalRHandlerGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/StreamFlowTest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/StreamFlowTest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/XFramework.Tests.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Tests/XFramework.Tests.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -190,7 +257,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "ml.llm.LLMProjectConfigurable",
+    "settings.editor.selected.configurable": "reference.settingsdialog.IDE.editor.colors",
     "vue.rearranger.settings.migration": "true"
   },
   "keyToStringList": {
@@ -532,6 +599,8 @@
       <workItem from="1699292251963" duration="7332000" />
       <workItem from="1699509336783" duration="17439000" />
       <workItem from="1700116843667" duration="11404000" />
+      <workItem from="1700201583549" duration="3842000" />
+      <workItem from="1700212148488" duration="5943000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure To Support Sub-Systems">
       <created>1616960634242</created>
@@ -745,13 +814,13 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands/Credential/CreateCredential.cs</url>
-          <line>11</line>
+          <line>14</line>
           <properties documentPath="C:\Projects\XFramework\XFramework\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Core\DataAccess\Commands\Credential\CreateCredential.cs" initialLine="17" containingFunctionPresentation="Method 'Handle'">
             <startOffsets>
-              <option value="480" />
+              <option value="574" />
             </startOffsets>
             <endOffsets>
-              <option value="608" />
+              <option value="702" />
             </endOffsets>
           </properties>
           <option name="timeStamp" value="22" />
@@ -761,45 +830,6 @@
           <line>1138</line>
           <properties documentPath="C:\Users\Xeon\AppData\Local\Temp\SourceGeneratedDocuments\838FBCC529DC806D7D194B1F\XFramework.SourceGenerators\XFramework.SourceGenerators.ServiceWrapperGenerator\IdentityServerServiceWrapperGenerator.g.cs" initialLine="1062" containingFunctionPresentation="Method 'AddIdentityServerWrapperServices'" />
           <option name="timeStamp" value="31" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="DotNet Breakpoints">
-          <url>file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/PipelineBehaviours/BasePipelineBehavior.cs</url>
-          <line>43</line>
-          <properties documentPath="C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Integration\PipelineBehaviours\BasePipelineBehavior.cs" initialLine="43" containingFunctionPresentation="Method 'HandleError'">
-            <startOffsets>
-              <option value="1177" />
-            </startOffsets>
-            <endOffsets>
-              <option value="1238" />
-            </endOffsets>
-          </properties>
-          <option name="timeStamp" value="40" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="DotNet Breakpoints">
-          <url>file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/PipelineBehaviours/BasePipelineBehavior.cs</url>
-          <line>73</line>
-          <properties documentPath="C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Integration\PipelineBehaviours\BasePipelineBehavior.cs" initialLine="73" containingFunctionPresentation="Method 'HandleResponse'">
-            <startOffsets>
-              <option value="2244" />
-            </startOffsets>
-            <endOffsets>
-              <option value="2286" />
-            </endOffsets>
-          </properties>
-          <option name="timeStamp" value="41" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="DotNet Breakpoints">
-          <url>file://$PROJECT_DIR$/../XFramework/Server/XFramework.Integration/PipelineBehaviours/BasePipelineBehavior.cs</url>
-          <line>74</line>
-          <properties documentPath="C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Integration\PipelineBehaviours\BasePipelineBehavior.cs" initialLine="74" containingFunctionPresentation="Method 'HandleResponse'">
-            <startOffsets>
-              <option value="2295" />
-            </startOffsets>
-            <endOffsets>
-              <option value="2549" />
-            </endOffsets>
-          </properties>
-          <option name="timeStamp" value="42" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

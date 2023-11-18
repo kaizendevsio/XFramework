@@ -9,5 +9,5 @@ namespace XFramework.Integration.Abstractions;
 
 public interface ISignalREventHandler
 {
-    public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, MetricsMonitor metricsMonitor, IServiceScopeFactory scopeFactory);
+    public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory);
 }

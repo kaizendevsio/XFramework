@@ -2,8 +2,6 @@
 using System.Diagnostics;
 using System.Reflection;
 using MediatR;
-using MessagePack;
-using MessagePack.Resolvers;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,18 +9,14 @@ using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Configurations;
-using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Drivers;
-using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Services;
 
 public class SignalRService : ISignalRService
 {
-    private readonly IConfiguration _configuration;
     private readonly ILogger<SignalRService> _logger;
-    private readonly MetricsMonitor _metricsMonitor;
     private readonly IMediator _mediator;
     private readonly ILogger<BaseSignalRHandler> _baseLogger;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -36,15 +30,13 @@ public class SignalRService : ISignalRService
     public HubConnection? Connection { get; set; }
     
     public StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
-    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessage >> PendingMethodCalls { get; set; } = new();
+    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessage>> PendingMethodCalls { get; set; } = new();
 
-    public SignalRService(IConfiguration configuration, ILogger<SignalRService> logger, MetricsMonitor metricsMonitor, IMediator mediator, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
+    public SignalRService(IConfiguration configuration, ILogger<SignalRService> logger, IMediator mediator, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
     {
-        _metricsMonitor = metricsMonitor;
         _mediator = mediator;
         _baseLogger = baseLogger;
         _scopeFactory = scopeFactory;
-        _configuration = configuration;
         _logger = logger;
         configuration.Bind(nameof(StreamFlowConfiguration), StreamFlowConfiguration);
         
@@ -89,7 +81,7 @@ public class SignalRService : ISignalRService
             .Cast<ISignalREventHandler>()
             .ToList();
         
-        installers.ForEach(installer => installer.Handle(Connection, _mediator, _baseLogger, _metricsMonitor, _scopeFactory));
+        installers.ForEach(installer => installer.Handle(Connection, _mediator, _baseLogger, _scopeFactory));
     }
 
     public async Task StartEventListener(string topic)
@@ -117,10 +109,9 @@ public class SignalRService : ISignalRService
     private void HandleInvokeResponseEvent()
     {
         //_logger.LogInformation($"InvokeResponseHandler Initialized");
-        Connection?.On<StreamFlowMessage >(nameof(IStreamFlow.InvokeResponseHandler),
+        Connection?.On<StreamFlowMessage>(nameof(IStreamFlow.InvokeResponseHandler),
             async (response) =>
             {
-                using var metricLogger = _metricsMonitor.Start($"Invoked '{GetType().Name}'");
                 try
                 {
                     if (PendingMethodCalls.TryRemove(response.RequestId, out TaskCompletionSource<StreamFlowMessage> methodCallCompletionSource))
@@ -139,16 +130,16 @@ public class SignalRService : ISignalRService
                 }
                 catch (Exception e)
                 {
-                    metricLogger.Failed($"Invoked '{GetType().Name}' resulted in exception {e.Message}");
+                    _logger.LogInformation("[{Caller}] Processing response for '{Request}' resulted in exception: {Error}", nameof(HandleInvokeResponseEvent), response.CommandName, e.Message);
                 }
             });
     }
 
     private void HandleClosedEvent()
     {
-        Connection.Closed += async connectionId =>
+        Connection!.Closed += async connectionId =>
         {
-            _logger.LogInformation("Connection to StreamFlow server closed");
+            _logger.LogInformation("Connection to StreamFlow server close, connectionId: {ConnectionId}", connectionId);
             _isRegistered = false;
             await EnsureConnection();
         };
@@ -247,9 +238,12 @@ public class SignalRService : ISignalRService
                 // If connection is disconnected, then start it.
                 if (Connection?.State == HubConnectionState.Disconnected)
                 {
-                    using var metricLogger = _metricsMonitor.Start("Connecting to StreamFlow server..");
+                    var startTimer = Stopwatch.StartNew();
+                    _logger.LogInformation("Connecting to StreamFlow server..");
+
                     await Connection.StartAsync();
-                    metricLogger.Completed();
+                    startTimer.Stop();
+                    _logger.LogInformation("Connecting to StreamFlow server.. Done in {ElapsedMilliseconds}ms", startTimer.ElapsedMilliseconds);
                 }
 
                 // If we're connected, proceed with registration.
@@ -276,24 +270,27 @@ public class SignalRService : ISignalRService
         if(_isRegistered) return;
         
         _isRegistering = true;
-        using (_metricsMonitor.Start("Registering Connection.."))
-        {
-            _clientId = StreamFlowConfiguration.Anonymous ? Guid.NewGuid() : StreamFlowConfiguration.ClientGuid ?? throw new ArgumentException("Client Guid is not set");
-            var request = new StreamFlowClient()
-            {
-                Guid = _clientId,
-                Name = StreamFlowConfiguration.ClientName
-            };
-            await Connection?.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
+        var startTimer = Stopwatch.StartNew();
+        _logger.LogInformation("Registering Connection..");
         
-            _isRegistered = true;
-            _isRegistering = false;
-        }
+
+        _clientId = StreamFlowConfiguration.Anonymous ? Guid.NewGuid() : StreamFlowConfiguration.ClientGuid ?? throw new ArgumentException("Client Guid is not set");
+        var request = new StreamFlowClient()
+        {
+            Guid = _clientId,
+            Name = StreamFlowConfiguration.ClientName
+        };
+        await Connection?.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
+    
+        startTimer.Stop();
+        _logger.LogInformation("Registering Connection.. Done in {ElapsedMilliseconds}ms", startTimer.ElapsedMilliseconds);
+        
+        _isRegistered = true;
+        _isRegistering = false;
     }
 
     public async Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage) 
     {
-        _metricsMonitor.Start();
         try
         {
             if (Connection?.State is HubConnectionState.Connected && _isRegistered is true && !_isRegistering)
@@ -316,39 +313,45 @@ public class SignalRService : ISignalRService
 
     public async Task<StreamFlowMessage> InvokeAsync(StreamFlowMessage sfMessage)
     {
-        using var metricLogger = _metricsMonitor.Start();
-        sfMessage.ClientId = _clientId;
+        _logger.LogInformation("Invoking Method \'{SfMessageCommandName}\'", sfMessage.CommandName);
         
-        var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage >();
+        var startTimer = Stopwatch.StartNew();
+        
+        sfMessage.ClientId = _clientId;
+        var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage>();
 
         try
         {
             if (!PendingMethodCalls.TryAdd(sfMessage.RequestId, methodCallCompletionSource))
             {
-                return CreateErrorResponse(sfMessage, HttpStatusCode.InternalServerError,
-                    $"Error while invoking method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
+                return CreateErrorResponse(sfMessage, HttpStatusCode.InternalServerError, $"Error while invoking method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
             }
 
             var response = methodCallCompletionSource.Task.ConfigureAwait(false);
 
             var signalRResponse = await InvokeVoidAsync(nameof(IStreamFlow.Push), sfMessage);
+            
             if (signalRResponse is HttpStatusCode.ServiceUnavailable or HttpStatusCode.NotFound)
             {
+                startTimer.Stop();
+                _logger.LogInformation("Invoked Method \'{SfMessageCommandName}\' resulted in {ResponseStatusCode} response", sfMessage.CommandName, signalRResponse);
                 return new()
                 {
-                    ResponseStatusCode = (HttpStatusCode)signalRResponse
+                    ResponseStatusCode = signalRResponse
                 };
             }
 
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300_000));
             cts.Token.Register(() => methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out")));
 
-            _logger.LogInformation("Request Sent: \'{SfMessageCommandName}\', awaiting response...", sfMessage.CommandName);
+            _logger.LogInformation("Awaiting response for Invoked Method \'{SfMessageCommandName}\'", sfMessage.CommandName);
 
             try
             {
                 var streamFlowMessage = await response;
-                metricLogger.Completed($"Response for Invoked Method '{sfMessage.CommandName}' Received with status code {streamFlowMessage.ResponseStatusCode}");
+                
+                startTimer.Stop();
+                _logger.LogInformation("Response for Invoked Method \'{SfMessageCommandName}\' received in {ElapsedMilliseconds}ms", sfMessage.CommandName, startTimer.ElapsedMilliseconds);
 
                 return new()
                 {
