@@ -20,4 +20,4 @@ namespace IdentityServer.Integration.Generators;
     nameof(StorageFile),
     nameof(StorageFileType)
 })]
-public static partial class IdentityServerServiceWrapper;
+public static class IdentityServerServiceWrapper;
