@@ -49,7 +49,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
 
         codeBuilder.AppendLine(
                 $$"""
-                             public interface I{{serviceName}}ServiceWrapper : IXFrameworkService, IServiceWrapper
+                             public partial interface I{{serviceName}}ServiceWrapper : IXFrameworkService, IServiceWrapper
                              {
                   """);
         foreach (var model in models)
@@ -66,12 +66,13 @@ public class ServiceWrapperGenerator : ISourceGenerator
             codeBuilder.AppendLine($"public interface I{model}CrudService : ICrudService<{model}>;");
         }
         
-        codeBuilder.AppendLine($"public record {serviceName}ServiceWrapper(");
+        codeBuilder.AppendLine($"public partial record {serviceName}ServiceWrapper(");
         foreach (var model in models)
         {
             codeBuilder.AppendLine($"I{model}CrudService {model}{(models.Last() == model ? "" : "," )}");
         }
-        codeBuilder.AppendLine($") : I{serviceName}ServiceWrapper;");
+        codeBuilder.AppendLine($"{(models.Any() ? "," : string.Empty)} IMessageBusWrapper messageBusDriver, IConfiguration configuration");
+        codeBuilder.AppendLine($") : DriverBase, I{serviceName}ServiceWrapper;");
         
         // Generate implementation start
 
@@ -79,7 +80,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
         {
             codeBuilder.AppendLine(
                 $$"""
-                               public class {{model}}CrudService : DriverBase, I{{model}}CrudService, IServiceWrapper
+                               public record {{model}}CrudService : DriverBase, I{{model}}CrudService, IServiceWrapper
                                {
                                    public {{model}}CrudService(IMessageBusWrapper messageBusDriver, IConfiguration configuration)
                                    {

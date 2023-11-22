@@ -5,7 +5,7 @@ using XFramework.Integration.Abstractions.Wrappers;
 
 namespace XFramework.Integration.Drivers;
 
-public class DriverBase
+public record DriverBase
 {
     protected IConfiguration Configuration { get; set; }
     public IMessageBusWrapper MessageBusDriver { get; set; }

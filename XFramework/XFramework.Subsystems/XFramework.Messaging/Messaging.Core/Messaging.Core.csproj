@@ -9,14 +9,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Commands\Entity\Application" />
-      <Folder Include="DataAccess\Commands\Handlers\Application" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Core\XFramework.Core.csproj"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj"/>
+        <ProjectReference Include="..\Messaging.Domain\Messaging.Domain.csproj"/>
+        <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
-      <ProjectReference Include="..\Messaging.Domain\Messaging.Domain.csproj" />
-      <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj" />
+      <Folder Include="DataAccess\Commands\" />
+      <Folder Include="DataAccess\Query\" />
     </ItemGroup>
 </Project>

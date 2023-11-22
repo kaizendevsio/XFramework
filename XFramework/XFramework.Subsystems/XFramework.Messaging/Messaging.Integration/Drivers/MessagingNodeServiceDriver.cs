@@ -7,7 +7,7 @@ using XFramework.Integration.Drivers;
 
 namespace Messaging.Integration.Drivers;
 
-public class MessagingNodeServiceDriver : DriverBase, IMessagingNodeServiceWrapper
+public record MessagingNodeServiceDriver : DriverBase, IMessagingNodeServiceWrapper
 {
     public MessagingNodeServiceDriver(IMessageBusWrapper messageBusDriver, IConfiguration configuration)
     {

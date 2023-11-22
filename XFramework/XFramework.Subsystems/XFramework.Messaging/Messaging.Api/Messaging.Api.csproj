@@ -5,25 +5,20 @@
     <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        
+
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="7.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.OData" Version="8.0.11" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
-        <PackageReference Include="Sentry.AspNetCore" Version="3.24.0" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"/>
+        <ProjectReference Include="..\Messaging.Core\Messaging.Core.csproj"/>
+        <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\Messaging.Integration\Messaging.Integration.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Messaging.Core\Messaging.Core.csproj" />
-      <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Controllers" />
+      <Folder Include="HostedService\" />
     </ItemGroup>
 
 </Project>
