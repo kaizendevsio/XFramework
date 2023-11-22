@@ -7,10 +7,14 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+
     <ItemGroup>
-      <Folder Include="BusinessObjects" />
-      <Folder Include="Contracts\" />
-      <Folder Include="Enums" />
+        <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
     </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+    </ItemGroup>
+
 
 </Project>

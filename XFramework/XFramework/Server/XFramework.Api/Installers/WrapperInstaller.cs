@@ -12,7 +12,8 @@ public class WrapperInstaller : IInstaller
     {
         services.AddSingleton<ICommunityServiceWrapper, CommunityServiceDriver>();
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
-        services.AddSingleton<IWalletServiceWrapper, WalletServiceDriver>();
+        services.AddSingleton<IWalletsServiceWrapper, WalletsServiceWrapper>();
         services.AddIdentityServerWrapperServices();
+        services.AddWalletsWrapperServices();
     }
 }

@@ -24,21 +24,3 @@ public class CreateCredential(
         };
     }
 } 
-
-
-public class GetCredentialList(
-        AppDbContext appDbContext,
-        ILogger<GetCredentialList> logger,
-        IRequestHandler<GetList<IdentityCredential>, QueryResponse<PaginatedResult<IdentityCredential>>> baseHandler
-    ) 
-    :  IGetListHandler<IdentityCredential>, IDecorator
-{
-    public async Task<QueryResponse<PaginatedResult<IdentityCredential>>> Handle(GetList<IdentityCredential> request, CancellationToken cancellationToken)
-    {
-        return new()
-        {
-            Response = null,
-            HttpStatusCode = HttpStatusCode.OK
-        };
-    }
-} 

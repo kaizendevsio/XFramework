@@ -16,7 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
     <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
   </ItemGroup>
 

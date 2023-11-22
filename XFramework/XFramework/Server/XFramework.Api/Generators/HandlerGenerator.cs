@@ -3,7 +3,6 @@
 namespace XFramework.Api.Generators;
 
 [GenerateApiFromNamespace("XFramework.Domain.Generic.Contracts",new[] {
-    nameof(Tenant),
-    nameof(IdentityCredential)
+    nameof(Tenant)
 })]
 public static partial class MinimalApiGenerator;

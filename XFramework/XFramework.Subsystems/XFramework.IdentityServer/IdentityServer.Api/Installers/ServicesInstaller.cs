@@ -9,6 +9,5 @@ public class ServicesInstaller : IInstaller
     {
         /*services.AddSingleton<ICachingService, CachingService>();*/
         services.AddDecoratorHandlers(typeof(IdentityServerCore).Assembly);
-        services.AddIdentityServerWrapperServices();
     }
 }

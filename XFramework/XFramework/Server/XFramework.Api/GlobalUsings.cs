@@ -12,7 +12,6 @@ global using Microsoft.AspNetCore.Authorization;
 global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.AspNetCore.OData.Query;
 global using Microsoft.EntityFrameworkCore;
-global using Wallets.Integration.Interfaces;
 global using XFramework.Api.Extensions;
 global using XFramework.Api.Generators;
 global using XFramework.Api.Installers;

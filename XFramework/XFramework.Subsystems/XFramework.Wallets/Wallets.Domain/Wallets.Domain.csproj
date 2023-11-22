@@ -9,10 +9,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="BusinessObjects" />
-      <Folder Include="Contracts" />
-      <Folder Include="DataTransferObjects" />
-      <Folder Include="Enums" />
       <Folder Include="Migrations" />
     </ItemGroup>
 

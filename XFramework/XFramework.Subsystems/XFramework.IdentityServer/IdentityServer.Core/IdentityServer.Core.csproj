@@ -10,8 +10,6 @@
 
     <ItemGroup>
       <Folder Include="DataAccess\Query\" />
-      <Folder Include="PipelineBehaviors\" />
-      <Folder Include="Validations\" />
     </ItemGroup>
 
     <ItemGroup>

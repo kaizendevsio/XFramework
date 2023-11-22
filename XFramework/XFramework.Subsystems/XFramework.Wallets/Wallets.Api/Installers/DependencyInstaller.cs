@@ -1,9 +1,9 @@
 ﻿namespace Wallets.Api.Installers;
 
-public class HostedServiceInstaller : IInstaller
+public class DependencyInstaller : IInstaller
 {
     public void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        //services.AddHostedService<ProcessMonitorHostedService>();
+        services.AddMediatRHandlers();
     }
 }
