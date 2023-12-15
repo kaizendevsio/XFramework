@@ -17,7 +17,8 @@ public class SignalRHandlerGenerator : ISourceGenerator
     public void Execute(GeneratorExecutionContext context)
     {
         var serviceName = context.Compilation.AssemblyName?.Split(".").First();
-        var models = BaseSourceGenerator.GetModels(context,"GenerateApiFromNamespace");
+        var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateApiFromNamespace");
+        var models = BaseSourceGenerator.GetModels(context,"GenerateApiFromNamespace", $"{serviceName}ServiceWrapper");
         var codeBuilder = new StringBuilder();
         
         if (models.Count == 0)
@@ -43,6 +44,7 @@ public class SignalRHandlerGenerator : ISourceGenerator
         using Asp.Versioning;
         using Asp.Versioning.Conventions;
         using Microsoft.AspNetCore.Components;
+        using {namespaceName};
 
         namespace {serviceName}.Api.SignalR.Handlers
         {{

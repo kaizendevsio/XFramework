@@ -3049,7 +3049,152 @@ public partial class HealthEssentialsContext : Microsoft.EntityFrameworkCore.DbC
         });
 
         OnModelCreatingPartial(modelBuilder);
+        SeedDatabase(modelBuilder);
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+
+    protected void SeedDatabase(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ConsultationTypeGroup>().HasData(
+            new ConsultationTypeGroup
+            {
+                Id = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16"),
+                Name = "Unnamed",
+            }
+        );
+        
+         modelBuilder.Entity<ConsultationType>().HasData(
+        new ConsultationType
+        {
+            Id = new Guid("5037e7ae-864c-4336-b0bd-32350cf334aa"),
+            Name = "Emergency Consultation",
+            Description = "Urgent consultation for acute illnesses or injuries",
+            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+        },
+        new ConsultationType
+        {
+            Id = new Guid("f9c35417-bc70-4035-b70a-ac2c71b8a051"),
+            Name = "Follow-up Check-up",
+            Description = "Subsequent check-up following an initial consultation or treatment",
+            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+        },
+        new ConsultationType
+        {
+            Id = new Guid("cda4df14-aa1c-4fc9-86a4-cb855b84b555"),
+            Name = "General Check-up",
+            Description = "Routine health check-up with primary care physician",
+            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+        },
+        new ConsultationType
+        {
+            Id = new Guid("73e5ed91-581e-47bf-8d7e-9c273847c483"),
+            Name = "Mental Health Consultation",
+            Description = "Consultation for mental health issues (e.g., with a psychiatrist or psychologist)",
+            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+        },
+        new ConsultationType
+        {
+            Id = new Guid("3259dc78-49d0-4359-8c8b-b3cfe7ccc421"),
+            Name = "Post-surgical Follow-up",
+            Description = "Follow-up visit after a surgical procedure",
+            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+        },
+        new ConsultationType
+        {
+            Id = new Guid("c3221472-9a87-4be9-982a-d442296b487a"),
+            Name = "Pre-surgical Consultation",
+            Description = "Consultation before undergoing surgery",
+            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+        },
+        new ConsultationType
+        {
+            Id = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Specialist Consultation",
+            Description = "Consultation with a medical specialist (e.g., cardiologist, neurologist)",
+            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+        }
+    );
+        
+          modelBuilder.Entity<Consultation>().HasData(
+        new Consultation
+        {
+            Id = new Guid("ac671073-c789-41c4-8c63-eb9c9084fde9"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Cardiologist",
+            Description = "Heart and cardiovascular system related consultations"
+        },
+        new Consultation
+        {
+            Id = new Guid("c051027c-dd33-4b2b-ac59-0024e650b231"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Dermatologist",
+            Description = "Skin related consultations, including skin diseases, allergies, and cosmetic concerns"
+        },
+        new Consultation
+        {
+            Id = new Guid("8c0d8be1-5241-40e9-bf2c-5a458ba58bac"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "ENT (Ear, Nose, Throat)",
+            Description = "Consultation for conditions affecting the ear, nose, and throat"
+        },
+        new Consultation
+        {
+            Id = new Guid("f354d822-c472-4677-8086-7d6ec89047bf"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Gastroenterologist",
+            Description = "Consultation for digestive system and gastrointestinal tract issues"
+        },
+        new Consultation
+        {
+            Id = new Guid("439c4908-63e2-4648-92b6-8ed10772e7ef"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "General Check-up",
+            Description = "Routine health check-up with a primary care physician"
+        },
+        new Consultation
+        {
+            Id = new Guid("0297352d-4788-4ee4-9241-e2cea66e41cd"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Neurologist",
+            Description = "Consultation for disorders of the nervous system, brain, and spinal cord"
+        },
+        new Consultation
+        {
+            Id = new Guid("46e7bbe6-7ffe-47f7-858b-0f521273eb0f"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Optometrist/Ophthalmologist",
+            Description = "Eye examinations, vision care, and treatment of eye-related conditions"
+        },
+        new Consultation
+        {
+            Id = new Guid("aa4e36c7-cde2-481b-9c6a-e7276ab8f55a"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Orthopedist",
+            Description = "Consultation for issues related to bones, joints, muscles, and ligaments"
+        },
+        new Consultation
+        {
+            Id = new Guid("901e6429-b7a1-421e-a72c-f25f4963e81b"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Pediatrician",
+            Description = "Healthcare for infants, children, and adolescents"
+        },
+        new Consultation
+        {
+            Id = new Guid("17d8f674-e960-4b4b-ac54-4d1f9a42a8d7"),
+            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+            Name = "Psychiatrist/Psychologist",
+            Description = "Mental health consultations, including therapy and medication management"
+        },
+        new Consultation
+        {
+            Id = new Guid("66e64415-73ea-4797-bc0a-d13a2c095501"),
+            TypeId = new Guid("cda4df14-aa1c-4fc9-86a4-cb855b84b555"),
+            Name = "General Check-up",
+            Description = "Routine health check-up with primary care physician"
+        }
+    );
+        
+    }
 }

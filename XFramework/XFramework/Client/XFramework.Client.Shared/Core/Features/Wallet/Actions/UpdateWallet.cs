@@ -2,7 +2,5 @@
 
 public partial class WalletState
 {
-    public class UpdateWallet : BaseAction
-    {
-    }
+    public class UpdateWallet : BaseAction;
 }

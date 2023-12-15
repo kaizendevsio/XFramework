@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using IdentityServer.Domain.Generic;
+using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Generic.Contracts;
 
 namespace XFramework.Domain.Contexts;
@@ -68,7 +69,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public virtual DbSet<CommunityContentReactionType> CommunityContentReactionTypes { get; set; }
 
-    public virtual DbSet<CommunityIdentity> CommunityIdTypes { get; set; }
+    public virtual DbSet<CommunityIdentity> CommunityIdentities { get; set; }
 
     public virtual DbSet<CommunityIdentityType> CommunityIdentityTypes { get; set; }
 
@@ -2701,7 +2702,37 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
         });
 
         OnModelCreatingPartial(modelBuilder);
+        SeedDatabase(modelBuilder);
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+
+    protected void SeedDatabase(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<IdentityContactType>().HasData(
+            new { ID = IdentityConstants.ContactType.Phone, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Phone" },
+            new { ID = IdentityConstants.ContactType.Email, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Email" },
+            new { ID = IdentityConstants.ContactType.Facebook, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Facebook" },
+            new { ID = IdentityConstants.ContactType.Instagram, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Instagram" },
+            new { ID = IdentityConstants.ContactType.Twitter, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Twitter" },
+            new { ID = IdentityConstants.ContactType.LinkedIn, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "LinkedIn" }
+        );
+        
+        modelBuilder.Entity<IdentityAddressType>().HasData(
+            new { ID = IdentityConstants.ContactGroup.Home, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "HOME" },
+            new { ID = IdentityConstants.ContactGroup.Personal, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "PERSONAL" },
+            new { ID = IdentityConstants.ContactGroup.Business, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "BUSINESS" },
+            new { ID = IdentityConstants.ContactGroup.Work, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK" },
+            new { ID = IdentityConstants.ContactGroup.WorkPharmacy, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK_PHARMACY" },
+            new { ID = IdentityConstants.ContactGroup.WorkRider, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK_RIDER" },
+            new { ID = IdentityConstants.ContactGroup.WorkLaboratory, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK_LABORATORY" },
+            new { ID = IdentityConstants.ContactGroup.WorkDoctor, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK_DOCTOR" }
+        );
+        
+        modelBuilder.Entity<IdentityVerificationType>().HasData(
+            new { ID = IdentityConstants.VerificationType.Sms, IsEnabled = false, CreatedAt = DateTime.MinValue, Name = "SMS", DefaultExpiry = 10 },
+            new { ID = IdentityConstants.VerificationType.Email, IsEnabled = false, CreatedAt = DateTime.MinValue, Name = "Email", DefaultExpiry = 120 },
+            new { ID = IdentityConstants.VerificationType.Kyc, IsEnabled = false, CreatedAt = DateTime.MinValue, Name = "KYC", DefaultExpiry = 1051200 }
+        );
+    }
 }

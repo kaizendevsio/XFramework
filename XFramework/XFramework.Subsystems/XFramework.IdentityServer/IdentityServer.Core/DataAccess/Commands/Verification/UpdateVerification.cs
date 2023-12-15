@@ -1,7 +1,10 @@
-﻿namespace IdentityServer.Core.DataAccess.Commands.Verification;
+﻿using XFramework.Core.Services;
+
+namespace IdentityServer.Core.DataAccess.Commands.Verification;
 
 public class UpdateVerification(
         AppDbContext appDbContext,
+        ITenantService tenantService,
         ILogger<UpdateVerification> logger,
         IRequestHandler<Patch<IdentityVerification>, CmdResponse<IdentityVerification>> baseHandler
     ) 

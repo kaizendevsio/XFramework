@@ -1,6 +1,3 @@
 ﻿namespace XFramework.Client.Shared.Entity.Properties;
 
-public class SideBarProp : ActivityBaseProp
-{
-    
-}
+public class SideBarProp : ActivityBaseProp;

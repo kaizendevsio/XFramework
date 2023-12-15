@@ -2,6 +2,7 @@
 using System.Text;
 using System.Text.Json;
 using XFramework.Domain.Generic.BusinessObjects;
+using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Integration.Extensions;
 
@@ -54,39 +55,39 @@ public static class HelperExtensions
 
             switch (queryFilter.Operation)
             {
-                case "Equals":
+                case QueryFilterOperation.Equal:
                     comparisonExpression = Expression.Equal(property, target);
                     break;
 
-                case "Contains":
+                case QueryFilterOperation.Contains:
                     // Assumes the property is a string
                     comparisonExpression = Expression.Call(property,
                         typeof(string).GetMethod("Contains", new[] { typeof(string) }), target);
                     break;
 
-                case "GreaterThan":
+                case QueryFilterOperation.GreaterThan:
                     comparisonExpression = Expression.GreaterThan(property, target);
                     break;
 
-                case "LessThan":
+                case QueryFilterOperation.LessThan:
                     comparisonExpression = Expression.LessThan(property, target);
                     break;
 
-                case "GreaterThanOrEqual":
+                case QueryFilterOperation.GreaterThanOrEqual:
                     comparisonExpression = Expression.GreaterThanOrEqual(property, target);
                     break;
 
-                case "LessThanOrEqual":
+                case QueryFilterOperation.LessThanOrEqual:
                     comparisonExpression = Expression.LessThanOrEqual(property, target);
                     break;
 
-                case "StartsWith":
+                case QueryFilterOperation.StartsWith:
                     // Assumes the property is a string
                     comparisonExpression = Expression.Call(property,
                         typeof(string).GetMethod("StartsWith", new[] { typeof(string) }), target);
                     break;
 
-                case "EndsWith":
+                case QueryFilterOperation.EndsWith:
                     // Assumes the property is a string
                     comparisonExpression = Expression.Call(property,
                         typeof(string).GetMethod("EndsWith", new[] { typeof(string) }), target);
@@ -135,18 +136,18 @@ public static class HelperExtensions
             return base.VisitBinary(node);
         }
 
-        private string GetOperationName(ExpressionType nodeType)
+        private QueryFilterOperation GetOperationName(ExpressionType nodeType)
         {
             return nodeType switch
             {
-                ExpressionType.Equal => "Equals",
-                ExpressionType.NotEqual => "NotEquals",
-                ExpressionType.GreaterThan => "GreaterThan",
-                ExpressionType.LessThan => "LessThan",
-                ExpressionType.GreaterThanOrEqual => "GreaterThanOrEqual",
-                ExpressionType.LessThanOrEqual => "LessThanOrEqual",
-                ExpressionType.AndAlso => "And",
-                ExpressionType.OrElse => "Or",
+                ExpressionType.Equal => QueryFilterOperation.Equal,
+                ExpressionType.NotEqual => QueryFilterOperation.NotEqual,
+                ExpressionType.GreaterThan => QueryFilterOperation.GreaterThan,
+                ExpressionType.LessThan => QueryFilterOperation.LessThan,
+                ExpressionType.GreaterThanOrEqual => QueryFilterOperation.GreaterThanOrEqual,
+                ExpressionType.LessThanOrEqual => QueryFilterOperation.LessThanOrEqual,
+                ExpressionType.AndAlso => QueryFilterOperation.And,
+                ExpressionType.OrElse => QueryFilterOperation.Or,
                 // More cases as necessary
                 _ => throw new NotSupportedException($"Unsupported operation '{nodeType}'")
             };
@@ -158,9 +159,9 @@ public static class HelperExtensions
             {
                 var operation = node.Method.Name switch
                 {
-                    "Contains" => "Contains",
-                    "StartsWith" => "StartsWith",
-                    "EndsWith" => "EndsWith",
+                    "Contains" => QueryFilterOperation.Contains,
+                    "StartsWith" => QueryFilterOperation.StartsWith,
+                    "EndsWith" => QueryFilterOperation.EndsWith,
                     _ => throw new NotSupportedException($"Unsupported method call '{node.Method.Name}'")
                 };
 

@@ -1,5 +1,5 @@
 ﻿using Messaging.Integration.Drivers;
-using Messaging.Integration.Interfaces;
+using XFramework.Core.Services;
 using XFramework.Integration.Abstractions;
 
 namespace IdentityServer.Core.DataAccess.Commands.Verification;
@@ -7,6 +7,7 @@ namespace IdentityServer.Core.DataAccess.Commands.Verification;
 public class CreateVerification(
         AppDbContext appDbContext,
         IHelperService helperService, 
+        ITenantService tenantService,
         ILogger<CreateVerification> logger,
         IMessagingServiceWrapper messagingServiceWrapper,
         IRequestHandler<Create<IdentityVerification>, CmdResponse<IdentityVerification>> baseHandler
@@ -15,7 +16,7 @@ public class CreateVerification(
 {
     public async Task<CmdResponse<IdentityVerification>> Handle(Create<IdentityVerification> request, CancellationToken cancellationToken)
     {
-        var tenant = await GetTenant(request.Model.TenantId);
+        var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.Model.TenantId);
 
         var verificationType = await appDbContext.IdentityVerificationTypes
             .FirstOrDefaultAsync(i => i.Id == request.Model.VerificationTypeId, CancellationToken.None);
@@ -104,17 +105,5 @@ public class CreateVerification(
         {
             HttpStatusCode = HttpStatusCode.Accepted
         };
-    }
-    
-    private async Task<Tenant> GetTenant(Guid? id)
-    {
-        if (id is null) throw new ArgumentNullException(nameof(id));
-        var entity = await appDbContext.Tenants
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == id);
-
-        ArgumentNullException.ThrowIfNull(entity, "Tenant");
-
-        return entity;
     }
 }

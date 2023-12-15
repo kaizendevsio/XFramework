@@ -2,7 +2,16 @@
 
 public partial class ApplicationState
 {
-    public class BootUp : BaseAction
+    public class BootUp : BaseAction;
+    
+    protected class BootUpHandler(HandlerServices handlerServices, IStore store)
+        : ActionHandler<BootUp>(handlerServices, store)
     {
+        private ApplicationState CurrentState => Store.GetState<ApplicationState>();
+        
+        public override async Task Handle(BootUp action, CancellationToken aCancellationToken)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

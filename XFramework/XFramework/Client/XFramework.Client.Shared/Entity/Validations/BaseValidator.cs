@@ -1,7 +1,4 @@
 ﻿namespace XFramework.Client.Shared.Entity.Validations
 {
-    public class BaseValidator
-    {
-        
-    }
+    public class BaseValidator;
 }

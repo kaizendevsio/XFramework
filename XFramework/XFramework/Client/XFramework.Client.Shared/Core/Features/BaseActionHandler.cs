@@ -1,19 +1,11 @@
-using System.Runtime.CompilerServices;
 using TypeSupport.Extensions;
 using XFramework.Client.Shared.Core.Features.Address;
-using XFramework.Client.Shared.Core.Features.Configuration;
 using XFramework.Client.Shared.Core.Features.Cache;
-using XFramework.Client.Shared.Core.Features.Community;
-using XFramework.Client.Shared.Core.Features.Cryptocurrency;
 using XFramework.Client.Shared.Core.Features.Layout;
-using XFramework.Client.Shared.Core.Features.Member;
-using XFramework.Client.Shared.Core.Features.Session;
 using XFramework.Client.Shared.Core.Features.Wallet;
-using XFramework.Client.Shared.Core.Services;
 using XFramework.Client.Shared.Entity.Enums;
 using XFramework.Client.Shared.Entity.Models.Requests.Common;
 using XFramework.Domain.Generic.Contracts.Requests;
-using XFramework.Integration.Security;
 
 namespace XFramework.Client.Shared.Core.Features;
 
@@ -35,17 +27,35 @@ public class BaseActionHandler
     public bool IsSilent { get; set; }
     
     protected ApplicationState ApplicationState => Store.GetState<ApplicationState>();
-    protected ConfigurationState ConfigurationState => Store.GetState<ConfigurationState>();
-    protected CryptocurrencyState CryptocurrencyState => Store.GetState<CryptocurrencyState>();
     protected AddressState AddressState => Store.GetState<AddressState>();
-    protected CommunityState CommunityState => Store.GetState<CommunityState>();
     protected SessionState SessionState => Store.GetState<SessionState>();
-    protected MemberState MemberState => Store.GetState<MemberState>();
     protected LayoutState LayoutState => Store.GetState<LayoutState>();
     protected CacheState CacheState => Store.GetState<CacheState>();
     protected WalletState WalletState => Store.GetState<WalletState>();
     
-    
+    public async Task<CmdResponse> HandleFailure<TAction>(TAction action, string message, bool silent = false)
+    {
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+        
+        // Display message to UI
+        if (!silent)
+        {
+            SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(message)
+                ? $"There was an error while trying to process your request, please try again later"
+                : $"{message}", SweetAlertIcon.Error);
+        }
+
+        // Display error to the console
+        Console.WriteLine($"Error from response: {message}");
+
+        HandleFailureHooks(action);
+        
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.InternalServerError,
+            Message = message
+        };
+    }
     public async Task<bool> HandleFailure<TAction>(CmdResponse response, TAction action, bool silent = false,  string customMessage = "")
     {
         if ((int)response.HttpStatusCode < 300) return false;
@@ -124,6 +134,26 @@ public class BaseActionHandler
         HandleFailureHooks(action);
         return true;
     }
+    public async Task<CmdResponse> HandleSuccess<TAction>(TAction action, string message, bool silent = true)
+    {
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+        
+        // Display message to UI
+        if (!silent)
+        {
+            SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(message)
+                ? null
+                : $"{message}", SweetAlertIcon.Success);
+        }
+
+        HandleSuccessHooks(action);
+        
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.Accepted,
+            Message = message
+        };
+    }
     public async Task HandleSuccess<TAction>(CmdResponse response, TAction action, bool silent = false, string customMessage = "")
     {
         // Display message to UI
@@ -189,6 +219,8 @@ public class BaseActionHandler
             var onSuccessAction = onSuccess as Action;
             onSuccessAction?.Invoke();
         }
+        
+        ReportTaskCompleted();
     }
     private void HandleFailureHooks<TAction>(TAction action)
     {
@@ -207,6 +239,8 @@ public class BaseActionHandler
             var failureAction = onFailure as Action;
             failureAction?.Invoke();
         }
+        
+        ReportTaskCompleted();
     }
     
     public async Task Persist<TState>(TState state)
@@ -329,25 +363,26 @@ public class BaseActionHandler
     
     public async Task NavigateTo(string path)
     {
-        await Mediator.Send(new SessionState.NavigateToPath() {NavigationPath = path});
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+        NavigationManager.NavigateTo(path);
     }
 }
 
 public abstract class ActionHandler<TAction> : BaseActionHandler, IRequestHandler<TAction>
     where TAction : IAction
 {
-    protected ActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store)
+    protected ActionHandler(HandlerServices handlerServices, IStore store)
     {
-        Configuration = configuration;
-        SessionStorageService = sessionStorageService;
-        LocalStorageService = localStorageService;
-        SweetAlertService = sweetAlertService;
-        NavigationManager = navigationManager;
-        EndPoints = endPoints;
-        HttpClient = httpClient;
-        BaseHttpClient = baseHttpClient;
-        JsRuntime = jsRuntime;
-        Mediator = mediator;
+        Configuration = handlerServices.Configuration;
+        SessionStorageService = handlerServices.SessionStorageService;
+        LocalStorageService = handlerServices.LocalStorageService;
+        SweetAlertService = handlerServices.SweetAlertService;
+        NavigationManager = handlerServices.NavigationManager;
+        EndPoints = handlerServices.EndPoints;
+        HttpClient = handlerServices.HttpClient;
+        BaseHttpClient = handlerServices.BaseHttpClient;
+        JsRuntime = handlerServices.JsRuntime;
+        Mediator = handlerServices.Mediator;
         Store = store;
     }
     public abstract Task Handle(TAction action, CancellationToken aCancellationToken);
@@ -356,18 +391,18 @@ public abstract class ActionHandler<TAction> : BaseActionHandler, IRequestHandle
 public abstract class EventHandler<TAction> : BaseActionHandler, INotificationHandler<TAction>
     where TAction : INotification
 {
-    protected EventHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store)
+    protected EventHandler(HandlerServices handlerServices, IStore store)
     {
-        Configuration = configuration;
-        SessionStorageService = sessionStorageService;
-        LocalStorageService = localStorageService;
-        SweetAlertService = sweetAlertService;
-        NavigationManager = navigationManager;
-        EndPoints = endPoints;
-        HttpClient = httpClient;
-        BaseHttpClient = baseHttpClient;
-        JsRuntime = jsRuntime;
-        Mediator = mediator;
+        Configuration = handlerServices.Configuration;
+        SessionStorageService = handlerServices.SessionStorageService;
+        LocalStorageService = handlerServices.LocalStorageService;
+        SweetAlertService = handlerServices.SweetAlertService;
+        NavigationManager = handlerServices.NavigationManager;
+        EndPoints = handlerServices.EndPoints;
+        HttpClient = handlerServices.HttpClient;
+        BaseHttpClient = handlerServices.BaseHttpClient;
+        JsRuntime = handlerServices.JsRuntime;
+        Mediator = handlerServices.Mediator;
         Store = store;
     }
     public abstract Task Handle(TAction action, CancellationToken aCancellationToken);
@@ -377,18 +412,18 @@ public abstract class EventHandler<TAction> : BaseActionHandler, INotificationHa
 public abstract class ActionHandler<TAction, TResponse> : BaseActionHandler, IRequestHandler<TAction, TResponse> 
     where TAction : IRequest<TResponse>
 {
-    protected ActionHandler(IConfiguration configuration, ISessionStorageService sessionStorageService, ILocalStorageService localStorageService, SweetAlertService sweetAlertService, NavigationManager navigationManager, EndPointsModel endPoints, IHttpClient httpClient, HttpClient baseHttpClient, IJSRuntime jsRuntime, IMediator mediator, IStore store)
+    protected ActionHandler(HandlerServices handlerServices, IStore store)
     {
-        Configuration = configuration;
-        SessionStorageService = sessionStorageService;
-        LocalStorageService = localStorageService;
-        SweetAlertService = sweetAlertService;
-        NavigationManager = navigationManager;
-        EndPoints = endPoints;
-        HttpClient = httpClient;
-        BaseHttpClient = baseHttpClient;
-        JsRuntime = jsRuntime;
-        Mediator = mediator;
+        Configuration = handlerServices.Configuration;
+        SessionStorageService = handlerServices.SessionStorageService;
+        LocalStorageService = handlerServices.LocalStorageService;
+        SweetAlertService = handlerServices.SweetAlertService;
+        NavigationManager = handlerServices.NavigationManager;
+        EndPoints = handlerServices.EndPoints;
+        HttpClient = handlerServices.HttpClient;
+        BaseHttpClient = handlerServices.BaseHttpClient;
+        JsRuntime = handlerServices.JsRuntime;
+        Mediator = handlerServices.Mediator;
         Store = store;
     }
     public abstract Task<TResponse> Handle(TAction action, CancellationToken aCancellationToken);

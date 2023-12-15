@@ -16,4 +16,8 @@
         <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"/>
         <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj"/>
     </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Interfaces\" />
+    </ItemGroup>
 </Project>

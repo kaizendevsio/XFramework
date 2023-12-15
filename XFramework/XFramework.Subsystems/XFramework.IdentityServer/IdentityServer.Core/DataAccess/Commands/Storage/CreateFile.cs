@@ -1,12 +1,14 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using ByteSizeLib;
+using XFramework.Core.Services;
 
 namespace IdentityServer.Core.DataAccess.Commands.Storage;
 
 public class CreateFile(
         AppDbContext appDbContext,
         ILogger<CreateFile> logger,
+        ITenantService tenantService,
         IRequestHandler<Create<StorageFile>, CmdResponse<StorageFile>> baseHandler
     ) 
     : ICreateHandler<StorageFile>, IDecorator

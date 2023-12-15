@@ -1,7 +1,6 @@
 ﻿/*using IdentityServer.Api.SignalR;*/
 
 using Messaging.Integration.Drivers;
-using Messaging.Integration.Interfaces;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
 
@@ -13,6 +12,5 @@ public class WrapperInstaller : IInstaller
     {
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
         services.AddSingleton<IMessagingServiceWrapper, MessagingServiceWrapper>();
-        services.AddIdentityServerWrapperServices();
     }
 }

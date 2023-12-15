@@ -11,13 +11,13 @@ public partial interface IMessagingServiceWrapper
 
 public partial record MessagingServiceWrapper
 {
-    public async Task<CmdResponse> CreateDirectMessage(CreateDirectMessageRequest request)
+    public Task<CmdResponse> CreateDirectMessage(CreateDirectMessageRequest request)
     {
-        return await SendVoidAsync(request);
+        return SendVoidAsync(request);
     }
 
-    public async Task<CmdResponse> CreateVerificationMessage(CreateVerificationMessageRequest request)
+    public Task<CmdResponse> CreateVerificationMessage(CreateVerificationMessageRequest request)
     {
-        return await SendVoidAsync(request);
+        return SendVoidAsync(request);
     }
 }   

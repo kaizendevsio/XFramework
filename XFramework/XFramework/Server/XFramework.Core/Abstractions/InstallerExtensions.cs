@@ -16,6 +16,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using XFramework.Core.Filters;
 using XFramework.Core.Interfaces;
+using XFramework.Core.Services;
 using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Extensions;
@@ -115,6 +116,7 @@ public static class InstallerExtensions
         services.AddSingleton<ISignalRService, SignalRService>();
         services.AddSingleton<IHelperService, HelperService>();
         services.AddSingleton<IJwtService, JwtService>();
+        services.AddScoped<ITenantService, TenantService>();
         services.AddHttpClient();
         services.AddMemoryCache();
 

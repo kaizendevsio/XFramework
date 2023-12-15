@@ -2,7 +2,25 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class ClearState : SetState
+    public class ClearState : SetState;
+    
+    protected class ClearStateHandler(HandlerServices handlerServices, IStore store)
+        : ActionHandler<ClearState>(handlerServices, store)
     {
+        private SessionState CurrentState => Store.GetState<SessionState>();
+
+        public override async Task Handle(ClearState state, CancellationToken aCancellationToken)
+        {
+            try
+            {
+                StateHelper.ClearProperties(state, CurrentState);
+                Persist(CurrentState);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+            return;
+        }
     }
 }

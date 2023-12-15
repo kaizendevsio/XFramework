@@ -1,23 +1,25 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests;
 using IdentityServer.Domain.Generic.Contracts.Responses;
+using XFramework.Core.Services;
 
 namespace IdentityServer.Core.DataAccess.Query.Verifications;
 
 public class CheckVerification(
         IMediator Mediator,
         AppDbContext appDbContext,
+        ITenantService tenantService,
         ILogger<CheckVerification> logger) 
     : IRequestHandler<CheckVerificationRequest, QueryResponse<CheckVerificationResponse>>
 {
     public async Task<QueryResponse<CheckVerificationResponse>> Handle(CheckVerificationRequest request, CancellationToken cancellationToken)
     {
-        var application = await GetTenant(request.Metadata.TenantId);
+        var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
         
         var identityCredential = await appDbContext.IdentityCredentials
             .Include(i => i.IdentityContacts)
             .ThenInclude(i => i.Type)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == request.CredentialId && i.TenantId == application.Id, cancellationToken: cancellationToken);
+            .FirstOrDefaultAsync(i => i.Id == request.CredentialId && i.TenantId == tenant.Id, cancellationToken: cancellationToken);
        
         if (identityCredential is null)
         {
@@ -86,17 +88,5 @@ public class CheckVerification(
                 LastVerification = lastVerification
             }
         };
-    }
-    
-    private async Task<Tenant> GetTenant(Guid? id)
-    {
-        if (id is null) throw new ArgumentNullException(nameof(id));
-        var entity = await appDbContext.Tenants
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == id);
-
-        ArgumentNullException.ThrowIfNull(entity, "Tenant");
-
-        return entity;
     }
 }

@@ -1,6 +1,7 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Requests;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Enums;
+using XFramework.Core.Services;
 using XFramework.Integration.Abstractions;
 
 namespace IdentityServer.Core.DataAccess.Query.Credential;
@@ -9,6 +10,7 @@ public class AuthenticateIdentity(
         IJwtService jwtService,
         AppDbContext appDbContext,
         IHelperService helperService,
+        ITenantService tenantService,
         ILogger<AuthenticateIdentity> logger
     )
     : IRequestHandler<AuthenticateIdentityRequest, QueryResponse<AuthenticateIdentityResponse>>
@@ -16,7 +18,7 @@ public class AuthenticateIdentity(
 
     public async Task<QueryResponse<AuthenticateIdentityResponse>> Handle(AuthenticateIdentityRequest request, CancellationToken cancellationToken)
     {
-        var tenant = await GetTenant(request.Metadata.TenantId);
+        var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
         
         if (request.RoleId == Guid.Empty)
         {
@@ -73,7 +75,8 @@ public class AuthenticateIdentity(
             {
                 AccessToken = token.AccessToken,
                 RefreshToken = token.RefreshToken,
-                Identity = credential.IdentityInfo
+                Identity = credential.IdentityInfo,
+                Credential = credential
             }
         };
     }
@@ -191,18 +194,6 @@ public class AuthenticateIdentity(
 
         var hashPassword = Encoding.ASCII.GetString(credential.PasswordByte);
         return BCrypt.Net.BCrypt.Verify(request.Password, hashPassword) is false ? null : credential;
-    }
-    
-    private async Task<Tenant> GetTenant(Guid? id)
-    {
-        if (id is null) throw new ArgumentNullException(nameof(id));
-        var entity = await appDbContext.Tenants
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == id);
-
-        ArgumentNullException.ThrowIfNull(entity, "Tenant");
-
-        return entity;
     }
         
     

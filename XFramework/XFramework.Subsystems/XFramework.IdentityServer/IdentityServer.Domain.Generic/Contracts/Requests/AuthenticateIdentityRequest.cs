@@ -8,9 +8,9 @@ namespace IdentityServer.Domain.Generic.Contracts.Requests;
 
 public record AuthenticateIdentityRequest : RequestBase, IRequest<QueryResponse<AuthenticateIdentityResponse>>
 {
-    public Guid RoleId { get; init; }
-    public AuthorizationType AuthorizationType { get; init; }
-    public string? Username { get; init; }
-    public string? Password { get; init; }
-    public bool GenerateToken { get; init; } = true;
+    public Guid RoleId { get; set; }
+    public AuthorizationType AuthorizationType { get; set; }
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+    public bool GenerateToken { get; set; } = true;
 }

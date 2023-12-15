@@ -36,6 +36,13 @@ public abstract class BaseSignalRHandler
         logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TQuery).GetTypeFullName());
         connection.On(typeof(TQuery).GetTypeFullName(), (StreamFlowMessage<TQuery> response) => StreamflowRequestHandler<TQuery, QueryResponse<TResponse>>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
     }
+   
+    protected virtual void HandleRequestCmd<TCmd>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
+        where TCmd : class, IRequest<CmdResponse>, IHasRequestServer
+    {
+        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
+        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
+    }
     
     protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
         where TResponse : class

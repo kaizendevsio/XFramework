@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using XFramework.Core.Services;
 using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Core.DataAccess.Commands;
@@ -8,7 +9,8 @@ namespace XFramework.Core.DataAccess.Commands;
 public class PatchHandler<TModel>(
         IMemoryCache cache,
         AppDbContext appDbContext,
-        ILogger<PatchHandler<TModel>> logger
+        ILogger<PatchHandler<TModel>> logger,
+        ITenantService tenantService
     )
     : IPatchHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
@@ -22,7 +24,7 @@ public class PatchHandler<TModel>(
             throw new ArgumentException("An error occurred while processing your request");
         }
         
-        var tenant = await GetTenant(request.Model.TenantId);
+        var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.Model.TenantId);
 
         var entity = await appDbContext.Set<TModel>()
             .Where(i => i.TenantId == tenant.Id)
@@ -68,17 +70,5 @@ public class PatchHandler<TModel>(
             logger.LogError(ex, "Error occurred while patching entity of type {EntityName} with ID {EntityId}", typeof(TModel).Name, request.Model.Id);
             throw new InvalidOperationException("An error occurred while processing your request");
         }
-    }
-    
-    private async Task<Tenant> GetTenant(Guid? id)
-    {
-        if (id is null) throw new ArgumentNullException(nameof(id));
-        var entity = await appDbContext.Tenants
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == id);
-
-        ArgumentNullException.ThrowIfNull(entity, "Tenant");
-        
-        return entity;
     }
 }

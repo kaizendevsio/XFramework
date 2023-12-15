@@ -9,10 +9,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Folder Include="BusinessObjects" />
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
       <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
     </ItemGroup>

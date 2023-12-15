@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using XFramework.Core.Services;
 using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Core.DataAccess.Query;
@@ -9,7 +10,8 @@ namespace XFramework.Core.DataAccess.Query;
 public class GetHandler<TModel>(
         ILogger<GetHandler<TModel>> logger,
         AppDbContext appDbContext,
-        IMemoryCache cache
+        IMemoryCache cache,
+        ITenantService tenantService
     )
     : IGetHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
@@ -24,7 +26,7 @@ public class GetHandler<TModel>(
             query = IncludeNavigations(query, 3); // Limited to 3 levels deep
         }
         
-        var tenant = await GetTenant(request.TenantId);
+        var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.TenantId);
 
         // Use caching
         if (!cache.TryGetValue($"Entity-{typeof(TModel).Name}-{request.Id}", out TModel? entity))
@@ -74,18 +76,6 @@ public class GetHandler<TModel>(
             }
         }
         return query;
-    }
-    
-    private async Task<Tenant> GetTenant(Guid? id)
-    {
-        if (id is null) throw new ArgumentNullException(nameof(id));
-        var entity = await appDbContext.Tenants
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == id);
-
-        ArgumentNullException.ThrowIfNull(entity, "Tenant");
-        
-        return entity;
     }
 }
 

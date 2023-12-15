@@ -9,15 +9,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Commands\Entity\Application" />
-      <Folder Include="DataAccess\Commands\Handlers\Application" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Core\XFramework.Core.csproj"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj"/>
+        <ProjectReference Include="..\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\SmsGateway.Domain\SmsGateway.Domain.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-      <ProjectReference Include="..\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj" />
-      <ProjectReference Include="..\SmsGateway.Domain\SmsGateway.Domain.csproj" />
+      <Folder Include="Validations\Common\" />
     </ItemGroup>
 
 

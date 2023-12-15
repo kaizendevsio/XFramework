@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using XFramework.Core.Services;
 using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Core.DataAccess.Commands;
@@ -8,7 +9,8 @@ namespace XFramework.Core.DataAccess.Commands;
 public class ReplaceHandler<TModel>(
         IMemoryCache cache,
         AppDbContext appDbContext,
-        ILogger<ReplaceHandler<TModel>> logger
+        ILogger<ReplaceHandler<TModel>> logger,
+        ITenantService tenantService
     )
     : IReplaceHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
@@ -22,7 +24,7 @@ public class ReplaceHandler<TModel>(
             throw new ArgumentException("An error occurred while processing your request");
         }
         
-        var tenant = await GetTenant(request.Model.TenantId);
+        var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.Model.TenantId);
 
         // Fetch the existing entity by its ID.
         var existingEntity = await appDbContext.Set<TModel>()
@@ -70,17 +72,5 @@ public class ReplaceHandler<TModel>(
             Response = existingEntity,
             HttpStatusCode = HttpStatusCode.OK
         };
-    }
-    
-    private async Task<Tenant> GetTenant(Guid? id)
-    {
-        if (id is null) throw new ArgumentNullException(nameof(id));
-        var entity = await appDbContext.Tenants
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == id);
-
-        ArgumentNullException.ThrowIfNull(entity, "Tenant");
-        
-        return entity;
     }
 }

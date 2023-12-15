@@ -5,6 +5,7 @@ namespace IdentityServer.Domain.Generic.Contracts.Responses;
 public record AuthenticateIdentityResponse
 {
     public IdentityInformation? Identity { get; set; }
+    public IdentityCredential? Credential { get; set; }
     public string? AccessToken { get; set; }
     public string? TokenType { get; set; }
     public int ExpiresIn { get; set; }

@@ -15,7 +15,8 @@ public class MediatRRegistrationGenerator : ISourceGenerator
     public void Execute(GeneratorExecutionContext context)
     {
         var serviceName = context.Compilation.AssemblyName?.Split(".").First();
-        var models = BaseSourceGenerator.GetModels(context, "GenerateApiFromNamespace");
+        var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateApiFromNamespace");
+        var models = BaseSourceGenerator.GetModels(context, "GenerateApiFromNamespace", $"{serviceName}ServiceWrapper");
         var codeBuilder = new StringBuilder();
 
         if (models.Count == 0)
@@ -30,6 +31,8 @@ public class MediatRRegistrationGenerator : ISourceGenerator
         using XFramework.Core.DataAccess.Query;
         using XFramework.Domain.Generic.Contracts;
         using XFramework.Domain.Generic.Contracts.Requests;
+        using {namespaceName};
+
 
         namespace {serviceName}.Api.Extensions
         {{

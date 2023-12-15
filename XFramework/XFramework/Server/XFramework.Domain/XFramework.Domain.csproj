@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
     <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
   </ItemGroup>
 

@@ -1,4 +1,4 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+﻿using XFramework.Domain.Generic.Contracts;
 
 namespace XFramework.Client.Shared.Core.Features.Address;
 
@@ -9,18 +9,18 @@ public partial class AddressState : State<AddressState>
         
     }
 
-    public List<AddressCountryResponse> CountryList { get; set; }
-    public List<AddressRegionResponse> RegionList { get; set; }
-    public List<AddressProvinceResponse> ProvinceList { get; set; }
-    public List<AddressCityResponse> CityList { get; set; }
-    public List<AddressBarangayResponse> BarangayList { get; set; }
+    public List<AddressCountry>? CountryList { get; set; }
+    public List<AddressRegion>? RegionList { get; set; }
+    public List<AddressProvince>? ProvinceList { get; set; }
+    public List<AddressCity>? CityList { get; set; }
+    public List<AddressBarangay>? BarangayList { get; set; }
     
-    public AddressCountryResponse SelectedCountry { get; set; } = new();
-    public AddressRegionResponse SelectedRegion { get; set; } = new();
-    public AddressProvinceResponse SelectedProvince { get; set; } = new();
-    public AddressCityResponse SelectedCity { get; set; } = new();
-    public AddressBarangayResponse SelectedBarangay { get; set; } = new();
-    public string CurrentAddressName { get; set; }
-    public string CurrentUnitNumber { get; set; }
+    public AddressCountry SelectedCountry { get; set; } = new();
+    public AddressRegion SelectedRegion { get; set; } = new();
+    public AddressProvince SelectedProvince { get; set; } = new();
+    public AddressCity SelectedCity { get; set; } = new();
+    public AddressBarangay SelectedBarangay { get; set; } = new();
+    public string? CurrentAddressName { get; set; }
+    public string? CurrentUnitNumber { get; set; }
 
 }

@@ -2,14 +2,14 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
-    <LangVersion>preview</LangVersion>
+        <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        
+
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Query\" />
+        <Folder Include="DataAccess\Query\"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -17,11 +17,11 @@
         <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"/>
         <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj"/>
         <ProjectReference Include="..\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj"/>
-        <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
+        <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Azure.Storage.Blobs" Version="12.12.0" />
+        <PackageReference Include="Azure.Storage.Blobs" Version="12.12.0"/>
     </ItemGroup>
 
 </Project>

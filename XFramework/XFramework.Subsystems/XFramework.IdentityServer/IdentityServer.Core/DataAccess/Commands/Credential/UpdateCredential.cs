@@ -1,8 +1,11 @@
-﻿namespace IdentityServer.Core.DataAccess.Commands.Credential;
+﻿using XFramework.Core.Services;
+
+namespace IdentityServer.Core.DataAccess.Commands.Credential;
 
 public class UpdateCredential(
         AppDbContext appDbContext,
         ILogger<UpdateCredential> logger,
+        ITenantService tenantService,
         IRequestHandler<Patch<IdentityCredential>, CmdResponse<IdentityCredential>> baseHandler
     )
     : IPatchHandler<IdentityCredential>, IDecorator
