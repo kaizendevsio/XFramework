@@ -2,7 +2,7 @@ namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
 {
-    public class UpdateSidebarItems : BaseAction;
+    public record UpdateSidebarItems : BaseAction;
     
     protected class UpdateSidebarItemsHandler(HandlerServices handlerServices, IStore store)
         : ActionHandler<UpdateSidebarItems>(handlerServices, store)

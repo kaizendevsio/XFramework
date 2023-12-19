@@ -2,7 +2,7 @@ namespace XFramework.Client.Shared.Core.Features.Cache;
 
 public partial class CacheState
 {
-    public class SetState : BaseAction;
+    public record SetState : BaseAction;
     
     protected class SetStateHandler(HandlerServices handlerServices, IStore store)
         : ActionHandler<SetState>(handlerServices, store)

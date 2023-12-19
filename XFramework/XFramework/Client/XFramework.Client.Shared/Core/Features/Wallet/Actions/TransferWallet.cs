@@ -24,9 +24,9 @@ public partial class WalletState
             var result = await walletsServiceWrapper.TransferWallet(new()
             {
                 ClientReference = CurrentState.SendWalletVm.ClientReference,
-                CredentialId = CurrentState.SendWalletVm.Sender?.Id ?? SessionState.Credential.Id,
+                CredentialId = CurrentState.SendWalletVm.SenderCredentialId,
                 WalletTypeId = CurrentState.SendWalletVm.WalletTypeId,
-                RecipientCredentialId = CurrentState.SendWalletVm.Recipient.Id,
+                RecipientCredentialId = CurrentState.SendWalletVm.RecipientCredentialId,
                 Amount = CurrentState.SendWalletVm.Amount,
                 Remarks = CurrentState.SendWalletVm.Remarks,
             });

@@ -9,6 +9,7 @@ public partial class IdentityAddress : BaseModel
     public string? Street { get; set; }
 
     public string? Building { get; set; }
+    public string? Name { get; set; }
 
     public Guid BarangayId { get; set; }
 

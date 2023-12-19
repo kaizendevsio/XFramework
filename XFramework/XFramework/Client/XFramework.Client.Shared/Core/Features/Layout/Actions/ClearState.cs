@@ -2,7 +2,7 @@ namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
 {
-    public class ClearState : SetState;
+    public record ClearState : SetState;
     
     protected class ClearStateHandler(HandlerServices handlerServices, IStore store)
         : ActionHandler<ClearState>(handlerServices, store)

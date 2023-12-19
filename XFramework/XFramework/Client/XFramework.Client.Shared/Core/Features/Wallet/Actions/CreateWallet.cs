@@ -4,7 +4,7 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class CreateWallet : BaseAction
+    public record CreateWallet : BaseAction
     {
         public bool ReloadWalletList { get; set; }
         public Guid WalletTypeId { get; set; }

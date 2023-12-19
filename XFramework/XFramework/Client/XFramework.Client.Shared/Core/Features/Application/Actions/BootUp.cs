@@ -2,7 +2,7 @@
 
 public partial class ApplicationState
 {
-    public class BootUp : BaseAction;
+    public record BootUp : BaseAction;
     
     protected class BootUpHandler(HandlerServices handlerServices, IStore store)
         : ActionHandler<BootUp>(handlerServices, store)

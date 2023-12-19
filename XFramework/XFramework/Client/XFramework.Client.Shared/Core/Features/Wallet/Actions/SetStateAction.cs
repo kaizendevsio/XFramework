@@ -4,7 +4,7 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class SetState : BaseAction
+    public record SetState : BaseAction
     {
         public List<Domain.Generic.Contracts.Wallet>? WalletList { get; set; }
         public Domain.Generic.Contracts.Wallet? Selected { get; set; }

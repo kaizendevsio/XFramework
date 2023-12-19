@@ -6,7 +6,7 @@ namespace XFramework.Client.Shared.Core.Features.Application;
 
 public partial class ApplicationState
 {
-    public class RestoreStates : BaseAction;
+    public record RestoreStates : BaseAction;
     
     protected class RestoreStatesHandler(HandlerServices handlerServices, IStore store) 
         : ActionHandler<RestoreStates>(handlerServices, store)

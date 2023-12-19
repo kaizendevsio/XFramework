@@ -4,7 +4,7 @@ namespace XFramework.Client.Shared.Core.Features.Address;
 
 public partial class AddressState
 {
-    public class SetState : BaseAction
+    public record SetState : BaseAction
     {
         public List<AddressCountry> CountryList { get; set; }
         public List<AddressRegion> RegionList { get; set; }

@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class SetState : BaseAction
+    public record SetState : BaseAction
     {
         public CurrentSessionState? State { get; set; }
         public List<IdentityContact> ContactList { get; set; }

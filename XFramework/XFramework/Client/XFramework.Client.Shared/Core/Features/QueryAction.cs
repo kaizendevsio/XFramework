@@ -7,6 +7,6 @@ public record QueryAction<T> : BaseAction<T>
     public string? OrderBy { get; set; }
     public OrderByDirection OrderByDirection { get; set; }
     public string? SearchText { get; set; }
-    public List<string>? SearchFields { get; set; } = ["Name"];
+    public List<string>? SearchFields { get; set; } = new() { "Name" };
     public bool Silent { get; set; }
 }

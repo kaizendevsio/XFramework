@@ -2,7 +2,7 @@ namespace XFramework.Client.Shared.Core.Features.Application;
 
 public partial class ApplicationState
 {
-    public class SetState : BaseAction
+    public record SetState : BaseAction
     {
         public bool? IsBusy { get; set; }
         public bool? NoSpinner { get; set; }

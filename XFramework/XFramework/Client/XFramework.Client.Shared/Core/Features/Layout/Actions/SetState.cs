@@ -4,7 +4,7 @@ namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
 {
-    public class SetState : BaseAction
+    public record SetState : BaseAction
     {
         public LayoutIntent LayoutIntent { get; set; }
         public ViewProp View { get; set; }

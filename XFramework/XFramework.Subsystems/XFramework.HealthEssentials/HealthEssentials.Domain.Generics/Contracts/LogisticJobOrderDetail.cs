@@ -10,18 +10,18 @@ public partial class LogisticJobOrderDetail : BaseModel
 
     public string Description { get; set; } = null!;
 
-    public Guid Quantity { get; set; }
+    public int Quantity { get; set; }
 
     public Guid UnitId { get; set; }
 
 
-    public Guid UnitPrice { get; set; }
+    public decimal UnitPrice { get; set; }
 
     public Guid Discount { get; set; }
 
     public Guid DiscountType { get; set; }
 
-    public string? LocationGuid { get; set; }
+    public Guid LocationGuid { get; set; }
 
     public virtual LogisticJobOrder LogisticJobOrder { get; set; } = null!;
 
