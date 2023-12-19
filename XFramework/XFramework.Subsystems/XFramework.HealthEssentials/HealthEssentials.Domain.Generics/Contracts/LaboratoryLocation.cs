@@ -14,6 +14,7 @@ public partial class LaboratoryLocation : BaseModel
 
     public string? Building { get; set; }
 
+    public Guid IdentityCredentialId { get; set; }
     public Guid BarangayId { get; set; }
 
     public Guid CityId { get; set; }

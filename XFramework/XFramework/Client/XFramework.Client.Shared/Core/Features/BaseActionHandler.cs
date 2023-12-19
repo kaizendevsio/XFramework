@@ -332,12 +332,12 @@ public class BaseActionHandler
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressMessage = title, NoSpinner = false});
     }
-    public async Task ReportTask(QueryableRequest action)
+    public async Task ReportTask<T>(QueryAction<T> action)
     {
         if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, ProgressTitle = action.GetType().Name, NoSpinner = false});
     }
-    public async Task ReportTask<T>(QueryableRequest action, IEnumerable<T> list)
+    public async Task ReportTask<T,TQ>(QueryAction<TQ> action, IEnumerable<T> list)
     {
         if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
         if (list.TryGetNonEnumeratedCount(out var count) && count > 0) return;
@@ -349,7 +349,7 @@ public class BaseActionHandler
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
     }
     
-    public async Task ReportTaskCompleted(QueryableRequest action)
+    public async Task ReportTaskCompleted<T>(QueryAction<T> action)
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
     }

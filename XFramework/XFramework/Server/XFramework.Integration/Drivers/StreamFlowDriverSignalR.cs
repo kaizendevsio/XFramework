@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Contracts.Base;
+using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Entity.Contracts.Responses;
@@ -317,7 +318,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return new();
     }
 
-    public async Task PublishAsync<TRequest>(string eventName, string topic, TRequest request) 
+    public async Task PublishAsync<TRequest>(string eventName, string topic, TRequest? request) 
         where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
@@ -336,6 +337,26 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         
         await PushAsync(r);
     }
+    
+    public async Task PublishAsync(string eventName, string topic)
+    {
+        var request = new RequestBase();
+        await SetRequestServer(request);
+        var r = new StreamFlowMessage<RequestBase>(request)
+        {
+            ExchangeType = MessageExchangeType.Topic,
+            Topic = topic,
+            CommandName = eventName,
+        };
+        
+        Task.Run(() =>
+        {
+            var serviceRequestLog = new ServiceRequestLog<RequestBase>(Request: request);
+            Logger.LogInformation("Publishing broadcast request: {@ServiceRequestLog}", serviceRequestLog);
+        });
+        
+        await PushAsync(r);
+    }
 
     public async Task PushAsync<TModel>(StreamFlowMessage<TModel> request) 
         where TModel : class, IHasRequestServer
@@ -345,9 +366,9 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     }
 
     public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request) 
-        where TResponse : class, IHasRequestServer
+        where TResponse : class
     {
-        SignalRService.Connection.On<StreamFlowMessage<TResponse>>(request.Name,
+        SignalRService.Connection.On<StreamFlowMessage>(request.Name,
             async (response) =>
             {
                 Logger.LogInformation("Notification Received: {RequestName}", request.Name);

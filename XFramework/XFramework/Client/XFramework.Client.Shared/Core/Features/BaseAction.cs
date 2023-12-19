@@ -1,7 +1,14 @@
 ﻿namespace XFramework.Client.Shared.Core.Features;
 
 #pragma warning disable TW0001
-public class BaseAction : IAction
+public record BaseAction : IAction
 {
-    //public Action OnAfterHandled { get; set; }
+    public Action? OnSuccess { get; set; }
+    public Action? OnFailure { get; set; }
+}
+
+public record BaseAction<T> : IAction, IRequest<T>
+{
+    public Action? OnSuccess { get; set; }
+    public Action? OnFailure { get; set; }
 }

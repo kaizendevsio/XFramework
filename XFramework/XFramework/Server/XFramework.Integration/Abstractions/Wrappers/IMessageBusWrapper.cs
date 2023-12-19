@@ -24,11 +24,12 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TModel,TResponse>(StreamFlowMessage<TModel> request) 
         where TModel : class, IHasRequestServer
         where TResponse : class, IBaseResponse;
-    public Task PublishAsync<TModel>(string eventName, string topic, TModel data) 
+    public Task PublishAsync<TModel>(string eventName, string topic, TModel? data) 
         where TModel : class, IHasRequestServer;
+    public Task PublishAsync(string eventName, string topic);
     public Task PushAsync<TModel>(StreamFlowMessage<TModel> request) 
         where TModel : class, IHasRequestServer;
     public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request) 
-        where TResponse : class, IHasRequestServer;
+        where TResponse : class;
     public Task Unsubscribe(StreamFlowSubscriptionRequest request);
 }
