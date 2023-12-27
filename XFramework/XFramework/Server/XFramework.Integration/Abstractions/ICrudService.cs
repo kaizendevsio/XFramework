@@ -1,6 +1,4 @@
-﻿using System.Linq.Expressions;
-
-namespace XFramework.Integration.Abstractions;
+﻿namespace XFramework.Integration.Abstractions;
 
 public interface ICrudService<T> : IXFrameworkService 
     where T : class

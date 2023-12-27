@@ -1,5 +1,4 @@
-﻿using System.Linq.Expressions;
-using XFramework.Domain.Generic.Enums;
+﻿using XFramework.Domain.Generic.Enums;
 
 namespace XFramework.Domain.Generic.BusinessObjects;
 

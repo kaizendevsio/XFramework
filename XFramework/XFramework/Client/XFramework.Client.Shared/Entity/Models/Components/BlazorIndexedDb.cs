@@ -1,6 +1,4 @@
-﻿using XFramework.Client.Shared.Core.Features.Cache;
-
-namespace XFramework.Client.Shared.Entity.Models.Components;
+﻿namespace XFramework.Client.Shared.Entity.Models.Components;
 
 public class BlazorIndexedDb : IndexedDb
 {

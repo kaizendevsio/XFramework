@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Serilog;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Contracts.Base;

@@ -1,5 +1,4 @@
-﻿using System.Net;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿using XFramework.Domain.Generic.BusinessObjects;
 
 namespace XFramework.Domain.Generic.Contracts.Requests;
 

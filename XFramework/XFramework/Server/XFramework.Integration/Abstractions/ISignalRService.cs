@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
-using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Configurations;
-using XFramework.Domain.Generic.Contracts.Base;
 
 namespace XFramework.Integration.Abstractions;
 

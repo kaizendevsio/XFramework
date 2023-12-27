@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
-using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Entity.Contracts.Responses;

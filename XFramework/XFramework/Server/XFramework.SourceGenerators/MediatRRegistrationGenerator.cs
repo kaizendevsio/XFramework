@@ -16,7 +16,7 @@ public class MediatRRegistrationGenerator : ISourceGenerator
     {
         var serviceName = context.Compilation.AssemblyName?.Split(".").First();
         var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateApiFromNamespace");
-        var models = BaseSourceGenerator.GetModels(context, "GenerateApiFromNamespace", $"{serviceName}ServiceWrapper");
+        var models = BaseSourceGenerator.GetModels(context, "GenerateApiFromNamespace", $"{serviceName}ApiGenerator");
         var codeBuilder = new StringBuilder();
 
         if (models.Count == 0)

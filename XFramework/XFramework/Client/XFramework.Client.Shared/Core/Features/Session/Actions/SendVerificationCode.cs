@@ -39,7 +39,7 @@ public partial class SessionState
                         
                     };
                 }
-                await NavigateTo(action.NavigateToOnSuccess);
+                NavigateTo(action.NavigateToOnSuccess);
             }
             else
             {

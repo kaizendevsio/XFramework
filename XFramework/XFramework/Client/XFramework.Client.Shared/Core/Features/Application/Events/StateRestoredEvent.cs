@@ -10,11 +10,12 @@ public partial class ApplicationState
     protected class StateRestoredEventHandler(IMessageBusWrapper messageBusWrapper,HandlerServices handlerServices, IStore store)
         : EventHandler<StateRestoredEvent>(handlerServices, store)
     {
-        public SessionState CurrentState => Store.GetState<SessionState>();
-
         public override async Task Handle(StateRestoredEvent action, CancellationToken cancellationToken)
         {
-            await messageBusWrapper.StartClientEventListener($"{CurrentState.Credential.Id}");
+            if (SessionState.State is CurrentSessionState.Active)
+            {
+                await messageBusWrapper.StartClientEventListener($"{SessionState.Credential.Id}");
+            }
         }
     }
 }

@@ -5,7 +5,6 @@ using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Client.Shared.Entity.Enums;
 using XFramework.Client.Shared.Entity.Models.Requests.Common;
-using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Client.Shared.Core.Features;
 

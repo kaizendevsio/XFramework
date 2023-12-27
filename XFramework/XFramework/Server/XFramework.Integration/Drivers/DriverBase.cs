@@ -1,14 +1,15 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
-using StreamFlow.Domain.Generic.Abstractions;
 using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Abstractions.Wrappers;
 
 namespace XFramework.Integration.Drivers;
 
-public record DriverBase
+public record DriverBase(IMessageBusWrapper MessageBusDriver, IConfiguration Configuration)
 {
-    protected IConfiguration Configuration { get; set; }
-    public IMessageBusWrapper MessageBusDriver { get; set; }
+    public DriverBase() : this(null, null)
+    {
+        
+    }
     public HubConnectionState ConnectionState => MessageBusDriver.ConnectionState;
 
     public Guid? TargetClient { get; set; }

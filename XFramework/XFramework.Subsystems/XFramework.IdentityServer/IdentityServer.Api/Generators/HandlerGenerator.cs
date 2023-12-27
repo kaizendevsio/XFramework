@@ -19,4 +19,4 @@ namespace IdentityServer.Api.Generators;
     nameof(StorageFile),
     nameof(StorageFileType)
 })]
-public static partial class MinimalApiGenerator;
+public static partial class IdentityServerApiGenerator;

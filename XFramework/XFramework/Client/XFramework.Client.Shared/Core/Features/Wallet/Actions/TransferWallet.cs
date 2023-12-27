@@ -1,6 +1,5 @@
 ﻿using Wallets.Integration.Drivers;
 using XFramework.Client.Shared.Entity.Models.Requests.Common;
-using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Client.Shared.Core.Features.Wallet;
 

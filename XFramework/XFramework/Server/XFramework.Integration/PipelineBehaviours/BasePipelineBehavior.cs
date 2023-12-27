@@ -2,7 +2,6 @@
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
-using Serilog;
 using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Extensions;
 

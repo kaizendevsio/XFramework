@@ -17,7 +17,6 @@ public class ServiceWrapperGenerator : ISourceGenerator
     {
         var serviceName = context.Compilation.AssemblyName?.Split(".").First();
         var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateStreamFlowWrapper");
-        
         var classes = BaseSourceGenerator.GetClasses(context, "GenerateStreamFlowWrapper", "ServiceWrapper");
         
         foreach (var classDeclarationSyntax in classes)
@@ -86,7 +85,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
             codeBuilder.AppendLine($"I{model}CrudService {model}{(models.Last() == model ? "" : "," )}");
         }
         codeBuilder.AppendLine($"{(models.Any() ? "," : string.Empty)} IMessageBusWrapper messageBusDriver, IConfiguration configuration");
-        codeBuilder.AppendLine($") : DriverBase, I{serviceName}ServiceWrapper;");
+        codeBuilder.AppendLine($") : DriverBase(messageBusDriver, configuration), I{serviceName}ServiceWrapper;");
         
         // Generate implementation start
 

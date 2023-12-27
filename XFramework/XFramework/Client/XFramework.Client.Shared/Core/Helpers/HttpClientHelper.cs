@@ -1,5 +1,4 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace XFramework.Client.Shared.Core.Helpers;
 

@@ -1,7 +1,4 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Responses;
-using XFramework.Client.Shared.Entity.Models.Requests.Common;
-using XFramework.Domain.Generic.Contracts;
-using XFramework.Domain.Generic.Contracts.Requests;
+﻿using XFramework.Client.Shared.Entity.Models.Requests.Common;
 
 namespace XFramework.Client.Shared.Entity.Models.Requests.Wallet;
 

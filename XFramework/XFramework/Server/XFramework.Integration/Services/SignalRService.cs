@@ -275,6 +275,8 @@ public class SignalRService : ISignalRService
         
 
         _clientId = StreamFlowConfiguration.Anonymous ? Guid.NewGuid() : StreamFlowConfiguration.ClientGuid ?? throw new ArgumentException("Client Guid is not set");
+        _logger.LogInformation("Registering streamflow client with id {ClientId}", _clientId);
+        
         var request = new StreamFlowClient()
         {
             Guid = _clientId,
@@ -313,11 +315,11 @@ public class SignalRService : ISignalRService
 
     public async Task<StreamFlowMessage> InvokeAsync(StreamFlowMessage sfMessage)
     {
-        _logger.LogInformation("Invoking Method \'{SfMessageCommandName}\'", sfMessage.CommandName);
-        
         var startTimer = Stopwatch.StartNew();
-        
         sfMessage.ClientId = _clientId;
+        
+        _logger.LogInformation("Invoking Method \'{SfMessageCommandName}\' on {SfMessageRecipientId}", sfMessage.CommandName, sfMessage.RecipientId);
+        
         var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage>();
 
         try

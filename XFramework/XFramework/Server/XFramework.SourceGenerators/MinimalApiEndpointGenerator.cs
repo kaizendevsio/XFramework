@@ -17,7 +17,8 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
     {
         var serviceName = context.Compilation.AssemblyName?.Split(".").First();
         var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateApiFromNamespace");
-        var models = BaseSourceGenerator.GetModels(context, "GenerateApiFromNamespace", $"{serviceName}ServiceWrapper");
+
+        var models = BaseSourceGenerator.GetModels(context, "GenerateApiFromNamespace", $"{serviceName}ApiGenerator");
         var codeBuilder = new StringBuilder();
 
         if (models.Count == 0)
@@ -44,7 +45,7 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
 
         namespace {serviceName}.Api.Generators
         {{
-            public static partial class MinimalApiGenerator
+            public static partial class {serviceName}ApiGenerator
             {{
                 public static WebApplication GenerateMinimalApi(this WebApplication app)
                 {{

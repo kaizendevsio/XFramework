@@ -33,7 +33,7 @@ public partial class SessionState
         {
             if (!hostEnvironment.IsProduction())
             {
-                await NavigateTo(action.NavigateToOnSuccess);
+                NavigateTo(action.NavigateToOnSuccess);
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Accepted,

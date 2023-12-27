@@ -1,5 +1,4 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Responses;
-using XFramework.Client.Shared.Entity.Models.Requests.Session;
+﻿using XFramework.Client.Shared.Entity.Models.Requests.Session;
 using XFramework.Domain.Generic.Contracts;
 
 namespace XFramework.Client.Shared.Core.Features.Session;
