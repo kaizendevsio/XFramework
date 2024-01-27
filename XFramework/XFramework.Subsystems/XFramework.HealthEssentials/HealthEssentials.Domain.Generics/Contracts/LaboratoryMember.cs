@@ -1,4 +1,5 @@
-﻿using XFramework.Domain.Generic.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Domain.Generics.Contracts;
 
@@ -22,5 +23,7 @@ public partial class LaboratoryMember : BaseModel
     public virtual Laboratory Laboratory { get; set; } = null!;
 
     public virtual LaboratoryLocation? LaboratoryLocation { get; set; }
-    public virtual IdentityCredential? Credential { get; set; }
+    
+    [NotMapped]
+    public IdentityCredential? Credential { get; set; }
 }

@@ -4,15 +4,17 @@ namespace StreamFlow.Stream.Extensions;
 
 public static class ApplicationBuilderExtension
 {
-    public static WebApplication UseAppServices(this WebApplication app)
+    public static IApplicationBuilder UseAppServices(this IApplicationBuilder appBuilder)
     {
-        app.UseSignalRHubEndpoints();
-        return app;
+        appBuilder.UseSignalRHubEndpoints();
+        return appBuilder;
     }
     
-    public static WebApplication UseSignalRHubEndpoints(this WebApplication app)
+    public static IApplicationBuilder UseSignalRHubEndpoints(this IApplicationBuilder appBuilder)
     {
+        var app = appBuilder as WebApplication;
         app.MapHub<MessageQueueHub>("/stream-flow/queue");
-        return app;
+        
+        return app as IApplicationBuilder;
     }
 }

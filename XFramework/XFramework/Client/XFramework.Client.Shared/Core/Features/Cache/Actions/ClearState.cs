@@ -2,10 +2,10 @@ namespace XFramework.Client.Shared.Core.Features.Cache;
 
 public partial class CacheState
 {
-    public record ClearState : BaseAction;
+    public record ClearState : StateAction;
     
     protected class ClearStateHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<ClearState>(handlerServices, store)
+        : StateActionHandler<ClearState>(handlerServices, store)
     {
         private CacheState CurrentState => Store.GetState<CacheState>();
 

@@ -1,4 +1,7 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using XFramework.Domain.Generic.Contracts;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class Doctor : BaseModel
 {
@@ -39,4 +42,10 @@ public partial class Doctor : BaseModel
     public virtual ICollection<DoctorTag> DoctorTags { get; } = new List<DoctorTag>();
 
     public virtual DoctorType Type { get; set; } = null!;
+
+    [NotMapped]
+    public IdentityCredential? Credential { get; set; }
+    
+    [NotMapped]
+    public List<StorageFile>? Files { get; set; }
 }

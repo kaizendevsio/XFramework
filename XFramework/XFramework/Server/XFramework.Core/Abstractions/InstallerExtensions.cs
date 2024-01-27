@@ -14,11 +14,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Core.Filters;
 using XFramework.Core.Interfaces;
 using XFramework.Core.Services;
 using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Drivers;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.PipelineBehaviours;
 using XFramework.Integration.Services;
@@ -58,6 +60,11 @@ public static class InstallerExtensions
             .ToList();
 
         installers.ForEach(installer => installer.InstallServices(services, configuration));
+    }
+
+    public static void InstallStreamflowRequestHandlers()
+    {
+        
     }
     
     public static void InstallSwagger(this IServiceCollection services, IConfiguration configuration)
@@ -116,7 +123,7 @@ public static class InstallerExtensions
         services.AddSingleton<ISignalRService, SignalRService>();
         services.AddSingleton<IHelperService, HelperService>();
         services.AddSingleton<IJwtService, JwtService>();
-        services.AddScoped<ITenantService, TenantService>();
+        services.AddSingleton<CacheManager>();
         services.AddHttpClient();
         services.AddMemoryCache();
 
@@ -175,6 +182,11 @@ public static class InstallerExtensions
                     ClockSkew = TimeSpan.FromMinutes(1)
                 };
             });
+    }
+    
+    public static void AddTenantService(this IServiceCollection services)
+    {
+        services.AddScoped<ITenantService, TenantService>();
     }
     
     public static void UseEndpointsInAssembly(this IApplicationBuilder app, IWebHostEnvironment env)

@@ -5,7 +5,7 @@ public partial class ApplicationState
     public record ClearState : SetState;
     
     protected class ClearStateHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<ClearState>(handlerServices, store)
+        : StateActionHandler<ClearState>(handlerServices, store)
     {
         private ApplicationState CurrentState => Store.GetState<ApplicationState>();
 

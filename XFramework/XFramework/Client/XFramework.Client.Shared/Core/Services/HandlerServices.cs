@@ -3,6 +3,7 @@
 public record HandlerServices(
     IConfiguration Configuration,
     ISessionStorageService SessionStorageService,
+    IWebAssemblyHostEnvironment HostEnvironment,
     ILocalStorageService LocalStorageService,
     SweetAlertService SweetAlertService,
     NavigationManager NavigationManager,

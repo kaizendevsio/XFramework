@@ -2,7 +2,8 @@
 
 namespace StreamFlow.Domain.Generic.BusinessObjects;
 
-public class StreamFlowQueue : GenericAudit
+public class StreamFlowQueue
 {
     public string Name { get; set; }
+    public Guid Id { get; set; }
 }

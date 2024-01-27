@@ -45,7 +45,7 @@ public class StreamFlowMessage
     public string Message { get; set; }
 
     [Key(4)]
-    public Guid? RecipientId { get; set; }
+    public string RecipientId { get; set; }
 
     [Key(5)]
     public Guid RequestId { get; set; }
@@ -54,7 +54,7 @@ public class StreamFlowMessage
     public Guid? ConsumerId { get; set; }
     
     [Key(7)]
-    public Guid ClientId { get; set; }
+    public string ClientId { get; set; }
 
     [Key(8)]
     public HttpStatusCode ResponseStatusCode { get; set; } = HttpStatusCode.Processing;
@@ -72,4 +72,7 @@ public class StreamFlowMessage
     
     [Key(13)]
     public HttpStatusCode StreamFlowStatusCode { get; set; } = HttpStatusCode.OK;
+    
+    [Key(14)] 
+    public TimeSpan Duration { get; set; }
 }

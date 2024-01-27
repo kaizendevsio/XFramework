@@ -5,7 +5,7 @@ using XFramework.Domain.Generic.Contracts.Responses;
 namespace IdentityServer.Core.DataAccess.Commands.Credential;
 
 public class CreateCredential(
-    AppDbContext appDbContext,
+    DbContext appDbContext,
     ILogger<CreateCredential> logger,
     ITenantService tenantService,
     IRequestHandler<Create<IdentityCredential>, CmdResponse<IdentityCredential>> baseHandler

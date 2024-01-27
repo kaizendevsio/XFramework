@@ -1,4 +1,8 @@
+using IdentityServer.Domain.Generic.Contracts.Requests;
+
 XApplication
     .Build<Program>()
     .GenerateMinimalApi()
-    .Run();
+    .UseCustomRequestsInAssembly<IdentityServerBaseRequest>()
+    .EnsureDatabase<DbContext>()
+    .Run(); 

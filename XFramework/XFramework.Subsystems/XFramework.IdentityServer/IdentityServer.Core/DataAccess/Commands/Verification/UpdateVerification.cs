@@ -3,7 +3,7 @@
 namespace IdentityServer.Core.DataAccess.Commands.Verification;
 
 public class UpdateVerification(
-        AppDbContext appDbContext,
+        DbContext dbContext,
         ITenantService tenantService,
         ILogger<UpdateVerification> logger,
         IRequestHandler<Patch<IdentityVerification>, CmdResponse<IdentityVerification>> baseHandler
@@ -12,7 +12,7 @@ public class UpdateVerification(
 {
     public async Task<CmdResponse<IdentityVerification>> Handle(Patch<IdentityVerification> request, CancellationToken cancellationToken)
     {
-        var verification = await appDbContext.IdentityVerifications
+        var verification = await dbContext.Set<IdentityVerification>()
             .Where(i => i.Status == (int?) GenericStatusType.Pending)
             .Where(i => i.Token == request.Model.Token)
             .FirstOrDefaultAsync(CancellationToken.None);

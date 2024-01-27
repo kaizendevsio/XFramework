@@ -5,7 +5,7 @@ using XFramework.Core.Services;
 namespace IdentityServer.Core.DataAccess.Commands.Credential;
 
 public class ResetPassword(
-    AppDbContext appDbContext,
+    DbContext dbContext,
     ILogger<CreateCredential> logger,
     IMediator mediator,
     ITenantService tenantService
@@ -22,9 +22,9 @@ public class ResetPassword(
 
         try
         {
-            var user = await appDbContext.IdentityCredentials
+            var user = await dbContext.Set<IdentityCredential>()
                            .FirstOrDefaultAsync(u => u.UserName == request.PhoneEmailUsername, CancellationToken.None)
-                       ?? await appDbContext.IdentityContacts
+                       ?? await dbContext.Set<IdentityContact>()
                            .Where(u => u.Value == request.PhoneEmailUsername)
                            .Select(i => i.Credential)
                            .FirstOrDefaultAsync(CancellationToken.None);
@@ -48,7 +48,7 @@ public class ResetPassword(
                 Status = (short?) GenericStatusType.Pending
             }));
 
-            await appDbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation("Password reset request successful for identifier {Identifier}", request.PhoneEmailUsername);
 

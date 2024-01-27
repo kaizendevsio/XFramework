@@ -1,6 +1,6 @@
 ﻿namespace IdentityServer.Domain.Generic.Enums;
 
-public enum RoleEntity
+public enum Type
 {
     NotSpecified = 0,
     Administrator = 1,

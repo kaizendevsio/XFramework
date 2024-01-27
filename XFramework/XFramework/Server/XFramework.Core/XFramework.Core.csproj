@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\XFramework.Subsystems\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
     <ProjectReference Include="..\XFramework.Domain\XFramework.Domain.csproj" />
     <ProjectReference Include="..\XFramework.Integration\XFramework.Integration.csproj" />
   </ItemGroup>

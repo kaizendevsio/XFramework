@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class TransferWallet : NavigableRequest, IAction
+    public record TransferWallet : NavigableRequest, IAction
     {
         public TransactionPurpose TransactionPurpose { get; set; }
     }
@@ -14,7 +14,7 @@ public partial class WalletState
         IWalletsServiceWrapper walletsServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : ActionHandler<TransferWallet>(handlerServices, store)
+        : StateActionHandler<TransferWallet>(handlerServices, store)
     {
         public WalletState CurrentState => Store.GetState<WalletState>();
 

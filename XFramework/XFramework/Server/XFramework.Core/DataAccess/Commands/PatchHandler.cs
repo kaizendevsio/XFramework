@@ -7,8 +7,8 @@ using XFramework.Domain.Generic.Contracts.Requests;
 namespace XFramework.Core.DataAccess.Commands;
 
 public class PatchHandler<TModel>(
-        IMemoryCache cache,
-        AppDbContext appDbContext,
+        DbContext dbContext,
+        CacheManager cache,
         ILogger<PatchHandler<TModel>> logger,
         ITenantService tenantService
     )
@@ -24,9 +24,18 @@ public class PatchHandler<TModel>(
             throw new ArgumentException("An error occurred while processing your request");
         }
         
+        if (request.Metadata.TenantId is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = "TenantId is required"
+            };
+        }
+        
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.Model.TenantId);
 
-        var entity = await appDbContext.Set<TModel>()
+        var entity = await dbContext.Set<TModel>()
             .Where(i => i.TenantId == tenant.Id)
             .Where(i => i.Id == request.Model.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -47,12 +56,13 @@ public class PatchHandler<TModel>(
 
         try
         {
-            await appDbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             // Remove the entity from the cache after successful patch
-            cache.Remove($"Entity-{typeof(TModel).Name}-{request.Model.Id}");
+            await cache.InvalidateCacheForModel(request.Model);
 
             logger.LogInformation("Entity of type {EntityName} with ID {EntityId} successfully patched", typeof(TModel).Name, request.Model.Id);
+
 
             return new CmdResponse<TModel>
             {

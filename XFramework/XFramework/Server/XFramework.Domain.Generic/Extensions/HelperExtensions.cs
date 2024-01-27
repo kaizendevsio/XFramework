@@ -1,4 +1,5 @@
 ﻿using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using XFramework.Domain.Generic.BusinessObjects;
@@ -51,7 +52,21 @@ public static class HelperExtensions
         {
             Expression property = Expression.Property(parameter, queryFilter.PropertyName);
             Expression target = Expression.Constant(queryFilter.Value);
+            
             Expression? comparisonExpression = null;
+            
+            if (property.Type == typeof(Guid) && queryFilter.Value is string stringValue)
+            {
+                // Create an expression to call Guid.Parse
+                MethodInfo guidParseMethod = typeof(Guid).GetMethod(nameof(Guid.Parse), new[] { typeof(string) });
+                target = Expression.Call(null, guidParseMethod, Expression.Constant(stringValue));
+            }
+            else
+            {
+                // For other types, use Convert as before
+                target = Expression.Constant(queryFilter.Value);
+                target = Expression.Convert(target, property.Type);
+            }
 
             switch (queryFilter.Operation)
             {

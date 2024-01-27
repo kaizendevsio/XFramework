@@ -1,12 +1,11 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Responses;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Contracts.Requests;
-using XFramework.Domain.Generic.Enums;
+﻿namespace IdentityServer.Domain.Generic.Contracts.Requests;
 
-namespace IdentityServer.Domain.Generic.Contracts.Requests;
+using TRequest = AuthenticateIdentityRequest;
+using TResponse = QueryResponse<AuthenticateIdentityResponse>;
 
-public record AuthenticateIdentityRequest : RequestBase, IRequest<QueryResponse<AuthenticateIdentityResponse>>
+public record AuthenticateIdentityRequest : RequestBase, 
+    IRequest<TResponse>, 
+    IStreamflowRequest<TRequest, TResponse>
 {
     public Guid RoleId { get; set; }
     public AuthorizationType AuthorizationType { get; set; }

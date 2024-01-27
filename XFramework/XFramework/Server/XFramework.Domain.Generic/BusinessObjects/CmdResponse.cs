@@ -7,7 +7,7 @@ public class CmdResponse<T> : CmdResponse
     public T? Response { get; set; }
 }
     
-public class CmdResponse : IBaseResponse, IHasRequestServer
+public class CmdResponse : IBaseResponse, IHasRequestServer, ICmdResponse
 {
     public CmdResponse() { }
     
@@ -16,3 +16,5 @@ public class CmdResponse : IBaseResponse, IHasRequestServer
     public bool IsSuccess => (int)HttpStatusCode >= 200 && (int)HttpStatusCode < 300;
     public RequestMetadata? Metadata { get; set; }
 }
+
+public interface ICmdResponse;

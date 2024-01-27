@@ -1,17 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
 using Wallets.Domain.Generic.Contracts.Requests;
 using XFramework.Core.Services;
-using XFramework.Domain.Contexts;
-using System;
-using System.Threading.Tasks;
-using System.Threading;
-using System.Net;
-using XFramework.Domain.Generic.Contracts;
+using Microsoft.EntityFrameworkCore;
 
 namespace Wallets.Core.DataAccess.Commands.Wallet;
+using XFramework.Domain.Generic.Contracts;
 
 public class TransferWallet(
-    AppDbContext appDbContext,
+    DbContext appDbContext,
     ILogger<TransferWallet> logger,
     ITenantService tenantService
 )
@@ -19,6 +15,8 @@ public class TransferWallet(
 {
     public async Task<CmdResponse> Handle(TransferWalletRequest request, CancellationToken cancellationToken)
     {
+        var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
+
         // Validate the amount and fee
         if (request.Amount <= 0 || request.Fee < 0)
         {
@@ -26,8 +24,20 @@ public class TransferWallet(
         }
 
         // Fetch the sender and recipient wallet
-        var senderWallet = await appDbContext.Wallets.FindAsync(request.CredentialId, request.WalletTypeId);
-        var recipientWallet = await appDbContext.Wallets.FindAsync(request.RecipientCredentialId, request.WalletTypeId);
+        
+        IQueryable<Wallet> query = appDbContext.Set<Wallet>();
+
+        var senderWallet = await query
+            .Where(x => x.TenantId == tenant.Id)
+            .Where(x => x.CredentialId == request.CredentialId)
+            .Where(x => x.WalletTypeId == request.WalletTypeId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var recipientWallet = await query
+            .Where(x => x.TenantId == tenant.Id)
+            .Where(x => x.CredentialId == request.RecipientCredentialId)
+            .Where(x => x.WalletTypeId == request.WalletTypeId)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (senderWallet == null || recipientWallet == null)
         {
@@ -55,6 +65,7 @@ public class TransferWallet(
         // Record the transactions
         var senderTransaction = new WalletTransaction
         {
+            TenantId = tenant.Id,
             CredentialId = request.CredentialId,
             WalletId = senderWallet.Id,
             Amount = -totalDeduction,
@@ -66,6 +77,7 @@ public class TransferWallet(
 
         var recipientTransaction = new WalletTransaction
         {
+            TenantId = tenant.Id,
             CredentialId = request.RecipientCredentialId,
             WalletId = recipientWallet.Id,
             Amount = request.Amount,
@@ -75,8 +87,8 @@ public class TransferWallet(
             Description = $"Received from {request.CredentialId}"
         };
 
-        appDbContext.WalletTransactions.Add(senderTransaction);
-        appDbContext.WalletTransactions.Add(recipientTransaction);
+        appDbContext.Set<WalletTransaction>().Add(senderTransaction);
+        appDbContext.Set<WalletTransaction>().Add(recipientTransaction);
 
         try
         {
@@ -87,7 +99,9 @@ public class TransferWallet(
         {
             logger.LogError(ex, "Error transferring wallet balance");
             return new CmdResponse
-                { HttpStatusCode = HttpStatusCode.InternalServerError, Message = "Error processing request" };
+            {
+                HttpStatusCode = HttpStatusCode.InternalServerError, Message = "Error processing request"
+            };
         }
     }
 }

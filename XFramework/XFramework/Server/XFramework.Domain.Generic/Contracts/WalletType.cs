@@ -16,9 +16,6 @@ public partial class WalletType : BaseModel
 
     public decimal? MaxTransfer { get; set; }
 
-
-    public Guid TenantId { get; set; }
-
     public virtual Tenant Tenant { get; set; } = null!;
 
     public virtual CurrencyType? CurrencyType { get; set; }

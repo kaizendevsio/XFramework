@@ -14,11 +14,11 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task<bool> Connect();
     public Task StartClientEventListener(string topic);
 
-    public Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, Guid? recipient) 
+    public Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient) 
         where TRequest : class, IHasRequestServer;
-    public Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, Guid? recipient) 
+    public Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, string recipient) 
         where TRequest : class, IHasRequestServer;
-    public Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, Guid? recipient) 
+    public Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient) 
         where TRequest : class, IHasRequestServer;
     public Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TModel,TResponse>(StreamFlowMessage<TModel> request) 
         where TModel : class, IHasRequestServer

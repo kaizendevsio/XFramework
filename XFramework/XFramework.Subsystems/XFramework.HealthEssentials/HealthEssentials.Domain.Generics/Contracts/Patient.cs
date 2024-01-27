@@ -1,4 +1,7 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using XFramework.Domain.Generic.Contracts;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class Patient : BaseModel
 {
@@ -26,4 +29,7 @@ public partial class Patient : BaseModel
     public virtual ICollection<PatientTag> PatientTags { get; } = new List<PatientTag>();
 
     public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; } = new List<PharmacyJobOrder>();
+
+    [NotMapped]
+    public IdentityCredential? Credential { get; set; }
 }

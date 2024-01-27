@@ -3,7 +3,7 @@
 namespace IdentityServer.Core.DataAccess.Commands.Credential;
 
 public class UpdateCredential(
-        AppDbContext appDbContext,
+        DbContext appDbContext,
         ILogger<UpdateCredential> logger,
         ITenantService tenantService,
         IRequestHandler<Patch<IdentityCredential>, CmdResponse<IdentityCredential>> baseHandler

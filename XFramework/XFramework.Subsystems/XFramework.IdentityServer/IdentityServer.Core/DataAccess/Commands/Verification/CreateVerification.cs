@@ -5,7 +5,7 @@ using XFramework.Integration.Abstractions;
 namespace IdentityServer.Core.DataAccess.Commands.Verification;
 
 public class CreateVerification(
-        AppDbContext appDbContext,
+        DbContext dbContext,
         IHelperService helperService, 
         ITenantService tenantService,
         ILogger<CreateVerification> logger,
@@ -18,7 +18,7 @@ public class CreateVerification(
     {
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.Model.TenantId);
 
-        var verificationType = await appDbContext.IdentityVerificationTypes
+        var verificationType = await dbContext.Set<IdentityVerificationType>()
             .FirstOrDefaultAsync(i => i.Id == request.Model.VerificationTypeId, CancellationToken.None);
         if (verificationType is null)
         {
@@ -29,7 +29,7 @@ public class CreateVerification(
             };
         }
 
-        var identityCredential = await appDbContext.IdentityCredentials
+        var identityCredential = await dbContext.Set<IdentityCredential>()
             .Include(i => i.IdentityContacts)
             .ThenInclude(i => i.Type)
             .AsSplitQuery()
@@ -47,7 +47,7 @@ public class CreateVerification(
         switch (verificationType.Name)
         {
             case "SMS":
-                var messageTemplate = await appDbContext.RegistryConfigurations
+                var messageTemplate = await dbContext.Set<RegistryConfiguration>()
                     .Where(i => i.TenantId == tenant.Id)
                     .Where(i => i.Group.Name == "MessagingService_Otp")
                     .FirstOrDefaultAsync(CancellationToken.None);

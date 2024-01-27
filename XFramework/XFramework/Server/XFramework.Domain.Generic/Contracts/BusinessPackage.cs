@@ -26,16 +26,13 @@ public partial class BusinessPackage : BaseModel
 
     public string? Remarks { get; set; }
 
-
-    public virtual BinaryMap? BinaryMap { get; set; }
-
+    
     public virtual ICollection<BusinessPackageUpgradeTransaction> BusinessPackageUpgradeTransactions { get; } =
         new List<BusinessPackageUpgradeTransaction>();
 
     public virtual ICollection<BusinessPackageInclusion> BusinessPackageInclusions { get; } =
         new List<BusinessPackageInclusion>();
 
-    public virtual ICollection<IncomeDistribution> IncomeDistributions { get; } = new List<IncomeDistribution>();
 
     public virtual ICollection<CommissionDeductionRequest> CommissionDeductionRequests { get; } =
         new List<CommissionDeductionRequest>();

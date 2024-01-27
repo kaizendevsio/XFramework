@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Address;
 
 public partial class AddressState
 {
-    public class Fetch : IRequest<CmdResponse>
+    public record Fetch : StateAction
     {
         public AddressType AddressType { get; set; }
     }
@@ -14,11 +14,11 @@ public partial class AddressState
         IAddressServiceWrapper addressServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : ActionHandler<Fetch, CmdResponse>(handlerServices, store)
+        : StateActionHandler<Fetch>(handlerServices, store)
     {
         private AddressState CurrentState => Store.GetState<AddressState>();
         
-        public override async Task<CmdResponse> Handle(Fetch action, CancellationToken aCancellationToken)
+        public override async Task Handle(Fetch action, CancellationToken aCancellationToken)
         {
             switch (action.AddressType)
             {
@@ -27,34 +27,41 @@ public partial class AddressState
                 case AddressType.Country:
                     var countryResponse = await addressServiceWrapper.AddressCountry.GetList(500, 1);
                     await HandleFailure(countryResponse, action, false);
-                    await Mediator.Send(new SetState() {CountryList = countryResponse.Response?.Items.ToList()});
+                    CurrentState.CountryList = countryResponse.Response?.Items.ToList();
                     break;
                 case AddressType.Region:
                     var regionResponse = await addressServiceWrapper.AddressRegion.GetList(500, 1);
                     await HandleFailure(regionResponse, action, false);
-                    await Mediator.Send(new SetState() {RegionList = regionResponse.Response?.Items.ToList(), SelectedRegion = new(), SelectedCity = new(), SelectedBarangay = new()});
+                    CurrentState.RegionList = regionResponse.Response?.Items.ToList();
+                    CurrentState.SelectedRegion = new();
+                    CurrentState.SelectedCity = new();
+                    CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.Province:
                     var provinceResponse = await addressServiceWrapper.AddressProvince.GetList(500, 1);
                     await HandleFailure(provinceResponse, action, false);
-                    await Mediator.Send(new SetState() {ProvinceList = provinceResponse.Response?.Items.ToList(), SelectedProvince = new(), SelectedCity = new(), SelectedBarangay = new()});
+                    CurrentState.ProvinceList = provinceResponse.Response?.Items.ToList(); 
+                    CurrentState.SelectedProvince = new(); 
+                    CurrentState.SelectedCity = new();
+                    CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.City:
                     var cityResponse = await addressServiceWrapper.AddressCity.GetList(500, 1);
                     await HandleFailure(cityResponse, action, false);
-                    await Mediator.Send(new SetState() {CityList = cityResponse.Response?.Items.ToList(), SelectedCity = new(), SelectedBarangay = new()});
+                    CurrentState.CityList = cityResponse.Response?.Items.ToList();
+                    CurrentState.SelectedCity = new();
+                    CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.Barangay:
                     var barangayResponse = await addressServiceWrapper.AddressBarangay.GetList(500, 1);
                     await HandleFailure(barangayResponse, action, false);
-                    await Mediator.Send(new SetState() {BarangayList = barangayResponse.Response?.Items.ToList(), SelectedBarangay = new()});
+                    CurrentState.BarangayList = barangayResponse.Response?.Items.ToList();
+                    CurrentState.SelectedBarangay = new();
                     break;
             }
-
-            return new()
-            {
-                HttpStatusCode = HttpStatusCode.Accepted,
-            };
+            
+            store.SetState(CurrentState);
+            
         }
     }
 }

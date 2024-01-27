@@ -9,4 +9,4 @@ namespace Wallets.Api.Generators;
     nameof(WalletAddress),
     nameof(WalletTransaction),
 })]
-public static partial class MinimalApiGenerator;
+public static partial class WalletsApiGenerator;

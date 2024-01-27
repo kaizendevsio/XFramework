@@ -8,10 +8,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Attributes\" />
+      <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
+      <Folder Include="Attributes\" />
     </ItemGroup>
 </Project>

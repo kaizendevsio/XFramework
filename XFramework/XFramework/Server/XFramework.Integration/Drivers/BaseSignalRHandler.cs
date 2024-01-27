@@ -13,7 +13,7 @@ namespace XFramework.Integration.Drivers;
 public abstract class BaseSignalRHandler
 {
     
-    public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, Guid requestId, Guid clientId, TResult data) 
+    public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, Guid requestId, string clientId, TResult data) 
         where TResult : class, IBaseResponse, IHasRequestServer
     {
         var request = new StreamFlowMessage<TResult>(data)

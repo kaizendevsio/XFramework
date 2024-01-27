@@ -13,11 +13,7 @@
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
     </ItemGroup>
-
-
+    
 </Project>

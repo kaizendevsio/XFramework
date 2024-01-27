@@ -17,6 +17,7 @@ public class PushMessageHandler(
     public async Task<CmdResponse<PushMessageCmd>> Handle(PushMessageCmd request, CancellationToken cancellationToken)
     {
         // Check if Client is Registered
+        var clients = cachingService.Clients.ToList();
         var client = cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == request.Context.ConnectionId);
         if (client.Value == null)
         {
@@ -30,7 +31,7 @@ public class PushMessageHandler(
 
         request.RequestMetadata = new()
         {
-            RequestId = client.Value.Guid,
+            RequestId = request.Message.RequestId,
             Name = client.Value.Name
         };
             
@@ -43,12 +44,12 @@ public class PushMessageHandler(
             case MessageExchangeType.Direct:
                 StreamFlowClient currentClient;
 
-                var availableClients = cachingService.Clients.Where(x => x.Value.Guid == request.Message.RecipientId).Select(i => i.Value).ToList();
+                var availableClients = cachingService.Clients.Where(x => x.Value.Id == request.Message.RecipientId).Select(i => i.Value).ToList();
                 var count = availableClients.Count;
                     
                 if (count > 1)
                 {
-                    var cachedClient = cachingService.LatestClients.Select(i => i.Value).FirstOrDefault(x => x.Guid == request.Message.RecipientId);
+                    var cachedClient = cachingService.LatestClients.Select(i => i.Value).FirstOrDefault(x => x.Id == request.Message.RecipientId);
                     if (cachedClient is null)
                     {
                         var cc = availableClients[0];
@@ -68,7 +69,7 @@ public class PushMessageHandler(
                             : availableClients[cachedClientIndex + 1];
                             
                         ReTryRemoveLatestClients:
-                        var tmpIndex = cachingService.LatestClients.FirstOrDefault(i => i.Value.Guid == cachedClient.Guid);
+                        var tmpIndex = cachingService.LatestClients.FirstOrDefault(i => i.Value.Id == cachedClient.Id);
                         if (!cachingService.LatestClients.TryRemove(tmpIndex.Key, out _))
                         {
                             goto ReTryRemoveLatestClients;
@@ -93,7 +94,7 @@ public class PushMessageHandler(
                     break;
                 }
 
-                if (cachingService.AbsoluteClients.All(x => x.Value.Guid != request.Message.RecipientId))
+                if (cachingService.AbsoluteClients.All(x => x.Value.Id != request.Message.RecipientId))
                 {
                     Console.WriteLine($"Connection with ID {request.RequestMetadata.RequestId} : {request.RequestMetadata.Name} has invalid recipient");
                     return new()

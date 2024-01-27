@@ -40,15 +40,17 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
         using System.Linq.Expressions;
         using Asp.Versioning;
         using Asp.Versioning.Conventions;
-        using {namespaceName};
 
 
         namespace {serviceName}.Api.Generators
         {{
+        using {namespaceName};
             public static partial class {serviceName}ApiGenerator
             {{
-                public static WebApplication GenerateMinimalApi(this WebApplication app)
+                public static IApplicationBuilder GenerateMinimalApi(this IApplicationBuilder appBuilder)
                 {{
+
+                    var app = appBuilder as WebApplication;
                     ");
 
         codeBuilder.AppendLine(@"
@@ -64,7 +66,7 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
             GenerateHandler(codeBuilder, model);
         }
         codeBuilder.AppendLine(@"
-                return app;
+                return app as IApplicationBuilder;
                 }
             }
         }");

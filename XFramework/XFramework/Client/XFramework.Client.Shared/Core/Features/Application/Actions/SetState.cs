@@ -2,7 +2,7 @@ namespace XFramework.Client.Shared.Core.Features.Application;
 
 public partial class ApplicationState
 {
-    public record SetState : BaseAction
+    public record SetState : StateAction
     {
         public bool? IsBusy { get; set; }
         public bool? NoSpinner { get; set; }
@@ -13,7 +13,7 @@ public partial class ApplicationState
     }
     
     protected class SetStateHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<SetState>(handlerServices, store)
+        : StateActionHandler<SetState>(handlerServices, store)
     {
         private ApplicationState CurrentState => Store.GetState<ApplicationState>();
 

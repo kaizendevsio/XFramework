@@ -21,16 +21,8 @@ public partial class IncomeTransaction : BaseModel
     public Guid PairMapId { get; set; }
 
 
-    public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; } =
-        new List<BillsPaymentTransaction>();
-
     public virtual IdentityCredential Credential { get; set; } = null!;
 
     public virtual IncomeType? IncomeType { get; set; }
 
-    public virtual BinaryMap? PairMap { get; set; }
-
-    public virtual BinaryMap? SourceMap { get; set; }
-
-    public virtual BinaryMap? TargetMap { get; set; }
 }

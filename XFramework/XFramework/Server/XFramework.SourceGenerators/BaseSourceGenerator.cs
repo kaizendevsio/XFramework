@@ -43,31 +43,28 @@ public static class BaseSourceGenerator
                     .SelectMany(a => a.Attributes)
                     .FirstOrDefault(attr => attr.Name.ToString().Contains(attribute));
 
-                if (attributeSyntax != null)
+                if (attributeSyntax == null) continue;
+                
+                var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[0];
+                var typesArgumentSyntax = attributeSyntax.ArgumentList.Arguments[1];
+
+                var namespaceValue = namespaceArgumentSyntax.Expression.NormalizeWhitespace().ToFullString();
+                var typesArraySyntax = typesArgumentSyntax.Expression as ImplicitArrayCreationExpressionSyntax;
+
+                if (typesArraySyntax == null) continue;
+                
+                foreach (var typeArgumentSyntax in typesArraySyntax.Initializer.Expressions)
                 {
-                    var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[0];
-                    var typesArgumentSyntax = attributeSyntax.ArgumentList.Arguments[1];
-
-                    var namespaceValue = namespaceArgumentSyntax.Expression.NormalizeWhitespace().ToFullString();
-                    var typesArraySyntax = typesArgumentSyntax.Expression as ImplicitArrayCreationExpressionSyntax;
-
-                    if (typesArraySyntax != null)
+                    if (typeArgumentSyntax is not InvocationExpressionSyntax invocationExpression ||
+                        invocationExpression.Expression is not IdentifierNameSyntax identifierName ||
+                        identifierName.Identifier.Text != "nameof") continue;
+                    
+                    var nameofArgument = invocationExpression.ArgumentList.Arguments[0].Expression;
+                    if (nameofArgument is IdentifierNameSyntax identifierArgument)
                     {
-                        foreach (var typeArgumentSyntax in typesArraySyntax.Initializer.Expressions)
-                        {
-                            if (typeArgumentSyntax is InvocationExpressionSyntax invocationExpression &&
-                                invocationExpression.Expression is IdentifierNameSyntax identifierName &&
-                                identifierName.Identifier.Text == "nameof")
-                            {
-                                var nameofArgument = invocationExpression.ArgumentList.Arguments[0].Expression;
-                                if (nameofArgument is IdentifierNameSyntax identifierArgument)
-                                {
-                                    var typeValue = identifierArgument.Identifier.Text;
-                                    models.Add(typeValue);
-                                    // Do something with typeValue
-                                }
-                            }
-                        }
+                        var typeValue = identifierArgument.Identifier.Text;
+                        models.Add(typeValue);
+                        // Do something with typeValue
                     }
                 }
             }
@@ -76,9 +73,9 @@ public static class BaseSourceGenerator
         return models;
     }
     
-    public static List<ClassDeclarationSyntax> GetClasses(GeneratorExecutionContext context, string attribute, string classNameSuffix)
+    public static List<(ClassDeclarationSyntax ClassDeclarationSyntax, SemanticModel SemanticModel)> GetClasses(GeneratorExecutionContext context, string attribute, string classNameSuffix)
     {
-        List<ClassDeclarationSyntax> classes = new();
+        List<(ClassDeclarationSyntax, SemanticModel)> classes = new();
 
         foreach (var syntaxTree in context.Compilation.SyntaxTrees)
         {
@@ -93,7 +90,7 @@ public static class BaseSourceGenerator
 
                 if (attributeSyntax != null)
                 {
-                    classes.Add(classNode);
+                    classes.Add((classNode, semanticModel));
                 }
             }
         }
@@ -136,5 +133,30 @@ public static class BaseSourceGenerator
         }
 
         return models;
+    }
+    
+    public static string? GetAttributeParameterValue(ClassDeclarationSyntax classDeclarationSyntax, string attribute, int parameterIndex)
+    {
+        var syntax = Enumerable.SelectMany<AttributeListSyntax, AttributeSyntax>(classDeclarationSyntax.AttributeLists, a => a.Attributes)
+            .FirstOrDefault(attr => attr.Name.ToString().Contains(attribute));
+        var attributeSyntax = syntax as AttributeSyntax;
+        if (attributeSyntax == null) return null;
+
+        var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[parameterIndex];
+        var parameterValue = SyntaxNodeExtensions.NormalizeWhitespace<ExpressionSyntax>(namespaceArgumentSyntax.Expression).ToFullString();
+        var s = parameterValue.Replace("\"", string.Empty);
+        return s;
+    }
+  
+    public static string? GetAttributeParameterValueFromType(ClassDeclarationSyntax classDeclarationSyntax, SemanticModel semanticModel, string attribute, int parameterIndex)
+    {
+        var syntax = Enumerable.SelectMany(classDeclarationSyntax.AttributeLists, a => a.Attributes)
+            .FirstOrDefault(attr => attr.Name.ToString().Contains(attribute));
+        var attributeSyntax = syntax;
+        if (attributeSyntax == null) return null;
+        
+        var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[parameterIndex].Expression as TypeOfExpressionSyntax;
+        var typeInfo = semanticModel.GetTypeInfo(namespaceArgumentSyntax);
+        return typeInfo.Type?.ToDisplayString();
     }
 }

@@ -4,4 +4,4 @@ using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Domain.Generics.Contracts.Requests;
 
-public record GetPendingRegistrationCompletionListRequest : RequestBase, IRequest<QueryResponse<List<IdentityCredential>>>;
+public record GetPendingRegistrationCompletionListRequest : QueryableRequest, IRequest<QueryResponse<List<IdentityCredential>>>;

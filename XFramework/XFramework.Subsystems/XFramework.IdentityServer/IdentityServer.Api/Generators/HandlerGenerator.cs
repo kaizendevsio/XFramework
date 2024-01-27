@@ -1,4 +1,6 @@
-﻿using XFramework.Core.Attributes;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests;
+using IdentityServer.Domain.Generic.Contracts.Responses;
+using XFramework.Core.Attributes;
 
 namespace IdentityServer.Api.Generators;
 
@@ -17,6 +19,7 @@ namespace IdentityServer.Api.Generators;
     nameof(IdentityRoleType),
     nameof(IdentityRoleTypeGroup),
     nameof(StorageFile),
-    nameof(StorageFileType)
+    nameof(StorageFileType),
+    nameof(Tenant)
 })]
 public static partial class IdentityServerApiGenerator;

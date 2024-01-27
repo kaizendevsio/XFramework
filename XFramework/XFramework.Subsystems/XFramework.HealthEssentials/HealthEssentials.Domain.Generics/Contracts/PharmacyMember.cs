@@ -1,4 +1,7 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using XFramework.Domain.Generic.Contracts;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class PharmacyMember : BaseModel
 {
@@ -20,4 +23,7 @@ public partial class PharmacyMember : BaseModel
     public virtual Pharmacy Pharmacy { get; set; } = null!;
 
     public virtual PharmacyLocation? PharmacyLocation { get; set; }
+    
+    [NotMapped]
+    public IdentityCredential? Credential { get; set; }
 }

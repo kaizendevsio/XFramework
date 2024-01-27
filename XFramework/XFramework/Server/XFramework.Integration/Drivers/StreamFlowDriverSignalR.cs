@@ -115,8 +115,8 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 {
                     Logger.LogInformation("Attempting to get client IP address");
                     
-                    var jsonIpResponse = await new HttpClient().GetFromJsonAsync<JsonIpResponse>("https://jsonip.com/");
-                    ClientIpAddress = jsonIpResponse?.IpAddress;
+                    var ipAddress = await new HttpClient().GetStringAsync("https://api.ipify.org/");
+                    ClientIpAddress = ipAddress;
                     
                     Logger.LogInformation("Client IP address acquired: {ClientIpAddress}", ClientIpAddress);
 
@@ -147,8 +147,8 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             {
                 Logger.LogInformation("Attempting to get client IP address");
 
-                var jsonIpResponse = await HttpClient.GetFromJsonAsync<JsonIpResponse>("https://jsonip.com/");
-                ClientIpAddress = jsonIpResponse?.IpAddress;
+                var ipAddress = await new HttpClient().GetStringAsync("https://api.ipify.org/");
+                ClientIpAddress = ipAddress;
 
                 Logger.LogInformation("Client IP address acquired: {ClientIpAddress}", ClientIpAddress);
             }
@@ -193,7 +193,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return SignalRService.StartEventListener(topic);
     }
 
-    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, Guid? recipient) 
+    public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient) 
         where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
@@ -203,21 +203,21 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             RecipientId = recipient,
             CommandName = GetRequestFriendlyName(typeof(TRequest))
         };
-
-        Logger.LogInformation("Sending request: {@Request}", r);
         
         var result = await InvokeAsync<TRequest, CmdResponse>(r);
-        
+
+#if DEBUG
         Task.Run(() =>
         {
             var serviceRequestLog = new ServiceRequestLog<TRequest, CmdResponse>(Request: request, Response: result.Response);
-            Logger.LogInformation("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
+            Logger.LogWarning("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
         });
+#endif
         
         return result.Response;
     }
 
-    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, Guid? recipient)
+    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, string recipient)
         where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
@@ -227,16 +227,16 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             RecipientId = recipient,
             CommandName = GetRequestFriendlyName(typeof(TRequest))
         };
-
-        Logger.LogInformation("Sending request: {@Request}", r);
-
+        
         var result = await InvokeAsync<TRequest, CmdResponse<TRequest>>(r);
         
+#if DEBUG
         Task.Run(() =>
         {
             var serviceRequestLog = new ServiceRequestLog<TRequest, CmdResponse<TRequest>>(Request: request, Response: result.Response);
-            Logger.LogInformation("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
+            Logger.LogWarning("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
         });
+#endif
 
         if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
         {
@@ -245,7 +245,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return result.Response;
     }
 
-    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, Guid? recipient) 
+    public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient) 
         where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
@@ -256,23 +256,25 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             CommandName = GetRequestFriendlyName(typeof(TRequest))
         };
         
-        Logger.LogInformation("Sending request: {@Request}", r);
-
         var result = await InvokeAsync<TRequest, QueryResponse<TResponse>>(r);
         
+#if DEBUG
         Task.Run(() =>
         {
             var serviceRequestLog = new ServiceRequestLog<TRequest, QueryResponse<TResponse>>(Request: request, Response: result.Response);
-            Logger.LogInformation("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
+            Logger.LogWarning("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
         });
-        
-        return result.Response.Adapt<QueryResponse<TResponse>>();
+#endif
+
+        return result.Response;
     }
 
     public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TModel, TResponse>(StreamFlowMessage<TModel> request) 
         where TModel : class, IHasRequestServer
         where TResponse : class, IBaseResponse
     {
+        Logger.LogInformation("Sending request {Request}...", request.CommandName);
+        
         var signalRResponse = await SignalRService.InvokeAsync(request);
         var tResponse = Activator.CreateInstance<TResponse>();
         
@@ -302,16 +304,19 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             {
                 return new()
                 {
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    HttpStatusCode = signalRResponse.ResponseStatusCode,
                     Message = signalRResponse.Message,
                     Response = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance))
                 };
             }
             default:
+                var t = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
+                Logger.LogInformation("Sending request: {Request}... Done in {Duration}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
+
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.Accepted,
-                    Response = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance))
+                    Response = t
                 };
                 break;
         }

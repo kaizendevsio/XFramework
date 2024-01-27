@@ -1,6 +1,6 @@
 ﻿namespace XFramework.Client.Shared.Core.Features;
 
-public class SetStateHandler<TAction, TState>(HandlerServices handlerServices, IStore store) : ActionHandler<TAction>(handlerServices, store) where TAction : IAction
+public class SetStateHandler<TAction, TState>(HandlerServices handlerServices, IStore store) : StateActionHandler<TAction>(handlerServices, store) where TAction : IAction
 {
     private TState CurrentState => Store.GetState<TState>();
 

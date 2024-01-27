@@ -3,7 +3,7 @@ using System.Net;
 
 namespace XFramework.Domain.Generic.BusinessObjects;
 
-public class QueryResponse<T> : IBaseResponse, IHasRequestServer
+public class QueryResponse<T> : IBaseResponse, IHasRequestServer, IQueryResponse
 {
     public QueryResponse() { }
     
@@ -15,3 +15,5 @@ public class QueryResponse<T> : IBaseResponse, IHasRequestServer
     public T? Response { get; set; }
     public RequestMetadata? Metadata { get; set; }
 }
+
+public interface IQueryResponse;

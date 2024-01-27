@@ -1,29 +1,33 @@
 ﻿using System.Collections;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Services;
 using XFramework.Domain.Generic.Contracts.Requests;
+using XFramework.Integration.Abstractions;
 using XFramework.Integration.Extensions;
 
 namespace XFramework.Core.DataAccess.Query;
 
 public class GetListHandler<TModel>(
         ILogger<GetListHandler<TModel>> logger,
-        AppDbContext appDbContext,
-        IMemoryCache cache,
-        ITenantService tenantService
+        DbContext dbContext,
+        CacheManager cache,
+        ITenantService tenantService,
+        IHelperService helperService
     ) 
     : IGetListHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
 {
-    private const int MaxNavigationDepth = 3;
+    private const int MaxNavigationDepth = 1;
 
     public async Task<QueryResponse<PaginatedResult<TModel>>> Handle(GetList<TModel> request, CancellationToken cancellationToken)
     {
-        var cacheKey = $"GetList-{typeof(TModel).Name}-{request.Filter}";
-            
-        if (cache.TryGetValue(cacheKey, out PaginatedResult<TModel>? cachedResult))
+        var cacheKey = $"GetList-{typeof(TModel).Name}-{string.Join("-", request.Filter?.Select(i => $"{i.PropertyName}-{i.Operation}-{i.Value}"))}"; // Adjust cache key as needed
+
+        var cachedResult = cache.Get<PaginatedResult<TModel>>(cacheKey);
+        if (cachedResult is not null)
         {
             return new QueryResponse<PaginatedResult<TModel>>
             {
@@ -31,7 +35,7 @@ public class GetListHandler<TModel>(
             };
         }
 
-        if (request.TenantId is null)
+        if (request.TenantId is null && request.Metadata.TenantId is null)
         {
             return new()
             {
@@ -42,31 +46,36 @@ public class GetListHandler<TModel>(
         
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.TenantId);
 
-        IQueryable<TModel> query = appDbContext.Set<TModel>();
+        IQueryable<TModel> query = dbContext.Set<TModel>();
 
         if (request.IncludeNavigations.HasValue && request.IncludeNavigations.Value)
         {
             query = IncludeNavigations(query, MaxNavigationDepth);
         }
 
-        if (request.Filter != null)
+        if (request.Filter != null && request.Filter.Any())
         {
             var expression = request.Filter.ToExpression<TModel>();
             query = query.Where(expression);
         }
 
-        query = query.AsSplitQuery();
+        query = query
+            .AsSplitQuery()
+            .AsNoTracking();
 
         var totalItems = await query.CountAsync(cancellationToken);
-        var items = await query.Skip((request.PageNumber - 1) * request.PageSize)
+        var items = await query
             .Where(i => i.TenantId == tenant.Id)
+            .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
+        
+        items = helperService.RemoveCircularReference(items);
 
         var paginatedResult = new PaginatedResult<TModel>(totalItems, request.PageNumber, request.PageSize, items);
 
-            
-        cache.Set(cacheKey, paginatedResult, TimeSpan.FromMinutes(10)); // Adjust cache duration as needed
+        #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+        cache.Set(cacheKey, paginatedResult);
 
         return new QueryResponse<PaginatedResult<TModel>>
         {
@@ -74,18 +83,16 @@ public class GetListHandler<TModel>(
         };
     }
 
-    private IQueryable<TModel> IncludeNavigations(IQueryable<TModel> query, int maxDepth, int currentDepth = 0)
+    private IQueryable<TModel> IncludeNavigations(IQueryable<TModel> query, int maxDepth, int currentDepth = 0, PropertyInfo? propertyInfo = null)
     {
         if (currentDepth >= maxDepth) return query;
+        var model = propertyInfo?.PropertyType ?? typeof(TModel);
 
-        foreach (var property in typeof(TModel).GetProperties())
+        foreach (var property in model.GetProperties().Where(p => p.PropertyType.IsClass && p.PropertyType != typeof(string) && !typeof(IEnumerable).IsAssignableFrom(p.PropertyType)))
         {
-            var propertyType = property.PropertyType;
-            if (typeof(IEnumerable).IsAssignableFrom(propertyType) && propertyType != typeof(string))
-            {
-                query = query.Include(property.Name);
-                query = IncludeNavigations(query, maxDepth, currentDepth + 1); // Recursive call
-            }
+            if (currentDepth >= maxDepth) return query;
+            query = query.Include(property.Name);
+            query = IncludeNavigations(query, maxDepth, currentDepth + 1, propertyInfo); // Recursive call
         }
         return query;
     }

@@ -103,4 +103,4 @@ namespace HealthEssentials.Api.Generators;
     nameof(VendorType),
     nameof(VendorTypeGroup)
 })]
-public static partial class MinimalApiGenerator;
+public static partial class HealthEssentialsApiGenerator;

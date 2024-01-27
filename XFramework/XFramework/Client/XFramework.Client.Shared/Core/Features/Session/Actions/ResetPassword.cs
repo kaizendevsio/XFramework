@@ -6,7 +6,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class ResetPassword : NavigableRequest, IRequest<CmdResponse>
+    public record ResetPassword : NavigableRequest, IRequest<CmdResponse>
     {
         public string? PhoneEmailUsername { get; set; }
     }
@@ -15,11 +15,11 @@ public partial class SessionState
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : ActionHandler<ResetPassword, CmdResponse>(handlerServices, store)
+        : StateActionHandler<ResetPassword>(handlerServices, store)
     {
         public SessionState CurrentState => Store.GetState<SessionState>();
 
-        public override async Task<CmdResponse> Handle(ResetPassword action, CancellationToken aCancellationToken)
+        public override async Task Handle(ResetPassword action, CancellationToken aCancellationToken)
         {
             await Mediator.Send(new ApplicationState.SetState(){IsBusy = true});
 
@@ -36,20 +36,14 @@ public partial class SessionState
             // Handle if the response is invalid or error
             if (await HandleFailure(response, action, true, "There was an error resetting your password"))
             {
-                return new()
-                {
-                    HttpStatusCode = HttpStatusCode.InternalServerError
-                };
+                return;
             };
             
             await Mediator.Send(new ApplicationState.SetState(){IsBusy = false});
 
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(response, action, false, "Password reset request successful");
-            return new()
-            {
-                HttpStatusCode = HttpStatusCode.Accepted
-            };
+            return;
         }
     }
 }

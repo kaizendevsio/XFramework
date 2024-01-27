@@ -3,7 +3,7 @@ using XFramework.Integration.Attributes;
 
 namespace HealthEssentials.Integration.Generators;
 
-[GenerateStreamFlowWrapper("HealthEssentials.Domain.Generics.Contracts", new[] {
+[StreamFlowWrapper("HealthEssentials.Domain.Generics.Contracts", new[] {
     nameof(Ailment),
     nameof(AilmentType),
     nameof(AilmentTypeGroup),

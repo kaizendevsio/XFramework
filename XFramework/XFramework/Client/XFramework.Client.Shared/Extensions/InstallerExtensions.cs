@@ -33,6 +33,7 @@ public static class InstallerExtensions
         services.AddSingleton(o => new DeviceAgentProvider(Environment.MachineName));
         services.AddScoped<HandlerServices>();
     }
+    
     public static void AddSerilog(this IServiceCollection services, IConfiguration configuration)
     {
         var loggerConfiguration = new LoggerConfiguration()

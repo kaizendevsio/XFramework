@@ -2,10 +2,10 @@ namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
 {
-    public record UpdateSidebarItems : BaseAction;
+    public record UpdateSidebarItems : StateAction;
     
     protected class UpdateSidebarItemsHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<UpdateSidebarItems>(handlerServices, store)
+        : StateActionHandler<UpdateSidebarItems>(handlerServices, store)
     {
             
         public override async Task Handle(UpdateSidebarItems a, CancellationToken aCancellationToken)

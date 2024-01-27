@@ -1,7 +1,7 @@
 ﻿namespace XFramework.Client.Shared.Core.Features;
 
 public abstract class ClearStateHandler<TAction, TState>(HandlerServices handlerServices, IStore store)
-    : ActionHandler<TAction>(handlerServices, store) where TAction : IAction
+    : StateActionHandler<TAction>(handlerServices, store) where TAction : IAction
 {
     public TState CurrentState => Store.GetState<TState>();
         

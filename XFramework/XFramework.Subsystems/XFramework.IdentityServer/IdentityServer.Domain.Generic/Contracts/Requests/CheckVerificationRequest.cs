@@ -1,11 +1,11 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Responses;
-using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Contracts.Requests;
+﻿namespace IdentityServer.Domain.Generic.Contracts.Requests;
 
-namespace IdentityServer.Domain.Generic.Contracts.Requests;
+using TRequest = CheckVerificationRequest;
+using TResponse = QueryResponse<CheckVerificationResponse>;
 
-public record CheckVerificationRequest : RequestBase, IRequest<QueryResponse<CheckVerificationResponse>>
+public record CheckVerificationRequest : RequestBase, 
+    IRequest<TResponse>, 
+    IStreamflowRequest<TRequest, TResponse>
 {
     public Guid CredentialId { get; init; }
     public Guid VerificationTypeId { get; init; }

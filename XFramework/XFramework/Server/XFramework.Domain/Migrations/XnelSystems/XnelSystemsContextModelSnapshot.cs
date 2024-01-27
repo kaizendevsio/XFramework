@@ -64,6 +64,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<int?>("RegCode")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("addresses_refbrgy_pk");
 
@@ -115,6 +118,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<int?>("RegCode")
                         .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("tbl_addresscity_pk");
@@ -177,6 +183,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(9)
                         .HasColumnType("character varying(9)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_AddressCountry_pkey");
 
@@ -222,6 +231,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<long>("RegCodeId")
                         .HasColumnType("bigint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("tbl_addressprovince_pk");
@@ -273,6 +285,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<int>("PsgcCode")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_addressregions_pk");
 
@@ -282,67 +297,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsUnique();
 
                     b.ToTable("AddressRegion", "GeoLocation");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Application", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<string>("AppName")
-                        .HasColumnType("character varying");
-
-                    b.Property<DateTime?>("AvailabilityDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid>("EnterpriseId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("EnterpriseID");
-
-                    b.Property<DateTime?>("Expiration")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ParentAppId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ParentAppID");
-
-                    b.Property<short?>("Status")
-                        .HasColumnType("smallint");
-
-                    b.Property<decimal>("Version")
-                        .HasPrecision(6, 3)
-                        .HasColumnType("numeric(6,3)");
-
-                    b.HasKey("Id")
-                        .HasName("PK_tbl_Application");
-
-                    b.HasIndex("EnterpriseId");
-
-                    b.ToTable("Application", "Application");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.AuthorizationLog", b =>
@@ -397,482 +351,15 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityAuthorizationLogs");
 
                     b.HasIndex(new[] { "CredentialId" }, "IX_tbl_IdentityAuthorizationLogs_CredentialID");
 
                     b.ToTable("AuthorizationLog", "Audit");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Biller", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("BillerCategoryId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("BillerCategoryID");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("ConvenienceFee")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("character varying");
-
-                    b.Property<decimal?>("Discount")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)")
-                        .HasDefaultValueSql("0");
-
-                    b.Property<string>("Image")
-                        .HasColumnType("character varying");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid?>("ProviderEndpointId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("ServiceCharge")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_billers_pk");
-
-                    b.HasIndex("BillerCategoryId");
-
-                    b.HasIndex("ProviderEndpointId");
-
-                    b.ToTable("Biller", "Integration.BillsPayment");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BillerCategory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("character varying");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isDeleted")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isEnabled")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid>("ProviderTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ProviderTypeID");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_billercategories_pk");
-
-                    b.HasIndex("ProviderTypeId");
-
-                    b.ToTable("BillerCategory", "Integration.BillsPayment");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BillerField", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("BillerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("BillerID");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("character varying");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isDeleted")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isEnabled")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("character varying");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("character varying");
-
-                    b.Property<decimal?>("Width")
-                        .HasPrecision(2)
-                        .HasColumnType("numeric(2)");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_billerfields_pk");
-
-                    b.HasIndex("BillerId");
-
-                    b.ToTable("BillerField", "Integration.BillsPayment");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BillsPaymentTransaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<decimal?>("Amount")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)");
-
-                    b.Property<Guid?>("BillerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("ConvenienceFee")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)")
-                        .HasDefaultValueSql("0");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("CredentialId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("Discount")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)");
-
-                    b.Property<Guid?>("IncomeTransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("RawRequest")
-                        .HasMaxLength(3000)
-                        .HasColumnType("character varying(3000)");
-
-                    b.Property<string>("RawResponse")
-                        .HasMaxLength(3000)
-                        .HasColumnType("character varying(3000)");
-
-                    b.Property<string>("ReferenceNo")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int?>("ResponseHttpStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ResponseReasonPhrase")
-                        .HasMaxLength(3000)
-                        .HasColumnType("character varying(3000)");
-
-                    b.Property<decimal?>("ServiceCharge")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)");
-
-                    b.Property<int?>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("TotalAmount")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_userbillspaymenttransaction_pk");
-
-                    b.HasIndex("BillerId");
-
-                    b.HasIndex("CredentialId");
-
-                    b.HasIndex("IncomeTransactionId");
-
-                    b.ToTable("BillsPaymentTransaction", "Integration.BillsPayment");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BinaryList", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<int?>("Level")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<int?>("Placement")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("SourceUserMapId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceUserMapID");
-
-                    b.Property<Guid?>("TargetUserMapId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("TargetUserMapID");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_userbinarylist_pk");
-
-                    b.HasIndex("SourceUserMapId");
-
-                    b.HasIndex("TargetUserMapId");
-
-                    b.ToTable("BinaryList", "Affiliate");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BinaryListMultiplex", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid?>("BinaryMapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("BusinessPackageId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<long?>("LeftCount")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("Level")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<long?>("RightCount")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_userbinarylistmultiplex_pk");
-
-                    b.HasIndex("BinaryMapId");
-
-                    b.ToTable("BinaryListMultiplex", "Affiliate");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BinaryMap", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID");
-
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<Guid>("Id"), null, null, null, 2147483647L, null, null);
-
-                    b.Property<string>("Alias")
-                        .HasColumnType("character varying");
-
-                    b.Property<long?>("BinaryLeft")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("BinaryRight")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<long>("LeftLegCount")
-                        .HasColumnType("bigint");
-
-                    b.Property<int?>("LeftLegGoldCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("LeftLegSilverCount")
-                        .HasColumnType("integer");
-
-                    b.Property<long?>("Level")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<short?>("Position")
-                        .HasColumnType("smallint");
-
-                    b.Property<long>("RightLegCount")
-                        .HasColumnType("bigint");
-
-                    b.Property<int?>("RightLegGoldCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("RightLegSilverCount")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("SponsorUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("UplineLevel")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("UplineUserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_BinaryMap_pkey");
-
-                    b.HasIndex("SponsorUserId");
-
-                    b.HasIndex("UplineUserId");
-
-                    b.HasIndex(new[] { "Alias" }, "tbl_usermap_alias_uindex")
-                        .IsUnique();
-
-                    b.ToTable("BinaryMap", "Affiliate");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BusinessPackage", b =>
@@ -938,6 +425,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
 
@@ -994,6 +484,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("StringValue")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid")
@@ -1058,6 +551,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Unit")
                         .HasColumnType("character varying");
 
@@ -1100,6 +596,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("tbl_BusinessPackageType_pkey");
@@ -1150,6 +649,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<int?>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("UserBusinessPackageId")
                         .HasColumnType("uuid");
@@ -1216,6 +718,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<int?>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_usercommissiondeductionrequest_pk");
 
@@ -1260,6 +765,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TargetSocialMediaIdentityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
@@ -1313,6 +821,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("socialmediaconnectionentity_pk");
 
@@ -1358,6 +869,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("SocialMediaIdentityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Text")
@@ -1421,6 +935,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("StorageId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("socialmediacontentfiles_pk");
 
@@ -1467,6 +984,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("SocialMediaIdentityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
@@ -1524,6 +1044,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("socialmediacontentreactionentity_pk");
 
@@ -1565,6 +1088,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("socialmediacontententity_pk");
@@ -1624,6 +1150,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Tagline")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
 
@@ -1673,6 +1202,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("StorageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
@@ -1726,6 +1258,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("communityidentityfileentity_pk");
 
@@ -1767,6 +1302,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("communityidentityentity_pk");
@@ -1815,6 +1353,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<short?>("Type")
                         .HasColumnType("smallint");
@@ -1909,6 +1450,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("WalletTypeId")
                         .HasColumnType("uuid");
 
@@ -1924,369 +1468,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.HasIndex("WalletTypeId");
 
                     b.ToTable("DepositRequest", "Wallet");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadGatewayNumber", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Gateway")
-                        .HasMaxLength(13)
-                        .HasColumnType("character varying(13)");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("TelcoTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("TelcoTypeID");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_gatewaynumbers_pk");
-
-                    b.HasIndex("TelcoTypeId");
-
-                    b.ToTable("GatewayNumber", "Integration.ELoad");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadProductCode", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)");
-
-                    b.Property<string>("Code")
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid?>("EloadPromoId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("TelcoCodePromosID");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isDeleted")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid?>("TelcoTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("TelcoTypeID");
-
-                    b.Property<string>("Validity")
-                        .HasColumnType("character varying");
-
-                    b.HasKey("Id")
-                        .HasName("PK_tbl_TelcoProductCode");
-
-                    b.HasIndex(new[] { "EloadPromoId" }, "IX_tbl_TelcoProductCode_TelcoCodePromosID");
-
-                    b.HasIndex(new[] { "TelcoTypeId" }, "IX_tbl_TelcoProductCode_TelcoTypeID");
-
-                    b.ToTable("TelcoProductCode", "Integration.ELoad");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadPromo", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("character varying");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("character varying");
-
-                    b.HasKey("Id")
-                        .HasName("PK_tbl_TelcoCodePromos");
-
-                    b.ToTable("TelcoCodePromo", "Integration.ELoad");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadTelcoPrefix", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Prefix")
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)");
-
-                    b.Property<Guid?>("TelcoTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("TelcoTypeID");
-
-                    b.HasKey("Id")
-                        .HasName("PK_tbl_TelcoPrefix");
-
-                    b.HasIndex(new[] { "TelcoTypeId" }, "IX_tbl_TelcoPrefix_TelcoTypeID");
-
-                    b.HasIndex(new[] { "Prefix" }, "tbl_telcoprefix_prefix_index");
-
-                    b.ToTable("TelcoPrefix", "Integration.ELoad");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadTelcoType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("character varying");
-
-                    b.Property<string>("Image")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("character varying");
-
-                    b.HasKey("Id")
-                        .HasName("PK_tbl_TelcoType");
-
-                    b.ToTable("TelcoType", "Integration.ELoad");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadTransaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<string>("Amount")
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("CredentialId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("CurrentBalance")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("CustomerNumber")
-                        .HasMaxLength(13)
-                        .HasColumnType("character varying(13)");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("Discount")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid?>("EloadProductCodeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("TelcoProductCodeID");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isDeleted")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isEnabled")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<decimal?>("PreviousBalance")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("RawRequest")
-                        .HasMaxLength(5000)
-                        .HasColumnType("character varying(5000)");
-
-                    b.Property<string>("RawResponse")
-                        .HasMaxLength(5000)
-                        .HasColumnType("character varying(5000)");
-
-                    b.Property<string>("SenderNumber")
-                        .HasMaxLength(13)
-                        .HasColumnType("character varying(13)");
-
-                    b.Property<int?>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("TransactionId")
-                        .HasColumnType("character varying")
-                        .HasColumnName("TransactionID");
-
-                    b.Property<Guid?>("WalletTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("WalletTypeID");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_usereloadtransaction_pk");
-
-                    b.HasIndex("CredentialId");
-
-                    b.HasIndex("EloadProductCodeId");
-
-                    b.ToTable("ELoadTransaction", "Integration.ELoad");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Enterprise", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.HasKey("Id")
-                        .HasName("PK_tbl_tbl_Enterprises");
-
-                    b.ToTable("Enterprise", "Application");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.ExchangeRate", b =>
@@ -2336,6 +1517,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("TargetCurrencyTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("TargetCurrencyTypeID");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal?>("Value")
                         .HasPrecision(18, 10)
@@ -2401,6 +1585,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Name")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("ProvinceId")
                         .HasColumnType("uuid");
 
@@ -2414,6 +1601,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Subdivision")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("UnitNumber")
                         .HasMaxLength(500)
@@ -2469,10 +1659,75 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityAddressType");
 
                     b.ToTable("IdentityAddressType", "Identity");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("c9136227-f5dc-4147-984d-70aa855090e4"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "HOME",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("23c13259-1e24-427d-ba89-a4d2506c7464"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "PERSONAL",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("54ab2c38-be75-4572-916b-72019d676162"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "BUSINESS",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("66c8ab89-f24d-4aea-af1a-9ac6a8263575"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "WORK",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("4eec62eb-08ef-406c-9ea2-2ac2d6e0f206"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "BILLING",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("337ee33d-445f-4e6e-bc61-8709170b0ee4"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "SHIPPING",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        });
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityContact", b =>
@@ -2507,6 +1762,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("TypeId")
                         .HasColumnType("uuid");
@@ -2563,10 +1821,55 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("identitycontactgroup_pk");
 
                     b.ToTable("IdentityContactGroup", "Identity");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("5d6f29ff-9779-44df-9900-40550bdf9d19"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "HOME",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("b4bda700-03c1-4a8a-bf6d-6043704cf767"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "PERSONAL",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("067b21a1-1cba-4c57-b357-43a6fab0a18b"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "BUSINESS",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("08fb17f1-f4ae-4540-b7ae-03dad680f9ea"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "WORK",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        });
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityContactType", b =>
@@ -2598,10 +1901,75 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityContactType");
 
                     b.ToTable("IdentityContactType", "Identity");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("cdc88887-c7e7-415e-9d43-cc0050d523d3"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "Phone",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("03f26cc1-e4c2-424f-9d5b-b22d006ae45b"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "Email",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("d89c4b4a-2077-44ea-958e-4327d191a14c"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "Facebook",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("4e5edd0d-5c16-4955-9323-3c6e86b54f0b"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "Instagram",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("17583df0-c1b2-47a7-875b-2d9b44f55249"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "Twitter",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("2fa27f70-d083-4327-b04e-74e1295cb4be"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            IsEnabled = true,
+                            Name = "LinkedIn",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        });
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityCredential", b =>
@@ -2611,10 +1979,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ApplicationID");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -2644,6 +2008,10 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<byte[]>("PasswordByte")
                         .HasColumnType("bytea");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
                     b.Property<string>("Token")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
@@ -2659,7 +2027,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityCredentials");
 
-                    b.HasIndex("ApplicationId");
+                    b.HasIndex("TenantId");
 
                     b.HasIndex(new[] { "IdentityInfoId" }, "IX_tbl_IdentityCredentials_IdentityInfoID");
 
@@ -2714,6 +2082,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_userfavorites_pk");
 
@@ -2731,10 +2102,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ApplicationID");
 
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");
@@ -2786,10 +2153,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityInfo");
 
-                    b.HasIndex("ApplicationId");
+                    b.HasIndex("TenantId");
 
                     b.ToTable("IdentityInformation", "Identity");
                 });
@@ -2827,6 +2198,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime>("RoleExpiration")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("TypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("RoleTypeID");
@@ -2848,9 +2222,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -2880,12 +2251,15 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<short?>("RoleLevel")
                         .HasColumnType("smallint");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("PK_tbl_IdentityRoleType");
 
-                    b.HasIndex("ApplicationId");
-
                     b.HasIndex("GroupId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("IdentityRoleType", "Identity");
                 });
@@ -2929,6 +2303,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("identityroleentitygroup_pk");
@@ -2974,6 +2351,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTimeOffset?>("StatusUpdatedOn")
                         .HasColumnType("time with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Token")
                         .HasColumnType("character varying");
@@ -3028,119 +2408,48 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<short?>("Priority")
                         .HasColumnType("smallint");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("PK_tbl_VerificationType");
 
                     b.ToTable("IdentityVerificationType", "Identity");
-                });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IncomeDistribution", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("BusinessPackageId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("BusinessPackageID");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("DistributionType")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid>("IncomeTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("IncomeTypeID");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<long?>("MaxLimit")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("MinLimit")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Value")
-                        .HasPrecision(18, 10)
-                        .HasColumnType("numeric(18,10)");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_IncomeDistribution_pkey");
-
-                    b.HasIndex("BusinessPackageId");
-
-                    b.HasIndex("IncomeTypeId");
-
-                    b.ToTable("IncomeDistribution", "Income");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IncomePartition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("IdentityRoleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("IncomeTypeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<decimal?>("Percentage")
-                        .HasPrecision(18, 8)
-                        .HasColumnType("numeric(18,8)");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_IncomePartition_pkey");
-
-                    b.HasIndex("IdentityRoleId");
-
-                    b.HasIndex("IncomeTypeId");
-
-                    b.ToTable("IncomePartition", "Income");
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            DefaultExpiry = 10L,
+                            IsDeleted = false,
+                            IsEnabled = false,
+                            Name = "SMS",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("fe1197ba-dfee-4a4e-b2d3-f8f8c48796be"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            DefaultExpiry = 120L,
+                            IsDeleted = false,
+                            IsEnabled = false,
+                            Name = "Email",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        },
+                        new
+                        {
+                            Id = new Guid("41b5d12c-ce50-4af6-b68f-79443bd5c489"),
+                            ConcurrencyStamp = new Guid("00000000-0000-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            DefaultExpiry = 1051200L,
+                            IsDeleted = false,
+                            IsEnabled = false,
+                            Name = "KYC",
+                            TenantId = new Guid("00000000-0000-0000-0000-000000000000")
+                        });
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IncomeTransaction", b =>
@@ -3199,6 +2508,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("TargetMapId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<short?>("TransactionType")
                         .HasColumnType("smallint");
 
@@ -3208,12 +2520,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.HasIndex("CredentialId");
 
                     b.HasIndex("IncomeTypeId");
-
-                    b.HasIndex("PairMapId");
-
-                    b.HasIndex("SourceMapId");
-
-                    b.HasIndex("TargetMapId");
 
                     b.ToTable("IncomeTransaction", "Income");
                 });
@@ -3264,68 +2570,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_IncomeType_pkey");
 
                     b.ToTable("IncomeType", "Income");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Log", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ApplicationID");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Initiator")
-                        .HasColumnType("character varying");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Message")
-                        .HasColumnType("character varying");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("character varying");
-
-                    b.Property<bool?>("Seen")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<short?>("Severity")
-                        .HasColumnType("smallint");
-
-                    b.Property<short?>("Type")
-                        .HasColumnType("smallint");
-
-                    b.HasKey("Id")
-                        .HasName("PK_tbl_ApplicationLogs");
-
-                    b.HasIndex(new[] { "ApplicationId" }, "IX_tbl_ApplicationLogs_AppID");
-
-                    b.ToTable("Log", "Audit");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Message", b =>
@@ -3365,6 +2616,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Text")
                         .IsRequired()
@@ -3418,6 +2672,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
 
@@ -3468,6 +2725,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("messagedeliveryentity_pk");
@@ -3539,6 +2799,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
 
@@ -3594,6 +2857,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("StorageId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("messagefiles_pk");
 
@@ -3638,6 +2904,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
@@ -3692,6 +2961,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("messagereactionentity_pk");
 
@@ -3737,6 +3009,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
@@ -3805,6 +3080,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<short>("Status")
                         .HasColumnType("smallint");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("messagethreadmember_pk");
 
@@ -3867,6 +3145,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<short>("Status")
                         .HasColumnType("smallint");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("messagethreadmembergroup_pk");
 
@@ -3911,6 +3192,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id")
@@ -3962,6 +3246,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("messagethreadentity_pk");
 
@@ -4009,6 +3296,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<short>("Priority")
                         .HasColumnType("smallint");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("messagetype_pk");
 
@@ -4049,6 +3339,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid");
@@ -4106,6 +3399,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<int?>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("metadataentity_pk");
 
@@ -4149,6 +3445,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("metadataentitygroup_pk");
@@ -4218,6 +3517,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(3, 2)
                         .HasColumnType("numeric(3,2)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_gateways_pk");
 
@@ -4267,6 +3569,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_gatewaycategories_pk");
 
@@ -4310,6 +3615,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("UrlEndpoint")
                         .HasMaxLength(100)
@@ -4361,6 +3669,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<int?>("StepOrder")
                         .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("GatewayInstructions_pk");
@@ -4420,6 +3731,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("ResponseStatusTypeId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("gatewayresponse_pk");
 
@@ -4470,6 +3784,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("gatewayresponsestatustype_pk");
 
@@ -4519,6 +3836,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("gatewayresponsetype_pk");
 
@@ -4566,105 +3886,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_gatewayType_pk");
 
                     b.ToTable("GatewayType", "Integration.PaymentGateway");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.ProviderEndpoint", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<string>("BaseUrlEndpoint")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid?>("ProviderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ProviderID");
-
-                    b.Property<string>("UrlEndpoint")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_providerendpoints_pk");
-
-                    b.HasIndex("ProviderId");
-
-                    b.ToTable("ProviderEndpoint", "Integration.BillsPayment");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.ProviderType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("character varying");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isDeleted")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasColumnName("isEnabled")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("character varying");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_providerType_pk");
-
-                    b.ToTable("ProviderType", "Integration.BillsPayment");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.RegistryConfiguration", b =>
@@ -4674,10 +3902,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ApplicationID");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -4704,6 +3928,10 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ApplicationId");
+
                     b.Property<string>("Unit")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -4714,9 +3942,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.HasKey("Id")
                         .HasName("tbl_applicationconfiguration_pk");
 
-                    b.HasIndex("ApplicationId");
-
                     b.HasIndex("GroupId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("RegistryConfiguration", "Registry");
                 });
@@ -4754,6 +3982,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("tbl_configurationgroup_pk");
@@ -4801,13 +4032,16 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("tbl_favoriteType_pk");
 
                     b.ToTable("RegistryFavoriteType", "Registry");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.SessionDatum", b =>
+            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Session", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4845,6 +4079,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("SessionTypeID");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("PK_tbl_SessionData");
 
@@ -4852,7 +4089,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.HasIndex(new[] { "SessionTypeId" }, "IX_tbl_SessionData_SessionTypeID");
 
-                    b.ToTable("SessionData", "Identity");
+                    b.ToTable("Session", "Identity");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.SessionType", b =>
@@ -4884,6 +4121,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("PK_tbl_SessionType");
 
@@ -4897,6 +4137,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("BlobContainer")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -4945,6 +4188,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("character varying");
 
                     b.Property<Guid>("StorageFileIdentifierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
@@ -5002,6 +4248,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("storagefileidentifier_pk");
 
@@ -5046,6 +4295,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("scheduleentitygroup_pk");
 
@@ -5087,6 +4339,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("storagefileentity_pk");
@@ -5138,6 +4393,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<short?>("Status")
                         .HasColumnType("smallint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TypeId")
                         .HasColumnType("uuid")
@@ -5195,10 +4453,71 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id")
                         .HasName("subscriptionentity_pk");
 
                     b.ToTable("SubscriptionType", "Affiliate");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Tenant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<DateTime?>("AvailabilityDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("character varying");
+
+                    b.Property<DateTime?>("Expiration")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("character varying");
+
+                    b.Property<Guid?>("ParentTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ParentAppID");
+
+                    b.Property<short?>("Status")
+                        .HasColumnType("smallint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Version")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_tbl_Application");
+
+                    b.ToTable("Application", "Application");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Wallet", b =>
@@ -5239,6 +4558,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("WalletTypeId")
                         .HasColumnType("uuid");
@@ -5294,6 +4616,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Remarks")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("WalletId")
                         .HasColumnType("uuid");
@@ -5359,6 +4684,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasPrecision(24, 8)
                         .HasColumnType("numeric(24,8)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("WalletId")
                         .HasColumnType("uuid");
 
@@ -5379,9 +4707,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid");
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -5425,15 +4750,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<short>("Type")
                         .HasColumnType("smallint");
 
                     b.HasKey("Id")
                         .HasName("tbl_WalletType_pkey");
 
-                    b.HasIndex("ApplicationId");
-
                     b.HasIndex("CurrencyTypeId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("WalletType", "Wallet");
                 });
@@ -5477,6 +4805,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<string>("Remarks")
                         .HasColumnType("character varying");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal?>("TotalAmount")
                         .HasPrecision(18, 10)
@@ -5564,17 +4895,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("Country");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Application", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Enterprise", "Enterprise")
-                        .WithMany("Applications")
-                        .HasForeignKey("EnterpriseId")
-                        .IsRequired()
-                        .HasConstraintName("tbl_applications_tbl_enterprises_id_fk");
-
-                    b.Navigation("Enterprise");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.AuthorizationLog", b =>
                 {
                     b.HasOne("XFramework.Domain.Generic.Contracts.IdentityCredential", "IdentityCredentials")
@@ -5585,124 +4905,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasConstraintName("tbl_userauthhistory_fk");
 
                     b.Navigation("IdentityCredentials");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Biller", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BillerCategory", "BillerCategory")
-                        .WithMany("Billers")
-                        .HasForeignKey("BillerCategoryId")
-                        .IsRequired()
-                        .HasConstraintName("tbl_billers_tbl_billercategories_id_fk");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.ProviderEndpoint", "ProviderEndpoint")
-                        .WithMany("Billers")
-                        .HasForeignKey("ProviderEndpointId")
-                        .HasConstraintName("tbl_billers_tbl_providerendpoints_id_fk");
-
-                    b.Navigation("BillerCategory");
-
-                    b.Navigation("ProviderEndpoint");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BillerCategory", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.ProviderType", "ProviderType")
-                        .WithMany("BillerCategories")
-                        .HasForeignKey("ProviderTypeId")
-                        .IsRequired()
-                        .HasConstraintName("tbl_billercategories_tbl_providerType_id_fk");
-
-                    b.Navigation("ProviderType");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BillerField", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Biller", "Biller")
-                        .WithMany("BillerFields")
-                        .HasForeignKey("BillerId")
-                        .IsRequired()
-                        .HasConstraintName("tbl_billerfields_tbl_billers_id_fk");
-
-                    b.Navigation("Biller");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BillsPaymentTransaction", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Biller", "Biller")
-                        .WithMany("BillsPaymentTransactions")
-                        .HasForeignKey("BillerId")
-                        .HasConstraintName("tbl_userbillspaymenttransaction_tbl_billers_id_fk");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.IdentityCredential", "Credential")
-                        .WithMany("BillsPaymentTransactions")
-                        .HasForeignKey("CredentialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("tbl_userbillspaymenttransaction_tbl_identitycredentials_id_fk");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.IncomeTransaction", "IncomeTransaction")
-                        .WithMany("BillsPaymentTransactions")
-                        .HasForeignKey("IncomeTransactionId")
-                        .HasConstraintName("tbl_userbillspaymenttransaction_tbl_userincometransaction_id_fk");
-
-                    b.Navigation("Biller");
-
-                    b.Navigation("Credential");
-
-                    b.Navigation("IncomeTransaction");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BinaryList", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BinaryMap", "SourceUserMap")
-                        .WithMany("BinaryListSourceUserMaps")
-                        .HasForeignKey("SourceUserMapId")
-                        .HasConstraintName("tbl_userbinarylist_tbl_usermap_id_fk_2");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BinaryMap", "TargetUserMap")
-                        .WithMany("BinaryListTargetUserMaps")
-                        .HasForeignKey("TargetUserMapId")
-                        .HasConstraintName("tbl_userbinarylist_tbl_usermap_id_fk");
-
-                    b.Navigation("SourceUserMap");
-
-                    b.Navigation("TargetUserMap");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BinaryListMultiplex", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BinaryMap", "BinaryMap")
-                        .WithMany("BinaryListMultiplexes")
-                        .HasForeignKey("BinaryMapId")
-                        .HasConstraintName("tbl_userbinarylistmultiplex_tbl_usermap_id_fk");
-
-                    b.Navigation("BinaryMap");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BinaryMap", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BusinessPackage", "IdNavigation")
-                        .WithOne("BinaryMap")
-                        .HasForeignKey("XFramework.Domain.Generic.Contracts.BinaryMap", "Id")
-                        .IsRequired()
-                        .HasConstraintName("tbl_usermap_fk");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BinaryMap", "SponsorUser")
-                        .WithMany("InverseSponsorUser")
-                        .HasForeignKey("SponsorUserId")
-                        .HasConstraintName("SponsorUserId");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BinaryMap", "UplineUser")
-                        .WithMany("InverseUplineUser")
-                        .HasForeignKey("UplineUserId")
-                        .HasConstraintName("uplineuserbpid");
-
-                    b.Navigation("IdNavigation");
-
-                    b.Navigation("SponsorUser");
-
-                    b.Navigation("UplineUser");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BusinessPackage", b =>
@@ -5988,65 +5190,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("WalletType");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadGatewayNumber", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.EloadTelcoType", "EloadTelcoType")
-                        .WithMany("GatewayNumbers")
-                        .HasForeignKey("TelcoTypeId")
-                        .HasConstraintName("tbl_telcoType_id_fk");
-
-                    b.Navigation("EloadTelcoType");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadProductCode", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.EloadPromo", "EloadPromo")
-                        .WithMany("TelcoProductCodes")
-                        .HasForeignKey("EloadPromoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("tbl_telcoproductcode_tbl_telcocodepromos_id_fk");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.EloadTelcoType", "EloadTelcoType")
-                        .WithMany("TelcoProductCodes")
-                        .HasForeignKey("TelcoTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("tbl_telcoproductcode_tbl_telcoType_id_fk");
-
-                    b.Navigation("EloadPromo");
-
-                    b.Navigation("EloadTelcoType");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadTelcoPrefix", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.EloadTelcoType", "TelcoType")
-                        .WithMany("TelcoPrefixes")
-                        .HasForeignKey("TelcoTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("tbl_telcoentityid___fk");
-
-                    b.Navigation("TelcoType");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadTransaction", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.IdentityCredential", "Credential")
-                        .WithMany("EloadTransactions")
-                        .HasForeignKey("CredentialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("EloadTransaction_CredentialId");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.EloadProductCode", "EloadProductCode")
-                        .WithMany("EloadTransactions")
-                        .HasForeignKey("EloadProductCodeId")
-                        .HasConstraintName("tbl_usereloadtransaction_tbl_telcoproductcode_id_fk");
-
-                    b.Navigation("Credential");
-
-                    b.Navigation("EloadProductCode");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.ExchangeRate", b =>
                 {
                     b.HasOne("XFramework.Domain.Generic.Contracts.CurrencyType", "SourceCurrencyType")
@@ -6161,12 +5304,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityCredential", b =>
                 {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Application", "Application")
-                        .WithMany("IdentityCredentials")
-                        .HasForeignKey("ApplicationId")
-                        .IsRequired()
-                        .HasConstraintName("tbl_identitycredentials___fk");
-
                     b.HasOne("XFramework.Domain.Generic.Contracts.IdentityInformation", "IdentityInfo")
                         .WithMany("IdentityCredentials")
                         .HasForeignKey("IdentityInfoId")
@@ -6174,9 +5311,15 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasConstraintName("tbl_identitycredentials_fk");
 
-                    b.Navigation("Application");
+                    b.HasOne("XFramework.Domain.Generic.Contracts.Tenant", "Tenant")
+                        .WithMany("IdentityCredentials")
+                        .HasForeignKey("TenantId")
+                        .IsRequired()
+                        .HasConstraintName("tbl_identitycredentials___fk");
 
                     b.Navigation("IdentityInfo");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityFavorite", b =>
@@ -6200,13 +5343,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityInformation", b =>
                 {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Application", "Application")
+                    b.HasOne("XFramework.Domain.Generic.Contracts.Tenant", "Tenant")
                         .WithMany("IdentityInformations")
-                        .HasForeignKey("ApplicationId")
+                        .HasForeignKey("TenantId")
                         .IsRequired()
                         .HasConstraintName("identityinformation_application_id_fk");
 
-                    b.Navigation("Application");
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityRole", b =>
@@ -6231,12 +5374,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityRoleType", b =>
                 {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Application", "Application")
-                        .WithMany("IdentityRoleTypes")
-                        .HasForeignKey("ApplicationId")
-                        .IsRequired()
-                        .HasConstraintName("tbl_identityroleTypes_tbl_applications_id_fk");
-
                     b.HasOne("XFramework.Domain.Generic.Contracts.IdentityRoleTypeGroup", "Group")
                         .WithMany("IdentityRoleTypes")
                         .HasForeignKey("GroupId")
@@ -6244,9 +5381,15 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasConstraintName("identityroleentity_identityroleentitygroup_id_fk");
 
-                    b.Navigation("Application");
+                    b.HasOne("XFramework.Domain.Generic.Contracts.Tenant", "Tenant")
+                        .WithMany("IdentityRoleTypes")
+                        .HasForeignKey("TenantId")
+                        .IsRequired()
+                        .HasConstraintName("tbl_identityroleTypes_tbl_applications_id_fk");
 
                     b.Navigation("Group");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityVerification", b =>
@@ -6269,44 +5412,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("VerificationType");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IncomeDistribution", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BusinessPackage", "BusinessPackage")
-                        .WithMany("IncomeDistributions")
-                        .HasForeignKey("BusinessPackageId")
-                        .IsRequired()
-                        .HasConstraintName("BusinessPackageID");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.IncomeType", "IncomeType")
-                        .WithMany("IncomeDistributions")
-                        .HasForeignKey("IncomeTypeId")
-                        .IsRequired()
-                        .HasConstraintName("IncomeTypeID");
-
-                    b.Navigation("BusinessPackage");
-
-                    b.Navigation("IncomeType");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IncomePartition", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.IdentityRole", "IdentityRole")
-                        .WithMany("IncomePartitions")
-                        .HasForeignKey("IdentityRoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("UserRoleId");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.IncomeType", "IncomeType")
-                        .WithMany("IncomePartitions")
-                        .HasForeignKey("IncomeTypeId")
-                        .HasConstraintName("IncomeTypeId");
-
-                    b.Navigation("IdentityRole");
-
-                    b.Navigation("IncomeType");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IncomeTransaction", b =>
                 {
                     b.HasOne("XFramework.Domain.Generic.Contracts.IdentityCredential", "Credential")
@@ -6321,48 +5426,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasForeignKey("IncomeTypeId")
                         .HasConstraintName("tbl_userincometransaction_tbl_incometype_id_fk");
 
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BinaryMap", "PairMap")
-                        .WithMany("IncomeTransactionPairMaps")
-                        .HasForeignKey("PairMapId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk_3");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BinaryMap", "SourceMap")
-                        .WithMany("IncomeTransactionSourceMaps")
-                        .HasForeignKey("SourceMapId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk_2");
-
-                    b.HasOne("XFramework.Domain.Generic.Contracts.BinaryMap", "TargetMap")
-                        .WithMany("IncomeTransactionTargetMaps")
-                        .HasForeignKey("TargetMapId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk");
-
                     b.Navigation("Credential");
 
                     b.Navigation("IncomeType");
-
-                    b.Navigation("PairMap");
-
-                    b.Navigation("SourceMap");
-
-                    b.Navigation("TargetMap");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Log", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Application", "Application")
-                        .WithMany("Logs")
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("tbl_applogs_appid_fk");
-
-                    b.Navigation("Application");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Message", b =>
@@ -6655,24 +5721,8 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("PaymentGatewayType");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.ProviderEndpoint", b =>
-                {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.ProviderType", "Provider")
-                        .WithMany("ProviderEndpoints")
-                        .HasForeignKey("ProviderId")
-                        .HasConstraintName("tbl_providerendpoints_tbl_providerType_id_fk");
-
-                    b.Navigation("Provider");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.RegistryConfiguration", b =>
                 {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Application", "Application")
-                        .WithMany("RegistryConfigurations")
-                        .HasForeignKey("ApplicationId")
-                        .IsRequired()
-                        .HasConstraintName("tbl_applicationconfiguration_tbl_application_id_fk");
-
                     b.HasOne("XFramework.Domain.Generic.Contracts.RegistryConfigurationGroup", "Group")
                         .WithMany("RegistryConfigurations")
                         .HasForeignKey("GroupId")
@@ -6680,12 +5730,18 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasConstraintName("tbl_configurations_tbl_configurationgroup_id_fk");
 
-                    b.Navigation("Application");
+                    b.HasOne("XFramework.Domain.Generic.Contracts.Tenant", "Tenant")
+                        .WithMany("RegistryConfigurations")
+                        .HasForeignKey("TenantId")
+                        .IsRequired()
+                        .HasConstraintName("tbl_applicationconfiguration_tbl_application_id_fk");
 
                     b.Navigation("Group");
+
+                    b.Navigation("Tenant");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.SessionDatum", b =>
+            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Session", b =>
                 {
                     b.HasOne("XFramework.Domain.Generic.Contracts.IdentityCredential", "Credential")
                         .WithMany("SessionData")
@@ -6807,20 +5863,20 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.WalletType", b =>
                 {
-                    b.HasOne("XFramework.Domain.Generic.Contracts.Application", "Application")
-                        .WithMany("WalletTypes")
-                        .HasForeignKey("ApplicationId")
-                        .IsRequired()
-                        .HasConstraintName("tbl_walletTypes_tbl_applications_id_fk");
-
                     b.HasOne("XFramework.Domain.Generic.Contracts.CurrencyType", "CurrencyType")
                         .WithMany("WalletTypes")
                         .HasForeignKey("CurrencyTypeId")
                         .HasConstraintName("CurrencyID");
 
-                    b.Navigation("Application");
+                    b.HasOne("XFramework.Domain.Generic.Contracts.Tenant", "Tenant")
+                        .WithMany("WalletTypes")
+                        .HasForeignKey("TenantId")
+                        .IsRequired()
+                        .HasConstraintName("tbl_walletTypes_tbl_applications_id_fk");
 
                     b.Navigation("CurrencyType");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.WithdrawalRequest", b =>
@@ -6884,63 +5940,13 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("IdentityAddresses");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Application", b =>
-                {
-                    b.Navigation("IdentityCredentials");
-
-                    b.Navigation("IdentityInformations");
-
-                    b.Navigation("IdentityRoleTypes");
-
-                    b.Navigation("Logs");
-
-                    b.Navigation("RegistryConfigurations");
-
-                    b.Navigation("WalletTypes");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Biller", b =>
-                {
-                    b.Navigation("BillerFields");
-
-                    b.Navigation("BillsPaymentTransactions");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BillerCategory", b =>
-                {
-                    b.Navigation("Billers");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BinaryMap", b =>
-                {
-                    b.Navigation("BinaryListMultiplexes");
-
-                    b.Navigation("BinaryListSourceUserMaps");
-
-                    b.Navigation("BinaryListTargetUserMaps");
-
-                    b.Navigation("IncomeTransactionPairMaps");
-
-                    b.Navigation("IncomeTransactionSourceMaps");
-
-                    b.Navigation("IncomeTransactionTargetMaps");
-
-                    b.Navigation("InverseSponsorUser");
-
-                    b.Navigation("InverseUplineUser");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BusinessPackage", b =>
                 {
-                    b.Navigation("BinaryMap");
-
                     b.Navigation("BusinessPackageInclusions");
 
                     b.Navigation("BusinessPackageUpgradeTransactions");
 
                     b.Navigation("CommissionDeductionRequests");
-
-                    b.Navigation("IncomeDistributions");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.BusinessPackageInclusionType", b =>
@@ -7020,30 +6026,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("BusinessPackages");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadProductCode", b =>
-                {
-                    b.Navigation("EloadTransactions");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadPromo", b =>
-                {
-                    b.Navigation("TelcoProductCodes");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.EloadTelcoType", b =>
-                {
-                    b.Navigation("GatewayNumbers");
-
-                    b.Navigation("TelcoPrefixes");
-
-                    b.Navigation("TelcoProductCodes");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Enterprise", b =>
-                {
-                    b.Navigation("Applications");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityAddressType", b =>
                 {
                     b.Navigation("IdentityAddresses");
@@ -7063,8 +6045,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                 {
                     b.Navigation("AuthorizationLogs");
 
-                    b.Navigation("BillsPaymentTransactions");
-
                     b.Navigation("BusinessPackageConsumedByNavigations");
 
                     b.Navigation("BusinessPackageIdentityCredentials");
@@ -7076,8 +6056,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("CommunityIdentities");
 
                     b.Navigation("DepositRequests");
-
-                    b.Navigation("EloadTransactions");
 
                     b.Navigation("IdentityContacts");
 
@@ -7115,8 +6093,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IdentityRole", b =>
                 {
-                    b.Navigation("IncomePartitions");
-
                     b.Navigation("MessageThreadMemberRoles");
                 });
 
@@ -7135,17 +6111,8 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("IdentityVerifications");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IncomeTransaction", b =>
-                {
-                    b.Navigation("BillsPaymentTransactions");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.IncomeType", b =>
                 {
-                    b.Navigation("IncomeDistributions");
-
-                    b.Navigation("IncomePartitions");
-
                     b.Navigation("IncomeTransactions");
                 });
 
@@ -7252,18 +6219,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Navigation("GatewayResponseTypes");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.ProviderEndpoint", b =>
-                {
-                    b.Navigation("Billers");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.ProviderType", b =>
-                {
-                    b.Navigation("BillerCategories");
-
-                    b.Navigation("ProviderEndpoints");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.RegistryConfigurationGroup", b =>
                 {
                     b.Navigation("RegistryConfigurations");
@@ -7306,6 +6261,19 @@ namespace XFramework.Domain.Migrations.XnelSystems
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.SubscriptionType", b =>
                 {
                     b.Navigation("Subscriptions");
+                });
+
+            modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Tenant", b =>
+                {
+                    b.Navigation("IdentityCredentials");
+
+                    b.Navigation("IdentityInformations");
+
+                    b.Navigation("IdentityRoleTypes");
+
+                    b.Navigation("RegistryConfigurations");
+
+                    b.Navigation("WalletTypes");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Generic.Contracts.Wallet", b =>

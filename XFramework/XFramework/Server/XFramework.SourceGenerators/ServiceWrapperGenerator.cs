@@ -16,18 +16,19 @@ public class ServiceWrapperGenerator : ISourceGenerator
     public void Execute(GeneratorExecutionContext context)
     {
         var serviceName = context.Compilation.AssemblyName?.Split(".").First();
-        var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateStreamFlowWrapper");
-        var classes = BaseSourceGenerator.GetClasses(context, "GenerateStreamFlowWrapper", "ServiceWrapper");
+        var namespaceName = BaseSourceGenerator.GetNamespace(context, "StreamFlowWrapper");
+        var classes = BaseSourceGenerator.GetClasses(context, "StreamFlowWrapper", "ServiceWrapper");
+        var serviceId = serviceName.ToSha256();
         
-        foreach (var classDeclarationSyntax in classes)
+        foreach (var item in classes)
         {
-            Generate(context,  namespaceName, classDeclarationSyntax);
+            Generate(context, namespaceName, serviceId, item.ClassDeclarationSyntax);
         }
     }
 
-    private static void Generate(GeneratorExecutionContext context, string namespaceName, ClassDeclarationSyntax classDeclarationSyntax)
+    private static void Generate(GeneratorExecutionContext context, string namespaceName, string serviceId, ClassDeclarationSyntax classDeclarationSyntax)
     {
-        var models = BaseSourceGenerator.GetModels(classDeclarationSyntax, "GenerateStreamFlowWrapper");
+        var models = BaseSourceGenerator.GetModels(classDeclarationSyntax, "StreamFlowWrapper");
         var codeBuilder = new StringBuilder();
         var serviceName = classDeclarationSyntax.Identifier.Text.Replace("ServiceWrapper", string.Empty);
         
@@ -53,11 +54,12 @@ public class ServiceWrapperGenerator : ISourceGenerator
                          using Serilog;
                          using System;
                          using System.Net;
-                         using {{namespaceName}};
+                         
               
               
                          namespace {{serviceName}}.Integration.Drivers
                          {
+                         using {{namespaceName}};
               """);
 
         codeBuilder.AppendLine(
@@ -85,7 +87,16 @@ public class ServiceWrapperGenerator : ISourceGenerator
             codeBuilder.AppendLine($"I{model}CrudService {model}{(models.Last() == model ? "" : "," )}");
         }
         codeBuilder.AppendLine($"{(models.Any() ? "," : string.Empty)} IMessageBusWrapper messageBusDriver, IConfiguration configuration");
-        codeBuilder.AppendLine($") : DriverBase(messageBusDriver, configuration), I{serviceName}ServiceWrapper;");
+        codeBuilder.AppendLine($") : DriverBase(messageBusDriver, configuration), I{serviceName}ServiceWrapper");
+        
+        codeBuilder.AppendLine($$"""
+                                 {
+                                     public override void Initialize()
+                                     {
+                                         TargetClient = "{{serviceId}}";
+                                     }
+                                 }
+                                 """);
         
         // Generate implementation start
 
@@ -99,7 +110,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
                       {
                            MessageBusDriver = messageBusDriver;
                            Configuration = configuration;
-                           TargetClient = Guid.Parse(Configuration.GetValue<string>("StreamFlowConfiguration:Targets:{{serviceName}}Service"));
+                           TargetClient = "{{serviceId}}";
                       }
                       
                       public async Task<CmdResponse<{{model}}>> Create({{model}} entity)
@@ -147,22 +158,12 @@ public class ServiceWrapperGenerator : ISourceGenerator
                   
                       public async Task<QueryResponse<PaginatedResult<{{model}}>>> GetList(int pageSize, int pageNumber, Guid? tenantId = null, bool? includeNavigations = false, List<QueryFilter>? filter = null)
                       {
-                          var t = await SendAsync(new GetList<{{model}}>(pageSize, pageNumber, tenantId, includeNavigations, filter));
-                          return new QueryResponse<PaginatedResult<{{model}}>>
-                          {
-                              HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
-                              Message = t?.Message
-                          };
+                          return await SendAsync<GetList<{{model}}>, PaginatedResult<{{model}}>>(new GetList<{{model}}>(pageSize, pageNumber, tenantId, includeNavigations, filter));
                       }
                   
                       public async Task<QueryResponse<{{model}}>> Get(Guid id, Guid? tenantId = null, bool? includeNavigations = null)
                       {
-                          var t = await SendAsync(new Get<{{model}}>(id, tenantId, includeNavigations));
-                          return new QueryResponse<{{model}}>
-                          {
-                              HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
-                              Message = t?.Message
-                          };
+                          return await SendAsync<Get<{{model}}>, {{model}}>(new Get<{{model}}>(id, tenantId, includeNavigations));
                       }
                   }
                   """);   

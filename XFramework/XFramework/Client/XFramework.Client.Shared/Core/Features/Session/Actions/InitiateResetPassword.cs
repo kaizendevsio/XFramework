@@ -6,14 +6,14 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class InitiateResetPassword : NavigableRequest, IRequest<CmdResponse>;
+    public record InitiateResetPassword : NavigableRequest;
     
     public class InitiateResetPasswordHandler(IHelperService helperService, HandlerServices handlerServices, IStore store)
-        : ActionHandler<InitiateResetPassword, CmdResponse>(handlerServices, store)
+        : StateActionHandler<InitiateResetPassword>(handlerServices, store)
     {
         private SessionState CurrentState => Store.GetState<SessionState>();
         
-        public override async Task<CmdResponse> Handle(InitiateResetPassword action, CancellationToken aCancellationToken)
+        public override async Task Handle(InitiateResetPassword action, CancellationToken aCancellationToken)
         {
             await Mediator.Send(new ApplicationState.SetState() { IsBusy = true });
 
@@ -34,18 +34,9 @@ public partial class SessionState
             catch (Exception e)
             {
                 SweetAlertService.FireAsync("Error", $"{e.Message}", SweetAlertIcon.Error);
-                return new()
-                {
-                    Message = e.Message,
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
-                };
             }
 
             await Mediator.Send(new ApplicationState.SetState() { IsBusy = false });
-            return new()
-            {
-                HttpStatusCode = HttpStatusCode.Accepted,
-            };
         }
     }
 }

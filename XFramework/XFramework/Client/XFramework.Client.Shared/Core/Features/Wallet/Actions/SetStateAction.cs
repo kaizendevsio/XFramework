@@ -4,7 +4,7 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public record SetState : BaseAction
+    public record SetState : StateAction
     {
         public List<Domain.Generic.Contracts.Wallet>? WalletList { get; set; }
         public Domain.Generic.Contracts.Wallet? Selected { get; set; }
@@ -13,7 +13,7 @@ public partial class WalletState
     }
     
     protected class SetStateHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<SetState>(handlerServices, store)
+        : StateActionHandler<SetState>(handlerServices, store)
     {
         private WalletState CurrentState => Store.GetState<WalletState>();
       

@@ -31,11 +31,11 @@ public class MediatRRegistrationGenerator : ISourceGenerator
         using XFramework.Core.DataAccess.Query;
         using XFramework.Domain.Generic.Contracts;
         using XFramework.Domain.Generic.Contracts.Requests;
-        using {namespaceName};
 
 
         namespace {serviceName}.Api.Extensions
         {{
+        using {namespaceName};
             public static class MediatRServiceExtensions
             {{
                 public static void AddMediatRHandlers(this IServiceCollection services)

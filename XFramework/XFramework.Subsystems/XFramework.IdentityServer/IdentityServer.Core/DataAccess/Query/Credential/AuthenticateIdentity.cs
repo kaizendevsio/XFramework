@@ -1,10 +1,14 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Requests;
+﻿using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using IdentityServer.Domain.Generic.Contracts.Requests;
 using IdentityServer.Domain.Generic.Contracts.Responses;
 using IdentityServer.Domain.Generic.Enums;
 using XFramework.Core.Services;
 using XFramework.Integration.Abstractions;
 
 namespace IdentityServer.Core.DataAccess.Query.Credential;
+using XFramework.Domain.Generic.Contracts;
 
 public class AuthenticateIdentity(
         IJwtService jwtService,
@@ -63,9 +67,11 @@ public class AuthenticateIdentity(
         var token = new JwtToken();
         if (request.GenerateToken)
         {
-            token = await jwtService.GenerateToken(request.Username, credential.Id, roleList.Select(i => i.TypeId).Adapt<List<RoleEntity>>());
+            token = await jwtService.GenerateToken(request.Username, credential.Id, roleList.Select(i => i.TypeId ?? Guid.Empty).ToList());
         }
         //_recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
+
+        credential = helperService.RemoveCircularReference(credential);
         
         return new()
         {
@@ -106,7 +112,7 @@ public class AuthenticateIdentity(
                     .FirstOrDefaultAsync(i => i.TenantId == tenant.Id & i.Key == "DefaultAuthorizeBy", cancellationToken: cancellationToken);
                 if (getDefaults is null)
                 {
-                    throw new ArgumentException($"Unable to login: Application with Guid '{tenant.Id}' does not have 'DefaultAuthorizeBy' key in registry");
+                    throw new ArgumentException($"Unable to login: Tenant with id '{tenant.Id}' does not have 'DefaultAuthorizeBy' key in registry");
                 }
                 authorizationType = (AuthorizationType) int.Parse(getDefaults.Value);
                 goto reAuth;

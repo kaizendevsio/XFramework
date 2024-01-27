@@ -2,7 +2,7 @@
 
 namespace XFramework.Client.Shared.Entity.Models.Requests.Wallet;
 
-public class SendWalletRequest : NavigableRequest
+public record SendWalletRequest : NavigableRequest
 {
     public Guid SenderCredentialId { get; set; }
     public Guid RecipientCredentialId { get; set; }

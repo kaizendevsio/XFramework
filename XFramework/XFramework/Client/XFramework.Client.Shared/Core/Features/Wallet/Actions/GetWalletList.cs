@@ -5,14 +5,16 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class GetWalletList : NavigableRequest, IAction;
+    public record GetWalletList : NavigableRequest, IAction;
     
     protected class GetWalletListHandler(
         IWalletsServiceWrapper walletsServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : ActionHandler<GetWalletList>(handlerServices, store)
+        : StateActionHandler<GetWalletList>(handlerServices, store)
     {
+        private WalletState CurrentState => Store.GetState<WalletState>();
+        
         public override async Task Handle(GetWalletList action, CancellationToken aCancellationToken)
         {
             if (SessionState.State is not CurrentSessionState.Active) return;
@@ -30,7 +32,7 @@ public partial class WalletState
             if (await HandleFailure(response, action, true)) return;
 
             // Set Session State To Active
-            await Mediator.Send(new SetState() { WalletList = response.Response.Items.ToList() });
+            CurrentState.WalletList = response.Response?.Items.ToList();
 
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(response, action, true);

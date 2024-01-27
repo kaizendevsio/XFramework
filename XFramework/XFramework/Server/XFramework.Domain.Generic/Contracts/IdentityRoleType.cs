@@ -6,8 +6,6 @@ public partial class IdentityRoleType : BaseModel
 
     public short? RoleLevel { get; set; }
 
-    public Guid TenantId { get; set; }
-
     public Guid GroupId { get; set; }
 
     public virtual Tenant Tenant { get; set; } = null!;

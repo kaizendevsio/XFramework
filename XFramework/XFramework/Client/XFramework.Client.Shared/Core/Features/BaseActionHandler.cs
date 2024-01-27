@@ -8,7 +8,7 @@ using XFramework.Client.Shared.Entity.Models.Requests.Common;
 
 namespace XFramework.Client.Shared.Core.Features;
 
-public class BaseActionHandler
+public class BaseStateActionHandler
 {
     public IConfiguration Configuration { get;set; }
     public IndexedDbService IndexedDbService { get; set; }
@@ -35,7 +35,7 @@ public class BaseActionHandler
     public async Task<CmdResponse> HandleFailure<TAction>(TAction action, string message, bool silent = false)
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-        
+       
         // Display message to UI
         if (!silent)
         {
@@ -43,7 +43,7 @@ public class BaseActionHandler
                 ? $"There was an error while trying to process your request, please try again later"
                 : $"{message}", SweetAlertIcon.Error);
         }
-
+        
         // Display error to the console
         Console.WriteLine($"Error from response: {message}");
 
@@ -60,6 +60,19 @@ public class BaseActionHandler
         if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
+        if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
+        {
+            switch (response.HttpStatusCode)
+            {
+                case HttpStatusCode.InternalServerError:
+                    SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
+                    
+                    goto JumpToError;
+                    break;
+            }
+
+        }
+        
         // Display message to UI
         switch (silent)
         {
@@ -74,6 +87,8 @@ public class BaseActionHandler
                     : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
                 break;
         }
+
+        JumpToError:
 
         // Display error to the console
         Console.WriteLine($"Error from response: {response.Message}");
@@ -86,6 +101,19 @@ public class BaseActionHandler
         if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
+        if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
+        {
+            switch (response.HttpStatusCode)
+            {
+                case HttpStatusCode.InternalServerError:
+                    SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
+                    
+                    goto JumpToError;
+                    break;
+            }
+
+        }
+        
         // Display message to UI
         switch (silent)
         {
@@ -101,6 +129,8 @@ public class BaseActionHandler
                 break;
         }
 
+        JumpToError:
+
         // Display error to the console
         Console.WriteLine($"Error from response: {response.Message}");
 
@@ -111,6 +141,19 @@ public class BaseActionHandler
     {
         if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
+
+        if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
+        {
+            switch (response.HttpStatusCode)
+            {
+                case HttpStatusCode.InternalServerError:
+                    SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
+                    
+                    goto JumpToError;
+                    break;
+            }
+
+        }
         
         // Display message to UI
         switch (silent)
@@ -127,6 +170,7 @@ public class BaseActionHandler
                 break;
         }
 
+        JumpToError:
         // Display error to the console
         Console.WriteLine($"Error from response: {response.Message}");
 
@@ -331,12 +375,12 @@ public class BaseActionHandler
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressMessage = title, NoSpinner = false});
     }
-    public async Task ReportTask<T>(QueryAction<T> action)
+    public async Task ReportTask<T>(QueryAction action)
     {
         if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, ProgressTitle = action.GetType().Name, NoSpinner = false});
     }
-    public async Task ReportTask<T,TQ>(QueryAction<TQ> action, IEnumerable<T> list)
+    public async Task ReportTask<T,TQ>(QueryAction action, IEnumerable<T> list)
     {
         if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
         if (list.TryGetNonEnumeratedCount(out var count) && count > 0) return;
@@ -348,7 +392,7 @@ public class BaseActionHandler
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
     }
     
-    public async Task ReportTaskCompleted<T>(QueryAction<T> action)
+    public async Task ReportTaskCompleted(QueryAction action)
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
     }
@@ -367,10 +411,10 @@ public class BaseActionHandler
     }
 }
 
-public abstract class ActionHandler<TAction> : BaseActionHandler, IRequestHandler<TAction>
+public abstract class StateActionHandler<TAction> : BaseStateActionHandler, IRequestHandler<TAction>
     where TAction : IAction
 {
-    protected ActionHandler(HandlerServices handlerServices, IStore store)
+    protected StateActionHandler(HandlerServices handlerServices, IStore store)
     {
         Configuration = handlerServices.Configuration;
         SessionStorageService = handlerServices.SessionStorageService;
@@ -379,6 +423,7 @@ public abstract class ActionHandler<TAction> : BaseActionHandler, IRequestHandle
         NavigationManager = handlerServices.NavigationManager;
         EndPoints = handlerServices.EndPoints;
         HttpClient = handlerServices.HttpClient;
+        HostEnvironment = handlerServices.HostEnvironment;
         BaseHttpClient = handlerServices.BaseHttpClient;
         JsRuntime = handlerServices.JsRuntime;
         Mediator = handlerServices.Mediator;
@@ -387,7 +432,7 @@ public abstract class ActionHandler<TAction> : BaseActionHandler, IRequestHandle
     public abstract Task Handle(TAction action, CancellationToken aCancellationToken);
 }
 
-public abstract class EventHandler<TAction> : BaseActionHandler, INotificationHandler<TAction>
+public abstract class EventHandler<TAction> : BaseStateActionHandler, INotificationHandler<TAction>
     where TAction : INotification
 {
     protected EventHandler(HandlerServices handlerServices, IStore store)
@@ -399,6 +444,7 @@ public abstract class EventHandler<TAction> : BaseActionHandler, INotificationHa
         NavigationManager = handlerServices.NavigationManager;
         EndPoints = handlerServices.EndPoints;
         HttpClient = handlerServices.HttpClient;
+        HostEnvironment = handlerServices.HostEnvironment;
         BaseHttpClient = handlerServices.BaseHttpClient;
         JsRuntime = handlerServices.JsRuntime;
         Mediator = handlerServices.Mediator;
@@ -408,10 +454,10 @@ public abstract class EventHandler<TAction> : BaseActionHandler, INotificationHa
 
 }
 
-public abstract class ActionHandler<TAction, TResponse> : BaseActionHandler, IRequestHandler<TAction, TResponse> 
+public abstract class StateActionHandler<TAction, TResponse> : BaseStateActionHandler, IRequestHandler<TAction, TResponse> 
     where TAction : IRequest<TResponse>
 {
-    protected ActionHandler(HandlerServices handlerServices, IStore store)
+    protected StateActionHandler(HandlerServices handlerServices, IStore store)
     {
         Configuration = handlerServices.Configuration;
         SessionStorageService = handlerServices.SessionStorageService;
@@ -420,6 +466,7 @@ public abstract class ActionHandler<TAction, TResponse> : BaseActionHandler, IRe
         NavigationManager = handlerServices.NavigationManager;
         EndPoints = handlerServices.EndPoints;
         HttpClient = handlerServices.HttpClient;
+        HostEnvironment = handlerServices.HostEnvironment;
         BaseHttpClient = handlerServices.BaseHttpClient;
         JsRuntime = handlerServices.JsRuntime;
         Mediator = handlerServices.Mediator;

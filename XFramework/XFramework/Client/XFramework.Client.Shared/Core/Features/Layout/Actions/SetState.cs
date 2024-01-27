@@ -4,14 +4,14 @@ namespace XFramework.Client.Shared.Core.Features.Layout;
 
 public partial class LayoutState
 {
-    public record SetState : BaseAction
+    public record SetState : StateAction
     {
         public LayoutIntent LayoutIntent { get; set; }
         public ViewProp View { get; set; }
     }
     
     protected class SetStateHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<SetState>(handlerServices, store)
+        : StateActionHandler<SetState>(handlerServices, store)
     {
         private LayoutState CurrentState => Store.GetState<LayoutState>();
 

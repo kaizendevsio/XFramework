@@ -1,6 +1,9 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
+using HashidsNet;
+using IdentityServer.Domain.Generic.Contracts.Requests;
+using IdentityServer.Domain.Generic.Contracts.Responses;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,19 +11,22 @@ using Microsoft.Extensions.Logging;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.BusinessObjects;
 using StreamFlow.Domain.Generic.Contracts.Requests;
+using TypeSupport.Extensions;
 using XFramework.Domain.Generic.Configurations;
+using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Drivers;
+using XFramework.Integration.Security;
 
 namespace XFramework.Integration.Services;
 
-public class SignalRService : ISignalRService
+public class SignalRService : BaseSignalRHandler, ISignalRService
 {
     private readonly ILogger<SignalRService> _logger;
     private readonly IMediator _mediator;
     private readonly ILogger<BaseSignalRHandler> _baseLogger;
     private readonly IServiceScopeFactory _scopeFactory;
-    private Guid _clientId;
+    private string _clientId;
     private bool _isRegistered;
     private bool _isRegistering;
     private bool _subscriptionsEventHandle;
@@ -65,7 +71,7 @@ public class SignalRService : ISignalRService
     {
         Connection?.On<string, string>("Ping", (intent, message) => { _logger.LogInformation("Message Received ({Now}): [{Intent}] {Message}", DateTime.Now, intent, message); });
 
-        RegisterHandlers();
+        ScanAndRegisterHandlers();
         HandleInvokeResponseEvent();
         HandleTelemetryCallEvent();
         HandleReconnectingEvent();
@@ -73,7 +79,52 @@ public class SignalRService : ISignalRService
         HandleClosedEvent();
     }
 
-    private void RegisterHandlers()
+    public Task AddHandlersFromAssembly<T>()
+    {
+        var typesImplementingStreamflowRequest = Assembly.GetAssembly(typeof(T)).GetTypes()
+            .Where(x => !x.IsInterface && !x.IsAbstract)
+            .SelectMany(x => x.GetInterfaces(), (x, i) => new { Type = x, Interface = i })
+            .Where(x => x.Interface.IsGenericType && x.Interface.GetGenericTypeDefinition() == typeof(IStreamflowRequest<,>))
+            .ToList();
+
+        foreach (var type in typesImplementingStreamflowRequest)
+        {
+            var genericArguments = type.Interface.GetGenericArguments();
+
+            // Ensure there are exactly two generic arguments (TRequest, TResponse)
+            if (genericArguments.Length == 2)
+            {
+                Type tRequest = genericArguments[0];
+                Type tResponse = genericArguments[1];
+
+                // Now you have TRequest and TResponse for each type that implements IStreamflowRequest<TRequest, TResponse>
+                // You can process them as needed, for example:
+                Console.WriteLine($"Type: {type.Type.Name}, TRequest: {tRequest.Name}, TResponse: {tResponse.Name}");
+        
+                // If you need to invoke HandleRequestCmd or other methods dynamically, you can do so here.
+
+                if (tResponse.IsAssignableTo(typeof(ICmdResponse)))
+                {
+                    // Use reflection to call HandleRequestCmd with the correct type arguments
+                    var methodInfo = GetType()
+                        .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
+                        .First(m => m.Name == nameof(HandleRequestCmd) && m.GetGenericArguments().Length == 1);
+                    
+                    var genericMethod = methodInfo.MakeGenericMethod(tRequest);
+                    genericMethod.Invoke(this, new object[] { Connection, _mediator, _baseLogger, _scopeFactory });
+                }
+                else if (tResponse.IsAssignableTo(typeof(IQueryResponse)))
+                {
+                    var methodInfo = GetType().GetMethod(nameof(HandleRequestQuery), BindingFlags.NonPublic | BindingFlags.Instance);
+                    var genericMethod = methodInfo.MakeGenericMethod(tRequest, tResponse.GetGenericArguments().First());
+                    genericMethod.Invoke(this, new object[] { Connection, _mediator, _baseLogger, _scopeFactory });
+                }
+            }
+        }
+        return Task.CompletedTask;
+    }
+
+    private void ScanAndRegisterHandlers()
     {
         var installers = Assembly.GetEntryAssembly().ExportedTypes
             .Where(x => typeof(ISignalREventHandler).IsAssignableFrom(x) && x is { IsInterface: false, IsAbstract: false })
@@ -273,13 +324,15 @@ public class SignalRService : ISignalRService
         var startTimer = Stopwatch.StartNew();
         _logger.LogInformation("Registering Connection..");
         
-
-        _clientId = StreamFlowConfiguration.Anonymous ? Guid.NewGuid() : StreamFlowConfiguration.ClientGuid ?? throw new ArgumentException("Client Guid is not set");
+        var serviceName = Assembly.GetEntryAssembly()?.GetName().Name.Split(".").First() ?? throw new ArgumentException("Assembly name is not set");
+        var serviceId = serviceName.ToSha256();
+        
+        _clientId = StreamFlowConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Streamflow client Id is not set");
         _logger.LogInformation("Registering streamflow client with id {ClientId}", _clientId);
         
         var request = new StreamFlowClient()
         {
-            Guid = _clientId,
+            Id = _clientId,
             Name = StreamFlowConfiguration.ClientName
         };
         await Connection?.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
@@ -318,7 +371,7 @@ public class SignalRService : ISignalRService
         var startTimer = Stopwatch.StartNew();
         sfMessage.ClientId = _clientId;
         
-        _logger.LogInformation("Invoking Method \'{SfMessageCommandName}\' on {SfMessageRecipientId}", sfMessage.CommandName, sfMessage.RecipientId);
+        _logger.LogWarning("Invoking Method \'{SfMessageCommandName}\' on {SfMessageRecipientId}", sfMessage.CommandName, sfMessage.RecipientId);
         
         var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage>();
 
@@ -330,13 +383,12 @@ public class SignalRService : ISignalRService
             }
 
             var response = methodCallCompletionSource.Task.ConfigureAwait(false);
-
             var signalRResponse = await InvokeVoidAsync(nameof(IStreamFlow.Push), sfMessage);
             
             if (signalRResponse is HttpStatusCode.ServiceUnavailable or HttpStatusCode.NotFound)
             {
                 startTimer.Stop();
-                _logger.LogInformation("Invoked Method \'{SfMessageCommandName}\' resulted in {ResponseStatusCode} response", sfMessage.CommandName, signalRResponse);
+                _logger.LogWarning("Invoked Method \'{SfMessageCommandName}\' resulted in {ResponseStatusCode} response", sfMessage.CommandName, signalRResponse);
                 return new()
                 {
                     ResponseStatusCode = signalRResponse
@@ -346,20 +398,21 @@ public class SignalRService : ISignalRService
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300_000));
             cts.Token.Register(() => methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out")));
 
-            _logger.LogInformation("Awaiting response for Invoked Method \'{SfMessageCommandName}\'", sfMessage.CommandName);
+            _logger.LogWarning("Awaiting response for Invoked Method \'{SfMessageCommandName}\'", sfMessage.CommandName);
 
             try
             {
                 var streamFlowMessage = await response;
                 
                 startTimer.Stop();
-                _logger.LogInformation("Response for Invoked Method \'{SfMessageCommandName}\' received in {ElapsedMilliseconds}ms", sfMessage.CommandName, startTimer.ElapsedMilliseconds);
+                _logger.LogWarning("Response for Invoked Method \'{SfMessageCommandName}\' received in {ElapsedMilliseconds}ms", sfMessage.CommandName, startTimer.ElapsedMilliseconds);
 
                 return new()
                 {
                     ResponseStatusCode = HttpStatusCode.Accepted,
                     Data = streamFlowMessage.Data,
-                    Message = streamFlowMessage.Message
+                    Message = streamFlowMessage.Message,
+                    Duration = startTimer.Elapsed
                 };
             }
             catch (Exception e)

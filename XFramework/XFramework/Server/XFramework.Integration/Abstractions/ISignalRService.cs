@@ -11,6 +11,7 @@ public interface ISignalRService : IXFrameworkService
 
     Task<bool> EnsureConnection();
     Task StartEventListener(string topic);
+    Task AddHandlersFromAssembly<T>();
 
     Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage);
 

@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public record SetState : BaseAction
+    public record SetState : StateAction
     {
         public CurrentSessionState? State { get; set; }
         public List<IdentityContact> ContactList { get; set; }
@@ -18,7 +18,7 @@ public partial class SessionState
     }
     
     protected class SetStateHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<SetState>(handlerServices, store)
+        : StateActionHandler<SetState>(handlerServices, store)
     {
         private SessionState CurrentState => Store.GetState<SessionState>();
         

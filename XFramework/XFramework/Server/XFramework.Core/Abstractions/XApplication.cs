@@ -1,8 +1,11 @@
-﻿namespace XFramework.Core.Abstractions;
+﻿using Microsoft.EntityFrameworkCore;
+using XFramework.Integration.Abstractions;
+
+namespace XFramework.Core.Abstractions;
 
 public static class XApplication
 {
-    public static WebApplication Build<T>()
+    public static IApplicationBuilder Build<T>()
     {
         var builder = WebApplication.CreateBuilder();
         builder.Host.UseSerilog();
@@ -27,8 +30,35 @@ public static class XApplication
         return app;
     }
 
-    public static void Run(this WebApplication app)
+    public static IApplicationBuilder UseCustomRequestsInAssembly<T>(this IApplicationBuilder app)
     {
-        app.Run();
+        var signalRService = app.ApplicationServices.GetRequiredService<ISignalRService>();
+        
+        signalRService.AddHandlersFromAssembly<T>();
+        return app;
+    }
+
+    public static IApplicationBuilder EnsureDatabase<TDbContext>(this IApplicationBuilder app)
+        where TDbContext : DbContext
+    {
+        using var serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>().CreateScope();
+        var dbContext = serviceScope.ServiceProvider.GetRequiredService<TDbContext>();
+
+        var canMigrate = dbContext.Database.GetPendingMigrations().Any();
+        if (!canMigrate)
+        {
+            dbContext.Database.EnsureCreated();
+        }
+        else
+        {
+            dbContext.Database.Migrate();
+        }
+
+        return app;
+    }
+    
+    public static void Run(this IApplicationBuilder app)
+    {
+        (app as WebApplication).Run();
     }
 }

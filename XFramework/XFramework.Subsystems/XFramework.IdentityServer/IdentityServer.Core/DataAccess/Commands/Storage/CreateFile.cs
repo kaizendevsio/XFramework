@@ -6,7 +6,7 @@ using XFramework.Core.Services;
 namespace IdentityServer.Core.DataAccess.Commands.Storage;
 
 public class CreateFile(
-        AppDbContext appDbContext,
+        DbContext dbContext,
         ILogger<CreateFile> logger,
         ITenantService tenantService,
         IRequestHandler<Create<StorageFile>, CmdResponse<StorageFile>> baseHandler
@@ -15,7 +15,7 @@ public class CreateFile(
 {
     public async Task<CmdResponse<StorageFile>> Handle(Create<StorageFile> request, CancellationToken cancellationToken)
     {
-        var storageFileType = await appDbContext.StorageFileTypes.FirstOrDefaultAsync(i => i.Id == request.Model.TypeId, cancellationToken);
+        var storageFileType = await dbContext.Set<StorageFileType>().FirstOrDefaultAsync(i => i.Id == request.Model.TypeId, cancellationToken);
         if (storageFileType == null)
         {
             return new ()
@@ -25,7 +25,7 @@ public class CreateFile(
             };
         }
      
-        var fileIdentifier = await appDbContext.StorageFileIdentifiers.FirstOrDefaultAsync(i => i.Id == request.Model.StorageFileIdentifierId, cancellationToken);
+        var fileIdentifier = await dbContext.Set<StorageFileIdentifier>().FirstOrDefaultAsync(i => i.Id == request.Model.StorageFileIdentifierId, cancellationToken);
         if (fileIdentifier == null)
         {
             return new ()
@@ -36,7 +36,7 @@ public class CreateFile(
         }
 
         // Upload Files to azure blob storage
-        var connectionConfig =  await appDbContext.RegistryConfigurationGroups
+        var connectionConfig =  await dbContext.Set<RegistryConfigurationGroup>()
             .Include(i => i.RegistryConfigurations)
             .FirstOrDefaultAsync(i => i.Name == "AzureBlobStorage", CancellationToken.None);
 

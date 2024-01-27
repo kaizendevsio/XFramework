@@ -1,4 +1,5 @@
 ﻿using XFramework.Client.Shared.Entity.Models.Requests.Wallet;
+using XFramework.Domain.Generic.Contracts;
 
 namespace XFramework.Client.Shared.Core.Features.Wallet;
 
@@ -9,6 +10,7 @@ public partial class WalletState : State<WalletState>
     }
     
     public List<Domain.Generic.Contracts.Wallet>? WalletList { get; set; }
+    public List<WalletTransaction>? TransactionList { get; set; }
     public Domain.Generic.Contracts.Wallet? Selected { get; set; }
     public SendWalletRequest SendWalletVm { get; set; } = new();
     public SendWalletRequest CurrentTransactionVm { get; set; } = new();

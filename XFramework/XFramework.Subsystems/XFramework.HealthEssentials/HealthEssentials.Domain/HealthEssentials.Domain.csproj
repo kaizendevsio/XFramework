@@ -16,12 +16,14 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain\XFramework.Domain.csproj" />
       <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="Migrations\" />
+      <Folder Include="Migrations\HealthEssentials\" />
     </ItemGroup>
     
 </Project>

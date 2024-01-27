@@ -3,7 +3,7 @@ using XFramework.Integration.Attributes;
 
 namespace Wallets.Integration.Generators;
 
-[GenerateStreamFlowWrapper("XFramework.Domain.Generic.Contracts",new[] {
+[StreamFlowWrapper("XFramework.Domain.Generic.Contracts",new[] {
     nameof(Wallet),
     nameof(WalletType),
     nameof(WalletAddress),

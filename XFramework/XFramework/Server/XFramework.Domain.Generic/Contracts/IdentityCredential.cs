@@ -19,18 +19,13 @@ public partial class IdentityCredential : BaseModel
     [NotMapped]
     public string? Password { get; set; }
 
-    public Guid TenantId { get; set; }
-
     public string? Token { get; set; }
 
 
     public virtual Tenant Tenant { get; set; } = null!;
 
     public virtual ICollection<AuthorizationLog> AuthorizationLogs { get; set; } = new List<AuthorizationLog>();
-
-    public virtual ICollection<BillsPaymentTransaction> BillsPaymentTransactions { get; set; } =
-        new List<BillsPaymentTransaction>();
-
+    
     public virtual ICollection<BusinessPackage> BusinessPackageConsumedByNavigations { get; set; } =
         new List<BusinessPackage>();
 
@@ -47,7 +42,6 @@ public partial class IdentityCredential : BaseModel
 
     public virtual ICollection<DepositRequest> DepositRequests { get; set; } = new List<DepositRequest>();
 
-    public virtual ICollection<EloadTransaction> EloadTransactions { get; set; } = new List<EloadTransaction>();
 
     public virtual ICollection<IdentityContact> IdentityContacts { get; set; } = new List<IdentityContact>();
 
@@ -67,7 +61,7 @@ public partial class IdentityCredential : BaseModel
 
     public virtual ICollection<MessageThreadMember> MessageThreadMembers { get; set; } = new List<MessageThreadMember>();
 
-    public virtual ICollection<SessionDatum> SessionData { get; set; } = new List<SessionDatum>();
+    public virtual ICollection<Session> SessionData { get; set; } = new List<Session>();
 
     public virtual ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
 

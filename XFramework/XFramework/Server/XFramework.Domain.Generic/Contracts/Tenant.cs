@@ -23,8 +23,6 @@ public partial class Tenant : BaseModel
 
     public virtual ICollection<IdentityRoleType> IdentityRoleTypes { get; } = new List<IdentityRoleType>();
 
-    public virtual ICollection<Log> Logs { get; } = new List<Log>();
-
     public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; } =
         new List<RegistryConfiguration>();
 

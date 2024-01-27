@@ -32,7 +32,7 @@ public class MessageQueueHub : Hub<IStreamFlow>
         _cachingService.LatestClients.Remove(cachedClient.Key, out _);
 
         await base.OnDisconnectedAsync(exception);
-        _logger.LogInformation("Connection Lost and Unregistered with ID {ContextConnectionId} : {ValueGuid} : {ValueName}", Context.ConnectionId, a?.Guid, a?.Name);
+        _logger.LogInformation("Connection Lost and Unregistered with ID {ContextConnectionId} : {ValueGuid} : {ValueName}", Context.ConnectionId, a?.Id, a?.Name);
     }
 
     public StreamFlowInvokeResponse Invoke(StreamFlowMessage request)
@@ -84,7 +84,7 @@ public class MessageQueueHub : Hub<IStreamFlow>
     }
     public async Task<HttpStatusCode> Unsubscribe(StreamFlowClient request)
     {
-        await Groups.RemoveFromGroupAsync(request.StreamId, request.Queue.Guid.ToString());
+        await Groups.RemoveFromGroupAsync(request.StreamId, request.Queue.Id.ToString());
         return HttpStatusCode.Accepted;
     }
 }

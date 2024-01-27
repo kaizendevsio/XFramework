@@ -1,4 +1,6 @@
-﻿using Messaging.Integration.Drivers;
+﻿using IdentityServer.Integration.Drivers;
+using Messaging.Integration.Drivers;
+using Tenant.Integration.Drivers;
 
 namespace HealthEssentials.Api.Installers;
 
@@ -10,7 +12,10 @@ public class ServicesInstaller : IInstaller
         /*services.AddIdentityServerWrapperServices();
         services.AddDecoratorHandlers(typeof(IdentityServerCore).Assembly);*/
         
+        services.AddTenantService();
         services.AddHealthEssentialsWrapperServices();
+        services.AddIdentityServerWrapperServices();
+        services.AddTenantWrapperServices();
         services.AddMessagingWrapperServices();
     }
 }

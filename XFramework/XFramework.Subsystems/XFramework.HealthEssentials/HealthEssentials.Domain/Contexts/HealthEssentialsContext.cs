@@ -1,9 +1,9 @@
 ﻿using HealthEssentials.Domain.Generics.Contracts;
 using Microsoft.EntityFrameworkCore;
 
-namespace XFramework.Domain.Contexts;
+namespace HealthEssentials.Domain.Contexts;
 
-public partial class HealthEssentialsContext : Microsoft.EntityFrameworkCore.DbContext
+public partial class HealthEssentialsContext : DbContext
 {
     public HealthEssentialsContext()
     {
@@ -211,11 +211,7 @@ public partial class HealthEssentialsContext : Microsoft.EntityFrameworkCore.DbC
     public virtual DbSet<VendorType> VendorTypes { get; set; }
 
     public virtual DbSet<VendorTypeGroup> VendorTypeGroups { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=HealthEssentials;Username=xnelsystems-migration;Password=BqzX}V~,/p:7]K(FRH-bun!6PG?_g^<#h2EdtAQM[35x8;Pooling=true;MinPoolSize=2;MaxPoolSize=900;Timeout=300;CommandTimeout=300;");
-
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         
@@ -3063,138 +3059,323 @@ public partial class HealthEssentialsContext : Microsoft.EntityFrameworkCore.DbC
                 Name = "Unnamed",
             }
         );
+
+        modelBuilder.Entity<ConsultationType>().HasData(
+            new ConsultationType
+            {
+                Id = new Guid("5037e7ae-864c-4336-b0bd-32350cf334aa"),
+                Name = "Emergency Consultation",
+                Description = "Urgent consultation for acute illnesses or injuries",
+                GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+            },
+            new ConsultationType
+            {
+                Id = new Guid("f9c35417-bc70-4035-b70a-ac2c71b8a051"),
+                Name = "Follow-up Check-up",
+                Description = "Subsequent check-up following an initial consultation or treatment",
+                GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+            },
+            new ConsultationType
+            {
+                Id = new Guid("cda4df14-aa1c-4fc9-86a4-cb855b84b555"),
+                Name = "General Check-up",
+                Description = "Routine health check-up with primary care physician",
+                GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+            },
+            new ConsultationType
+            {
+                Id = new Guid("73e5ed91-581e-47bf-8d7e-9c273847c483"),
+                Name = "Mental Health Consultation",
+                Description = "Consultation for mental health issues (e.g., with a psychiatrist or psychologist)",
+                GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+            },
+            new ConsultationType
+            {
+                Id = new Guid("3259dc78-49d0-4359-8c8b-b3cfe7ccc421"),
+                Name = "Post-surgical Follow-up",
+                Description = "Follow-up visit after a surgical procedure",
+                GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+            },
+            new ConsultationType
+            {
+                Id = new Guid("c3221472-9a87-4be9-982a-d442296b487a"),
+                Name = "Pre-surgical Consultation",
+                Description = "Consultation before undergoing surgery",
+                GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+            },
+            new ConsultationType
+            {
+                Id = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Specialist Consultation",
+                Description = "Consultation with a medical specialist (e.g., cardiologist, neurologist)",
+                GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
+            }
+        );
+
+        modelBuilder.Entity<Consultation>().HasData(
+            new Consultation
+            {
+                Id = new Guid("ac671073-c789-41c4-8c63-eb9c9084fde9"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Cardiologist",
+                Description = "Heart and cardiovascular system related consultations"
+            },
+            new Consultation
+            {
+                Id = new Guid("c051027c-dd33-4b2b-ac59-0024e650b231"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Dermatologist",
+                Description = "Skin related consultations, including skin diseases, allergies, and cosmetic concerns"
+            },
+            new Consultation
+            {
+                Id = new Guid("8c0d8be1-5241-40e9-bf2c-5a458ba58bac"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "ENT (Ear, Nose, Throat)",
+                Description = "Consultation for conditions affecting the ear, nose, and throat"
+            },
+            new Consultation
+            {
+                Id = new Guid("f354d822-c472-4677-8086-7d6ec89047bf"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Gastroenterologist",
+                Description = "Consultation for digestive system and gastrointestinal tract issues"
+            },
+            new Consultation
+            {
+                Id = new Guid("439c4908-63e2-4648-92b6-8ed10772e7ef"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "General Check-up",
+                Description = "Routine health check-up with a primary care physician"
+            },
+            new Consultation
+            {
+                Id = new Guid("0297352d-4788-4ee4-9241-e2cea66e41cd"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Neurologist",
+                Description = "Consultation for disorders of the nervous system, brain, and spinal cord"
+            },
+            new Consultation
+            {
+                Id = new Guid("46e7bbe6-7ffe-47f7-858b-0f521273eb0f"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Optometrist/Ophthalmologist",
+                Description = "Eye examinations, vision care, and treatment of eye-related conditions"
+            },
+            new Consultation
+            {
+                Id = new Guid("aa4e36c7-cde2-481b-9c6a-e7276ab8f55a"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Orthopedist",
+                Description = "Consultation for issues related to bones, joints, muscles, and ligaments"
+            },
+            new Consultation
+            {
+                Id = new Guid("901e6429-b7a1-421e-a72c-f25f4963e81b"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Pediatrician",
+                Description = "Healthcare for infants, children, and adolescents"
+            },
+            new Consultation
+            {
+                Id = new Guid("17d8f674-e960-4b4b-ac54-4d1f9a42a8d7"),
+                TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
+                Name = "Psychiatrist/Psychologist",
+                Description = "Mental health consultations, including therapy and medication management"
+            },
+            new Consultation
+            {
+                Id = new Guid("66e64415-73ea-4797-bc0a-d13a2c095501"),
+                TypeId = new Guid("cda4df14-aa1c-4fc9-86a4-cb855b84b555"),
+                Name = "General Check-up",
+                Description = "Routine health check-up with primary care physician"
+            }
+        );
         
-         modelBuilder.Entity<ConsultationType>().HasData(
-        new ConsultationType
-        {
-            Id = new Guid("5037e7ae-864c-4336-b0bd-32350cf334aa"),
-            Name = "Emergency Consultation",
-            Description = "Urgent consultation for acute illnesses or injuries",
-            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
-        },
-        new ConsultationType
-        {
-            Id = new Guid("f9c35417-bc70-4035-b70a-ac2c71b8a051"),
-            Name = "Follow-up Check-up",
-            Description = "Subsequent check-up following an initial consultation or treatment",
-            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
-        },
-        new ConsultationType
-        {
-            Id = new Guid("cda4df14-aa1c-4fc9-86a4-cb855b84b555"),
-            Name = "General Check-up",
-            Description = "Routine health check-up with primary care physician",
-            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
-        },
-        new ConsultationType
-        {
-            Id = new Guid("73e5ed91-581e-47bf-8d7e-9c273847c483"),
-            Name = "Mental Health Consultation",
-            Description = "Consultation for mental health issues (e.g., with a psychiatrist or psychologist)",
-            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
-        },
-        new ConsultationType
-        {
-            Id = new Guid("3259dc78-49d0-4359-8c8b-b3cfe7ccc421"),
-            Name = "Post-surgical Follow-up",
-            Description = "Follow-up visit after a surgical procedure",
-            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
-        },
-        new ConsultationType
-        {
-            Id = new Guid("c3221472-9a87-4be9-982a-d442296b487a"),
-            Name = "Pre-surgical Consultation",
-            Description = "Consultation before undergoing surgery",
-            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
-        },
-        new ConsultationType
-        {
-            Id = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Specialist Consultation",
-            Description = "Consultation with a medical specialist (e.g., cardiologist, neurologist)",
-            GroupId = new Guid("3246bc14-c348-4e4e-9b0d-5d1d51760d16")
-        }
-    );
-        
-          modelBuilder.Entity<Consultation>().HasData(
-        new Consultation
-        {
-            Id = new Guid("ac671073-c789-41c4-8c63-eb9c9084fde9"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Cardiologist",
-            Description = "Heart and cardiovascular system related consultations"
-        },
-        new Consultation
-        {
-            Id = new Guid("c051027c-dd33-4b2b-ac59-0024e650b231"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Dermatologist",
-            Description = "Skin related consultations, including skin diseases, allergies, and cosmetic concerns"
-        },
-        new Consultation
-        {
-            Id = new Guid("8c0d8be1-5241-40e9-bf2c-5a458ba58bac"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "ENT (Ear, Nose, Throat)",
-            Description = "Consultation for conditions affecting the ear, nose, and throat"
-        },
-        new Consultation
-        {
-            Id = new Guid("f354d822-c472-4677-8086-7d6ec89047bf"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Gastroenterologist",
-            Description = "Consultation for digestive system and gastrointestinal tract issues"
-        },
-        new Consultation
-        {
-            Id = new Guid("439c4908-63e2-4648-92b6-8ed10772e7ef"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "General Check-up",
-            Description = "Routine health check-up with a primary care physician"
-        },
-        new Consultation
-        {
-            Id = new Guid("0297352d-4788-4ee4-9241-e2cea66e41cd"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Neurologist",
-            Description = "Consultation for disorders of the nervous system, brain, and spinal cord"
-        },
-        new Consultation
-        {
-            Id = new Guid("46e7bbe6-7ffe-47f7-858b-0f521273eb0f"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Optometrist/Ophthalmologist",
-            Description = "Eye examinations, vision care, and treatment of eye-related conditions"
-        },
-        new Consultation
-        {
-            Id = new Guid("aa4e36c7-cde2-481b-9c6a-e7276ab8f55a"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Orthopedist",
-            Description = "Consultation for issues related to bones, joints, muscles, and ligaments"
-        },
-        new Consultation
-        {
-            Id = new Guid("901e6429-b7a1-421e-a72c-f25f4963e81b"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Pediatrician",
-            Description = "Healthcare for infants, children, and adolescents"
-        },
-        new Consultation
-        {
-            Id = new Guid("17d8f674-e960-4b4b-ac54-4d1f9a42a8d7"),
-            TypeId = new Guid("ab3dc83a-0841-45ea-822d-19580b32cd91"),
-            Name = "Psychiatrist/Psychologist",
-            Description = "Mental health consultations, including therapy and medication management"
-        },
-        new Consultation
-        {
-            Id = new Guid("66e64415-73ea-4797-bc0a-d13a2c095501"),
-            TypeId = new Guid("cda4df14-aa1c-4fc9-86a4-cb855b84b555"),
-            Name = "General Check-up",
-            Description = "Routine health check-up with primary care physician"
-        }
-    );
-        
+        // Seeding data for PatientTypeGroup
+        modelBuilder.Entity<PatientTypeGroup>().HasData(
+            new PatientTypeGroup
+            {
+                Id = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
+                Name = "General",
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                // TenantId is not set, defaulting to null
+            },
+            new PatientTypeGroup
+            {
+                Id = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"),
+                Name = "Specialized",
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                // TenantId is not set, defaulting to null
+            }
+        );
+
+        // Seeding data for PatientType
+        modelBuilder.Entity<PatientType>().HasData(
+            new PatientType
+            {
+                Id = new Guid("34ee8325-8060-43c7-b4a8-b8e861db6c47"),
+                Name = "Outpatient",
+                Description = "Outpatient services",
+                GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"), // General
+                SortOrder = 1,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("da22eb54-e064-43d1-89ed-51591f21f903"),
+                Name = "Inpatient",
+                Description = "Inpatient services",
+                GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"), // General
+                SortOrder = 2,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("486917df-2b21-41fe-aa03-c564014f8cad"),
+                Name = "Pediatric",
+                Description = "Specialized pediatric services",
+                GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"), // Specialized
+                SortOrder = 1,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            // Adding new patient types
+            new PatientType
+            {
+                Id = new Guid("1001c82f-987a-4ed2-893f-b0237aec69c4"),
+                Name = "Emergency",
+                Description = "Immediate medical attention for life-threatening conditions",
+                GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"), // General
+                SortOrder = 3,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("e18ac75a-2d74-4670-8da2-201a476306ac"),
+                Name = "Surgical",
+                Description = "Patients admitted for surgical procedures",
+                GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"), // Specialized
+                SortOrder = 2,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("e36b4212-3add-452f-8448-825242821176"),
+                Name = "Chronic Care",
+                Description = "Long-term care for ongoing conditions like diabetes, heart disease",
+                GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"), // General
+                SortOrder = 4,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("d8149d7e-fc1b-4b3d-8c37-7befea74bbce"),
+                Name = "Rehabilitation",
+                Description = "Recovery and rehabilitation services for post-surgery or injury",
+                GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"), // Specialized
+                SortOrder = 3,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("b9099ba0-e446-4b71-8ec0-be1ced260a42"),
+                Name = "Maternity",
+                Description = "Care for childbirth and postnatal services",
+                GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"), // General
+                SortOrder = 5,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("ff0fdb4a-64b8-4b27-8c05-f55819a4511e"),
+                Name = "Geriatric",
+                Description = "Specialized care for elderly patients",
+                GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"), // Specialized
+                SortOrder = 4,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("ad6aa943-8f49-47f6-980c-7f45d5e4db58"),
+                Name = "Psychiatric",
+                Description = "Treatment for mental health conditions",
+                GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"), // Specialized
+                SortOrder = 5,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("0a98a21f-0e34-418c-a2f9-67e42b0898fe"),
+                Name = "Palliative Care",
+                Description = "Relief from the symptoms and stress of a serious illness",
+                GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"), // General
+                SortOrder = 6,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("26b63a34-5aee-4474-9b9c-74a867e947cc"),
+                Name = "Ambulatory",
+                Description = "Patients visiting for outpatient services without overnight stay",
+                GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"), // General
+                SortOrder = 7,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            },
+            new PatientType
+            {
+                Id = new Guid("c611fced-0cf2-4fc5-80ae-de0154bba11e"),
+                Name = "Home Care",
+                Description = "Medical care or treatment provided at the patient's home",
+                GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"), // General
+                SortOrder = 8,
+                IsEnabled = true,
+                IsDeleted = false,
+                ConcurrencyStamp = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            }
+        );
+
     }
 }

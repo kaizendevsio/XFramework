@@ -6,10 +6,10 @@ namespace XFramework.Client.Shared.Core.Features.Application;
 
 public partial class ApplicationState
 {
-    public record RestoreStates : BaseAction;
+    public record RestoreStates : StateAction;
     
     protected class RestoreStatesHandler(HandlerServices handlerServices, IStore store) 
-        : ActionHandler<RestoreStates>(handlerServices, store)
+        : StateActionHandler<RestoreStates>(handlerServices, store)
     {
         public override async Task Handle(RestoreStates action, CancellationToken aCancellationToken)
         {

@@ -5,7 +5,7 @@ public partial class WalletState
     public record ClearState : SetState;
     
     protected class ClearStateHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<ClearState>(handlerServices, store)
+        : StateActionHandler<ClearState>(handlerServices, store)
     {
         private SessionState CurrentState => Store.GetState<SessionState>();
 

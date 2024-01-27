@@ -2,5 +2,5 @@
 
 public partial class WalletState
 {
-    public record UpdateWallet : BaseAction;
+    public record UpdateWallet : StateAction;
 }

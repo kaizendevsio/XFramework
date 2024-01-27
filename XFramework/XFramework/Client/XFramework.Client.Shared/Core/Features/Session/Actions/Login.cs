@@ -9,7 +9,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class Login : NavigableRequest, IRequest<CmdResponse>
+    public record Login : NavigableRequest
     {
         public bool SkipVerification { get; set; }
         public bool InitializeWallets { get; set; }
@@ -22,12 +22,12 @@ public partial class SessionState
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : ActionHandler<Login, CmdResponse>(handlerServices, store)
+        : StateActionHandler<Login>(handlerServices, store)
     {
         private SessionState CurrentState => Store.GetState<SessionState>();
         private bool VerificationRequired { get; set; }
 
-        public override async Task<CmdResponse> Handle(Login action, CancellationToken aCancellationToken)
+        public override async Task Handle(Login action, CancellationToken aCancellationToken)
         {
             // Inform UI About Busy State
             await Mediator.Send(new ApplicationState.SetState() {IsBusy = true});
@@ -40,11 +40,7 @@ public partial class SessionState
             var response = await identityServerServiceWrapper.AuthenticateIdentity(request);
 
             // Handle if the response is invalid or error
-            if(await HandleFailure(response, action, false ,$"{response.Message}")) return new()
-            {
-                HttpStatusCode = HttpStatusCode.BadRequest,
-                
-            };
+            if (await HandleFailure(response, action)) return;
             
             var checkVerification = new QueryResponse<CheckVerificationResponse>();
             if (!action.SkipVerification && HostEnvironment.IsProduction())
@@ -79,8 +75,8 @@ public partial class SessionState
             // Set Session State To Active
             await Mediator.Send(new SetState()
             {
-                Identity = new(){Id = response.Response.Identity.Id},
-                Credential = new(){Id = response.Response.Credential.Id},
+                Identity = response.Response.Identity,
+                Credential = response.Response.Credential,
                 State = CurrentSessionState.Active
             });
             
@@ -125,7 +121,7 @@ public partial class SessionState
             {
                 Identity = credentialResponse.Result.Response.IdentityInfo,
                 Credential = credentialResponse.Result.Response,
-                ContactList = contactListResponse.Result.Response.Items.ToList(),
+                ContactList = contactListResponse.Result.Response?.Items.ToList(),
             });
 
             // Reset Session Forms
@@ -159,12 +155,6 @@ public partial class SessionState
                     throw;
                 }
             }
-
-            return new()
-            {
-                HttpStatusCode = VerificationRequired ? HttpStatusCode.PreconditionRequired : HttpStatusCode.Accepted,
-                
-            };
         }
     }
 }

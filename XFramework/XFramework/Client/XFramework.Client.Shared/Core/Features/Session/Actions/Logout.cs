@@ -4,7 +4,7 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public record Logout : BaseAction
+    public record Logout : StateAction
     {
         public string NavigateTo { get; set; }
         public bool ResetAllStates { get; set; } = true;
@@ -13,7 +13,7 @@ public partial class SessionState
     protected class LogoutHandler(
         HandlerServices handlerServices,
         IStore store)
-        : ActionHandler<Logout>(handlerServices, store)
+        : StateActionHandler<Logout>(handlerServices, store)
     {
         public SessionState CurrentState => Store.GetState<SessionState>();
 

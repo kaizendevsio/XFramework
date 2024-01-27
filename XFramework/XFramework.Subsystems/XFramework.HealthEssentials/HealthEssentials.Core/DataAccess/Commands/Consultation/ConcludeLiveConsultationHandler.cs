@@ -1,18 +1,21 @@
-﻿using HealthEssentials.Domain.Generics.Contracts;
+﻿using HealthEssentials.Domain.Generics.Constants;
+using HealthEssentials.Domain.Generics.Contracts;
 using HealthEssentials.Domain.Generics.Contracts.Requests;
+using IdentityServer.Integration.Drivers;
 using Messaging.Domain.Generic;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Services;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Consultation;
 
 public class ConcludeLiveConsultationHandler(
+    DbContext dbContext,
+    IIdentityServerServiceWrapper identityServerService,
     IMessageBusWrapper messageBusWrapper,
     IMessagingServiceWrapper messagingServiceWrapper,
     IHostEnvironment hostEnvironment,
-    HealthEssentialsContext healthEssentialsContext,
-    AppDbContext appDbContext,
     ITenantService tenantService,
     ILogger<ConcludeLiveConsultationHandler> logger
 )
@@ -23,7 +26,7 @@ public class ConcludeLiveConsultationHandler(
     {
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
         
-        var jobOrder = await healthEssentialsContext.ConsultationJobOrders
+        var jobOrder = await dbContext.Set<ConsultationJobOrder>()
             .Where(c => c.TenantId == tenant.Id)
             .Include(i => i.PatientConsultations)
             .ThenInclude(i => i.Patient)
@@ -40,11 +43,13 @@ public class ConcludeLiveConsultationHandler(
             }; 
         }
 
-        var credential = await appDbContext.IdentityCredentials
-            .Include(i => i.IdentityContacts)
-            .ThenInclude(i => i.Type)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId, CancellationToken.None);
+        var credentialResponse = await identityServerService.IdentityCredential.Get(jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId, tenantId: tenant.Id);
+        if (credentialResponse.HttpStatusCode is not HttpStatusCode.Accepted)
+        {
+            return credentialResponse.Adapt<CmdResponse>();
+        }
+        
+        var credential = credentialResponse.Response;
         if (credential is null)
         {
             return new ()
@@ -67,7 +72,7 @@ public class ConcludeLiveConsultationHandler(
         jobOrder.CompletedAt = DateTime.UtcNow;
         jobOrder.Status = (short?) TransactionStatus.Completed;
         
-        await healthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         messageBusWrapper.PublishAsync(HealthEssentialsEvent.ConcludeConsultation, credential.Id.ToString(), new PublishRequest<ConsultationJobOrder>(jobOrder));
         

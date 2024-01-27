@@ -4,7 +4,7 @@ using XFramework.Domain.Generic.Contracts;
 
 namespace XFramework.Domain.Contexts;
 
-public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
+public partial class AppDbContext : DbContext
 {
     public AppDbContext()
     {
@@ -29,20 +29,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public virtual DbSet<AuthorizationLog> AuthorizationLogs { get; set; }
 
-    public virtual DbSet<Biller> Billers { get; set; }
-
-    public virtual DbSet<BillerCategory> BillerCategories { get; set; }
-
-    public virtual DbSet<BillerField> BillerFields { get; set; }
-
-    public virtual DbSet<BillsPaymentTransaction> BillsPaymentTransactions { get; set; }
-
-    public virtual DbSet<BinaryList> BinaryLists { get; set; }
-
-    public virtual DbSet<BinaryListMultiplex> BinaryListMultiplexes { get; set; }
-
-    public virtual DbSet<BinaryMap> BinaryMaps { get; set; }
-
     public virtual DbSet<BusinessPackage> BusinessPackages { get; set; }
 
     public virtual DbSet<BusinessPackageInclusion> BusinessPackageInclusions { get; set; }
@@ -53,7 +39,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public virtual DbSet<BusinessPackageUpgradeTransaction> BusinessPackageUpgradeTransactions { get; set; }
 
-    public virtual DbSet<CommissionDeductionRequest> CommissionDeductionRequests { get; set; }
 
     public virtual DbSet<CommunityConnection> CommunityConnections { get; set; }
 
@@ -80,8 +65,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
     public virtual DbSet<CurrencyType> CurrencyTypes { get; set; }
 
     public virtual DbSet<DepositRequest> DepositRequests { get; set; }
-
-    public virtual DbSet<EloadTransaction> EloadTransactions { get; set; }
     
     public virtual DbSet<ExchangeRate> ExchangeRates { get; set; }
 
@@ -94,9 +77,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
     public virtual DbSet<PaymentGatewayType> PaymentGatewayTypes { get; set; }
 
     public virtual DbSet<PaymentGatewayInstruction> PaymentGatewayInstructions { get; set; }
-
-    public virtual DbSet<EloadGatewayNumber> EloadGatewayNumbers { get; set; }
-
+    
     public virtual DbSet<PaymentGatewayResponse> PaymentGatewayResponses { get; set; }
 
     public virtual DbSet<PaymentGatewayResponseStatusType> PaymentGatewayResponseStatusTypes { get; set; }
@@ -123,22 +104,16 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public virtual DbSet<IdentityRoleType> IdentityRoleTypes { get; set; }
 
-    public virtual DbSet<IdentityRoleTypeGroup> IdentityRoleEntityGroups { get; set; }
+    public virtual DbSet<IdentityRoleTypeGroup> IdentityRoleTypeGroups { get; set; }
 
     public virtual DbSet<IdentityVerification> IdentityVerifications { get; set; }
 
     public virtual DbSet<IdentityVerificationType> IdentityVerificationTypes { get; set; }
-
-    public virtual DbSet<IncomeDistribution> IncomeDistributions { get; set; }
-
+    
     public virtual DbSet<IncomeType> IncomeTypes { get; set; }
-
-    public virtual DbSet<IncomePartition> IncomePartitions { get; set; }
-
+    
     public virtual DbSet<IncomeTransaction> IncomeTransactions { get; set; }
-
-    public virtual DbSet<Log> Logs { get; set; }
-
+    
     public virtual DbSet<Message> Messages { get; set; }
 
     public virtual DbSet<MessageDelivery> MessageDeliveries { get; set; }
@@ -170,18 +145,14 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
     public virtual DbSet<MetaDataType> MetaDataTypes { get; set; }
 
     public virtual DbSet<MetaDataTypeGroup> MetaDataTypeGroups { get; set; }
-
-    public virtual DbSet<ProviderEndpoint> ProviderEndpoints { get; set; }
-
-    public virtual DbSet<ProviderType> ProviderTypes { get; set; }
-
+    
     public virtual DbSet<RegistryConfiguration> RegistryConfigurations { get; set; }
 
     public virtual DbSet<RegistryConfigurationGroup> RegistryConfigurationGroups { get; set; }
 
     public virtual DbSet<RegistryFavoriteType> RegistryFavoriteTypes { get; set; }
 
-    public virtual DbSet<SessionDatum> SessionData { get; set; }
+    public virtual DbSet<Session> Session { get; set; }
 
     public virtual DbSet<SessionType> SessionTypes { get; set; }
 
@@ -196,15 +167,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
     public virtual DbSet<Subscription> Subscriptions { get; set; }
 
     public virtual DbSet<SubscriptionType> SubscriptionTypes { get; set; }
-
-    public virtual DbSet<EloadPromo> EloadPromos { get; set; }
-
-    public virtual DbSet<EloadTelcoType> EloadTelcoTypes { get; set; }
-
-    public virtual DbSet<EloadTelcoPrefix> EloadTelcoPrefixes { get; set; }
-
-    public virtual DbSet<EloadProductCode> EloadProductCodes { get; set; }
-
+    
     public virtual DbSet<Wallet> Wallets { get; set; }
 
     public virtual DbSet<WalletAddress> WalletAddresses { get; set; }
@@ -214,11 +177,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
     public virtual DbSet<WalletTransaction> WalletTransactions { get; set; }
 
     public virtual DbSet<WithdrawalRequest> WithdrawalRequests { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https: //go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseNpgsql("Host=localhost;Database=XnelSystems;Username=xnelsystems-migration;Password=BqzX}V~,/p:7]K(FRH-bun!6PG?_g^<#h2EdtAQM[35x8;Pooling=true;MinPoolSize=2;MaxPoolSize=900;Timeout=300;CommandTimeout=300;");
-
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("uuid-ossp");
@@ -371,205 +330,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
                 .HasConstraintName("tbl_userauthhistory_fk");
         });
 
-        modelBuilder.Entity<Biller>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_billers_pk");
-
-            entity.ToTable("Biller", "Integration.BillsPayment");
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-
-            entity.Property(e => e.BillerCategoryId).HasColumnName("BillerCategoryID");
-            entity.Property(e => e.ConvenienceFee).HasPrecision(10, 2);
-            entity.Property(e => e.Description).HasColumnType("character varying");
-            entity.Property(e => e.Discount)
-                .HasPrecision(10, 2)
-                .HasDefaultValueSql("0");
-
-            entity.Property(e => e.Image).HasColumnType("character varying");
-            entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
-            entity.Property(e => e.IsEnabled).HasDefaultValueSql("true");
-            entity.Property(e => e.Name).HasColumnType("character varying");
-            entity.Property(e => e.ServiceCharge).HasPrecision(10, 2);
-
-            entity.HasOne(d => d.BillerCategory).WithMany(p => p.Billers)
-                .HasForeignKey(d => d.BillerCategoryId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("tbl_billers_tbl_billercategories_id_fk");
-
-            entity.HasOne(d => d.ProviderEndpoint).WithMany(p => p.Billers)
-                .HasForeignKey(d => d.ProviderEndpointId)
-                .HasConstraintName("tbl_billers_tbl_providerendpoints_id_fk");
-        });
-
-        modelBuilder.Entity<BillerCategory>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_billercategories_pk");
-
-            entity.ToTable("BillerCategory", "Integration.BillsPayment");
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.Description).HasColumnType("character varying");
-
-            entity.Property(e => e.IsDeleted)
-                .HasDefaultValueSql("false")
-                .HasColumnName("isDeleted");
-            entity.Property(e => e.IsEnabled)
-                .HasDefaultValueSql("true")
-                .HasColumnName("isEnabled");
-            entity.Property(e => e.Name).HasColumnType("character varying");
-            entity.Property(e => e.ProviderTypeId).HasColumnName("ProviderTypeID");
-
-            entity.HasOne(d => d.ProviderType).WithMany(p => p.BillerCategories)
-                .HasForeignKey(d => d.ProviderTypeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("tbl_billercategories_tbl_providerType_id_fk");
-        });
-
-        modelBuilder.Entity<BillerField>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_billerfields_pk");
-
-            entity.ToTable("BillerField", "Integration.BillsPayment");
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.BillerId).HasColumnName("BillerID");
-            entity.Property(e => e.Description).HasColumnType("character varying");
-
-            entity.Property(e => e.IsDeleted)
-                .HasDefaultValueSql("false")
-                .HasColumnName("isDeleted");
-            entity.Property(e => e.IsEnabled)
-                .HasDefaultValueSql("true")
-                .HasColumnName("isEnabled");
-            entity.Property(e => e.Name).HasColumnType("character varying");
-            entity.Property(e => e.Type).HasColumnType("character varying");
-            entity.Property(e => e.Width).HasPrecision(2);
-
-            entity.HasOne(d => d.Biller).WithMany(p => p.BillerFields)
-                .HasForeignKey(d => d.BillerId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("tbl_billerfields_tbl_billers_id_fk");
-        });
-
-        modelBuilder.Entity<BillsPaymentTransaction>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_userbillspaymenttransaction_pk");
-
-            entity.ToTable("BillsPaymentTransaction", "Integration.BillsPayment");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.Amount).HasPrecision(10, 2);
-            entity.Property(e => e.ConvenienceFee)
-                .HasPrecision(10, 2)
-                .HasDefaultValueSql("0");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.Discount).HasPrecision(10, 2);
-
-            entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.RawRequest).HasMaxLength(3000);
-            entity.Property(e => e.RawResponse).HasMaxLength(3000);
-            entity.Property(e => e.ReferenceNo).HasMaxLength(100);
-            entity.Property(e => e.ResponseReasonPhrase).HasMaxLength(3000);
-            entity.Property(e => e.ServiceCharge).HasPrecision(10, 2);
-            entity.Property(e => e.TotalAmount).HasPrecision(10, 2);
-
-            entity.HasOne(d => d.Biller).WithMany(p => p.BillsPaymentTransactions)
-                .HasForeignKey(d => d.BillerId)
-                .HasConstraintName("tbl_userbillspaymenttransaction_tbl_billers_id_fk");
-
-            entity.HasOne(d => d.Credential).WithMany(p => p.BillsPaymentTransactions)
-                .HasForeignKey(d => d.CredentialId)
-                .HasConstraintName("tbl_userbillspaymenttransaction_tbl_identitycredentials_id_fk");
-
-            entity.HasOne(d => d.IncomeTransaction).WithMany(p => p.BillsPaymentTransactions)
-                .HasForeignKey(d => d.IncomeTransactionId)
-                .HasConstraintName("tbl_userbillspaymenttransaction_tbl_userincometransaction_id_fk");
-        });
-
-        modelBuilder.Entity<BinaryList>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_userbinarylist_pk");
-
-            entity.ToTable("BinaryList", "Affiliate");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-
-            entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.SourceUserMapId).HasColumnName("SourceUserMapID");
-            entity.Property(e => e.TargetUserMapId).HasColumnName("TargetUserMapID");
-
-            entity.HasOne(d => d.SourceUserMap).WithMany(p => p.BinaryListSourceUserMaps)
-                .HasForeignKey(d => d.SourceUserMapId)
-                .HasConstraintName("tbl_userbinarylist_tbl_usermap_id_fk_2");
-
-            entity.HasOne(d => d.TargetUserMap).WithMany(p => p.BinaryListTargetUserMaps)
-                .HasForeignKey(d => d.TargetUserMapId)
-                .HasConstraintName("tbl_userbinarylist_tbl_usermap_id_fk");
-        });
-
-        modelBuilder.Entity<BinaryListMultiplex>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_userbinarylistmultiplex_pk");
-
-            entity.ToTable("BinaryListMultiplex", "Affiliate");
-            
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-
-            entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-
-            entity.HasOne(d => d.BinaryMap).WithMany(p => p.BinaryListMultiplexes)
-                .HasForeignKey(d => d.BinaryMapId)
-                .HasConstraintName("tbl_userbinarylistmultiplex_tbl_usermap_id_fk");
-        });
-
-        modelBuilder.Entity<BinaryMap>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_BinaryMap_pkey");
-
-            entity.ToTable("BinaryMap", "Affiliate");
-
-            entity.HasIndex(e => e.Alias, "tbl_usermap_alias_uindex").IsUnique();
-
-            entity.Property(e => e.Id)
-                .ValueGeneratedOnAdd()
-                .HasIdentityOptions(null, null, null, 2147483647L, null, null)
-                .HasColumnName("ID");
-            entity.Property(e => e.Alias).HasColumnType("character varying");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-
-            entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-
-            entity.HasOne(d => d.IdNavigation).WithOne(p => p.BinaryMap)
-                .HasForeignKey<BinaryMap>(d => d.Id)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("tbl_usermap_fk");
-
-            entity.HasOne(d => d.SponsorUser).WithMany(p => p.InverseSponsorUser)
-                .HasForeignKey(d => d.SponsorUserId)
-                .HasConstraintName("SponsorUserId");
-
-            entity.HasOne(d => d.UplineUser).WithMany(p => p.InverseUplineUser)
-                .HasForeignKey(d => d.UplineUserId)
-                .HasConstraintName("uplineuserbpid");
-        });
-
+        
         modelBuilder.Entity<BusinessPackage>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("tbl_BusinessPackages_pkey");
@@ -1059,45 +820,7 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
                 .HasForeignKey(d => d.WalletTypeId)
                 .HasConstraintName("DepositRequest_WalletTypeId");
         });
-
-        modelBuilder.Entity<EloadTransaction>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_usereloadtransaction_pk");
-
-            entity.ToTable("ELoadTransaction", "Integration.ELoad");
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.Amount).HasColumnType("character varying");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.CustomerNumber).HasMaxLength(13);
-
-            entity.Property(e => e.IsDeleted)
-                .HasDefaultValueSql("false")
-                .HasColumnName("isDeleted");
-            entity.Property(e => e.IsEnabled)
-                .HasDefaultValueSql("true")
-                .HasColumnName("isEnabled");
-            entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.RawRequest).HasMaxLength(5000);
-            entity.Property(e => e.RawResponse).HasMaxLength(5000);
-            entity.Property(e => e.SenderNumber).HasMaxLength(13);
-            entity.Property(e => e.EloadProductCodeId).HasColumnName("TelcoProductCodeID");
-            entity.Property(e => e.TransactionId)
-                .HasColumnType("character varying")
-                .HasColumnName("TransactionID");
-            entity.Property(e => e.WalletTypeId).HasColumnName("WalletTypeID");
-
-            entity.HasOne(d => d.Credential).WithMany(p => p.EloadTransactions)
-                .HasForeignKey(d => d.CredentialId)
-                .HasConstraintName("EloadTransaction_CredentialId");
-
-            entity.HasOne(d => d.EloadProductCode).WithMany(p => p.EloadTransactions)
-                .HasForeignKey(d => d.EloadProductCodeId)
-                .HasConstraintName("tbl_usereloadtransaction_tbl_telcoproductcode_id_fk");
-        });
-
+        
         modelBuilder.Entity<ExchangeRate>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("tbl_ExchangeRate_pkey");
@@ -1233,26 +956,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.HasOne(d => d.Gateway).WithMany(p => p.GatewayInstructions)
                 .HasForeignKey(d => d.GatewayId)
                 .HasConstraintName("GatewayInstructions_Gateways_ID_fk");
-        });
-
-        modelBuilder.Entity<EloadGatewayNumber>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_gatewaynumbers_pk");
-
-            entity.ToTable("GatewayNumber", "Integration.ELoad");
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.Gateway).HasMaxLength(13);
-
-            entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
-            entity.Property(e => e.IsEnabled).HasDefaultValueSql("true");
-            entity.Property(e => e.TelcoTypeId).HasColumnName("TelcoTypeID");
-
-            entity.HasOne(d => d.EloadTelcoType).WithMany(p => p.GatewayNumbers)
-                .HasForeignKey(d => d.TelcoTypeId)
-                .HasConstraintName("tbl_telcoType_id_fk");
         });
 
         modelBuilder.Entity<PaymentGatewayResponse>(entity =>
@@ -1656,33 +1359,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Name).HasMaxLength(100);
         });
 
-        modelBuilder.Entity<IncomeDistribution>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_IncomeDistribution_pkey");
-
-            entity.ToTable("IncomeDistribution", "Income");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.BusinessPackageId).HasColumnName("BusinessPackageID");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-
-            entity.Property(e => e.IncomeTypeId).HasColumnName("IncomeTypeID");
-            entity.Property(e => e.Value).HasPrecision(18, 10);
-
-            entity.HasOne(d => d.BusinessPackage).WithMany(p => p.IncomeDistributions)
-                .HasForeignKey(d => d.BusinessPackageId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("BusinessPackageID");
-
-            entity.HasOne(d => d.IncomeType).WithMany(p => p.IncomeDistributions)
-                .HasForeignKey(d => d.IncomeTypeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("IncomeTypeID");
-        });
-
         modelBuilder.Entity<IncomeType>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("tbl_IncomeType_pkey");
@@ -1699,30 +1375,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.IncomeTypeName).HasMaxLength(100);
             entity.Property(e => e.IncomeTypeShortName).HasMaxLength(50);
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-        });
-
-        modelBuilder.Entity<IncomePartition>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_IncomePartition_pkey");
-
-            entity.ToTable("IncomePartition", "Income");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-
-            entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.Percentage).HasPrecision(18, 8);
-
-            entity.HasOne(d => d.IdentityRole).WithMany(p => p.IncomePartitions)
-                .HasForeignKey(d => d.IdentityRoleId)
-                .HasConstraintName("UserRoleId");
-
-            entity.HasOne(d => d.IncomeType).WithMany(p => p.IncomePartitions)
-                .HasForeignKey(d => d.IncomeTypeId)
-                .HasConstraintName("IncomeTypeId");
         });
 
         modelBuilder.Entity<IncomeTransaction>(entity =>
@@ -1748,42 +1400,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.HasOne(d => d.IncomeType).WithMany(p => p.IncomeTransactions)
                 .HasForeignKey(d => d.IncomeTypeId)
                 .HasConstraintName("tbl_userincometransaction_tbl_incometype_id_fk");
-
-            entity.HasOne(d => d.PairMap).WithMany(p => p.IncomeTransactionPairMaps)
-                .HasForeignKey(d => d.PairMapId)
-                .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk_3");
-
-            entity.HasOne(d => d.SourceMap).WithMany(p => p.IncomeTransactionSourceMaps)
-                .HasForeignKey(d => d.SourceMapId)
-                .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk_2");
-
-            entity.HasOne(d => d.TargetMap).WithMany(p => p.IncomeTransactionTargetMaps)
-                .HasForeignKey(d => d.TargetMapId)
-                .HasConstraintName("tbl_userincometransaction_tbl_usermap_id_fk");
-        });
-
-        modelBuilder.Entity<Log>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK_tbl_ApplicationLogs");
-
-            entity.ToTable("Log", "Audit");
-
-            entity.HasIndex(e => e.TenantId, "IX_tbl_ApplicationLogs_AppID");
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.TenantId).HasColumnName("ApplicationId");
-
-            entity.Property(e => e.Initiator).HasColumnType("character varying");
-            entity.Property(e => e.Message).HasColumnType("character varying");
-            entity.Property(e => e.Name).HasColumnType("character varying");
-            entity.Property(e => e.Seen).HasDefaultValueSql("false");
-
-            entity.HasOne(d => d.Application).WithMany(p => p.Logs)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("tbl_applogs_appid_fk");
         });
 
         modelBuilder.Entity<Message>(entity =>
@@ -2190,48 +1806,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Name).HasColumnType("character varying");
         });
 
-        modelBuilder.Entity<ProviderEndpoint>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_providerendpoints_pk");
-
-            entity.ToTable("ProviderEndpoint", "Integration.BillsPayment");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.BaseUrlEndpoint).HasMaxLength(100);
-
-            entity.Property(e => e.Name).HasMaxLength(100);
-            entity.Property(e => e.ProviderId).HasColumnName("ProviderID");
-            entity.Property(e => e.UrlEndpoint).HasMaxLength(100);
-
-            entity.HasOne(d => d.Provider).WithMany(p => p.ProviderEndpoints)
-                .HasForeignKey(d => d.ProviderId)
-                .HasConstraintName("tbl_providerendpoints_tbl_providerType_id_fk");
-        });
-
-        modelBuilder.Entity<ProviderType>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_providerType_pk");
-
-            entity.ToTable("ProviderType", "Integration.BillsPayment");
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.Description).HasColumnType("character varying");
-
-            entity.Property(e => e.IsDeleted)
-                .HasDefaultValueSql("false")
-                .HasColumnName("isDeleted");
-            entity.Property(e => e.IsEnabled)
-                .IsRequired()
-                .HasDefaultValueSql("true")
-                .HasColumnName("isEnabled");
-            entity.Property(e => e.Name).HasColumnType("character varying");
-        });
-
         modelBuilder.Entity<RegistryConfiguration>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("tbl_applicationconfiguration_pk");
@@ -2291,11 +1865,11 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Name).HasMaxLength(100);
         });
 
-        modelBuilder.Entity<SessionDatum>(entity =>
+        modelBuilder.Entity<Session>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK_tbl_SessionData");
 
-            entity.ToTable("SessionData", "Identity");
+            entity.ToTable("Session", "Identity");
 
             entity.HasIndex(e => e.SessionTypeId, "IX_tbl_SessionData_SessionTypeID");
 
@@ -2478,99 +2052,6 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
             entity.Property(e => e.Name).HasColumnType("character varying");
         });
 
-        modelBuilder.Entity<EloadPromo>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK_tbl_TelcoCodePromos");
-
-            entity.ToTable("TelcoCodePromo", "Integration.ELoad");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.Description).HasColumnType("character varying");
-
-            entity.Property(e => e.Name).HasColumnType("character varying");
-        });
-
-        modelBuilder.Entity<EloadTelcoType>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK_tbl_TelcoType");
-
-            entity.ToTable("TelcoType", "Integration.ELoad");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.Description).HasColumnType("character varying");
-
-            entity.Property(e => e.Image).HasMaxLength(500);
-            entity.Property(e => e.Name).HasColumnType("character varying");
-        });
-
-        modelBuilder.Entity<EloadTelcoPrefix>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK_tbl_TelcoPrefix");
-
-            entity.ToTable("TelcoPrefix", "Integration.ELoad");
-
-            entity.HasIndex(e => e.TelcoTypeId, "IX_tbl_TelcoPrefix_TelcoTypeID");
-
-
-            entity.HasIndex(e => e.Prefix, "tbl_telcoprefix_prefix_index");
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-
-            entity.Property(e => e.Prefix).HasMaxLength(4);
-            entity.Property(e => e.TelcoTypeId).HasColumnName("TelcoTypeID");
-
-            entity.HasOne(d => d.TelcoType).WithMany(p => p.TelcoPrefixes)
-                .HasForeignKey(d => d.TelcoTypeId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("tbl_telcoentityid___fk");
-        });
-
-        modelBuilder.Entity<EloadProductCode>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK_tbl_TelcoProductCode");
-
-            entity.ToTable("TelcoProductCode", "Integration.ELoad");
-
-            entity.HasIndex(e => e.EloadPromoId, "IX_tbl_TelcoProductCode_TelcoCodePromosID");
-
-            entity.HasIndex(e => e.TelcoTypeId, "IX_tbl_TelcoProductCode_TelcoTypeID");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.Amount).HasPrecision(10, 2);
-            entity.Property(e => e.Code).HasColumnType("character varying");
-            entity.Property(e => e.Description).HasColumnType("character varying");
-
-            entity.Property(e => e.IsDeleted)
-                .HasDefaultValueSql("false")
-                .HasColumnName("isDeleted");
-            entity.Property(e => e.IsEnabled).HasDefaultValueSql("true");
-            entity.Property(e => e.Name).HasColumnType("character varying");
-            entity.Property(e => e.EloadPromoId).HasColumnName("TelcoCodePromosID");
-            entity.Property(e => e.TelcoTypeId).HasColumnName("TelcoTypeID");
-            entity.Property(e => e.Validity).HasColumnType("character varying");
-
-            entity.HasOne(d => d.EloadPromo).WithMany(p => p.TelcoProductCodes)
-                .HasForeignKey(d => d.EloadPromoId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("tbl_telcoproductcode_tbl_telcocodepromos_id_fk");
-
-            entity.HasOne(d => d.EloadTelcoType).WithMany(p => p.TelcoProductCodes)
-                .HasForeignKey(d => d.TelcoTypeId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("tbl_telcoproductcode_tbl_telcoType_id_fk");
-        });
-
         modelBuilder.Entity<Wallet>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("tbl_Wallets_pkey");
@@ -2710,29 +2191,34 @@ public partial class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
     protected void SeedDatabase(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<IdentityContactType>().HasData(
-            new { ID = IdentityConstants.ContactType.Phone, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Phone" },
-            new { ID = IdentityConstants.ContactType.Email, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Email" },
-            new { ID = IdentityConstants.ContactType.Facebook, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Facebook" },
-            new { ID = IdentityConstants.ContactType.Instagram, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Instagram" },
-            new { ID = IdentityConstants.ContactType.Twitter, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "Twitter" },
-            new { ID = IdentityConstants.ContactType.LinkedIn, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T10:15:00"), IsDeleted = false, Name = "LinkedIn" }
+            new IdentityContactType() { Id = IdentityConstants.ContactType.Phone, IsEnabled = true, IsDeleted = false, Name = "Phone" },
+            new IdentityContactType() { Id = IdentityConstants.ContactType.Email, IsEnabled = true, IsDeleted = false, Name = "Email" },
+            new IdentityContactType() { Id = IdentityConstants.ContactType.Facebook, IsEnabled = true, IsDeleted = false, Name = "Facebook" },
+            new IdentityContactType() { Id = IdentityConstants.ContactType.Instagram, IsEnabled = true, IsDeleted = false, Name = "Instagram" },
+            new IdentityContactType() { Id = IdentityConstants.ContactType.Twitter, IsEnabled = true, IsDeleted = false, Name = "Twitter" },
+            new IdentityContactType() { Id = IdentityConstants.ContactType.LinkedIn, IsEnabled = true, IsDeleted = false, Name = "LinkedIn" }
+        );
+        
+        modelBuilder.Entity<IdentityContactGroup>().HasData(
+            new IdentityContactGroup { Id = IdentityConstants.ContactGroup.Home, IsEnabled = true, Name = "HOME" },
+            new IdentityContactGroup { Id = IdentityConstants.ContactGroup.Personal, IsEnabled = true, Name = "PERSONAL" },
+            new IdentityContactGroup { Id = IdentityConstants.ContactGroup.Business, IsEnabled = true, Name = "BUSINESS" },
+            new IdentityContactGroup { Id = IdentityConstants.ContactGroup.Work, IsEnabled = true, Name = "WORK" }
         );
         
         modelBuilder.Entity<IdentityAddressType>().HasData(
-            new { ID = IdentityConstants.ContactGroup.Home, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "HOME" },
-            new { ID = IdentityConstants.ContactGroup.Personal, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "PERSONAL" },
-            new { ID = IdentityConstants.ContactGroup.Business, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "BUSINESS" },
-            new { ID = IdentityConstants.ContactGroup.Work, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK" },
-            new { ID = IdentityConstants.ContactGroup.WorkPharmacy, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK_PHARMACY" },
-            new { ID = IdentityConstants.ContactGroup.WorkRider, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK_RIDER" },
-            new { ID = IdentityConstants.ContactGroup.WorkLaboratory, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK_LABORATORY" },
-            new { ID = IdentityConstants.ContactGroup.WorkDoctor, IsEnabled = true, CreatedAt = DateTime.Parse("2023-12-09T02:28:00"), Name = "WORK_DOCTOR" }
+            new IdentityAddressType { Id = IdentityConstants.AddressType.Home, IsEnabled = true, Name = "HOME" },
+            new IdentityAddressType { Id = IdentityConstants.AddressType.Personal, IsEnabled = true, Name = "PERSONAL" },
+            new IdentityAddressType { Id = IdentityConstants.AddressType.Business, IsEnabled = true, Name = "BUSINESS" },
+            new IdentityAddressType { Id = IdentityConstants.AddressType.Work, IsEnabled = true, Name = "WORK" },
+            new IdentityAddressType { Id = IdentityConstants.AddressType.Billing, IsEnabled = true, Name = "BILLING" },
+            new IdentityAddressType { Id = IdentityConstants.AddressType.Shipping, IsEnabled = true, Name = "SHIPPING" }
         );
         
         modelBuilder.Entity<IdentityVerificationType>().HasData(
-            new { ID = IdentityConstants.VerificationType.Sms, IsEnabled = false, CreatedAt = DateTime.MinValue, Name = "SMS", DefaultExpiry = 10 },
-            new { ID = IdentityConstants.VerificationType.Email, IsEnabled = false, CreatedAt = DateTime.MinValue, Name = "Email", DefaultExpiry = 120 },
-            new { ID = IdentityConstants.VerificationType.Kyc, IsEnabled = false, CreatedAt = DateTime.MinValue, Name = "KYC", DefaultExpiry = 1051200 }
+            new IdentityVerificationType{ Id = IdentityConstants.VerificationType.Sms, IsEnabled = false, Name = "SMS", DefaultExpiry = 10 },
+            new IdentityVerificationType{ Id = IdentityConstants.VerificationType.Email, IsEnabled = false, Name = "Email", DefaultExpiry = 120 },
+            new IdentityVerificationType{ Id = IdentityConstants.VerificationType.Kyc, IsEnabled = false, Name = "KYC", DefaultExpiry = 1051200 }
         );
     }
 }

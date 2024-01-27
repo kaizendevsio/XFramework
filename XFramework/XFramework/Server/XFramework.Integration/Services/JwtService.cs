@@ -17,13 +17,13 @@ public class JwtService : IJwtService
     {
         _jwtOptions = jwtOptions;
     }
-    public virtual async Task<JwtToken> GenerateToken(string username, Guid cuid, List<RoleEntity> roleEntity)
+    public virtual async Task<JwtToken> GenerateToken(string username, Guid id, List<Guid> Type)
     {
         var authClaims = new List<Claim>  
         {  
             new (ClaimTypes.GivenName, username),
-            new (ClaimTypes.Role, JsonSerializer.Serialize(roleEntity)),
-            new (ClaimTypes.Name, cuid.ToString()),
+            new (ClaimTypes.Role, JsonSerializer.Serialize(Type)),
+            new (ClaimTypes.Name, id.ToString()),
             new (JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new (JwtRegisteredClaimNames.AuthTime, DateTime.UtcNow.ToString())
         };
@@ -40,7 +40,7 @@ public class JwtService : IJwtService
             
         var refreshToken = new RefreshToken
         {
-            Cuid = cuid,
+            Cuid = id,
             Token = GenerateRefreshToken(),
             ExpireAt = DateTime.UtcNow.AddMinutes(DateTime.Parse(_jwtOptions.RefreshTokenLifespan).Minute)
         };

@@ -19,10 +19,6 @@ public static class IdentityConstants
         public static readonly Guid Personal = new Guid("b4bda700-03c1-4a8a-bf6d-6043704cf767");
         public static readonly Guid Business = new Guid("067b21a1-1cba-4c57-b357-43a6fab0a18b");
         public static readonly Guid Work = new Guid("08fb17f1-f4ae-4540-b7ae-03dad680f9ea");
-        public static readonly Guid WorkPharmacy = new Guid("f9da3fec-e466-413a-b88e-adbbc26cff74");
-        public static readonly Guid WorkRider = new Guid("3afe8862-9881-49b7-885c-fbe96544e07d");
-        public static readonly Guid WorkLaboratory = new Guid("9f6cdc72-8ee3-4934-88c0-6aba12c69bbf");
-        public static readonly Guid WorkDoctor = new Guid("67ab57af-d5ce-4562-8797-3b53e0b42221");
     }
     
     public static class VerificationType
@@ -31,6 +27,17 @@ public static class IdentityConstants
         public static readonly Guid Email = new Guid("fe1197ba-dfee-4a4e-b2d3-f8f8c48796be");
         public static readonly Guid Kyc = new Guid("41b5d12c-ce50-4af6-b68f-79443bd5c489");
     }
+    
+    public static class AddressType
+    {
+        public static readonly Guid Home = new Guid("c9136227-f5dc-4147-984d-70aa855090e4");
+        public static readonly Guid Personal = new Guid("23c13259-1e24-427d-ba89-a4d2506c7464");
+        public static readonly Guid Business = new Guid("54ab2c38-be75-4572-916b-72019d676162");
+        public static readonly Guid Work = new Guid("66c8ab89-f24d-4aea-af1a-9ac6a8263575");
+        public static readonly Guid Billing = new Guid("4eec62eb-08ef-406c-9ea2-2ac2d6e0f206");
+        public static readonly Guid Shipping = new Guid("337ee33d-445f-4e6e-bc61-8709170b0ee4");
+    }
+
 
 }
 

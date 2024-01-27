@@ -3,7 +3,7 @@ using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Integration.Generators;
 
-[GenerateStreamFlowWrapper("XFramework.Domain.Generic.Contracts",new[] {
+[StreamFlowWrapper("XFramework.Domain.Generic.Contracts",new[] {
     nameof(Message),
     nameof(MessageType),
     nameof(MessageDelivery),

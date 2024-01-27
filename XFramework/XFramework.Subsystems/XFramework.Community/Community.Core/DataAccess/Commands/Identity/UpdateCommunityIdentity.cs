@@ -14,7 +14,7 @@ public class UpdateCommunityIdentity(
         {
             return new ()
             {
-                Message = $"Community identity with guid {request.Id} does not exist",
+                Message = $"Community identity with id {request.Id} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
                 
             };
@@ -30,7 +30,7 @@ public class UpdateCommunityIdentity(
             {
                 return new ()
                 {
-                    Message = $"Credential with guid {request.CredentialId} does not exist",
+                    Message = $"Credential with id {request.CredentialId} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound
                 };
             }
@@ -47,7 +47,7 @@ public class UpdateCommunityIdentity(
             {
                 return new ()
                 {
-                    Message = $"Community Identity Type with guid {request.CommunityIdentityTypeId} does not exist",
+                    Message = $"Community Identity Type with id {request.CommunityIdentityTypeId} does not exist",
                     HttpStatusCode = HttpStatusCode.NotFound,
                     
                 };

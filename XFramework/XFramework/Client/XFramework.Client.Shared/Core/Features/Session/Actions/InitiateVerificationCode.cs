@@ -7,11 +7,9 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class InitiateVerificationCode : NavigableRequest, IRequest<CmdResponse>
+    public record InitiateVerificationCode : NavigableRequest
     {
         public Guid? CredentialGuid { get; set; }
-        public Action OnSuccess { get; set; }
-        public Action OnFailure { get; set; }
         public GenericContactType ContactType { get; set; }
         public string Contact { get; set; }
         public bool? LocalVerification { get; set; }
@@ -25,20 +23,15 @@ public partial class SessionState
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : ActionHandler<InitiateVerificationCode, CmdResponse>(handlerServices, store)
+        : StateActionHandler<InitiateVerificationCode>(handlerServices, store)
     {
         public SessionState CurrentState => Store.GetState<SessionState>();
 
-        public override async Task<CmdResponse> Handle(InitiateVerificationCode action, CancellationToken aCancellationToken)
+        public override async Task Handle(InitiateVerificationCode action, CancellationToken aCancellationToken)
         {
             if (!hostEnvironment.IsProduction())
             {
                 NavigateTo(action.NavigateToOnSuccess);
-                return new()
-                {
-                    HttpStatusCode = HttpStatusCode.Accepted,
-                    
-                };
             }
              
             if (action.LocalVerification is true)
@@ -61,11 +54,6 @@ public partial class SessionState
 
             SessionState.VerificationVm = action.Adapt<VerificationRequest>();
             NavigateTo(action.NavigateToOnVerificationRequired);
-
-            return new()
-            {
-                HttpStatusCode = HttpStatusCode.Accepted
-            };
         }
     }
 }

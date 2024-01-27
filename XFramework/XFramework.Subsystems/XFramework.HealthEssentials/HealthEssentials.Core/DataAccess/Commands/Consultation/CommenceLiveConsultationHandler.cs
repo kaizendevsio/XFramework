@@ -1,18 +1,21 @@
-﻿using HealthEssentials.Domain.Generics.Contracts;
+﻿using HealthEssentials.Domain.Generics.Constants;
+using HealthEssentials.Domain.Generics.Contracts;
 using HealthEssentials.Domain.Generics.Contracts.Requests;
+using IdentityServer.Integration.Drivers;
 using Messaging.Domain.Generic;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Services;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Consultation;
 
 public class CommenceLiveConsultationHandler(
-    AppDbContext appDbContext,
+    DbContext healthEssentialsContext,
     ITenantService tenantService,
+    IIdentityServerServiceWrapper identityServerService,
     IHostEnvironment hostEnvironment,
     IMessageBusWrapper messageBusWrapper,
-    HealthEssentialsContext healthEssentialsContext,
     ILogger<CommenceLiveConsultationHandler> logger,
     IMessagingServiceWrapper messagingServiceWrapper
     )
@@ -20,7 +23,10 @@ public class CommenceLiveConsultationHandler(
 {
     public async Task<CmdResponse> Handle(CommenceLiveConsultationRequest request, CancellationToken cancellationToken)
     {
-        var jobOrder = await healthEssentialsContext.ConsultationJobOrders
+        var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
+        
+        var jobOrder = await healthEssentialsContext.Set<ConsultationJobOrder>()
+            .Where(c => c.TenantId == tenant.Id)
             .Include(i => i.PatientConsultations)
             .ThenInclude(i => i.Patient)
             .Include(i => i.DoctorConsultationJobOrders)
@@ -36,11 +42,13 @@ public class CommenceLiveConsultationHandler(
             }; 
         }
 
-        var credential = await appDbContext.IdentityCredentials
-            .Include(i => i.IdentityContacts)
-            .ThenInclude(i => i.Type)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(i => i.Id == jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId, CancellationToken.None);
+        var credentialResponse = await identityServerService.IdentityCredential.Get(jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId, tenantId: tenant.Id);
+        if (credentialResponse.HttpStatusCode is not HttpStatusCode.Accepted)
+        {
+            return credentialResponse.Adapt<CmdResponse>();
+        }
+        
+        var credential = credentialResponse.Response;
         if (credential is null)
         {
             return new ()
@@ -72,7 +80,7 @@ public class CommenceLiveConsultationHandler(
         jobOrder.StartedAt = DateTime.UtcNow;
         jobOrder.Status = (short?) TransactionStatus.OnGoing;
         
-        await healthEssentialsContext.SaveChangesAsync(CancellationToken.None);
+        await healthEssentialsContext.SaveChangesAsync(cancellationToken);
         
         messageBusWrapper.PublishAsync(HealthEssentialsEvent.CommenceConsultation, credential.Id.ToString(), new PublishRequest<ConsultationJobOrder>(jobOrder));
         

@@ -5,7 +5,7 @@ public partial class LayoutState
     public record ClearState : SetState;
     
     protected class ClearStateHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<ClearState>(handlerServices, store)
+        : StateActionHandler<ClearState>(handlerServices, store)
     {
         private LayoutState CurrentState => Store.GetState<LayoutState>();
         

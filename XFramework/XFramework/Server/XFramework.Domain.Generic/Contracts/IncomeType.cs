@@ -9,11 +9,6 @@ public partial class IncomeType : BaseModel
     public string? IncomeTypeDescription { get; set; }
 
     public bool? IsReward { get; set; }
-
-
-    public virtual ICollection<IncomeDistribution> IncomeDistributions { get; } = new List<IncomeDistribution>();
-
-    public virtual ICollection<IncomePartition> IncomePartitions { get; } = new List<IncomePartition>();
-
+    
     public virtual ICollection<IncomeTransaction> IncomeTransactions { get; } = new List<IncomeTransaction>();
 }

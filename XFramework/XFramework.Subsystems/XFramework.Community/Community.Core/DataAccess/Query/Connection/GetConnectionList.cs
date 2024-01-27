@@ -14,7 +14,7 @@ public class GetConnectionList(
         {
             return new ()
             {
-                Message = $"Connection entity with guid {request.ConnectionTypeId} does not exist",
+                Message = $"Connection entity with id {request.ConnectionTypeId} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
                 
             };
@@ -25,7 +25,7 @@ public class GetConnectionList(
         {
             return new ()
             {
-                Message = $"Community identity with guid {request.CommunityIdentityId} does not exist",
+                Message = $"Community identity with id {request.CommunityIdentityId} does not exist",
                 HttpStatusCode = HttpStatusCode.NotFound,
                 
             };

@@ -1,4 +1,7 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using XFramework.Domain.Generic.Contracts;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class PharmacyLocation : BaseModel
 {
@@ -46,4 +49,8 @@ public partial class PharmacyLocation : BaseModel
     public virtual ICollection<PharmacyMember> PharmacyMembers { get; } = new List<PharmacyMember>();
 
     public virtual ICollection<PharmacyService> PharmacyServices { get; } = new List<PharmacyService>();
+        
+    [NotMapped]
+    public List<StorageFile>? Files { get; set; }
+    
 }

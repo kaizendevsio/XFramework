@@ -3,7 +3,6 @@ global using System.Collections.Generic;
 global using System.Net;
 global using System.Threading.Tasks;
 global using HealthEssentials.Core.Interfaces;
-global using HealthEssentials.Domain.Generics.Strings;
 global using Mapster;
 global using XFramework.Domain.Generic.BusinessObjects;
 global using XFramework.Domain.Generic.Interfaces;

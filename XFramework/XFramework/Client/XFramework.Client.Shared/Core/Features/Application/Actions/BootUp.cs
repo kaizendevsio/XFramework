@@ -2,10 +2,10 @@
 
 public partial class ApplicationState
 {
-    public record BootUp : BaseAction;
+    public record BootUp : StateAction;
     
     protected class BootUpHandler(HandlerServices handlerServices, IStore store)
-        : ActionHandler<BootUp>(handlerServices, store)
+        : StateActionHandler<BootUp>(handlerServices, store)
     {
         private ApplicationState CurrentState => Store.GetState<ApplicationState>();
         

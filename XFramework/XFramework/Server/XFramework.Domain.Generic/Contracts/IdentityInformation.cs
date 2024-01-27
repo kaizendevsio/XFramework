@@ -1,4 +1,6 @@
-﻿namespace XFramework.Domain.Generic.Contracts;
+﻿using XFramework.Domain.Generic.Enums;
+
+namespace XFramework.Domain.Generic.Contracts;
 
 public partial class IdentityInformation : BaseModel
 {
@@ -14,11 +16,11 @@ public partial class IdentityInformation : BaseModel
 
     public DateOnly? BirthDate { get; set; }
 
-    public short Gender { get; set; }
+    public Gender? Gender { get; set; }
 
     public bool IsVerified { get; set; }
 
-    public short? CivilStatus { get; set; }
+    public CivilStatus? CivilStatus { get; set; }
 
 
     public virtual Tenant Tenant { get; set; } = null!;

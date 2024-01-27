@@ -6,7 +6,8 @@ using XFramework.Domain.Generic.Contracts.Requests;
 namespace XFramework.Core.DataAccess.Commands;
 
 public class DeleteHandler<TModel>(
-        AppDbContext appDbContext,
+        DbContext dbContext,
+        CacheManager cache,
         ILogger<DeleteHandler<TModel>> logger,
         ITenantService tenantService
     ) 
@@ -22,10 +23,19 @@ public class DeleteHandler<TModel>(
             throw new ArgumentException("An error occurred while processing your request");
         }
         
+        if (request.Metadata.TenantId is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = "TenantId is required"
+            };
+        }
+        
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.Model.TenantId);
 
         // Fetch the entity by its ID.
-        var entity = await appDbContext.Set<TModel>()
+        var entity = await dbContext.Set<TModel>()
             .Where(i => i.TenantId == tenant.Id)
             .Where(i => i.Id == request.Model.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -52,14 +62,18 @@ public class DeleteHandler<TModel>(
         try
         {
             // Save the changes.
-            await appDbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
             logger.LogInformation("Entity of type {EntityName} with ID {EntityId} successfully soft-deleted", typeof(TModel).Name, request.Model.Id);
+   
+            // Remove the entity from the cache after successful deletion
+            await cache.InvalidateCacheForModel(request.Model);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error occurred while soft-deleting entity of type {EntityName} with ID {EntityId}", typeof(TModel).Name, request.Model.Id);
             throw new InvalidOperationException("An error occurred while processing your request");
         }
+
 
         // Return a successful response.
         return new CmdResponse<TModel>

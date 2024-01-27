@@ -5,17 +5,17 @@ namespace XFramework.Client.Shared.Core.Features.Session;
 
 public partial class SessionState
 {
-    public class SendVerificationCode : NavigableRequest, IRequest<CmdResponse>;
+    public record SendVerificationCode : NavigableRequest, IRequest<CmdResponse>;
     
     public class SendVerificationCodeHandler(
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : ActionHandler<SendVerificationCode, CmdResponse>(handlerServices, store)
+        : StateActionHandler<SendVerificationCode>(handlerServices, store)
     {
         public SessionState CurrentState => Store.GetState<SessionState>();
 
-        public override async Task<CmdResponse> Handle(SendVerificationCode action, CancellationToken aCancellationToken)
+        public override async Task Handle(SendVerificationCode action, CancellationToken aCancellationToken)
         {
             action.NavigateToOnSuccess = CurrentState.VerificationVm.NavigateToOnSuccess;
             action.NavigateToOnFailure = CurrentState.VerificationVm.NavigateToOnFailure;
@@ -33,11 +33,7 @@ public partial class SessionState
                         ConfirmButtonText = "Close",
                     });
                     CurrentState.VerificationVm.OnFailure?.Invoke();
-                    return new()
-                    {
-                        HttpStatusCode = HttpStatusCode.BadRequest,
-                        
-                    };
+                    return;
                 }
                 NavigateTo(action.NavigateToOnSuccess);
             }
@@ -51,10 +47,7 @@ public partial class SessionState
                 if (await HandleFailure(response, action, true, "Your otp code is incorrect. Please try again"))
                 {
                     CurrentState.VerificationVm.OnFailure?.Invoke();
-                    return new()
-                    {
-                        HttpStatusCode = HttpStatusCode.BadRequest
-                    };
+                    return;
                 }
                 await HandleSuccess(response, action, true);
             }
@@ -62,11 +55,7 @@ public partial class SessionState
             CurrentState.VerificationVm.OnSuccess?.Invoke();
             CurrentState.VerificationVm = new();
             
-            return new()
-            {
-                HttpStatusCode = HttpStatusCode.Accepted,
-                
-            };
+            return;
         }
     }
 }
