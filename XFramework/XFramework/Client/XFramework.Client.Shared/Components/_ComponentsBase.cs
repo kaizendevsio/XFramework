@@ -1,5 +1,6 @@
 ﻿using Humanizer;
 using XFramework.Client.Shared.Core.Features.Address;
+using XFramework.Client.Shared.Core.Features.Affiliate;
 using XFramework.Client.Shared.Core.Features.Cache;
 using XFramework.Client.Shared.Core.Features.Identity;
 using XFramework.Client.Shared.Core.Features.Layout;
@@ -27,6 +28,7 @@ public class XComponentsBase : BlazorStateComponent
     public LayoutState LayoutState => GetState<LayoutState>();
     public SessionState SessionState => GetState<SessionState>();
     public IdentityState IdentityState => GetState<IdentityState>();
+    public AffiliateState AffiliateState => GetState<AffiliateState>();
     public AddressState AddressState => Store.GetState<AddressState>();
     public CacheState CacheState => GetState<CacheState>();
     public WalletState WalletState => GetState<WalletState>();

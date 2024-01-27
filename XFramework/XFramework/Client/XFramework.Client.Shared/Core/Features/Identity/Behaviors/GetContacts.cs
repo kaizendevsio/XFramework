@@ -33,10 +33,11 @@ public partial class IdentityState
                 filter: filters);
             
             if (await HandleFailure(response, request)) return;
-            await HandleSuccess(response, request, true);
             
             CurrentState.Contacts = response.Response?.Items.ToList();
             Store.SetState(CurrentState);
+            
+            await HandleSuccess(response, request, true);
         }
     }
 }

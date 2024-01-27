@@ -32,10 +32,11 @@ public partial class IdentityState
                 filter: filters);
             
             if (await HandleFailure(response, request)) return;
-            await HandleSuccess(response, request, true);
             
             CurrentState.CredentialList = response.Response;
             Store.SetState(CurrentState);
+            
+            await HandleSuccess(response, request, true);
         }
     }
 }

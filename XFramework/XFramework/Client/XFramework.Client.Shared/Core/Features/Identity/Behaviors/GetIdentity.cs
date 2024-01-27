@@ -19,10 +19,11 @@ public partial class IdentityState
         {
             var response = await identityServerServiceWrapper.IdentityInformation.Get(request.Id);
             if (await HandleFailure(response, request)) return;
-            await HandleSuccess(response, request, true);
             
             CurrentState.Identity = response.Response;
             Store.SetState(CurrentState);
+            
+            await HandleSuccess(response, request, true);
         }
     }
 }
