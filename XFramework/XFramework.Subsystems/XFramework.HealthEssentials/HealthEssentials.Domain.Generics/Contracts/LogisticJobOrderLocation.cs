@@ -1,4 +1,7 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using XFramework.Domain.Generic.Contracts;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class LogisticJobOrderLocation : BaseModel
 {
@@ -40,4 +43,16 @@ public partial class LogisticJobOrderLocation : BaseModel
     public string? ClientName { get; set; }
 
     public virtual LogisticJobOrder LogisticJobOrder { get; set; } = null!;
+
+    [NotMapped]
+    public AddressRegion? Region { get; set; }
+    
+    [NotMapped]
+    public AddressProvince? Province { get; set; }
+    
+    [NotMapped]
+    public AddressCity? City { get; set; }
+    
+    [NotMapped]
+    public AddressBarangay? Barangay { get; set; }
 }
