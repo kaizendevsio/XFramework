@@ -11,15 +11,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="409723ac-d59d-499a-9f6f-0d22e3f077ee" name="Default Changelist" comment="Safety backup">
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/QueryUser.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Entity/Validations/Affiliate/CreateAffiliateSubscriptionValidator.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../DataGrip/.idea/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../DataGrip/.idea/DataGrip.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../DataGrip/.idea/dataSources.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../DataGrip/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../../DataGrip/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../.idea/.idea.XFramework.Server/.idea/dataSources/368e3ed9-e7cb-4a96-bf1a-859106502d7e.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/.idea.XFramework.Server/.idea/dataSources/368e3ed9-e7cb-4a96-bf1a-859106502d7e.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/_ComponentsBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/_ComponentsBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Behaviours/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Behaviours/SetState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetContacts.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetContacts.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetCredential.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetCredential.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetCredentialList.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetCredentialList.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetIdentity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetIdentity.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -182,7 +181,7 @@
     &quot;XThreadsFramesViewSplitterKey&quot;: &quot;0.4415437&quot;,
     &quot;git-widget-placeholder&quot;: &quot;Development/Preview-2&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Projects/XFramework/XFramework/XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Core/DataAccess/Commands&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/xeon/RiderProjects/XFramework/XFramework/XFramework.Subsystems/XFramework.StreamFlow.sln&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -193,13 +192,13 @@
   },
   &quot;keyToStringList&quot;: {
     &quot;rider.external.source.directories&quot;: [
-      &quot;C:\\Users\\Xeon\\AppData\\Roaming\\JetBrains\\Rider2023.3\\resharper-host\\DecompilerCache&quot;,
-      &quot;C:\\Users\\Xeon\\AppData\\Roaming\\JetBrains\\Rider2023.3\\resharper-host\\SourcesCache&quot;,
-      &quot;C:\\Users\\Xeon\\AppData\\Local\\Symbols\\src&quot;
+      &quot;/home/xeon/.config/JetBrains/Rider2023.3/resharper-host/DecompilerCache&quot;,
+      &quot;/home/xeon/.config/JetBrains/Rider2023.3/resharper-host/SourcesCache&quot;,
+      &quot;/home/xeon/.local/share/Symbols/src&quot;
     ]
   }
 }</component>
-  <component name="RunManager" selected=".NET Launch Settings Profile.XFramework.SourceGenerators: Generators">
+  <component name="RunManager" selected=".NET Launch Settings Profile.IdentityServer.Api">
     <configuration name="IdentityServer.Test" type="DotNetProject" factoryName=".NET Project">
       <option name="EXE_PATH" value="" />
       <option name="PROGRAM_PARAMETERS" value="" />
@@ -571,6 +570,9 @@
       <workItem from="1705803880552" duration="688000" />
       <workItem from="1705835501341" duration="673000" />
       <workItem from="1706316668115" duration="3785000" />
+      <workItem from="1706532846428" duration="956000" />
+      <workItem from="1706535277375" duration="348000" />
+      <workItem from="1706535875081" duration="185000" />
     </task>
     <task id="LOCAL-00001" summary="Updated File Structure To Support Sub-Systems">
       <created>1616960634242</created>
