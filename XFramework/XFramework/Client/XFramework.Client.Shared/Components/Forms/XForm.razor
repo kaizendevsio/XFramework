@@ -6,8 +6,6 @@
 <EditForm
     @ref="@EditForm"
     Model="@Model"
-    OnValidSubmit="async (e) => await OnValidSubmit?.Invoke(e)"
-    OnInvalidSubmit="async (e) => await OnInvalidSubmit?.Invoke(e)"
     OnSubmit="async (e) => await OnSubmit?.Invoke(e)">
     
     @if (Validator is not null)
