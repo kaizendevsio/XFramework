@@ -115,34 +115,34 @@ public class ServiceWrapperGenerator : ISourceGenerator
                       
                       public async Task<CmdResponse<{{model}}>> Create({{model}} entity)
                       {
-                          var t = await SendAsync(new Create<{{model}}>(entity));
+                          var t = await SendAsync<Create<{{model}}>, {{model}}>(new Create<{{model}}>(entity));
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
                               Message = t?.Message,
-                              Response = t?.Response?.Model
+                              Response = t?.Response
                           };
                       }
                   
                       public async Task<CmdResponse<{{model}}>> Patch({{model}} entity)
                       {
-                          var t = await SendAsync(new Patch<{{model}}>(entity));
+                          var t = await SendAsync<Patch<{{model}}>, {{model}}>(new Patch<{{model}}>(entity));
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
                               Message = t?.Message,
-                              Response = t?.Response?.Model
+                              Response = t?.Response
                           };
                       }
                   
                       public async Task<CmdResponse<{{model}}>> Replace({{model}} entity)
                       {
-                          var t = await SendAsync(new Replace<{{model}}>(entity));
+                          var t = await SendAsync<Replace<{{model}}>, {{model}}>(new Replace<{{model}}>(entity));
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
                               Message = t?.Message,
-                              Response = t?.Response?.Model
+                              Response = t?.Response
                           };
                       }
                   
@@ -156,14 +156,44 @@ public class ServiceWrapperGenerator : ISourceGenerator
                           };
                       }
                   
-                      public async Task<QueryResponse<PaginatedResult<{{model}}>>> GetList(int pageSize, int pageNumber, Guid? tenantId = null, bool? includeNavigations = false, List<QueryFilter>? filter = null)
+                      public async Task<QueryResponse<PaginatedResult<{{model}}>>> GetList(
+                        int pageSize, 
+                        int pageNumber, 
+                        Guid? tenantId = null, 
+                        bool noCache = true, 
+                        int navigationDepth = 1,
+                        bool? includeNavigations = false,
+                        List<QueryFilter>? filter = null,
+                        List<string>? includes = null)
                       {
-                          return await SendAsync<GetList<{{model}}>, PaginatedResult<{{model}}>>(new GetList<{{model}}>(pageSize, pageNumber, tenantId, includeNavigations, filter));
+                          return await SendAsync<GetList<{{model}}>, PaginatedResult<{{model}}>>(new GetList<{{model}}>(
+                            PageSize: pageSize, 
+                            PageNumber: pageNumber, 
+                            TenantId: tenantId, 
+                            NoCache: noCache, 
+                            IncludeNavigations: includeNavigations,
+                            NavigationDepth: navigationDepth,
+                            Filter: filter,
+                            Includes: includes
+                            ));
                       }
                   
-                      public async Task<QueryResponse<{{model}}>> Get(Guid id, Guid? tenantId = null, bool? includeNavigations = null)
+                      public async Task<QueryResponse<{{model}}>> Get(
+                        Guid id, 
+                        Guid? tenantId = null, 
+                        bool noCache = true,
+                        int navigationDepth = 1,
+                        bool? includeNavigations = null,
+                        List<string>? includes = null)
                       {
-                          return await SendAsync<Get<{{model}}>, {{model}}>(new Get<{{model}}>(id, tenantId, includeNavigations));
+                          return await SendAsync<Get<{{model}}>, {{model}}>(new Get<{{model}}>(
+                            Id: id, 
+                            TenantId: tenantId, 
+                            NoCache: noCache, 
+                            IncludeNavigations: includeNavigations,
+                            NavigationDepth: navigationDepth,
+                            Includes: includes
+                            ));
                       }
                   }
                   """);   

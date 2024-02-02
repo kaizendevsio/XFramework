@@ -2188,6 +2188,12 @@ public partial class AppDbContext : DbContext
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 
+    /*protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.UseLazyLoadingProxies();
+    }*/
+
+    
     protected void SeedDatabase(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<IdentityContactType>().HasData(

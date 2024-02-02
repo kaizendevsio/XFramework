@@ -91,21 +91,51 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
 
         codeBuilder.AppendLine("");
         codeBuilder.Append("                        ");
-        codeBuilder.AppendLine($@"{model.ToLower()}Model.MapGet(""/"", async ([FromServices] IMediator mediator, [FromQuery] int pageSize, [FromQuery] int pageNumber, [FromQuery] bool? includeNavigations, [FromQuery] string filter, [FromQuery] Guid tenantId) =>");
+        codeBuilder.AppendLine($@"{model.ToLower()}Model.MapGet(""/"", async (
+            [FromServices] IMediator mediator, 
+            [FromQuery] int pageSize, 
+            [FromQuery] int pageNumber, 
+            [FromQuery] bool noCache, 
+            [FromQuery] bool? includeNavigations, 
+            [FromQuery] string filter, 
+            [FromQuery] Guid tenantId,
+            [FromQuery] int navigationDepth = 1,
+            [FromQuery] List<string>? includes = null) =>");
             
         codeBuilder.Append("                        ");
         codeBuilder.AppendLine($@"{{
                             var filters = JsonSerializer.Deserialize<List<QueryFilter>>(filter);
-                            var request = new GetList<{model}>(pageSize, pageNumber, tenantId, includeNavigations, filters);
+                            var request = new GetList<{model}>(
+                                PageSize: pageSize, 
+                                PageNumber: pageNumber, 
+                                TenantId: tenantId, 
+                                NoCache: noCache, 
+                                NavigationDepth: navigationDepth,
+                                IncludeNavigations: includeNavigations,
+                                Filter: filters,
+                                Includes: includes);
                             return await mediator.Send(request);
                         }});");
 
         // Get
         codeBuilder.Append("                        ");
-        codeBuilder.AppendLine($@"{model.ToLower()}Model.MapGet(""/{{id}}"", async (IMediator mediator, Guid id, bool? includeNavigations, [FromQuery] Guid tenantId) =>");
+        codeBuilder.AppendLine($@"{model.ToLower()}Model.MapGet(""/{{id}}"", async (
+            IMediator mediator, 
+            Guid id, 
+            [FromQuery] bool noCache, 
+            [FromQuery] bool? includeNavigations,
+            [FromQuery] Guid tenantId,      
+            [FromQuery] int navigationDepth = 1, 
+            [FromQuery] List<string>? includes = null) =>");
         codeBuilder.Append("                        ");
         codeBuilder.AppendLine($@"{{
-                            var request = new Get<{model}>(id, tenantId, includeNavigations);
+                            var request = new Get<{model}>(
+                                Id: id,
+                                TenantId: tenantId, 
+                                NoCache: noCache,
+                                NavigationDepth: navigationDepth,
+                                IncludeNavigations: includeNavigations,
+                                Includes: includes);
                             return await mediator.Send(request);
                         }});");
 

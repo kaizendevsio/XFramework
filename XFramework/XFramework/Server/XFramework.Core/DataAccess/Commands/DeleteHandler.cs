@@ -67,6 +67,8 @@ public class DeleteHandler<TModel>(
    
             // Remove the entity from the cache after successful deletion
             await cache.InvalidateCacheForModel(request.Model);
+            cache.Remove($"GetList-{typeof(TModel).Name}-");
+
         }
         catch (Exception ex)
         {

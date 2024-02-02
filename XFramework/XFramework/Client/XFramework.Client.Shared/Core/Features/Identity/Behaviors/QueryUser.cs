@@ -5,7 +5,7 @@ namespace XFramework.Client.Shared.Core.Features.Identity;
 
 public partial class IdentityState
 {
-    public record QueryUser(Guid Id) : StateAction<IdentityCredential?>;
+    public record QueryUser(Guid CredentialId) : StateAction<IdentityCredential?>;
 
     protected class QueryUserHandler(
         IIdentityServerServiceWrapper identityServerServiceWrapper,
@@ -17,7 +17,7 @@ public partial class IdentityState
 
         public override async Task<IdentityCredential?> Handle(QueryUser request, CancellationToken cancellationToken)
         {
-            var responseCredential = await identityServerServiceWrapper.IdentityCredential.Get(request.Id);
+            var responseCredential = await identityServerServiceWrapper.IdentityCredential.Get(request.CredentialId);
             if (await HandleFailure(responseCredential, request)) return null;
             
             var responseIdentity = await identityServerServiceWrapper.IdentityInformation.Get(responseCredential.Response.IdentityInfoId);

@@ -28,10 +28,10 @@ public partial class IdentityState
                 var response = await identityServerServiceWrapper.IdentityContact.Patch(currentStateContact);
                 if (await HandleFailure(response, request)) return;
             }
-
-            HandleSuccess(request, "Contacts updated successfully.");
-
+            
             await Mediator.Send(new GetContacts(Id: CurrentState.Contacts.First().CredentialId));
+            
+            await HandleSuccess(request, "Contacts updated successfully.");
         }
     }
 }

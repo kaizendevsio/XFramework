@@ -1,7 +1,9 @@
 ﻿using System.Diagnostics;
 using FluentValidation;
 using MediatR;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Sentry;
 using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Extensions;
 
@@ -10,7 +12,8 @@ namespace XFramework.Integration.PipelineBehaviours;
 public class BasePipelineBehavior<TRequest, TResponse>
     (
         IEnumerable<IValidator<TRequest>> validators,
-        ILogger<BasePipelineBehavior<TRequest, TResponse>> log
+        ILogger<BasePipelineBehavior<TRequest, TResponse>> log,
+        IHostEnvironment env
     )
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
@@ -40,12 +43,23 @@ public class BasePipelineBehavior<TRequest, TResponse>
         }
     }
 
-    private static TResponse HandleError(Exception e)
+    private TResponse HandleError(Exception e)
     {
         var responseInstance = Activator.CreateInstance<TResponse>();
                 
         responseInstance.Message = $"Error: {e.Message}; {(e.InnerException is not null ? $"Inner Exception: {e.InnerException?.Message}" : string.Empty)}";
         responseInstance.HttpStatusCode = HttpStatusCode.InternalServerError;
+        
+        log.LogError("Error: {Message}; Inner Exception: {InnerException}; Stack Trace: {StackTrace}", 
+            e.Message, 
+            e.InnerException?.Message, 
+            e.StackTrace
+        );
+
+        if (env.IsProduction())
+        {
+            SentrySdk.CaptureException(e);
+        }
                 
         return responseInstance;
     }

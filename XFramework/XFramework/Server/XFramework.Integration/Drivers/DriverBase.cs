@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.SignalR.Client;
+﻿using System.Text.Json;
+using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Domain.Generic.Contracts.Base;
 using XFramework.Integration.Abstractions.Wrappers;
 
@@ -35,7 +36,10 @@ public record DriverBase(IMessageBusWrapper MessageBusDriver, IConfiguration Con
         {
             Initialize();
         }
-        return await MessageBusDriver.SendAsync(request, TargetClient);
+        
+        var t = await MessageBusDriver.SendAsync(request, TargetClient);
+        Console.WriteLine(JsonSerializer.Serialize(t));
+        return t;
     }
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) 
         where TRequest : class, IHasRequestServer
@@ -44,7 +48,8 @@ public record DriverBase(IMessageBusWrapper MessageBusDriver, IConfiguration Con
         {
             Initialize();
         }
-        return await MessageBusDriver.SendAsync<TRequest, TResponse>(request, TargetClient);
+        var t = await MessageBusDriver.SendAsync<TRequest, TResponse>(request, TargetClient);
+        return t;
     }
     
 }

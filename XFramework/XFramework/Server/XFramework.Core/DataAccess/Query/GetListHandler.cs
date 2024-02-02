@@ -20,21 +20,28 @@ public class GetListHandler<TModel>(
     : IGetListHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
 {
-    private const int MaxNavigationDepth = 1;
+    private int _maxNavigationDepth = 1;
 
     public async Task<QueryResponse<PaginatedResult<TModel>>> Handle(GetList<TModel> request, CancellationToken cancellationToken)
     {
         var cacheKey = $"GetList-{typeof(TModel).Name}-{string.Join("-", request.Filter?.Select(i => $"{i.PropertyName}-{i.Operation}-{i.Value}"))}"; // Adjust cache key as needed
-
-        var cachedResult = cache.Get<PaginatedResult<TModel>>(cacheKey);
-        if (cachedResult is not null)
+        
+        if (request.NoCache is false)
         {
-            return new QueryResponse<PaginatedResult<TModel>>
+            var cachedResult = cache.Get<PaginatedResult<TModel>>(cacheKey);
+            if (cachedResult is not null)
             {
-                Response = cachedResult
-            };
+                return new QueryResponse<PaginatedResult<TModel>>
+                {
+                    Response = cachedResult
+                };
+            }
         }
 
+        _maxNavigationDepth = request.NavigationDepth > 0 
+            ? request.NavigationDepth 
+            : _maxNavigationDepth;
+        
         if (request.TenantId is null && request.Metadata.TenantId is null)
         {
             return new()
@@ -50,7 +57,7 @@ public class GetListHandler<TModel>(
 
         if (request.IncludeNavigations.HasValue && request.IncludeNavigations.Value)
         {
-            query = IncludeNavigations(query, MaxNavigationDepth);
+            query = IncludeNavigations(query, _maxNavigationDepth);
         }
 
         if (request.Filter != null && request.Filter.Any())

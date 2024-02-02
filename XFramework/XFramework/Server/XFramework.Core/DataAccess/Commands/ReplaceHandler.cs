@@ -48,7 +48,7 @@ public class ReplaceHandler<TModel>(
         }
 
         // Adapt (map) the provided model data over the existing entity, while preserving the ID.
-        request.Model.Adapt(existingEntity);
+        existingEntity = request.Model;
             
         // Set ModifiedAt and ConcurrencyStamp
         existingEntity.ModifiedAt = DateTime.UtcNow;
@@ -61,6 +61,7 @@ public class ReplaceHandler<TModel>(
                 
             // Remove the entity from the cache after successful patch
             await cache.InvalidateCacheForModel(request.Model);
+            cache.Remove($"GetList-{typeof(TModel).Name}-");
                 
             logger.LogInformation("Entity of type {EntityName} with ID {EntityId} was successfully replaced", typeof(TModel).Name, request.Model.Id);
         }

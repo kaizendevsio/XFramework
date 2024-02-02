@@ -287,7 +287,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 return new()
                 {
                     HttpStatusCode = tResponse.HttpStatusCode,
-                    Response = tResponse
+                    Response = tResponse,
                 };
             case HttpStatusCode.NotFound:
             {

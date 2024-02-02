@@ -29,6 +29,7 @@ public partial class IdentityState
             var response = await identityServerServiceWrapper.IdentityCredential.GetList(
                 pageSize: request.PageSize, 
                 pageNumber: request.PageIndex, 
+                includeNavigations: true,
                 filter: filters);
             
             if (await HandleFailure(response, request)) return;

@@ -52,7 +52,8 @@ public class CreateHandler<TModel>(
             logger.LogInformation("Entity of type {EntityName} was successfully created", typeof(TModel).Name);
             
             await cache.InvalidateCacheForModel(request.Model);
-            
+            cache.Remove($"GetList-{typeof(TModel).Name}-");
+
             // Return a successful response.
             return new CmdResponse<TModel>
             {

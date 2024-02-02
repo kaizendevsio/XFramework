@@ -16,10 +16,19 @@ public record GetList<T>(
     int PageSize,
     int PageNumber,
     Guid? TenantId,
+    bool NoCache = true,
+    int NavigationDepth = 1,
     bool? IncludeNavigations = false,
-    List<QueryFilter>? Filter = null) : RequestBase, IRequest<QueryResponse<PaginatedResult<T>>>;
+    List<QueryFilter>? Filter = null,
+    List<string>? Includes = null) : RequestBase, IRequest<QueryResponse<PaginatedResult<T>>>;
 
-public record Get<T>(Guid Id, Guid? TenantId, bool? IncludeNavigations = null) : RequestBase, IRequest<QueryResponse<T>>;
+public record Get<T>(
+    Guid Id, 
+    Guid? TenantId, 
+    bool NoCache = true, 
+    int NavigationDepth = 1,
+    bool? IncludeNavigations = null,
+    List<string>? Includes = null) : RequestBase, IRequest<QueryResponse<T>>;
 
 public record RequestBase : IHasRequestServer
 {

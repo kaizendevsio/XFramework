@@ -46,7 +46,7 @@ public class PatchHandler<TModel>(
             throw new KeyNotFoundException("The requested item was not found");
         }
 
-        entity.Adapt(request.Model);
+        entity = request.Model.Adapt(entity);
         entity.ModifiedAt = DateTime.UtcNow;
 
         if (entity is IHasConcurrencyStamp concurrencyEntity)
@@ -60,7 +60,8 @@ public class PatchHandler<TModel>(
 
             // Remove the entity from the cache after successful patch
             await cache.InvalidateCacheForModel(request.Model);
-
+            cache.Remove($"GetList-{typeof(TModel).Name}-");
+            
             logger.LogInformation("Entity of type {EntityName} with ID {EntityId} successfully patched", typeof(TModel).Name, request.Model.Id);
 
 
