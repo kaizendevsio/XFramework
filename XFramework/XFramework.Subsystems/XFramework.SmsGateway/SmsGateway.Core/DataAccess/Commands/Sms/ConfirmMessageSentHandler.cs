@@ -1,4 +1,4 @@
-﻿using Messaging.Integration.Interfaces;
+﻿using Messaging.Integration.Drivers;
 using SmsGateway.Domain.Generic.Contracts.Requests.Update;
 
 namespace SmsGateway.Core.DataAccess.Commands.Sms;

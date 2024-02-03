@@ -15,4 +15,4 @@
     nameof(MessageThreadMemberRole),
     nameof(MessageThreadMemberGroup),
 })]
-public static partial class MinimalApiGenerator;
+public static partial class MessagingApiGenerator;

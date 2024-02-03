@@ -15,4 +15,4 @@ namespace Community.Api.Generators;
     nameof(CommunityContentReaction),
     nameof(CommunityContentReactionType)
 })]
-public static partial class MinimalApiGenerator;
+public static partial class CommunityApiGenerator;

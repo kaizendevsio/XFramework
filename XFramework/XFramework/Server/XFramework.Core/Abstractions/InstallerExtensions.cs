@@ -260,8 +260,12 @@ public static class InstallerExtensions
             app.UseDeveloperExceptionPage();
         }
 
-        app.UseHttpsRedirection();
-        app.UseHsts();
+        if (env.IsProduction() || env.IsStaging())
+        {
+            app.UseHttpsRedirection();
+            app.UseHsts();
+        }
+        
         app.UseCors(o => o.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
         app.UseRouting();
         app.UseAuthentication();
