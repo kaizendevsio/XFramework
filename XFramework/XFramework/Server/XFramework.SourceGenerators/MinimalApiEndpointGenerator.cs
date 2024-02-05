@@ -100,7 +100,7 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
             [FromQuery] string filter, 
             [FromQuery] Guid tenantId,
             [FromQuery] int navigationDepth = 1,
-            [FromQuery] List<string>? includes = null) =>");
+            [FromQuery] string[]? includes = null) =>");
             
         codeBuilder.Append("                        ");
         codeBuilder.AppendLine($@"{{
@@ -113,7 +113,7 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
                                 NavigationDepth: navigationDepth,
                                 IncludeNavigations: includeNavigations,
                                 Filter: filters,
-                                Includes: includes);
+                                Includes: includes.ToList());
                             return await mediator.Send(request);
                         }});");
 
@@ -126,7 +126,7 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
             [FromQuery] bool? includeNavigations,
             [FromQuery] Guid tenantId,      
             [FromQuery] int navigationDepth = 1, 
-            [FromQuery] List<string>? includes = null) =>");
+            [FromQuery] string[]? includes = null) =>");
         codeBuilder.Append("                        ");
         codeBuilder.AppendLine($@"{{
                             var request = new Get<{model}>(
@@ -135,7 +135,7 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
                                 NoCache: noCache,
                                 NavigationDepth: navigationDepth,
                                 IncludeNavigations: includeNavigations,
-                                Includes: includes);
+                                Includes: includes.ToList());
                             return await mediator.Send(request);
                         }});");
 

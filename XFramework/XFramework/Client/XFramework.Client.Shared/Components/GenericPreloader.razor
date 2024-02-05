@@ -5,7 +5,7 @@
 {
     <MudPaper Class="pa-6 ma-2 generic-preloader" Elevation="3">
         <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center">
-            @if (string.IsNullOrEmpty(ApplicationState.ProgressMessage))
+            @if (!string.IsNullOrEmpty(ApplicationState.ProgressMessage))
             {
                 <MudText Typo="Typo.h6">@ApplicationState.ProgressMessage</MudText>
             }
@@ -17,7 +17,7 @@
                 }
                 else
                 {
-                    <MudProgressCircular Size="Size.Large" Color="Color.Primary" Indeterminate="true" />
+                    <MudProgressCircular Size="Size.Medium" Color="Color.Success" Indeterminate="@true" />
                 }
             }
         </MudStack>

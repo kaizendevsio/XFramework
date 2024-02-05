@@ -26,7 +26,7 @@ public partial class WalletState
             // Inform UI About Busy State
             if (!action.Silent)
             {
-                ReportTask("Creating Wallet..", true);
+                ReportBusy("Creating Wallet..", true);
             }
 
             // Check if CredentialGuid is provided
@@ -61,7 +61,7 @@ public partial class WalletState
             // Inform UI About Not Busy State
             if (!action.Silent)
             {
-                ReportTask("Done", false);
+                ReportBusy("Done", false);
             }
 
             return;

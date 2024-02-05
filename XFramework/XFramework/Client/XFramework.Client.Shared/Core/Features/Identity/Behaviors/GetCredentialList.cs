@@ -17,6 +17,8 @@ public partial class IdentityState
 
         public override async Task Handle(GetCredentialList request, CancellationToken cancellationToken)
         {
+            await ReportBusy();
+
             var filters = new List<QueryFilter>();
             
             filters.AddRange(request.SearchFields.Select(i => new QueryFilter
@@ -30,6 +32,12 @@ public partial class IdentityState
                 pageSize: request.PageSize, 
                 pageNumber: request.PageIndex, 
                 includeNavigations: true,
+                includes: new List<string>
+                {
+                    $"{nameof(IdentityCredential.IdentityInfo)}",
+                    $"{nameof(IdentityCredential.IdentityContacts)}.{nameof(IdentityContact.Type)}",
+                    $"{nameof(IdentityCredential.IdentityRoles)}.{nameof(IdentityRole.Type)}"
+                },
                 filter: filters);
             
             if (await HandleFailure(response, request)) return;
@@ -38,6 +46,7 @@ public partial class IdentityState
             Store.SetState(CurrentState);
             
             await HandleSuccess(response, request, true);
+            await ReportTaskCompleted();
         }
     }
 }

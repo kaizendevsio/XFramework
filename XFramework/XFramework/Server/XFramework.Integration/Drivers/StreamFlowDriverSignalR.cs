@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using MessagePack;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
@@ -22,6 +23,8 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     private DeviceAgentProvider DeviceAgentProvider { get; set; }
     private ILogger<StreamFlowDriverSignalR> Logger { get; }
     private string? ClientIpAddress { get; set; }
+    private DateTime ClientIpAddressLastFailedFetch { get; set; }
+    private TimeSpan ClientIpAddressFetchTimeout => DateTime.Now - ClientIpAddressLastFailedFetch;
     private string? ClientName { get; set; }
     private Guid? TenantId { get; set; }
     public List<string> TopicList { get; init; }
@@ -110,7 +113,6 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 var retryCount = 0;
                 const int maxRetryCount = 5;
                 
-                TryGetClientIpAddress:
                 try
                 {
                     Logger.LogInformation("Attempting to get client IP address");
@@ -123,12 +125,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 }
                 catch (Exception e)
                 {
-                    if (retryCount < maxRetryCount)
-                    {
-                        Logger.LogInformation(e, "Unable to get client IP address, retrying...");
-                        retryCount++;
-                        goto TryGetClientIpAddress;
-                    }
+                    ClientIpAddressLastFailedFetch = DateTime.Now;
                     Logger.LogError(e, "Unable to get client IP address");
                     ClientIpAddress = string.Empty;
                 }
@@ -145,6 +142,11 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         {
             try
             {
+                if (ClientIpAddressFetchTimeout < TimeSpan.FromMinutes(2))
+                {
+                    Logger.LogError("Unable to get client IP address");
+                    ClientIpAddress = string.Empty; 
+                }
                 Logger.LogInformation("Attempting to get client IP address");
 
                 var ipAddress = await new HttpClient().GetStringAsync("https://api.ipify.org/");
@@ -155,6 +157,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             catch (Exception e)
             {
                 Logger.LogError(e, "Unable to get client IP address");
+                ClientIpAddressLastFailedFetch = DateTime.Now;
                 ClientIpAddress = string.Empty;
             }
         }

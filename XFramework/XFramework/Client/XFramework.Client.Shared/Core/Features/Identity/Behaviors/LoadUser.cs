@@ -17,6 +17,8 @@ public partial class IdentityState
 
         public override async Task Handle(LoadUser request, CancellationToken cancellationToken)
         {
+            await ReportBusy();
+            
             var responseCredential = await identityServerServiceWrapper.IdentityCredential.Get(
                 id: request.CredentialId, 
                 includeNavigations: true, 
@@ -31,6 +33,7 @@ public partial class IdentityState
             store.SetState(CurrentState);
             
             await HandleSuccess(responseCredential, request, true);
+            await ReportTaskCompleted();
         }
     }
 }

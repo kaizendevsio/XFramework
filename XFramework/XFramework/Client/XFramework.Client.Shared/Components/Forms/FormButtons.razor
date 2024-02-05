@@ -1,4 +1,5 @@
 ﻿@using XFramework.Client.Shared.Entity.Enums
+
 <div class="d-flex flex-row justify-content-between">
     @if (OnDelete is not null && FormMode == FormMode.Edit)
     {
@@ -8,8 +9,25 @@
     @if(FormMode is FormMode.Create or FormMode.Edit)
     {
         <div class="d-flex flex-row justify-content-end gap-3">
-            <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="() => Cancel()">Cancel</MudButton>
-            <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save" ButtonType="ButtonType.Submit" Color="Color.Primary" OnClick="() => OnSave?.Invoke()">Save</MudButton>
+            <MudButton 
+                Variant="Variant.Filled" 
+                Color="Color.Warning"
+                Disabled="@IsLoading"
+                Size="Size.Large"
+                OnClick="() => InternalCancel()">Cancel</MudButton>
+            
+            <MudButton 
+                StartIcon="@Icons.Material.Filled.Save" 
+                Variant="Variant.Filled" 
+                Color="Color.Primary" 
+                Disabled="@IsLoading"
+                Size="Size.Large"
+                OnClick="() => InternalSave()">Save 
+                @if (IsLoading)
+                {
+                    <MudProgressCircular Class="ms-3" Indeterminate="@true" Color="Color.Dark" Size="Size.Small"/>
+                }
+            </MudButton>
         </div>
     }
 </div>
@@ -28,8 +46,16 @@
     [CascadingParameter] 
     public FormMode FormMode { get; set; }
 
-    private Task Cancel()
+    [CascadingParameter]
+    public bool IsLoading { get; set; }
+
+    private Task InternalCancel()
     {
         return OnCancel?.Invoke() ?? NavigateBack();
+    }
+    
+    private Task InternalSave()
+    {
+        return OnSave?.Invoke() ?? Task.CompletedTask;
     }
 }

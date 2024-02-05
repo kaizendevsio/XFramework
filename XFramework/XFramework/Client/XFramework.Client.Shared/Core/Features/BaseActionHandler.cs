@@ -1,3 +1,4 @@
+using Serilog;
 using TypeSupport.Extensions;
 using XFramework.Client.Shared.Core.Features.Address;
 using XFramework.Client.Shared.Core.Features.Cache;
@@ -46,6 +47,7 @@ public class BaseStateActionHandler
         
         // Display error to the console
         Console.WriteLine($"Error from response: {message}");
+        Log.Error("Error from response: {message}", message); 
 
         HandleFailureHooks(action);
         
@@ -371,16 +373,16 @@ public class BaseStateActionHandler
         return Task.CompletedTask;
     }
     
-    public async Task ReportTask(string title, bool? isBusy = true)
+    public async Task ReportBusy(string? title = null, bool? isBusy = true)
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressMessage = title, NoSpinner = false});
     }
-    public async Task ReportTask<T>(QueryAction action)
+    public async Task ReportBusy<T>(QueryAction action)
     {
         if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, ProgressTitle = action.GetType().Name, NoSpinner = false});
     }
-    public async Task ReportTask<T,TQ>(QueryAction action, IEnumerable<T> list)
+    public async Task ReportBusy<T,TQ>(QueryAction action, IEnumerable<T> list)
     {
         if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
         if (list.TryGetNonEnumeratedCount(out var count) && count > 0) return;

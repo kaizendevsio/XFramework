@@ -17,6 +17,8 @@ public partial class IdentityState
 
         public override async Task Handle(GetContacts request, CancellationToken cancellationToken)
         {
+            await ReportBusy();
+
             var filters = new List<QueryFilter>
             {
                 new QueryFilter
@@ -30,7 +32,10 @@ public partial class IdentityState
             var response = await identityServerServiceWrapper.IdentityContact.GetList(
                 pageSize: request.PageSize,
                 pageNumber: request.PageIndex,
-                filter: filters);
+                filter: filters,
+                includeNavigations: true,
+                navigationDepth: 1
+                );
             
             if (await HandleFailure(response, request)) return;
             
@@ -38,6 +43,8 @@ public partial class IdentityState
             Store.SetState(CurrentState);
             
             await HandleSuccess(response, request, true);
+            await ReportTaskCompleted();
+
         }
     }
 }

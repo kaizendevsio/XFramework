@@ -265,7 +265,7 @@ public static class InstallerExtensions
             app.UseHttpsRedirection();
             app.UseHsts();
         }
-        
+       
         app.UseCors(o => o.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
         app.UseRouting();
         app.UseAuthentication();

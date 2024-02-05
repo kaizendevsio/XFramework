@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Collections;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Services;
@@ -46,6 +47,16 @@ public class ReplaceHandler<TModel>(
             logger.LogWarning("Entity of type {EntityName} with ID {EntityId} was not found during replace attempt", typeof(TModel).Name, request.Model.Id);
             throw new KeyNotFoundException("The requested item was not found");
         }
+        
+        // strip navigation properties
+        var navigationProperties = request.Model.GetType().GetProperties()
+            .Where(p => IsNavigationProperty(p.PropertyType))
+            .ToList();
+
+        foreach (var navigationProperty in navigationProperties.Where(navigationProperty => navigationProperty.CanWrite))
+        {
+            navigationProperty.SetValue(request.Model, null);
+        }
 
         // Adapt (map) the provided model data over the existing entity, while preserving the ID.
         existingEntity = request.Model;
@@ -82,5 +93,12 @@ public class ReplaceHandler<TModel>(
             Response = existingEntity,
             HttpStatusCode = HttpStatusCode.OK
         };
+    }
+    
+    private bool IsNavigationProperty(Type type)
+    {
+        return (type.IsClass && type != typeof(string) && type != typeof(byte[])) ||
+               (typeof(IEnumerable).IsAssignableFrom(type) && type != typeof(string) &&
+                (type.GetGenericArguments().Any() ? type.GetGenericArguments()[0].IsClass : false));
     }
 }

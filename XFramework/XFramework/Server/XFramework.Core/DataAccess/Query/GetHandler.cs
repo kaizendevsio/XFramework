@@ -130,8 +130,5 @@ public class GetHandler<TModel>(
 
         return IncludeNavigations(query, elementType, maxDepth, currentDepth + 1, modelName: propertyName);
     }
-
-
-
 }
 

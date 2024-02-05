@@ -30,7 +30,7 @@ public partial class SessionState
             CurrentState.RegisterVm.RoleList ??= action.RoleList;
             
             // Inform UI About Busy State
-            await ReportTask("Creating Account..", true);
+            await ReportBusy("Creating Account..", true);
 
             // Check If Any Given Data Are Already Existing
             if (await CheckDuplicateRecords(action)) return;
@@ -47,7 +47,7 @@ public partial class SessionState
             var credentialId = Guid.NewGuid();
 
             // Send Create Identity Request
-            await ReportTask("Creating identity..", null);
+            await ReportBusy("Creating identity..", null);
             var identityRequest = CurrentState.RegisterVm.Adapt<IdentityInformation>();
             identityRequest.Id = identityId;
             
@@ -55,7 +55,7 @@ public partial class SessionState
             if (await HandleFailure(identity, action)) return;
             
             // Send Create Credential Request
-            await ReportTask("Creating credential..", null);
+            await ReportBusy("Creating credential..", null);
             var credentialRequest = CurrentState.RegisterVm.Adapt<IdentityCredential>();
             credentialRequest.Id = credentialId;
             credentialRequest.IdentityInfoId = identityId;
@@ -64,7 +64,7 @@ public partial class SessionState
             if (await HandleFailure(credential, action)) return;
             
             // Send Create Phone Contact Request
-            await ReportTask("Creating contacts..", null);
+            await ReportBusy("Creating contacts..", null);
 
             var phoneContactType = await identityServerServiceWrapper.IdentityContactType.Get(IdentityConstants.ContactType.Phone);
             var phoneContact = await identityServerServiceWrapper.IdentityContact.Create(new(){
@@ -77,7 +77,7 @@ public partial class SessionState
             if (await HandleFailure(phoneContact, action)) return;
             
             // Send Create Email Contact Request
-            await ReportTask("Creating contacts..", null);
+            await ReportBusy("Creating contacts..", null);
             var emailContactType = await identityServerServiceWrapper.IdentityContactType.Get(IdentityConstants.ContactType.Email);
             var emailContact = await identityServerServiceWrapper.IdentityContact.Create(new(){
                 CredentialId = credentialId,
@@ -91,21 +91,21 @@ public partial class SessionState
             // If WalletList property is provided, automatically create wallets
             if (action.WalletList is not null)
             {
-                await ReportTask("Creating wallets..", null);
+                await ReportBusy("Creating wallets..", null);
                 await CreateWallets(action.WalletList, credentialId);
             }
             
             // If Roles property is provided, automatically create wallets
             if (action.RoleList is not null && action.RoleList.Any())
             {
-                await ReportTask("Creating roles..", null);
+                await ReportBusy("Creating roles..", null);
                 await CreateRoles(CurrentState.RegisterVm.RoleList, credentialId);
             }
             
             // If AutoLogin property is true, automatically log the identity in
             if (action.AutoLogin)
             {
-                ReportTask("Logging In..", null);
+                ReportBusy("Logging In..", null);
                 var username = string.Empty;
                 if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
                 {
@@ -136,7 +136,7 @@ public partial class SessionState
             await HandleSuccess(credential, action);
 
             // Inform UI About Not Busy State
-            ReportTask("", false);
+            ReportBusy("", false);
             
             return;
         }
@@ -172,7 +172,7 @@ public partial class SessionState
         private async Task<bool> CheckDuplicateRecords(Register action)
         {
             // Check Credential Duplicates
-            await ReportTask("Validating credentials..", null);
+            await ReportBusy("Validating credentials..", null);
             var credentialExistence = await identityServerServiceWrapper.IdentityCredential.GetList(pageSize:1, pageNumber:1, filter: new()
             {
                 new()
@@ -190,7 +190,7 @@ public partial class SessionState
             }
 
             // Check Phone Number Duplicates
-            await ReportTask("Checking for duplicate phone numbers..", null);
+            await ReportBusy("Checking for duplicate phone numbers..", null);
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
             {
                 var phoneContactExistence = await identityServerServiceWrapper.IdentityContact.GetList(pageSize:1, pageNumber:1, filter: new()
@@ -212,7 +212,7 @@ public partial class SessionState
             }
 
             // Check Email Address Duplicates
-            await ReportTask("Checking for duplicate email address..", null);
+            await ReportBusy("Checking for duplicate email address..", null);
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress))
             {
                 var emailContactExistence = await identityServerServiceWrapper.IdentityContact.GetList(pageSize:1, pageNumber:1, filter: new()

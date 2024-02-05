@@ -55,9 +55,16 @@ public class GetListHandler<TModel>(
 
         IQueryable<TModel> query = dbContext.Set<TModel>();
 
-        if (request.IncludeNavigations.HasValue && request.IncludeNavigations.Value)
+        if (request.IncludeNavigations is true)
         {
-            query = IncludeNavigations(query, _maxNavigationDepth);
+            if (request.Includes is not null && request.Includes.Any())
+            {
+                query = request.Includes.Aggregate(query, (current, include) => current.Include(include));
+            }
+            else 
+            {
+                query = IncludeNavigations(query, typeof(TModel), _maxNavigationDepth); // Limited to 3 levels deep
+            }
         }
 
         if (request.Filter != null && request.Filter.Any())
@@ -90,17 +97,44 @@ public class GetListHandler<TModel>(
         };
     }
 
-    private IQueryable<TModel> IncludeNavigations(IQueryable<TModel> query, int maxDepth, int currentDepth = 0, PropertyInfo? propertyInfo = null)
+    private IQueryable<TModel> IncludeNavigations(IQueryable<TModel> query, Type model, int maxDepth, int currentDepth = 0, string? modelName = "")
     {
-        if (currentDepth >= maxDepth) return query;
-        var model = propertyInfo?.PropertyType ?? typeof(TModel);
+        if (currentDepth >= maxDepth || (typeof(TModel) == model && currentDepth > 0)) return query;
 
-        foreach (var property in model.GetProperties().Where(p => p.PropertyType.IsClass && p.PropertyType != typeof(string) && !typeof(IEnumerable).IsAssignableFrom(p.PropertyType)))
+        // Collecting navigation properties to include
+        var navigationProperties = model.GetProperties()
+            .Where(p => IsNavigationProperty(p.PropertyType))
+            .ToList();
+
+        // Including navigation properties
+        foreach (var property in navigationProperties)
         {
-            if (currentDepth >= maxDepth) return query;
-            query = query.Include(property.Name);
-            query = IncludeNavigations(query, maxDepth, currentDepth + 1, propertyInfo); // Recursive call
+            if (typeof(TModel) == property.PropertyType)
+            {
+                continue;
+            }
+            query = currentDepth == 0
+                ? query.Include(property.Name)
+                : query.Include($"{modelName}.{property.Name}");
+            query = IncludeNavigationsForProperty(query, model, property.Name, maxDepth, currentDepth);
         }
+
         return query;
+    }
+
+    private bool IsNavigationProperty(Type type)
+    {
+        return (type.IsClass && type != typeof(string) && type != typeof(byte[])) ||
+               (typeof(IEnumerable).IsAssignableFrom(type) && type != typeof(string) &&
+                (type.GetGenericArguments().Any() ? type.GetGenericArguments()[0].IsClass : false));
+    }
+
+    private IQueryable<TModel> IncludeNavigationsForProperty(IQueryable<TModel> query, Type model, string propertyName, int maxDepth, int currentDepth)
+    {
+        var propertyType = model.GetProperty(propertyName).PropertyType;
+        var isCollection = typeof(IEnumerable).IsAssignableFrom(propertyType);
+        var elementType = isCollection ? propertyType.GetGenericArguments()[0] : propertyType;
+
+        return IncludeNavigations(query, elementType, maxDepth, currentDepth + 1, modelName: propertyName);
     }
 }

@@ -5,8 +5,7 @@
 
 <EditForm
     @ref="@EditForm"
-    Model="@Model"
-    OnSubmit="async (e) => await OnSubmit?.Invoke(e)">
+    Model="@Model">
     
     @if (Validator is not null)
     {
@@ -15,11 +14,14 @@
     }
 
     <CascadingValue Value="@FormMode">
-        @ChildContent
+        <CascadingValue Value="@IsLoading">
+            @ChildContent
 
-        <FormButtons
-            OnDelete="@OnDelete"
-            OnCancel="@OnCancel"/>
+            <FormButtons
+                OnDelete="@OnDelete"
+                OnCancel="@OnCancel"
+                OnSave="async () => await InternalSubmit()"/>
+        </CascadingValue>
     </CascadingValue>
 
 </EditForm>
@@ -28,7 +30,8 @@
 @code {
 
     private EditForm? EditForm { get; set; }
-    
+    private bool IsLoading { get; set; }
+
     public EditContext? EditContext => EditForm?.EditContext;
     
     [Parameter]
@@ -57,5 +60,36 @@
     
     [Parameter] 
     public FormMode FormMode { get; set; }
+
+    protected async Task InternalSubmit()
+    {
+        Console.WriteLine("On InternalSubmit..");
+        IsLoading = true;
+        StateHasChanged();
+        
+        if (EditContext!.Validate())
+        {
+            Console.WriteLine("Validating form..");
+            if (OnValidSubmit is not null)
+            {
+                Console.WriteLine("Invoking OnValidSubmit");
+                await OnValidSubmit?.Invoke(EditContext)!;
+            }
+        }
+        else
+        {
+            if (OnInvalidSubmit is not null)
+            {
+                await OnInvalidSubmit?.Invoke(EditContext)!;
+            }
+        }
+        if (OnSubmit is not null)
+        {
+            await OnSubmit?.Invoke(EditContext)!;
+        }
+
+        IsLoading = false;
+        StateHasChanged();
+    }
     
 }

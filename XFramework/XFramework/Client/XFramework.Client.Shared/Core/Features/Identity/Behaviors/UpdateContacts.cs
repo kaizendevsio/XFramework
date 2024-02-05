@@ -30,7 +30,6 @@ public partial class IdentityState
             }
             
             await Mediator.Send(new GetContacts(Id: CurrentState.Contacts.First().CredentialId));
-            
             await HandleSuccess(request, "Contacts updated successfully.");
         }
     }
