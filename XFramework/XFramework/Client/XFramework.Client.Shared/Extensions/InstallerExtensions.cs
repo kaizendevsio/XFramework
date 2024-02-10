@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Serilog;
 using XFramework.Client.Shared.Interfaces;
 
@@ -51,4 +53,12 @@ public class MockedWebAssemblyHostEnvironment : IWebAssemblyHostEnvironment
 {
     public string Environment { get; set; }
     public string BaseAddress { get; set; }
+}
+
+public class MockedHostEnvironment : IHostEnvironment
+{
+    public string EnvironmentName { get; set; }
+    public string ApplicationName { get; set; }
+    public string ContentRootPath { get; set; }
+    public IFileProvider ContentRootFileProvider { get; set; }
 }
