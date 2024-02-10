@@ -1,7 +1,7 @@
 ﻿using System.Collections.Specialized;
 using System.Web;
 
-namespace XFramework.Client.Shared.Core.Extensions
+namespace XFramework.Client.Shared.Extensions
 {
     public static class BlazorExtensions
     {

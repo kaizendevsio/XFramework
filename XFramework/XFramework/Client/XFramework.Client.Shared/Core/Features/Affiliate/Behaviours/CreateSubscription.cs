@@ -42,22 +42,21 @@ public partial class AffiliateState
                 SweetAlertService.FireAsync("Error", $"{e.Message}", SweetAlertIcon.Error);
                 return new()
                 {
-                    
                     Message = e.Message
                 };
             }
 
-            var response = await identityServerServiceWrapper.CreateAffiliateSubscription(CurrentState.AffiliateSubscriptionVm);
+            /*var response = await identityServerServiceWrapper.CreateAffiliateSubscription(CurrentState.AffiliateSubscriptionVm);
             if (await HandleFailure(response, action))
             {
                 return new()
                 {
-                    
                     Message = response.Message
                 };
-            }
+            }*/
 
-            await Mediator.Send(new SessionState.InitiateVerificationCode
+            await NavigateTo(action.NavigateToOnSuccess);
+            /*await Mediator.Send(new SessionState.InitiateVerificationCode
             {
                 LocalVerification = true,
                 LocalToken = $"{helperService.GenerateRandomNumber(111111, 999999)}",
@@ -66,16 +65,16 @@ public partial class AffiliateState
                 NavigateToOnSuccess = action.NavigateToOnSuccess,
                 NavigateToOnFailure = action.NavigateToOnFailure,
                 NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired
-            });
+            });*/
             
             await Mediator.Send(new SessionState.SetState() {RegisterVm = SessionState.RegisterVm});
             await Mediator.Send(new ApplicationState.SetState(){IsBusy = false});
+            
             //await HandleSuccess(response, action, true);
             return new()
             {
-                
                 HttpStatusCode = HttpStatusCode.Accepted,
-                Message = response.Message
+                //Message = response.Message
             };
             
         }

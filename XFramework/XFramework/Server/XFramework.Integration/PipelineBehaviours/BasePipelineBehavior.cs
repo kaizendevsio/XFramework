@@ -46,8 +46,11 @@ public class BasePipelineBehavior<TRequest, TResponse>
     private TResponse HandleError(Exception e)
     {
         var responseInstance = Activator.CreateInstance<TResponse>();
-                
-        responseInstance.Message = $"Error: {e.Message}; {(e.InnerException is not null ? $"Inner Exception: {e.InnerException?.Message}" : string.Empty)}";
+
+        responseInstance.Message = env.IsProduction() 
+            ? "An error occurred while processing your request, please try again later" 
+            : $"Error: {e.Message}; {(e.InnerException is not null ? $"Inner Exception: {e.InnerException?.Message}" : string.Empty)}";
+        
         responseInstance.HttpStatusCode = HttpStatusCode.InternalServerError;
         
         log.LogError("Error: {Message}; Inner Exception: {InnerException}; Stack Trace: {StackTrace}", 

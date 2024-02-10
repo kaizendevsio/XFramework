@@ -7,7 +7,8 @@ public class SignUpRequest
     public string? LastName { get; set; }
     public string? IdentityName { get; set; }
     public string? IdentityDescription { get; set; }
-    public DateTime? BirthDate { get; set; }
+    public DateTime? BindableBirthDate { get; set; }
+    public DateOnly? BirthDate => BindableBirthDate is not null ? DateOnly.FromDateTime(BindableBirthDate.Value) : null;
     public short Gender { get; set; }
     public short CivilStatus { get; set; }
     public string? UserName { get; set; }

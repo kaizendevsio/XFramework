@@ -38,7 +38,6 @@ public record DriverBase(IMessageBusWrapper MessageBusDriver, IConfiguration Con
         }
         
         var t = await MessageBusDriver.SendAsync(request, TargetClient);
-        Console.WriteLine(JsonSerializer.Serialize(t));
         return t;
     }
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) 

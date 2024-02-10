@@ -2,9 +2,9 @@
 
 public interface ISoftDeletable
 {
-    public bool IsEnabled { get; set; }
+    public bool? IsEnabled { get; set; }
 
-    public bool IsDeleted { get; set; }
+    public bool? IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
 
 }

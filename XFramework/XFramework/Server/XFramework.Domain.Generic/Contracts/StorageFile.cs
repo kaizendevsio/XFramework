@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace XFramework.Domain.Generic.Contracts;
 
@@ -25,6 +26,7 @@ public partial class StorageFile : BaseModel
     public string? BlobContainer { get; set; }
 
     [NotMapped]
+    [JsonIgnore]
     public byte[]? FileBytes { get; set; }
 
     public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; } = new List<CommunityContentFile>();

@@ -5,6 +5,11 @@ using XFramework.Core.Attributes;
 namespace IdentityServer.Api.Generators;
 
 [GenerateApiFromNamespace("XFramework.Domain.Generic.Contracts",new[] {
+    nameof(AddressBarangay),
+    nameof(AddressCity),
+    nameof(AddressCountry),
+    nameof(AddressProvince),
+    nameof(AddressRegion),
     nameof(IdentityInformation),
     nameof(IdentityCredential),
     nameof(IdentityAddress),

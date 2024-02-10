@@ -1,5 +1,6 @@
 ﻿using Address.Integration.Drivers;
 using XFramework.Client.Shared.Entity.Enums;
+using XFramework.Domain.Generic.Contracts;
 
 namespace XFramework.Client.Shared.Core.Features.Address;
 
@@ -30,7 +31,16 @@ public partial class AddressState
                     CurrentState.CountryList = countryResponse.Response?.Items.ToList();
                     break;
                 case AddressType.Region:
-                    var regionResponse = await addressServiceWrapper.AddressRegion.GetList(500, 1);
+                    var regionResponse = await addressServiceWrapper.AddressRegion.GetList(
+                        pageSize: 500, 
+                        pageNumber: 1,
+                        filter: [new ()
+                            {
+                                PropertyName = nameof(AddressRegion.CountryId),
+                                Operation = QueryFilterOperation.Equal,
+                                Value = CurrentState.SelectedCountry.Id
+                            }
+                        ]);
                     await HandleFailure(regionResponse, action, false);
                     CurrentState.RegionList = regionResponse.Response?.Items.ToList();
                     CurrentState.SelectedRegion = new();
@@ -38,7 +48,16 @@ public partial class AddressState
                     CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.Province:
-                    var provinceResponse = await addressServiceWrapper.AddressProvince.GetList(500, 1);
+                    var provinceResponse = await addressServiceWrapper.AddressProvince.GetList(
+                        pageSize: 500, 
+                        pageNumber: 1,
+                        filter: [new ()
+                            {
+                                PropertyName = nameof(AddressProvince.RegCodeId),
+                                Operation = QueryFilterOperation.Equal,
+                                Value = CurrentState.SelectedRegion.Code
+                            }
+                        ]);
                     await HandleFailure(provinceResponse, action, false);
                     CurrentState.ProvinceList = provinceResponse.Response?.Items.ToList(); 
                     CurrentState.SelectedProvince = new(); 
@@ -46,14 +65,32 @@ public partial class AddressState
                     CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.City:
-                    var cityResponse = await addressServiceWrapper.AddressCity.GetList(500, 1);
+                    var cityResponse = await addressServiceWrapper.AddressCity.GetList(
+                        pageSize: 500, 
+                        pageNumber: 1,
+                        filter: [new ()
+                            {
+                                PropertyName = nameof(AddressCity.ProvCodeId),
+                                Operation = QueryFilterOperation.Equal,
+                                Value = CurrentState.SelectedProvince.Code
+                            }
+                        ]);
                     await HandleFailure(cityResponse, action, false);
                     CurrentState.CityList = cityResponse.Response?.Items.ToList();
                     CurrentState.SelectedCity = new();
                     CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.Barangay:
-                    var barangayResponse = await addressServiceWrapper.AddressBarangay.GetList(500, 1);
+                    var barangayResponse = await addressServiceWrapper.AddressBarangay.GetList(
+                        pageSize: 500, 
+                        pageNumber: 1,
+                        filter: [new ()
+                            {
+                                PropertyName = nameof(AddressBarangay.CityCodeId),
+                                Operation = QueryFilterOperation.Equal,
+                                Value = CurrentState.SelectedCity.Code
+                            }
+                        ]);
                     await HandleFailure(barangayResponse, action, false);
                     CurrentState.BarangayList = barangayResponse.Response?.Items.ToList();
                     CurrentState.SelectedBarangay = new();

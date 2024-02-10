@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using MessagePack;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
@@ -19,6 +20,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     public ISignalRService SignalRService { get; set; }
     private IConfiguration Configuration { get; set; }
     private HttpClient HttpClient { get; set; }
+    public IHostEnvironment HostEnvironment { get; }
     private IHttpClientFactory HttpClientFactory { get; set; }
     private DeviceAgentProvider DeviceAgentProvider { get; set; }
     private ILogger<StreamFlowDriverSignalR> Logger { get; }
@@ -37,8 +39,9 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     public Action OnReconnecting { get; set; }
     public Action OnDisconnected { get; set; }
 
-    public StreamFlowDriverSignalR(ISignalRService signalRService, IConfiguration configuration, ILogger<StreamFlowDriverSignalR> logger, IHttpClientFactory httpClientFactory, DeviceAgentProvider deviceAgentProvider)
+    public StreamFlowDriverSignalR(IHostEnvironment hostEnvironment, ISignalRService signalRService, IConfiguration configuration, ILogger<StreamFlowDriverSignalR> logger, IHttpClientFactory httpClientFactory, DeviceAgentProvider deviceAgentProvider)
     {
+        HostEnvironment = hostEnvironment;
         HttpClientFactory = httpClientFactory;
         HttpClient = HttpClientFactory.CreateClient();
         DeviceAgentProvider = deviceAgentProvider;
@@ -117,7 +120,10 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 {
                     Logger.LogInformation("Attempting to get client IP address");
                     
-                    var ipAddress = await new HttpClient().GetStringAsync("https://api.ipify.org/");
+                    var ipAddress = await new HttpClient()
+                    {
+                        Timeout = TimeSpan.FromMilliseconds(500)
+                    }.GetStringAsync("https://api.ipify.org/");
                     ClientIpAddress = ipAddress;
                     
                     Logger.LogInformation("Client IP address acquired: {ClientIpAddress}", ClientIpAddress);
@@ -126,7 +132,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 catch (Exception e)
                 {
                     ClientIpAddressLastFailedFetch = DateTime.Now;
-                    Logger.LogError(e, "Unable to get client IP address");
+                    Logger.LogError("Unable to get client IP address");
                     ClientIpAddress = string.Empty;
                 }
             }
@@ -149,14 +155,17 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 }
                 Logger.LogInformation("Attempting to get client IP address");
 
-                var ipAddress = await new HttpClient().GetStringAsync("https://api.ipify.org/");
+                var ipAddress = await new HttpClient()
+                {
+                    Timeout = TimeSpan.FromMilliseconds(500)
+                }.GetStringAsync("https://api.ipify.org/");
                 ClientIpAddress = ipAddress;
 
                 Logger.LogInformation("Client IP address acquired: {ClientIpAddress}", ClientIpAddress);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Unable to get client IP address");
+                Logger.LogError("Unable to get client IP address");
                 ClientIpAddressLastFailedFetch = DateTime.Now;
                 ClientIpAddress = string.Empty;
             }
@@ -210,11 +219,14 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         var result = await InvokeAsync<TRequest, CmdResponse>(r);
 
 #if DEBUG
-        Task.Run(() =>
+        if (!HostEnvironment.IsProduction())
         {
-            var serviceRequestLog = new ServiceRequestLog<TRequest, CmdResponse>(Request: request, Response: result.Response);
-            Logger.LogWarning("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
-        });
+            Task.Run(() =>
+            {
+                var serviceRequestLog = new ServiceRequestLog<TRequest, CmdResponse>(Request: request, Response: result.Response);
+                Logger.LogWarning("Service Request Log: {$ServiceRequestLog}", serviceRequestLog);
+            });
+        }
 #endif
         
         return result.Response;
@@ -237,7 +249,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         Task.Run(() =>
         {
             var serviceRequestLog = new ServiceRequestLog<TRequest, CmdResponse<TRequest>>(Request: request, Response: result.Response);
-            Logger.LogWarning("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
+            Logger.LogWarning("Service Request Log: {$ServiceRequestLog}", serviceRequestLog);
         });
 #endif
 
@@ -265,7 +277,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         Task.Run(() =>
         {
             var serviceRequestLog = new ServiceRequestLog<TRequest, QueryResponse<TResponse>>(Request: request, Response: result.Response);
-            Logger.LogWarning("Service Request Log: {@ServiceRequestLog}", serviceRequestLog);
+            Logger.LogWarning("Service Request Log: {$ServiceRequestLog}", serviceRequestLog);
         });
 #endif
 

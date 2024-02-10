@@ -1,7 +1,10 @@
-﻿using MediatR;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Serilog.Context;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Domain.Generic.Contracts.Base;
@@ -55,30 +58,53 @@ public abstract class BaseSignalRHandler
         where TQuery : class, IRequest<TResponse>, IHasRequestServer
         where TResponse : class, IBaseResponse, IHasRequestServer
     {
-        logger.LogInformation("[{Caller}] Request received, Invoking '{Request}'", nameof(StreamflowRequestHandler), GetType().Name);
 
         try
         {
             using var scope = scopeFactory.CreateScope();
             var internalMediator = scope.ServiceProvider.GetRequiredService<IMediator>();
             var r = response.Data.AsMediatorCmd<TQuery, TResponse>();
-            var result = await internalMediator.Send(r).ConfigureAwait(false);
 
-            if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
+            using (LogContext.PushProperty("TenantId", r.Metadata?.TenantId))
             {
-                logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}", nameof(StreamflowRequestHandler), GetType().Name, result.Message);
-            }
-            else
-            {
-                logger.LogInformation("[{Caller}] Invoking {Request}' returned {HttpStatusCode}", nameof(StreamflowRequestHandler), GetType().Name, result.HttpStatusCode);
+                using (LogContext.PushProperty("RequestId", r.Metadata?.RequestId))
+                {
+                    // Offload logging to a background task
+                    _ = Task.Run(() =>
+                    {
+                        if (!logger.IsEnabled(LogLevel.Information)) return;
 
-            }
+                        var requestData = JsonSerializer.Serialize(r, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
+                        logger.LogInformation("[{Caller}] Request received, Invoking '{Request}' with data: {Data}", nameof(StreamflowRequestHandler), GetType().Name, requestData);
+                    });
 
-            await RespondToInvoke(connection, response.RequestId, response.ClientId, result);
+                    var result = await internalMediator.Send(r).ConfigureAwait(false);
+
+                    // Log result in a background task
+                    _ = Task.Run(() =>
+                    {
+                        if (!logger.IsEnabled(LogLevel.Information)) return;
+
+                        var resultData = JsonSerializer.Serialize(result, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
+
+                        if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
+                        {
+                            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}; {Data}", nameof(StreamflowRequestHandler), GetType().Name, result.Message, resultData);
+                        }
+                        else
+                        {
+                            logger.LogInformation("[{Caller}] Invoking {Request}' returned {HttpStatusCode}; {Data}", nameof(StreamflowRequestHandler), GetType().Name, result.HttpStatusCode, resultData);
+                        }
+                    });
+
+                    await RespondToInvoke(connection, response.RequestId, response.ClientId, result);
+                }
+            }
         }
         catch (Exception e)
         {
-            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}", nameof(StreamflowRequestHandler), GetType().Name, e.Message);
+            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}; {StackTrace}",
+                nameof(StreamflowRequestHandler), GetType().Name, e.Message, e.StackTrace);
         }
     }
 }

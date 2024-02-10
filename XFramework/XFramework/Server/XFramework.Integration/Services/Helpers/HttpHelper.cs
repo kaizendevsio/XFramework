@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.Security;
@@ -36,7 +37,7 @@ public class HttpHelper
                 }
             }
 
-            var serializeObject = JsonSerializer.Serialize(param);
+            var serializeObject = JsonSerializer.Serialize(param, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
             HttpResponseMessage x = await client.PostAsync($"{baseUrl.AbsoluteUri}{url}", new StringContent(serializeObject, Encoding.UTF8, contentType));
             CookieCollection responseCookies = cookies.GetCookies(baseUrl);
             var stringContent = x.Content.ReadAsStringAsync();
@@ -85,7 +86,7 @@ public class HttpHelper
             }
 
             HttpResponseMessage x;
-            var requestModelJson = param != null ? JsonSerializer.Serialize(param).JsonToQuery() : string.Empty;
+            var requestModelJson = param != null ? JsonSerializer.Serialize(param, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles}).JsonToQuery() : string.Empty;
             try
             {
                 x = await client.GetAsync($"{baseUrl.AbsoluteUri}{url}{requestModelJson}");

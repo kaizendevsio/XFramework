@@ -24,7 +24,7 @@ public class GetListHandler<TModel>(
 
     public async Task<QueryResponse<PaginatedResult<TModel>>> Handle(GetList<TModel> request, CancellationToken cancellationToken)
     {
-        var cacheKey = $"GetList-{typeof(TModel).Name}-{string.Join("-", request.Filter?.Select(i => $"{i.PropertyName}-{i.Operation}-{i.Value}"))}"; // Adjust cache key as needed
+        var cacheKey = $"GetList-{typeof(TModel).Name}-{string.Join("-", request.Filter?.Select(i => $"{i.PropertyName}-{i.Operation}-{i.Value}") ?? Array.Empty<string>())}"; // Adjust cache key as needed
         
         if (request.NoCache is false)
         {

@@ -3,8 +3,8 @@
 public abstract class BaseModel : ISoftDeletable, IHasId, IHasConcurrencyStamp, IAuditable, IHasTenantId
 {
     public Guid Id { get; set; }
-    public bool IsEnabled { get; set; }
-    public bool IsDeleted { get; set; }
+    public bool? IsEnabled { get; set; }
+    public bool? IsDeleted { get; set; }
     public Guid ConcurrencyStamp { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ModifiedAt { get; set; }

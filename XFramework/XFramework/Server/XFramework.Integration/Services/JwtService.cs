@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using IdentityServer.Domain.Generic.Enums;
 using Microsoft.IdentityModel.Tokens;
 using XFramework.Integration.Abstractions;
@@ -22,7 +23,7 @@ public class JwtService : IJwtService
         var authClaims = new List<Claim>  
         {  
             new (ClaimTypes.GivenName, username),
-            new (ClaimTypes.Role, JsonSerializer.Serialize(Type)),
+            new (ClaimTypes.Role, JsonSerializer.Serialize(Type, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles})),
             new (ClaimTypes.Name, id.ToString()),
             new (JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new (JwtRegisteredClaimNames.AuthTime, DateTime.UtcNow.ToString())

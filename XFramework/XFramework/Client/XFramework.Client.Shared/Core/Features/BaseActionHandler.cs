@@ -85,7 +85,7 @@ public class BaseStateActionHandler
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $"There was an error while trying to process your request: {response.Message}"
+                    ? $" {response.Message}"
                     : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
                 break;
         }
@@ -126,7 +126,7 @@ public class BaseStateActionHandler
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $"There was an error while trying to process your request: {response.Message}"
+                    ? $" {response.Message}"
                     : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
                 break;
         }
@@ -167,7 +167,7 @@ public class BaseStateActionHandler
                 break;
             case false:
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $"There was an error while trying to process your request: {response.Message}"
+                    ? $" {response.Message}"
                     : $"{customMessage}", SweetAlertIcon.Error);
                 break;
         }

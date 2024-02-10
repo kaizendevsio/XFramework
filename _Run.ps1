@@ -39,8 +39,8 @@ function Start-Services {
 	    "Starting project at $(Get-Date): $projectPath" | Out-File $logFilePath -Append
 	    dotnet run --project $projectPath >> $logFilePath 2>&1
 	    "Project ended at $(Get-Date): $projectPath" | Out-File $logFilePath -Append
-	}
-
+ 
+	   }
         Start-Job -ScriptBlock $scriptBlock -ArgumentList $project, $logPath -Name $project.Replace($pathSeparator, '_')
     }
 

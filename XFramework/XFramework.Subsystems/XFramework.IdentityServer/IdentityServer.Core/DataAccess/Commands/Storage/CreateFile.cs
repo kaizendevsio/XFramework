@@ -36,7 +36,7 @@ public class CreateFile(
         }
 
         // Upload Files to azure blob storage
-        var connectionConfig =  await dbContext.Set<RegistryConfigurationGroup>()
+        var connectionConfig = await dbContext.Set<RegistryConfigurationGroup>()
             .Include(i => i.RegistryConfigurations)
             .FirstOrDefaultAsync(i => i.Name == "AzureBlobStorage", CancellationToken.None);
 
@@ -46,19 +46,11 @@ public class CreateFile(
         var blob = client.GetBlobClient(request.Model.ContentPath.Replace($"{request.Model.BlobContainer}/", ""));
         await blob.UploadAsync(BinaryData.FromBytes(request.Model.FileBytes), new BlobUploadOptions {HttpHeaders = new() {ContentType = request.Model.ContentType}}, CancellationToken.None);
 
-        var file = request.Adapt<StorageFile>();
-        file.Type = storageFileType;
-        file.StorageFileIdentifier = fileIdentifier;
-        file.FileSize = (decimal?) ByteSize.FromBytes(request.Model.FileBytes.Length).KiloBytes;
+        request.Model.Type = storageFileType;
+        request.Model.StorageFileIdentifier = fileIdentifier;
+        request.Model.FileSize = (decimal?) ByteSize.FromBytes(request.Model.FileBytes.Length).KiloBytes;
         
-        await baseHandler.Handle(new Create<StorageFile>(file), cancellationToken);
-        
-        //await appDbContext.SaveChangesAsync(CancellationToken.None);
-        
-        return new ()
-        {
-            Response = request.Model,
-            HttpStatusCode = HttpStatusCode.OK
-        };
+        var response = await baseHandler.Handle(request, cancellationToken);
+        return response;
     }
 }

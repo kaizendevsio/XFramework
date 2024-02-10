@@ -27,7 +27,6 @@
 
     <ItemGroup>
       <Folder Include="Core\Features\Base" />
-      <Folder Include="Core\Wrappers" />
       <Folder Include="Entity\Models\Responses" />
     </ItemGroup>
 

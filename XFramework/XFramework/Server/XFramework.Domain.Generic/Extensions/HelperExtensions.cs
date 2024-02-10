@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Enums;
 
@@ -126,7 +127,7 @@ public static class HelperExtensions
         var visitor = new FilterExpressionVisitor();
         var filterConditions = visitor.VisitAndConvert(expression.Body, "");
 
-        return JsonSerializer.Serialize(filterConditions);
+        return JsonSerializer.Serialize(filterConditions, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
     }
 
     private class FilterExpressionVisitor : ExpressionVisitor

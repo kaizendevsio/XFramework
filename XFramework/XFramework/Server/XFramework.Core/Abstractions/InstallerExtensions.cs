@@ -2,6 +2,7 @@
 using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Asp.Versioning;
 using FluentValidation;
 using Humanizer;
@@ -14,9 +15,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Serilog.Context;
 using StreamFlow.Domain.Generic.Contracts.Requests;
 using XFramework.Core.Filters;
 using XFramework.Core.Interfaces;
+using XFramework.Core.Loggers;
 using XFramework.Core.Services;
 using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Abstractions;
@@ -129,7 +132,9 @@ public static class InstallerExtensions
 
         var loggerConfiguration = new LoggerConfiguration()
             .Enrich.FromLogContext() // This will ensure SourceContext is populated
-            .WriteTo.Async(a => a.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} => {Message:lj}{NewLine}{Exception}"));
+            .Enrich.With(new ApplicationEnricher()) // U
+            .WriteTo.Async(a => a.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} RequestId: {RequestId} => {Message:lj}{NewLine}{Exception}"))
+            .WriteTo.Async(a => a.Seq("http://localhost:5341"));
         
         Log.Logger = loggerConfiguration.CreateLogger();
         services.AddSingleton(Log.Logger);
@@ -229,7 +234,7 @@ public static class InstallerExtensions
                     errors = validationException.Errors.Select(err => (err.PropertyName, err.ErrorMessage));
                 }
 
-                errorText = JsonSerializer.Serialize(errors);
+                errorText = JsonSerializer.Serialize(errors, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
                 context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                 context.Response.ContentType = "application/json";
 
