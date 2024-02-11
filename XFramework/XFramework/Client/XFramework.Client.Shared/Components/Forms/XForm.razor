@@ -5,6 +5,7 @@
 
 <EditForm
     @ref="@EditForm"
+    OnSubmit="@InternalSubmit"
     Model="@Model">
     
     @if (Validator is not null)
@@ -14,13 +15,16 @@
     }
 
     <CascadingValue Value="@FormMode">
-        <CascadingValue Value="@IsLoading">
+        <CascadingValue Name="FormIsLoading" Value="@IsLoading">
             @ChildContent
 
-            <FormButtons
-                OnDelete="@OnDelete"
-                OnCancel="@OnCancel"
-                OnSave="async () => await InternalSubmit()"/>
+            @if (FormButtonsVisible)
+            {
+                <FormButtons
+                    OnDelete="@OnDelete"
+                    OnCancel="@OnCancel"
+                    OnSave="async () => await InternalSubmit()"/>
+            }
         </CascadingValue>
     </CascadingValue>
 
@@ -38,19 +42,19 @@
     public TItem? Model { get; set; }
 
     [Parameter]
-    public Func<EditContext, Task>? OnValidSubmit { get; set; }
+    public EventCallback<EditContext> OnValidSubmit { get; set; }
     
     [Parameter]
-    public Func<EditContext, Task>? OnInvalidSubmit { get; set; }
+    public EventCallback<EditContext> OnInvalidSubmit { get; set; }
     
     [Parameter]
-    public Func<EditContext, Task>? OnSubmit { get; set; }
+    public EventCallback<EditContext> OnSubmit { get; set; }
 
     [Parameter]
-    public Func<Task>? OnCancel { get; set; }
+    public EventCallback OnCancel { get; set; }
 
     [Parameter]
-    public Func<Task>? OnDelete { get; set; }
+    public EventCallback OnDelete { get; set; }
 
     [Parameter]
     public IValidator<TItem>? Validator { get; set; }
@@ -61,6 +65,9 @@
     [Parameter] 
     public FormMode FormMode { get; set; }
 
+    [Parameter]
+    public bool FormButtonsVisible { get; set; }
+
     protected async Task InternalSubmit()
     {
         Console.WriteLine("On InternalSubmit..");
@@ -70,22 +77,22 @@
         if (EditContext!.Validate())
         {
             Console.WriteLine("Validating form..");
-            if (OnValidSubmit is not null)
+            if (OnValidSubmit.HasDelegate)
             {
                 Console.WriteLine("Invoking OnValidSubmit");
-                await OnValidSubmit?.Invoke(EditContext)!;
+                await OnValidSubmit.InvokeAsync(EditContext)!;
             }
         }
         else
         {
-            if (OnInvalidSubmit is not null)
+            if (OnInvalidSubmit.HasDelegate)
             {
-                await OnInvalidSubmit?.Invoke(EditContext)!;
+                await OnInvalidSubmit.InvokeAsync(EditContext)!;
             }
         }
-        if (OnSubmit is not null)
+        if (OnSubmit.HasDelegate)
         {
-            await OnSubmit?.Invoke(EditContext)!;
+            await OnSubmit.InvokeAsync(EditContext)!;
         }
 
         IsLoading = false;

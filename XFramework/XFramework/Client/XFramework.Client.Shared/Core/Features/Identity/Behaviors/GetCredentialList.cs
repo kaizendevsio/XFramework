@@ -15,22 +15,22 @@ public partial class IdentityState
     {
         private IdentityState CurrentState => Store.GetState<IdentityState>();
 
-        public override async Task Handle(GetCredentialList request, CancellationToken cancellationToken)
+        public override async Task Handle(GetCredentialList action, CancellationToken cancellationToken)
         {
             await ReportBusy();
 
             var filters = new List<QueryFilter>();
             
-            filters.AddRange(request.SearchFields.Select(i => new QueryFilter
+            filters.AddRange(action.SearchFields.Select(i => new QueryFilter
             {
                 PropertyName = i,
                 Operation = QueryFilterOperation.Contains,
-                Value = request.SearchText
+                Value = action.SearchText
             }).ToList());
             
             var response = await identityServerServiceWrapper.IdentityCredential.GetList(
-                pageSize: request.PageSize, 
-                pageNumber: request.PageIndex, 
+                pageSize: action.PageSize, 
+                pageNumber: action.PageIndex, 
                 includeNavigations: true,
                 includes: new List<string>
                 {
@@ -40,12 +40,12 @@ public partial class IdentityState
                 },
                 filter: filters);
             
-            if (await HandleFailure(response, request)) return;
+            if (await HandleFailure(response, action)) return;
             
             CurrentState.CredentialList = response.Response;
             Store.SetState(CurrentState);
             
-            await HandleSuccess(response, request, true);
+            await HandleSuccess(response, action, true);
             await ReportTaskCompleted();
         }
     }

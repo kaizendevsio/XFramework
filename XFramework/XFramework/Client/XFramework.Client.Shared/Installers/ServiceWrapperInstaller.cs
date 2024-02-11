@@ -1,5 +1,4 @@
 ﻿using Address.Integration.Drivers;
-using Community.Integration.Drivers;
 using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using Microsoft.Extensions.DependencyInjection;

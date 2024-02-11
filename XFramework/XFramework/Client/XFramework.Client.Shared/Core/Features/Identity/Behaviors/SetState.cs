@@ -1,5 +1,4 @@
-﻿using XFramework.Client.Shared.Entity.Models.Requests.Session;
-using XFramework.Domain.Generic.Contracts;
+﻿using XFramework.Domain.Generic.Contracts;
 using XFramework.Domain.Generic.Contracts.Responses;
 
 namespace XFramework.Client.Shared.Core.Features.Identity;

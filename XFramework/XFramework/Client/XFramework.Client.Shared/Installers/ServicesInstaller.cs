@@ -3,7 +3,6 @@ using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using Microsoft.Extensions.DependencyInjection;
 using Wallets.Integration.Drivers;
-using XFramework.Client.Shared.Core.Services.Interface;
 using XFramework.Client.Shared.Interfaces;
 
 namespace XFramework.Client.Shared.Installers;

@@ -1,5 +1,4 @@
 ﻿using IdentityServer.Integration.Drivers;
-using XFramework.Domain.Generic.Contracts;
 
 namespace XFramework.Client.Shared.Core.Features.Identity;
 

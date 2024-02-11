@@ -160,7 +160,8 @@ public partial class SessionState
                     identityServerServiceWrapper.IdentityRole.Create(new()
                         {
                             CredentialId = credentialGuid,
-                            TypeId = typeId
+                            TypeId = typeId,
+                            IsEnabled = true
                         }
                     ))
                 .Cast<Task>()

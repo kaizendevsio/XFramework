@@ -1,47 +1,41 @@
 ﻿@using XFramework.Client.Shared.Entity.Enums
 
+
 <div class="d-flex flex-row justify-content-between">
-    @if (OnDelete is not null && FormMode == FormMode.Edit)
+    @if (OnDelete.HasDelegate && FormMode == FormMode.Edit)
     {
-        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="() => OnDelete?.Invoke()">Delete</MudButton>
+        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="() => OnDelete.InvokeAsync()">Delete</MudButton>
     }
 
     @if(FormMode is FormMode.Create or FormMode.Edit)
     {
-        <div class="d-flex flex-row justify-content-end gap-3">
-            <MudButton 
-                Variant="Variant.Filled" 
-                Color="Color.Warning"
-                Disabled="@IsLoading"
-                Size="Size.Large"
-                OnClick="() => InternalCancel()">Cancel</MudButton>
-            
-            <MudButton 
-                StartIcon="@Icons.Material.Filled.Save" 
-                Variant="Variant.Filled" 
-                Color="Color.Primary" 
-                Disabled="@IsLoading"
-                Size="Size.Large"
-                OnClick="() => InternalSave()">Save 
-                @if (IsLoading)
-                {
-                    <MudProgressCircular Class="ms-3" Indeterminate="@true" Color="Color.Dark" Size="Size.Small"/>
-                }
-            </MudButton>
-        </div>
+        <CascadingValue Name="ParentDisabled" Value="@_disabled">
+            <div class="d-flex flex-row justify-content-end gap-3">
+                <CancelButton
+                    Size="Size.Large"
+                    OnClick="@InternalCancel"/>
+
+                <SaveButton
+                    Size="Size.Large"
+                    OnClick="@InternalSave"/>
+            </div>
+        </CascadingValue>
+        
     }
 </div>
 
 @code {
+
+    private bool _disabled = false;
     
     [Parameter]
-    public Func<Task>? OnSave { get; set; }
+    public EventCallback OnSave { get; set; }
     
     [Parameter]
-    public Func<Task>? OnCancel { get; set; }
+    public EventCallback OnCancel { get; set; }
     
     [Parameter]
-    public Func<Task>? OnDelete { get; set; }
+    public EventCallback OnDelete { get; set; }
     
     [CascadingParameter] 
     public FormMode FormMode { get; set; }
@@ -49,13 +43,20 @@
     [CascadingParameter]
     public bool IsLoading { get; set; }
 
-    private Task InternalCancel()
+    private Task InternalCancel(MouseEventArgs? e)
     {
-        return OnCancel?.Invoke() ?? NavigateBack();
+        //return OnCancel?.InvokeAsync() ?? NavigateBack();
+        return OnCancel.InvokeAsync();
     }
     
-    private Task InternalSave()
+    private async Task InternalSave()
     {
-        return OnSave?.Invoke() ?? Task.CompletedTask;
+        _disabled = true;
+        StateHasChanged();
+        
+        await OnSave.InvokeAsync();
+
+        _disabled = false;
+        StateHasChanged();
     }
 }

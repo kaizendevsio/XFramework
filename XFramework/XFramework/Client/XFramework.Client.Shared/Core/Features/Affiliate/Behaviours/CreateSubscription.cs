@@ -1,7 +1,6 @@
 ﻿using IdentityServer.Integration.Drivers;
 using XFramework.Client.Shared.Entity.Models.Requests.Common;
 using XFramework.Integration.Abstractions;
-using XFramework.Integration.Services;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Client.Shared.Core.Features.Affiliate;

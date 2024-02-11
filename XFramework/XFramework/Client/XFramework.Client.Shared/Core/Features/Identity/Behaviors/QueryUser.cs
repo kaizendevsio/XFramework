@@ -17,33 +17,24 @@ public partial class IdentityState
 
         public override async Task<IdentityCredential?> Handle(QueryUser request, CancellationToken cancellationToken)
         {
-            var responseCredential = await identityServerServiceWrapper.IdentityCredential.Get(request.CredentialId);
-            if (await HandleFailure(responseCredential, request)) return null;
-            
-            var responseIdentity = await identityServerServiceWrapper.IdentityInformation.Get(responseCredential.Response.IdentityInfoId);
-            if (await HandleFailure(responseIdentity, request)) return null;
-            
-            var filters = new List<QueryFilter>
-            {
-                new QueryFilter
+            var responseCredential = await identityServerServiceWrapper.IdentityCredential.Get(
+                id: request.CredentialId,
+                includeNavigations: true,
+                includes: new List<string>
                 {
-                    PropertyName = nameof(IdentityContact.CredentialId),
-                    Operation = QueryFilterOperation.Equal,
-                    Value = responseCredential.Response.Id
-                }
-            };
-
-            var responseContact = await identityServerServiceWrapper.IdentityContact.GetList(
-                pageSize: 100_000,
-                pageNumber: 1,
-                filter: filters);
-            if (await HandleFailure(responseContact, request)) return null;
+                    $"{nameof(IdentityCredential.IdentityInfo)}",
+                    $"{nameof(IdentityCredential.IdentityContacts)}.{nameof(IdentityContact.Type)}",
+                    $"{nameof(IdentityCredential.IdentityRoles)}.{nameof(IdentityRole.Type)}"
+                });
+            
+           
+            if (await HandleFailure(responseCredential, request)) return null;
             
             await HandleSuccess(responseCredential, request, true);
 
             var result = responseCredential.Response;
-            result.IdentityInfo = responseIdentity.Response;
-            result.IdentityContacts = responseContact.Response?.Items?.ToList();
+            result.IdentityInfo = responseCredential.Response.IdentityInfo;
+            result.IdentityContacts = responseCredential.Response.IdentityContacts.ToList();
             
             return result;
         }

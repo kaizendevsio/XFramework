@@ -9,13 +9,37 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/CancelButton.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/DangerButton.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/PrimaryButton.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/SaveButton.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/SubmitButton.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/SuccessButton.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/WarningButton.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/XButton.razor" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/XButtonBase.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Buttons/_Imports.razor" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Forms/FormButtons.razor" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Forms/FormButtons.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Forms/XForm.razor" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Forms/XForm.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/GenericPreloader.razor" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/GenericPreloader.razor" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Behaviours/CreateSubscription.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Affiliate/Behaviours/CreateSubscription.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetCredential.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetCredential.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetCredentialList.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetCredentialList.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetIdentity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/GetIdentity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/LoadUser.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/LoadUser.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/QueryUser.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/QueryUser.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/SetState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/SetState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/UpdateContact.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/UpdateContact.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/UpdateContacts.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/UpdateContacts.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/UpdateCredential.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/UpdateCredential.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/UpdateIdentity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Identity/Behaviors/UpdateIdentity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Register.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Register.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Installers/ServiceWrapperInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Installers/ServiceWrapperInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Installers/ServicesInstaller.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Installers/ServicesInstaller.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/_Imports.razor" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/_Imports.razor" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -391,7 +415,8 @@
       <workItem from="1707308883894" duration="1257000" />
       <workItem from="1707361948689" duration="16676000" />
       <workItem from="1707534439897" duration="4901000" />
-      <workItem from="1707563396114" duration="448000" />
+      <workItem from="1707563396114" duration="1587000" />
+      <workItem from="1707580269556" duration="2351000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>
