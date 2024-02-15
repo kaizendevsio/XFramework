@@ -1,9 +1,6 @@
 ﻿using XFramework.Client.Shared.Core.Features.Address;
 using XFramework.Client.Shared.Core.Features.Cache;
-using XFramework.Client.Shared.Core.Features.Cryptocurrency;
 using XFramework.Client.Shared.Core.Features.Layout;
-using XFramework.Client.Shared.Core.Features.Member;
-using XFramework.Client.Shared.Core.Features.Modals;
 using XFramework.Client.Shared.Core.Features.Wallet;
 
 namespace XFramework.Client.Shared.Components;
@@ -23,21 +20,12 @@ public class XLayoutBase : BlazorStateLayoutComponent
     
     
     public ApplicationState ApplicationState => GetState<ApplicationState>();
-    public MemberState MemberState => GetState<MemberState>();
     public LayoutState LayoutState => GetState<LayoutState>();
     public SessionState SessionState => GetState<SessionState>();
-    public ModalState ModalState => GetState<ModalState>();
     public AddressState AddressState => Store.GetState<AddressState>();
     public CacheState CacheState => GetState<CacheState>();
     public WalletState WalletState => GetState<WalletState>();
-    public CryptocurrencyState CryptocurrencyState => GetState<CryptocurrencyState>();
 
-    public async Task NavigateTo(string path)
-    {
-        await Mediator.Send(new SessionState.NavigateToPath() {NavigationPath = path});
-    }
-    public async Task NavigateBack()
-    {
-        await Mediator.Send(new SessionState.NavigateBack());
-    }
+    public void NavigateTo(string path) => NavigationManager.NavigateTo(path);
+    public async Task NavigateBack() => await JsRuntime.InvokeVoidAsync("history.back");
 }

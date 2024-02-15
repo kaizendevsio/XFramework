@@ -3,7 +3,7 @@ using XFramework.Domain.Generic.Enums;
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateVerificationMessageRequest : RequestBase
+public record CreateVerificationMessageRequest : RequestBase
 {
     public string? VerificationToken { get; set; }
     public GenericContactType ContactType { get; set; }

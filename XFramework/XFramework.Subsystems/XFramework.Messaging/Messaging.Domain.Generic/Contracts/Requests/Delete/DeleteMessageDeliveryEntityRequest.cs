@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Delete;
 
-public class DeleteMessageDeliveryEntityRequest : RequestBase
+public record DeleteMessageDeliveryEntityRequest : RequestBase
 {
     
 }

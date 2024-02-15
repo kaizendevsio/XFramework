@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Update;
 
-public class UpdateMessageThreadMemberRequest : RequestBase
+public record UpdateMessageThreadMemberRequest : RequestBase
 {
     public short Status { get; set; }
     public string? Emoji { get; set; }

@@ -3,27 +3,28 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using IdentityServer.Domain.Generic.Enums;
 using Microsoft.IdentityModel.Tokens;
-using XFramework.Integration.Interfaces;
+using XFramework.Integration.Abstractions;
 
 namespace XFramework.Integration.Services;
 
 public class JwtService : IJwtService
 {
-    private readonly JwtOptionsBO _jwtOptions;
+    private readonly JwtOptions _jwtOptions;
 
-    public JwtService(JwtOptionsBO jwtOptions)
+    public JwtService(JwtOptions jwtOptions)
     {
         _jwtOptions = jwtOptions;
     }
-    public virtual async Task<JwtTokenBO> GenerateToken(string username, Guid cuid, List<RoleEntity> roleEntity)
+    public virtual async Task<JwtToken> GenerateToken(string username, Guid id, List<Guid> Type)
     {
         var authClaims = new List<Claim>  
         {  
             new (ClaimTypes.GivenName, username),
-            new (ClaimTypes.Role, JsonSerializer.Serialize(roleEntity)),
-            new (ClaimTypes.Name, cuid.ToString()),
+            new (ClaimTypes.Role, JsonSerializer.Serialize(Type, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles})),
+            new (ClaimTypes.Name, id.ToString()),
             new (JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new (JwtRegisteredClaimNames.AuthTime, DateTime.UtcNow.ToString())
         };
@@ -38,9 +39,9 @@ public class JwtService : IJwtService
             signingCredentials: new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512)  
         );
             
-        var refreshToken = new RefreshTokenBO
+        var refreshToken = new RefreshToken
         {
-            Cuid = cuid,
+            Cuid = id,
             Token = GenerateRefreshToken(),
             ExpireAt = DateTime.UtcNow.AddMinutes(DateTime.Parse(_jwtOptions.RefreshTokenLifespan).Minute)
         };
@@ -52,7 +53,7 @@ public class JwtService : IJwtService
         };
     }
 
-    public virtual async Task<JwtTokenBO> GenerateToken(List<Claim> claims)
+    public virtual async Task<JwtToken> GenerateToken(List<Claim> claims)
     {
         var authClaims = claims;
 
@@ -66,7 +67,7 @@ public class JwtService : IJwtService
             signingCredentials: new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512)  
         );
             
-        var refreshToken = new RefreshTokenBO
+        var refreshToken = new RefreshToken
         {
             //Cuid = cuid,
             Token = GenerateRefreshToken(),
@@ -88,7 +89,7 @@ public class JwtService : IJwtService
         return Convert.ToBase64String(randomNumber);
     }
         
-    public async Task<JwtTokenBO> Refresh(string refreshToken, string accessToken, DateTime now)
+    public async Task<JwtToken> Refresh(string refreshToken, string accessToken, DateTime now)
     {
         var (principal, jwtToken) = await DecodeJwtToken(accessToken);
         if (jwtToken == null || !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256Signature))

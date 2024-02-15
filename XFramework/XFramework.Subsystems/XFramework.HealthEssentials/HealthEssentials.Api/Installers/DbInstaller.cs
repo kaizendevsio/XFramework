@@ -1,7 +1,6 @@
-﻿using HealthEssentials.Core.DataAccess;
-using HealthEssentials.Core.Interfaces;
-using HealthEssentials.Domain.DataTransferObjects;
-using HealthEssentials.Domain.DataTransferObjects.XnelSystemsHealthEssentials;
+﻿
+using HealthEssentials.Domain.Contexts;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace HealthEssentials.Api.Installers;
 
@@ -9,8 +8,9 @@ public class DbInstaller : IInstaller
 {
     public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<XnelSystemsContext>(options => options.UseNpgsql(configuration.GetConnectionString("DefaultDatabaseConnection")), ServiceLifetime.Transient);
-        services.AddDbContext<XnelSystemsHealthEssentialsContext>(options => options.UseNpgsql(configuration.GetConnectionString("HealthDatabaseConnection")), ServiceLifetime.Transient);
-        services.AddTransient<IDataLayer, DataLayer>();
+        services.AddDbContext<DbContext, HealthEssentialsContext>(options => options
+                .UseNpgsql(configuration.GetConnectionString("HealthDatabaseConnection"))
+                .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
+            );
     }
 }

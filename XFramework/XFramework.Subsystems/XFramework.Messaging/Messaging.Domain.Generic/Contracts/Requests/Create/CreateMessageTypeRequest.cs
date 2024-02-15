@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateMessageTypeRequest : RequestBase
+public record CreateMessageTypeRequest : RequestBase
 {
     public short Priority { get; set; }
 }

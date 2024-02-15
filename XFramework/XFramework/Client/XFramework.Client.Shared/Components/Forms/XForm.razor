@@ -1,0 +1,103 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using FluentValidation
+@using Serilog
+@using XFramework.Client.Shared.Entity.Enums
+@typeparam TItem
+
+<EditForm
+    @ref="@EditForm"
+    OnSubmit="@InternalSubmit"
+    Model="@Model">
+    
+    @if (Validator is not null)
+    {
+        <DataAnnotationsValidator/>
+        <FluentValidator Validator="@Validator"/>
+    }
+
+    <CascadingValue Value="@FormMode">
+        <CascadingValue Name="FormIsLoading" Value="@IsLoading">
+            @ChildContent
+
+            @if (FormButtonsVisible)
+            {
+                <FormButtons
+                    OnDelete="@OnDelete"
+                    OnCancel="@OnCancel"
+                    OnSave="async () => await InternalSubmit()"/>
+            }
+        </CascadingValue>
+    </CascadingValue>
+
+</EditForm>
+
+
+@code {
+
+    private EditForm? EditForm { get; set; }
+    private bool IsLoading { get; set; }
+
+    public EditContext? EditContext => EditForm?.EditContext;
+    
+    [Parameter]
+    public TItem? Model { get; set; }
+
+    [Parameter]
+    public EventCallback<EditContext> OnValidSubmit { get; set; }
+    
+    [Parameter]
+    public EventCallback<EditContext> OnInvalidSubmit { get; set; }
+    
+    [Parameter]
+    public EventCallback<EditContext> OnSubmit { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    [Parameter]
+    public IValidator<TItem>? Validator { get; set; }
+    
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+    
+    [Parameter] 
+    public FormMode FormMode { get; set; }
+
+    [Parameter]
+    public bool FormButtonsVisible { get; set; }
+
+    protected async Task InternalSubmit()
+    {
+        Log.Warning("On InternalSubmit..");
+        IsLoading = true;
+        StateHasChanged();
+        
+        if (EditContext!.Validate())
+        {
+            Log.Warning("EditContext is valid");
+            if (OnValidSubmit.HasDelegate)
+            {
+                Log.Warning("OnValidSubmit has delegate");
+                await OnValidSubmit.InvokeAsync(EditContext)!;
+            }
+        }
+        else
+        {
+            if (OnInvalidSubmit.HasDelegate)
+            {
+                await OnInvalidSubmit.InvokeAsync(EditContext)!;
+            }
+        }
+        if (OnSubmit.HasDelegate)
+        {
+            await OnSubmit.InvokeAsync(EditContext)!;
+        }
+
+        IsLoading = false;
+        StateHasChanged();
+    }
+    
+}

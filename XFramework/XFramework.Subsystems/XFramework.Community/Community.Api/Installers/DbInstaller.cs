@@ -1,6 +1,5 @@
-﻿using Community.Core.DataAccess;
-using Community.Core.Interfaces;
-using Community.Domain.DataTransferObjects;
+﻿
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Community.Api.Installers;
 
@@ -8,7 +7,9 @@ public class DbInstaller : IInstaller
 {
     public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<XnelSystemsContext>(options => options.UseNpgsql(configuration.GetConnectionString("DatabaseConnection")), ServiceLifetime.Transient);
-        services.AddTransient<IDataLayer, DataLayer>();
+        services.AddDbContext<DbContext, AppDbContext>(options => options
+            .UseNpgsql(configuration.GetConnectionString("DefaultDatabaseConnection"))
+            .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
+        );
     }
 }

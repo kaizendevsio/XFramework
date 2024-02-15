@@ -2,9 +2,10 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
+        
     </PropertyGroup>
 
     <ItemGroup>
@@ -17,11 +18,5 @@
     <ItemGroup>
         <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
         <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Contracts" />
-      <Folder Include="DataTransferObjects" />
-      <Folder Include="Enums" />
     </ItemGroup>
 </Project>

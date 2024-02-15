@@ -1,17 +1,29 @@
-﻿using System.Security.Cryptography;
+﻿using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
-using XFramework.Integration.Interfaces;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
+using XFramework.Integration.Abstractions;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Services;
 
 public class HelperService : IHelperService
 {
-    public HttpHelper Http { get; }
-    const string Chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz1234567890";
+    private readonly ILogger<HelperService> _logger;
 
-    public HelperService(IConfiguration configuration)
+    public JsonSerializerOptions CachedSerializationOptions = new JsonSerializerOptions
     {
+        ReferenceHandler = ReferenceHandler.IgnoreCycles,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    public HttpHelper Http { get; }
+    private const string Chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz1234567890";
+
+    public HelperService(IConfiguration configuration, ILogger<HelperService> logger)
+    {
+        _logger = logger;
         Http = new HttpHelper(configuration);
     }
         
@@ -52,6 +64,16 @@ public class HelperService : IHelperService
         var uniqueId = ans.ToString("x").ToUpper();
         return uniqueId;
     }
-
-    public StopWatchHelper StopWatch { get; set; } = new();
+    
+    public T? RemoveCircularReference<T>(T obj)
+    {
+        var sw = new Stopwatch();
+        
+        sw.Start();
+        var json = JsonSerializer.Serialize(obj,CachedSerializationOptions).AsSpan();
+        var result = JsonSerializer.Deserialize<T>(json);
+        sw.Stop();
+        _logger.LogInformation($"Circular reference removal took {sw.ElapsedMilliseconds}ms");
+        return result;
+    }
 }

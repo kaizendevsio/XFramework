@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Text;
+﻿using System.Net;
 
-namespace XFramework.External.Models
+namespace XFramework.External.Models;
+
+public class HttpResponseBO
 {
-   public class HttpResponseBO
-    {
-        public CookieCollection ResponseCookies { get; set; }
+    public CookieCollection ResponseCookies { get; set; }
 
-        public string ResponseResult { get; set; }
-    }
+    public string ResponseResult { get; set; }
 }

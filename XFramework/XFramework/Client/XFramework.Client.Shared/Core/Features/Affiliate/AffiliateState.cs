@@ -1,4 +1,4 @@
-﻿using IdentityServer.Domain.Generic.Contracts.Requests.Create.Subscription;
+﻿using IdentityServer.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Client.Shared.Core.Features.Affiliate;
 

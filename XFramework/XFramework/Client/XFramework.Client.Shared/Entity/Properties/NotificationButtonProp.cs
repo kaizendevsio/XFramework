@@ -1,6 +1,3 @@
 ﻿namespace XFramework.Client.Shared.Entity.Properties;
 
-public class NotificationButtonProp : ActivityBaseProp
-{
-    
-}
+public class NotificationButtonProp : ActivityBaseProp;

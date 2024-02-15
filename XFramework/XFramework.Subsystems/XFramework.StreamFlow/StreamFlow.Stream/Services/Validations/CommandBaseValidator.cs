@@ -5,10 +5,10 @@ namespace StreamFlow.Stream.Services.Validations;
 
 public class CommandBaseValidator<T> : AbstractValidator<T>
 {
-    public RequestServerBoValidator RequestServerValidator { get; set; }
+    public RequestServerValidator RequestServerValidator { get; set; }
 
     public CommandBaseValidator()
     {
-        RequestServerValidator = new RequestServerBoValidator();
+        RequestServerValidator = new RequestServerValidator();
     }
 }

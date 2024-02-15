@@ -1,9 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using StreamFlow.Core.DataAccess;
-using StreamFlow.Core.Interfaces;
-using StreamFlow.Domain.DataTransferObjects;
+﻿using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace StreamFlow.Stream.Installers;
 
@@ -11,7 +6,9 @@ public class DbInstaller : IInstaller
 {
     public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<XFrameworkContext>(options => options.UseNpgsql(configuration.GetConnectionString("DatabaseConnection")));
-        services.AddScoped<IDataLayer, DataLayer>();
+        services.AddDbContext<DbContext, AppDbContext>(options => options
+            .UseNpgsql(configuration.GetConnectionString("DefaultDatabaseConnection"))
+            .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
+        );
     }
 }

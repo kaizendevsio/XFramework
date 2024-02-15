@@ -160,7 +160,7 @@ public class CreateDepositHandler : CommandBaseHandler, IRequestHandler<CreateDe
             .ThenInclude(i => i.Entity)
             .FirstOrDefaultAsync(i => i.Guid == request.CredentialGuid.ToString(), CancellationToken.None);
 
-        if (credential == null) throw new ArgumentException($"Credential with guid {request.CredentialGuid} does not exist");
+        if (credential == null) throw new ArgumentException($"Credential with id {request.CredentialGuid} does not exist");
         return credential;
     }
 

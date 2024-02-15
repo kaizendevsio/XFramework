@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateMessageReactionEntityRequest : RequestBase
+public record CreateMessageReactionEntityRequest : RequestBase
 {
     public string? Name { get; set; }
     public string? Emoji { get; set; }

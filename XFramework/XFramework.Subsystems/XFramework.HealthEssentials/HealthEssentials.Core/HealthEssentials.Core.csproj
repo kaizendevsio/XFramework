@@ -2,39 +2,45 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+        <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
+
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Azure.Storage.Blobs" Version="12.16.0" />
-        <PackageReference Include="RestSharp" Version="108.0.2-alpha.0.5" />
+        <PackageReference Include="Azure.Storage.Blobs" Version="12.16.0"/>
+        <PackageReference Include="RestSharp" Version="108.0.2-alpha.0.5"/>
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Commands\Validations" />
-      <Folder Include="DataAccess\Query\Entity\Tag" />
-      <Folder Include="DataAccess\Query\Handlers\Tag" />
-      <Folder Include="Validations\Consultation" />
-      <Folder Include="Validations\Doctor" />
-      <Folder Include="Validations\Laboratory" />
-      <Folder Include="Validations\Logistic" />
-      <Folder Include="Validations\Patient" />
-      <Folder Include="Validations\Pharmacy" />
+        <Folder Include="Validations\Consultation"/>
+        <Folder Include="Validations\Doctor"/>
+        <Folder Include="Validations\Laboratory"/>
+        <Folder Include="Validations\Logistic"/>
+        <Folder Include="Validations\Patient"/>
+        <Folder Include="Validations\Pharmacy"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj" />
-      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj" />
-      <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj" />
-      <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
-      <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
-      <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Core\XFramework.Core.csproj"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain\XFramework.Domain.csproj" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj"/>
+        <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj"/>
     </ItemGroup>
-    
+
+    <ItemGroup>
+      <Reference Include="IdentityServer.Integration">
+        <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Integration\bin\Debug\net7.0\IdentityServer.Integration.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
 </Project>

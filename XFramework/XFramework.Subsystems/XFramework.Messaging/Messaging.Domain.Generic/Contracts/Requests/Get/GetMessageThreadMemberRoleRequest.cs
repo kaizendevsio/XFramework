@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Get;
 
-public class GetMessageThreadMemberRoleRequest : RequestBase
+public record GetMessageThreadMemberRoleRequest : RequestBase
 {
     
 }

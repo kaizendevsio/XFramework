@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using TypeSupport.Extensions;
 using XFramework.Client.Shared.Entity.Enums;
 
 namespace XFramework.Client.Shared.Core.Helpers;

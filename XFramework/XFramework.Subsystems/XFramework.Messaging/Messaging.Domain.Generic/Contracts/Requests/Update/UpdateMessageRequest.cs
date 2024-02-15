@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Update;
 
-public class UpdateMessageRequest : RequestBase
+public record UpdateMessageRequest : RequestBase
 {
     public string? Text { get; set; }
     public Guid? MessageThreadGuid { get; set; }

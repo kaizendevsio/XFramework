@@ -2,27 +2,32 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+        <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
+
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="7.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.OData" Version="8.0.11" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
-        <PackageReference Include="Sentry.AspNetCore" Version="3.24.0" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj"/>
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj"/>
+        <ProjectReference Include="..\HealthEssentials.Core\HealthEssentials.Core.csproj"/>
+        <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj"/>
+        <ProjectReference Include="..\HealthEssentials.Integration\HealthEssentials.Integration.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-      <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
-      <ProjectReference Include="..\HealthEssentials.Core\HealthEssentials.Core.csproj" />
-      <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
-      <ProjectReference Include="..\HealthEssentials.Integration\HealthEssentials.Integration.csproj" />
+      <Folder Include="HostedService\" />
     </ItemGroup>
-    
+
+    <ItemGroup>
+      <Reference Include="IdentityServer.Integration">
+        <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Integration\bin\Debug\net7.0\IdentityServer.Integration.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
 </Project>

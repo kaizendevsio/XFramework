@@ -2,24 +2,24 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
+        
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="7.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.OData" Version="8.0.11" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
-        <PackageReference Include="Sentry.AspNetCore" Version="3.24.0" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Core\XFramework.Core.csproj"/>
+        <ProjectReference Include="..\Wallets.Core\Wallets.Core.csproj"/>
+        <ProjectReference Include="..\Wallets.Domain\Wallets.Domain.csproj"/>
+        <ProjectReference Include="..\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Wallets.Core\Wallets.Core.csproj" />
-      <ProjectReference Include="..\Wallets.Domain\Wallets.Domain.csproj" />
-      <ProjectReference Include="..\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj" />
+      <Folder Include="HostedService\" />
     </ItemGroup>
 
 </Project>

@@ -2,15 +2,16 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Contracts\Requests\Check" />
-      <Folder Include="Contracts\Requests\Delete" />
-      <Folder Include="Contracts\Requests\Get" />
-      <Folder Include="Contracts\Requests\Update" />
+      <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Attributes\" />
     </ItemGroup>
 </Project>
