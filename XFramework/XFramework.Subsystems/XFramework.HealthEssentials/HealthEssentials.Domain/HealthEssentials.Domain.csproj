@@ -2,9 +2,10 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
+        
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,12 +16,14 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Folder Include="DataTransferObjects" />
-        <Folder Include="Enums" />
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain\XFramework.Domain.csproj" />
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
+      <Folder Include="Migrations\" />
+      <Folder Include="Migrations\HealthEssentials\" />
     </ItemGroup>
     
 </Project>

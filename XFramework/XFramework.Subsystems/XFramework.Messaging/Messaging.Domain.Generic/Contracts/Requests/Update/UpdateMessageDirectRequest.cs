@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Update;
 
-public class UpdateMessageDirectRequest : RequestBase
+public record UpdateMessageDirectRequest : RequestBase
 {
     public Guid? ParentMessageGuid { get; set; }
     public Guid? TypeGuid { get; set; }

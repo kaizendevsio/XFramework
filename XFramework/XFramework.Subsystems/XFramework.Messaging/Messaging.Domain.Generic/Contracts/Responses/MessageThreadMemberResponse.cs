@@ -1,9 +1,8 @@
 ﻿
-using IdentityServer.Domain.Generic.Contracts.Responses;
 
 namespace Messaging.Domain.Generic.Contracts.Responses;
 
-public class MessageThreadMemberResponse
+public record MessageThreadMemberResponse
 {
     public DateTime CreatedAt { get; set; }
     public DateTime ModifiedAt { get; set; }
@@ -17,6 +16,6 @@ public class MessageThreadMemberResponse
 
     public MessageThreadResponse? Thread { get; set; }
     public MessageThreadMemberGroupResponse? Group { get; set; }
-    public CredentialResponse? Credential { get; set; }
+    /*public CredentialResponse? Credential { get; set; }*/
 
 }

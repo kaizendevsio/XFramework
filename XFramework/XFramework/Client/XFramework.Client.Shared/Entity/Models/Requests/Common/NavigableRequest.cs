@@ -1,11 +1,11 @@
-﻿namespace XFramework.Client.Shared.Entity.Models.Requests.Common;
+﻿using XFramework.Client.Shared.Core.Features;
 
-public class NavigableRequest
+namespace XFramework.Client.Shared.Entity.Models.Requests.Common;
+
+public record NavigableRequest : StateAction
 {
-    public Action? OnSuccess { get; set; }
-    public Action? OnFailure { get; set; }
     public bool Silent { get; set; }
-    public string NavigateToOnSuccess { get; set; }
-    public string NavigateToOnFailure { get; set; }
-    public string NavigateToOnVerificationRequired { get; set; }
+    public string? NavigateToOnSuccess { get; set; }
+    public string? NavigateToOnFailure { get; set; }
+    public string? NavigateToOnVerificationRequired { get; set; }
 }

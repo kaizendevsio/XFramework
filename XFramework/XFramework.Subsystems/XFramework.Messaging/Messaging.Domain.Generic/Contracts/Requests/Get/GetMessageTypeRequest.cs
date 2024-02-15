@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Get;
 
-public class GetMessageTypeRequest : RequestBase
+public record GetMessageTypeRequest : RequestBase
 {
     
 }

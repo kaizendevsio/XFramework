@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace XFramework.Domain.Generic.Enums;
+﻿namespace XFramework.Domain.Generic.Enums;
 
 [Flags]
 public enum TransactionStatus : int

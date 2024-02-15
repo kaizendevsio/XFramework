@@ -2,11 +2,16 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
-        <LangVersion>11</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="MessagePack" Version="2.5.124" />
+      <PackageReference Include="MessagePack.Annotations" Version="2.5.124" />
     </ItemGroup>
 </Project>

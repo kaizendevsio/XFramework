@@ -2,13 +2,22 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+        <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
+
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-      <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj" />
+        <ProjectReference
+                Include="..\..\..\XFramework\Server\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+                OutputItemType="Analyzer"
+                ReferenceOutputAssembly="false"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj"/>
+        <ProjectReference Include="..\Messaging.Domain.Generic\Messaging.Domain.Generic.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Interfaces\" />
     </ItemGroup>
 </Project>

@@ -1,20 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+        <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
+
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
-      <ProjectReference Include="..\Community.Domain.Generic\Community.Domain.Generic.csproj" />
-      <ProjectReference Include="..\Community.Domain\Community.Domain.csproj" />
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Core\XFramework.Core.csproj"/>
+        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
+        <ProjectReference Include="..\Community.Domain.Generic\Community.Domain.Generic.csproj" />
+        <ProjectReference Include="..\Community.Domain\Community.Domain.csproj" />
     </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="DataAccess\Query\Validations\Identity" />
-    </ItemGroup>
-
 </Project>

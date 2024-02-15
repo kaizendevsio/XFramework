@@ -2,20 +2,24 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>11</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Core\XFramework.Core.csproj" />
       <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
       <ProjectReference Include="..\StreamFlow.Domain\StreamFlow.Domain.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Commands\Entity\Events" />
-      <Folder Include="DataAccess\Commands\Handlers\Events" />
+      <Folder Include="DataAccess\Commands\Entity\" />
+      <Folder Include="DataAccess\Commands\Handlers\" />
+      <Folder Include="DataAccess\Query\Entity\" />
+      <Folder Include="DataAccess\Query\Handlers\" />
     </ItemGroup>
 
 </Project>
+ 

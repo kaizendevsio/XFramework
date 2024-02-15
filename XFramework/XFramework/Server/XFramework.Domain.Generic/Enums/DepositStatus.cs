@@ -1,5 +1,3 @@
-using System;
-
 namespace XFramework.Domain.Generic.Enums;
 
 [Flags]

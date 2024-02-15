@@ -1,9 +1,9 @@
 ﻿using FluentValidation;
-using SmsGateway.Core.DataAccess.Commands.Entity.Sms;
+using SmsGateway.Domain.Generic.Contracts.Requests.Create;
 
 namespace SmsGateway.Core.Validations.Sms;
 
-public class CreateSmsMessageCmdValidator : AbstractValidator<CreateSmsMessageCmd>
+public class CreateSmsMessageCmdValidator : AbstractValidator<CreateSmsMessageRequest>
 {
     public CreateSmsMessageCmdValidator()
     {

@@ -127,12 +127,12 @@ namespace XFramework.External.Models
 
     public partial class BlockchainTx
     {
-        public static BlockchainTx FromJson(string json) => JsonConvert.DeserializeObject<BlockchainTx>(json, XFramework.External.Models.Converter.Settings);
+        public static BlockchainTx FromJson(string json) => JsonConvert.DeserializeObject<BlockchainTx>(json, Converter.Settings);
     }
 
     public static class Serialize
     {
-        public static string ToJson(this BlockchainTx self) => JsonConvert.SerializeObject(self, XFramework.External.Models.Converter.Settings);
+        public static string ToJson(this BlockchainTx self) => JsonConvert.SerializeObject(self, Converter.Settings);
     }
 
     internal static class Converter

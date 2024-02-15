@@ -2,7 +2,7 @@
 
 namespace XFramework.Client.Shared.Entity.Models.Requests.Session;
 
-public class VerificationRequest : NavigableRequest
+public record VerificationRequest : NavigableRequest
 {
     public string OtpCode { get; set; }
     public Action OnSuccess { get; set; }

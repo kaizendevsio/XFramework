@@ -1,0 +1,16 @@
+2023-11-17 17:48:16.524 +08:00 [INF] [ThreadId:1] NBomber 5.3.0 started a new session: 2023-11-17_09.48.48_session_89a52166
+2023-11-17 17:48:16.554 +08:00 [INF] [ThreadId:1] NBomber started as single node
+2023-11-17 17:48:16.555 +08:00 [INF] [ThreadId:1] License validation....
+2023-11-17 17:48:16.556 +08:00 [WRN] [ThreadId:1] THIS VERSION IS FREE ONLY FOR PERSONAL USE. You can't use it for an organization.
+2023-11-17 17:48:16.563 +08:00 [INF] [ThreadId:1] Reports folder: C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Tests\bin\Debug\net7.0\reports\empty session
+2023-11-17 17:48:16.564 +08:00 [INF] [ThreadId:1] Plugins: no plugins were loaded
+2023-11-17 17:48:16.564 +08:00 [INF] [ThreadId:1] Reporting sinks: no reporting sinks were loaded
+2023-11-17 17:48:16.565 +08:00 [INF] [ThreadId:1] Starting init...
+2023-11-17 17:48:16.570 +08:00 [INF] [ThreadId:1] Target scenarios: http_scenario
+2023-11-17 17:48:16.571 +08:00 [INF] [ThreadId:1] Init finished
+2023-11-17 17:48:16.582 +08:00 [INF] [ThreadId:1] Starting warm up...
+2023-11-17 17:48:16.582 +08:00 [INF] [ThreadId:1] Warm up for scenarios: http_scenario
+2023-11-17 17:48:16.584 +08:00 [INF] [ThreadId:1] Warm up duration: 00:00:30
+2023-11-17 17:48:21.623 +08:00 [WRN] [ThreadId:8] Stopping test early: Stopping test because of too many fails. Scenario 'http_scenario' contains '5560' fails.
+2023-11-17 17:48:22.686 +08:00 [INF] [ThreadId:16] Reports saved in folder: C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Tests\reports\2023-11-17_09.48.48_session_89a52166
+2023-11-17 17:48:22.686 +08:00 [WRN] [ThreadId:16] THIS VERSION IS FREE ONLY FOR PERSONAL USE. You can't use it for an organization.

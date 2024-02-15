@@ -1,25 +1,43 @@
-using IdentityServer.Domain.Generic.Contracts.Responses.Address;
+using XFramework.Domain.Generic.Contracts;
 
 namespace XFramework.Client.Shared.Core.Features.Address;
 
 public partial class AddressState
 {
-    public class SetState : BaseAction
+    public record SetState : StateAction
     {
-        public List<AddressCountryResponse> CountryList { get; set; }
-        public List<AddressRegionResponse> RegionList { get; set; }
-        public List<AddressProvinceResponse> ProvinceList { get; set; }
-        public List<AddressCityResponse> CityList { get; set; }
-        public List<AddressBarangayResponse> BarangayList { get; set; }
+        public List<AddressCountry>? CountryList { get; set; }
+        public List<AddressRegion>? RegionList { get; set; }
+        public List<AddressProvince>? ProvinceList { get; set; }
+        public List<AddressCity>? CityList { get; set; }
+        public List<AddressBarangay>? BarangayList { get; set; }
     
-        public AddressCountryResponse SelectedCountry { get; set; }
-        public AddressRegionResponse SelectedRegion { get; set; }
-        public AddressProvinceResponse SelectedProvince { get; set; }
-        public AddressCityResponse SelectedCity { get; set; }
-        public AddressBarangayResponse SelectedBarangay { get; set; }
-        public string CurrentAddressName { get; set; }
-        public string CurrentUnitNumber { get; set; }
+        public AddressCountry? SelectedCountry { get; set; }
+        public AddressRegion? SelectedRegion { get; set; }
+        public AddressProvince? SelectedProvince { get; set; }
+        public AddressCity? SelectedCity { get; set; }
+        public AddressBarangay? SelectedBarangay { get; set; }
+        public string? CurrentAddressName { get; set; }
+        public string? CurrentUnitNumber { get; set; }
+    }
 
+    protected class SetStateHandler(HandlerServices handlerServices, IStore store)
+        : StateActionHandler<SetState>(handlerServices, store)
+    {
+        private AddressState CurrentState => Store.GetState<AddressState>();
 
+        public override async Task Handle(SetState action, CancellationToken aCancellationToken)
+        {
+            try
+            {
+                StateHelper.SetProperties(action, CurrentState);
+                Persist(CurrentState);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+            return;
+        }
     }
 }

@@ -1,6 +1,6 @@
 ﻿namespace Messaging.Domain.Generic.Contracts.Responses;
 
-public class MessageDirectResponse
+public record MessageDirectResponse
 {
     public DateTime CreatedAt { get; set; }
     public DateTime ModifiedAt { get; set; }
