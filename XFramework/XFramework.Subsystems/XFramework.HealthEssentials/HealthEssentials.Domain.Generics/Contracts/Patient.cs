@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
-using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Domain.Generics.Contracts;
 
@@ -16,19 +15,19 @@ public partial class Patient : BaseModel
 
     public virtual PatientType Type { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; } = new List<LaboratoryJobOrder>();
+    public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; } = new List<LaboratoryJobOrder>();
 
-    public virtual ICollection<PatientAilment> PatientAilments { get; } = new List<PatientAilment>();
+    public virtual ICollection<PatientAilment> PatientAilments { get; set; } = new List<PatientAilment>();
 
-    public virtual ICollection<PatientConsultation> PatientConsultations { get; } = new List<PatientConsultation>();
+    public virtual ICollection<PatientConsultation> PatientConsultations { get; set; } = new List<PatientConsultation>();
 
-    public virtual ICollection<PatientLaboratory> PatientLaboratories { get; } = new List<PatientLaboratory>();
+    public virtual ICollection<PatientLaboratory> PatientLaboratories { get; set; } = new List<PatientLaboratory>();
 
-    public virtual ICollection<PatientReminder> PatientReminders { get; } = new List<PatientReminder>();
+    public virtual ICollection<PatientReminder> PatientReminders { get; set; } = new List<PatientReminder>();
 
-    public virtual ICollection<PatientTag> PatientTags { get; } = new List<PatientTag>();
+    public virtual ICollection<PatientTag> PatientTags { get; set; } = new List<PatientTag>();
 
-    public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; } = new List<PharmacyJobOrder>();
+    public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; set; } = new List<PharmacyJobOrder>();
 
     [NotMapped]
     public IdentityCredential? Credential { get; set; }

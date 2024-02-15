@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
-using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Domain.Generics.Contracts;
 

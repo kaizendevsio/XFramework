@@ -2192,7 +2192,6 @@ public partial class AppDbContext : DbContext
     {
         optionsBuilder.UseLazyLoadingProxies();
     }*/
-
     
     protected void SeedDatabase(ModelBuilder modelBuilder)
     {

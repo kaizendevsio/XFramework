@@ -14,6 +14,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+        <ProjectReference Include="..\..\XFramework.StreamFlow\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj" />
     </ItemGroup>
 
 

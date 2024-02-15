@@ -10,13 +10,13 @@ public partial class CurrencyType : BaseModel
 
     public short? Type { get; set; }
 
-    public virtual ICollection<AddressCountry> AddressCountries { get; } = new List<AddressCountry>();
+    public virtual ICollection<AddressCountry> AddressCountries { get; set; } = new List<AddressCountry>();
 
-    public virtual ICollection<DepositRequest> DepositRequests { get; } = new List<DepositRequest>();
+    public virtual ICollection<DepositRequest> DepositRequests { get; set; } = new List<DepositRequest>();
 
-    public virtual ICollection<ExchangeRate> ExchangeRateSourceCurrencyTypes { get; } = new List<ExchangeRate>();
+    public virtual ICollection<ExchangeRate> ExchangeRateSourceCurrencyTypes { get; set; } = new List<ExchangeRate>();
 
-    public virtual ICollection<ExchangeRate> ExchangeRateTargetCurrencyTypes { get; } = new List<ExchangeRate>();
+    public virtual ICollection<ExchangeRate> ExchangeRateTargetCurrencyTypes { get; set; } = new List<ExchangeRate>();
 
-    public virtual ICollection<WalletType> WalletTypes { get; } = new List<WalletType>();
+    public virtual ICollection<WalletType> WalletTypes { get; set; } = new List<WalletType>();
 }

@@ -1,31 +1,29 @@
 ﻿using HealthEssentials.Domain.Generics.Constants;
-using HealthEssentials.Domain.Generics.Contracts;
-using HealthEssentials.Domain.Generics.Contracts.Requests;
-using IdentityServer.Integration.Drivers;
 using Messaging.Domain.Generic;
-using Microsoft.Extensions.Logging;
-using XFramework.Core.Services;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Generic.Contracts;
+using XFramework.Integration.Abstractions;
 
 namespace HealthEssentials.Core.DataAccess.Commands.Consultation;
 
-public class CommenceLiveConsultationHandler(
-    DbContext healthEssentialsContext,
-    ITenantService tenantService,
+public class ConcludeLiveConsultationHandler(
+    DbContext dbContext,
     IIdentityServerServiceWrapper identityServerService,
-    IHostEnvironment hostEnvironment,
     IMessageBusWrapper messageBusWrapper,
-    ILogger<CommenceLiveConsultationHandler> logger,
-    IMessagingServiceWrapper messagingServiceWrapper
-    )
-    : IRequestHandler<CommenceLiveConsultationRequest, CmdResponse>
+    IMessagingServiceWrapper messagingServiceWrapper,
+    IHostEnvironment hostEnvironment,
+    ITenantService tenantService,
+    ILogger<ConcludeLiveConsultationHandler> logger,
+    IHelperService helperService
+)
+    : IRequestHandler<ConcludeLiveConsultationRequest, CmdResponse>
 {
-    public async Task<CmdResponse> Handle(CommenceLiveConsultationRequest request, CancellationToken cancellationToken)
+  
+    public async Task<CmdResponse> Handle(ConcludeLiveConsultationRequest request, CancellationToken cancellationToken)
     {
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
         
-        var jobOrder = await healthEssentialsContext.Set<ConsultationJobOrder>()
+        var jobOrder = await dbContext.Set<ConsultationJobOrder>()
             .Where(c => c.TenantId == tenant.Id)
             .Include(i => i.PatientConsultations)
             .ThenInclude(i => i.Patient)
@@ -42,8 +40,15 @@ public class CommenceLiveConsultationHandler(
             }; 
         }
 
-        var credentialResponse = await identityServerService.IdentityCredential.Get(jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId, tenantId: tenant.Id);
-        if (credentialResponse.HttpStatusCode is not HttpStatusCode.Accepted)
+        var credentialResponse = await identityServerService.IdentityCredential.Get(
+            id: jobOrder.PatientConsultations.FirstOrDefault().Patient.CredentialId,
+            includeNavigations: true,
+            includes: new List<string>()
+            {
+                $"{nameof(IdentityCredential.IdentityContacts)}.{nameof(IdentityContact.Type)}",
+            },
+            tenantId: tenant.Id);
+        if (credentialResponse.HttpStatusCode is not HttpStatusCode.OK)
         {
             return credentialResponse.Adapt<CmdResponse>();
         }
@@ -67,46 +72,40 @@ public class CommenceLiveConsultationHandler(
                 HttpStatusCode = HttpStatusCode.NotFound
             };
         }
+        
+        jobOrder.CompletedAt = DateTime.UtcNow;
+        jobOrder.Status = (short?) TransactionStatus.Completed;
+        
+        await dbContext.SaveChangesAsync(cancellationToken);
 
-        if (jobOrder.PaymentStatus is not (short?) DepositStatus.Paid)
-        {
-            return new ()
-            {
-                Message = $"Consultation Job Order with Id {request.Id} is not paid",
-                HttpStatusCode = HttpStatusCode.BadRequest
-            };
-        }
-        
-        jobOrder.StartedAt = DateTime.UtcNow;
-        jobOrder.Status = (short?) TransactionStatus.OnGoing;
-        
-        await healthEssentialsContext.SaveChangesAsync(cancellationToken);
-        
-        messageBusWrapper.PublishAsync(HealthEssentialsEvent.CommenceConsultation, credential.Id.ToString(), new PublishRequest<ConsultationJobOrder>(jobOrder));
+        var publishObject = new PublishRequest<ConsultationJobOrder>(jobOrder);
+        publishObject = helperService.RemoveCircularReference(publishObject);
+
+        messageBusWrapper.PublishAsync(HealthEssentialsEvent.ConcludeConsultation, credential.Id.ToString(), publishObject);
         
         if (!hostEnvironment.IsProduction())
         {
             return new ()
             {
-                Message = $"Consultation Job Order with Id {request.Id} has commenced",
+                Message = $"Consultation Job Order with Id {request.Id} concluded successfully",
                 HttpStatusCode = HttpStatusCode.Accepted
             };
         }
-        
-        await messagingServiceWrapper.CreateDirectMessage(new()
+
+        messagingServiceWrapper.CreateDirectMessage(new()
         {
             MessageType = MessageTypes.Sms,
             Sender = GenericSender.System,
             Recipient = contact,
-            Subject = "Consultation Commenced",
+            Subject = "Consultation Concluded",
             Intent = MessageIntents.Notification,
-            Message = $"Your consultation with Dr. {jobOrder.DoctorConsultationJobOrders.FirstOrDefault()?.Doctor.Name} has started. Please open the app to start the consultation.",
+            Message = $"Thank you for using MyHealthInfo. Your consultation with {jobOrder.DoctorConsultationJobOrders.FirstOrDefault().Doctor.Name} has ended. Please check your MyHealthInfo account for more details.",
             IsScheduled = false
         });
         
         return new()
         {
-            Message = $"Consultation Job Order with Id {request.Id} has been commenced",
+            Message = $"Consultation Job Order with Id {request.Id} concluded successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
             
         };

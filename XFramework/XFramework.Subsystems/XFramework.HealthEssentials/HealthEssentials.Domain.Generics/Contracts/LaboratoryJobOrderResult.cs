@@ -19,6 +19,6 @@ public partial class LaboratoryJobOrderResult : BaseModel
 
     public virtual LaboratoryJobOrder LaboratoryJobOrder { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryJobOrderResultFile> LaboratoryJobOrderResultFiles { get; } =
+    public virtual ICollection<LaboratoryJobOrderResultFile> LaboratoryJobOrderResultFiles { get; set; } =
         new List<LaboratoryJobOrderResultFile>();
 }

@@ -6,5 +6,5 @@ public partial class MessageReactionType : BaseModel
 
     public string Emoji { get; set; } = null!;
 
-    public virtual ICollection<MessageReaction> MessageReactions { get; } = new List<MessageReaction>();
+    public virtual ICollection<MessageReaction> MessageReactions { get; set; } = new List<MessageReaction>();
 }

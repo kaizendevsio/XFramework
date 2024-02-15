@@ -15,16 +15,16 @@ public partial class CommunityContent : BaseModel
 
     public Guid CommunityGroupId { get; set; }
 
-    public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; } = new List<CommunityContentFile>();
+    public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; set; } = new List<CommunityContentFile>();
 
-    public virtual ICollection<CommunityContentReaction> CommunityContentReactions { get; } =
+    public virtual ICollection<CommunityContentReaction> CommunityContentReactions { get; set; } =
         new List<CommunityContentReaction>();
 
     public virtual CommunityIdentity? CommunityGroup { get; set; }
 
     public virtual CommunityContentType Type { get; set; } = null!;
 
-    public virtual ICollection<CommunityContent> InverseParentContent { get; } = new List<CommunityContent>();
+    public virtual ICollection<CommunityContent> InverseParentContent { get; set; } = new List<CommunityContent>();
 
     public virtual CommunityContent? ParentContent { get; set; }
 

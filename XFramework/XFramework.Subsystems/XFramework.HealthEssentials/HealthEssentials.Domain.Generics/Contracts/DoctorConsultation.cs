@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class DoctorConsultation : BaseModel
 {

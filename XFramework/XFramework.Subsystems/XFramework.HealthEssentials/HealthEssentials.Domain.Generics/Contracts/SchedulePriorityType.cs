@@ -9,5 +9,5 @@ public partial class SchedulePriorityType : BaseModel
 
     public int? SortOrder { get; set; }
 
-    public virtual ICollection<SchedulePriority> SchedulePriorities { get; } = new List<SchedulePriority>();
+    public virtual ICollection<SchedulePriority> SchedulePriorities { get; set; } = new List<SchedulePriority>();
 }

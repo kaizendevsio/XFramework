@@ -15,5 +15,5 @@ public partial class AddressBarangay : BaseModel
 
     public virtual AddressCity? CityCode { get; set; }
 
-    public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();
+    public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; } = new List<IdentityAddress>();
 }

@@ -11,10 +11,10 @@ public partial class LaboratoryServiceType : BaseModel
 
     public int? SortOrder { get; set; }
 
-    public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; } =
+    public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; set; } =
         new List<ConsultationJobOrderLaboratory>();
 
     public virtual LaboratoryServiceTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryService> LaboratoryServices { get; } = new List<LaboratoryService>();
+    public virtual ICollection<LaboratoryService> LaboratoryServices { get; set; } = new List<LaboratoryService>();
 }

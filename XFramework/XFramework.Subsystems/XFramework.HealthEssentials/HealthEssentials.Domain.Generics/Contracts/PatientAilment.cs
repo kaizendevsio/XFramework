@@ -13,5 +13,5 @@ public partial class PatientAilment : BaseModel
 
     public virtual Patient Patient { get; set; } = null!;
 
-    public virtual ICollection<PatientAilmentDetail> PatientAilmentDetails { get; } = new List<PatientAilmentDetail>();
+    public virtual ICollection<PatientAilmentDetail> PatientAilmentDetails { get; set; } = new List<PatientAilmentDetail>();
 }

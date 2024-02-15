@@ -13,5 +13,5 @@ public partial class TagType : BaseModel
 
     public virtual TagTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<Tag> Tags { get; } = new List<Tag>();
+    public virtual ICollection<Tag> Tags { get; set; } = new List<Tag>();
 }

@@ -23,5 +23,5 @@ public partial class Logistic : BaseModel
 
     public virtual LogisticType Type { get; set; } = null!;
 
-    public virtual ICollection<LogisticRiderHandle> LogisticRiderHandles { get; } = new List<LogisticRiderHandle>();
+    public virtual ICollection<LogisticRiderHandle> LogisticRiderHandles { get; set; } = new List<LogisticRiderHandle>();
 }

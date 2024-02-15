@@ -12,5 +12,5 @@ public partial class IdentityRoleType : BaseModel
 
     public virtual IdentityRoleTypeGroup? Group { get; set; }
 
-    public virtual ICollection<IdentityRole> IdentityRoles { get; } = new List<IdentityRole>();
+    public virtual ICollection<IdentityRole> IdentityRoles { get; set; } = new List<IdentityRole>();
 }

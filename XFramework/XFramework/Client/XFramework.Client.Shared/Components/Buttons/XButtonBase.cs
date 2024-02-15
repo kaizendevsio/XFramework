@@ -65,4 +65,10 @@ public class XButtonBase : ComponentBase
     [Parameter]
     [Category("Appearance")]
     public bool FullWidth { get; set; }
+    
+    /// <summary>
+    /// Pass class name to button
+    /// </summary>
+    [Parameter]
+    public string? Class { get; set; }
 }

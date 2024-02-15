@@ -41,24 +41,24 @@ public partial class ConsultationJobOrder : BaseModel
 
     public virtual Consultation Consultation { get; set; } = null!;
 
-    public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; } =
+    public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; set; } =
         new List<ConsultationJobOrderLaboratory>();
 
-    public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; } =
+    public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; set; } =
         new List<ConsultationJobOrderMedicine>();
 
-    public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; } =
+    public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; set; } =
         new List<DoctorConsultationJobOrder>();
 
-    public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; } = new List<LaboratoryJobOrder>();
+    public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; } = new List<LaboratoryJobOrder>();
 
-    public virtual ICollection<PatientAilmentDetail> PatientAilmentDetails { get; } = new List<PatientAilmentDetail>();
+    public virtual ICollection<PatientAilmentDetail> PatientAilmentDetails { get; set; } = new List<PatientAilmentDetail>();
 
-    public virtual ICollection<PatientConsultation> PatientConsultations { get; } = new List<PatientConsultation>();
+    public virtual ICollection<PatientConsultation> PatientConsultations { get; set; } = new List<PatientConsultation>();
 
-    public virtual ICollection<PatientReminder> PatientReminders { get; } = new List<PatientReminder>();
+    public virtual ICollection<PatientReminder> PatientReminders { get; set; } = new List<PatientReminder>();
 
-    public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; } =
+    public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; set; } =
         new List<PharmacyJobOrderConsultationJobOrder>();
 
     public virtual Schedule Schedule { get; set; } = null!;

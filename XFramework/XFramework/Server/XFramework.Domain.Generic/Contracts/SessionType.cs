@@ -5,5 +5,5 @@ public partial class SessionType : BaseModel
     public string? Name { get; set; }
 
 
-    public virtual ICollection<Session> SessionData { get; } = new List<Session>();
+    public virtual ICollection<Session> SessionData { get; set; } = new List<Session>();
 }

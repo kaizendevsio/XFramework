@@ -21,17 +21,17 @@ public partial class Schedule : BaseModel
     public DateTime? CompletedAt { get; set; }
 
 
-    public virtual ICollection<ConsultationJobOrder> ConsultationJobOrders { get; } = new List<ConsultationJobOrder>();
+    public virtual ICollection<ConsultationJobOrder> ConsultationJobOrders { get; set; } = new List<ConsultationJobOrder>();
 
     public virtual ScheduleType Type { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; } = new List<LaboratoryJobOrder>();
+    public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; } = new List<LaboratoryJobOrder>();
 
-    public virtual ICollection<LogisticJobOrder> LogisticJobOrders { get; } = new List<LogisticJobOrder>();
+    public virtual ICollection<LogisticJobOrder> LogisticJobOrders { get; set; } = new List<LogisticJobOrder>();
 
-    public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; } = new List<PharmacyJobOrder>();
+    public virtual ICollection<PharmacyJobOrder> PharmacyJobOrders { get; set; } = new List<PharmacyJobOrder>();
 
     public virtual SchedulePriority Priority { get; set; } = null!;
 
-    public virtual ICollection<ScheduleTag> ScheduleTags { get; } = new List<ScheduleTag>();
+    public virtual ICollection<ScheduleTag> ScheduleTags { get; set; } = new List<ScheduleTag>();
 }

@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
-using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Domain.Generics.Contracts;
 
@@ -24,11 +23,11 @@ public partial class LogisticRider : BaseModel
 
     public DateTime? LicenseExpiry { get; set; }
 
-    public virtual ICollection<LogisticJobOrder> LogisticJobOrders { get; } = new List<LogisticJobOrder>();
+    public virtual ICollection<LogisticJobOrder> LogisticJobOrders { get; set; } = new List<LogisticJobOrder>();
 
-    public virtual ICollection<LogisticRiderHandle> LogisticRiderHandles { get; } = new List<LogisticRiderHandle>();
+    public virtual ICollection<LogisticRiderHandle> LogisticRiderHandles { get; set; } = new List<LogisticRiderHandle>();
 
-    public virtual ICollection<LogisticRiderTag> LogisticRiderTags { get; } = new List<LogisticRiderTag>();
+    public virtual ICollection<LogisticRiderTag> LogisticRiderTags { get; set; } = new List<LogisticRiderTag>();
     
     [NotMapped]
     public List<StorageFile>? Files { get; set; }

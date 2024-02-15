@@ -10,5 +10,5 @@ public partial class PaymentGatewayResponseType : BaseModel
 
     public virtual PaymentGatewayType PaymentGatewayType { get; set; } = null!;
 
-    public virtual ICollection<PaymentGatewayResponse> GatewayResponses { get; } = new List<PaymentGatewayResponse>();
+    public virtual ICollection<PaymentGatewayResponse> GatewayResponses { get; set; } = new List<PaymentGatewayResponse>();
 }

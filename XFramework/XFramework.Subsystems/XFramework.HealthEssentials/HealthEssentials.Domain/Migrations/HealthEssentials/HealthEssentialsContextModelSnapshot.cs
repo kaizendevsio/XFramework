@@ -1050,6 +1050,9 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                     b.Property<string>("Description")
                         .HasColumnType("character varying");
 
+                    b.Property<string>("Device")
+                        .HasColumnType("text");
+
                     b.Property<int?>("ExperienceYears")
                         .HasColumnType("integer");
 
@@ -1061,6 +1064,18 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         .HasColumnType("boolean")
                         .HasDefaultValueSql("true");
 
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LastActivityType")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("LastSeen")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1069,6 +1084,9 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
+
+                    b.Property<DateTime?>("OnlineSince")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PhilHealthNumber")
                         .HasColumnType("character varying");
@@ -1084,6 +1102,9 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<string>("StatusMessage")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -4491,8 +4512,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("34ee8325-8060-43c7-b4a8-b8e861db6c47"),
-                            ConcurrencyStamp = new Guid("185f1d21-0fa6-4d4c-a256-b75818ed99c1"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8312),
+                            ConcurrencyStamp = new Guid("6f6bad8f-0afb-4138-9ed0-49134cb87439"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1136),
                             Description = "Outpatient services",
                             GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
                             IsDeleted = false,
@@ -4504,8 +4525,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("da22eb54-e064-43d1-89ed-51591f21f903"),
-                            ConcurrencyStamp = new Guid("7ea421c7-fd01-4c2c-a581-0b2dda98dc84"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8315),
+                            ConcurrencyStamp = new Guid("a6aab619-77d1-405e-ab4c-2e948a977b60"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1138),
                             Description = "Inpatient services",
                             GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
                             IsDeleted = false,
@@ -4517,8 +4538,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("486917df-2b21-41fe-aa03-c564014f8cad"),
-                            ConcurrencyStamp = new Guid("35000149-391a-4905-9f12-c9e32382e84f"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8317),
+                            ConcurrencyStamp = new Guid("8f5feb09-befe-4f0e-963f-951d5e8d4684"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1141),
                             Description = "Specialized pediatric services",
                             GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"),
                             IsDeleted = false,
@@ -4530,8 +4551,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("1001c82f-987a-4ed2-893f-b0237aec69c4"),
-                            ConcurrencyStamp = new Guid("6dc1b0f7-fd01-43e7-83f8-1d9002c3d279"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8319),
+                            ConcurrencyStamp = new Guid("da781d0e-81e3-4116-aaf6-ff1ac8ee4969"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1144),
                             Description = "Immediate medical attention for life-threatening conditions",
                             GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
                             IsDeleted = false,
@@ -4543,8 +4564,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("e18ac75a-2d74-4670-8da2-201a476306ac"),
-                            ConcurrencyStamp = new Guid("4036fb4d-e181-43da-b8ad-1b5d1503658a"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8328),
+                            ConcurrencyStamp = new Guid("8a7f1be6-8113-4b15-b59a-d1faec959053"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1167),
                             Description = "Patients admitted for surgical procedures",
                             GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"),
                             IsDeleted = false,
@@ -4556,8 +4577,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("e36b4212-3add-452f-8448-825242821176"),
-                            ConcurrencyStamp = new Guid("5691d972-11f1-4056-ae79-aefa98918b57"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8336),
+                            ConcurrencyStamp = new Guid("251d4784-13c2-4a0f-88b5-e5cce5717ce1"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1170),
                             Description = "Long-term care for ongoing conditions like diabetes, heart disease",
                             GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
                             IsDeleted = false,
@@ -4569,8 +4590,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("d8149d7e-fc1b-4b3d-8c37-7befea74bbce"),
-                            ConcurrencyStamp = new Guid("9838e837-d241-43be-8af7-eaf0bc60ce16"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8367),
+                            ConcurrencyStamp = new Guid("e4c4291f-88a4-4c5f-a633-a8edb5d661db"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1174),
                             Description = "Recovery and rehabilitation services for post-surgery or injury",
                             GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"),
                             IsDeleted = false,
@@ -4582,8 +4603,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("b9099ba0-e446-4b71-8ec0-be1ced260a42"),
-                            ConcurrencyStamp = new Guid("e06e97bc-8ef7-4465-8db7-44e073d9d685"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8370),
+                            ConcurrencyStamp = new Guid("d35315d8-d412-48c4-b399-30d8732433a1"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1176),
                             Description = "Care for childbirth and postnatal services",
                             GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
                             IsDeleted = false,
@@ -4595,8 +4616,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("ff0fdb4a-64b8-4b27-8c05-f55819a4511e"),
-                            ConcurrencyStamp = new Guid("0c5d0a19-fd71-4aa6-9bc2-a50b9d9cb6f2"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8382),
+                            ConcurrencyStamp = new Guid("2afac3c1-fe85-4c01-b102-6120738a06a6"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1179),
                             Description = "Specialized care for elderly patients",
                             GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"),
                             IsDeleted = false,
@@ -4608,8 +4629,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("ad6aa943-8f49-47f6-980c-7f45d5e4db58"),
-                            ConcurrencyStamp = new Guid("d6d602d9-1885-4009-a108-9ccd5871f439"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8384),
+                            ConcurrencyStamp = new Guid("b5684863-8c91-496a-950a-274191c6a20d"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1181),
                             Description = "Treatment for mental health conditions",
                             GroupId = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"),
                             IsDeleted = false,
@@ -4621,8 +4642,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("0a98a21f-0e34-418c-a2f9-67e42b0898fe"),
-                            ConcurrencyStamp = new Guid("33c435fb-9f6d-4bd9-9cc5-8d07dc228147"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8386),
+                            ConcurrencyStamp = new Guid("6c2f351b-06e3-41a7-8398-64afaf960198"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1183),
                             Description = "Relief from the symptoms and stress of a serious illness",
                             GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
                             IsDeleted = false,
@@ -4634,8 +4655,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("26b63a34-5aee-4474-9b9c-74a867e947cc"),
-                            ConcurrencyStamp = new Guid("14b54c01-e132-4df9-bbcb-9c2b0b0895af"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8389),
+                            ConcurrencyStamp = new Guid("4eb542c3-cf05-4999-b09d-de8b4a2c7919"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1186),
                             Description = "Patients visiting for outpatient services without overnight stay",
                             GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
                             IsDeleted = false,
@@ -4647,8 +4668,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("c611fced-0cf2-4fc5-80ae-de0154bba11e"),
-                            ConcurrencyStamp = new Guid("4448305c-b52d-4f7a-8f2f-bfdbfdc6fb58"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8393),
+                            ConcurrencyStamp = new Guid("fa998ccf-8c92-4410-a4d6-c0910eb5467a"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1189),
                             Description = "Medical care or treatment provided at the patient's home",
                             GroupId = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
                             IsDeleted = false,
@@ -4707,8 +4728,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("1fdf84c3-a53f-42bc-9cf9-22ca728ddef3"),
-                            ConcurrencyStamp = new Guid("9a60f533-cc8c-41b5-8862-f7c7c6bc083f"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8270),
+                            ConcurrencyStamp = new Guid("cc5d9531-dcee-40d8-8715-48e7b1c3cb21"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1099),
                             IsDeleted = false,
                             IsEnabled = true,
                             Name = "General",
@@ -4717,8 +4738,8 @@ namespace HealthEssentials.Domain.Migrations.HealthEssentials
                         new
                         {
                             Id = new Guid("7a284dea-f6c1-4025-9149-842ccae76236"),
-                            ConcurrencyStamp = new Guid("642fd6c5-4dd2-42c0-9c3b-d7f38c0895b8"),
-                            CreatedAt = new DateTime(2024, 1, 18, 11, 30, 11, 498, DateTimeKind.Utc).AddTicks(8275),
+                            ConcurrencyStamp = new Guid("1689bd23-a08d-49ec-b2e9-149744c79329"),
+                            CreatedAt = new DateTime(2024, 2, 12, 12, 33, 19, 846, DateTimeKind.Utc).AddTicks(1103),
                             IsDeleted = false,
                             IsEnabled = true,
                             Name = "Specialized",

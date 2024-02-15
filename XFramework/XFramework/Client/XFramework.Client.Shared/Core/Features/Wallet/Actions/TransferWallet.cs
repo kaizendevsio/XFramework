@@ -35,8 +35,15 @@ public partial class WalletState
                 Mediator.Send(new GetWalletList());
             }
 
-            if (await HandleFailure(result, action, true)) return;
-            await HandleSuccess(result, action, false, $"{(action.TransactionPurpose is TransactionPurpose.Payment ? "Payment" : "Transfer")} successful");
+
+            if (await HandleFailure(result, action, silent: action.Silent))
+            {
+                WalletState.SendWalletVm.OnFailure?.Invoke();
+                return;
+            }
+            
+            WalletState.SendWalletVm.OnSuccess?.Invoke();
+            await HandleSuccess(result, action, silent: action.Silent);
         }
     }
 }

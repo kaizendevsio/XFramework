@@ -27,12 +27,12 @@ public partial class LaboratoryService : BaseModel
 
     public virtual Laboratory Laboratory { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryJobOrderDetail> LaboratoryJobOrderDetails { get; } =
+    public virtual ICollection<LaboratoryJobOrderDetail> LaboratoryJobOrderDetails { get; set; } =
         new List<LaboratoryJobOrderDetail>();
 
     public virtual LaboratoryLocation LaboratoryLocation { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryServiceTag> LaboratoryServiceTags { get; } = new List<LaboratoryServiceTag>();
+    public virtual ICollection<LaboratoryServiceTag> LaboratoryServiceTags { get; set; } = new List<LaboratoryServiceTag>();
 
     public virtual Unit? Unit { get; set; }
 }

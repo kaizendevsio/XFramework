@@ -1,6 +1,8 @@
-﻿using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
+﻿namespace HealthEssentials.Domain.Generics.Contracts.Requests;
 
-namespace HealthEssentials.Domain.Generics.Contracts.Requests;
+using TRequest = ConcludeLiveConsultationRequest;
+using TResponse = CmdResponse;
 
-public record ConcludeLiveConsultationRequest(Guid Id) : RequestBase, IRequest<CmdResponse>;
+public record ConcludeLiveConsultationRequest(Guid Id) : RequestBase,
+    IRequest<TResponse>,
+    IStreamflowRequest<TRequest, TResponse>;

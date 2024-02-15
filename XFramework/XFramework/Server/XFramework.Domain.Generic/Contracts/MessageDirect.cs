@@ -23,7 +23,7 @@ public partial class MessageDirect : BaseModel
 
     public short Status { get; set; }
 
-    public virtual ICollection<MessageDirect> InverseParentMessage { get; } = new List<MessageDirect>();
+    public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = new List<MessageDirect>();
 
     public virtual MessageDirect? ParentMessage { get; set; }
 

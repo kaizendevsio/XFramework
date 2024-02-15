@@ -11,5 +11,5 @@ public partial class VendorType : BaseModel
 
     public virtual VendorTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<Vendor> Vendors { get; } = new List<Vendor>();
+    public virtual ICollection<Vendor> Vendors { get; set; } = new List<Vendor>();
 }

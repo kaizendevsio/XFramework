@@ -9,5 +9,5 @@ public partial class LogisticType : BaseModel
 
     public int? SortOrder { get; set; }
 
-    public virtual ICollection<Logistic> Logistics { get; } = new List<Logistic>();
+    public virtual ICollection<Logistic> Logistics { get; set; } = new List<Logistic>();
 }

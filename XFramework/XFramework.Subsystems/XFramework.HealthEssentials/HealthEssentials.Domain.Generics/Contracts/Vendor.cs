@@ -13,5 +13,5 @@ public partial class Vendor : BaseModel
 
     public virtual VendorType Type { get; set; } = null!;
 
-    public virtual ICollection<MedicineVendor> MedicineVendors { get; } = new List<MedicineVendor>();
+    public virtual ICollection<MedicineVendor> MedicineVendors { get; set; } = new List<MedicineVendor>();
 }

@@ -13,5 +13,5 @@ public partial class LaboratoryType : BaseModel
 
     public virtual LaboratoryTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<Laboratory> Laboratories { get; } = new List<Laboratory>();
+    public virtual ICollection<Laboratory> Laboratories { get; set; } = new List<Laboratory>();
 }

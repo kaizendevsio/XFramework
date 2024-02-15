@@ -5,5 +5,5 @@ public partial class HospitalServiceTypeGroup : BaseModel
     public string Name { get; set; } = null!;
 
 
-    public virtual ICollection<HospitalServiceType> HospitalServiceTypes { get; } = new List<HospitalServiceType>();
+    public virtual ICollection<HospitalServiceType> HospitalServiceTypes { get; set; } = new List<HospitalServiceType>();
 }

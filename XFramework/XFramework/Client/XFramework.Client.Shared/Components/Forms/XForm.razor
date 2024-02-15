@@ -1,5 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 @using FluentValidation
+@using Serilog
 @using XFramework.Client.Shared.Entity.Enums
 @typeparam TItem
 
@@ -70,16 +71,16 @@
 
     protected async Task InternalSubmit()
     {
-        Console.WriteLine("On InternalSubmit..");
+        Log.Warning("On InternalSubmit..");
         IsLoading = true;
         StateHasChanged();
         
         if (EditContext!.Validate())
         {
-            Console.WriteLine("Validating form..");
+            Log.Warning("EditContext is valid");
             if (OnValidSubmit.HasDelegate)
             {
-                Console.WriteLine("Invoking OnValidSubmit");
+                Log.Warning("OnValidSubmit has delegate");
                 await OnValidSubmit.InvokeAsync(EditContext)!;
             }
         }

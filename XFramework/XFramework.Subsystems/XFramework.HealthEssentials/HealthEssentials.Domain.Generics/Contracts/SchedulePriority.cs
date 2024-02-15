@@ -13,5 +13,5 @@ public partial class SchedulePriority : BaseModel
 
     public virtual SchedulePriorityType Type { get; set; } = null!;
 
-    public virtual ICollection<Schedule> Schedules { get; } = new List<Schedule>();
+    public virtual ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
 }

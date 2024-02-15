@@ -11,5 +11,6 @@ public record HandlerServices(
     IHttpClient HttpClient,
     HttpClient BaseHttpClient,
     IJSRuntime JsRuntime,
-    IMediator Mediator
+    IMediator Mediator,
+    ISnackbar Snackbar
     );

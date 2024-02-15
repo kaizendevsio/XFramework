@@ -13,5 +13,5 @@ public partial class UnitType : BaseModel
 
     public virtual UnitTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<Unit> Units { get; } = new List<Unit>();
+    public virtual ICollection<Unit> Units { get; set; } = new List<Unit>();
 }

@@ -10,5 +10,5 @@ public partial class MetaDataType : BaseModel
 
     public virtual MetaDataTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<MetaData> MetaData { get; } = new List<MetaData>();
+    public virtual ICollection<MetaData> MetaData { get; set; } = new List<MetaData>();
 }

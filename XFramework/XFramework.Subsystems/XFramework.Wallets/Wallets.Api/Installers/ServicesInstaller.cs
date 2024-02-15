@@ -12,5 +12,10 @@ public class ServicesInstaller : IInstaller
         services.AddTenantService();
         services.AddTenantWrapperServices();
         services.AddDecoratorHandlers(typeof(WalletsCore).Assembly);
+        
+        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
+            typeof(WalletsBaseRequest).Assembly,
+            typeof(WalletsCore).Assembly
+        ));
     }
 }

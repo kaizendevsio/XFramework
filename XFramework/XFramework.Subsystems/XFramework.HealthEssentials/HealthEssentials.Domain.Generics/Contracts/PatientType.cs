@@ -13,5 +13,5 @@ public partial class PatientType : BaseModel
 
     public virtual PatientTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<Patient> Patients { get; } = new List<Patient>();
+    public virtual ICollection<Patient> Patients { get; set; } = new List<Patient>();
 }

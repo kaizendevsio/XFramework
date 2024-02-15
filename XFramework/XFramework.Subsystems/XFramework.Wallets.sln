@@ -33,6 +33,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentGateways.Domain.Gene
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Core", "..\XFramework\Server\XFramework.Core\XFramework.Core.csproj", "{A323664C-4168-4172-AB78-47B2E28F002C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamFlow.Domain.Generic", "XFramework.StreamFlow\StreamFlow.Domain.Generic\StreamFlow.Domain.Generic.csproj", "{58E7B3B6-6A84-41CE-8DCB-6EC707459870}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,10 @@ Global
 		{A323664C-4168-4172-AB78-47B2E28F002C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A323664C-4168-4172-AB78-47B2E28F002C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A323664C-4168-4172-AB78-47B2E28F002C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{58E7B3B6-6A84-41CE-8DCB-6EC707459870}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58E7B3B6-6A84-41CE-8DCB-6EC707459870}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58E7B3B6-6A84-41CE-8DCB-6EC707459870}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58E7B3B6-6A84-41CE-8DCB-6EC707459870}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -99,6 +105,7 @@ Global
 		{A5141188-E95A-4E77-B3F3-E56D4F327CC7} = {DD689294-15A0-4930-B124-8C663BC0F25C}
 		{1C7ACF8F-26EA-4239-92BA-6E088D7529F3} = {CE422A75-50D7-46F1-8564-1F3233837962}
 		{A323664C-4168-4172-AB78-47B2E28F002C} = {CE422A75-50D7-46F1-8564-1F3233837962}
+		{58E7B3B6-6A84-41CE-8DCB-6EC707459870} = {CE422A75-50D7-46F1-8564-1F3233837962}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E852611F-18A7-4E61-864A-E5E688626BA8}

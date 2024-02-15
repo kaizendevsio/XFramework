@@ -1,11 +1,11 @@
-﻿using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Contracts;
-using XFramework.Domain.Generic.Contracts.Requests;
+﻿namespace Wallets.Domain.Generic.Contracts.Requests;
 
-namespace Wallets.Domain.Generic.Contracts.Requests;
+using TRequest = ConvertWalletRequest;
+using TResponse = CmdResponse;
 
-public record ConvertWalletRequest : RequestBase, IRequest<CmdResponse>
+public record ConvertWalletRequest : RequestBase, 
+    IRequest<TResponse>,
+    IStreamflowRequest<TRequest, TResponse>
 {
     public decimal Amount { get; set; }
     public Guid CredentialId { get; set; }

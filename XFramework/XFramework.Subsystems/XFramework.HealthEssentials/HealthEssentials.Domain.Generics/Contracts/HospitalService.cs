@@ -29,7 +29,7 @@ public partial class HospitalService : BaseModel
 
     public virtual HospitalLocation HospitalLocation { get; set; } = null!;
 
-    public virtual ICollection<HospitalServiceTag> HospitalServiceTags { get; } = new List<HospitalServiceTag>();
+    public virtual ICollection<HospitalServiceTag> HospitalServiceTags { get; set; } = new List<HospitalServiceTag>();
 
     public virtual Unit? Unit { get; set; }
 }

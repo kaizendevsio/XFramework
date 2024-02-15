@@ -5,5 +5,5 @@ public partial class ScheduleTypeGroup : BaseModel
     public string Name { get; set; } = null!;
 
 
-    public virtual ICollection<ScheduleType> ScheduleTypes { get; } = new List<ScheduleType>();
+    public virtual ICollection<ScheduleType> ScheduleTypes { get; set; } = new List<ScheduleType>();
 }

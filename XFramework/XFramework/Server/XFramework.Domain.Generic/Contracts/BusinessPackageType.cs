@@ -6,5 +6,5 @@ public partial class BusinessPackageType : BaseModel
 
     public string? Description { get; set; }
 
-    public virtual ICollection<BusinessPackage> BusinessPackages { get; } = new List<BusinessPackage>();
+    public virtual ICollection<BusinessPackage> BusinessPackages { get; set; } = new List<BusinessPackage>();
 }

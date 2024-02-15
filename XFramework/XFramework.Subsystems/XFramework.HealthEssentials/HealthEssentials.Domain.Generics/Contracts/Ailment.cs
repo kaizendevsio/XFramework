@@ -13,9 +13,9 @@ public partial class Ailment : BaseModel
     public string? Description { get; set; }
 
 
-    public virtual ICollection<AilmentTag> AilmentTags { get; } = new List<AilmentTag>();
+    public virtual ICollection<AilmentTag> AilmentTags { get; set; } = new List<AilmentTag>();
 
     public virtual AilmentType Type { get; set; } = null!;
 
-    public virtual ICollection<PatientAilment> PatientAilments { get; } = new List<PatientAilment>();
+    public virtual ICollection<PatientAilment> PatientAilments { get; set; } = new List<PatientAilment>();
 }

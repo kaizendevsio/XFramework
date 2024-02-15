@@ -15,5 +15,5 @@ public partial class MessageThreadMemberGroup : BaseModel
 
     public virtual MessageThread MessageThread { get; set; } = null!;
 
-    public virtual ICollection<MessageThreadMember> MessageThreadMembers { get; } = new List<MessageThreadMember>();
+    public virtual ICollection<MessageThreadMember> MessageThreadMembers { get; set; } = new List<MessageThreadMember>();
 }

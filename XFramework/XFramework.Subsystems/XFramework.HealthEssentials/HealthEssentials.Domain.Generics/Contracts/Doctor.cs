@@ -1,9 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
-using XFramework.Domain.Generic.Contracts;
 
 namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class Doctor : BaseModel
+public partial class Doctor : BaseModel, IHasOnlineStatus
 {
     public Guid TypeId { get; set; }
 
@@ -34,12 +33,12 @@ public partial class Doctor : BaseModel
 
     public int Status { get; set; }
 
-    public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; } =
+    public virtual ICollection<DoctorConsultationJobOrder> DoctorConsultationJobOrders { get; set; } =
         new List<DoctorConsultationJobOrder>();
 
-    public virtual ICollection<DoctorConsultation> DoctorConsultations { get; } = new List<DoctorConsultation>();
+    public virtual ICollection<DoctorConsultation> DoctorConsultations { get; set; } = new List<DoctorConsultation>();
 
-    public virtual ICollection<DoctorTag> DoctorTags { get; } = new List<DoctorTag>();
+    public virtual ICollection<DoctorTag> DoctorTags { get; set; } = new List<DoctorTag>();
 
     public virtual DoctorType Type { get; set; } = null!;
 
@@ -48,4 +47,18 @@ public partial class Doctor : BaseModel
     
     [NotMapped]
     public List<StorageFile>? Files { get; set; }
+
+    public bool IsOnline { get; set; } = true; // TODO: Implement online status
+    
+    public DateTime LastSeen { get; set; }
+    
+    public DateTime? OnlineSince { get; set; }
+    
+    public string? StatusMessage { get; set; }
+    
+    public string? LastActivityType { get; set; }
+    
+    public string? Device { get; set; }
+    
+    public string? Location { get; set; }
 }

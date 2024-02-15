@@ -11,9 +11,9 @@ public partial class AddressRegion : BaseModel
 
     public Guid CountryId { get; set; }
 
-    public virtual ICollection<AddressProvince> AddressProvinces { get; } = new List<AddressProvince>();
+    public virtual ICollection<AddressProvince> AddressProvinces { get; set; } = new List<AddressProvince>();
 
     public virtual AddressCountry? Country { get; set; }
 
-    public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();
+    public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; } = new List<IdentityAddress>();
 }

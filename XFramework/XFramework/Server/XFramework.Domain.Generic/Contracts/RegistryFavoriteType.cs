@@ -7,5 +7,5 @@ public partial class RegistryFavoriteType : BaseModel
     public string? Description { get; set; }
 
 
-    public virtual ICollection<IdentityFavorite> IdentityFavorites { get; } = new List<IdentityFavorite>();
+    public virtual ICollection<IdentityFavorite> IdentityFavorites { get; set; } = new List<IdentityFavorite>();
 }

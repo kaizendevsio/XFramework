@@ -1,13 +1,7 @@
 ﻿using HealthEssentials.Domain.Generics.Constants;
-using HealthEssentials.Domain.Generics.Contracts;
-using HealthEssentials.Domain.Generics.Contracts.Requests;
-using IdentityServer.Integration.Drivers;
-using Microsoft.Extensions.Logging;
-using XFramework.Core.Services;
-using XFramework.Domain.Contexts;
 using XFramework.Domain.Generic.Contracts;
 
-namespace HealthEssentials.Core.DataAccess.Query.Administrator;
+namespace HealthEssentials.Core.DataAccess.Query.Administrators;
 
 public class GetPendingRegistrationCompletionListHandler(
     DbContext dbContext,
@@ -36,7 +30,7 @@ public class GetPendingRegistrationCompletionListHandler(
             }
             );
         
-        if (response.HttpStatusCode is not HttpStatusCode.Accepted)
+        if (response.HttpStatusCode is not HttpStatusCode.OK)
         {
             return new()
             {

@@ -7,6 +7,6 @@ public partial class RegistryConfigurationGroup : BaseModel
     public string? Description { get; set; }
 
 
-    public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; } =
+    public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; set; } =
         new List<RegistryConfiguration>();
 }

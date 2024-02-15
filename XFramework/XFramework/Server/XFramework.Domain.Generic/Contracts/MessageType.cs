@@ -7,7 +7,7 @@ public partial class MessageType : BaseModel
     public short Priority { get; set; }
 
 
-    public virtual ICollection<MessageDirect> MessageDirects { get; } = new List<MessageDirect>();
+    public virtual ICollection<MessageDirect> MessageDirects { get; set; } = new List<MessageDirect>();
 
-    public virtual ICollection<MessageThreadType> MessageThreadTypes { get; } = new List<MessageThreadType>();
+    public virtual ICollection<MessageThreadType> MessageThreadTypes { get; set; } = new List<MessageThreadType>();
 }

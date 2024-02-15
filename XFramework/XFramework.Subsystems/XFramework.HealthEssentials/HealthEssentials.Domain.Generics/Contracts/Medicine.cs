@@ -15,17 +15,17 @@ public partial class Medicine : BaseModel
     public string? ChemicalComponent { get; set; }
 
 
-    public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; } =
+    public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; set; } =
         new List<ConsultationJobOrderMedicine>();
 
     public virtual MedicineType Type { get; set; } = null!;
 
-    public virtual ICollection<MedicineTag> MedicineTags { get; } = new List<MedicineTag>();
+    public virtual ICollection<MedicineTag> MedicineTags { get; set; } = new List<MedicineTag>();
 
-    public virtual ICollection<MedicineVendor> MedicineVendors { get; } = new List<MedicineVendor>();
+    public virtual ICollection<MedicineVendor> MedicineVendors { get; set; } = new List<MedicineVendor>();
 
-    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; } =
+    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; set; } =
         new List<PharmacyJobOrderMedicine>();
 
-    public virtual ICollection<PharmacyStock> PharmacyStocks { get; } = new List<PharmacyStock>();
+    public virtual ICollection<PharmacyStock> PharmacyStocks { get; set; } = new List<PharmacyStock>();
 }

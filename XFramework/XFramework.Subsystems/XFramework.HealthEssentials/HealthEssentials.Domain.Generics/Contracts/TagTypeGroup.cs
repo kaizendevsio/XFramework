@@ -5,5 +5,5 @@ public partial class TagTypeGroup : BaseModel
     public string Name { get; set; } = null!;
 
 
-    public virtual ICollection<TagType> TagTypes { get; } = new List<TagType>();
+    public virtual ICollection<TagType> TagTypes { get; set; } = new List<TagType>();
 }

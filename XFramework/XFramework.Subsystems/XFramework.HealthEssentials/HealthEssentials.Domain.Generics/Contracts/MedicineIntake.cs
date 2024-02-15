@@ -15,12 +15,12 @@ public partial class MedicineIntake : BaseModel
     public Guid UnitId { get; set; }
 
 
-    public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; } =
+    public virtual ICollection<ConsultationJobOrderMedicine> ConsultationJobOrderMedicines { get; set; } =
         new List<ConsultationJobOrderMedicine>();
 
     public virtual MedicineIntakeType Type { get; set; } = null!;
 
-    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; } =
+    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; set; } =
         new List<PharmacyJobOrderMedicine>();
 
     public virtual Unit? Unit { get; set; }

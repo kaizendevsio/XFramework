@@ -6,6 +6,7 @@ using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Wallet;
 using XFramework.Client.Shared.Entity.Enums;
 using XFramework.Client.Shared.Entity.Models.Requests.Common;
+using XFramework.Integration.Security;
 
 namespace XFramework.Client.Shared.Core.Features;
 
@@ -15,6 +16,7 @@ public class BaseStateActionHandler
     public IndexedDbService IndexedDbService { get; set; }
     public ISessionStorageService SessionStorageService { get; set; }
     public ILocalStorageService LocalStorageService { get; set; }
+    public ISnackbar Snackbar { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
     protected NavigationManager NavigationManager { get; set; }
     protected IWebAssemblyHostEnvironment HostEnvironment { get; set; }
@@ -40,14 +42,18 @@ public class BaseStateActionHandler
         // Display message to UI
         if (!silent)
         {
-            SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(message)
-                ? $"There was an error while trying to process your request, please try again later"
-                : $"{message}", SweetAlertIcon.Error);
+            if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
+            {
+                SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
+            }
+            else
+            {
+                SweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+            }
         }
-        
+
         // Display error to the console
-        Console.WriteLine($"Error from response: {message}");
-        Log.Error("Error from response: {message}", message); 
+        Log.Error("Error from response: {Message}", message); 
 
         HandleFailureHooks(action);
         
@@ -62,39 +68,34 @@ public class BaseStateActionHandler
         if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
         
-        if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
+        if (!silent)
         {
-            switch (response.HttpStatusCode)
+            if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
             {
-                case HttpStatusCode.InternalServerError:
-                    SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
-                    
-                    goto JumpToError;
-                    break;
-            }
+                switch (response.HttpStatusCode)
+                {
+                    case HttpStatusCode.InternalServerError:
+                        SweetAlertService.FireAsync("Error",
+                            "There was an error while trying to process your request, please try again later",
+                            SweetAlertIcon.Error);
 
-        }
-        
-        // Display message to UI
-        switch (silent)
-        {
-            case true:
-                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $"There was an error while trying to process your request, please try again later"
-                    : $"{customMessage}", SweetAlertIcon.Error);
-                break;
-            case false:
+                        goto JumpToError;
+                        break;
+                }
+            }
+            else
+            {
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $" {response.Message}"
                     : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
-                break;
+            }
         }
 
         JumpToError:
 
         // Display error to the console
-        Console.WriteLine($"Error from response: {response.Message}");
-
+        Log.Error("Error from response: {Message}", response.Message); 
+        
         HandleFailureHooks(action);
         return true;
     }
@@ -102,39 +103,34 @@ public class BaseStateActionHandler
     {
         if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-        
-        if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
-        {
-            switch (response.HttpStatusCode)
-            {
-                case HttpStatusCode.InternalServerError:
-                    SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
-                    
-                    goto JumpToError;
-                    break;
-            }
 
-        }
-        
-        // Display message to UI
-        switch (silent)
+        if (!silent)
         {
-            case true:
-                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $"There was an error while trying to process your request, please try again later"
-                    : $"{customMessage}", SweetAlertIcon.Error);
-                break;
-            case false:
+            if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
+            {
+                switch (response.HttpStatusCode)
+                {
+                    case HttpStatusCode.InternalServerError:
+                        SweetAlertService.FireAsync("Error",
+                            "There was an error while trying to process your request, please try again later",
+                            SweetAlertIcon.Error);
+
+                        goto JumpToError;
+                        break;
+                }
+            }
+            else
+            {
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $" {response.Message}"
                     : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
-                break;
+            }
         }
 
         JumpToError:
 
         // Display error to the console
-        Console.WriteLine($"Error from response: {response.Message}");
+        Log.Error("Error from response: {Message}", response.Message); 
 
         HandleFailureHooks(action);
         return true;
@@ -144,37 +140,33 @@ public class BaseStateActionHandler
         if ((int)response.HttpStatusCode < 300) return false;
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
 
-        if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
+        if (!silent)
         {
-            switch (response.HttpStatusCode)
+            if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
             {
-                case HttpStatusCode.InternalServerError:
-                    SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
-                    
-                    goto JumpToError;
-                    break;
-            }
+                switch (response.HttpStatusCode)
+                {
+                    case HttpStatusCode.InternalServerError:
+                        SweetAlertService.FireAsync("Error",
+                            "There was an error while trying to process your request, please try again later",
+                            SweetAlertIcon.Error);
 
-        }
-        
-        // Display message to UI
-        switch (silent)
-        {
-            case true:
-                SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $"There was an error while trying to process your request, please try again later"
-                    : $"{customMessage}", SweetAlertIcon.Error);
-                break;
-            case false:
+                        goto JumpToError;
+                        break;
+                }
+            }
+            else
+            {
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $" {response.Message}"
-                    : $"{customMessage}", SweetAlertIcon.Error);
-                break;
+                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
+            }
         }
 
         JumpToError:
+        
         // Display error to the console
-        Console.WriteLine($"Error from response: {response.Message}");
+        Log.Error("Error from response: {Message}", response.Message); 
 
         HandleFailureHooks(action);
         return true;
@@ -202,30 +194,23 @@ public class BaseStateActionHandler
     public async Task HandleSuccess<TAction>(CmdResponse response, TAction action, bool silent = false, string customMessage = "")
     {
         // Display message to UI
-        switch (silent)
+        if (!silent)
         {
-            case true:
-                break;
-            case false:
-                  SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
-                    ? $"Success: {response.Message}"
-                    : $"{customMessage}", SweetAlertIcon.Success);
-                break;
+            SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
+                ? $"Success: {response.Message}"
+                : $"{customMessage}", SweetAlertIcon.Success);
+                
         }
         HandleSuccessHooks(action);
     }
     public async Task HandleSuccess<TAction, TRequest>(CmdResponse<TRequest> response, TAction action, bool silent = false, string customMessage = "")
     {
         // Display message to UI
-        switch (silent)
+        if (!silent)
         {
-            case true:
-                break;
-            case false:
-                SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
-                    ? $"Success: {response.Message}"
-                    : $"{customMessage}", SweetAlertIcon.Success);
-                break;
+            SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
+                ? $"Success: {response.Message}"
+                : $"{customMessage}", SweetAlertIcon.Success);
         }
         
         HandleSuccessHooks(action);
@@ -233,15 +218,11 @@ public class BaseStateActionHandler
     public async Task HandleSuccess<TResponse,TAction>(QueryResponse<TResponse> response, TAction action, bool silent = false, string customMessage = "")
     {
         // Display message to UI
-        switch (silent)
+        if (!silent)
         {
-            case true:
-                break;
-            case false:
-                SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
-                    ? $"Success: {response.Message}"
-                    : $"{customMessage}", SweetAlertIcon.Success);
-                break;
+            SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
+                ? $"Success: {response.Message}"
+                : $"{customMessage}", SweetAlertIcon.Success);
         }
       
         HandleSuccessHooks(action);
@@ -357,53 +338,17 @@ public class BaseStateActionHandler
         }
     }
     
-    public Task DisplayProgress(bool show)
-    {
-        if (show)
-        {
-            SweetAlertService.FireAsync(new()
-            {
-                Backdrop = false,
-                Html = $"<div class='loadingio-spinner-ellipsis-hm5jphe6my'><div class='ldio-o8ctnog1lcq'><div></div><div></div><div></div><div></div><div></div></div></div>",
-                ShowConfirmButton = false,
-            });
-            return Task.CompletedTask;
-        }
-        SweetAlertService.CloseAsync();
-        return Task.CompletedTask;
-    }
-    
     public async Task ReportBusy(string? title = null, bool? isBusy = true)
     {
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy, ProgressMessage = title, NoSpinner = false});
-    }
-    public async Task ReportBusy<T>(QueryAction action)
-    {
-        if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, ProgressTitle = action.GetType().Name, NoSpinner = false});
-    }
-    public async Task ReportBusy<T,TQ>(QueryAction action, IEnumerable<T> list)
-    {
-        if (action.Silent) { await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, NoSpinner = true, ProgressTitle = action.GetType().Name}); return;}
-        if (list.TryGetNonEnumeratedCount(out var count) && count > 0) return;
-        if (list.Any()) return;
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = true, ProgressTitle = action.GetType().Name, NoSpinner = false});
+        var y =Snackbar.Add(
+            message: title,
+            severity: Severity.Info
+        );
+        await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy});
     }
     public async Task ReportTaskCompleted()
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-    }
-    
-    public async Task ReportTaskCompleted(QueryAction action)
-    {
-        await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-    }
-    public async Task ReportTaskCompleted(NavigableRequest action)
-    {
-        if (!action.Silent)
-        {
-            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-        }
     }
     
     public async Task NavigateTo(string path)
@@ -429,6 +374,7 @@ public abstract class StateActionHandler<TAction> : BaseStateActionHandler, IReq
         BaseHttpClient = handlerServices.BaseHttpClient;
         JsRuntime = handlerServices.JsRuntime;
         Mediator = handlerServices.Mediator;
+        Snackbar = handlerServices.Snackbar;
         Store = store;
     }
     public abstract Task Handle(TAction action, CancellationToken aCancellationToken);

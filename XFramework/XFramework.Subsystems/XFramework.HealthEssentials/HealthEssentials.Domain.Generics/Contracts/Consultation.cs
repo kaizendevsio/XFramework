@@ -11,13 +11,13 @@ public partial class Consultation : BaseModel
     public string? Description { get; set; }
 
 
-    public virtual ICollection<ConsultationJobOrder> ConsultationJobOrders { get; } = new List<ConsultationJobOrder>();
+    public virtual ICollection<ConsultationJobOrder> ConsultationJobOrders { get; set; } = new List<ConsultationJobOrder>();
 
-    public virtual ICollection<ConsultationTag> ConsultationTags { get; } = new List<ConsultationTag>();
+    public virtual ICollection<ConsultationTag> ConsultationTags { get; set; } = new List<ConsultationTag>();
 
-    public virtual ICollection<DoctorConsultation> DoctorConsultations { get; } = new List<DoctorConsultation>();
+    public virtual ICollection<DoctorConsultation> DoctorConsultations { get; set; } = new List<DoctorConsultation>();
 
     public virtual ConsultationType Type { get; set; } = null!;
 
-    public virtual ICollection<HospitalConsultation> HospitalConsultations { get; } = new List<HospitalConsultation>();
+    public virtual ICollection<HospitalConsultation> HospitalConsultations { get; set; } = new List<HospitalConsultation>();
 }

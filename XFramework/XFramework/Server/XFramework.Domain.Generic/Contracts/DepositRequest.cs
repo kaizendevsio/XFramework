@@ -35,7 +35,7 @@ public partial class DepositRequest : BaseModel
     public Guid GatewayId { get; set; }
 
 
-    public virtual ICollection<BusinessPackage> BusinessPackages { get; } = new List<BusinessPackage>();
+    public virtual ICollection<BusinessPackage> BusinessPackages { get; set; } = new List<BusinessPackage>();
 
     public virtual PaymentGateway? PaymentGateway { get; set; }
 

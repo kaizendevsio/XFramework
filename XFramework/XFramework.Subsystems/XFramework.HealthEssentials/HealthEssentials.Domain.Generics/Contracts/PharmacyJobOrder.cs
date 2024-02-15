@@ -35,10 +35,10 @@ public partial class PharmacyJobOrder : BaseModel
 
     public virtual Patient? Patient { get; set; }
 
-    public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; } =
+    public virtual ICollection<PharmacyJobOrderConsultationJobOrder> PharmacyJobOrderConsultationJobOrders { get; set; } =
         new List<PharmacyJobOrderConsultationJobOrder>();
 
-    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; } =
+    public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; set; } =
         new List<PharmacyJobOrderMedicine>();
 
     public virtual PharmacyLocation PharmacyLocation { get; set; } = null!;

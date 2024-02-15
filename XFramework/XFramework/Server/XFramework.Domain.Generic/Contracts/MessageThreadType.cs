@@ -7,7 +7,7 @@ public partial class MessageThreadType : BaseModel
 
     public Guid MessageTypeId { get; set; }
 
-    public virtual ICollection<MessageThread> MessageThreads { get; } = new List<MessageThread>();
+    public virtual ICollection<MessageThread> MessageThreads { get; set; } = new List<MessageThread>();
 
     public virtual MessageType MessageType { get; set; } = null!;
 }

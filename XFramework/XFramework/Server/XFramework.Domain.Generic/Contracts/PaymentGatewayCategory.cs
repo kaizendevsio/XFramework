@@ -7,5 +7,5 @@ public partial class PaymentGatewayCategory : BaseModel
     public string? Description { get; set; }
 
 
-    public virtual ICollection<PaymentGateway> Gateways { get; } = new List<PaymentGateway>();
+    public virtual ICollection<PaymentGateway> Gateways { get; set; } = new List<PaymentGateway>();
 }

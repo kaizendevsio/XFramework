@@ -7,6 +7,7 @@ using IdentityServer.Domain.Generic.Contracts.Responses;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.BusinessObjects;
@@ -23,6 +24,7 @@ namespace XFramework.Integration.Services;
 public class SignalRService : BaseSignalRHandler, ISignalRService
 {
     private readonly ILogger<SignalRService> _logger;
+    private readonly IHostEnvironment _hostEnvironment;
     private readonly IMediator _mediator;
     private readonly ILogger<BaseSignalRHandler> _baseLogger;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -38,8 +40,9 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     public StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
     public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessage>> PendingMethodCalls { get; set; } = new();
 
-    public SignalRService(IConfiguration configuration, ILogger<SignalRService> logger, IMediator mediator, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
+    public SignalRService(IHostEnvironment hostEnvironment, IConfiguration configuration, ILogger<SignalRService> logger, IMediator mediator, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
     {
+        _hostEnvironment = hostEnvironment;
         _mediator = mediator;
         _baseLogger = baseLogger;
         _scopeFactory = scopeFactory;
@@ -137,10 +140,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
     public async Task StartEventListener(string topic)
     {
-        if (_subscriptionsEventHandle) return;
         if (string.IsNullOrEmpty(topic)) return;
-
-        _subscriptionsEventHandle = true;
         var client = new StreamFlowClient
         {
             Queue = new()
@@ -154,7 +154,10 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             throw new ArgumentException("Handle subscriptions event error: Failed to subscribe for notifications");
         }
 
-        _logger.LogInformation("Notification listener started");
+        if (!_hostEnvironment.IsProduction())
+        {
+            _logger.LogInformation("Started subscription event listener with topic {Topic}", topic);
+        }
     }
 
     private void HandleInvokeResponseEvent()

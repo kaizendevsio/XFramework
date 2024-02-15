@@ -20,8 +20,8 @@ public partial class WalletType : BaseModel
 
     public virtual CurrencyType? CurrencyType { get; set; }
 
-    public virtual ICollection<DepositRequest> DepositRequests { get; } = new List<DepositRequest>();
-    public virtual ICollection<WithdrawalRequest> WithdrawalRequests { get; } = new List<WithdrawalRequest>();
+    public virtual ICollection<DepositRequest> DepositRequests { get; set; } = new List<DepositRequest>();
+    public virtual ICollection<WithdrawalRequest> WithdrawalRequests { get; set; } = new List<WithdrawalRequest>();
 
-    public virtual ICollection<Wallet> Wallets { get; } = new List<Wallet>();
+    public virtual ICollection<Wallet> Wallets { get; set; } = new List<Wallet>();
 }

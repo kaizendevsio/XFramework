@@ -21,13 +21,13 @@ public partial class Hospital : BaseModel
 
     public virtual HospitalType Type { get; set; } = null!;
 
-    public virtual ICollection<HospitalConsultation> HospitalConsultations { get; } = new List<HospitalConsultation>();
+    public virtual ICollection<HospitalConsultation> HospitalConsultations { get; set; } = new List<HospitalConsultation>();
 
-    public virtual ICollection<HospitalLaboratory> HospitalLaboratories { get; } = new List<HospitalLaboratory>();
+    public virtual ICollection<HospitalLaboratory> HospitalLaboratories { get; set; } = new List<HospitalLaboratory>();
 
-    public virtual ICollection<HospitalLocation> HospitalLocations { get; } = new List<HospitalLocation>();
+    public virtual ICollection<HospitalLocation> HospitalLocations { get; set; } = new List<HospitalLocation>();
 
-    public virtual ICollection<HospitalService> HospitalServices { get; } = new List<HospitalService>();
+    public virtual ICollection<HospitalService> HospitalServices { get; set; } = new List<HospitalService>();
 
-    public virtual ICollection<HospitalTag> HospitalTags { get; } = new List<HospitalTag>();
+    public virtual ICollection<HospitalTag> HospitalTags { get; set; } = new List<HospitalTag>();
 }

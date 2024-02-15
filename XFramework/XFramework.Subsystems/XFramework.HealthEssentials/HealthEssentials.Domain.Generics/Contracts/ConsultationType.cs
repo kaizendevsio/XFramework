@@ -11,7 +11,7 @@ public partial class ConsultationType : BaseModel
 
     public int? SortOrder { get; set; }
 
-    public virtual ICollection<Consultation> Consultations { get; } = new List<Consultation>();
+    public virtual ICollection<Consultation> Consultations { get; set; } = new List<Consultation>();
 
     public virtual ConsultationTypeGroup Group { get; set; } = null!;
 }

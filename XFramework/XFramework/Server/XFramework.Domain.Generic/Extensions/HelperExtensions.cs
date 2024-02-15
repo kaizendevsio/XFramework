@@ -51,23 +51,29 @@ public static class HelperExtensions
 
         foreach (var queryFilter in filters)
         {
-            Expression property = Expression.Property(parameter, queryFilter.PropertyName);
-            Expression target = Expression.Constant(queryFilter.Value);
-            
-            Expression? comparisonExpression = null;
-            
+            // Split the property name to handle nested properties
+            string[] propertyNames = queryFilter.PropertyName.Split('.');
+            Expression property = parameter;
+            foreach (var name in propertyNames)
+            {
+                property = Expression.Property(property, name);
+            }
+
+            // Handle the conversion for Guids and other types
+            Expression target = Expression.Constant(queryFilter.Value, queryFilter.Value?.GetType());
             if (property.Type == typeof(Guid) && queryFilter.Value is string stringValue)
             {
-                // Create an expression to call Guid.Parse
                 MethodInfo guidParseMethod = typeof(Guid).GetMethod(nameof(Guid.Parse), new[] { typeof(string) });
+                if (guidParseMethod == null) throw new InvalidOperationException("Guid.Parse method not found.");
                 target = Expression.Call(null, guidParseMethod, Expression.Constant(stringValue));
             }
-            else
+            else if (queryFilter.Value != null)
             {
-                // For other types, use Convert as before
-                target = Expression.Constant(queryFilter.Value);
+                target = Expression.Constant(queryFilter.Value, queryFilter.Value.GetType());
                 target = Expression.Convert(target, property.Type);
             }
+
+            Expression? comparisonExpression = null;
 
             switch (queryFilter.Operation)
             {

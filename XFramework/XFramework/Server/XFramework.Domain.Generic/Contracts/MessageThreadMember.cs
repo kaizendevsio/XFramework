@@ -21,12 +21,12 @@ public partial class MessageThreadMember : BaseModel
 
     public virtual IdentityCredential Credential { get; set; } = null!;
 
-    public virtual ICollection<MessageDelivery> MessageDeliveries { get; } = new List<MessageDelivery>();
+    public virtual ICollection<MessageDelivery> MessageDeliveries { get; set; } = new List<MessageDelivery>();
 
     public virtual MessageThread MessageThread { get; set; } = null!;
 
-    public virtual ICollection<MessageThreadMemberRole> MessageThreadMemberRoles { get; } =
+    public virtual ICollection<MessageThreadMemberRole> MessageThreadMemberRoles { get; set; } =
         new List<MessageThreadMemberRole>();
 
-    public virtual ICollection<Message> Messages { get; } = new List<Message>();
+    public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
 }

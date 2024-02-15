@@ -7,5 +7,5 @@ public partial class IdentityRoleTypeGroup : BaseModel
     public string Description { get; set; } = null!;
 
 
-    public virtual ICollection<IdentityRoleType> IdentityRoleTypes { get; } = new List<IdentityRoleType>();
+    public virtual ICollection<IdentityRoleType> IdentityRoleTypes { get; set; } = new List<IdentityRoleType>();
 }

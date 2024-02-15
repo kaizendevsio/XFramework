@@ -7,7 +7,7 @@ namespace Wallets.Core.DataAccess.Commands.Wallet;
 using XFramework.Domain.Generic.Contracts;
 
 public class TransferWallet(
-    DbContext appDbContext,
+    DbContext dbContext,
     ILogger<TransferWallet> logger,
     ITenantService tenantService
 )
@@ -25,7 +25,7 @@ public class TransferWallet(
 
         // Fetch the sender and recipient wallet
         
-        IQueryable<Wallet> query = appDbContext.Set<Wallet>();
+        IQueryable<Wallet> query = dbContext.Set<Wallet>();
 
         var senderWallet = await query
             .Where(x => x.TenantId == tenant.Id)
@@ -87,20 +87,25 @@ public class TransferWallet(
             Description = $"Received from {request.CredentialId}"
         };
 
-        appDbContext.Set<WalletTransaction>().Add(senderTransaction);
-        appDbContext.Set<WalletTransaction>().Add(recipientTransaction);
+        dbContext.Set<WalletTransaction>().Add(senderTransaction);
+        dbContext.Set<WalletTransaction>().Add(recipientTransaction);
 
         try
         {
-            await appDbContext.SaveChangesAsync(cancellationToken);
-            return new CmdResponse { HttpStatusCode = HttpStatusCode.Accepted, Message = "Transfer successful" };
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.Accepted,
+                Message = "Transfer successful"
+            };
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error transferring wallet balance");
             return new CmdResponse
             {
-                HttpStatusCode = HttpStatusCode.InternalServerError, Message = "Error processing request"
+                HttpStatusCode = HttpStatusCode.InternalServerError,
+                Message = "Error processing request"
             };
         }
     }

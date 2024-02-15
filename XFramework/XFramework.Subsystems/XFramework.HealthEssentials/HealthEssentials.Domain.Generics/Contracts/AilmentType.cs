@@ -11,7 +11,7 @@ public partial class AilmentType : BaseModel
 
     public int? SortOrder { get; set; }
 
-    public virtual ICollection<Ailment> Ailments { get; } = new List<Ailment>();
+    public virtual ICollection<Ailment> Ailments { get; set; } = new List<Ailment>();
 
     public virtual AilmentTypeGroup Group { get; set; } = null!;
 }

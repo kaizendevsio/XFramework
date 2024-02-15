@@ -11,9 +11,9 @@ public partial class AddressProvince : BaseModel
     public long Code { get; set; }
 
 
-    public virtual ICollection<AddressCity> AddressCities { get; } = new List<AddressCity>();
+    public virtual ICollection<AddressCity> AddressCities { get; set; } = new List<AddressCity>();
 
-    public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();
+    public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; } = new List<IdentityAddress>();
 
     public virtual AddressRegion RegCode { get; set; } = null!;
 }

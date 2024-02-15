@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace XFramework.Domain.Generic.Contracts;
 
-public partial class IdentityCredential : BaseModel
+public partial class IdentityCredential : BaseModel, IHasOnlineStatus
 {
     public Guid IdentityInfoId { get; set; }
 
@@ -17,11 +17,27 @@ public partial class IdentityCredential : BaseModel
     public byte[]? PasswordByte { get; set; }
     
     [NotMapped]
+    [JsonIgnore]
     public string? Password { get; set; }
 
+    [JsonIgnore]
     public string? Token { get; set; }
-
-
+    
+    public bool IsOnline { get; set; }
+    
+    public DateTime LastSeen { get; set; }
+    
+    public DateTime? OnlineSince { get; set; }
+    
+    public string? StatusMessage { get; set; }
+    
+    public string? LastActivityType { get; set; }
+    
+    public string? Device { get; set; }
+    
+    public string? Location { get; set; }
+    
+    
     public virtual Tenant Tenant { get; set; } = null!;
 
     public virtual ICollection<AuthorizationLog> AuthorizationLogs { get; set; } = new List<AuthorizationLog>();
@@ -41,8 +57,7 @@ public partial class IdentityCredential : BaseModel
     public virtual ICollection<CommunityIdentity> CommunityIdentities { get; set; } = new List<CommunityIdentity>();
 
     public virtual ICollection<DepositRequest> DepositRequests { get; set; } = new List<DepositRequest>();
-
-
+    
     public virtual ICollection<IdentityContact> IdentityContacts { get; set; } = new List<IdentityContact>();
 
     public virtual ICollection<IdentityFavorite> IdentityFavorites { get; set; } = new List<IdentityFavorite>();

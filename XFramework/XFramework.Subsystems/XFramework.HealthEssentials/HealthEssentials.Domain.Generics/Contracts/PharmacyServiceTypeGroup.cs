@@ -5,5 +5,5 @@ public partial class PharmacyServiceTypeGroup : BaseModel
     public string Name { get; set; } = null!;
 
 
-    public virtual ICollection<PharmacyServiceType> PharmacyServiceTypes { get; } = new List<PharmacyServiceType>();
+    public virtual ICollection<PharmacyServiceType> PharmacyServiceTypes { get; set; } = new List<PharmacyServiceType>();
 }

@@ -39,17 +39,17 @@ public partial class LaboratoryJobOrder : BaseModel
 
     public virtual Laboratory Laboratory { get; set; } = null!;
 
-    public virtual ICollection<LaboratoryJobOrderDetail> LaboratoryJobOrderDetails { get; } =
+    public virtual ICollection<LaboratoryJobOrderDetail> LaboratoryJobOrderDetails { get; set; } =
         new List<LaboratoryJobOrderDetail>();
 
-    public virtual ICollection<LaboratoryJobOrderResult> LaboratoryJobOrderResults { get; } =
+    public virtual ICollection<LaboratoryJobOrderResult> LaboratoryJobOrderResults { get; set; } =
         new List<LaboratoryJobOrderResult>();
 
     public virtual LaboratoryLocation LaboratoryLocation { get; set; } = null!;
 
     public virtual Patient? Patient { get; set; }
 
-    public virtual ICollection<PatientLaboratory> PatientLaboratories { get; } = new List<PatientLaboratory>();
+    public virtual ICollection<PatientLaboratory> PatientLaboratories { get; set; } = new List<PatientLaboratory>();
 
     public virtual Schedule Schedule { get; set; } = null!;
 }

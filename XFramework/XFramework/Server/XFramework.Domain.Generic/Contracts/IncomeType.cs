@@ -10,5 +10,5 @@ public partial class IncomeType : BaseModel
 
     public bool? IsReward { get; set; }
     
-    public virtual ICollection<IncomeTransaction> IncomeTransactions { get; } = new List<IncomeTransaction>();
+    public virtual ICollection<IncomeTransaction> IncomeTransactions { get; set; } = new List<IncomeTransaction>();
 }

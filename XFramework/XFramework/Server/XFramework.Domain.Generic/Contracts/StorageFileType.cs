@@ -5,5 +5,5 @@ public partial class StorageFileType : BaseModel
     public string Name { get; set; } = null!;
 
 
-    public virtual ICollection<StorageFile> StorageFiles { get; } = new List<StorageFile>();
+    public virtual ICollection<StorageFile> StorageFiles { get; set; } = new List<StorageFile>();
 }

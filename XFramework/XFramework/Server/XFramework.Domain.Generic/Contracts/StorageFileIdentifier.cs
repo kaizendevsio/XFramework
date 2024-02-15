@@ -11,5 +11,5 @@ public partial class StorageFileIdentifier : BaseModel
 
     public virtual StorageFileIdentifierGroup Group { get; set; } = null!;
 
-    public virtual ICollection<StorageFile> StorageFiles { get; } = new List<StorageFile>();
+    public virtual ICollection<StorageFile> StorageFiles { get; set; } = new List<StorageFile>();
 }

@@ -5,5 +5,5 @@ public partial class MedicineTypeGroup : BaseModel
     public string Name { get; set; } = null!;
 
 
-    public virtual ICollection<MedicineType> MedicineTypes { get; } = new List<MedicineType>();
+    public virtual ICollection<MedicineType> MedicineTypes { get; set; } = new List<MedicineType>();
 }

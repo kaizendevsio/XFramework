@@ -1,10 +1,11 @@
-﻿using MediatR;
-using XFramework.Domain.Generic.BusinessObjects;
-using XFramework.Domain.Generic.Contracts.Requests;
+﻿namespace Wallets.Domain.Generic.Contracts.Requests;
 
-namespace Wallets.Domain.Generic.Contracts.Requests;
+using TRequest = TransferWalletRequest;
+using TResponse = CmdResponse;
 
-public record TransferWalletRequest : TransactionRequestBase, IRequest<CmdResponse>
+public record TransferWalletRequest : TransactionRequestBase, 
+    IRequest<TResponse>,
+    IStreamflowRequest<TRequest, TResponse>
 {
     public Guid CredentialId { get; set; }
     public Guid RecipientCredentialId { get; set; }

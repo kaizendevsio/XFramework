@@ -11,7 +11,7 @@ public partial class DoctorType : BaseModel
 
     public int? SortOrder { get; set; }
 
-    public virtual ICollection<Doctor> Doctors { get; } = new List<Doctor>();
+    public virtual ICollection<Doctor> Doctors { get; set; } = new List<Doctor>();
 
     public virtual DoctorTypeGroup Group { get; set; } = null!;
 }

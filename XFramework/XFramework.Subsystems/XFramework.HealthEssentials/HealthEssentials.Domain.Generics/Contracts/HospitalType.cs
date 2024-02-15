@@ -13,5 +13,5 @@ public partial class HospitalType : BaseModel
 
     public virtual HospitalTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<Hospital> Hospitals { get; } = new List<Hospital>();
+    public virtual ICollection<Hospital> Hospitals { get; set; } = new List<Hospital>();
 }

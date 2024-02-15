@@ -5,5 +5,5 @@ public partial class ConsultationTypeGroup : BaseModel
     public string Name { get; set; } = null!;
 
 
-    public virtual ICollection<ConsultationType> ConsultationTypes { get; } = new List<ConsultationType>();
+    public virtual ICollection<ConsultationType> ConsultationTypes { get; set; } = new List<ConsultationType>();
 }

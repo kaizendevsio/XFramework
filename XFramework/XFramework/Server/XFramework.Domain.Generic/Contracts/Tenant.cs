@@ -17,14 +17,14 @@ public partial class Tenant : BaseModel
     
     public decimal Version { get; set; }
     
-    public virtual ICollection<IdentityCredential> IdentityCredentials { get; } = new List<IdentityCredential>();
+    public virtual ICollection<IdentityCredential> IdentityCredentials { get; set; } = new List<IdentityCredential>();
 
-    public virtual ICollection<IdentityInformation> IdentityInformations { get; } = new List<IdentityInformation>();
+    public virtual ICollection<IdentityInformation> IdentityInformations { get; set; } = new List<IdentityInformation>();
 
-    public virtual ICollection<IdentityRoleType> IdentityRoleTypes { get; } = new List<IdentityRoleType>();
+    public virtual ICollection<IdentityRoleType> IdentityRoleTypes { get; set; } = new List<IdentityRoleType>();
 
-    public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; } =
+    public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; set; } =
         new List<RegistryConfiguration>();
 
-    public virtual ICollection<WalletType> WalletTypes { get; } = new List<WalletType>();
+    public virtual ICollection<WalletType> WalletTypes { get; set; } = new List<WalletType>();
 }

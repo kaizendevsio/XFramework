@@ -1,4 +1,6 @@
 ﻿using IdentityServer.Domain.Generic.Contracts.Responses;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using XFramework.Client.Shared.Interfaces;
 using XFramework.Integration.Abstractions.Wrappers;
 
@@ -16,6 +18,8 @@ public partial class SessionState
     (
         IMessageBusWrapper messageBusWrapper,
         HandlerServices handlerServices,
+        ILogger<LoginEventHandler> logger,
+        IHostEnvironment hostEnvironment,
         IStore store)
         : EventHandler<LoginEvent>(handlerServices, store)
     {
@@ -26,17 +30,14 @@ public partial class SessionState
         {
             if (action.StatusCode is HttpStatusCode.Accepted)
             {
-                Console.WriteLine("Client event listener started");
                 try
                 {
-                    await messageBusWrapper.StartClientEventListener($"{CurrentState.Credential.Id}");
+                    await messageBusWrapper.StartClientEventListener($"{action.Data.Credential.Id}");
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e);
-                    throw;
+                    logger.LogError(e, "Client event listener failed");
                 }
-                Console.WriteLine("Client event listener success");
             }
         }
     }

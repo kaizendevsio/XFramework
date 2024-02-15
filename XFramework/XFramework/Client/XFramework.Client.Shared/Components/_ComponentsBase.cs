@@ -33,7 +33,8 @@ public class XComponentsBase : BlazorStateComponent
     public CacheState CacheState => GetState<CacheState>();
     public WalletState WalletState => GetState<WalletState>();
 
-    public string Cursor => ApplicationState.IsBusy ? "progress" : "arrow";
+    [Parameter] public bool IsLoading { get; set; }
+    public string Cursor => IsLoading ? "progress" : "arrow";
     
     // Global Methods
     public void NavigateTo(string path) => NavigationManager.NavigateTo(path);
@@ -45,4 +46,11 @@ public class XComponentsBase : BlazorStateComponent
     public string NickName(IdentityCredential? item) => $"{item?.IdentityInfo.FirstName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.MiddleName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.LastName?.ToLowerInvariant().Humanize(LetterCasing.Title)}";
     public string PhoneNumber(IdentityCredential? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Type.Name == "Phone")?.Value}";
     public string EmailAddress(IdentityCredential? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Type.Name == "Email")?.Value}";
+
+    public void ShowLoading(bool value)
+    {
+        IsLoading = value;
+        StateHasChanged();
+    }
+    
 }

@@ -27,14 +27,14 @@ public partial class BusinessPackage : BaseModel
     public string? Remarks { get; set; }
 
     
-    public virtual ICollection<BusinessPackageUpgradeTransaction> BusinessPackageUpgradeTransactions { get; } =
+    public virtual ICollection<BusinessPackageUpgradeTransaction> BusinessPackageUpgradeTransactions { get; set; } =
         new List<BusinessPackageUpgradeTransaction>();
 
-    public virtual ICollection<BusinessPackageInclusion> BusinessPackageInclusions { get; } =
+    public virtual ICollection<BusinessPackageInclusion> BusinessPackageInclusions { get; set; } =
         new List<BusinessPackageInclusion>();
 
 
-    public virtual ICollection<CommissionDeductionRequest> CommissionDeductionRequests { get; } =
+    public virtual ICollection<CommissionDeductionRequest> CommissionDeductionRequests { get; set; } =
         new List<CommissionDeductionRequest>();
 
     public virtual IdentityCredential? ConsumedBy { get; set; }

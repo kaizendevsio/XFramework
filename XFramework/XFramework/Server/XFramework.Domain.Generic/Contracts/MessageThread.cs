@@ -11,10 +11,10 @@ public partial class MessageThread : BaseModel
 
     public virtual MessageThreadType Type { get; set; } = null!;
 
-    public virtual ICollection<MessageThreadMemberGroup> MessageThreadMemberGroups { get; } =
+    public virtual ICollection<MessageThreadMemberGroup> MessageThreadMemberGroups { get; set; } =
         new List<MessageThreadMemberGroup>();
 
-    public virtual ICollection<MessageThreadMember> MessageThreadMembers { get; } = new List<MessageThreadMember>();
+    public virtual ICollection<MessageThreadMember> MessageThreadMembers { get; set; } = new List<MessageThreadMember>();
 
-    public virtual ICollection<Message> Messages { get; } = new List<Message>();
+    public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
 }

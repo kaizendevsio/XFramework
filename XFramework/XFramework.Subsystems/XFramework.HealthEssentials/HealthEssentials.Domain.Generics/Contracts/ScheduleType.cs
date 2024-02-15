@@ -11,9 +11,9 @@ public partial class ScheduleType : BaseModel
 
     public int? SortOrder { get; set; }
 
-    public virtual ICollection<Availability> Availabilities { get; } = new List<Availability>();
+    public virtual ICollection<Availability> Availabilities { get; set; } = new List<Availability>();
 
     public virtual ScheduleTypeGroup Group { get; set; } = null!;
 
-    public virtual ICollection<Schedule> Schedules { get; } = new List<Schedule>();
+    public virtual ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
 }

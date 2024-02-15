@@ -6,5 +6,5 @@ public partial class PaymentGatewayResponseStatusType : BaseModel
 
     public string Code { get; set; } = null!;
 
-    public virtual ICollection<PaymentGatewayResponse> GatewayResponses { get; } = new List<PaymentGatewayResponse>();
+    public virtual ICollection<PaymentGatewayResponse> GatewayResponses { get; set; } = new List<PaymentGatewayResponse>();
 }

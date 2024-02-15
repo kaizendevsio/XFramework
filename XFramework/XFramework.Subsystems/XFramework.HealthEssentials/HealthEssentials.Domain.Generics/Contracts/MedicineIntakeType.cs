@@ -7,5 +7,5 @@ public partial class MedicineIntakeType : BaseModel
 
     public int? SortOrder { get; set; }
 
-    public virtual ICollection<MedicineIntake> MedicineIntakes { get; } = new List<MedicineIntake>();
+    public virtual ICollection<MedicineIntake> MedicineIntakes { get; set; } = new List<MedicineIntake>();
 }

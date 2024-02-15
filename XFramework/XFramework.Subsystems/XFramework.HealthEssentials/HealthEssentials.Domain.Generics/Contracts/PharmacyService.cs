@@ -29,7 +29,7 @@ public partial class PharmacyService : BaseModel
 
     public virtual PharmacyLocation PharmacyLocation { get; set; } = null!;
 
-    public virtual ICollection<PharmacyServiceTag> PharmacyServiceTags { get; } = new List<PharmacyServiceTag>();
+    public virtual ICollection<PharmacyServiceTag> PharmacyServiceTags { get; set; } = new List<PharmacyServiceTag>();
 
     public virtual Unit? Unit { get; set; }
 }

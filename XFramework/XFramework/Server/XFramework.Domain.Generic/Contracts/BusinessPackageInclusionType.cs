@@ -15,6 +15,6 @@ public partial class BusinessPackageInclusionType : BaseModel
     public string? Unit { get; set; }
 
 
-    public virtual ICollection<BusinessPackageInclusion> BusinessPackageInclusions { get; } =
+    public virtual ICollection<BusinessPackageInclusion> BusinessPackageInclusions { get; set; } =
         new List<BusinessPackageInclusion>();
 }

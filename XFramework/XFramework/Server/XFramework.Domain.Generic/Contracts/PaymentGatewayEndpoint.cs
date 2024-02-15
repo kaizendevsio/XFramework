@@ -14,5 +14,5 @@ public partial class PaymentGatewayEndpoint : BaseModel
 
     public virtual PaymentGatewayType? Gateway { get; set; }
 
-    public virtual ICollection<PaymentGateway> Gateways { get; } = new List<PaymentGateway>();
+    public virtual ICollection<PaymentGateway> Gateways { get; set; } = new List<PaymentGateway>();
 }

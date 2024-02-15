@@ -1989,6 +1989,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Device")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("IdentityInfoId")
                         .HasColumnType("uuid")
                         .HasColumnName("IdentityInfoID");
@@ -1999,14 +2002,32 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LastActivityType")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("LastSeen")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text");
+
                     b.Property<short?>("LogInStatus")
                         .HasColumnType("smallint");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("OnlineSince")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<byte[]>("PasswordByte")
                         .HasColumnType("bytea");
+
+                    b.Property<string>("StatusMessage")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -2106,8 +2127,8 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");
 
-                    b.Property<short?>("CivilStatus")
-                        .HasColumnType("smallint");
+                    b.Property<int?>("CivilStatus")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -2122,8 +2143,8 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<short>("Gender")
-                        .HasColumnType("smallint");
+                    b.Property<int?>("Gender")
+                        .HasColumnType("integer");
 
                     b.Property<string>("IdentityDescription")
                         .HasMaxLength(100)

@@ -23,15 +23,15 @@ public partial class Laboratory : BaseModel
 
     public virtual LaboratoryType Type { get; set; } = null!;
 
-    public virtual ICollection<HospitalLaboratory> HospitalLaboratories { get; } = new List<HospitalLaboratory>();
+    public virtual ICollection<HospitalLaboratory> HospitalLaboratories { get; set; } = new List<HospitalLaboratory>();
 
-    public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; } = new List<LaboratoryJobOrder>();
+    public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; } = new List<LaboratoryJobOrder>();
 
-    public virtual ICollection<LaboratoryLocation> LaboratoryLocations { get; } = new List<LaboratoryLocation>();
+    public virtual ICollection<LaboratoryLocation> LaboratoryLocations { get; set; } = new List<LaboratoryLocation>();
 
-    public virtual ICollection<LaboratoryMember> LaboratoryMembers { get; } = new List<LaboratoryMember>();
+    public virtual ICollection<LaboratoryMember> LaboratoryMembers { get; set; } = new List<LaboratoryMember>();
 
-    public virtual ICollection<LaboratoryService> LaboratoryServices { get; } = new List<LaboratoryService>();
+    public virtual ICollection<LaboratoryService> LaboratoryServices { get; set; } = new List<LaboratoryService>();
 
-    public virtual ICollection<LaboratoryTag> LaboratoryTags { get; } = new List<LaboratoryTag>();
+    public virtual ICollection<LaboratoryTag> LaboratoryTags { get; set; } = new List<LaboratoryTag>();
 }

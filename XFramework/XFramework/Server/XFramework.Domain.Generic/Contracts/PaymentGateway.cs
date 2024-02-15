@@ -20,11 +20,11 @@ public partial class PaymentGateway : BaseModel
     public decimal ConvenienceFee { get; set; }
 
 
-    public virtual ICollection<DepositRequest> DepositRequests { get; } = new List<DepositRequest>();
+    public virtual ICollection<DepositRequest> DepositRequests { get; set; } = new List<DepositRequest>();
 
     public virtual PaymentGatewayCategory PaymentGatewayCategory { get; set; } = null!;
 
-    public virtual ICollection<PaymentGatewayInstruction> GatewayInstructions { get; } =
+    public virtual ICollection<PaymentGatewayInstruction> GatewayInstructions { get; set; } =
         new List<PaymentGatewayInstruction>();
 
     public virtual PaymentGatewayEndpoint? ProviderEndpoint { get; set; }

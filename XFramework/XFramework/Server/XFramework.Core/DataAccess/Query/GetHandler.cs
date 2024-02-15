@@ -68,6 +68,7 @@ public class GetHandler<TModel>(
 
         var entity = await query
             .Where(i => i.TenantId == tenant.Id)
+            .Where(i => i.IsDeleted == false)
             .Where(e => e.Id == request.Id)
             .AsSplitQuery()
             .FirstOrDefaultAsync(cancellationToken);

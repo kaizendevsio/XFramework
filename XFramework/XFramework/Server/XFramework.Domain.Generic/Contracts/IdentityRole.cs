@@ -8,7 +8,7 @@ public partial class IdentityRole : BaseModel
 
     public DateTime RoleExpiration { get; set; }
     
-    public virtual ICollection<MessageThreadMemberRole> MessageThreadMemberRoles { get; } =
+    public virtual ICollection<MessageThreadMemberRole> MessageThreadMemberRoles { get; set; } =
         new List<MessageThreadMemberRole>();
 
     public virtual IdentityRoleType? Type { get; set; }

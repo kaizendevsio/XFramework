@@ -15,9 +15,9 @@ public partial class AddressCountry : BaseModel
     public Guid CurrencyId { get; set; }
 
 
-    public virtual ICollection<AddressRegion> AddressRegions { get; } = new List<AddressRegion>();
+    public virtual ICollection<AddressRegion> AddressRegions { get; set; } = new List<AddressRegion>();
 
     public virtual CurrencyType? Currency { get; set; }
 
-    public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();
+    public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; } = new List<IdentityAddress>();
 }

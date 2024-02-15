@@ -29,13 +29,13 @@ public partial class StorageFile : BaseModel
     [JsonIgnore]
     public byte[]? FileBytes { get; set; }
 
-    public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; } = new List<CommunityContentFile>();
+    public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; set; } = new List<CommunityContentFile>();
 
-    public virtual ICollection<CommunityIdentityFile> CommunityIdentityFiles { get; } = new List<CommunityIdentityFile>();
+    public virtual ICollection<CommunityIdentityFile> CommunityIdentityFiles { get; set; } = new List<CommunityIdentityFile>();
 
     public virtual StorageFileType Type { get; set; } = null!;
 
-    public virtual ICollection<MessageFile> MessageFiles { get; } = new List<MessageFile>();
+    public virtual ICollection<MessageFile> MessageFiles { get; set; } = new List<MessageFile>();
 
     public virtual StorageFileIdentifier? StorageFileIdentifier { get; set; }
 }

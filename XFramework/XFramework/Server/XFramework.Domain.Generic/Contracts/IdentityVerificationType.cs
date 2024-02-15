@@ -9,5 +9,5 @@ public partial class IdentityVerificationType : BaseModel
     public short? Priority { get; set; }
 
 
-    public virtual ICollection<IdentityVerification> IdentityVerifications { get; } = new List<IdentityVerification>();
+    public virtual ICollection<IdentityVerification> IdentityVerifications { get; set; } = new List<IdentityVerification>();
 }

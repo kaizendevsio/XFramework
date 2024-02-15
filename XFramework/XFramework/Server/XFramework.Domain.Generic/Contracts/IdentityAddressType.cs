@@ -5,5 +5,5 @@ public partial class IdentityAddressType : BaseModel
     public string? Name { get; set; }
 
 
-    public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();
+    public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; } = new List<IdentityAddress>();
 }

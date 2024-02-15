@@ -25,7 +25,7 @@ public partial class IdentityInformation : BaseModel
 
     public virtual Tenant Tenant { get; set; } = null!;
 
-    public virtual ICollection<IdentityAddress> IdentityAddresses { get; } = new List<IdentityAddress>();
+    public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; } = new List<IdentityAddress>();
 
-    public virtual ICollection<IdentityCredential> IdentityCredentials { get; } = new List<IdentityCredential>();
+    public virtual ICollection<IdentityCredential> IdentityCredentials { get; set; } = new List<IdentityCredential>();
 }

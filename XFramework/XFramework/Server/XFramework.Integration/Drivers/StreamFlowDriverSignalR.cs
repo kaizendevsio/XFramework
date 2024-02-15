@@ -382,20 +382,22 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         where TModel : class, IHasRequestServer
     {
         //request.Recipient ??= TargetClient;
-        await SignalRService.InvokeVoidAsync(nameof(IStreamFlow.Push), request as StreamFlowMessage );
+        await SignalRService.InvokeVoidAsync(nameof(IStreamFlow.Push), request as StreamFlowMessage);
     }
 
     public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request) 
         where TResponse : class
     {
+        Logger.LogInformation("Subscribing to {RequestName}...", request.Name);
         SignalRService.Connection.On<StreamFlowMessage>(request.Name,
             async (response) =>
             {
                 Logger.LogInformation("Notification Received: {RequestName}", request.Name);
                 try
                 {
-                    var r = response.Data as TResponse;
-                    request.OnInvoke?.Invoke(r);
+                    var r = MessagePackSerializer.Deserialize<PublishRequest<TResponse>>(response.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
+                    
+                    request.OnInvoke?.Invoke(r.Data);
                 }
                 catch (Exception e)
                 {

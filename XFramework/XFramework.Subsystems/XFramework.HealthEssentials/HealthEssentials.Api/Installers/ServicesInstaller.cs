@@ -1,4 +1,5 @@
-﻿using IdentityServer.Integration.Drivers;
+﻿using HealthEssentials.Core;
+using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using Tenant.Integration.Drivers;
 
@@ -17,5 +18,10 @@ public class ServicesInstaller : IInstaller
         services.AddIdentityServerWrapperServices();
         services.AddTenantWrapperServices();
         services.AddMessagingWrapperServices();
+        
+        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
+            typeof(HealthEssentialsBaseRequest).Assembly,
+            typeof(HealthEssentialsCore).Assembly
+        ));
     }
 }

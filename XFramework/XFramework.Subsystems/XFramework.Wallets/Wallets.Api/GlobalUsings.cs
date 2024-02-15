@@ -14,3 +14,4 @@ global using XFramework.Domain.Generic.Contracts;
 global using XFramework.Integration.Abstractions;
 global using Wallets.Api.Extensions;
 global using Wallets.Api.Generators;
+global using Wallets.Domain.Generic.Contracts.Requests;

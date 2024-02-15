@@ -1,4 +1,5 @@
 ﻿<MudButton HtmlTag="@HtmlTag"
+           Class="@Class"
            ButtonType="@ButtonType"
            Href="@Href"
            Target="@Target"
@@ -95,7 +96,6 @@
     
     private async Task InternalOnClick(MouseEventArgs e)
     {
-        Console.WriteLine($"XButton InternalOnClick: {ButtonType}");
         _processing = true;
         StateHasChanged();
         
@@ -103,7 +103,6 @@
         
         _processing = false;
         StateHasChanged();
-        Console.WriteLine("XButton InternalOnClick end");
     }
 
 }

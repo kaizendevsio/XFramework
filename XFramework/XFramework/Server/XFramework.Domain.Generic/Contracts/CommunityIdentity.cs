@@ -16,22 +16,22 @@ public partial class CommunityIdentity : BaseModel
 
     public string? Tagline { get; set; }
 
-    public virtual ICollection<CommunityConnection> CommunityConnectionSourceSocialMediaIdentities { get; } =
+    public virtual ICollection<CommunityConnection> CommunityConnectionSourceSocialMediaIdentities { get; set; } =
         new List<CommunityConnection>();
 
-    public virtual ICollection<CommunityConnection> CommunityConnectionTargetSocialMediaIdentities { get; } =
+    public virtual ICollection<CommunityConnection> CommunityConnectionTargetSocialMediaIdentities { get; set; } =
         new List<CommunityConnection>();
 
-    public virtual ICollection<CommunityContent> CommunityContentCommunityGroups { get; } =
+    public virtual ICollection<CommunityContent> CommunityContentCommunityGroups { get; set; } =
         new List<CommunityContent>();
 
-    public virtual ICollection<CommunityContentReaction> CommunityContentReactions { get; } =
+    public virtual ICollection<CommunityContentReaction> CommunityContentReactions { get; set; } =
         new List<CommunityContentReaction>();
 
-    public virtual ICollection<CommunityContent> CommunityContentSocialMediaIdentities { get; } =
+    public virtual ICollection<CommunityContent> CommunityContentSocialMediaIdentities { get; set; } =
         new List<CommunityContent>();
 
-    public virtual ICollection<CommunityIdentityFile> CommunityIdentityFiles { get; } =
+    public virtual ICollection<CommunityIdentityFile> CommunityIdentityFiles { get; set; } =
         new List<CommunityIdentityFile>();
 
     public virtual CommunityIdentityType Type { get; set; } = null!;
