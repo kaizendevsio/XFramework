@@ -9,14 +9,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Medicine/MedicineAutoCompleteHandler.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Requests/MedicineAutoCompleteRequest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Contracts/Responses/MimsAutoCompleteResponse.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Community/Community.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.IdentityServer/IdentityServer.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Messaging/Messaging.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Api/appsettings.Staging.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Staging.json" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Api/appsettings.Staging.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Doctors/GetDoctorListByConsultationIdHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Doctors/GetDoctorListByConsultationIdHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceWrapper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Drivers/HealthEssentialsServiceWrapper.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Extensions/HelperExtensions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Extensions/HelperExtensions.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -139,7 +138,7 @@
     "node.js.selected.package.stylelint": "",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "settings.editor.selected.configurable": "RiderNetFileTemplatesSettingsId",
     "vue.rearranger.settings.migration": "true"
   },
   "keyToStringList": {
@@ -414,7 +413,11 @@
       <workItem from="1707580269556" duration="30728000" />
       <workItem from="1707818429932" duration="7114000" />
       <workItem from="1707895389882" duration="1780000" />
-      <workItem from="1707956812288" duration="13635000" />
+      <workItem from="1707956812288" duration="14144000" />
+      <workItem from="1708095516108" duration="324000" />
+      <workItem from="1708096141751" duration="4465000" />
+      <workItem from="1708243810678" duration="3230000" />
+      <workItem from="1708255892098" duration="5359000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>
@@ -671,7 +674,7 @@
         <line-breakpoint enabled="true" type="DotNet Breakpoints">
           <url>file://$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Consultation/GetConsultationJobOrderListHandler.cs</url>
           <line>30</line>
-          <properties documentPath="C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Core\DataAccess\Query\Handlers\Consultation\GetConsultationJobOrderListHandler.cs" initialLine="32" containingFunctionPresentation="method 'Handle'" />
+          <properties documentPath="C:\Projects\Net Core\XFramework\XFramework\XFramework.Subsystems\XFramework.HealthEssentials\HealthEssentials.Core\DataAccess\Query\Handlers\Consultation\GetConsultationJobOrderListHandler.cs" containingFunctionPresentation="method 'Handle'" />
           <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>

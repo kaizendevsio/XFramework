@@ -80,13 +80,29 @@ public static class HelperExtensions
                 case QueryFilterOperation.Equal:
                     comparisonExpression = Expression.Equal(property, target);
                     break;
-
-                case QueryFilterOperation.Contains:
-                    // Assumes the property is a string
-                    comparisonExpression = Expression.Call(property,
-                        typeof(string).GetMethod("Contains", new[] { typeof(string) }), target);
+                
+                case QueryFilterOperation.NotEqual:
+                    comparisonExpression = Expression.NotEqual(property, target);
                     break;
 
+                case QueryFilterOperation.Contains when property.Type == typeof(string):
+                {
+                    // Assuming 'property' is an Expression representing a string property
+                    // and 'target' is an Expression representing the string to search for.
+
+                    // Convert both the property and the target value to lowercase (or uppercase) for a case-insensitive comparison
+                    var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+
+                    // Make sure the property expression and the target expression are calling ToLower
+                    Expression propertyToLower = Expression.Call(property, toLowerMethod);
+                    Expression targetToLower = Expression.Call(target, toLowerMethod);
+
+                    // Now create the Contains call on the lowercase expressions
+                    var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                    comparisonExpression = Expression.Call(propertyToLower, containsMethod, targetToLower);
+                    
+                    break;
+                }
                 case QueryFilterOperation.GreaterThan:
                     comparisonExpression = Expression.GreaterThan(property, target);
                     break;
@@ -103,17 +119,35 @@ public static class HelperExtensions
                     comparisonExpression = Expression.LessThanOrEqual(property, target);
                     break;
 
-                case QueryFilterOperation.StartsWith:
-                    // Assumes the property is a string
-                    comparisonExpression = Expression.Call(property,
-                        typeof(string).GetMethod("StartsWith", new[] { typeof(string) }), target);
-                    break;
+                case QueryFilterOperation.StartsWith when property.Type == typeof(string):
+                {
+                    // Convert both the property and the target value to lowercase (or uppercase) for a case-insensitive comparison
+                    var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
 
-                case QueryFilterOperation.EndsWith:
-                    // Assumes the property is a string
-                    comparisonExpression = Expression.Call(property,
-                        typeof(string).GetMethod("EndsWith", new[] { typeof(string) }), target);
+                    // Make sure the property expression and the target expression are calling ToLower
+                    Expression propertyToLower = Expression.Call(property, toLowerMethod);
+                    Expression targetToLower = Expression.Call(target, toLowerMethod);
+
+                    // Now create the Contains call on the lowercase expressions
+                    var containsMethod = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
+                    comparisonExpression = Expression.Call(propertyToLower, containsMethod, targetToLower);
                     break;
+                }
+
+                case QueryFilterOperation.EndsWith when property.Type == typeof(string):
+                {
+                    // Convert both the property and the target value to lowercase (or uppercase) for a case-insensitive comparison
+                    var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+
+                    // Make sure the property expression and the target expression are calling ToLower
+                    Expression propertyToLower = Expression.Call(property, toLowerMethod);
+                    Expression targetToLower = Expression.Call(target, toLowerMethod);
+
+                    // Now create the Contains call on the lowercase expressions
+                    var containsMethod = typeof(string).GetMethod("EndsWith", new[] { typeof(string) });
+                    comparisonExpression = Expression.Call(propertyToLower, containsMethod, targetToLower);
+                    break;
+                }
 
                 // Add more cases as necessary
                 default:

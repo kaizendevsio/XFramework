@@ -12,9 +12,9 @@ public class GetDoctorListByConsultationIdHandler(
     ILogger<GetDoctorListByConsultationIdHandler> logger,
     IHelperService helperService
 )
-    : IRequestHandler<GetDoctorListByConsultationIdRequest, QueryResponse<PaginatedResult<Doctor>>>
+    : IRequestHandler<GetDoctorListByConsultationIdRequest, QueryResponse<PaginatedResult<TModel>>>
 {
-    public async Task<QueryResponse<PaginatedResult<Doctor>>> Handle(GetDoctorListByConsultationIdRequest request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<PaginatedResult<TModel>>> Handle(GetDoctorListByConsultationIdRequest request, CancellationToken cancellationToken)
     {
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
 
