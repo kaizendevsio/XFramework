@@ -5,9 +5,7 @@ public partial class ConsultationJobOrderMedicine : BaseModel
     public Guid ConsultationJobOrderId { get; set; }
 
     public Guid MedicineId { get; set; }
-
-    public Guid MedicineIntakeId { get; set; }
-
+    
     public int Quantity { get; set; }
 
     public string? PrescriptionNote { get; set; }
@@ -39,5 +37,4 @@ public partial class ConsultationJobOrderMedicine : BaseModel
 
     public virtual Medicine? Medicine { get; set; }
 
-    public virtual MedicineIntake? MedicineIntake { get; set; }
 }

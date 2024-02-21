@@ -30,13 +30,35 @@ public class MedicineAutoCompleteHandler(
                 
                 response.EnsureSuccessStatusCode(); // Throw an exception if not successful
                 var responseBody = await response.Content.ReadFromJsonAsync<MimsAutoCompleteResponse>(cancellationToken: cancellationToken);
+                responseBody.Suggestions = responseBody.Suggestions.Take(responseBody.Suggestions.Count - 1).ToList();
+                
+                var existingMedicines = await dbContext.Set<Domain.Generics.Contracts.Medicine>()
+                    .Where(i => i.TenantId == tenant.Id)
+                    .Where(i => i.IsDeleted == false)
+                    .Where(i => responseBody.Suggestions.Select(s => s.Value.ToUpperInvariant()).Contains(i.Name))
+                    .ToListAsync(cancellationToken);
+
+                var newMedicines = responseBody.Suggestions;
+                newMedicines.RemoveAll(s => existingMedicines.Select(m => m.Name.ToUpperInvariant()).Contains(s.Value.ToUpperInvariant()));
+
+                var newMedicineEntities = new List<Domain.Generics.Contracts.Medicine>();
+                
+                if (newMedicines.Any())
+                {
+                    newMedicineEntities = newMedicines.Select(m => new Domain.Generics.Contracts.Medicine
+                    {
+                        Name = m.Value.ToUpperInvariant(),
+                        TenantId = tenant.Id,
+                        TypeId = new Guid("570ccf7f-f68a-450d-b110-09648f3540ed")
+                    }).ToList();
+                    await dbContext.Set<Domain.Generics.Contracts.Medicine>().AddRangeAsync(newMedicineEntities, cancellationToken);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                }
                 
                 return new QueryResponse<List<Domain.Generics.Contracts.Medicine>>
                 {
-                    Response = responseBody?.Suggestions?.Take(responseBody.Suggestions.Count - 1).Select(s => new Domain.Generics.Contracts.Medicine
-                    {
-                        Name = s.Value
-                    }).ToList()
+                    HttpStatusCode = HttpStatusCode.OK,
+                    Response = existingMedicines.Concat(newMedicineEntities).ToList()
                 };
             }
             catch (HttpRequestException e)

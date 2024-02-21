@@ -6,7 +6,7 @@ public partial class ConsultationJobOrderLaboratory : BaseModel
 
     public Guid LaboratoryServiceId { get; set; }
 
-    public Guid SuggestedLaboratoryLocationId { get; set; }
+    public Guid? SuggestedLaboratoryLocationId { get; set; }
 
     public string? Quantity { get; set; }
 

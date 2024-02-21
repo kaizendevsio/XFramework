@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System.Collections;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Interfaces;
@@ -41,6 +42,16 @@ public class CreateHandler<TModel>(
         request.Model.CreatedAt = DateTime.UtcNow;
         request.Model.TenantId = tenant.Id;
 
+        // strip navigation properties
+        var navigationProperties = request.Model.GetType().GetProperties()
+            .Where(p => IsNavigationProperty(p.PropertyType))
+            .ToList();
+
+        foreach (var navigationProperty in navigationProperties.Where(navigationProperty => navigationProperty.CanWrite))
+        {
+            navigationProperty.SetValue(request.Model, null);
+        }
+        
         try
         {
             // Add the entity to the context.
@@ -51,8 +62,8 @@ public class CreateHandler<TModel>(
 
             logger.LogInformation("Entity of type {EntityName} was successfully created", typeof(TModel).Name);
             
-            await cache.InvalidateCacheForModel(request.Model);
-            cache.Remove($"GetList-{typeof(TModel).Name}-");
+            //await cache.InvalidateCacheForModel(request.Model);
+            //cache.Remove($"GetList-{typeof(TModel).Name}-");
 
             // Return a successful response.
             return new CmdResponse<TModel>
@@ -67,5 +78,12 @@ public class CreateHandler<TModel>(
             logger.LogError(ex, "An error occurred while creating entity of type {EntityName}", typeof(TModel).Name);
             throw new InvalidOperationException("An error occurred while processing your request");
         }
+    }
+    
+    private bool IsNavigationProperty(Type type)
+    {
+        return (type.IsClass && type != typeof(string) && type != typeof(byte[])) ||
+               (typeof(IEnumerable).IsAssignableFrom(type) && type != typeof(string) &&
+                (type.GetGenericArguments().Any() ? type.GetGenericArguments()[0].IsClass : false));
     }
 }

@@ -66,8 +66,8 @@ public class DeleteHandler<TModel>(
             logger.LogInformation("Entity of type {EntityName} with ID {EntityId} successfully soft-deleted", typeof(TModel).Name, request.Model.Id);
    
             // Remove the entity from the cache after successful deletion
-            await cache.InvalidateCacheForModel(request.Model);
-            cache.Remove($"GetList-{typeof(TModel).Name}-");
+            //await cache.InvalidateCacheForModel(request.Model);
+            //cache.Remove($"GetList-{typeof(TModel).Name}-");
 
         }
         catch (Exception ex)
