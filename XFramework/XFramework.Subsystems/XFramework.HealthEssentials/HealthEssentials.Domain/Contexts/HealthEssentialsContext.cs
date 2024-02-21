@@ -540,10 +540,7 @@ public partial class HealthEssentialsContext : DbContext
             entity.HasOne(d => d.Medicine).WithMany(p => p.ConsultationJobOrderMedicines)
                 .HasForeignKey(d => d.MedicineId)
                 .HasConstraintName("consultationjobordermedicine_medicine_id_fk");
-
-            entity.HasOne(d => d.MedicineIntake).WithMany(p => p.ConsultationJobOrderMedicines)
-                .HasForeignKey(d => d.MedicineIntakeId)
-                .HasConstraintName("consultationjobordermedicine_medicineintake_id_fk");
+            
         });
 
         modelBuilder.Entity<ConsultationTag>(entity =>
@@ -2404,10 +2401,6 @@ public partial class HealthEssentialsContext : DbContext
             entity.HasOne(d => d.Medicine).WithMany(p => p.PharmacyJobOrderMedicines)
                 .HasForeignKey(d => d.MedicineId)
                 .HasConstraintName("pharmacyjobordermedicine_medicine_id_fk");
-
-            entity.HasOne(d => d.MedicineIntake).WithMany(p => p.PharmacyJobOrderMedicines)
-                .HasForeignKey(d => d.MedicineIntakeId)
-                .HasConstraintName("pharmacyjobordermedicine_medicineintake_id_fk");
 
             entity.HasOne(d => d.PharmacyJobOrder).WithMany(p => p.PharmacyJobOrderMedicines)
                 .HasForeignKey(d => d.PharmacyJobOrderId)

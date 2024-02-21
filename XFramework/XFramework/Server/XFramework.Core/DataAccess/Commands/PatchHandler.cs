@@ -12,8 +12,9 @@ namespace XFramework.Core.DataAccess.Commands;
 public class PatchHandler<TModel>(
         DbContext dbContext,
         CacheManager cache,
+        ITenantService tenantService,
         ILogger<PatchHandler<TModel>> logger,
-        ITenantService tenantService
+        IMediator mediator
     )
     : IPatchHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
@@ -21,12 +22,6 @@ public class PatchHandler<TModel>(
 
     public async Task<CmdResponse<TModel>> Handle(Patch<TModel> request, CancellationToken cancellationToken)
     {
-        if (request.Model?.Id is null)
-        {
-            logger.LogWarning("Patch attempt with null ID for {EntityName}", typeof(TModel).Name);
-            throw new ArgumentException("An error occurred while processing your request");
-        }
-        
         if (request.Metadata.TenantId is null)
         {
             return new()
@@ -45,8 +40,10 @@ public class PatchHandler<TModel>(
 
         if (entity == null)
         {
-            logger.LogWarning("Entity of type {EntityName} with ID {EntityId} not found during patching attempt", typeof(TModel).Name, request.Model.Id);
-            throw new KeyNotFoundException("The requested item was not found");
+            logger.LogWarning("Entity of type {EntityName} with ID {EntityId} not found during patching attempt, creating new record", typeof(TModel).Name, request.Model.Id);
+            
+            // Create new record if not found (upsert)
+            return await mediator.Send(new Create<TModel>(entity), cancellationToken);
         }
         
         // strip navigation properties
