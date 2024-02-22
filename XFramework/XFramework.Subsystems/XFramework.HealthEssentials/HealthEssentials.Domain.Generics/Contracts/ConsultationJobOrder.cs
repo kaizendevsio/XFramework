@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class ConsultationJobOrder : BaseModel
 {
@@ -25,6 +27,9 @@ public partial class ConsultationJobOrder : BaseModel
     public DateTime? StartedAt { get; set; }
 
     public DateTime? CompletedAt { get; set; }
+
+    [NotMapped]
+    public TimeSpan Duration => CompletedAt?.Subtract(StartedAt ?? DateTime.Now) ?? TimeSpan.Zero;
 
     public string? Prescription { get; set; }
 
