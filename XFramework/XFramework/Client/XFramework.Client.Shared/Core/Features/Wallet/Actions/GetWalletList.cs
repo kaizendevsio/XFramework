@@ -18,15 +18,23 @@ public partial class WalletState
         public override async Task Handle(GetWalletList action, CancellationToken aCancellationToken)
         {
             if (SessionState.State is not CurrentSessionState.Active) return;
-            var response = await walletsServiceWrapper.Wallet.GetList(pageSize: 10, pageNumber: 1, filter: new()
-            {
-                new()
+            var response = await walletsServiceWrapper.Wallet.GetList(
+                pageSize: 100,
+                pageNumber: 1,
+                filter: new()
                 {
-                    PropertyName = nameof(Domain.Generic.Contracts.Wallet.CredentialId),
-                    Operation = QueryFilterOperation.Equal,
-                    Value = SessionState.Credential.Id
-                }
-            });
+                    new()
+                    {
+                        PropertyName = nameof(Domain.Generic.Contracts.Wallet.CredentialId),
+                        Operation = QueryFilterOperation.Equal,
+                        Value = SessionState.Credential.Id
+                    }
+                },
+                includeNavigations: true,
+                includes: new List<string>
+                {
+                    $"{nameof(Domain.Generic.Contracts.Wallet.WalletType)}",
+                });
 
             // Handle if the response is invalid or error
             if (await HandleFailure(response, action, true)) return;
