@@ -2141,9 +2141,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(10000);
 
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.PreviousBalance).HasPrecision(24, 8);
+            entity.Property(e => e.PreviousTotalBalance).HasPrecision(24, 8);
             entity.Property(e => e.Remarks).HasMaxLength(10000);
-            entity.Property(e => e.RunningBalance).HasPrecision(24, 8);
+            entity.Property(e => e.RunningTotalBalance).HasPrecision(24, 8);
 
             entity.HasOne(d => d.Credential).WithMany(p => p.WalletTransactions)
                 .HasForeignKey(d => d.CredentialId)
