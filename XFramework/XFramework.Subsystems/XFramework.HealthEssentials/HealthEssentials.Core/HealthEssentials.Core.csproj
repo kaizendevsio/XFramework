@@ -33,6 +33,7 @@
         <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Generic\SmsGateway.Domain.Generic.csproj"/>
         <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj"/>
         <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj"/>
+        <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
         <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj"/>
         <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj"/>
     </ItemGroup>

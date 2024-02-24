@@ -1,5 +1,6 @@
 ﻿using HealthEssentials.Domain.Generics.Constants;
 using Messaging.Domain.Generic;
+using Wallets.Integration.Drivers;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Generic.Contracts;
 using XFramework.Integration.Abstractions;
@@ -11,6 +12,7 @@ public class ConcludeLiveConsultationHandler(
     IIdentityServerServiceWrapper identityServerService,
     IMessageBusWrapper messageBusWrapper,
     IMessagingServiceWrapper messagingServiceWrapper,
+    IWalletsServiceWrapper walletsServiceWrapper,
     IHostEnvironment hostEnvironment,
     ITenantService tenantService,
     ILogger<ConcludeLiveConsultationHandler> logger,
@@ -22,6 +24,8 @@ public class ConcludeLiveConsultationHandler(
     public async Task<CmdResponse> Handle(ConcludeLiveConsultationRequest request, CancellationToken cancellationToken)
     {
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
+        
+        var dbTransaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         
         var jobOrder = await dbContext.Set<ConsultationJobOrder>()
             .Where(c => c.TenantId == tenant.Id)
@@ -76,8 +80,79 @@ public class ConcludeLiveConsultationHandler(
         jobOrder.CompletedAt = DateTime.UtcNow;
         jobOrder.Status = (short?) TransactionStatus.Completed;
         
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // Get wallet transaction to release from onhold
 
+        var walletTransactions = await walletsServiceWrapper.WalletTransaction.GetList(
+            pageNumber: 1,
+            pageSize: 10,
+            filter: new List<QueryFilter>()
+            {
+                new QueryFilter
+                {
+                    PropertyName = nameof(WalletTransaction.ReferenceNumber),
+                    Operation = QueryFilterOperation.Equal,
+                    Value = jobOrder.ReferenceNumber
+                }
+            }
+        );
+
+        if (walletTransactions.IsSuccess is false)
+        {
+            logger.LogError("Failed to get wallet transactions for reference number {ReferenceNumber}", jobOrder.ReferenceNumber);
+            return new ()
+            {
+                Message = $"Failed to process payment, please try again",
+                HttpStatusCode = HttpStatusCode.InternalServerError
+            };
+        }
+        
+        if (walletTransactions.Response?.TotalItems == 0)
+        {
+            logger.LogError("No wallet transactions for reference number {ReferenceNumber}", jobOrder.ReferenceNumber);
+            return new ()
+            {
+                Message = $"Failed to process payment, please try again",
+                HttpStatusCode = HttpStatusCode.InternalServerError
+            };
+        }
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogError(ex, "A concurrency conflict occurred while concluding consultation job order with Id {Id}", request.Id);
+            throw new InvalidOperationException("A concurrency conflict occurred, please try again");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred while concluding consultation job order with Id {Id}", request.Id);
+            throw new InvalidOperationException("An error occurred while processing your request");
+        }
+        
+        var tasks = new List<Task<CmdResponse>>();
+        
+        foreach (var walletTransaction in walletTransactions.Response?.Items)
+        {
+            logger.LogInformation("Releasing wallet transaction with Id {WalletTransactionId}", walletTransaction.Id);
+            tasks.Add(walletsServiceWrapper.ReleaseTransaction(new() { Id = walletTransaction.Id }));
+        }
+
+        await Task.WhenAll(tasks);
+
+        if (tasks.Any(i => i.Result.IsSuccess is false))
+        {
+            logger.LogError("Failed to release wallet transactions for reference number {ReferenceNumber}", jobOrder.ReferenceNumber);
+            return new ()
+            {
+                Message = $"Failed to process payment, please try again",
+                HttpStatusCode = HttpStatusCode.InternalServerError
+            };
+        }
+        
+        await dbTransaction.CommitAsync(cancellationToken);
+        
         var publishObject = new PublishRequest<ConsultationJobOrder>(jobOrder);
         publishObject = helperService.RemoveCircularReference(publishObject);
 
@@ -107,7 +182,6 @@ public class ConcludeLiveConsultationHandler(
         {
             Message = $"Consultation Job Order with Id {request.Id} concluded successfully",
             HttpStatusCode = HttpStatusCode.Accepted,
-            
         };
     }
 }

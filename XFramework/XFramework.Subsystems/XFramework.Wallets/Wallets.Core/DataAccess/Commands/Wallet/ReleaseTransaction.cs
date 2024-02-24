@@ -53,14 +53,19 @@ public class ReleaseTransaction(
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Successfully released transaction with Id {Id}.", request.Id);
+            logger.LogInformation("Transaction with Id {Id} released successfully.", request.Id);
 
-            return new CmdResponse { HttpStatusCode = HttpStatusCode.OK, Message = "Transaction released successfully." };
+            return new CmdResponse { HttpStatusCode = HttpStatusCode.OK };
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogError(ex, "A concurrency conflict occurred while releasing transaction with Id {Id}", request.Id);
+            throw new InvalidOperationException("A concurrency conflict occurred, please try again");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error releasing transaction with Id {Id}.", request.Id);
-            return new CmdResponse { HttpStatusCode = HttpStatusCode.InternalServerError, Message = "Error releasing transaction." };
+            logger.LogError(ex, "An error occurred while releasing transaction with Id {Id}", request.Id);
+            throw new InvalidOperationException("An error occurred while processing your request");
         }
     }
 }
