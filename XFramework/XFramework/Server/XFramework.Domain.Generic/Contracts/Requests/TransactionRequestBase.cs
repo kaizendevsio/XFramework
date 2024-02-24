@@ -2,7 +2,11 @@
 
 public record TransactionRequestBase : RequestBase
 {
-    public string? ClientReference { get; set; }
-    public string? Description { get; set; }
-    public string? Currency { get; set; }
+    public Guid CredentialId { get; set; }
+    public decimal Amount { get; set; }
+    public decimal Fee { get; set; }
+    public string? Remarks { get; set; }
+    public bool OnHold { get; set; }
+    public string? ReferenceNumber { get; set; }
+    public required Guid CurrencyId { get; set; }
 }

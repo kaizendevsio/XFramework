@@ -1,9 +1,9 @@
 ﻿namespace Wallets.Domain.Generic.Contracts.Requests;
 
-using TRequest = TransferWalletRequest;
+using TRequest = ReleaseTransactionRequest;
 using TResponse = CmdResponse;
 
-public record TransferWalletRequest : TransactionRequestBase, 
+public record ReleaseTransactionRequest : TransactionRequestBase, 
     IRequest<TResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {

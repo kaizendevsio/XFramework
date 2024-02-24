@@ -8,6 +8,7 @@ public record SendWalletRequest : NavigableRequest
     public Guid RecipientCredentialId { get; set; }
     public Guid WalletTypeId { get; set; }
     public decimal Amount { get; set; }
+    public bool OnHold { get; set; }
     public decimal TotalAmount => Amount + Fee;
     public decimal Fee { get; set; }
     public string? Remarks { get; set; }

@@ -2,6 +2,7 @@
 using Wallets.Domain.Generic.Contracts.Requests;
 using XFramework.Core.Services;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Generic.Enums;
 
 namespace Wallets.Core.DataAccess.Commands.Wallet;
 using XFramework.Domain.Generic.Contracts;
@@ -59,8 +60,23 @@ public class TransferWallet(
         }
 
         // Perform the transfer and deduct the fee
-        senderWallet.Balance -= totalDeduction;
-        recipientWallet.Balance += request.Amount;
+
+        var previousSenderBalance = senderWallet.Balance ?? 0;
+        var previousRecipientBalance = recipientWallet.Balance ?? 0;
+        
+        var previousSenderOnHoldBalance = senderWallet.OnHoldBalance ?? 0;
+        var previousRecipientOnHoldBalance = recipientWallet.OnHoldBalance ?? 0;
+        
+        if (request.OnHold is true)
+        {
+            senderWallet.OnHoldBalance -= request.Amount;
+            recipientWallet.OnHoldBalance += request.Amount;
+        }
+        else
+        {
+            senderWallet.Balance -= totalDeduction;
+            recipientWallet.Balance += request.Amount;
+        }
 
         // Record the transactions
         var senderTransaction = new WalletTransaction
@@ -68,11 +84,17 @@ public class TransferWallet(
             TenantId = tenant.Id,
             CredentialId = request.CredentialId,
             WalletId = senderWallet.Id,
-            Amount = -totalDeduction,
-            PreviousBalance = (senderWallet.Balance ?? 0) + totalDeduction,
+            Amount = totalDeduction,
+            PreviousBalance = previousSenderBalance,
+            PreviousOnHoldBalance = previousSenderOnHoldBalance,
+            RunningOnHoldBalance = senderWallet.OnHoldBalance,
             RunningBalance = senderWallet.Balance,
             Remarks = request.Remarks,
-            Description = $"Transfer to {request.RecipientCredentialId}"
+            Description = $"Transfer to {request.RecipientCredentialId}",
+            TransactionType = TransactionType.Debit,
+            Held = request.OnHold,
+            Released = false,
+            ReferenceNumber = request.ReferenceNumber
         };
 
         var recipientTransaction = new WalletTransaction
@@ -81,10 +103,16 @@ public class TransferWallet(
             CredentialId = request.RecipientCredentialId,
             WalletId = recipientWallet.Id,
             Amount = request.Amount,
-            PreviousBalance = (recipientWallet.Balance ?? 0) - request.Amount,
+            PreviousBalance = previousRecipientBalance,
+            PreviousOnHoldBalance = previousRecipientOnHoldBalance,
             RunningBalance = recipientWallet.Balance,
+            RunningOnHoldBalance = recipientWallet.OnHoldBalance,
             Remarks = request.Remarks,
-            Description = $"Received from {request.CredentialId}"
+            Description = $"Received from {request.CredentialId}",
+            TransactionType = TransactionType.Credit,
+            Held = request.OnHold,
+            Released = false,
+            ReferenceNumber = request.ReferenceNumber
         };
 
         dbContext.Set<WalletTransaction>().Add(senderTransaction);
@@ -93,20 +121,19 @@ public class TransferWallet(
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-            return new CmdResponse
-            {
-                HttpStatusCode = HttpStatusCode.Accepted,
-                Message = "Transfer successful"
-            };
+            logger.LogInformation("Wallet transfer from {SenderCredentialId} to {RecipientCredentialId} was successful", request.CredentialId, request.RecipientCredentialId);
+
+            return new CmdResponse { HttpStatusCode = HttpStatusCode.OK };
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogError(ex, "Concurrency conflict occurred while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
+            throw new InvalidOperationException("A concurrency conflict occurred, please try again");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error transferring wallet balance");
-            return new CmdResponse
-            {
-                HttpStatusCode = HttpStatusCode.InternalServerError,
-                Message = "Error processing request"
-            };
+            logger.LogError(ex, "An error occurred while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
+            throw new InvalidOperationException("An error occurred while processing your request");
         }
     }
 }

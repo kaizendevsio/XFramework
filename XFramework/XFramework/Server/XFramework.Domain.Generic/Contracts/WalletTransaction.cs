@@ -31,9 +31,13 @@ public partial class WalletTransaction : BaseModel
     [NotMapped]
     private decimal InternalAmount { get; set; }
 
-    public bool OnHold { get; set; }
+    public bool Held { get; set; }
+    
+    public bool Released { get; set; }
     
     public string? Remarks { get; set; }
+    
+    public string? ReferenceNumber { get; set; }
     
     public string? Description { get; set; }
 

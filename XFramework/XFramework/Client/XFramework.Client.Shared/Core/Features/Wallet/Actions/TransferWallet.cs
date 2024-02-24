@@ -22,19 +22,20 @@ public partial class WalletState
         {
             var result = await walletsServiceWrapper.TransferWallet(new()
             {
-                ClientReference = CurrentState.SendWalletVm.ClientReference,
+                ReferenceNumber = CurrentState.SendWalletVm.ClientReference,
                 CredentialId = CurrentState.SendWalletVm.SenderCredentialId,
                 WalletTypeId = CurrentState.SendWalletVm.WalletTypeId,
                 RecipientCredentialId = CurrentState.SendWalletVm.RecipientCredentialId,
                 Amount = CurrentState.SendWalletVm.Amount,
                 Remarks = CurrentState.SendWalletVm.Remarks,
+                OnHold = CurrentState.SendWalletVm.OnHold,
+                CurrencyId = new Guid("7ee3621a-5878-4c16-8112-eab11f29db95")
             });
 
             if (result.HttpStatusCode is HttpStatusCode.Accepted)
             {
                 Mediator.Send(new GetWalletList());
             }
-
 
             if (await HandleFailure(result, action, silent: action.Silent))
             {
