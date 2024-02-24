@@ -19,17 +19,17 @@ public class ReleaseTransaction(
 
         // Attempt to find the transaction by ReferenceNumber
         var transaction = await dbContext.Set<WalletTransaction>()
-            .FirstOrDefaultAsync(t => t.ReferenceNumber == request.ReferenceNumber && t.TenantId == tenant.Id, cancellationToken);
+            .FirstOrDefaultAsync(t => t.Id == request.Id && t.TenantId == tenant.Id, cancellationToken);
 
         if (transaction == null)
         {
-            logger.LogInformation("Transaction with ReferenceNumber {ReferenceNumber} not found.", request.ReferenceNumber);
+            logger.LogInformation("Transaction with Id {Id} not found.", request.Id);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Transaction not found." };
         }
 
         if (!transaction.Held)
         {
-            logger.LogInformation("Transaction with ReferenceNumber {ReferenceNumber} is not on hold.", request.ReferenceNumber);
+            logger.LogInformation("Transaction with Id {Id} is not on hold.", request.Id);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Transaction is not on hold." };
         }
 
@@ -38,12 +38,13 @@ public class ReleaseTransaction(
         transaction.Released = true;
 
         // Fetch the associated wallets to update their balances
-        var senderWallet = await dbContext.Set<Wallet>().firfir(transaction.WalletId, cancellationToken);
-        if (senderWallet != null)
+        var wallet = await dbContext.Set<Wallet>().FirstOrDefaultAsync(i => i.Id == transaction.WalletId, cancellationToken);
+        if (wallet != null)
         {
             // Assuming the amount was deducted from the balance when put on hold,
             // and now needs to be made available again.
-            senderWallet.OnHoldBalance -= transaction.Amount;
+            wallet.OnHoldBalance -= transaction.Amount;
+            wallet.Balance += transaction.Amount;
         }
 
         // Here you would also handle the recipient wallet if necessary,
@@ -52,13 +53,13 @@ public class ReleaseTransaction(
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Successfully released transaction with ReferenceNumber {ReferenceNumber}.", request.ReferenceNumber);
+            logger.LogInformation("Successfully released transaction with Id {Id}.", request.Id);
 
             return new CmdResponse { HttpStatusCode = HttpStatusCode.OK, Message = "Transaction released successfully." };
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error releasing transaction with ReferenceNumber {ReferenceNumber}.", request.ReferenceNumber);
+            logger.LogError(ex, "Error releasing transaction with Id {Id}.", request.Id);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.InternalServerError, Message = "Error releasing transaction." };
         }
     }

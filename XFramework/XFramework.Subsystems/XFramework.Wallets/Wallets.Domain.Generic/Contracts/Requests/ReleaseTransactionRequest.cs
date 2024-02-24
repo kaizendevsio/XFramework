@@ -3,10 +3,9 @@
 using TRequest = ReleaseTransactionRequest;
 using TResponse = CmdResponse;
 
-public record ReleaseTransactionRequest : TransactionRequestBase, 
+public record ReleaseTransactionRequest : RequestBase, 
     IRequest<TResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {
-    public required Guid RecipientCredentialId { get; set; }
-    public required Guid WalletTypeId { get; set; }
+    public required Guid Id { get; set; }
 }
