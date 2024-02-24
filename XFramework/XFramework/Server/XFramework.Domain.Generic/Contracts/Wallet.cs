@@ -7,7 +7,10 @@ public partial class Wallet : BaseModel
     public Guid? WalletTypeId { get; set; }
 
     public decimal? Balance { get; set; }
-
+    
+    public decimal? OnHoldBalance { get; set; }
+    
+    public decimal? TotalBalance => Balance + OnHoldBalance;
 
     public virtual IdentityCredential Credential { get; set; } = null!;
 

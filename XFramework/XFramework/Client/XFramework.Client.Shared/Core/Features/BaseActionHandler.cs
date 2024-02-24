@@ -178,9 +178,10 @@ public class BaseStateActionHandler
         // Display message to UI
         if (!silent)
         {
-            SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(message)
-                ? null
-                : $"{message}", SweetAlertIcon.Success);
+            var y =Snackbar.Add(
+                message: message,
+                severity: Severity.Success
+            );
         }
 
         HandleSuccessHooks(action);
@@ -340,7 +341,7 @@ public class BaseStateActionHandler
     
     public async Task ReportBusy(string? title = null, bool? isBusy = true)
     {
-        var y =Snackbar.Add(
+        var y = Snackbar.Add(
             message: title,
             severity: Severity.Info
         );

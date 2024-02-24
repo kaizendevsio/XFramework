@@ -1,4 +1,7 @@
-﻿namespace XFramework.Domain.Generic.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using XFramework.Domain.Generic.Enums;
+
+namespace XFramework.Domain.Generic.Contracts;
 
 public partial class WalletTransaction : BaseModel
 {
@@ -6,16 +9,47 @@ public partial class WalletTransaction : BaseModel
 
     public Guid WalletId { get; set; }
 
-    public decimal Amount { get; set; }
+    public decimal Amount
+    {
+        get
+        {
+            if (TransactionType is null)
+            {
+                return 0;
+            }
 
+            return decimal.Abs(InternalAmount) * (TransactionType switch
+            {
+                Enums.TransactionType.Credit => 1,
+                Enums.TransactionType.Debit => -1,
+                _ => 0
+            });
+        }
+        set => InternalAmount = value;
+    }
+
+    [NotMapped]
+    private decimal InternalAmount { get; set; }
+
+    public bool OnHold { get; set; }
+    
     public string? Remarks { get; set; }
-
-    public decimal? RunningBalance { get; set; }
-
+    
     public string? Description { get; set; }
 
+    public decimal? RunningTotalBalance { get; set; }
+   
+    public decimal? RunningBalance { get; set; }
+    
+    public decimal? RunningOnHoldBalance { get; set; }
+    
+    public decimal PreviousTotalBalance { get; set; }
+    
     public decimal PreviousBalance { get; set; }
+    
+    public decimal PreviousOnHoldBalance { get; set; }
 
+    public required TransactionType? TransactionType { get; set; }
 
     public virtual IdentityCredential Credential { get; set; } = null!;
 
