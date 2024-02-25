@@ -2,7 +2,7 @@
 
 namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class LaboratoryLocation : BaseModel
+public partial class LaboratoryBranch : BaseModel, IHasOnlineStatus
 {
     public Guid LaboratoryId { get; set; }
 
@@ -57,4 +57,18 @@ public partial class LaboratoryLocation : BaseModel
 
     [NotMapped]
     public List<StorageFile>? Files { get; set; }
+
+    public bool IsOnline { get; set; }
+    
+    public DateTime LastSeen { get; set; }
+    
+    public DateTime? OnlineSince { get; set; }
+    
+    public string? StatusMessage { get; set; }
+    
+    public string? LastActivityType { get; set; }
+    
+    public string? Device { get; set; }
+    
+    public string? Location { get; set; }
 }

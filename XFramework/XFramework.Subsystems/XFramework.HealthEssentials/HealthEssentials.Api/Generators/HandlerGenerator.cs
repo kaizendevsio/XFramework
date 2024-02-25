@@ -39,7 +39,7 @@ namespace HealthEssentials.Api.Generators;
     nameof(LaboratoryJobOrderDetail),
     nameof(LaboratoryJobOrderResult),
     nameof(LaboratoryJobOrderResultFile),
-    nameof(LaboratoryLocation),
+    nameof(LaboratoryBranch),
     nameof(LaboratoryLocationTag),
     nameof(LaboratoryMember),
     nameof(LaboratoryService),

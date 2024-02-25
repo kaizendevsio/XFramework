@@ -2,14 +2,14 @@
 
 public partial class LaboratoryLocationTag : BaseModel
 {
-    public Guid LaboratoryLocationId { get; set; }
+    public Guid LaboratoryBranchId { get; set; }
 
     public string? Value { get; set; }
 
     public Guid TagId { get; set; }
 
 
-    public virtual LaboratoryLocation LaboratoryLocation { get; set; } = null!;
+    public virtual LaboratoryBranch LaboratoryBranch { get; set; } = null!;
 
     public virtual Tag? Tag { get; set; }
 }

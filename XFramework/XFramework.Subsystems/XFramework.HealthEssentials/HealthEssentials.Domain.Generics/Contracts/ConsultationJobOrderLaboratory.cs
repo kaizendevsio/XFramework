@@ -6,7 +6,7 @@ public partial class ConsultationJobOrderLaboratory : BaseModel
 
     public Guid LaboratoryServiceId { get; set; }
 
-    public Guid? SuggestedLaboratoryLocationId { get; set; }
+    public Guid? SuggestedLaboratoryBranchId { get; set; }
 
     public string? Quantity { get; set; }
 
@@ -21,5 +21,5 @@ public partial class ConsultationJobOrderLaboratory : BaseModel
 
     public virtual LaboratoryServiceType LaboratoryService { get; set; } = null!;
 
-    public virtual LaboratoryLocation? SuggestedLaboratoryLocation { get; set; }
+    public virtual LaboratoryBranch? SuggestedLaboratoryLocation { get; set; }
 }

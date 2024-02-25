@@ -2,7 +2,7 @@
 
 public partial class LaboratoryJobOrder : BaseModel
 {
-    public Guid LaboratoryLocationId { get; set; }
+    public Guid LaboratoryBranchId { get; set; }
 
     public Guid LaboratoryId { get; set; }
 
@@ -45,7 +45,7 @@ public partial class LaboratoryJobOrder : BaseModel
     public virtual ICollection<LaboratoryJobOrderResult> LaboratoryJobOrderResults { get; set; } =
         new List<LaboratoryJobOrderResult>();
 
-    public virtual LaboratoryLocation LaboratoryLocation { get; set; } = null!;
+    public virtual LaboratoryBranch LaboratoryBranch { get; set; } = null!;
 
     public virtual Patient? Patient { get; set; }
 

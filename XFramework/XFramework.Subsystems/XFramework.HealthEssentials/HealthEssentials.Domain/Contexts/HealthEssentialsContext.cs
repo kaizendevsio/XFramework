@@ -86,7 +86,7 @@ public partial class HealthEssentialsContext : DbContext
 
     public virtual DbSet<LaboratoryJobOrderResultFile> LaboratoryJobOrderResultFiles { get; set; }
 
-    public virtual DbSet<LaboratoryLocation> LaboratoryLocations { get; set; }
+    public virtual DbSet<LaboratoryBranch> LaboratoryLocations { get; set; }
 
     public virtual DbSet<LaboratoryLocationTag> LaboratoryLocationTags { get; set; }
 
@@ -493,7 +493,7 @@ public partial class HealthEssentialsContext : DbContext
                 .HasConstraintName("consultationjoborderlaboratory_laboratoryserviceentity_id_fk");
 
             entity.HasOne(d => d.SuggestedLaboratoryLocation).WithMany(p => p.ConsultationJobOrderLaboratories)
-                .HasForeignKey(d => d.SuggestedLaboratoryLocationId)
+                .HasForeignKey(d => d.SuggestedLaboratoryBranchId)
                 .HasConstraintName("consultationjoborderlaboratory_laboratorylocation_id_fk");
         });
 
@@ -1163,8 +1163,8 @@ public partial class HealthEssentialsContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("laboratoryjoborder_laboratory_id_fk");
 
-            entity.HasOne(d => d.LaboratoryLocation).WithMany(p => p.LaboratoryJobOrders)
-                .HasForeignKey(d => d.LaboratoryLocationId)
+            entity.HasOne(d => d.LaboratoryBranch).WithMany(p => p.LaboratoryJobOrders)
+                .HasForeignKey(d => d.LaboratoryBranchId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("laboratoryjoborder_laboratorylocation_id_fk");
 
@@ -1260,7 +1260,7 @@ public partial class HealthEssentialsContext : DbContext
                 .HasConstraintName("laboratoryjoborderresultfiles_laboratoryjoborderresult_id_fk");
         });
 
-        modelBuilder.Entity<LaboratoryLocation>(entity =>
+        modelBuilder.Entity<LaboratoryBranch>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("laboratorylocation_pk");
 
@@ -1319,8 +1319,8 @@ public partial class HealthEssentialsContext : DbContext
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
             entity.Property(e => e.Value).HasColumnType("character varying");
 
-            entity.HasOne(d => d.LaboratoryLocation).WithMany(p => p.LaboratoryLocationTags)
-                .HasForeignKey(d => d.LaboratoryLocationId)
+            entity.HasOne(d => d.LaboratoryBranch).WithMany(p => p.LaboratoryLocationTags)
+                .HasForeignKey(d => d.LaboratoryBranchId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("laboratorylocationtag_laboratorylocation_id_fk");
 
@@ -1357,7 +1357,7 @@ public partial class HealthEssentialsContext : DbContext
                 .HasConstraintName("laboratorymember_laboratory_id_fk");
 
             entity.HasOne(d => d.LaboratoryLocation).WithMany(p => p.LaboratoryMembers)
-                .HasForeignKey(d => d.LaboratoryLocationId)
+                .HasForeignKey(d => d.LaboratoryBranchId)
                 .HasConstraintName("laboratorymember_laboratorylocation_id_fk");
         });
 
@@ -1393,8 +1393,8 @@ public partial class HealthEssentialsContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("laboratoryservice_laboratory_id_fk");
 
-            entity.HasOne(d => d.LaboratoryLocation).WithMany(p => p.LaboratoryServices)
-                .HasForeignKey(d => d.LaboratoryLocationId)
+            entity.HasOne(d => d.LaboratoryBranch).WithMany(p => p.LaboratoryServices)
+                .HasForeignKey(d => d.LaboratoryBranchId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("laboratoryservice_laboratorylocation_id_fk");
 

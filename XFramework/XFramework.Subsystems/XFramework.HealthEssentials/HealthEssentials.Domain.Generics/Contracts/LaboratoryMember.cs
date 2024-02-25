@@ -17,11 +17,11 @@ public partial class LaboratoryMember : BaseModel
 
     public string? Description { get; set; }
 
-    public Guid LaboratoryLocationId { get; set; }
+    public Guid LaboratoryBranchId { get; set; }
 
     public virtual Laboratory Laboratory { get; set; } = null!;
 
-    public virtual LaboratoryLocation? LaboratoryLocation { get; set; }
+    public virtual LaboratoryBranch? LaboratoryLocation { get; set; }
     
     [NotMapped]
     public IdentityCredential? Credential { get; set; }
