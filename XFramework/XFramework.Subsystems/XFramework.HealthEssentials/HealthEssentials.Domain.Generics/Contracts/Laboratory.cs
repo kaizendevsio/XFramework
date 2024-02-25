@@ -27,7 +27,7 @@ public partial class Laboratory : BaseModel
 
     public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; } = new List<LaboratoryJobOrder>();
 
-    public virtual ICollection<LaboratoryBranch> LaboratoryLocations { get; set; } = new List<LaboratoryBranch>();
+    public virtual ICollection<LaboratoryBranch> LaboratoryBranches { get; set; } = new List<LaboratoryBranch>();
 
     public virtual ICollection<LaboratoryMember> LaboratoryMembers { get; set; } = new List<LaboratoryMember>();
 

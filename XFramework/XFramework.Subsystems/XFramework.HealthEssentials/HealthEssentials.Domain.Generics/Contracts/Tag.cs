@@ -23,8 +23,8 @@ public partial class Tag : BaseModel
 
     public virtual ICollection<HospitalTag> HospitalTags { get; set; } = new List<HospitalTag>();
 
-    public virtual ICollection<LaboratoryLocationTag> LaboratoryLocationTags { get; set; } =
-        new List<LaboratoryLocationTag>();
+    public virtual ICollection<LaboratoryBranchTag> LaboratoryBranchTags { get; set; } =
+        new List<LaboratoryBranchTag>();
 
     public virtual ICollection<LaboratoryServiceTag> LaboratoryServiceTags { get; set; } = new List<LaboratoryServiceTag>();
 

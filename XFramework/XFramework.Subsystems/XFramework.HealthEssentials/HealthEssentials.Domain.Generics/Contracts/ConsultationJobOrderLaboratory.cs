@@ -21,5 +21,5 @@ public partial class ConsultationJobOrderLaboratory : BaseModel
 
     public virtual LaboratoryServiceType LaboratoryService { get; set; } = null!;
 
-    public virtual LaboratoryBranch? SuggestedLaboratoryLocation { get; set; }
+    public virtual LaboratoryBranch? SuggestedLaboratoryBranch { get; set; }
 }

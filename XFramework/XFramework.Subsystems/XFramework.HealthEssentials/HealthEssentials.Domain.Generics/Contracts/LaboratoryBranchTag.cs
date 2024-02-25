@@ -1,6 +1,6 @@
 ﻿namespace HealthEssentials.Domain.Generics.Contracts;
 
-public partial class LaboratoryLocationTag : BaseModel
+public partial class LaboratoryBranchTag : BaseModel
 {
     public Guid LaboratoryBranchId { get; set; }
 

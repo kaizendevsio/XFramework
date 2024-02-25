@@ -41,7 +41,7 @@ namespace HealthEssentials.Integration.Generators;
     nameof(LaboratoryJobOrderResult),
     nameof(LaboratoryJobOrderResultFile),
     nameof(LaboratoryBranch),
-    nameof(LaboratoryLocationTag),
+    nameof(LaboratoryBranchTag),
     nameof(LaboratoryMember),
     nameof(LaboratoryService),
     nameof(LaboratoryServiceType),

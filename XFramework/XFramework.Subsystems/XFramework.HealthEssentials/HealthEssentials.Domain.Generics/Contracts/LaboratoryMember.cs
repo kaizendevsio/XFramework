@@ -21,7 +21,7 @@ public partial class LaboratoryMember : BaseModel
 
     public virtual Laboratory Laboratory { get; set; } = null!;
 
-    public virtual LaboratoryBranch? LaboratoryLocation { get; set; }
+    public virtual LaboratoryBranch? LaboratoryBranch { get; set; }
     
     [NotMapped]
     public IdentityCredential? Credential { get; set; }

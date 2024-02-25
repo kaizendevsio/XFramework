@@ -48,8 +48,8 @@ public partial class LaboratoryBranch : BaseModel, IHasOnlineStatus
 
     public virtual ICollection<LaboratoryJobOrder> LaboratoryJobOrders { get; set; } = new List<LaboratoryJobOrder>();
 
-    public virtual ICollection<LaboratoryLocationTag> LaboratoryLocationTags { get; set; } =
-        new List<LaboratoryLocationTag>();
+    public virtual ICollection<LaboratoryBranchTag> LaboratoryBranchTags { get; set; } =
+        new List<LaboratoryBranchTag>();
 
     public virtual ICollection<LaboratoryMember> LaboratoryMembers { get; set; } = new List<LaboratoryMember>();
 
