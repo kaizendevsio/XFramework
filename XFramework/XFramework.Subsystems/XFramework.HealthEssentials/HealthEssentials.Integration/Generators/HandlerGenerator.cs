@@ -80,7 +80,7 @@ namespace HealthEssentials.Integration.Generators;
     nameof(PharmacyJobOrder),
     nameof(PharmacyJobOrderConsultationJobOrder),
     nameof(PharmacyJobOrderMedicine),
-    nameof(PharmacyLocation),
+    nameof(PharmacyBranch),
     nameof(PharmacyMember),
     nameof(PharmacyService),
     nameof(PharmacyServiceType),

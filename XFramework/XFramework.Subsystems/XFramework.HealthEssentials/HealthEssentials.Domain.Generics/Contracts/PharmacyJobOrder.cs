@@ -2,7 +2,7 @@
 
 public partial class PharmacyJobOrder : BaseModel
 {
-    public Guid PharmacyLocationId { get; set; }
+    public Guid PharmacyBranchId { get; set; }
 
     public string? ReferenceNumber { get; set; }
 
@@ -41,7 +41,7 @@ public partial class PharmacyJobOrder : BaseModel
     public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; set; } =
         new List<PharmacyJobOrderMedicine>();
 
-    public virtual PharmacyLocation PharmacyLocation { get; set; } = null!;
+    public virtual PharmacyBranch PharmacyBranch { get; set; } = null!;
 
     public virtual Schedule Schedule { get; set; } = null!;
 }

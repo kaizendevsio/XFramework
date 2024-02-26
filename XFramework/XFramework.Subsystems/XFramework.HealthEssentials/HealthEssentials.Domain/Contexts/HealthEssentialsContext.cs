@@ -166,7 +166,7 @@ public partial class HealthEssentialsContext : DbContext
 
     public virtual DbSet<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; set; }
 
-    public virtual DbSet<PharmacyLocation> PharmacyLocations { get; set; }
+    public virtual DbSet<PharmacyBranch> PharmacyBranches { get; set; }
 
     public virtual DbSet<PharmacyMember> PharmacyMembers { get; set; }
 
@@ -2319,8 +2319,8 @@ public partial class HealthEssentialsContext : DbContext
                 .HasForeignKey(d => d.PatientId)
                 .HasConstraintName("pharmacyjoborder_patient_id_fk");
 
-            entity.HasOne(d => d.PharmacyLocation).WithMany(p => p.PharmacyJobOrders)
-                .HasForeignKey(d => d.PharmacyLocationId)
+            entity.HasOne(d => d.PharmacyBranch).WithMany(p => p.PharmacyJobOrders)
+                .HasForeignKey(d => d.PharmacyBranchId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacyjoborder_pharmacylocation_id_fk");
 
@@ -2408,7 +2408,7 @@ public partial class HealthEssentialsContext : DbContext
                 .HasConstraintName("pharmacyjobordermedicine_pharmacyjoborder_id_fk");
         });
 
-        modelBuilder.Entity<PharmacyLocation>(entity =>
+        modelBuilder.Entity<PharmacyBranch>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("pharmacylocation_pk");
 
@@ -2442,7 +2442,7 @@ public partial class HealthEssentialsContext : DbContext
             entity.Property(e => e.UnitNumber).HasMaxLength(500);
             entity.Property(e => e.Website).HasColumnType("character varying");
 
-            entity.HasOne(d => d.Pharmacy).WithMany(p => p.PharmacyLocations)
+            entity.HasOne(d => d.Pharmacy).WithMany(p => p.PharmacyBranches)
                 .HasForeignKey(d => d.PharmacyId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacylocation_pharmacy_id_fk");
@@ -2475,8 +2475,8 @@ public partial class HealthEssentialsContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacymember_pharmacy_id_fk");
 
-            entity.HasOne(d => d.PharmacyLocation).WithMany(p => p.PharmacyMembers)
-                .HasForeignKey(d => d.PharmacyLocationId)
+            entity.HasOne(d => d.PharmacyBranch).WithMany(p => p.PharmacyMembers)
+                .HasForeignKey(d => d.PharmacyBranchId)
                 .HasConstraintName("pharmacymember_pharmacylocation_id_fk");
         });
 
@@ -2512,8 +2512,8 @@ public partial class HealthEssentialsContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacyservice_pharmacy_id_fk");
 
-            entity.HasOne(d => d.PharmacyLocation).WithMany(p => p.PharmacyServices)
-                .HasForeignKey(d => d.PharmacyLocationId)
+            entity.HasOne(d => d.PharmacyBranch).WithMany(p => p.PharmacyServices)
+                .HasForeignKey(d => d.PharmacyBranchId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacyservice_pharmacylocation_id_fk");
 

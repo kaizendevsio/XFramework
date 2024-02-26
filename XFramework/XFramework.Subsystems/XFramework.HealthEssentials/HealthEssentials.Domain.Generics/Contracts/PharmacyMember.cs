@@ -17,11 +17,11 @@ public partial class PharmacyMember : BaseModel
 
     public string? Description { get; set; }
 
-    public Guid PharmacyLocationId { get; set; }
+    public Guid PharmacyBranchId { get; set; }
 
     public virtual Pharmacy Pharmacy { get; set; } = null!;
 
-    public virtual PharmacyLocation? PharmacyLocation { get; set; }
+    public virtual PharmacyBranch? PharmacyBranch { get; set; }
     
     [NotMapped]
     public IdentityCredential? Credential { get; set; }
