@@ -53,7 +53,7 @@ public partial class WalletTransaction : BaseModel
     
     public decimal PreviousOnHoldBalance { get; set; }
 
-    public required TransactionType? TransactionType { get; set; }
+    public TransactionType? TransactionType { get; set; }
 
     public virtual IdentityCredential Credential { get; set; } = null!;
 

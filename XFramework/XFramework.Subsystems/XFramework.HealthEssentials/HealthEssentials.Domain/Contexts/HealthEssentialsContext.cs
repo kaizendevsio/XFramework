@@ -2412,7 +2412,7 @@ public partial class HealthEssentialsContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("pharmacylocation_pk");
 
-            entity.ToTable("PharmacyLocation", "Pharmacy");
+            entity.ToTable("PharmacyBranch", "Pharmacy");
 
             
             entity.Property(e => e.Id)

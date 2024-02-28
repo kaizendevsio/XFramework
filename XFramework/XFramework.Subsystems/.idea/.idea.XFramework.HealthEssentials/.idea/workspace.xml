@@ -9,15 +9,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0e4ff768-5aa9-47f6-8b76-dce9df8958c0" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Migrations/HealthEssentials/20240226102750_Renamed_Locations_To_Branches_2.Designer.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Migrations/HealthEssentials/20240226102750_Renamed_Locations_To_Branches_2.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/Generators/HandlerGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/Generators/HandlerGenerator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Pharmacy.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Pharmacy.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyJobOrder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyJobOrder.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyLocation.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyBranch.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyMember.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyMember.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.SmsGateway/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Contexts/HealthEssentialsContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Contexts/HealthEssentialsContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Generators/HandlerGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Integration/Generators/HandlerGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Migrations/HealthEssentials/HealthEssentialsContextModelSnapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Migrations/HealthEssentials/HealthEssentialsContextModelSnapshot.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Sms/CreateSmsMessageHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.SmsGateway/SmsGateway.Core/DataAccess/Commands/Sms/CreateSmsMessageHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/WalletTransaction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/WalletTransaction.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -111,53 +111,53 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    ".NET Launch Settings Profile.HealthEssentials.Api.executor": "Debug",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatOrder0": "0",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatOrder1": "1",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatOrder2": "2",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatOrder3": "3",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatWidth0": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatWidth1": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatWidth2": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_flatWidth3": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeOrder0": "0",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeOrder1": "1",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeOrder2": "2",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeOrder3": "3",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeWidth0": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeWidth1": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeWidth2": "494",
-    "FileHistory.git4idea.history.GitHistoryProvider_treeWidth3": "494",
-    "FindInProjectState.customScopeName": "Solution",
-    "FindInProjectState.isCustomScope": "true",
-    "FindInProjectState.isProjectScope": "false",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "XThreadsFramesViewSplitterKey": "0.51785713",
-    "git-widget-placeholder": "Development/Main",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "/home/xeon/RiderProjects/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Integration/Wallets.Integration.csproj",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.stylelint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.stylelint": "",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.lookFeel",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;.NET Launch Settings Profile.HealthEssentials.Api.executor&quot;: &quot;Debug&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatOrder0&quot;: &quot;0&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatOrder1&quot;: &quot;1&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatOrder2&quot;: &quot;2&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatOrder3&quot;: &quot;3&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatWidth0&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatWidth1&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatWidth2&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_flatWidth3&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeOrder0&quot;: &quot;0&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeOrder1&quot;: &quot;1&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeOrder2&quot;: &quot;2&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeOrder3&quot;: &quot;3&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeWidth0&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeWidth1&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeWidth2&quot;: &quot;494&quot;,
+    &quot;FileHistory.git4idea.history.GitHistoryProvider_treeWidth3&quot;: &quot;494&quot;,
+    &quot;FindInProjectState.customScopeName&quot;: &quot;Solution&quot;,
+    &quot;FindInProjectState.isCustomScope&quot;: &quot;true&quot;,
+    &quot;FindInProjectState.isProjectScope&quot;: &quot;false&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;XThreadsFramesViewSplitterKey&quot;: &quot;0.51785713&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Development/Main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/xeon/RiderProjects/XFramework/XFramework/XFramework.Subsystems/XFramework.Wallets/Wallets.Integration/Wallets.Integration.csproj&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.stylelint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.stylelint&quot;: &quot;&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.lookFeel&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "rider.external.source.directories": [
-      "/home/xeon/.config/JetBrains/Rider2023.3/resharper-host/DecompilerCache",
-      "/home/xeon/.config/JetBrains/Rider2023.3/resharper-host/SourcesCache",
-      "/home/xeon/.local/share/Symbols/src"
+  &quot;keyToStringList&quot;: {
+    &quot;rider.external.source.directories&quot;: [
+      &quot;C:\\Users\\Xeon\\AppData\\Roaming\\JetBrains\\Rider2024.1\\resharper-host\\DecompilerCache&quot;,
+      &quot;C:\\Users\\Xeon\\AppData\\Roaming\\JetBrains\\Rider2024.1\\resharper-host\\SourcesCache&quot;,
+      &quot;C:\\Users\\Xeon\\AppData\\Local\\Symbols\\src&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected=".NET Launch Settings Profile.HealthEssentials.Api">
     <configuration name="HealthEssentials.Api" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
       <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Api/HealthEssentials.Api.csproj" />
@@ -435,6 +435,8 @@
       <workItem from="1708749430254" duration="787000" />
       <workItem from="1708750268381" duration="2403000" />
       <workItem from="1708839106331" duration="4253000" />
+      <workItem from="1708940425034" duration="3013000" />
+      <workItem from="1709105880464" duration="976000" />
     </task>
     <task id="LOCAL-00001" summary=" - HealthEssentials SubSystem Updates">
       <created>1651756781460</created>
