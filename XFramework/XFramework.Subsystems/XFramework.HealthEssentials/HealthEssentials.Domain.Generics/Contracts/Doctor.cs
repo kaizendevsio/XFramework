@@ -48,7 +48,7 @@ public partial class Doctor : BaseModel, IHasOnlineStatus
     [NotMapped]
     public List<StorageFile>? Files { get; set; }
 
-    public bool IsOnline { get; set; } = true; // TODO: Implement online status
+    public bool IsOnline { get; set; }
     
     public DateTime LastSeen { get; set; }
     

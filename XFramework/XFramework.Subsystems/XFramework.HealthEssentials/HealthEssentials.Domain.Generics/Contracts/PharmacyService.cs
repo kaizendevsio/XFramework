@@ -4,7 +4,7 @@ public partial class PharmacyService : BaseModel
 {
     public Guid TypeId { get; set; }
 
-    public Guid PharmacyLocationId { get; set; }
+    public Guid PharmacyBranchId { get; set; }
 
     public Guid PharmacyId { get; set; }
 
@@ -27,7 +27,7 @@ public partial class PharmacyService : BaseModel
 
     public virtual Pharmacy Pharmacy { get; set; } = null!;
 
-    public virtual PharmacyLocation PharmacyLocation { get; set; } = null!;
+    public virtual PharmacyBranch PharmacyBranch { get; set; } = null!;
 
     public virtual ICollection<PharmacyServiceTag> PharmacyServiceTags { get; set; } = new List<PharmacyServiceTag>();
 

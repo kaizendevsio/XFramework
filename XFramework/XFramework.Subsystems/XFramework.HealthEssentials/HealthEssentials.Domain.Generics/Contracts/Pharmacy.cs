@@ -27,7 +27,7 @@ public partial class Pharmacy : BaseModel
 
     public virtual PharmacyType Type { get; set; } = null!;
 
-    public virtual ICollection<PharmacyLocation> PharmacyLocations { get; set; } = new List<PharmacyLocation>();
+    public virtual ICollection<PharmacyBranch> PharmacyBranches { get; set; } = new List<PharmacyBranch>();
 
     public virtual ICollection<PharmacyMember> PharmacyMembers { get; set; } = new List<PharmacyMember>();
 

@@ -2,6 +2,7 @@
 using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using Tenant.Integration.Drivers;
+using Wallets.Integration.Drivers;
 
 namespace HealthEssentials.Api.Installers;
 
@@ -16,6 +17,7 @@ public class ServicesInstaller : IInstaller
         services.AddTenantService();
         services.AddHealthEssentialsWrapperServices();
         services.AddIdentityServerWrapperServices();
+        services.AddWalletsWrapperServices();
         services.AddTenantWrapperServices();
         services.AddMessagingWrapperServices();
         

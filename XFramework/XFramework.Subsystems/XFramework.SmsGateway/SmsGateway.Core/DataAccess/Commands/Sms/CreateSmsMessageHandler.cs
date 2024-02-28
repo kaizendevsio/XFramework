@@ -24,7 +24,7 @@ public class CreateSmsMessageHandler : IRequestHandler<CreateSmsMessageRequest, 
             Intent = request.Intent,
             Subject = request.Subject,
             Message = request.Message,
-            Guid = $"{request.ClientReference}",
+            Guid = $"{request.ReferenceNumber}",
             Status = (int)(request.IsScheduled ? MessageStatus.Scheduled : MessageStatus.Queued)
         });
         return new()

@@ -69,8 +69,8 @@ public class PatchHandler<TModel>(
             await dbContext.SaveChangesAsync(cancellationToken);
             
             // Remove the entity from the cache after successful patch
-            await cache.InvalidateCacheForModel(request.Model);
-            cache.Remove($"GetList-{typeof(TModel).Name}-");
+            //await cache.InvalidateCacheForModel(request.Model);
+            //cache.Remove($"GetList-{typeof(TModel).Name}-");
             
             logger.LogInformation("Entity of type {EntityName} with ID {EntityId} successfully patched", typeof(TModel).Name, request.Model.Id);
 
