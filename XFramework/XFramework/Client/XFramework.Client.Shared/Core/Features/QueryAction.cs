@@ -1,5 +1,6 @@
 ﻿namespace XFramework.Client.Shared.Core.Features;
 
+[SuppressMessage("BlazorState", "TW0001:Blazor State Action should be a nested type of its State")]
 public record QueryAction : StateAction
 {
     public int PageIndex { get; set; } = 1;

@@ -8,3 +8,4 @@ global using StreamFlow.Domain.Generic.Enums;
 global using XFramework.Domain.Generic.BusinessObjects;
 global using XFramework.Domain.Generic.Contracts.Responses;
 global using XFramework.Domain.Generic.Interfaces;
+global using SimdLinq;

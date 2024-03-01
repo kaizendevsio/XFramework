@@ -22,3 +22,4 @@ global using XFramework.Domain.Contexts;
 global using XFramework.Domain.Generic.Contracts;
 global using XFramework.Integration.Abstractions;
 global using XFramework.Integration.Services;
+global using SimdLinq;

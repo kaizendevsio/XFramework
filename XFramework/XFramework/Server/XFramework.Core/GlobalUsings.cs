@@ -15,3 +15,4 @@ global using XFramework.Domain.Contexts;
 global using XFramework.Domain.Generic.Contracts;
 global using XFramework.Domain.Generic.Contracts.Base;
 global using XFramework.Domain.Generic.Enums;
+global using SimdLinq;
