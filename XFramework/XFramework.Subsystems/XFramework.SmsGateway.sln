@@ -26,6 +26,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Integration", ".
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain.Generic", "..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj", "{F5F719A0-68B2-41EC-B07A-524F5ECA12AB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Core", "..\XFramework\Server\XFramework.Core\XFramework.Core.csproj", "{A1A33484-6BDD-423F-B0DA-672774B09756}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,7 @@ Global
 		{87A4032E-EF3B-48B9-AF43-CC66C3EDAD71} = {846356A9-A4FA-41AA-9297-72B0D5060A90}
 		{AA48B69E-3574-4026-9533-243DD22CFA3A} = {846356A9-A4FA-41AA-9297-72B0D5060A90}
 		{F5F719A0-68B2-41EC-B07A-524F5ECA12AB} = {846356A9-A4FA-41AA-9297-72B0D5060A90}
+		{A1A33484-6BDD-423F-B0DA-672774B09756} = {846356A9-A4FA-41AA-9297-72B0D5060A90}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{4ACE1892-02A8-4362-B312-63C713EF9FB8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -79,5 +82,9 @@ Global
 		{F5F719A0-68B2-41EC-B07A-524F5ECA12AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F5F719A0-68B2-41EC-B07A-524F5ECA12AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F5F719A0-68B2-41EC-B07A-524F5ECA12AB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1A33484-6BDD-423F-B0DA-672774B09756}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1A33484-6BDD-423F-B0DA-672774B09756}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1A33484-6BDD-423F-B0DA-672774B09756}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1A33484-6BDD-423F-B0DA-672774B09756}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

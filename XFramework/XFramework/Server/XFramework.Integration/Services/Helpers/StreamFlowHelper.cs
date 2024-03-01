@@ -1,5 +1,5 @@
-﻿using System.Text.Json;
-using MediatR;
+﻿using MediatR;
+using MessagePack;
 
 namespace XFramework.Integration.Services.Helpers;
 
@@ -10,9 +10,11 @@ public static class StreamFlowHelper
         return entity.GetType().Name.Replace("Request", string.Empty);
     }
         
-    public static TQuery AsMediatorCmd<TRequest, TQuery, TResponse>(this string entity) where TRequest : new() where TQuery : IRequest<TResponse>
+    public static TQuery AsMediatorCmd<TQuery, TResponse>(this object entity) 
+        where TQuery : class, IRequest<TResponse>
     {
-        return JsonSerializer.Deserialize<TRequest>(entity).Adapt<TQuery>();
+        var deserializedEntity =  MessagePackSerializer.Deserialize<TQuery>(entity as byte[], new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance)); 
+        return deserializedEntity;
     }
 
 }

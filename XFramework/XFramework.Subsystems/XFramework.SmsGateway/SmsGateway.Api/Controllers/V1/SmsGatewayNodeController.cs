@@ -1,46 +1,42 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using SmsGateway.Core.DataAccess.Commands.Entity.Sms;
 using SmsGateway.Core.Interfaces;
+using SmsGateway.Domain.Generic.Contracts.Requests.Update;
 using SmsGateway.Domain.Generic.Contracts.Responses.Sms;
 
-namespace SmsGateway.Api.Controllers.V1
+namespace SmsGateway.Api.Controllers.V1;
+
+[ApiController]
+[Route("api/[controller]")]
+public class SmsGatewayNodeController : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class SmsGatewayNodeController : XFrameworkControllerBase
+    private readonly ICachingService _cachingService;
+    private readonly IMediator _mediator;
+
+    public SmsGatewayNodeController(ICachingService cachingService, IMediator mediator)
     {
-        private readonly ICachingService _cachingService;
-
-        public SmsGatewayNodeController(ICachingService cachingService)
-        {
-            _cachingService = cachingService;
-        }
+        _cachingService = cachingService;
+        _mediator = mediator;
+    }
         
-        [HttpGet("List")]
-        public async Task<List<SmsNodeResponse>> List()
-        {
-            var itemList = _cachingService.PendingMessageList
-                .Select(i => new SmsNodeResponse
-                {
-                    Recipient = i.Recipient,
-                    Message = i.Message
-                })
-                .ToList();
-            _cachingService.PendingMessageList.Clear();
+    [HttpGet("List")]
+    public async Task<List<SmsNodeResponse>> List()
+    {
+        var itemList = _cachingService.PendingMessageList
+            .Select(i => new SmsNodeResponse
+            {
+                Recipient = i.Recipient,
+                Message = i.Message
+            })
+            .ToList();
+        _cachingService.PendingMessageList.Clear();
 
-            return itemList;
-        }
+        return itemList;
+    }
         
-        [HttpPatch("MessageSent")]
-        public async Task<IActionResult> MessageSent(Guid? guid)
-        {
-            Task.Run(async () => await _mediator.Send(new ConfirmSmsMessageSentCmd()));
-            return Accepted();
-        }
+    [HttpPatch("MessageSent")]
+    public async Task<IActionResult> MessageSent(Guid guid)
+    {
+        Task.Run(async () => await _mediator.Send(new ConfirmSmsMessageSentRequest(guid)));
+        return Accepted();
     }
 }

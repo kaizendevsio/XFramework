@@ -1,19 +1,13 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using StreamFlow.Domain.BusinessObjects;
-using StreamFlow.Domain.Generic.BusinessObjects;
-using StreamFlow.Domain.Generic.Contracts.Requests;
+﻿using XFramework.Domain.Generic.Contracts.Base;
 
 namespace StreamFlow.Core.Interfaces;
 
 public interface ICachingService
 {
-    public ConcurrentDictionary<int,StreamFlowClientBO> LatestClients { get; set; }
-    public ConcurrentDictionary<int,StreamFlowClientBO> Clients { get; set; }
-    public ConcurrentDictionary<int,StreamFlowClientBO> AbsoluteClients { get; set; }
-    public ConcurrentDictionary<Guid,StreamFlowMessageBO> QueuedMessages { get; set; }
-    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessageBO>> PendingMethodCalls { get; set; }
+    public ConcurrentDictionary<int,StreamFlowClient> LatestClients { get; set; }
+    public ConcurrentDictionary<int,StreamFlowClient> Clients { get; set; }
+    public ConcurrentDictionary<int,StreamFlowClient> AbsoluteClients { get; set; }
+    public ConcurrentDictionary<Guid,StreamFlowMessage > QueuedMessages { get; set; }
+    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessage >> PendingMethodCalls { get; set; }
         
 }

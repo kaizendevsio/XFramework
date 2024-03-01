@@ -1,14 +1,8 @@
 ﻿using FluentValidation;
 using MediatR;
 using StreamFlow.Core.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 using Sentry;
-using StreamFlow.Domain.BusinessObjects;
 using XFramework.Domain.Generic.BusinessObjects;
 
 namespace StreamFlow.Core.PipelineBehaviors;
@@ -17,7 +11,6 @@ public class BasePipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     where TRequest : IRequest<TResponse>
 {
     private readonly IEnumerable<IValidator<TRequest>> _validators;
-    private readonly IDataLayer _dataLayer;
     private TResponse _response;
 
     public BasePipelineBehavior(IEnumerable<IValidator<TRequest>> validators)//, IDataLayer dataLayer)

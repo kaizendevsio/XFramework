@@ -1,5 +1,5 @@
 ﻿using FluentValidation;
-using IdentityServer.Domain.Generic.Contracts.Requests.Create.Subscription;
+using IdentityServer.Domain.Generic.Contracts.Requests;
 
 namespace XFramework.Client.Shared.Entity.Validations.Affiliate;
 

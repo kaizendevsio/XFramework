@@ -1,37 +1,27 @@
-﻿using System;
-using System.Linq;
-using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-using MediatR;
-using Microsoft.AspNetCore.Http.Connections.Features;
+﻿using Microsoft.AspNetCore.Http.Connections.Features;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
-using StreamFlow.Stream.Hubs.V1;
+using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Services.Entity.Events;
-using XFramework.Domain.Generic.BusinessObjects;
 using XFramework.Domain.Generic.Configurations;
 
 namespace StreamFlow.Stream.Services.Handlers.Events;
 
-public class RegisterClientHandler : CommandBaseHandler, IRequestHandler<RegisterClientCmd, CmdResponse<RegisterClientCmd>>
+public class RegisterClientHandler(
+        ICachingService cachingService, 
+        IHubContext<MessageQueueHub> hubContext,
+        StreamFlowConfiguration streamFlowConfiguration)
+    : IRequestHandler<RegisterClientCmd, CmdResponse<RegisterClientCmd>>
 {
-    private Random _rnd;
-    public RegisterClientHandler(ICachingService cachingService, IHubContext<MessageQueueHub> hubContext, StreamFlowConfiguration streamFlowConfiguration)
-    {
-        _cachingService = cachingService;
-        _hubContext = hubContext;
-        _streamFlowConfiguration = streamFlowConfiguration;
-        _rnd = new Random();
-    }
-        
+    private readonly Random _random = new();
+
     public async Task<CmdResponse<RegisterClientCmd>> Handle(RegisterClientCmd request, CancellationToken cancellationToken)
     {
         Again:
-        var y = _cachingService.Clients.TryAdd(_rnd.Next(100000000,999999999), new()
+        var y = cachingService.Clients.TryAdd(_random.Next(100000000,999999999), new()
         {
             StreamId = request.Context.ConnectionId,
-            Guid = request.Client.Guid,
+            Id = request.Client.Id,
             Name = request.Client.Name
         });
         if (!y)
@@ -40,7 +30,7 @@ public class RegisterClientHandler : CommandBaseHandler, IRequestHandler<Registe
         }
         RememberClient(request);
 
-        Console.WriteLine($"Connection Registered with ID {request.Context.ConnectionId} : {request.Client.Guid} [{request.Context.Features.Get<IHttpTransportFeature>()?.TransportType.ToString()}] : {request.Client.Name}");
+        Console.WriteLine($"Connection Registered with ID {request.Context.ConnectionId} : {request.Client.Id} [{request.Context.Features.Get<IHttpTransportFeature>()?.TransportType.ToString()}] : {request.Client.Name}");
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted
@@ -49,18 +39,18 @@ public class RegisterClientHandler : CommandBaseHandler, IRequestHandler<Registe
     }
     private async Task RememberClient(RegisterClientCmd request)
     {
-        if (_cachingService.AbsoluteClients.All(i => i.Value.Guid != request.Client.Guid))
+        if (cachingService.AbsoluteClients.All(i => i.Value.Id != request.Client.Id))
         {
-            _cachingService.AbsoluteClients.TryAdd(_cachingService.AbsoluteClients.Count , new()
+            cachingService.AbsoluteClients.TryAdd(cachingService.AbsoluteClients.Count , new()
             {
                 StreamId = request.Context.ConnectionId,
-                Guid = request.Client.Guid,
+                Id = request.Client.Id,
                 Name = request.Client.Name
             });
         }
         else
         {
-            var client = _cachingService.AbsoluteClients.FirstOrDefault(i => i.Value.Guid != request.Client.Guid);
+            var client = cachingService.AbsoluteClients.FirstOrDefault(i => i.Value.Id != request.Client.Id);
             client.Value.StreamId = request.Context.ConnectionId;
         }
     }

@@ -26,7 +26,7 @@ public class LoggerService : ILoggerWrapper
         if (entity is null)
         {
             throw new ArgumentException(
-                $"Application with Guid '{requestServer.ApplicationId}' does not exist in any tenants");
+                $"Application with id '{requestServer.ApplicationId}' does not exist in any tenants");
         }
 
         var log = new Log()

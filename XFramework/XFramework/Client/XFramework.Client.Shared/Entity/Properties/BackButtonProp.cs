@@ -1,7 +1,4 @@
 ﻿namespace XFramework.Client.Shared.Entity.Properties
 {
-    public class BackButtonProp : ActivityBaseProp
-    {
-        
-    }
+    public class BackButtonProp : ActivityBaseProp;
 }

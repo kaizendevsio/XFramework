@@ -1,19 +1,15 @@
-﻿using XFramework.Core.Interfaces;
-using XFramework.Core.Services;
-using XFramework.Integration.Interfaces;
-using XFramework.Integration.Services;
+﻿using Tenant.Integration.Drivers;
 
-namespace XFramework.Api.Installers
+namespace XFramework.Api.Installers;
+
+public class ServicesInstaller : IInstaller
 {
-    public class ServicesInstaller : IInstaller
+    public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
-        {
-            services.AddSingleton<ICachingService, CachingService>();
-            services.AddSingleton<IHelperService, HelperService>();
-            services.AddSingleton<IJwtService, JwtService>();
-            services.AddSingleton<ISignalRService, SignalRService>();
-            services.AddSingleton<ProcessMonitorService>();
-        }
+        services.AddSingleton<ProcessMonitorService>();
+        
+        services.AddTenantService();
+        services.AddIdentityServerWrapperServices();
+        services.AddTenantWrapperServices();
     }
 }

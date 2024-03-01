@@ -2,7 +2,7 @@
 
 namespace Messaging.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateMessageThreadMemberGroupRequest : RequestBase
+public record CreateMessageThreadMemberGroupRequest : RequestBase
 {
     public short Status { get; set; }
     public string? Emoji { get; set; }

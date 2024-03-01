@@ -1,10 +1,4 @@
-﻿using MediatR;
-using StreamFlow.Domain.Generic.BusinessObjects;
-using StreamFlow.Domain.Generic.Contracts.Requests;
-using StreamFlow.Domain.Generic.Contracts.Responses;
-using XFramework.Domain.Generic.BusinessObjects;
-
-namespace StreamFlow.Stream.Services.Entity.Events;
+﻿namespace StreamFlow.Stream.Services.Entity.Events;
 
 public class InvokeMethodQuery : CommandBaseEntity, IRequest<QueryResponse<StreamFlowInvokeResponse>>
 {
@@ -13,10 +7,10 @@ public class InvokeMethodQuery : CommandBaseEntity, IRequest<QueryResponse<Strea
             
     }
 
-    public InvokeMethodQuery(StreamFlowMessageBO messageQueue)
+    public InvokeMethodQuery(StreamFlowMessage messageQueue)
     {
         MessageQueue = messageQueue;
     }
         
-    public StreamFlowMessageBO MessageQueue { get; set; }
+    public StreamFlowMessage MessageQueue { get; set; }
 }

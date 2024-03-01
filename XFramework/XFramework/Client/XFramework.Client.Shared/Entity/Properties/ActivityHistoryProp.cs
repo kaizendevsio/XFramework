@@ -1,7 +1,4 @@
 ﻿namespace XFramework.Client.Shared.Entity.Properties
 {
-    public class ActivityHistoryProp
-    {
-      
-    }
+    public class ActivityHistoryProp;
 }

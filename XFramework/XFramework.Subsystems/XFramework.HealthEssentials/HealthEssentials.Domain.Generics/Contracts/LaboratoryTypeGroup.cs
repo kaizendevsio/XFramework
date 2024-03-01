@@ -1,0 +1,9 @@
+﻿namespace HealthEssentials.Domain.Generics.Contracts;
+
+public partial class LaboratoryTypeGroup : BaseModel
+{
+    public string Name { get; set; } = null!;
+
+
+    public virtual ICollection<LaboratoryType> LaboratoryTypes { get; set; } = new List<LaboratoryType>();
+}

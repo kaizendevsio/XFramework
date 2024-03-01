@@ -1,7 +1,8 @@
-﻿using HealthEssentials.Core.Interfaces;
-using HealthEssentials.Core.Services;
-using XFramework.Integration.Interfaces;
-using XFramework.Integration.Services;
+﻿using HealthEssentials.Core;
+using IdentityServer.Integration.Drivers;
+using Messaging.Integration.Drivers;
+using Tenant.Integration.Drivers;
+using Wallets.Integration.Drivers;
 
 namespace HealthEssentials.Api.Installers;
 
@@ -9,9 +10,20 @@ public class ServicesInstaller : IInstaller
 {
     public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ICachingService, CachingService>();
-        services.AddSingleton<IHelperService, HelperService>();
-        services.AddSingleton<IJwtService, JwtService>();
-        services.AddSingleton<ProcessMonitorService>();
+        /*services.AddSingleton<ICachingService, CachingService>();*/
+        /*services.AddIdentityServerWrapperServices();
+        services.AddDecoratorHandlers(typeof(IdentityServerCore).Assembly);*/
+        
+        services.AddTenantService();
+        services.AddHealthEssentialsWrapperServices();
+        services.AddIdentityServerWrapperServices();
+        services.AddWalletsWrapperServices();
+        services.AddTenantWrapperServices();
+        services.AddMessagingWrapperServices();
+        
+        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
+            typeof(HealthEssentialsBaseRequest).Assembly,
+            typeof(HealthEssentialsCore).Assembly
+        ));
     }
 }

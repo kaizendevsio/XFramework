@@ -25,9 +25,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain.Generic",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentGateways.Domain.Generic", "XFramework.PaymentGateways\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj", "{E694E079-EEE6-433E-96D9-86C287A40FA0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Domain.Generic", "XFramework.Wallets\Wallets.Domain.Generic\Wallets.Domain.Generic.csproj", "{864A18CA-E027-41EB-9776-9CD8FE0DC69D}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Domain.Generic", "XFramework.IdentityServer\IdentityServer.Domain.Generic\IdentityServer.Domain.Generic.csproj", "{DDDECBBE-5AA3-4C73-8F70-5B52E40F61D2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Core", "..\XFramework\Server\XFramework.Core\XFramework.Core.csproj", "{877D7711-2845-4B2D-9B54-5E85546896A2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Domain", "..\XFramework\Server\XFramework.Domain\XFramework.Domain.csproj", "{4B830ECE-44B3-4109-B927-934B0AD161E3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,14 +65,18 @@ Global
 		{E694E079-EEE6-433E-96D9-86C287A40FA0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E694E079-EEE6-433E-96D9-86C287A40FA0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E694E079-EEE6-433E-96D9-86C287A40FA0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{864A18CA-E027-41EB-9776-9CD8FE0DC69D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{864A18CA-E027-41EB-9776-9CD8FE0DC69D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{864A18CA-E027-41EB-9776-9CD8FE0DC69D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{864A18CA-E027-41EB-9776-9CD8FE0DC69D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{DDDECBBE-5AA3-4C73-8F70-5B52E40F61D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DDDECBBE-5AA3-4C73-8F70-5B52E40F61D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DDDECBBE-5AA3-4C73-8F70-5B52E40F61D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DDDECBBE-5AA3-4C73-8F70-5B52E40F61D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{877D7711-2845-4B2D-9B54-5E85546896A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{877D7711-2845-4B2D-9B54-5E85546896A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{877D7711-2845-4B2D-9B54-5E85546896A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{877D7711-2845-4B2D-9B54-5E85546896A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B830ECE-44B3-4109-B927-934B0AD161E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B830ECE-44B3-4109-B927-934B0AD161E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B830ECE-44B3-4109-B927-934B0AD161E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B830ECE-44B3-4109-B927-934B0AD161E3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -83,8 +89,9 @@ Global
 		{5C452832-C192-4354-A7E4-01E2A9A2DA3C} = {1CC43294-515C-4B39-88E0-143C4A2D1A7D}
 		{11784F62-3440-443A-8AD7-36CCEF4CE7E9} = {1CC43294-515C-4B39-88E0-143C4A2D1A7D}
 		{E694E079-EEE6-433E-96D9-86C287A40FA0} = {1CC43294-515C-4B39-88E0-143C4A2D1A7D}
-		{864A18CA-E027-41EB-9776-9CD8FE0DC69D} = {1CC43294-515C-4B39-88E0-143C4A2D1A7D}
 		{DDDECBBE-5AA3-4C73-8F70-5B52E40F61D2} = {1CC43294-515C-4B39-88E0-143C4A2D1A7D}
+		{877D7711-2845-4B2D-9B54-5E85546896A2} = {1CC43294-515C-4B39-88E0-143C4A2D1A7D}
+		{4B830ECE-44B3-4109-B927-934B0AD161E3} = {1CC43294-515C-4B39-88E0-143C4A2D1A7D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CDAF5D22-30A9-4D79-A3A4-2A2CD43243D2}

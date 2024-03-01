@@ -1,11 +1,10 @@
-﻿namespace StreamFlow.Domain.Generic.Contracts.Requests;
+﻿using XFramework.Domain.Generic.Contracts.Requests;
 
-public class StreamFlowSubscriptionRequest<TResponse>
+namespace StreamFlow.Domain.Generic.Contracts.Requests;
+
+public record StreamFlowSubscriptionRequest<TResponse> : RequestBase
 {
-    public StreamFlowSubscriptionRequest()
-    {
-        
-    }
+    public StreamFlowSubscriptionRequest() { }
     public StreamFlowSubscriptionRequest(string name, Action<TResponse> onInvoke)
     {
         Name = name;

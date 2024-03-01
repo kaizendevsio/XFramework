@@ -4,7 +4,7 @@ using XFramework.Domain.Generic.Contracts.Requests;
 
 namespace PaymentGateways.Domain.Generic.Contracts.Requests.Create;
 
-public class CreateWithdrawalRequest : TransactionRequestBase
+public record CreateWithdrawalRequest : TransactionRequestBase
 {
     public Guid? CredentialGuid { get; set; }
     public Guid? WalletEntityGuid { get; set; }

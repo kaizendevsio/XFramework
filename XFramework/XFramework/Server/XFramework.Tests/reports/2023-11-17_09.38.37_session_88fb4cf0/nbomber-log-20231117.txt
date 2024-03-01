@@ -1,0 +1,19 @@
+2023-11-17 17:38:46.415 +08:00 [INF] [ThreadId:1] NBomber 5.3.0 started a new session: 2023-11-17_09.38.37_session_88fb4cf0
+2023-11-17 17:38:46.444 +08:00 [INF] [ThreadId:1] NBomber started as single node
+2023-11-17 17:38:46.446 +08:00 [INF] [ThreadId:1] License validation....
+2023-11-17 17:38:46.447 +08:00 [WRN] [ThreadId:1] THIS VERSION IS FREE ONLY FOR PERSONAL USE. You can't use it for an organization.
+2023-11-17 17:38:46.454 +08:00 [INF] [ThreadId:1] Reports folder: C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Tests\bin\Debug\net7.0\reports\empty session
+2023-11-17 17:38:46.455 +08:00 [INF] [ThreadId:1] Plugins: no plugins were loaded
+2023-11-17 17:38:46.455 +08:00 [INF] [ThreadId:1] Reporting sinks: no reporting sinks were loaded
+2023-11-17 17:38:46.455 +08:00 [INF] [ThreadId:1] Starting init...
+2023-11-17 17:38:46.461 +08:00 [INF] [ThreadId:1] Target scenarios: http_scenario
+2023-11-17 17:38:46.464 +08:00 [INF] [ThreadId:1] Init finished
+2023-11-17 17:38:46.473 +08:00 [INF] [ThreadId:1] Starting warm up...
+2023-11-17 17:38:46.473 +08:00 [INF] [ThreadId:1] Warm up for scenarios: http_scenario
+2023-11-17 17:38:46.476 +08:00 [INF] [ThreadId:1] Warm up duration: 00:00:30
+2023-11-17 17:39:17.960 +08:00 [INF] [ThreadId:16] Starting bombing...
+2023-11-17 17:39:20.986 +08:00 [INF] [ThreadId:28] Waiting on scenarios completion...
+2023-11-17 17:39:21.998 +08:00 [WRN] [ThreadId:19] Stopping test early: Stopping test because of too many fails. Scenario 'http_scenario' contains '9470' fails.
+2023-11-17 17:39:24.993 +08:00 [INF] [ThreadId:28] Calculating final statistics...
+2023-11-17 17:39:25.224 +08:00 [INF] [ThreadId:28] Reports saved in folder: C:\Projects\XFramework\XFramework\XFramework\Server\XFramework.Tests\reports\2023-11-17_09.38.37_session_88fb4cf0
+2023-11-17 17:39:25.224 +08:00 [WRN] [ThreadId:28] THIS VERSION IS FREE ONLY FOR PERSONAL USE. You can't use it for an organization.

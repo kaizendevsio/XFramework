@@ -1,90 +1,110 @@
-﻿using System.Diagnostics;
-using System.Text.Json;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
-using StreamFlow.Domain.Generic.BusinessObjects;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Serilog.Context;
+using StreamFlow.Domain.Generic.Abstractions;
 using StreamFlow.Domain.Generic.Contracts.Requests;
-using TypeSupport.Extensions;
+using XFramework.Domain.Generic.Contracts.Base;
+using XFramework.Integration.Extensions;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Drivers;
 
-public class BaseSignalRHandler
+public abstract class BaseSignalRHandler
 {
-    public Guid? Guid { get; set; }
-    public Stopwatch Stopwatch { get; set; } = new();
-
-    public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, StreamFlowTelemetryBO telemetry, TResult data) where TResult : new()
+    
+    public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, Guid requestId, string clientId, TResult data) 
+        where TResult : class, IBaseResponse, IHasRequestServer
     {
-        var request = new StreamFlowMessageBO()
+        var request = new StreamFlowMessage<TResult>(data)
         {
-            RequestGuid = telemetry.RequestGuid,
-            Recipient = telemetry.ClientGuid,
+            RequestId = requestId,
+            RecipientId = clientId,
             ExchangeType = MessageExchangeType.Direct,
-            ResponseStatusCode = data.GetPropertyValue<HttpStatusCode>("HttpStatusCode")
+            ResponseStatusCode = data.HttpStatusCode,
+            CommandName = nameof(IStreamFlow.InvokeResponseHandler)
         };
-        request.SetData(data);
-        request.CommandName = "InvokeResponseHandler";
         
-        return await connection.InvokeAsync<HttpStatusCode>("Push",request);
-    }
-    
-    protected virtual void HandleRequestQuery<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator) where TRequest : new() where TResponse : new() where TQuery : IRequest<QueryResponse<TResponse>>
-    {
-        //Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, QueryResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
-        //connection.On(HandlerName(), Handler<TRequest, TQuery, QueryResponse<TResponse>>(connection, mediator));
-
-    }
-    
-    protected virtual void HandleRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse<TQuery>>
-    {
-        //Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse<TQuery>>(response, connection, mediator).ConfigureAwait(false));
-        //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse<TQuery>>(connection, mediator));
-    }
-    
-    protected virtual void HandleRequestCmd<TRequest, TQuery, TResponse>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse<TResponse>>
-    {
-        //Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse<TResponse>>(response, connection, mediator).ConfigureAwait(false));
-        //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse<TQuery>>(connection, mediator));
+        return await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Push), request);
     }
 
-    protected virtual void HandleVoidRequestCmd<TRequest, TQuery>(HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<CmdResponse>
+    protected virtual void HandleRequestQuery<TQuery, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
+        where TResponse : class
+        where TQuery : class, IRequest<QueryResponse<TResponse>>, IHasRequestServer
     {
-        //Console.WriteLine($"{GetType().Name} Initialized");
-        connection.On(HandlerName(), async (StreamFlowContract response) => Handler<TRequest, TQuery, CmdResponse>(response, connection, mediator).ConfigureAwait(false));
-        //connection.On(HandlerName(), Handler<TRequest, TQuery, CmdResponse>(connection, mediator));
+        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TQuery).GetTypeFullName());
+        connection.On(typeof(TQuery).GetTypeFullName(), (StreamFlowMessage<TQuery> response) => StreamflowRequestHandler<TQuery, QueryResponse<TResponse>>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
+    }
+   
+    protected virtual void HandleRequestCmd<TCmd>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
+        where TCmd : class, IRequest<CmdResponse>, IHasRequestServer
+    {
+        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
+        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
+    }
+    
+    protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
+        where TResponse : class
+        where TCmd : class, IRequest<CmdResponse<TResponse>>, IHasRequestServer
+    {
+        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
+        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse<TResponse>>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
     }
 
-    private async Task Handler<TRequest, TQuery, TResponse>(StreamFlowContract response, HubConnection connection, IMediator mediator) where TRequest : new() where TQuery : IRequest<TResponse> where TResponse : new()
+    private async Task StreamflowRequestHandler<TQuery, TResponse>(StreamFlowMessage<TQuery> response, HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
+        where TQuery : class, IRequest<TResponse>, IHasRequestServer
+        where TResponse : class, IBaseResponse, IHasRequestServer
     {
-        /*Task.Run(async () =>
-            {*/
-        Stopwatch.Restart();
+
         try
         {
-            var r = response.Data.AsMediatorCmd<TRequest, TQuery, TResponse>();
-            var result = await mediator.Send(r).ConfigureAwait(false);
-            Stopwatch.Stop();
+            using var scope = scopeFactory.CreateScope();
+            var internalMediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+            var r = response.Data.AsMediatorCmd<TQuery, TResponse>();
 
-            Console.WriteLine(result.GetPropertyValue("HttpStatusCode").ToString() == $"{HttpStatusCode.InternalServerError}"
-                ? $"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{result.GetType().GetProperty("Message")?.GetValue(result)}] in {Stopwatch.ElapsedMilliseconds}ms"
-                : $"[{DateTime.Now}] Invoked '{GetType().Name}' returned {result.GetType().GetProperty("HttpStatusCode")?.GetValue(result)} in {Stopwatch.ElapsedMilliseconds}ms");
+            using (LogContext.PushProperty("TenantId", r.Metadata?.TenantId))
+            {
+                using (LogContext.PushProperty("RequestId", r.Metadata?.RequestId))
+                {
+                    // Offload logging to a background task
+                    _ = Task.Run(() =>
+                    {
+                        if (!logger.IsEnabled(LogLevel.Information)) return;
 
-            await RespondToInvoke(connection, response.Telemetry, result);
+                        var requestData = JsonSerializer.Serialize(r, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
+                        logger.LogInformation("[{Caller}] Request received, Invoking '{Request}' with data: {Data}", nameof(StreamflowRequestHandler), GetType().Name, requestData);
+                    });
+
+                    var result = await internalMediator.Send(r).ConfigureAwait(false);
+
+                    // Log result in a background task
+                    _ = Task.Run(() =>
+                    {
+                        if (!logger.IsEnabled(LogLevel.Information)) return;
+
+                        var resultData = JsonSerializer.Serialize(result, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
+
+                        if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
+                        {
+                            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}; {Data}", nameof(StreamflowRequestHandler), GetType().Name, result.Message, resultData);
+                        }
+                        else
+                        {
+                            logger.LogInformation("[{Caller}] Invoking {Request}' returned {HttpStatusCode}; {Data}", nameof(StreamflowRequestHandler), GetType().Name, result.HttpStatusCode, resultData);
+                        }
+                    });
+
+                    await RespondToInvoke(connection, response.RequestId, response.ClientId, result);
+                }
+            }
         }
         catch (Exception e)
         {
-            Stopwatch.Stop();
-            Console.WriteLine($"[{DateTime.Now}] Invoked '{GetType().Name}' resulted in exception: [{e.Message}] in {Stopwatch.ElapsedMilliseconds}ms");
+            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}; {StackTrace}",
+                nameof(StreamflowRequestHandler), GetType().Name, e.Message, e.StackTrace);
         }
-        /*});*/
-    }
-
-    private string HandlerName()
-    {
-        return GetType().Name.Replace("Handler", string.Empty);
     }
 }

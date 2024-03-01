@@ -1,15 +1,34 @@
-using Wallets.Domain.Generic.Contracts.Responses;
 using XFramework.Client.Shared.Entity.Models.Requests.Wallet;
 
 namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public class SetState : BaseAction
+    public record SetState : StateAction
     {
-        public List<WalletResponse> WalletList { get; set; }
-        public WalletResponse SelectedWallet { get; set; }
-        public SendWalletRequest SendWalletVm { get; set; }
-        public SendWalletRequest CurrentTransactionVm { get; set; }
+        public List<Domain.Generic.Contracts.Wallet>? WalletList { get; set; }
+        public Domain.Generic.Contracts.Wallet? Selected { get; set; }
+        public SendWalletRequest? SendWalletVm { get; set; }
+        public SendWalletRequest? CurrentTransactionVm { get; set; }
+    }
+    
+    protected class SetStateHandler(HandlerServices handlerServices, IStore store)
+        : StateActionHandler<SetState>(handlerServices, store)
+    {
+        private WalletState CurrentState => Store.GetState<WalletState>();
+      
+        public override async Task Handle(SetState state, CancellationToken aCancellationToken)
+        {
+            try
+            {
+                StateHelper.SetProperties(state, CurrentState);
+                Persist(CurrentState);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+            return;
+        }
     }
 }

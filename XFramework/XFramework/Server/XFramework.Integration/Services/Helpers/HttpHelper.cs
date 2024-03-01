@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using XFramework.Domain.Generic.Contracts.Requests;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.Security;
@@ -14,7 +15,7 @@ public class HttpHelper
     {
         Configuration = configuration;
     }
-    public async Task<HttpResponseBO<T>> PostAsync<T>(Uri baseUrl, string url, object param, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
+    public async Task<HttpResponse<T>> PostAsync<T>(Uri baseUrl, string url, object param, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
     {
         try
         {
@@ -36,12 +37,12 @@ public class HttpHelper
                 }
             }
 
-            var serializeObject = JsonSerializer.Serialize(param);
+            var serializeObject = JsonSerializer.Serialize(param, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
             HttpResponseMessage x = await client.PostAsync($"{baseUrl.AbsoluteUri}{url}", new StringContent(serializeObject, Encoding.UTF8, contentType));
             CookieCollection responseCookies = cookies.GetCookies(baseUrl);
             var stringContent = x.Content.ReadAsStringAsync();
             
-            var response = new HttpResponseBO<T>
+            var response = new HttpResponse<T>
             {
                 StatusCode = x.StatusCode,
                 IsSuccess = x.IsSuccessStatusCode,
@@ -59,7 +60,7 @@ public class HttpHelper
             throw;
         }
     }
-    public async Task<HttpResponseBO<T>> GetAsync<T>(Uri baseUrl, string url, object param = null, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
+    public async Task<HttpResponse<T>> GetAsync<T>(Uri baseUrl, string url, object param = null, CookieCollection requestCookies = null, string contentType = "application/json", bool clearDefaultRequestHeaders = false, AuthenticationHeaderValue authenticationHeader = null)
     {
         try
         {
@@ -85,14 +86,14 @@ public class HttpHelper
             }
 
             HttpResponseMessage x;
-            var requestModelJson = param != null ? JsonSerializer.Serialize(param).JsonToQuery() : string.Empty;
+            var requestModelJson = param != null ? JsonSerializer.Serialize(param, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles}).JsonToQuery() : string.Empty;
             try
             {
                 x = await client.GetAsync($"{baseUrl.AbsoluteUri}{url}{requestModelJson}");
             }
             catch (Exception e)
             {
-                return new HttpResponseBO<T>
+                return new HttpResponse<T>
                 {
                     StatusCode = HttpStatusCode.BadRequest,
                     ReasonPhrase = $"{e.Message} : {e.InnerException?.Message}",
@@ -100,7 +101,7 @@ public class HttpHelper
                 };
             }
             CookieCollection responseCookies = cookies.GetCookies(baseUrl);
-            var response = new HttpResponseBO<T>
+            var response = new HttpResponse<T>
             {
                 StatusCode = x.StatusCode,
                 ReasonPhrase = x.ReasonPhrase,
@@ -120,7 +121,7 @@ public class HttpHelper
         }
        
     }
-    public async Task<HttpResponseBO<T>> SecurePostJsonAsync<T, TContent>(string requestUri, EncryptedRequestBase<TContent> requestContent,CookieCollection cookieCollection = null)
+    public async Task<HttpResponse<T>> SecurePostJsonAsync<T, TContent>(string requestUri, EncryptedRequestBase<TContent> requestContent,CookieCollection cookieCollection = null)
     {
         var encryptionSecret = Configuration.GetValue<string>("Application:PaddedEncryptionSecret");
         var keyString = $"{encryptionSecret}{DateTime.UtcNow:yyyyMMddHHmm}";

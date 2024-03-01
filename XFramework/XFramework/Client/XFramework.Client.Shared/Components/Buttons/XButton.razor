@@ -1,0 +1,108 @@
+﻿<MudButton HtmlTag="@HtmlTag"
+           Class="@Class"
+           ButtonType="@ButtonType"
+           Href="@Href"
+           Target="@Target"
+           Rel="@Rel"
+           Disabled="@(Disabled || _processing || FormIsLoading)"
+           DisableElevation="@DisableElevation"
+           DisableRipple="@DisableRipple"
+           OnClick="@InternalOnClick"
+           StartIcon="@(_processing || FormIsLoading ? null : StartIcon)"
+           EndIcon="@(_processing || FormIsLoading ? null : EndIcon)"
+           IconColor="@IconColor"
+           IconSize="@IconSize"
+           IconClass="@IconClass"
+           Color="@Color"
+           Size="@Size"
+           Variant="@Variant"
+           FullWidth="@FullWidth">
+
+    @if (_processing || FormIsLoading)
+    {
+        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+        <MudText Color="Color.Dark" Class="ms-2">Processing</MudText>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(Title))
+        {
+            <MudText>@Title</MudText>
+        }
+        else
+        {
+            @ChildContent
+        }
+    }
+</MudButton>
+
+@code {
+
+    private bool _processing = false;
+
+    /// <summary>
+    /// The HTML element that will be rendered in the root by the component
+    /// By default, is a button
+    /// </summary>
+    [Parameter]
+    [Category("Click action")]
+    public string HtmlTag { get; set; } = "button";
+
+    /// <summary>
+    /// If set to a URL, clicking the button will open the referenced document. Use Target to specify where
+    /// </summary>
+    [Parameter]
+    [Category("Click action")]
+    public string Href { get; set; }
+
+    /// <summary>
+    /// The target attribute specifies where to open the link, if Link is specified. Possible values: _blank | _self | _parent | _top | <i>framename</i>
+    /// </summary>
+    [Parameter]
+    [Category("Click action")]
+    public string Target { get; set; }
+
+    /// <summary>
+    /// The value of rel attribute for web crawlers. Overrides "noopener" set by <see cref="P:MudBlazor.MudBaseButton.Target" /> attribute.
+    /// </summary>
+    [Parameter]
+    [Category("Click action")]
+    public string Rel { get; set; }
+
+    /// <summary>If true, the button will be disabled.</summary>
+    [Parameter]
+    [Category("Behavior")]
+    public bool Disabled { get; set; }
+
+    /// <summary>If true, no drop-shadow will be used.</summary>
+    [Parameter]
+    [Category("Appearance")]
+    public bool DisableElevation { get; set; }
+
+    /// <summary>If true, disables ripple effect.</summary>
+    [Parameter]
+    [Category("Appearance")]
+    public bool DisableRipple { get; set; }
+
+    /// <summary>
+    /// The color of the component. It supports the theme colors.
+    /// </summary>
+    [Parameter]
+    [Category("Appearance")]
+    public Color Color { get; set; }
+
+    [CascadingParameter(Name = "FormIsLoading")]
+    public bool FormIsLoading { get; set; }
+    
+    private async Task InternalOnClick(MouseEventArgs e)
+    {
+        _processing = true;
+        StateHasChanged();
+        
+        await OnClick.InvokeAsync(e);
+        
+        _processing = false;
+        StateHasChanged();
+    }
+
+}

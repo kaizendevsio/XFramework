@@ -1,6 +1,4 @@
-﻿using SmsGateway.Core.DataAccess;
-using SmsGateway.Core.Interfaces;
-using SmsGateway.Domain.DataTransferObjects;
+﻿using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace SmsGateway.Api.Installers;
 
@@ -8,7 +6,9 @@ public class DbInstaller : IInstaller
 {
     public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<XnelSystemsContext>(options => options.UseNpgsql(configuration.GetConnectionString("DatabaseConnection")));
-        services.AddTransient<IDataLayer, DataLayer>();
+        services.AddDbContext<DbContext, AppDbContext>(options => options
+            .UseNpgsql(configuration.GetConnectionString("DefaultDatabaseConnection"))
+            .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
+        );
     }
 }

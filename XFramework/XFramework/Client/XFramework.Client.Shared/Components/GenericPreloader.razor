@@ -1,5 +1,4 @@
-﻿@using MudBlazor
-@inherits XComponentsBase
+﻿@inherits XComponentsBase
 
 @if (ApplicationState.IsBusy && !ApplicationState.NoSpinner)
 {
@@ -17,7 +16,7 @@
                 }
                 else
                 {
-                    <MudProgressCircular Size="Size.Large" Color="Color.Primary" Indeterminate="true" />
+                    <MudProgressCircular Size="Size.Medium" Color="Color.Success" Indeterminate="@true" />
                 }
             }
         </MudStack>

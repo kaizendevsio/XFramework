@@ -21,7 +21,7 @@ public class EncryptedRequestBase<T>
 
     public string AsJsonContent()
     {
-        return JsonSerializer.Serialize(ObjectContent);
+        return JsonSerializer.Serialize(ObjectContent, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
     } 
 }
     

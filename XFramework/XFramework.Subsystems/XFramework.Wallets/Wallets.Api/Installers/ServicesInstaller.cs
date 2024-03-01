@@ -1,7 +1,6 @@
-﻿using Wallets.Core.Interfaces;
-using Wallets.Core.Services;
-using XFramework.Integration.Interfaces;
-using XFramework.Integration.Services;
+﻿using Tenant.Integration.Drivers;
+using Wallets.Core;
+using XFramework.Integration.Extensions;
 
 namespace Wallets.Api.Installers;
 
@@ -9,9 +8,14 @@ public class ServicesInstaller : IInstaller
 {
     public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ICachingService, CachingService>();
-        services.AddSingleton<IHelperService, HelperService>();
-        services.AddSingleton<IJwtService, JwtService>();
-        services.AddSingleton<ProcessMonitorService>();
+        /*services.AddSingleton<ICachingService, CachingService>();*/
+        services.AddTenantService();
+        services.AddTenantWrapperServices();
+        services.AddDecoratorHandlers(typeof(WalletsCore).Assembly);
+        
+        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
+            typeof(WalletsBaseRequest).Assembly,
+            typeof(WalletsCore).Assembly
+        ));
     }
 }

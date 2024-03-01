@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace XFramework.Client.Shared.Entity.Models.Components
+﻿namespace XFramework.Client.Shared.Entity.Models.Components
 {
     public class JsScriptPath
     {
