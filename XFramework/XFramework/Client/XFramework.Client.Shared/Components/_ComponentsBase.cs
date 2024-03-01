@@ -29,7 +29,7 @@ public class XComponentsBase : BlazorStateComponent
     public SessionState SessionState => GetState<SessionState>();
     public IdentityState IdentityState => GetState<IdentityState>();
     public AffiliateState AffiliateState => GetState<AffiliateState>();
-    public AddressState AddressState => Store.GetState<AddressState>();
+    public AddressState AddressState => GetState<AddressState>();
     public CacheState CacheState => GetState<CacheState>();
     public WalletState WalletState => GetState<WalletState>();
 

@@ -2,6 +2,7 @@
 
 namespace XFramework.Client.Shared.Entity.Models.Requests.Wallet;
 
+[SuppressMessage("BlazorState", "TW0001:Blazor State Action should be a nested type of its State")]
 public record SendWalletRequest : NavigableRequest
 {
     public Guid SenderCredentialId { get; set; }
