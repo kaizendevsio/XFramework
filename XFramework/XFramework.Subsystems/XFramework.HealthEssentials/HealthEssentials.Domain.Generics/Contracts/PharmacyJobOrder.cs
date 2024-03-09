@@ -27,8 +27,9 @@ public partial class PharmacyJobOrder : BaseModel
     public DateTime? CompletedAt { get; set; }
 
     public string? PrescriptionNote { get; set; }
-
-
+    
+    public Guid UnavailabilityHandling { get; set; }
+    
     public Guid ScheduleId { get; set; }
 
     public Guid PatientId { get; set; }

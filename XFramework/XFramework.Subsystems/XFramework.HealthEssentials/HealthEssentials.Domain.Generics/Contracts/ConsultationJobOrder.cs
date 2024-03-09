@@ -44,6 +44,9 @@ public partial class ConsultationJobOrder : BaseModel
 
     public string MeetingLink { get; set; } = null!;
 
+    [NotMapped]
+    public List<FileUploadRequest> AttachmentFileList { get; set; } = [];
+
     public virtual Consultation Consultation { get; set; } = null!;
 
     public virtual ICollection<ConsultationJobOrderLaboratory> ConsultationJobOrderLaboratories { get; set; } =

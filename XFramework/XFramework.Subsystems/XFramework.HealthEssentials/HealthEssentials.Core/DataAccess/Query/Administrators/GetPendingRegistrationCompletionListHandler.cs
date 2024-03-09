@@ -42,11 +42,11 @@ public class GetPendingRegistrationCompletionListHandler(
         var credentials = response.Response?.Items
             .Where(c => c.Tenant.Id == tenant.Id)
             .Where(i => i.IdentityRoles.Any(p =>
-                p.Type.Id == HealthEssentialsIdentityRoles.Doctor ||
-                p.Type.Id == HealthEssentialsIdentityRoles.Pharmacy ||
-                p.Type.Id == HealthEssentialsIdentityRoles.Logistics ||
-                p.Type.Id == HealthEssentialsIdentityRoles.Hospital ||
-                p.Type.Id == HealthEssentialsIdentityRoles.Laboratory))
+                p.Type.Id == HealthEssentialsConstants.IdentityRole.Doctor ||
+                p.Type.Id == HealthEssentialsConstants.IdentityRole.Pharmacy ||
+                p.Type.Id == HealthEssentialsConstants.IdentityRole.Logistics ||
+                p.Type.Id == HealthEssentialsConstants.IdentityRole.Hospital ||
+                p.Type.Id == HealthEssentialsConstants.IdentityRole.Laboratory))
             .ToList();
            
 

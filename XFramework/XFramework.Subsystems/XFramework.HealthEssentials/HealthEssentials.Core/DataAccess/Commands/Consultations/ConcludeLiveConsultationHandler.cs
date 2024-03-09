@@ -156,7 +156,7 @@ public class ConcludeLiveConsultationHandler(
         var publishObject = new PublishRequest<ConsultationJobOrder>(jobOrder);
         publishObject = helperService.RemoveCircularReference(publishObject);
 
-        messageBusWrapper.PublishAsync(HealthEssentialsEvent.ConcludeConsultation, credential.Id.ToString(), publishObject);
+        messageBusWrapper.PublishAsync(HealthEssentialsConstants.Event.ConcludeConsultation, credential.Id.ToString(), publishObject);
         
         if (!hostEnvironment.IsProduction())
         {

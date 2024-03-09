@@ -88,7 +88,7 @@ public class CommenceLiveConsultationHandler(
         var publishObject = new PublishRequest<ConsultationJobOrder>(jobOrder);
         publishObject = helperService.RemoveCircularReference(publishObject);
         
-        messageBusWrapper.PublishAsync(HealthEssentialsEvent.CommenceConsultation, credential.Id.ToString(), publishObject);
+        messageBusWrapper.PublishAsync(HealthEssentialsConstants.Event.CommenceConsultation, credential.Id.ToString(), publishObject);
         
         if (!hostEnvironment.IsProduction())
         {

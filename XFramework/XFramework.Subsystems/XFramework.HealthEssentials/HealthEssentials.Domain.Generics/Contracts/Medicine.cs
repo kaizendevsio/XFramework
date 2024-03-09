@@ -24,6 +24,8 @@ public partial class Medicine : BaseModel
 
     public virtual ICollection<MedicineVendor> MedicineVendors { get; set; } = new List<MedicineVendor>();
 
+    public virtual ICollection<MedicineVariant> MedicineVariants { get; set; } = new List<MedicineVariant>();
+    
     public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicines { get; set; } =
         new List<PharmacyJobOrderMedicine>();
 

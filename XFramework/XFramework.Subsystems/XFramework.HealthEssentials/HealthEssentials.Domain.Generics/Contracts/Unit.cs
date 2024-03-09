@@ -30,6 +30,7 @@ public partial class Unit : BaseModel
         new List<LogisticJobOrderDetail>();
 
     public virtual ICollection<MedicineIntake> MedicineIntakes { get; set; } = new List<MedicineIntake>();
+    public virtual ICollection<MedicineVariant> MedicineVariants { get; set; } = new List<MedicineVariant>();
 
     public virtual ICollection<PharmacyJobOrderMedicine> PharmacyJobOrderMedicineDosageUnits { get; set; } =
         new List<PharmacyJobOrderMedicine>();
