@@ -2,6 +2,7 @@
 using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using Microsoft.Extensions.DependencyInjection;
+using Registry.Integration.Drivers;
 using Wallets.Integration.Drivers;
 using XFramework.Client.Shared.Interfaces;
 
@@ -15,5 +16,6 @@ public class ServicesInstaller : IInstaller
         services.AddAddressWrapperServices();
         services.AddWalletsWrapperServices();
         services.AddMessagingWrapperServices();
+        services.AddRegistryWrapperServices();
     }
 }

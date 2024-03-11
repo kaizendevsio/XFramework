@@ -26,9 +26,18 @@ public class MedicineAutoCompleteHandler(
         {
             try
             {
-                var response = await client.GetAsync(url, cancellationToken);
+                var mimsRequest = new HttpRequestMessage(HttpMethod.Get, url);
+                mimsRequest.Headers.Clear();
+                mimsRequest.Headers.Add("Host", "www.mims.com");
+                mimsRequest.Headers.Add("User-Agent", "PostmanRuntime/69");
+                mimsRequest.Headers.Add("Accept", "*/*");
+                mimsRequest.Headers.Add("Accept-Encoding", "");
+                mimsRequest.Headers.Add("Connection", "keep-alive");
+                
+                var response = await client.SendAsync(mimsRequest, cancellationToken);
                 
                 response.EnsureSuccessStatusCode(); // Throw an exception if not successful
+
                 var responseBody = await response.Content.ReadFromJsonAsync<MimsAutoCompleteResponse>(cancellationToken: cancellationToken);
                 responseBody.Suggestions = responseBody.Suggestions.Take(responseBody.Suggestions.Count - 1).ToList();
                 
@@ -36,6 +45,8 @@ public class MedicineAutoCompleteHandler(
                     .Where(i => i.TenantId == tenant.Id)
                     .Where(i => i.IsDeleted == false)
                     .Where(i => responseBody.Suggestions.Select(s => s.Value.ToUpperInvariant()).Contains(i.Name))
+                    .Include(i => i.MedicineVariants)
+                    .AsSplitQuery()
                     .ToListAsync(cancellationToken);
 
                 var newMedicines = responseBody.Suggestions;
@@ -49,16 +60,26 @@ public class MedicineAutoCompleteHandler(
                     {
                         Name = m.Value.ToUpperInvariant(),
                         TenantId = tenant.Id,
-                        TypeId = new Guid("570ccf7f-f68a-450d-b110-09648f3540ed")
+                        TypeId = new Guid("570ccf7f-f68a-450d-b110-09648f3540ed"),
+                        MedicineVariants = new List<MedicineVariant>
+                        {
+                            new()
+                            {
+                                Name = "No_Variant",
+                                TenantId = tenant.Id
+                            }
+                        }
                     }).ToList();
                     await dbContext.Set<Domain.Generics.Contracts.Medicine>().AddRangeAsync(newMedicineEntities, cancellationToken);
                     await dbContext.SaveChangesAsync(cancellationToken);
                 }
+
+                var results = helperService.RemoveCircularReference(existingMedicines.Concat(newMedicineEntities).ToList());
                 
                 return new QueryResponse<List<Domain.Generics.Contracts.Medicine>>
                 {
                     HttpStatusCode = HttpStatusCode.OK,
-                    Response = existingMedicines.Concat(newMedicineEntities).ToList()
+                    Response = results
                 };
             }
             catch (HttpRequestException e)

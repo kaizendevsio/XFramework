@@ -4,7 +4,7 @@ public partial class PharmacyJobOrderMedicine : BaseModel
 {
     public Guid PharmacyJobOrderId { get; set; }
 
-    public Guid MedicineId { get; set; }
+    public Guid MedicineVariantId { get; set; }
     
     public int Quantity { get; set; }
 
@@ -14,6 +14,7 @@ public partial class PharmacyJobOrderMedicine : BaseModel
 
     public short? Status { get; set; }
 
+    public Guid UnavailabilityHandling { get; set; }
 
     public int IntakeRepetition { get; set; }
 
@@ -33,7 +34,7 @@ public partial class PharmacyJobOrderMedicine : BaseModel
 
     public virtual Unit IntakeUnit { get; set; } = null!;
 
-    public virtual Medicine? Medicine { get; set; }
+    public virtual MedicineVariant? MedicineVariant { get; set; }
     
     public virtual PharmacyJobOrder PharmacyJobOrder { get; set; } = null!;
 }

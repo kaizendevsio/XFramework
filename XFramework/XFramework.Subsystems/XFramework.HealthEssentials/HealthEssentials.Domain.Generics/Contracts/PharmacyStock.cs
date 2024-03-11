@@ -4,7 +4,7 @@ public partial class PharmacyStock : BaseModel
 {
     public Guid PharmacyId { get; set; }
 
-    public Guid MedicineId { get; set; }
+    public Guid MedicineVariantId { get; set; }
 
     public DateTime LastRestock { get; set; }
 
@@ -19,7 +19,7 @@ public partial class PharmacyStock : BaseModel
     public Guid Unit { get; set; }
 
 
-    public virtual Medicine Medicine { get; set; } = null!;
+    public virtual MedicineVariant MedicineVariant { get; set; } = null!;
 
     public virtual Pharmacy Pharmacy { get; set; } = null!;
 

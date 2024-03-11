@@ -31,6 +31,13 @@ public static class TenantServiceWrapper;
 
 [StreamFlowWrapper("XFramework.Domain.Generic.Contracts", new[]
 {
+    nameof(RegistryConfiguration),
+    nameof(RegistryConfigurationGroup),
+})]
+public static class RegistryServiceWrapper;
+
+[StreamFlowWrapper("XFramework.Domain.Generic.Contracts", new[]
+{
     nameof(AddressBarangay),
     nameof(AddressCity),
     nameof(AddressCountry),

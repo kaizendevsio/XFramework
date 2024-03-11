@@ -129,6 +129,8 @@ public partial class HealthEssentialsContext : DbContext
     public virtual DbSet<MedicineIntakeType> MedicineIntakeTypes { get; set; }
 
     public virtual DbSet<MedicineTag> MedicineTags { get; set; }
+    
+    public virtual DbSet<MedicineVariant> MedicineVariants { get; set; }
 
     public virtual DbSet<MedicineVendor> MedicineVendors { get; set; }
 
@@ -537,8 +539,8 @@ public partial class HealthEssentialsContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("consultationjobordermedicine_unit_id_fk");
 
-            entity.HasOne(d => d.Medicine).WithMany(p => p.ConsultationJobOrderMedicines)
-                .HasForeignKey(d => d.MedicineId)
+            entity.HasOne(d => d.MedicineVariant).WithMany(p => p.ConsultationJobOrderMedicines)
+                .HasForeignKey(d => d.MedicineVariantId)
                 .HasConstraintName("consultationjobordermedicine_medicine_id_fk");
             
         });
@@ -1895,6 +1897,35 @@ public partial class HealthEssentialsContext : DbContext
                 .HasConstraintName("medicinetag_tag_id_fk");
         });
 
+        modelBuilder.Entity<MedicineVariant>(entity =>
+        {
+            entity.ToTable("MedicineVariant", "Medicine");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Name)
+                .HasMaxLength(255)
+                .IsUnicode(true);
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(1000)
+                .IsUnicode(true);
+
+            entity.Property(e => e.Dosage)
+                .HasColumnType("decimal(18,2)");
+
+            entity.HasOne(d => d.Medicine)
+                .WithMany(p => p.MedicineVariants)
+                .HasForeignKey(d => d.MedicineId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(d => d.Unit)
+                .WithMany(i => i.MedicineVariants)
+                .HasForeignKey(d => d.UnitId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+        });
+        
         modelBuilder.Entity<MedicineVendor>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("medicinevendor_pk");
@@ -2398,8 +2429,8 @@ public partial class HealthEssentialsContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacyjobordermedicine_unit_id_fk");
 
-            entity.HasOne(d => d.Medicine).WithMany(p => p.PharmacyJobOrderMedicines)
-                .HasForeignKey(d => d.MedicineId)
+            entity.HasOne(d => d.MedicineVariant).WithMany(p => p.PharmacyJobOrderMedicines)
+                .HasForeignKey(d => d.MedicineVariantId)
                 .HasConstraintName("pharmacyjobordermedicine_medicine_id_fk");
 
             entity.HasOne(d => d.PharmacyJobOrder).WithMany(p => p.PharmacyJobOrderMedicines)
@@ -2616,8 +2647,8 @@ public partial class HealthEssentialsContext : DbContext
             entity.Property(e => e.LastRestock).HasDefaultValueSql("now()");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
-            entity.HasOne(d => d.Medicine).WithMany(p => p.PharmacyStocks)
-                .HasForeignKey(d => d.MedicineId)
+            entity.HasOne(d => d.MedicineVariant).WithMany(p => p.PharmacyStocks)
+                .HasForeignKey(d => d.MedicineVariantId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacystocks_medicine_id_fk");
 

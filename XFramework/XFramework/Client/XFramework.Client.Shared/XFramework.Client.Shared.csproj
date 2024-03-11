@@ -26,6 +26,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Components\Modals\" />
       <Folder Include="Core\Features\Base" />
       <Folder Include="Entity\Models\Responses" />
     </ItemGroup>

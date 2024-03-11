@@ -1816,7 +1816,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Id)
                 .HasColumnName("ID")
                 .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.TenantId).HasColumnName("ApplicationId");
+            entity.Property(e => e.TenantId);
 
             entity.Property(e => e.Key).HasColumnType("character varying");
             entity.Property(e => e.Unit).HasMaxLength(100);

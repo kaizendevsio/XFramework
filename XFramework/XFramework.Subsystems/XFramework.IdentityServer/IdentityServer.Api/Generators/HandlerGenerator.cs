@@ -23,6 +23,8 @@ namespace IdentityServer.Api.Generators;
     nameof(IdentityRole),
     nameof(IdentityRoleType),
     nameof(IdentityRoleTypeGroup),
+    nameof(RegistryConfiguration),
+    nameof(RegistryConfigurationGroup),
     nameof(StorageFile),
     nameof(StorageFileType),
     nameof(Tenant)

@@ -2,6 +2,7 @@
 using Azure.Storage.Blobs.Models;
 using ByteSizeLib;
 using XFramework.Core.Services;
+using XFramework.Integration.Abstractions;
 
 namespace IdentityServer.Core.DataAccess.Commands.Storage;
 
@@ -9,6 +10,7 @@ public class CreateFile(
         DbContext dbContext,
         ILogger<CreateFile> logger,
         ITenantService tenantService,
+        IHelperService helperService,
         IRequestHandler<Create<StorageFile>, CmdResponse<StorageFile>> baseHandler
     ) 
     : ICreateHandler<StorageFile>, IDecorator
@@ -51,6 +53,8 @@ public class CreateFile(
         request.Model.FileSize = (decimal?) ByteSize.FromBytes(request.Model.FileBytes.Length).KiloBytes;
         
         var response = await baseHandler.Handle(request, cancellationToken);
+        response = helperService.RemoveCircularReference(response);
+
         return response;
     }
 }

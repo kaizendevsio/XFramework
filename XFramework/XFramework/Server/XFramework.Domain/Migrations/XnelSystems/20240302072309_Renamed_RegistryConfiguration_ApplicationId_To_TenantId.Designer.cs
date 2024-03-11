@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
@@ -11,9 +12,11 @@ using XFramework.Domain.Contexts;
 namespace XFramework.Domain.Migrations.XnelSystems
 {
     [DbContext(typeof(AppDbContext))]
-    partial class XnelSystemsContextModelSnapshot : ModelSnapshot
+    [Migration("20240302072309_Renamed_RegistryConfiguration_ApplicationId_To_TenantId")]
+    partial class Renamed_RegistryConfiguration_ApplicationId_To_TenantId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
