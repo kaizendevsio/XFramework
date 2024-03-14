@@ -14,7 +14,8 @@
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SEQ_URL": "http://localhost:5341"
       }
     },
     "IdentityServer.Api": {
@@ -24,7 +25,8 @@
       "launchUrl": "swagger",
       "applicationUrl": "https://localhost:8262;http://localhost:8261",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SEQ_URL": "http://localhost:5341"
       }
     }
   }

@@ -14,13 +14,15 @@
       "launchBrowser": true,
       "launchUrl": "startup",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SEQ_URL": "http://localhost:5341"
       }
     },
     "XFramework.API": {
       "commandName": "Project",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SEQ_URL": "http://localhost:5341"
       },
       "applicationUrl": "http://localhost:65006;https://localhost:65007"
     }
