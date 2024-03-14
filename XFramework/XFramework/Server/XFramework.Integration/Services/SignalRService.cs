@@ -58,7 +58,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     {
         var envConfig = _configuration["STREAMFLOW_SERVER_URLS"];
         
-        if (StreamFlowConfiguration.ServerUrls is null || !StreamFlowConfiguration.ServerUrls.Any() || string.IsNullOrEmpty(envConfig))
+        if ((StreamFlowConfiguration.ServerUrls is null || !StreamFlowConfiguration.ServerUrls.Any()) && string.IsNullOrEmpty(envConfig))
         {
             _logger.LogWarning("StreamFlow configuration is not set, therefore SignalR client service is disabled");
             return;
