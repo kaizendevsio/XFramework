@@ -14,7 +14,8 @@
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SEQ_URL": "http://localhost:5341"
       }
     },
     "Wallets.Api": {
@@ -24,7 +25,8 @@
       "launchUrl": "swagger",
       "applicationUrl": "https://localhost:9697;http://localhost:9696",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SEQ_URL": "http://localhost:5341"
       }
     }
   }
