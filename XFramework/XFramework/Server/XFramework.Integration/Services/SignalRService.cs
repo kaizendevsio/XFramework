@@ -25,6 +25,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 {
     private readonly ILogger<SignalRService> _logger;
     private readonly IHostEnvironment _hostEnvironment;
+    private readonly IConfiguration _configuration;
     private readonly IMediator _mediator;
     private readonly ILogger<BaseSignalRHandler> _baseLogger;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -43,6 +44,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     public SignalRService(IHostEnvironment hostEnvironment, IConfiguration configuration, ILogger<SignalRService> logger, IMediator mediator, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
     {
         _hostEnvironment = hostEnvironment;
+        _configuration = configuration;
         _mediator = mediator;
         _baseLogger = baseLogger;
         _scopeFactory = scopeFactory;
@@ -54,14 +56,16 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
     private void InitializeService()
     {
-        if (StreamFlowConfiguration.ServerUrls is null || !StreamFlowConfiguration.ServerUrls.Any())
+        var envConfig = _configuration["STREAMFLOW_SERVER_URLS"];
+        
+        if (StreamFlowConfiguration.ServerUrls is null || !StreamFlowConfiguration.ServerUrls.Any() || string.IsNullOrEmpty(envConfig))
         {
             _logger.LogWarning("StreamFlow configuration is not set, therefore SignalR client service is disabled");
             return;
         }
         
         Connection = new HubConnectionBuilder()
-            .WithUrl(StreamFlowConfiguration.ServerUrls.First())
+            .WithUrl(StreamFlowConfiguration?.ServerUrls?.FirstOrDefault() ?? new Uri(envConfig))
             .WithAutomaticReconnect(Enumerable.Repeat(TimeSpan.FromSeconds(2), 2000).ToArray())
             .AddMessagePackProtocol()
             .Build();
