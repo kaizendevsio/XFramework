@@ -10,7 +10,7 @@
     @if(FormMode is FormMode.Create or FormMode.Edit)
     {
         <CascadingValue Name="ParentDisabled" Value="@_disabled">
-            <div class="d-flex flex-row justify-content-end gap-3">
+            <div class="d-flex flex-row justify-content-end gap-3 ms-auto">
                 <CancelButton
                     Size="Size.Large"
                     OnClick="@InternalCancel"/>
@@ -39,9 +39,6 @@
     
     [CascadingParameter] 
     public FormMode FormMode { get; set; }
-
-    [CascadingParameter]
-    public bool IsLoading { get; set; }
 
     private Task InternalCancel(MouseEventArgs? e)
     {

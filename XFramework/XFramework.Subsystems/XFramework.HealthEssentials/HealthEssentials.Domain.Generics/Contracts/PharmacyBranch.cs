@@ -48,6 +48,8 @@ public partial class PharmacyBranch : BaseModel, IHasOnlineStatus
     public virtual ICollection<PharmacyMember> PharmacyMembers { get; set; } = new List<PharmacyMember>();
 
     public virtual ICollection<PharmacyService> PharmacyServices { get; set; } = new List<PharmacyService>();
+
+    public virtual ICollection<PharmacyStock> PharmacyStocks { get; set; } = new List<PharmacyStock>();
         
     [NotMapped]
     public List<StorageFile>? Files { get; set; }

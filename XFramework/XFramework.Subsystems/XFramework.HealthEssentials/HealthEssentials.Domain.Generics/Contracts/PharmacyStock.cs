@@ -21,7 +21,7 @@ public partial class PharmacyStock : BaseModel
 
     public virtual MedicineVariant MedicineVariant { get; set; } = null!;
 
-    public virtual Pharmacy Pharmacy { get; set; } = null!;
+    public virtual PharmacyBranch PharmacyBranch { get; set; } = null!;
 
     public virtual Unit? UnitNavigation { get; set; }
 }

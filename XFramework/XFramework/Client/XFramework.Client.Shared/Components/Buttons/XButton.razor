@@ -18,10 +18,10 @@
            Variant="@Variant"
            FullWidth="@FullWidth">
 
-    @if (_processing || FormIsLoading)
+    @if (_processing || (FormIsLoading && ButtonType == ButtonType.Submit))
     {
         <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
-        <MudText Color="Color.Dark" Class="ms-2">Processing</MudText>
+        <MudText Color="Color.Dark" Class="ms-2">@(string.IsNullOrEmpty(Title) ? Title : "Processing")</MudText>
     }
     else
     {

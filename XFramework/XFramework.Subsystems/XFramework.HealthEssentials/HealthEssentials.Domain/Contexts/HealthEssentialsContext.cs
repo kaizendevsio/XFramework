@@ -2652,7 +2652,7 @@ public partial class HealthEssentialsContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacystocks_medicine_id_fk");
 
-            entity.HasOne(d => d.Pharmacy).WithMany(p => p.PharmacyStocks)
+            entity.HasOne(d => d.PharmacyBranch).WithMany(p => p.PharmacyStocks)
                 .HasForeignKey(d => d.PharmacyId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacystocks_pharmacy_id_fk");

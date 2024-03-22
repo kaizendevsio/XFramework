@@ -1,0 +1,13 @@
+.skeleton-table {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+.skeleton-row {
+    display: flex;
+    gap: 8px; /* Adjust the space between cells */
+    margin-bottom: 8px; /* Adjust the space between rows */
+}
+.skeleton-cell {
+    flex: 1; /* Each cell takes equal width */
+}
