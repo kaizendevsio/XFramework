@@ -1,5 +1,6 @@
 ﻿using XFramework.Client.Shared.Core.Features.Address;
 using XFramework.Client.Shared.Core.Features.Cache;
+using XFramework.Client.Shared.Core.Features.Identity;
 using XFramework.Client.Shared.Core.Features.Layout;
 using XFramework.Client.Shared.Core.Features.Wallet;
 
@@ -22,6 +23,7 @@ public class XLayoutBase : BlazorStateLayoutComponent
     public ApplicationState ApplicationState => GetState<ApplicationState>();
     public LayoutState LayoutState => GetState<LayoutState>();
     public SessionState SessionState => GetState<SessionState>();
+    public IdentityState IdentityState => GetState<IdentityState>();
     public AddressState AddressState => Store.GetState<AddressState>();
     public CacheState CacheState => GetState<CacheState>();
     public WalletState WalletState => GetState<WalletState>();

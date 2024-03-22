@@ -1,4 +1,6 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class PharmacyJobOrderMedicine : BaseModel
 {
@@ -37,4 +39,7 @@ public partial class PharmacyJobOrderMedicine : BaseModel
     public virtual MedicineVariant? MedicineVariant { get; set; }
     
     public virtual PharmacyJobOrder PharmacyJobOrder { get; set; } = null!;
+
+    [NotMapped]
+    public bool? IsAvailable { get; set; }
 }

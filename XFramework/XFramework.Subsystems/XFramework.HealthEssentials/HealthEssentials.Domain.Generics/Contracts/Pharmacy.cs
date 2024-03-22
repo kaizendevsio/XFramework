@@ -33,7 +33,6 @@ public partial class Pharmacy : BaseModel
 
     public virtual ICollection<PharmacyService> PharmacyServices { get; set; } = new List<PharmacyService>();
 
-    public virtual ICollection<PharmacyStock> PharmacyStocks { get; set; } = new List<PharmacyStock>();
 
     public virtual ICollection<PharmacyTag> PharmacyTags { get; set; } = new List<PharmacyTag>();
 }
