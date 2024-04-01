@@ -33,8 +33,8 @@ public class XComponentsBase : BlazorStateComponent
     public CacheState CacheState => GetState<CacheState>();
     public WalletState WalletState => GetState<WalletState>();
 
-    [Parameter] public bool IsLoading { get; set; }
-    public string Cursor => IsLoading ? "progress" : "arrow";
+    [Parameter] public bool? IsLoading { get; set; }
+    public string Cursor => IsLoading is true ? "progress" : "arrow";
     
     // Global Methods
     public void NavigateTo(string path) => NavigationManager.NavigateTo(path);

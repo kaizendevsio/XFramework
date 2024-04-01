@@ -66,7 +66,8 @@ public class MedicineAutoCompleteHandler(
                             new()
                             {
                                 Name = "No_Variant",
-                                TenantId = tenant.Id
+                                TenantId = tenant.Id,
+                                UnitId = new Guid("4369507c-7cda-47c1-99b7-fd6420d5afa3")
                             }
                         }
                     }).ToList();

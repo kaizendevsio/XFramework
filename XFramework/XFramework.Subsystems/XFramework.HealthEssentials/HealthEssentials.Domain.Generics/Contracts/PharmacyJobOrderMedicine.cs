@@ -20,15 +20,15 @@ public partial class PharmacyJobOrderMedicine : BaseModel
 
     public int IntakeRepetition { get; set; }
 
-    public Guid IntakeUnitId { get; set; }
+    public Guid? IntakeUnitId { get; set; }
 
     public decimal Duration { get; set; }
 
-    public Guid DurationUnitId { get; set; }
+    public Guid? DurationUnitId { get; set; }
 
     public int? Dosage { get; set; }
 
-    public Guid DosageUnitId { get; set; }
+    public Guid? DosageUnitId { get; set; }
 
     public virtual Unit? DosageUnit { get; set; }
 
@@ -42,4 +42,7 @@ public partial class PharmacyJobOrderMedicine : BaseModel
 
     [NotMapped]
     public bool? IsAvailable { get; set; }
+
+    [NotMapped]
+    public PharmacyStock? PharmacyStock { get; set; }
 }

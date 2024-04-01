@@ -7,7 +7,7 @@ public partial class MedicineVariant : BaseModel
     public string? Name { get; set; }
     public string? Description { get; set; }
     public decimal Dosage { get; set; }
-    public Guid? UnitId { get; set; }
+    public Guid UnitId { get; set; }
     public Unit? Unit { get; set; }
     
     public virtual Medicine? Medicine { get; set; }

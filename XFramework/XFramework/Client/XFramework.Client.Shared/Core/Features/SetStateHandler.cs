@@ -9,7 +9,7 @@ public class SetStateHandler<TAction, TState>(HandlerServices handlerServices, I
         try
         {
             StateHelper.SetProperties(action,CurrentState);
-            Persist(CurrentState);
+            //Persist(CurrentState);
         }
         catch (Exception e)
         {

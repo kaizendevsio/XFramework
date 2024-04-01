@@ -3,6 +3,7 @@ using System;
 using HealthEssentials.Domain.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HealthEssentials.Domain.Migrations.HealthEssentials
 {
     [DbContext(typeof(HealthEssentialsContext))]
-    partial class HealthEssentialsContextModelSnapshot : ModelSnapshot
+    [Migration("20240401135334_Updated_PharmacyJobOrderMedicine")]
+    partial class Updated_PharmacyJobOrderMedicine
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -80,10 +80,12 @@
                 <MudSkeleton Animation="Animation.Pulse" SkeletonType="MudBlazor.SkeletonType.Circle" Height="100px" Width="100px" />
                 break;
             case XSkeletonType.Paragraph:
-                @for (int i = 0; i < 3; i++)
-                {
-                    <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Width="80%" />
-                }
+                <div class="d-flex flex-column gap-2">
+                    @for (int i = 0; i < 3; i++)
+                    {
+                        <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="15vh" Width="100%" />
+                    }
+                </div>
                 break;
             case XSkeletonType.Heading:
                 <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="40px" Width="50%" />

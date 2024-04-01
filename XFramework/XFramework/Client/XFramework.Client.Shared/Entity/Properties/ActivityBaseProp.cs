@@ -7,6 +7,7 @@
             Colors = new ThemeColorProp();
         }
         public bool Visible { get; set; }
+        public Func<Task>? OnClick { get; set; }
         public string Color
         {
             get => Colors.AccentColor; set => Colors.AccentColor = value; }

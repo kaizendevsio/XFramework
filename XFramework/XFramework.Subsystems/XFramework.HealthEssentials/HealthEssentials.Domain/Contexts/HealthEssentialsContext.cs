@@ -2653,12 +2653,12 @@ public partial class HealthEssentialsContext : DbContext
                 .HasConstraintName("pharmacystocks_medicine_id_fk");
 
             entity.HasOne(d => d.PharmacyBranch).WithMany(p => p.PharmacyStocks)
-                .HasForeignKey(d => d.PharmacyId)
+                .HasForeignKey(d => d.PharmacyBranchId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("pharmacystocks_pharmacy_id_fk");
 
-            entity.HasOne(d => d.UnitNavigation).WithMany(p => p.PharmacyStocks)
-                .HasForeignKey(d => d.Unit)
+            entity.HasOne(d => d.Unit).WithMany(p => p.PharmacyStocks)
+                .HasForeignKey(d => d.UnitId)
                 .HasConstraintName("pharmacystocks_unit_id_fk");
         });
 
