@@ -92,7 +92,7 @@ public partial class WalletState
             // Set State And Update UI
             if (action.ReloadWalletList)
             {
-                await Mediator.Send(new GetWalletList());
+                await Mediator.Send(new LoadWalletList());
             }
             
             // Inform UI About Not Busy State

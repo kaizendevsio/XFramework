@@ -34,7 +34,7 @@ public partial class WalletState
 
             if (await HandleFailure(result, action, silent: action.Silent)) return;
 
-            Mediator.Send(new GetWalletList());
+            Mediator.Send(new LoadWalletList());
 
             await HandleSuccess(result, action, silent: action.Silent);
         }

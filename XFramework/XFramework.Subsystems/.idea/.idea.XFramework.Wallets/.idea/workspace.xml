@@ -8,39 +8,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d37d412-dd63-4bc1-9000-5a758e6c9722" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Migrations/HealthEssentials/20240403162610_Added_IdentityIds_Pharmacy_Laboratory.Designer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Migrations/HealthEssentials/20240403162610_Added_IdentityIds_Pharmacy_Laboratory.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/Migrations/XnelSystems/20240405100804_Updated_Wallet_WalletType.Designer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/Migrations/XnelSystems/20240405100804_Updated_Wallet_WalletType.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/Migrations/XnelSystems/20240407063838_Add_Wallet_Account_Number.Designer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/Migrations/XnelSystems/20240407063838_Add_Wallet_Account_Number.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/copilot/chatSessions/00000000000.xd" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/copilot/chatSessions/blobs/version" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/QueryTransactionList.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.HealthEssentials/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/copilot/chatSessions/00000000000.xd" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/copilot/chatSessions/blobs/version" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.IdentityServer/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.XFramework.Wallets/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Medicine/MedicineAutoCompleteHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Core/DataAccess/Query/Medicine/MedicineAutoCompleteHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Laboratory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Laboratory.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/LaboratoryBranch.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/LaboratoryBranch.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Pharmacy.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/Pharmacy.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyBranch.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyBranch.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyStock.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain.Generics/Contracts/PharmacyStock.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Migrations/HealthEssentials/HealthEssentialsContextModelSnapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.HealthEssentials/HealthEssentials.Domain/Migrations/HealthEssentials/HealthEssentialsContextModelSnapshot.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Wallet/ReleaseTransaction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Wallet/ReleaseTransaction.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Wallet/TransferWallet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/XFramework.Wallets/Wallets.Core/DataAccess/Commands/Wallet/TransferWallet.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Skeleton.razor" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/Skeleton.razor" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/_ComponentsBase.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Components/_ComponentsBase.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/BaseActionHandler.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Register.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Register.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Login.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Session/Actions/Login.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/CreateWallet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/CreateWallet.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/GetWallet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/GetWallet.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/GetWalletList.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/LoadWalletList.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/TransferWallet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Core/Features/Wallet/Actions/TransferWallet.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Entity/Models/Requests/Common/NavigableRequest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Client/XFramework.Client.Shared/Entity/Models/Requests/Common/NavigableRequest.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Wallet.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/Wallet.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/WalletTransaction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/WalletTransaction.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/WalletType.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain.Generic/Contracts/WalletType.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/Migrations/XnelSystems/XnelSystemsContextModelSnapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../XFramework/Server/XFramework.Domain/Migrations/XnelSystems/XnelSystemsContextModelSnapshot.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -383,6 +360,7 @@
       <workItem from="1712469266579" duration="9000" />
       <workItem from="1712469352395" duration="604000" />
       <workItem from="1712475305809" duration="1644000" />
+      <workItem from="1712483946967" duration="555000" />
     </task>
     <task id="LOCAL-00001" summary="Initial Template">
       <created>1621423842771</created>

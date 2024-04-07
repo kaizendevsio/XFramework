@@ -42,6 +42,7 @@ public partial class WalletTransaction : BaseModel
     public string? Description { get; set; }
 
     public decimal? RunningTotalBalance { get; set; }
+    public decimal? RunningAvailableBalance { get; set; }
    
     public decimal? RunningBalance { get; set; }
     

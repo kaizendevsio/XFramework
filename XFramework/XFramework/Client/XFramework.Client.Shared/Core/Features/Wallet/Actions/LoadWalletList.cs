@@ -5,17 +5,17 @@ namespace XFramework.Client.Shared.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public record GetWalletList : NavigableRequest, IAction;
+    public record LoadWalletList : NavigableRequest, IAction;
     
-    protected class GetWalletListHandler(
+    protected class LoadWalletListHandler(
         IWalletsServiceWrapper walletsServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : StateActionHandler<GetWalletList>(handlerServices, store)
+        : StateActionHandler<LoadWalletList>(handlerServices, store)
     {
         private WalletState CurrentState => Store.GetState<WalletState>();
         
-        public override async Task Handle(GetWalletList action, CancellationToken aCancellationToken)
+        public override async Task Handle(LoadWalletList action, CancellationToken aCancellationToken)
         {
             if (SessionState.State is not CurrentSessionState.Active) return;
             var response = await walletsServiceWrapper.Wallet.GetList(
