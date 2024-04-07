@@ -45,13 +45,17 @@ public partial class WalletTransaction : BaseModel
    
     public decimal? RunningBalance { get; set; }
     
-    public decimal? RunningOnHoldBalance { get; set; }
+    public decimal? RunningDebitOnHoldBalance { get; set; }
+    
+    public decimal? RunningCreditOnHoldBalance { get; set; }
     
     public decimal PreviousTotalBalance { get; set; }
     
     public decimal PreviousBalance { get; set; }
     
-    public decimal PreviousOnHoldBalance { get; set; }
+    public decimal PreviousDebitOnHoldBalance { get; set; }
+    
+    public decimal PreviousCreditOnHoldBalance { get; set; }
 
     public TransactionType? TransactionType { get; set; }
 

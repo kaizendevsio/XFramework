@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
@@ -11,9 +12,11 @@ using XFramework.Domain.Contexts;
 namespace XFramework.Domain.Migrations.XnelSystems
 {
     [DbContext(typeof(AppDbContext))]
-    partial class XnelSystemsContextModelSnapshot : ModelSnapshot
+    [Migration("20240405100804_Updated_Wallet_WalletType")]
+    partial class Updated_Wallet_WalletType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4548,18 +4551,12 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<string>("AccountNumber")
-                        .HasColumnType("text");
-
                     b.Property<decimal>("Balance")
                         .HasPrecision(24, 8)
                         .HasColumnType("numeric(24,8)");
 
                     b.Property<decimal?>("BondBalanceRule")
                         .HasColumnType("numeric");
-
-                    b.Property<int>("CardNumber")
-                        .HasColumnType("integer");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -4571,12 +4568,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal>("CreditOnHoldBalance")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("DebitOnHoldBalance")
-                        .HasColumnType("numeric");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4602,6 +4593,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<decimal>("OnHoldBalance")
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -4725,10 +4719,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<decimal>("PreviousBalance")
                         .HasColumnType("numeric");
 
-                    b.Property<decimal>("PreviousCreditOnHoldBalance")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("PreviousDebitOnHoldBalance")
+                    b.Property<decimal>("PreviousOnHoldBalance")
                         .HasColumnType("numeric");
 
                     b.Property<decimal>("PreviousTotalBalance")
@@ -4748,10 +4739,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<decimal?>("RunningBalance")
                         .HasColumnType("numeric");
 
-                    b.Property<decimal?>("RunningCreditOnHoldBalance")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("RunningDebitOnHoldBalance")
+                    b.Property<decimal?>("RunningOnHoldBalance")
                         .HasColumnType("numeric");
 
                     b.Property<decimal?>("RunningTotalBalance")

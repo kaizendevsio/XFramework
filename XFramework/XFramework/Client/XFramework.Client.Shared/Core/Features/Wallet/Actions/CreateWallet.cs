@@ -1,4 +1,5 @@
 ﻿using Wallets.Integration.Drivers;
+using XFramework.Integration.Abstractions;
 
 namespace XFramework.Client.Shared.Core.Features.Wallet;
 
@@ -9,12 +10,13 @@ public partial class WalletState
         public bool ReloadWalletList { get; set; }
         public Guid WalletTypeId { get; set; }
         public decimal Balance { get; set; } = 0;
-        public Guid? CredentialId { get; set; }
+        public Guid CredentialId { get; set; }
         public bool Silent { get; set; }
     }
     
     protected class CreateWalletHandler(
         IWalletsServiceWrapper walletsServiceWrapper,
+        IHelperService helperService,
         HandlerServices handlerServices,
         IStore store)
         : StateActionHandler<CreateWallet>(handlerServices, store)
@@ -30,7 +32,7 @@ public partial class WalletState
             }
 
             // Check if CredentialGuid is provided
-            if (SessionState.State is not CurrentSessionState.Active && action.CredentialId is null)
+            if (SessionState.State is not CurrentSessionState.Active && action.CredentialId == Guid.Empty)
             {
                 SweetAlertService.FireAsync("Error", "Could not create wallet, credentials not provided");
                 return;
@@ -38,7 +40,42 @@ public partial class WalletState
             
             // Map view model to request object
             var request = action.Adapt<Domain.Generic.Contracts.Wallet>();
-            request.CredentialId = (Guid)(SessionState.State is CurrentSessionState.Active ? SessionState.Credential.Id : action.CredentialId);
+            request.CredentialId = action.CredentialId;
+            
+            // Get the wallet type
+            var walletType = await walletsServiceWrapper.WalletType.Get(id: action.WalletTypeId);
+            if (await HandleFailure(walletType, action, true, "Could not create wallet, wallet type not found")) return;
+            
+            // Set the wallet type
+            request.WalletTypeId = walletType.Response.Id;
+            request.BondBalanceRule = walletType.Response.BondBalanceRule;
+            request.MaintainingBalanceRule = walletType.Response.MaintainingBalanceRule;
+            request.MinTransferRule = walletType.Response.MinTransferRule;
+            request.MaxTransferRule = walletType.Response.MaxTransferRule;
+            request.AccountNumber = $"{helperService.GenerateRandomNumber(1000_0000_0000, 9999_9999_9999)}";
+            
+            checkAccountNumber:
+            // check if the account number is unique
+            var accountNumberExists = await walletsServiceWrapper.Wallet.GetList(
+                pageSize:2,
+                pageNumber:1,
+                filter: new List<QueryFilter>
+                {
+                    new()
+                    {
+                        PropertyName = nameof(Domain.Generic.Contracts.Wallet.AccountNumber),
+                        Operation = QueryFilterOperation.Equal,
+                        Value = request.AccountNumber
+                    }
+                }
+            );
+            
+            if (await HandleFailure(accountNumberExists, action, true, "Could not check account number uniqueness")) return;
+            if (accountNumberExists.Response.TotalItems > 0)
+            {
+                request.AccountNumber = $"{helperService.GenerateRandomNumber(1000_0000_0000, 9999_9999_9999)}";
+                goto checkAccountNumber;
+            }
             
             // Send the request
             var response = await walletsServiceWrapper.Wallet.Create(request);

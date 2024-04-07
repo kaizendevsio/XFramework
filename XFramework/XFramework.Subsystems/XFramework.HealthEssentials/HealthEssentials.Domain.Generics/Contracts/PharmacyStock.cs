@@ -9,6 +9,7 @@ public partial class PharmacyStock : BaseModel, IHasCost, IHasPrice
     public Guid MedicineVariantId { get; set; }
 
     public DateTime LastRestock { get; set; }
+    public DateTime? NearestExpiryDate { get; set; }
 
     public decimal AvailableQuantity { get; set; }
 

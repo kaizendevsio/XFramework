@@ -12,9 +12,13 @@ public partial class WalletType : BaseModel
 
     public Guid? CurrencyTypeId { get; set; }
 
-    public decimal? MinTransfer { get; set; }
+    public decimal? MinTransferRule { get; set; }
 
-    public decimal? MaxTransfer { get; set; }
+    public decimal? MaxTransferRule { get; set; }
+    
+    public decimal? BondBalanceRule { get; set; }
+    
+    public decimal? MaintainingBalanceRule { get; set; }
 
     public virtual Tenant Tenant { get; set; } = null!;
 

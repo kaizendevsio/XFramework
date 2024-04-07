@@ -2,6 +2,7 @@
 using Wallets.Domain.Generic.Contracts.Requests;
 using XFramework.Core.Services;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Generic.Enums;
 
 namespace Wallets.Core.DataAccess.Commands.Wallet;
 using XFramework.Domain.Generic.Contracts;
@@ -23,13 +24,13 @@ public class ReleaseTransaction(
 
         if (transaction == null)
         {
-            logger.LogInformation("Transaction with Id {Id} not found.", request.Id);
+            logger.LogInformation("Transaction with Id {Id} not found", request.Id);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Transaction not found." };
         }
 
         if (!transaction.Held)
         {
-            logger.LogInformation("Transaction with Id {Id} is not on hold.", request.Id);
+            logger.LogInformation("Transaction with Id {Id} is not on hold", request.Id);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Transaction is not on hold." };
         }
 
@@ -43,8 +44,17 @@ public class ReleaseTransaction(
         {
             // Assuming the amount was deducted from the balance when put on hold,
             // and now needs to be made available again.
-            wallet.OnHoldBalance -= transaction.Amount;
-            wallet.Balance += transaction.Amount;
+            if (transaction.TransactionType is TransactionType.Credit)
+            {
+                wallet.Balance += transaction.Amount;
+                wallet.TransferableBalance += transaction.Amount;
+                wallet.CreditOnHoldBalance -= transaction.Amount;
+            }
+            else if (transaction.TransactionType is TransactionType.Debit)
+            {
+                wallet.Balance -= transaction.Amount;
+                wallet.DebitOnHoldBalance -= transaction.Amount;
+            }
         }
 
         // Here you would also handle the recipient wallet if necessary,
@@ -53,7 +63,7 @@ public class ReleaseTransaction(
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Transaction with Id {Id} released successfully.", request.Id);
+            logger.LogInformation("Transaction with Id {Id} released successfully", request.Id);
 
             return new CmdResponse { HttpStatusCode = HttpStatusCode.OK };
         }

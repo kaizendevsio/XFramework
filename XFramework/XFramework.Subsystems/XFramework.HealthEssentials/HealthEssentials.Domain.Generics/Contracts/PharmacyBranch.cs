@@ -30,6 +30,7 @@ public partial class PharmacyBranch : BaseModel, IHasOnlineStatus
 
     public Guid CountryId { get; set; }
 
+    public Guid IdentityId { get; set; }
 
     public int? Status { get; set; }
 
@@ -53,6 +54,12 @@ public partial class PharmacyBranch : BaseModel, IHasOnlineStatus
         
     [NotMapped]
     public List<StorageFile>? Files { get; set; }
+    
+    [NotMapped]
+    public IdentityCredential? IdentityCredential { get; set; }
+
+    [NotMapped] 
+    public ICollection<Wallet>? Wallets => IdentityCredential?.Wallets;
     
     public bool IsOnline { get; set; }
     

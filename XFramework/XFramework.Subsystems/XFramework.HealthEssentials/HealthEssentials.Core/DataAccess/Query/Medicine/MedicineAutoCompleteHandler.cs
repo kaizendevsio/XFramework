@@ -34,6 +34,9 @@ public class MedicineAutoCompleteHandler(
                 mimsRequest.Headers.Add("Accept-Encoding", "");
                 mimsRequest.Headers.Add("Connection", "keep-alive");
                 
+                // set max timeout to 10 seconds
+                client.Timeout = TimeSpan.FromSeconds(5);
+                
                 var response = await client.SendAsync(mimsRequest, cancellationToken);
                 
                 response.EnsureSuccessStatusCode(); // Throw an exception if not successful
@@ -83,9 +86,26 @@ public class MedicineAutoCompleteHandler(
                     Response = results
                 };
             }
-            catch (HttpRequestException e)
+            catch (Exception e)
             {
                logger.LogError(e, "Error occurred while fetching data from MIMS");
+               
+               var searchString = request.SearchString.ToUpper();
+               var existingMedicines = await dbContext.Set<Domain.Generics.Contracts.Medicine>()
+                   .Where(i => i.TenantId == tenant.Id)
+                   .Where(i => i.IsDeleted == false)
+                   .Where(i => i.Name.ToUpper().Contains(searchString))
+                   .Include(i => i.MedicineVariants)
+                   .AsSplitQuery()
+                   .ToListAsync(cancellationToken);
+                
+                var results = helperService.RemoveCircularReference(existingMedicines);
+                 
+                return new QueryResponse<List<Domain.Generics.Contracts.Medicine>>
+                {
+                    HttpStatusCode = HttpStatusCode.OK,
+                    Response = results
+                };
             }
         }
         

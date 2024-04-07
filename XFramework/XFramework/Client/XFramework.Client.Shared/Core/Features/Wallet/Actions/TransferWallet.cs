@@ -32,18 +32,10 @@ public partial class WalletState
                 CurrencyId = new Guid("7ee3621a-5878-4c16-8112-eab11f29db95")
             });
 
-            if (result.HttpStatusCode is HttpStatusCode.Accepted)
-            {
-                Mediator.Send(new GetWalletList());
-            }
+            if (await HandleFailure(result, action, silent: action.Silent)) return;
 
-            if (await HandleFailure(result, action, silent: action.Silent))
-            {
-                WalletState.SendWalletVm.OnFailure?.Invoke();
-                return;
-            }
-            
-            WalletState.SendWalletVm.OnSuccess?.Invoke();
+            Mediator.Send(new GetWalletList());
+
             await HandleSuccess(result, action, silent: action.Silent);
         }
     }

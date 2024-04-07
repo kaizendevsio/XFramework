@@ -1,10 +1,14 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class Laboratory : BaseModel
 {
     public Guid TypeId { get; set; }
 
     public string? Name { get; set; }
+    
+    public Guid IdentityId { get; set; }
 
     public string? ShortName { get; set; }
 
@@ -34,4 +38,10 @@ public partial class Laboratory : BaseModel
     public virtual ICollection<LaboratoryService> LaboratoryServices { get; set; } = new List<LaboratoryService>();
 
     public virtual ICollection<LaboratoryTag> LaboratoryTags { get; set; } = new List<LaboratoryTag>();
+    
+    [NotMapped]
+    public IdentityCredential? IdentityCredential { get; set; }
+
+    [NotMapped] 
+    public ICollection<Wallet>? Wallets => IdentityCredential?.Wallets;
 }

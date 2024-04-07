@@ -6,11 +6,28 @@ public partial class Wallet : BaseModel
 
     public Guid? WalletTypeId { get; set; }
 
-    public decimal? Balance { get; set; }
+    public decimal Balance { get; set; }
     
-    public decimal? OnHoldBalance { get; set; }
+    public string? AccountNumber { get; set; }
     
-    public decimal? TotalBalance => Balance + OnHoldBalance;
+    public int CardNumber { get; set; }
+    
+    public decimal DebitOnHoldBalance { get; set; }
+    public decimal CreditOnHoldBalance { get; set; }
+    
+    public decimal TransferableBalance { get; set; }
+    
+    public decimal? MinTransferRule { get; set; }
+
+    public decimal? MaxTransferRule { get; set; }
+    
+    public decimal? BondBalanceRule { get; set; }
+    
+    public decimal? MaintainingBalanceRule { get; set; }
+    
+    public decimal? TotalBalance => Balance + CreditOnHoldBalance - DebitOnHoldBalance; // Total funds in the wallet
+    
+    public decimal AvailableBalance => Balance - DebitOnHoldBalance; // Funds that are free to be spent or withdrawn now
 
     public virtual IdentityCredential Credential { get; set; } = null!;
 

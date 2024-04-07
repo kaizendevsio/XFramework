@@ -58,24 +58,52 @@ public class TransferWallet(
         {
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Insufficient balance" };
         }
+        
+        // Check if the amount is within the min transferable amount
+        if (request.Amount < senderWallet.MinTransferRule)
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = $"Amount must be at least {senderWallet.MinTransferRule}"
+            };
+        }
+        
+        // Check if the amount is within the max transferable amount
+        if (request.Amount > senderWallet.MaxTransferRule)
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = $"Amount must not exceed {senderWallet.MaxTransferRule}"
+            };
+        }
 
         // Perform the transfer and deduct the fee
 
-        var previousSenderBalance = senderWallet.Balance ?? 0;
-        var previousRecipientBalance = recipientWallet.Balance ?? 0;
+        var previousSenderBalance = senderWallet.Balance;
+        var previousRecipientBalance = recipientWallet.Balance;
         
-        var previousSenderOnHoldBalance = senderWallet.OnHoldBalance ?? 0;
-        var previousRecipientOnHoldBalance = recipientWallet.OnHoldBalance ?? 0;
+        var previousSenderDebitOnHoldBalance = senderWallet.DebitOnHoldBalance;
+        var previousSenderCreditOnHoldBalance = senderWallet.CreditOnHoldBalance;
         
-        if (request.OnHold is true)
+        var previousRecipientDebitOnHoldBalance = recipientWallet.DebitOnHoldBalance;
+        var previousRecipientCreditOnHoldBalance = recipientWallet.CreditOnHoldBalance;
+        
+        if (request.OnHold)
         {
-            senderWallet.OnHoldBalance -= request.Amount;
-            recipientWallet.OnHoldBalance += request.Amount;
+            senderWallet.DebitOnHoldBalance += request.Amount;
+            senderWallet.TransferableBalance -= request.Amount;
+            
+            recipientWallet.CreditOnHoldBalance += request.Amount;
         }
         else
         {
             senderWallet.Balance -= totalDeduction;
+            senderWallet.TransferableBalance -= totalDeduction;
+            
             recipientWallet.Balance += request.Amount;
+            recipientWallet.TransferableBalance += request.Amount;
         }
 
         // Record the transactions
@@ -86,8 +114,10 @@ public class TransferWallet(
             WalletId = senderWallet.Id,
             Amount = totalDeduction,
             PreviousBalance = previousSenderBalance,
-            PreviousOnHoldBalance = previousSenderOnHoldBalance,
-            RunningOnHoldBalance = senderWallet.OnHoldBalance,
+            PreviousDebitOnHoldBalance = previousSenderDebitOnHoldBalance,
+            PreviousCreditOnHoldBalance = previousSenderCreditOnHoldBalance,
+            RunningDebitOnHoldBalance = senderWallet.DebitOnHoldBalance,
+            RunningCreditOnHoldBalance = senderWallet.CreditOnHoldBalance,
             RunningBalance = senderWallet.Balance,
             Remarks = request.Remarks,
             Description = $"Transfer to {request.RecipientCredentialId}",
@@ -104,9 +134,11 @@ public class TransferWallet(
             WalletId = recipientWallet.Id,
             Amount = request.Amount,
             PreviousBalance = previousRecipientBalance,
-            PreviousOnHoldBalance = previousRecipientOnHoldBalance,
+            PreviousDebitOnHoldBalance = previousRecipientDebitOnHoldBalance,
+            PreviousCreditOnHoldBalance = previousRecipientCreditOnHoldBalance,
             RunningBalance = recipientWallet.Balance,
-            RunningOnHoldBalance = recipientWallet.OnHoldBalance,
+            RunningCreditOnHoldBalance = recipientWallet.CreditOnHoldBalance,
+            RunningDebitOnHoldBalance = recipientWallet.DebitOnHoldBalance,
             Remarks = request.Remarks,
             Description = $"Received from {request.CredentialId}",
             TransactionType = TransactionType.Credit,

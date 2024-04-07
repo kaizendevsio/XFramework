@@ -7,7 +7,9 @@ public partial class LaboratoryBranch : BaseModel, IHasOnlineStatus
     public Guid LaboratoryId { get; set; }
 
     public string? Name { get; set; }
-
+    
+    public Guid IdentityId { get; set; }
+    
     public string? Description { get; set; }
 
     public string? UnitNumber { get; set; }
@@ -58,6 +60,12 @@ public partial class LaboratoryBranch : BaseModel, IHasOnlineStatus
     [NotMapped]
     public List<StorageFile>? Files { get; set; }
 
+    [NotMapped]
+    public IdentityCredential? IdentityCredential { get; set; }
+
+    [NotMapped] 
+    public ICollection<Wallet>? Wallets => IdentityCredential?.Wallets;
+    
     public bool IsOnline { get; set; }
     
     public DateTime LastSeen { get; set; }

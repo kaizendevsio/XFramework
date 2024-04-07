@@ -1,6 +1,6 @@
 ﻿@typeparam T
 
-@if (Item is null)
+@if (Item is null || IsLoading is true)
 {
     @if (Template is not null)
     {

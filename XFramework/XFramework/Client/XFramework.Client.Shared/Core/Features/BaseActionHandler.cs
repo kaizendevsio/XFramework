@@ -195,7 +195,7 @@ public class BaseStateActionHandler
         if (!silent)
         {
             SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
-                ? $"Success: {response.Message}"
+                ? $"{response.Message}"
                 : $"{customMessage}", SweetAlertIcon.Success);
                 
         }
@@ -207,7 +207,7 @@ public class BaseStateActionHandler
         if (!silent)
         {
             SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
-                ? $"Success: {response.Message}"
+                ? $"{response.Message}"
                 : $"{customMessage}", SweetAlertIcon.Success);
         }
         
@@ -219,7 +219,7 @@ public class BaseStateActionHandler
         if (!silent)
         {
             SweetAlertService.FireAsync("Success", string.IsNullOrEmpty(customMessage)
-                ? $"Success: {response.Message}"
+                ? $"{response.Message}"
                 : $"{customMessage}", SweetAlertIcon.Success);
         }
       
@@ -416,6 +416,7 @@ public abstract class StateActionHandler<TAction, TResponse> : BaseStateActionHa
         BaseHttpClient = handlerServices.BaseHttpClient;
         JsRuntime = handlerServices.JsRuntime;
         Mediator = handlerServices.Mediator;
+        Snackbar = handlerServices.Snackbar;
         Store = store;
     }
     public abstract Task<TResponse> Handle(TAction action, CancellationToken aCancellationToken);

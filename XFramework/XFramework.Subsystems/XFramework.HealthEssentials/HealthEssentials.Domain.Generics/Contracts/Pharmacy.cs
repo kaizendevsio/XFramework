@@ -1,10 +1,14 @@
-﻿namespace HealthEssentials.Domain.Generics.Contracts;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace HealthEssentials.Domain.Generics.Contracts;
 
 public partial class Pharmacy : BaseModel
 {
     public Guid TypeId { get; set; }
 
     public string? Name { get; set; }
+    
+    public Guid IdentityId { get; set; }
 
     public string? ShortName { get; set; }
 
@@ -32,7 +36,12 @@ public partial class Pharmacy : BaseModel
     public virtual ICollection<PharmacyMember> PharmacyMembers { get; set; } = new List<PharmacyMember>();
 
     public virtual ICollection<PharmacyService> PharmacyServices { get; set; } = new List<PharmacyService>();
-
-
+    
     public virtual ICollection<PharmacyTag> PharmacyTags { get; set; } = new List<PharmacyTag>();
+
+    [NotMapped]
+    public IdentityCredential? IdentityCredential { get; set; }
+
+    [NotMapped] 
+    public ICollection<Wallet>? Wallets => IdentityCredential?.Wallets;
 }

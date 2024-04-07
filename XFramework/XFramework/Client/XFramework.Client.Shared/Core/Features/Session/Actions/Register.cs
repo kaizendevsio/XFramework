@@ -7,12 +7,11 @@ using XFramework.Domain.Generic.Contracts;
 namespace XFramework.Client.Shared.Core.Features.Session;
 public partial class SessionState
 {
-    public record Register : NavigableRequest, IRequest<CmdResponse>
+    public record Register : NavigableRequest<CmdResponse<IdentityCredential?>>
     {
         public bool AutoLogin { get; set; } = true;
         public bool SkipVerification { get; set; }
         public List<Guid>? WalletList { get; set; }
-        public bool IsSilent { get; set; }
         public List<Guid>? RoleList { get; set; }
     }
     
@@ -20,26 +19,34 @@ public partial class SessionState
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : StateActionHandler<Register>(handlerServices, store)
+        : StateActionHandler<Register, CmdResponse<IdentityCredential?>>(handlerServices, store)
     {
         public SessionState CurrentState => Store.GetState<SessionState>();
 
-        public override async Task Handle(Register action, CancellationToken aCancellationToken)
+        public override async Task<CmdResponse<IdentityCredential?>> Handle(Register action, CancellationToken aCancellationToken)
         {
-            IsSilent = action.IsSilent;
             CurrentState.RegisterVm.RoleList ??= action.RoleList;
             
             // Inform UI About Busy State
             await ReportBusy("Creating Account..", true);
 
             // Check If Any Given Data Are Already Existing
-            if (await CheckDuplicateRecords(action)) return;
+            if (await CheckDuplicateRecords(action))
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.PreconditionFailed,
+                    Message = "Duplicate records found"
+                };
 
             // Check If Passwords Are Correct
             if (!CurrentState.RegisterVm.Password.Equals(CurrentState.RegisterVm.PasswordConfirmation))
             {
                 SweetAlertService.FireAsync("Password does not match",$"", SweetAlertIcon.Error);
-                return;
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.PreconditionFailed,
+                    Message = "Password does not match"
+                };
             }
             
             // Create Guids
@@ -52,7 +59,12 @@ public partial class SessionState
             identityRequest.Id = identityId;
             
             var identity = await identityServerServiceWrapper.IdentityInformation.Create(identityRequest);
-            if (await HandleFailure(identity, action)) return;
+            if (await HandleFailure(identity, action))
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    Message = "Failed to create identity"
+                };
             
             // Send Create Credential Request
             await ReportBusy("Creating credential..", null);
@@ -61,7 +73,12 @@ public partial class SessionState
             credentialRequest.IdentityInfoId = identityId;
             
             var credential = await identityServerServiceWrapper.IdentityCredential.Create(credentialRequest);
-            if (await HandleFailure(credential, action)) return;
+            if (await HandleFailure(credential, action)) return
+                new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    Message = "Failed to create credential"
+                };
             
             // Send Create Phone Contact Request
             await ReportBusy("Creating contacts..", null);
@@ -74,7 +91,12 @@ public partial class SessionState
                 Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber) ? CurrentState.RegisterVm.PhoneNumber : string.Empty,
                 /*SendOtp = !action.SkipVerification*/
             });
-            if (await HandleFailure(phoneContact, action)) return;
+            if (await HandleFailure(phoneContact, action)) return
+                new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    Message = "Failed to create phone contact"
+                };
             
             // Send Create Email Contact Request
             await ReportBusy("Creating contacts..", null);
@@ -86,7 +108,12 @@ public partial class SessionState
                 Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress) ? CurrentState.RegisterVm.EmailAddress : string.Empty,
                 /*SendOtp = !action.SkipVerification*/
             });
-            if (await HandleFailure(emailContact, action)) return;
+            if (await HandleFailure(emailContact, action)) return
+                new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    Message = "Failed to create email contact"
+                };
 
             // If WalletList property is provided, automatically create wallets
             if (action.WalletList is not null)
@@ -129,26 +156,33 @@ public partial class SessionState
                     Role = action.RoleList.First()
                 });
             
-                return;
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.OK,
+                    Message = "Account created successfully",
+                    Response = credential.Response
+                };
             }
             
             // If Success URL property is provided, navigate to the given URL
-            await HandleSuccess(credential, action);
-
-            // Inform UI About Not Busy State
-            ReportBusy("", false);
+            await HandleSuccess(credential, action, silent: action.Silent, customMessage:"Account created successfully");
             
-            return;
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Account created successfully",
+                Response = credential.Response
+            };
         }
 
         private async Task CreateWallets(List<Guid> walletList, Guid credentialGuid)
         {
-            foreach (var WalletTypeGuid in walletList)
+            foreach (var walletTypeGuid in walletList)
             {
                 await Mediator.Send(new WalletState.CreateWallet
                 {
                     CredentialId = credentialGuid,
-                    WalletTypeId = WalletTypeGuid,
+                    WalletTypeId = walletTypeGuid,
                     Silent = true
                 });
             }

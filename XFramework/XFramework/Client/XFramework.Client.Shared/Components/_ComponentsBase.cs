@@ -48,9 +48,15 @@ public class XComponentsBase : BlazorStateComponent
     public string PhoneNumber(IdentityCredential? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Type.Name == "Phone")?.Value}";
     public string EmailAddress(IdentityCredential? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Type.Name == "Email")?.Value}";
 
-    public void ShowLoading(bool value)
+    public void ShowPreloader()
     {
-        IsLoading = value;
+        IsLoading = true;
+        StateHasChanged();
+    }
+    
+    public void HidePreloader()
+    {
+        IsLoading = false;
         StateHasChanged();
     }
     
