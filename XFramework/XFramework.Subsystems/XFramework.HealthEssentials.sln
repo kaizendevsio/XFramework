@@ -42,6 +42,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Core", "..\XFram
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallets.Integration", "XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj", "{BB5C043C-F73D-4371-806E-237E42AFE6E4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer.Integration", "XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj", "{78CA5AE0-1C3E-4E5C-B5BB-6B509EE6BDB0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -65,6 +67,7 @@ Global
 		{405BB09E-08B0-4559-9F08-24BF334BEF01} = {9FA8360D-1D4D-445C-B750-B3D4BCD47B00}
 		{733E11EE-EA58-4579-AD02-F3738B1279B2} = {9FA8360D-1D4D-445C-B750-B3D4BCD47B00}
 		{BB5C043C-F73D-4371-806E-237E42AFE6E4} = {9FA8360D-1D4D-445C-B750-B3D4BCD47B00}
+		{78CA5AE0-1C3E-4E5C-B5BB-6B509EE6BDB0} = {9FA8360D-1D4D-445C-B750-B3D4BCD47B00}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{40EE5AE7-1F00-46E0-BBD1-052BDBD88A3E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -135,5 +138,9 @@ Global
 		{BB5C043C-F73D-4371-806E-237E42AFE6E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BB5C043C-F73D-4371-806E-237E42AFE6E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BB5C043C-F73D-4371-806E-237E42AFE6E4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{78CA5AE0-1C3E-4E5C-B5BB-6B509EE6BDB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{78CA5AE0-1C3E-4E5C-B5BB-6B509EE6BDB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{78CA5AE0-1C3E-4E5C-B5BB-6B509EE6BDB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{78CA5AE0-1C3E-4E5C-B5BB-6B509EE6BDB0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

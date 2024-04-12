@@ -10,6 +10,7 @@
 
     <EditForm
         @ref="@EditForm"
+        class="@Class"
         OnSubmit="@InternalSubmit"
         Model="@Model">
 
@@ -45,6 +46,8 @@
     public EditContext? EditContext => EditForm?.EditContext;
 
     [Parameter] public TItem? Model { get; set; }
+    
+    [Parameter] public string? Class { get; set; }
 
     [Parameter] public EventCallback<EditContext> OnValidSubmit { get; set; }
 

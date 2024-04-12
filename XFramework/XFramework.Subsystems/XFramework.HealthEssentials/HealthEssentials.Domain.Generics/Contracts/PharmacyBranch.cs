@@ -61,6 +61,9 @@ public partial class PharmacyBranch : BaseModel, IHasOnlineStatus
     [NotMapped] 
     public ICollection<Wallet>? Wallets => IdentityCredential?.Wallets;
     
+    [NotMapped]
+    public IdentityAddress? Address => IdentityCredential?.IdentityInfo?.IdentityAddresses.FirstOrDefault();
+    
     public bool IsOnline { get; set; }
     
     public DateTime LastSeen { get; set; }

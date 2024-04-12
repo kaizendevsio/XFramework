@@ -43,7 +43,10 @@ public partial class Doctor : BaseModel, IHasOnlineStatus
     public virtual DoctorType Type { get; set; } = null!;
 
     [NotMapped]
-    public IdentityCredential? Credential { get; set; }
+    public IdentityCredential? IdentityCredential { get; set; }
+
+    [NotMapped] 
+    public ICollection<Wallet>? Wallets => IdentityCredential?.Wallets;
     
     [NotMapped]
     public List<StorageFile>? Files { get; set; }

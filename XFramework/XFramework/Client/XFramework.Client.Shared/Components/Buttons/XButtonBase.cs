@@ -71,4 +71,33 @@ public class XButtonBase : ComponentBase
     /// </summary>
     [Parameter]
     public string? Class { get; set; }
+    
+    /// <summary>
+    /// User styles, applied on top of the component's own classes and styles.
+    /// </summary>
+    [Parameter]
+    [Category(CategoryTypes.ComponentBase.Common)]
+    public string? Style { get; set; }
+    
+    /// <summary>
+    /// Set the text-align on the component.
+    /// </summary>
+    [Parameter]
+    [Category(CategoryTypes.Text.Appearance)]
+    public Align Align { get; set; } = Align.Inherit;
+
+    /// <summary>If true, the button will be disabled.</summary>
+    [Parameter]
+    [Category("Behavior")]
+    public bool Disabled { get; set; }
+
+    /// <summary>If true, no drop-shadow will be used.</summary>
+    [Parameter]
+    [Category("Appearance")]
+    public bool DisableElevation { get; set; }
+
+    /// <summary>If true, disables ripple effect.</summary>
+    [Parameter]
+    [Category("Appearance")]
+    public bool DisableRipple { get; set; }
 }

@@ -31,4 +31,8 @@ public partial class Patient : BaseModel
 
     [NotMapped]
     public IdentityCredential? Credential { get; set; }
+    
+    [NotMapped]
+    public IdentityAddress? Address => Credential?.IdentityInfo?.IdentityAddresses
+        .FirstOrDefault(x => x.AddressTypeId == new Guid("23c13259-1e24-427d-ba89-a4d2506c7464"));
 }

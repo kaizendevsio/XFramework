@@ -8,10 +8,11 @@ public record SendWalletRequest : NavigableRequest
     public Guid SenderCredentialId { get; set; }
     public Guid RecipientCredentialId { get; set; }
     public Guid WalletTypeId { get; set; }
-    public decimal Amount { get; set; }
+    public decimal Amount => LineItems.Sum(x => x.AmountDue);
     public bool OnHold { get; set; }
     public decimal TotalAmount => Amount + Fee;
-    public decimal Fee { get; set; }
+    public decimal Fee => LineItems.Sum(x => x.Fee);
     public string? Remarks { get; set; }
     public string? ClientReference { get; set; }
+    public List<(string Description, decimal AmountDue, decimal Fee)> LineItems { get; set; } = [];
 }

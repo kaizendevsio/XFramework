@@ -59,6 +59,16 @@ public class TransferWallet(
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Insufficient balance" };
         }
         
+        // Check if the amount is within the transferable balance
+        if (request.Amount > senderWallet.TransferableBalance)
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = "Amount exceeds transferable balance"
+            };
+        }
+        
         // Check if the amount is within the min transferable amount
         if (request.Amount < senderWallet.MinTransferRule)
         {
@@ -78,6 +88,48 @@ public class TransferWallet(
                 Message = $"Amount must not exceed {senderWallet.MaxTransferRule}"
             };
         }
+        
+        // Check if amount is within the bond balance rule
+        if (senderWallet.BondBalanceRule.HasValue && request.Amount > senderWallet.BondBalanceRule)
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = $"Amount must not exceed {senderWallet.BondBalanceRule}"
+            };
+        }
+        
+        // Check if the amount is within the maintaining balance rule
+        if (senderWallet.MaintainingBalanceRule.HasValue && senderWallet.Balance - totalDeduction < senderWallet.MaintainingBalanceRule)
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = $"Amount must not exceed {senderWallet.MaintainingBalanceRule}"
+            };
+        }
+        
+        // Check if the recipient wallet is within the min transferable amount
+        if (request.Amount < recipientWallet.MinTransferRule)
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = $"Amount must be at least {recipientWallet.MinTransferRule}"
+            };
+        }
+        
+        // Check if the recipient wallet is within the max transferable amount
+        if (request.Amount > recipientWallet.MaxTransferRule)
+        {
+            return new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = $"Amount must not exceed {recipientWallet.MaxTransferRule}"
+            };
+        }
+        
+        // Check if the recipient wallet is within the bond balance rule
 
         // Perform the transfer and deduct the fee
 

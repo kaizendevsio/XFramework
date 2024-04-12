@@ -20,7 +20,7 @@ public partial class IdentityState
     protected class SetStateHandler(HandlerServices handlerServices, IStore store)
         : StateActionHandler<SetState>(handlerServices, store)
     {
-        private SessionState CurrentState => Store.GetState<SessionState>();
+        private IdentityState CurrentState => Store.GetState<IdentityState>();
         
         public override async Task Handle(SetState state, CancellationToken aCancellationToken)
         {

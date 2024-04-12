@@ -4,21 +4,22 @@
            Href="@Href"
            Target="@Target"
            Rel="@Rel"
-           Disabled="@(Disabled || _processing || FormIsLoading)"
+           Disabled="@(Disabled || Processing || FormIsLoading)"
            DisableElevation="@DisableElevation"
            DisableRipple="@DisableRipple"
            OnClick="@InternalOnClick"
-           StartIcon="@(_processing || FormIsLoading ? null : StartIcon)"
-           EndIcon="@(_processing || FormIsLoading ? null : EndIcon)"
+           StartIcon="@(Processing || FormIsLoading ? null : StartIcon)"
+           EndIcon="@(Processing || FormIsLoading ? null : EndIcon)"
            IconColor="@IconColor"
            IconSize="@IconSize"
            IconClass="@IconClass"
+           Style="@Style"
            Color="@Color"
            Size="@Size"
            Variant="@Variant"
            FullWidth="@FullWidth">
 
-    @if (_processing || (FormIsLoading && ButtonType == ButtonType.Submit))
+    @if (Processing || (FormIsLoading && ButtonType == ButtonType.Submit))
     {
         <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
         <MudText Color="Color.Dark" Class="ms-2">@(string.IsNullOrEmpty(Title) ? Title : "Processing")</MudText>
@@ -38,7 +39,8 @@
 
 @code {
 
-    private bool _processing = false;
+    [Parameter]
+    public bool Processing { get; set; }
 
     /// <summary>
     /// The HTML element that will be rendered in the root by the component
@@ -69,21 +71,6 @@
     [Category("Click action")]
     public string Rel { get; set; }
 
-    /// <summary>If true, the button will be disabled.</summary>
-    [Parameter]
-    [Category("Behavior")]
-    public bool Disabled { get; set; }
-
-    /// <summary>If true, no drop-shadow will be used.</summary>
-    [Parameter]
-    [Category("Appearance")]
-    public bool DisableElevation { get; set; }
-
-    /// <summary>If true, disables ripple effect.</summary>
-    [Parameter]
-    [Category("Appearance")]
-    public bool DisableRipple { get; set; }
-
     /// <summary>
     /// The color of the component. It supports the theme colors.
     /// </summary>
@@ -96,12 +83,12 @@
     
     private async Task InternalOnClick(MouseEventArgs e)
     {
-        _processing = true;
+        Processing = true;
         StateHasChanged();
         
         await OnClick.InvokeAsync(e);
         
-        _processing = false;
+        Processing = false;
         StateHasChanged();
     }
 

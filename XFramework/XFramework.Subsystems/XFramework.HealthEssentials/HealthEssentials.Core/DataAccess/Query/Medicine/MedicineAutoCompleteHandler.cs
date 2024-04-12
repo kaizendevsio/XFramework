@@ -57,7 +57,7 @@ public class MedicineAutoCompleteHandler(
 
                 var newMedicineEntities = new List<Domain.Generics.Contracts.Medicine>();
                 
-                if (newMedicines.Any())
+                if (newMedicines.Count != 0)
                 {
                     newMedicineEntities = newMedicines.Select(m => new Domain.Generics.Contracts.Medicine
                     {

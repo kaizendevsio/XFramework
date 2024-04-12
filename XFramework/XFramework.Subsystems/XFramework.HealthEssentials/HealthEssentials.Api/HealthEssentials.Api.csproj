@@ -24,10 +24,4 @@
       <Folder Include="HostedService\" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Reference Include="IdentityServer.Integration">
-        <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Integration\bin\Debug\net7.0\IdentityServer.Integration.dll</HintPath>
-      </Reference>
-    </ItemGroup>
-
 </Project>

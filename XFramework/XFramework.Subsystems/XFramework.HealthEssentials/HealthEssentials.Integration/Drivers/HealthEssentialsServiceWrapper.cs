@@ -12,6 +12,8 @@ public partial interface IHealthEssentialsServiceWrapper
     public Task<CmdResponse> ConcludeLiveConsultation(ConcludeLiveConsultationRequest request);
     public Task<QueryResponse<PaginatedResult<Doctor>>> GetDoctorListByConsultationId(GetDoctorListByConsultationIdRequest idRequest);
     public Task<QueryResponse<List<Medicine>>> MedicineAutoComplete(MedicineAutoCompleteRequest request);
+    public Task<QueryResponse<ShippingCalculation>> CalculateShippingFee(CalculateShippingFeeRequest request);
+    
 }
 
 public partial record HealthEssentialsServiceWrapper
@@ -39,5 +41,10 @@ public partial record HealthEssentialsServiceWrapper
     public async Task<QueryResponse<List<Medicine>>> MedicineAutoComplete(MedicineAutoCompleteRequest request)
     {
         return await SendAsync<MedicineAutoCompleteRequest, List<Medicine>>(request);
+    }
+
+    public Task<QueryResponse<ShippingCalculation>> CalculateShippingFee(CalculateShippingFeeRequest request)
+    {
+        return SendAsync<CalculateShippingFeeRequest, ShippingCalculation>(request);
     }
 }

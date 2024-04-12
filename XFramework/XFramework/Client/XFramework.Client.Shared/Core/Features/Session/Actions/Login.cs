@@ -87,22 +87,20 @@ public partial class SessionState
                 Data = response.Response
             });
             
-            // Inform UI About Not Busy State
-            await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});
-
-            if (!HostEnvironment.IsProduction())
-            {
-                // If Success URL property is provided, navigate to the given URL
-                await HandleSuccess(response, action, true);
-            }
-            else if (action.SkipVerification || (checkVerification.HttpStatusCode is not HttpStatusCode.NotFound && checkVerification.Response.IsVerified))
-            {
-                // If Success URL property is provided, navigate to the given URL
-                await HandleSuccess(response, action, true);
-            }
-            
             // Fetch User Identity And Credential and Contact List
-            var credentialResponse = identityServerServiceWrapper.IdentityCredential.Get(response.Response.Credential.Id);
+            var credentialResponse = identityServerServiceWrapper.IdentityCredential.Get(
+                id: CurrentState.Credential.Id,
+                includeNavigations: true,
+                includes:[
+                    $"{nameof(IdentityCredential.IdentityInfo)}.{nameof(IdentityInformation.IdentityAddresses)}.{nameof(IdentityAddress.AddressType)}",
+                    $"{nameof(IdentityCredential.IdentityInfo)}.{nameof(IdentityInformation.IdentityAddresses)}.{nameof(IdentityAddress.Country)}",
+                    $"{nameof(IdentityCredential.IdentityInfo)}.{nameof(IdentityInformation.IdentityAddresses)}.{nameof(IdentityAddress.Region)}",
+                    $"{nameof(IdentityCredential.IdentityInfo)}.{nameof(IdentityInformation.IdentityAddresses)}.{nameof(IdentityAddress.Province)}",
+                    $"{nameof(IdentityCredential.IdentityInfo)}.{nameof(IdentityInformation.IdentityAddresses)}.{nameof(IdentityAddress.City)}",
+                    $"{nameof(IdentityCredential.IdentityInfo)}.{nameof(IdentityInformation.IdentityAddresses)}.{nameof(IdentityAddress.Barangay)}",
+                    $"{nameof(IdentityCredential.IdentityContacts)}.{nameof(IdentityContact.Type)}",
+                ]
+            );
             var contactListResponse = identityServerServiceWrapper.IdentityContact.GetList(pageNumber: 1, pageSize: 100,
                 filter: new() { 
                     new()
@@ -124,6 +122,17 @@ public partial class SessionState
                 ContactList = contactListResponse.Result.Response?.Items.ToList(),
             });
 
+            if (!HostEnvironment.IsProduction())
+            {
+                // If Success URL property is provided, navigate to the given URL
+                await HandleSuccess(response, action, true);
+            }
+            else if (action.SkipVerification || (checkVerification.HttpStatusCode is not HttpStatusCode.NotFound && checkVerification.Response.IsVerified))
+            {
+                // If Success URL property is provided, navigate to the given URL
+                await HandleSuccess(response, action, true);
+            }
+            
             // Reset Session Forms
             await Mediator.Send(new SetState()
             {

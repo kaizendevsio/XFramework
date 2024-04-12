@@ -10,6 +10,7 @@
 
     <ItemGroup>
         <PackageReference Include="Azure.Storage.Blobs" Version="12.16.0"/>
+        <PackageReference Include="ChatGPT.Net" Version="2.0.0" />
         <PackageReference Include="RestSharp" Version="108.0.2-alpha.0.5"/>
     </ItemGroup>
 
@@ -36,12 +37,6 @@
         <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
         <ProjectReference Include="..\HealthEssentials.Domain.Generics\HealthEssentials.Domain.Generics.csproj"/>
         <ProjectReference Include="..\HealthEssentials.Domain\HealthEssentials.Domain.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="IdentityServer.Integration">
-        <HintPath>..\..\XFramework.IdentityServer\IdentityServer.Integration\bin\Debug\net7.0\IdentityServer.Integration.dll</HintPath>
-      </Reference>
     </ItemGroup>
 
 </Project>
