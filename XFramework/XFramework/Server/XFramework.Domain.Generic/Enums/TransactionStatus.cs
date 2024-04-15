@@ -16,4 +16,5 @@ public enum TransactionStatus : int
     OnHold = 10,
     OnGoing = 11,
     Scheduled = 12,
+    ForDelivery = 13,
 }

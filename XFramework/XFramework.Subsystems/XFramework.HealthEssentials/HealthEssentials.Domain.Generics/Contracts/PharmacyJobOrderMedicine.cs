@@ -16,6 +16,10 @@ public partial class PharmacyJobOrderMedicine : BaseModel
 
     public short? Status { get; set; }
 
+    public decimal PriceInc { get; set; }
+    
+    public decimal PriceEx { get; set; }
+
     public Guid UnavailabilityHandling { get; set; }
 
     public int IntakeRepetition { get; set; }

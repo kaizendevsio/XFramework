@@ -8,7 +8,7 @@ public partial class PharmacyJobOrder : BaseModel
 
     public string? Remarks { get; set; }
 
-    public short? Status { get; set; }
+    public TransactionStatus? Status { get; set; }
 
     public short? PaymentStatus { get; set; }
 

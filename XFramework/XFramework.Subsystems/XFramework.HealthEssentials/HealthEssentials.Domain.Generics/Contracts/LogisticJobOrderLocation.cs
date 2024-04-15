@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace HealthEssentials.Domain.Generics.Contracts;
 
@@ -44,14 +45,18 @@ public partial class LogisticJobOrderLocation : BaseModel
     public virtual LogisticJobOrder LogisticJobOrder { get; set; } = null!;
 
     [NotMapped]
+    [JsonIgnore]
     public AddressRegion? Region { get; set; }
     
     [NotMapped]
+    [JsonIgnore]
     public AddressProvince? Province { get; set; }
     
     [NotMapped]
+    [JsonIgnore]
     public AddressCity? City { get; set; }
     
     [NotMapped]
+    [JsonIgnore]
     public AddressBarangay? Barangay { get; set; }
 }

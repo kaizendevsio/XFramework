@@ -2,12 +2,12 @@
 
 public partial class LogisticJobOrder : BaseModel
 {
-    public Guid RiderId { get; set; }
+    public Guid? RiderId { get; set; }
 
 
     public short Status { get; set; }
 
-    public Guid ScheduleId { get; set; }
+    public Guid? ScheduleId { get; set; }
 
     public virtual ICollection<LogisticJobOrderDetail> LogisticJobOrderDetails { get; set; } =
         new List<LogisticJobOrderDetail>();
