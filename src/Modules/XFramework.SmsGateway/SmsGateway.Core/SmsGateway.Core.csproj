@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+      <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
+      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+      <ProjectReference Include="..\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
+      <ProjectReference Include="..\SmsGateway.Integration\SmsGateway.Integration.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Validations\Common\" />
+    </ItemGroup>
+
+
+</Project>

@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="C:\Projects\Net Core\XFramework" t="IncludeFlat">
+      <e p="Application" t="Include" />
+      <e p="Domain" t="Include" />
+      <e p="packages" t="ExcludeRecursive" />
+      <e p="Presentation" t="Include" />
+      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Api" t="IncludeRecursive">
+        <e p="appsettings.Development.json" t="Include" />
+        <e p="appsettings.json" t="Include" />
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Controllers" t="Include">
+          <e p="StartupController.cs" t="Include" />
+          <e p="V1" t="Include">
+            <e p="Application" t="Include">
+              <e p="ApplicationController.cs" t="Include" />
+            </e>
+            <e p="Identity" t="Include">
+              <e p="AuthorizationController.cs" t="Include" />
+              <e p="InformationController.cs" t="Include" />
+            </e>
+          </e>
+          <e p="XFrameworkControllerBase.cs" t="Include" />
+        </e>
+        <e p="IdentityServer.Api.csproj" t="IncludeRecursive" />
+        <e p="Installers" t="Include">
+          <e p="ApiInstaller.cs" t="Include" />
+          <e p="DbInstaller.cs" t="Include" />
+          <e p="ExternalDependencyInstaller.cs" t="Include" />
+          <e p="IInstaller.cs" t="Include" />
+          <e p="InstallerExtensions.cs" t="Include" />
+          <e p="ServicesInstaller.cs" t="Include" />
+        </e>
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="netcoreapp5.0" t="Include">
+              <e p="IdentityServer.Api.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="Options" t="Include">
+          <e p="JwtOptions.cs" t="Include" />
+          <e p="SwaggerOptions.cs" t="Include" />
+        </e>
+        <e p="Program.cs" t="Include" />
+        <e p="Properties" t="Include">
+          <e p="launchSettings.json" t="Include" />
+        </e>
+        <e p="Startup.cs" t="Include" />
+        <e p="WeatherForecast.cs" t="Include" />
+      </e>
+      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Core" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="DataAccess" t="Include">
+          <e p="Commands" t="Include">
+            <e p="Entity" t="Include">
+              <e p="Application" t="Include" />
+              <e p="CommandBaseEntity.cs" t="Include" />
+              <e p="Events" t="Include" />
+              <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="CreateAuthorizeIdentityCmd.cs" t="Include" />
+                  <e p="DeleteAuthorizeIdentityCmd.cs" t="Include" />
+                  <e p="UpdateAuthorizeIdentityCmd.cs" t="Include" />
+                </e>
+                <e p="CreateIdentityCmd.cs" t="Include" />
+                <e p="DeleteIdentityCmd.cs" t="Include" />
+                <e p="UpdateIdentityCmd.cs" t="Include" />
+              </e>
+            </e>
+            <e p="Handlers" t="Include">
+              <e p="Application" t="Include" />
+              <e p="CommandBaseHandler.cs" t="Include" />
+              <e p="Events" t="Include" />
+              <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="CreateAuthorizeIdentityHandler.cs" t="Include" />
+                  <e p="DeleteAuthorizeIdentityHandler.cs" t="Include" />
+                  <e p="UpdateAuthorizeIdentityHandler.cs" t="Include" />
+                </e>
+                <e p="CreateIdentityHandler.cs" t="Include" />
+                <e p="DeleteIdentityHandler.cs" t="Include" />
+                <e p="UpdateIdentityHandler.cs" t="Include" />
+              </e>
+            </e>
+            <e p="Validations" t="Include">
+              <e p="CommandBaseValidator.cs" t="Include" />
+              <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="CreateAuthorizeIdentityValidator.cs" t="Include" />
+                </e>
+              </e>
+            </e>
+          </e>
+          <e p="DataLayer.cs" t="Include" />
+          <e p="Query" t="Include">
+            <e p="Entity" t="Include">
+              <e p="Application" t="Include">
+                <e p="GetAllAppListQuery.cs" t="Include" />
+              </e>
+              <e p="Events" t="Include" />
+              <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="AuthenticateIdentityQuery.cs" t="Include" />
+                </e>
+                <e p="GetAllIdentityQuery.cs" t="Include" />
+                <e p="GetIdentityQuery.cs" t="Include" />
+              </e>
+              <e p="QueryBaseEntity.cs" t="Include" />
+            </e>
+            <e p="Handlers" t="Include">
+              <e p="Application" t="Include">
+                <e p="GetAllAppInfoQueryHandler.cs" t="Include" />
+              </e>
+              <e p="Events" t="Include" />
+              <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="AuthenticateIdentityHandler.cs" t="Include" />
+                </e>
+                <e p="GetAllIdentityHandler.cs" t="Include" />
+                <e p="GetIdentityHandler.cs" t="Include" />
+              </e>
+              <e p="QueryBaseHandler.cs" t="Include" />
+            </e>
+            <e p="Validations" t="Include">
+              <e p="Identity" t="Include">
+                <e p="Authorization" t="Include">
+                  <e p="AuthenticateIdentityValidator.cs" t="Include" />
+                </e>
+              </e>
+              <e p="QueryBaseValidator.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="IdentityServer.Core.csproj" t="IncludeRecursive" />
+        <e p="Interfaces" t="Include">
+          <e p="ICachingService.cs" t="Include" />
+          <e p="IDataLayer.cs" t="Include" />
+          <e p="IHelperService.cs" t="Include" />
+          <e p="IJwtService.cs" t="Include" />
+          <e p="ILoggerService.cs" t="Include" />
+        </e>
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Core.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="PipelineBehaviors" t="Include">
+          <e p="BasePipelineBehavior.cs" t="Include" />
+        </e>
+        <e p="Services" t="Include">
+          <e p="CachingService.cs" t="Include" />
+          <e p="HelperService.cs" t="Include" />
+          <e p="JwtService.cs" t="Include" />
+        </e>
+        <e p="Validations" t="Include">
+          <e p="Common" t="Include">
+            <e p="RequestServerBOValidator.cs" t="Include" />
+          </e>
+        </e>
+      </e>
+      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Domain" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="BusinessObjects" t="Include">
+          <e p="ApiStatusBO.cs" t="Include" />
+          <e p="AuditEntryBO.cs" t="Include" />
+          <e p="CmdResponseBO.cs" t="Include" />
+          <e p="HostBO.cs" t="Include" />
+          <e p="IdentitySessionBO.cs" t="Include" />
+          <e p="JwtOptionsBO.cs" t="Include" />
+          <e p="JwtTokenBO.cs" t="Include" />
+          <e p="QueryResponseBO.cs" t="Include" />
+          <e p="RefreshTokenBO.cs" t="Include" />
+          <e p="RequestServerBO.cs" t="Include" />
+        </e>
+        <e p="Contracts" t="Include">
+          <e p="AuthorizeIdentityContract.cs" t="Include" />
+          <e p="GetApplicationListContract.cs" t="Include" />
+          <e p="GetIdentityContract.cs" t="Include" />
+        </e>
+        <e p="DataTransferObjects" t="Include">
+          <e p="TblAddressBarangay.cs" t="Include" />
+          <e p="TblAddressCity.cs" t="Include" />
+          <e p="TblAddressCountry.cs" t="Include" />
+          <e p="TblAddressProvince.cs" t="Include" />
+          <e p="TblAddressRegion.cs" t="Include" />
+          <e p="TblApplication.cs" t="Include" />
+          <e p="TblApplicationLog.cs" t="Include" />
+          <e p="TblAuditField.cs" t="Include" />
+          <e p="TblAuditHistory.cs" t="Include" />
+          <e p="TblAuthorizationLog.cs" t="Include" />
+          <e p="TblConfiguration.cs" t="Include" />
+          <e p="TblCurrency.cs" t="Include" />
+          <e p="TblCurrencyEntity.cs" t="Include" />
+          <e p="TblEnterprise.cs" t="Include" />
+          <e p="TblExchangeRate.cs" t="Include" />
+          <e p="TblIdentityAddress.cs" t="Include" />
+          <e p="TblIdentityAddressEntity.cs" t="Include" />
+          <e p="TblIdentityContact.cs" t="Include" />
+          <e p="TblIdentityContactEntity.cs" t="Include" />
+          <e p="TblIdentityCredential.cs" t="Include" />
+          <e p="TblIdentityInfo.cs" t="Include" />
+          <e p="TblIdentityInformation.cs" t="Include" />
+          <e p="TblIdentityRole.cs" t="Include" />
+          <e p="TblIdentityRoleEntity.cs" t="Include" />
+          <e p="TblIdentityVerification.cs" t="Include" />
+          <e p="TblIdentityVerificationEntity.cs" t="Include" />
+          <e p="TblLog.cs" t="Include" />
+          <e p="TblSessionDatum.cs" t="Include" />
+          <e p="TblSessionEntity.cs" t="Include" />
+          <e p="TblVerificationType.cs" t="Include" />
+          <e p="XFrameworkContext.cs" t="Include" />
+        </e>
+        <e p="Enums" t="Include">
+          <e p="AuthorizeBy.cs" t="Include" />
+          <e p="SessionState.cs" t="Include" />
+        </e>
+        <e p="IdentityServer.Domain.csproj" t="IncludeRecursive" />
+        <e p="Migrations" t="Include">
+          <e p="DbScaffolding.ps1" t="Include" />
+        </e>
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Domain.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+      </e>
+      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Integrity" t="IncludeRecursive">
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Class1.cs" t="Include" />
+        <e p="IdentityServer.Integrity.csproj" t="IncludeRecursive" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Integrity.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+      </e>
+      <e p="XFramework\Server\XFramework.IdentityServer\IdentityServer.Stream" t="IncludeRecursive">
+        <e p="appsettings.Development.json" t="Include" />
+        <e p="appsettings.json" t="Include" />
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="Controllers" t="Include">
+          <e p="WeatherForecastController.cs" t="Include" />
+        </e>
+        <e p="IdentityServer.Stream.csproj" t="IncludeRecursive" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="net5.0" t="Include">
+              <e p="IdentityServer.Stream.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+        <e p="Program.cs" t="Include" />
+        <e p="Properties" t="Include">
+          <e p="launchSettings.json" t="Include" />
+        </e>
+        <e p="SignalR" t="Include">
+          <e p="Hubs" t="Include" />
+        </e>
+        <e p="Startup.cs" t="Include" />
+        <e p="WeatherForecast.cs" t="Include" />
+      </e>
+      <e p="XFramework.IdentityServer.sln" t="IncludeFlat" />
+    </e>
+    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Xeon\AppData\local\JetBrains\Rider2020.3\resharper-host\local\Transient\Rider\v203\SolutionCaches\_XFramework.IdentityServer.1901760484.00" t="ExcludeRecursive" />
+  </component>
+</project>

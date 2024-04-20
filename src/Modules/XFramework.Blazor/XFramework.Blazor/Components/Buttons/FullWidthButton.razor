@@ -1,0 +1,40 @@
+﻿<XButton
+    Color="@Color"
+    OnClick="@OnClick"
+    ButtonType="@ButtonType"
+    FullWidth="@true"
+    Variant="@Variant"
+    Size="@Size"
+    StartIcon="@StartIcon"
+    EndIcon="@EndIcon"
+    IconColor="@IconColor"
+    IconSize="@IconSize"
+    IconClass="@IconClass"
+    DisableElevation="@DisableElevation"
+    DisableRipple="@DisableRipple"
+    Disabled="@Disabled"
+    Style="@Style"
+    Class="@Class">
+
+    <div class="w-100">
+        @if (!string.IsNullOrEmpty(Title))
+        {
+            <MudText Align="@Align">@Title</MudText>
+        }
+        else
+        {
+            @ChildContent
+        }
+    </div>
+
+</XButton>
+
+@code {
+
+    /// <summary>
+    /// The color of the component. It supports the theme colors.
+    /// </summary>
+    [Parameter]
+    [Category("Appearance")]
+    public Color Color { get; set; }
+}

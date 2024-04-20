@@ -1,0 +1,3 @@
+XApplication
+    .Build<Program>()
+    .Run();

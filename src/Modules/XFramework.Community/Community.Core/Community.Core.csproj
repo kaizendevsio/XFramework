@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <LangVersion>12</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+      <ProjectReference Include="..\Community.Domain.Shared\Community.Domain.Shared.csproj" />
+      <ProjectReference Include="..\Community.Domain\Community.Domain.csproj" />
+    </ItemGroup>
+</Project>

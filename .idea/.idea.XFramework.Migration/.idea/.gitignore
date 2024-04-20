@@ -1,0 +1,13 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Rider ignored files
+/contentModel.xml
+/projectSettingsUpdater.xml
+/modules.xml
+/.idea.XFramework.Migration.iml
+# Datasource local storage ignored files
+/../../../../../../../:\Projects\Net Core\XFramework\.idea\.idea.XFramework.Migration\.idea/dataSources/
+/dataSources.local.xml
+# Editor-based HTTP Client requests
+/httpRequests/

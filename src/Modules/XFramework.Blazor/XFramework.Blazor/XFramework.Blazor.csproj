@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+        
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>        
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Blazor-State" Version="10.0.0" />
+        <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
+        <PackageReference Include="Blazored.SessionStorage" Version="2.4.0" />
+        <PackageReference Include="BlazorTransitionableRoute" Version="4.0.0" />
+        <PackageReference Include="CurrieTechnologies.Razor.SweetAlert2" Version="5.5.0" />
+        
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.2" />
+        <PackageReference Include="MudBlazor" Version="6.16.0" />
+        <PackageReference Include="Reshiru.Blazor.IndexedDB.Framework" Version="1.0.1" />
+        <PackageReference Include="Serilog.Sinks.BrowserHttp" Version="1.0.0-dev-00032" />
+        <PackageReference Include="TG.Blazor.IndexedDB" Version="1.5.0-preview" />
+        <PackageReference Include="PPioli.FluentValidation.Blazor" Version="11.1.0" />
+        <PackageReference Include="BlazorDownloadFile" Version="2.4.0.2" />
+        
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Components\Modals\" />
+      <Folder Include="Core\Features\Base" />
+      <Folder Include="Entity\Models\Responses" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
+    </ItemGroup>
+</Project>

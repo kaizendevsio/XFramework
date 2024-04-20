@@ -1,0 +1,59 @@
+﻿@using XFramework.Blazor.Entity.Enums
+
+
+<div class="d-flex flex-row justify-content-between">
+    @if (OnDelete.HasDelegate && FormMode == FormMode.Edit)
+    {
+        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="() => OnDelete.InvokeAsync()">Delete</MudButton>
+    }
+
+    @if(FormMode is FormMode.Create or FormMode.Edit)
+    {
+        <CascadingValue Name="ParentDisabled" Value="@_disabled">
+            <div class="d-flex flex-row justify-content-end gap-3 ms-auto">
+                <CancelButton
+                    Size="Size.Large"
+                    OnClick="@InternalCancel"/>
+
+                <SaveButton
+                    Size="Size.Large"
+                    OnClick="@InternalSave"/>
+            </div>
+        </CascadingValue>
+        
+    }
+</div>
+
+@code {
+
+    private bool _disabled = false;
+    
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+    
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+    
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+    
+    [CascadingParameter] 
+    public FormMode FormMode { get; set; }
+
+    private Task InternalCancel(MouseEventArgs? e)
+    {
+        //return OnCancel?.InvokeAsync() ?? NavigateBack();
+        return OnCancel.InvokeAsync();
+    }
+    
+    private async Task InternalSave()
+    {
+        _disabled = true;
+        StateHasChanged();
+        
+        await OnSave.InvokeAsync();
+
+        _disabled = false;
+        StateHasChanged();
+    }
+}

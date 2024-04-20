@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+        <ProjectReference Include="..\..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"/>
+        <ProjectReference Include="..\Messaging.Core\Messaging.Core.csproj" />
+        <ProjectReference Include="..\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />
+        <ProjectReference Include="..\Messaging.Integration\Messaging.Integration.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="HostedService\" />
+    </ItemGroup>
+
+</Project>

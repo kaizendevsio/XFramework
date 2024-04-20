@@ -1,0 +1,17 @@
+﻿global using System;
+global using System.Net;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using Mapster;
+global using MediatR;
+global using XFramework.Domain.Shared.BusinessObjects;
+global using Microsoft.EntityFrameworkCore;
+global using System.Text;
+global using Microsoft.Extensions.Logging;
+global using XFramework.Core.DataAccess.Commands;
+global using XFramework.Domain.Contexts;
+global using XFramework.Domain.Shared.Contracts;
+global using XFramework.Domain.Shared.Contracts.Requests;
+global using XFramework.Domain.Shared.Enums;
+global using XFramework.Domain.Shared.Interfaces;
+global using XFramework.Integration.Services.Helpers;

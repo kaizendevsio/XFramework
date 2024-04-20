@@ -1,0 +1,124 @@
+﻿@typeparam T
+
+@if (Item is null || IsLoading is true)
+{
+    @if (Template is not null)
+    {
+        @Template
+    }
+    else
+    {
+        @switch (SkeletonType)
+        {
+            case XSkeletonType.Text:
+                <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" />
+                break;
+            case XSkeletonType.Form:
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex flex-row w-100">
+                        <div class="px-2">
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="200px"/>
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Pulse" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="40px" Width="300px"/>
+                        </div>
+                        <div class="px-2">
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="200px"/>
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Pulse" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="40px" Width="300px"/>
+                        </div>
+                        <div class="px-2">
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="200px"/>
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Pulse" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="40px" Width="300px"/>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-row w-100">
+                        <div class="px-2">
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="200px"/>
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Pulse" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="40px" Width="300px"/>
+                        </div>
+                        <div class="px-2">
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="200px"/>
+                            <MudSkeleton Class="rounded-1" Animation="Animation.Pulse" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="40px" Width="300px"/>
+                        </div>
+                        <div class="px-2">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-column w-100">
+                        <div class="px-2">
+                            <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="70%"/>
+                            <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="70%"/>
+                            <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="50%"/>
+                            <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="20px" Width="50%"/>
+
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex flex-row justify-content-end gap-3 mt-5">
+                        <MudSkeleton Class="rounded-1" Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="50px" Width="150px"/>
+                        <MudSkeleton Class="rounded-1" Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="50px" Width="150px"/>
+                    </div>
+                </div>
+                break;
+            case XSkeletonType.Table:
+                <div class="skeleton-table">
+                    <div class="skeleton-row mb-3">
+                        @for (int j = 0; j < 5; j++)
+                        {
+                            <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="20px" Width="100%" Class="skeleton-cell"/>
+                        }
+                    </div>
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        <div class="skeleton-row">
+                            @for (int j = 0; j < 5; j++)
+                            {
+                                <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="20px" Width="100%" Class="skeleton-cell"/>
+                            }
+                        </div>
+                    }
+                </div>
+                break;
+            case XSkeletonType.Image:
+                <MudSkeleton Animation="Animation.Pulse" SkeletonType="MudBlazor.SkeletonType.Circle" Height="100px" Width="100px" />
+                break;
+            case XSkeletonType.Paragraph:
+                <div class="d-flex flex-column gap-2">
+                    @for (int i = 0; i < 3; i++)
+                    {
+                        <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Rectangle" Height="15vh" Width="100%" />
+                    }
+                </div>
+                break;
+            case XSkeletonType.Heading:
+                <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" Height="40px" Width="50%" />
+                break;
+            case null:
+                <p>No skeleton type selected.</p>
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+    }
+}
+else
+{
+    <div class="@Class animated animate__fadeIn">
+        @ChildContent
+    </div>
+}
+
+@code {
+    
+    [Parameter]
+    public T? Item { get; set; }
+
+    [Parameter] 
+    public XSkeletonType? SkeletonType { get; set; } = XSkeletonType.Text;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+    
+    [Parameter]
+    public RenderFragment? Template { get; set; }
+    
+    [Parameter]
+    public string? Class { get; set; }
+}

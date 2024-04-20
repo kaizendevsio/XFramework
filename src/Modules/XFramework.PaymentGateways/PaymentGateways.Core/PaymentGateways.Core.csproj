@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+    </PropertyGroup>
+    
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Domain.Generic\XFramework.Domain.Generic.csproj" />
+      <ProjectReference Include="..\..\..\XFramework\Server\XFramework.Integration\XFramework.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+      <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
+      <ProjectReference Include="..\PaymentGateways.Domain.Generic\PaymentGateways.Domain.Generic.csproj" />
+      <ProjectReference Include="..\PaymentGateways.Domain\PaymentGateways.Domain.csproj" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <PackageReference Include="RestSharp" Version="110.1.0" />
+    </ItemGroup>
+
+</Project>

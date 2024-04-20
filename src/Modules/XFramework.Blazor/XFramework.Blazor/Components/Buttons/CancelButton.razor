@@ -1,0 +1,28 @@
+﻿<XButton
+    Color="Color.Surface"
+    Title="@Title"
+    OnClick="@OnClick"
+    ButtonType="@ButtonType"
+    FullWidth="@FullWidth"
+    Variant="@Variant"
+    Size="@Size"
+    StartIcon="@StartIcon"
+    EndIcon="@EndIcon"
+    IconColor="@IconColor"
+    IconSize="@IconSize"
+    IconClass="@IconClass"
+    Class="@Class">
+
+    @ChildContent
+
+</XButton>
+
+@code {
+
+    protected override void OnInitialized()
+    {
+        Title = "Cancel";
+        base.OnInitialized();
+    }
+
+}
