@@ -2,7 +2,7 @@
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
 
-namespace XFramework.Api.Installers;
+namespace XFramework.Gateway.Installers;
 
 public class WrapperInstaller : IInstaller
 {
