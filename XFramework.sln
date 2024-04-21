@@ -81,7 +81,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Domain", "src\Mo
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Gateways", "Gateways", "{41398AE5-FD00-46BA-AF0B-B9313794B8C0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Api", "src\Modules\XFramework.Gateway\XFramework.Api\XFramework.Api.csproj", "{718EC8CB-9CC4-43FC-A5C3-8D4E4D4DD0EE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Gateway", "src\Modules\XFramework.Gateway\XFramework.Gateway.csproj", "{718EC8CB-9CC4-43FC-A5C3-8D4E4D4DD0EE}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Blazor", "Blazor", "{AE5E9EEE-0624-45A4-A97A-C43A4501BD5A}"
 EndProject

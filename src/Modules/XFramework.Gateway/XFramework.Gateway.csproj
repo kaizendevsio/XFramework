@@ -12,15 +12,15 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
-        <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
-        <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
-        
-        <ProjectReference Include="..\..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj" 
+        <ProjectReference Include="..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+        <ProjectReference Include="..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+        <ProjectReference Include="..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
+                
+        <ProjectReference Include="..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj" 
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"/>
         
-        <ProjectReference Include="..\..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
+        <ProjectReference Include="..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
         
     </ItemGroup>
 

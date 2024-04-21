@@ -1,4 +1,4 @@
-﻿namespace XFramework.Api.Installers;
+﻿namespace XFramework.Gateway.Installers;
 
 public class HostedServiceInstaller : IInstaller
 {

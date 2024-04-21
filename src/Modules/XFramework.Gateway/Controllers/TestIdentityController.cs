@@ -1,6 +1,6 @@
 ﻿using Wallets.Integration.Drivers;
 
-namespace XFramework.Api.Controllers;
+namespace XFramework.Gateway.Controllers;
 
 [ApiController]
 public class TestIdentityController : ControllerBase

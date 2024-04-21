@@ -1,6 +1,6 @@
 ﻿using Tenant.Integration.Drivers;
 
-namespace XFramework.Api.Installers;
+namespace XFramework.Gateway.Installers;
 
 public class ServicesInstaller : IInstaller
 {

@@ -1,4 +1,4 @@
-﻿namespace XFramework.Api.HostedService;
+﻿namespace XFramework.Gateway.HostedServices;
 
 public class SampleService : IHostedService
 {

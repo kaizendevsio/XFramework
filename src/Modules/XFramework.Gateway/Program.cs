@@ -1,3 +1,4 @@
+
 XApplication
     .Build<Program>()
     .GenerateMinimalApi()

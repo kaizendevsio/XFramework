@@ -1,6 +1,6 @@
 ﻿using XFramework.Core.Attributes;
 
-namespace XFramework.Api.Generators;
+namespace XFramework.Gateway.Generators;
 
 [GenerateApiFromNamespace("XFramework.Domain.Shared.Contracts",new[] {
     nameof(Tenant)
