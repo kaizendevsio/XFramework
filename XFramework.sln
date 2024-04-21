@@ -85,7 +85,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Gateway", "src\G
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Blazor", "Blazor", "{AE5E9EEE-0624-45A4-A97A-C43A4501BD5A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Blazor", "src\Modules\XFramework.Blazor\XFramework.Blazor\XFramework.Blazor.csproj", "{198FAC13-41FF-43F5-86E1-CD9C3A194415}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Blazor", "src\Modules\XFramework.Blazor\XFramework.Blazor.csproj", "{198FAC13-41FF-43F5-86E1-CD9C3A194415}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Api", "src\Modules\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj", "{701AEA97-7414-481C-9458-B20C8235CAE8}"
 EndProject
