@@ -35,7 +35,6 @@
       <ProjectReference Include="..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
       <ProjectReference Include="..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-      <ProjectReference Include="..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
       <ProjectReference Include="..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
     </ItemGroup>
 </Project>

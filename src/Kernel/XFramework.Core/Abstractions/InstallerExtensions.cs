@@ -1,11 +1,9 @@
-﻿using System.Reflection;
-using System.Runtime.Versioning;
+﻿using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Asp.Versioning;
 using FluentValidation;
-using Humanizer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;

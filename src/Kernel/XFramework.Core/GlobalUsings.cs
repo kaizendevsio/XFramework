@@ -1,7 +1,9 @@
 ﻿global using System;
 global using System.Collections.Generic;
 global using System.Net;
+global using System.Reflection;
 global using System.Threading.Tasks;
+global using Humanizer;
 global using Mapster;
 global using Microsoft.Extensions.Configuration;
 global using XFramework.Domain.Shared.BusinessObjects;
@@ -11,6 +13,8 @@ global using MediatR;
 global using Microsoft.AspNetCore.Builder;
 global using Microsoft.Extensions.DependencyInjection;
 global using Serilog;
+global using Serilog.Core;
+global using Serilog.Events;
 global using XFramework.Domain.Contexts;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Domain.Shared.Contracts.Base;
