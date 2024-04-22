@@ -1,8 +1,4 @@
-﻿using System.Reflection;
-using System.Runtime.Versioning;
-using Humanizer;
-using Serilog.Core;
-using Serilog.Events;
+﻿using System.Runtime.Versioning;
 
 namespace XFramework.Core.Loggers;
 
