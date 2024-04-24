@@ -25,7 +25,7 @@ public class StreamFlowMessage<T> : StreamFlowMessage
     private void SetData(T request)
     {
         CommandName ??= typeof(T).GetTypeFullName();
-        Data = request is null ? Array.Empty<byte>() : MessagePackSerializer.Serialize(request, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
+        Data = request is null ? Array.Empty<byte>() : MessagePackSerializer.Serialize(request, new(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
     }
 }
 

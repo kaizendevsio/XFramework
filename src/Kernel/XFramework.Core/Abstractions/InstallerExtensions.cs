@@ -275,6 +275,7 @@ public static class InstallerExtensions
        
         app.UseCors(o => o.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
         app.UseRouting();
+        app.UseAntiforgery();
         app.UseAuthentication();
         app.UseAuthorization();
 

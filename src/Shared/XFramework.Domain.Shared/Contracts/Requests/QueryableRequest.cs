@@ -7,6 +7,6 @@ public record QueryableRequest : RequestBase
     public string OrderBy { get; set; }
     public string OrderByDirection { get; set; }
     public string? SearchText { get; set; }
-    public List<string>? SearchFields { get; set; } = new() { "Name" };
+    public List<string>? SearchFields { get; set; } = ["Name"];
     public bool Silent { get; set; }
 }   

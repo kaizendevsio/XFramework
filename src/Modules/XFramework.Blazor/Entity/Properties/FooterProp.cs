@@ -4,7 +4,7 @@ namespace XFramework.Blazor.Entity.Properties
     {
         public FooterProp()
         {
-            Title = new TitleProp();
+            Title = new();
         }
         public TitleProp Title { get; set; }
     }

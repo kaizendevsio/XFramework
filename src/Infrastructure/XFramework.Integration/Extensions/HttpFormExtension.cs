@@ -57,7 +57,7 @@ public static class HttpFormExtension
     {
         var formData = obj.ToKeyValue();
 
-        return new FormUrlEncodedContent(formData);
+        return new(formData);
     }
 
     public static string JsonToQuery(this string jsonQuery)

@@ -24,7 +24,7 @@ public partial class SessionState
             {
                 if (SessionState.VerificationVm.LocalToken != SessionState.VerificationVm.OtpCode)
                 {
-                    await SweetAlertService.FireAsync(new SweetAlertOptions
+                    await SweetAlertService.FireAsync(new()
                     {
                         Title = "Error",
                         Text = "Your otp code is incorrect. Please try again",

@@ -93,7 +93,7 @@ public class HttpHelper
             }
             catch (Exception e)
             {
-                return new HttpResponse<T>
+                return new()
                 {
                     StatusCode = HttpStatusCode.BadRequest,
                     ReasonPhrase = $"{e.Message} : {e.InnerException?.Message}",
@@ -130,6 +130,6 @@ public class HttpHelper
         requestContent.Content = requestContent.AsJsonContent().EncryptWithAes(keyString);
         requestContent.RsaSignature = $"{requestContent.AsJsonContent()}{keyString}".ToSha512();
             
-        return await PostAsync<T>(new Uri(requestUri),"",requestContent, cookieCollection);
+        return await PostAsync<T>(new(requestUri),"",requestContent, cookieCollection);
     }
 }

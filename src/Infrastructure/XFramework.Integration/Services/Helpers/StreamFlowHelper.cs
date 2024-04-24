@@ -13,7 +13,7 @@ public static class StreamFlowHelper
     public static TQuery AsMediatorCmd<TQuery, TResponse>(this object entity) 
         where TQuery : class, IRequest<TResponse>
     {
-        var deserializedEntity =  MessagePackSerializer.Deserialize<TQuery>(entity as byte[], new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance)); 
+        var deserializedEntity =  MessagePackSerializer.Deserialize<TQuery>(entity as byte[], new(MessagePack.Resolvers.ContractlessStandardResolver.Instance)); 
         return deserializedEntity;
     }
 

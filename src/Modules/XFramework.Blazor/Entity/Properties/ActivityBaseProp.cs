@@ -4,7 +4,7 @@
     {
         public ActivityBaseProp()
         {
-            Colors = new ThemeColorProp();
+            Colors = new();
         }
         public bool Visible { get; set; }
         public Func<Task>? OnClick { get; set; }

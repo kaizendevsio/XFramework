@@ -21,7 +21,7 @@ public partial class IdentityState
 
             var filters = new List<QueryFilter>
             {
-                new QueryFilter
+                new()
                 {
                     PropertyName = nameof(IdentityContact.CredentialId),
                     Operation = QueryFilterOperation.Equal,

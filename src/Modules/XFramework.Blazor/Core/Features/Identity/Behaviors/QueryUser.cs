@@ -20,12 +20,12 @@ public partial class IdentityState
             var responseCredential = await identityServerServiceWrapper.IdentityCredential.Get(
                 id: request.CredentialId,
                 includeNavigations: true,
-                includes: new List<string>
-                {
+                includes:
+                [
                     $"{nameof(IdentityCredential.IdentityInfo)}",
                     $"{nameof(IdentityCredential.IdentityContacts)}.{nameof(IdentityContact.Type)}",
                     $"{nameof(IdentityCredential.IdentityRoles)}.{nameof(IdentityRole.Type)}"
-                });
+                ]);
             
            
             if (await HandleFailure(responseCredential, request)) return null;

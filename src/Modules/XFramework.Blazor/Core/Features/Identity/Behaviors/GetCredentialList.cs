@@ -32,12 +32,12 @@ public partial class IdentityState
                 pageSize: action.PageSize, 
                 pageNumber: action.PageIndex, 
                 includeNavigations: true,
-                includes: new List<string>
-                {
+                includes:
+                [
                     $"{nameof(IdentityCredential.IdentityInfo)}",
                     $"{nameof(IdentityCredential.IdentityContacts)}.{nameof(IdentityContact.Type)}",
                     $"{nameof(IdentityCredential.IdentityRoles)}.{nameof(IdentityRole.Type)}"
-                },
+                ],
                 filter: filters);
             
             if (await HandleFailure(response, action)) return;
