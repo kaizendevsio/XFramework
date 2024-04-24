@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Text;
+using IdentityServer.Integration.Drivers;
+using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Services;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,7 @@ using XFramework.Domain.Shared.Contracts;
 public class TransferWallet(
     DbContext dbContext,
     ILogger<TransferWallet> logger,
+    IIdentityServerServiceWrapper identityServerService,
     ITenantService tenantService
 )
     : IRequestHandler<TransferWalletRequest, CmdResponse>
@@ -40,6 +43,35 @@ public class TransferWallet(
             .Where(x => x.WalletTypeId == request.WalletTypeId)
             .FirstOrDefaultAsync(cancellationToken);
 
+        var senderUser = identityServerService.IdentityCredential.Get(
+            id: request.CredentialId,
+            includeNavigations: true,
+            includes: [
+                $"{nameof(IdentityCredential.IdentityInfo)}"
+            ],
+            tenantId: tenant.Id);
+        
+        var recipientUser = identityServerService.IdentityCredential.Get(
+            id: request.RecipientCredentialId,
+            includeNavigations: true,
+            includes:
+            [
+                $"{nameof(IdentityCredential.IdentityInfo)}"
+            ],
+            tenantId: tenant.Id);
+        
+        await Task.WhenAll(senderUser, recipientUser);
+
+        if (senderUser.Result.HttpStatusCode != HttpStatusCode.OK)
+        {
+            return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Sender not found" };
+        }
+        
+        if (recipientUser.Result.HttpStatusCode != HttpStatusCode.OK)
+        {
+            return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Recipient not found" };
+        }
+        
         if (senderWallet == null || recipientWallet == null)
         {
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
@@ -174,7 +206,7 @@ public class TransferWallet(
             RunningTotalBalance = senderWallet.TotalBalance,
             RunningAvailableBalance = senderWallet.AvailableBalance,
             Remarks = request.Remarks,
-            Description = $"Transfer to {request.RecipientCredentialId}",
+            Description = $"Transfered to {MaskFullName(recipientUser.Result.Response.IdentityInfo.FullName)}",
             TransactionType = TransactionType.Debit,
             Held = request.OnHold,
             Released = false,
@@ -196,7 +228,7 @@ public class TransferWallet(
             RunningCreditOnHoldBalance = recipientWallet.CreditOnHoldBalance,
             RunningDebitOnHoldBalance = recipientWallet.DebitOnHoldBalance,
             Remarks = request.Remarks,
-            Description = $"Received from {request.CredentialId}",
+            Description = $"Received from {MaskFullName(senderUser.Result.Response.IdentityInfo.FullName)}",
             TransactionType = TransactionType.Credit,
             Held = request.OnHold,
             Released = false,
@@ -223,5 +255,44 @@ public class TransferWallet(
             logger.LogError(ex, "An error occurred while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             throw new InvalidOperationException("An error occurred while processing your request");
         }
+        
     }
+
+    private string MaskFullName(string fullname)
+    {
+        // Split the full name into words, removing any empty entries caused by extra spaces
+        var names = fullname.Split(' ', StringSplitOptions.RemoveEmptyEntries).AsSpan();
+        var maskedNameBuilder = new StringBuilder();
+
+        for (int i = 0; i < names.Length; i++)
+        {
+            var word = names[i];
+            if (word.Length > 1)
+            {
+                // Append first character
+                maskedNameBuilder.Append(word[0]);
+        
+                // Append '*' for each middle character
+                maskedNameBuilder.Append('*', word.Length - 2);
+        
+                // Append last character
+                maskedNameBuilder.Append(word[^1]);
+            }
+            else
+            {
+                // If the word is a single character, just append it
+                maskedNameBuilder.Append(word);
+            }
+
+            // Add a space after each word, but avoid it after the last word
+            if (i < names.Length - 1)
+            {
+                maskedNameBuilder.Append(' ');
+            }
+        }
+
+        // No need to trim as we manage spaces correctly
+        return maskedNameBuilder.ToString();
+    }
+
 }

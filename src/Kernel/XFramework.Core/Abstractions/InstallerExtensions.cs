@@ -127,6 +127,7 @@ public static class InstallerExtensions
         services.AddSingleton<CacheManager>();
         services.AddHttpClient();
         services.AddMemoryCache();
+        services.AddAntiforgery();
 
         var seqUrl = configuration["SEQ_URL"];
         
