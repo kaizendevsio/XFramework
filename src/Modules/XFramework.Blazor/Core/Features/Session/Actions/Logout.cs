@@ -32,7 +32,7 @@ public partial class SessionState
 
                 await Mediator.Send(new ClearState()
                 {
-                    ContactList = new(),
+                    ContactList = [],
                     Credential = new(),
                     Identity = new()
                 });
@@ -46,7 +46,7 @@ public partial class SessionState
                 
                 await Mediator.Send(new WalletState.ClearState
                 {
-                    WalletList = new()
+                    WalletList = []
                 });
             }
 

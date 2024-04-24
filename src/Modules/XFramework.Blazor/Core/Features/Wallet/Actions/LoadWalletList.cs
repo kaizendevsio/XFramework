@@ -21,20 +21,20 @@ public partial class WalletState
             var response = await walletsServiceWrapper.Wallet.GetList(
                 pageSize: 100,
                 pageNumber: 1,
-                filter: new()
-                {
+                filter:
+                [
                     new()
                     {
                         PropertyName = nameof(Domain.Shared.Contracts.Wallet.CredentialId),
                         Operation = QueryFilterOperation.Equal,
                         Value = SessionState.Credential.Id
                     }
-                },
+                ],
                 includeNavigations: true,
-                includes: new List<string>
-                {
-                    $"{nameof(Domain.Shared.Contracts.Wallet.WalletType)}",
-                });
+                includes:
+                [
+                    $"{nameof(Domain.Shared.Contracts.Wallet.WalletType)}"
+                ]);
 
             // Handle if the response is invalid or error
             if (await HandleFailure(response, action, true)) return;

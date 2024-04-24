@@ -8,7 +8,7 @@ public record QueryAction : StateAction
     public string? OrderBy { get; set; }
     public OrderByDirection OrderByDirection { get; set; }
     public string? SearchText { get; set; }
-    public List<string>? SearchFields { get; set; } = new();
+    public List<string>? SearchFields { get; set; } = [];
     public bool Silent { get; set; }
 }
 
@@ -19,6 +19,6 @@ public record QueryAction<T> : StateAction<T>
     public string? OrderBy { get; set; }
     public OrderByDirection OrderByDirection { get; set; }
     public string? SearchText { get; set; }
-    public List<string>? SearchFields { get; set; } = new();
+    public List<string>? SearchFields { get; set; } = [];
     public bool Silent { get; set; }
 }

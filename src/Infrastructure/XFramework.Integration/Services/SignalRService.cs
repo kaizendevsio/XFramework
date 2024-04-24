@@ -34,7 +34,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     private bool _isRegistering;
     private bool _subscriptionsEventHandle;
 
-    private readonly List<(string MethodName, StreamFlowMessage  StreamFlowMessage)> _queueList = new();
+    private readonly List<(string MethodName, StreamFlowMessage  StreamFlowMessage)> _queueList = [];
     protected TaskCompletionSource TaskCompletionSource { get; set; } = new();
     public HubConnection? Connection { get; set; }
     
@@ -118,13 +118,13 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                         .First(m => m.Name == nameof(HandleRequestCmd) && m.GetGenericArguments().Length == 1);
                     
                     var genericMethod = methodInfo.MakeGenericMethod(tRequest);
-                    genericMethod.Invoke(this, new object[] { Connection, _mediator, _baseLogger, _scopeFactory });
+                    genericMethod.Invoke(this, [Connection, _mediator, _baseLogger, _scopeFactory]);
                 }
                 else if (tResponse.IsAssignableTo(typeof(IQueryResponse)))
                 {
                     var methodInfo = GetType().GetMethod(nameof(HandleRequestQuery), BindingFlags.NonPublic | BindingFlags.Instance);
                     var genericMethod = methodInfo.MakeGenericMethod(tRequest, tResponse.GetGenericArguments().First());
-                    genericMethod.Invoke(this, new object[] { Connection, _mediator, _baseLogger, _scopeFactory });
+                    genericMethod.Invoke(this, [Connection, _mediator, _baseLogger, _scopeFactory]);
                 }
             }
         }

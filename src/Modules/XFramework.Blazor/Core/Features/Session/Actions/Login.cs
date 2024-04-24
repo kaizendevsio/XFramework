@@ -102,14 +102,15 @@ public partial class SessionState
                 ]
             );
             var contactListResponse = identityServerServiceWrapper.IdentityContact.GetList(pageNumber: 1, pageSize: 100,
-                filter: new() { 
+                filter:
+                [
                     new()
                     {
                         PropertyName = nameof(IdentityContact.CredentialId),
                         Operation = QueryFilterOperation.Equal,
                         Value = response.Response.Credential.Id
                     }
-                }, 
+                ], 
                 includeNavigations: true);
 
             await Task.WhenAll(credentialResponse, contactListResponse);
@@ -149,7 +150,7 @@ public partial class SessionState
                     await Mediator.Send(new WalletState.LoadWalletList());
                     if (action.AutoRefreshWallets)
                     {
-                       WalletState.Timer = new Timer(_ =>
+                       WalletState.Timer = new(_ =>
                         {
                             Task.Run(async () =>
                             {

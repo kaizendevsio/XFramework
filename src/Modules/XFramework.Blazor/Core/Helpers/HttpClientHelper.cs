@@ -21,13 +21,13 @@ public class HttpClientHelper : IHttpClient
     {
         var request = new HttpRequestMessage
         {
-            Method = new HttpMethod("GET"),
-            RequestUri = new Uri(url),
+            Method = new("GET"),
+            RequestUri = new(url),
         };
         request.Headers.Add("Accept", "*/*");
         if (useAuthentication)
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Authentication.AccessToken);
+            request.Headers.Authorization = new("Bearer",Authentication.AccessToken);
         }
 
         var response = await HttpClient.SendAsync(request);
@@ -37,7 +37,7 @@ public class HttpClientHelper : IHttpClient
         }
             
         var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
-        return new QueryResponse<TResponse>()
+        return new()
         {
             
             HttpStatusCode = response.StatusCode,
@@ -60,14 +60,14 @@ public class HttpClientHelper : IHttpClient
             
             var request = new HttpRequestMessage
             {
-                Method = new HttpMethod("GET"),
-                RequestUri = new Uri($"{url}?{queryString}"),
+                Method = new("GET"),
+                RequestUri = new($"{url}?{queryString}"),
             };
             
             request.Headers.Add("Accept", "*/*");
             if (useAuthentication)
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Authentication.AccessToken);
+                request.Headers.Authorization = new("Bearer",Authentication.AccessToken);
             }
 
             var response = await HttpClient.SendAsync(request);
@@ -77,7 +77,7 @@ public class HttpClientHelper : IHttpClient
             }
             
             var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
-            return new QueryResponse<TResponse>()
+            return new()
             {
                 
                 HttpStatusCode = response.StatusCode,
@@ -107,22 +107,22 @@ public class HttpClientHelper : IHttpClient
             
             var httpRequest = new HttpRequestMessage
             {
-                Method = new HttpMethod("POST"),
-                RequestUri = new Uri($"{url}?{queryString}"),
+                Method = new("POST"),
+                RequestUri = new($"{url}?{queryString}"),
                 Content = JsonContent.Create(request, null, JsonSerializerOptions)
             };
         
             httpRequest.Headers.Add("Accept", "*/*");
             if (useAuthentication)
             {
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Authentication.AccessToken);
+                httpRequest.Headers.Authorization = new("Bearer",Authentication.AccessToken);
             }
             
             var response = await HttpClient.SendAsync(httpRequest);
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"{response.ReasonPhrase}; {await response.Content.ReadAsStringAsync()}");
-                return new QueryResponse<TResponse>()
+                return new()
                 {
                     
                     HttpStatusCode = response.StatusCode,
@@ -133,7 +133,7 @@ public class HttpClientHelper : IHttpClient
             if (string.IsNullOrEmpty(await response.Content.ReadAsStringAsync())) return Activator.CreateInstance<QueryResponse<TResponse>>();
             
             var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
-            return new QueryResponse<TResponse>()
+            return new()
             {
                 
                 HttpStatusCode = response.StatusCode,
@@ -153,15 +153,15 @@ public class HttpClientHelper : IHttpClient
         {
             var httpRequest = new HttpRequestMessage
             {
-                Method = new HttpMethod("POST"),
-                RequestUri = new Uri($"{url}?api-version={version}"),
+                Method = new("POST"),
+                RequestUri = new($"{url}?api-version={version}"),
                 Content = JsonContent.Create(request, null, JsonSerializerOptions)
             };
             
             httpRequest.Headers.Add("Accept", "*/*");
             if (useAuthentication)
             {
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Authentication.AccessToken);
+                httpRequest.Headers.Authorization = new("Bearer",Authentication.AccessToken);
             }
             
             var response = await HttpClient.SendAsync(httpRequest);
@@ -205,15 +205,15 @@ public class HttpClientHelper : IHttpClient
             
             var httpRequest = new HttpRequestMessage
             {
-                Method = new HttpMethod("POST"),
-                RequestUri = new Uri($"{url}?{queryString}"),
+                Method = new("POST"),
+                RequestUri = new($"{url}?{queryString}"),
                 Content = JsonContent.Create(request, null, JsonSerializerOptions)
             };
         
             httpRequest.Headers.Add("Accept", "*/*");
             if (useAuthentication)
             {
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Authentication.AccessToken);
+                httpRequest.Headers.Authorization = new("Bearer",Authentication.AccessToken);
             }
             
             var response = await HttpClient.SendAsync(httpRequest);
@@ -247,7 +247,7 @@ public class HttpClientHelper : IHttpClient
         try
         {
             var stringBuilder = new StringBuilder();
-            queryParams ??= new Dictionary<string, string>();
+            queryParams ??= new();
             queryParams.TryAdd("api-version", version.ToString());
             foreach (var queryParam in queryParams)
             {
@@ -258,15 +258,15 @@ public class HttpClientHelper : IHttpClient
 
             var httpRequest = new HttpRequestMessage
             {
-                Method = new HttpMethod("PATCH"),
-                RequestUri = new Uri($"{url}?{queryString}"),
+                Method = new("PATCH"),
+                RequestUri = new($"{url}?{queryString}"),
                 Content = JsonContent.Create(request, null, JsonSerializerOptions)
             };
 
             httpRequest.Headers.Add("Accept", "*/*");
             if (useAuthentication)
             {
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authentication.AccessToken);
+                httpRequest.Headers.Authorization = new("Bearer", Authentication.AccessToken);
             }
 
 
@@ -279,7 +279,7 @@ public class HttpClientHelper : IHttpClient
             if (string.IsNullOrEmpty(await response.Content.ReadAsStringAsync()))
                 return Activator.CreateInstance<CmdResponse>();
 
-            return new CmdResponse()
+            return new()
             {
                 
                 HttpStatusCode = response.StatusCode,
@@ -288,7 +288,7 @@ public class HttpClientHelper : IHttpClient
         catch (Exception e)
         {
             Console.WriteLine(e);
-            return new CmdResponse()
+            return new()
             {
                 
                 HttpStatusCode = HttpStatusCode.InternalServerError,
@@ -303,15 +303,15 @@ public class HttpClientHelper : IHttpClient
             var stringBuilder = new StringBuilder();
             var httpRequest = new HttpRequestMessage
             {
-                Method = new HttpMethod("PATCH"),
-                RequestUri = new Uri($"{url}?api-version={version}"),
+                Method = new("PATCH"),
+                RequestUri = new($"{url}?api-version={version}"),
                 Content = JsonContent.Create(request, null, JsonSerializerOptions)
             };
             
             httpRequest.Headers.Add("Accept", "*/*");
             if (useAuthentication)
             {
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Authentication.AccessToken);
+                httpRequest.Headers.Authorization = new("Bearer",Authentication.AccessToken);
             }
 
             var response = await HttpClient.SendAsync(httpRequest);
@@ -323,7 +323,7 @@ public class HttpClientHelper : IHttpClient
             if (string.IsNullOrEmpty(await response.Content.ReadAsStringAsync())) return Activator.CreateInstance<QueryResponse<TResponse>>();
             
             var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
-            return new QueryResponse<TResponse>()
+            return new()
             {
                 
                 HttpStatusCode = response.StatusCode,
@@ -342,7 +342,7 @@ public class HttpClientHelper : IHttpClient
         try
         {
             var stringBuilder = new StringBuilder();
-            queryParams ??= new Dictionary<string, string>();
+            queryParams ??= new();
             queryParams.TryAdd("api-version", version.ToString());
             foreach (var queryParam in queryParams)
             {
@@ -352,15 +352,15 @@ public class HttpClientHelper : IHttpClient
             
             var httpRequest = new HttpRequestMessage
             {
-                Method = new HttpMethod("PATCH"),
-                RequestUri = new Uri($"{url}?{queryString}"),
+                Method = new("PATCH"),
+                RequestUri = new($"{url}?{queryString}"),
                 Content = JsonContent.Create(request, null, JsonSerializerOptions)
             };
             
             httpRequest.Headers.Add("Accept", "*/*");
             if (useAuthentication)
             {
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Authentication.AccessToken);
+                httpRequest.Headers.Authorization = new("Bearer",Authentication.AccessToken);
             }
 
             var response = await HttpClient.SendAsync(httpRequest);
@@ -372,7 +372,7 @@ public class HttpClientHelper : IHttpClient
             if (string.IsNullOrEmpty(await response.Content.ReadAsStringAsync())) return Activator.CreateInstance<QueryResponse<TResponse>>();
             
             var responseModel = await response.Content.ReadFromJsonAsync<TResponse>();
-            return new QueryResponse<TResponse>()
+            return new()
             {
                 
                 HttpStatusCode = response.StatusCode,
@@ -406,14 +406,14 @@ public class HttpClientHelper : IHttpClient
             var queryString = stringBuilder.ToString().Substring(1);
             var request = new HttpRequestMessage
             {
-                Method = new HttpMethod("DELETE"),
-                RequestUri = new Uri($"{url}?{queryString}"),
+                Method = new("DELETE"),
+                RequestUri = new($"{url}?{queryString}"),
             };
         
             request.Headers.Add("Accept", "*/*");
             if (useAuthentication)
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Authentication.AccessToken);
+                request.Headers.Authorization = new("Bearer",Authentication.AccessToken);
             }
 
             var response = await HttpClient.SendAsync(request);

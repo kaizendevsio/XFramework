@@ -65,7 +65,7 @@ public static class HelperExtensions
             // Adjust for multiple values in the filter
             var values = (queryFilter.Value is IEnumerable enumerable && enumerable?.GetType() != typeof(string))
                 ? enumerable.Cast<object>().ToList() // Materialize to list once
-                : new List<object> { queryFilter.Value };
+                : [queryFilter.Value];
 
             if (values.Count > 1 && queryFilter.Operation == QueryFilterOperation.Equal) // Handling multiple values
             {
@@ -90,7 +90,7 @@ public static class HelperExtensions
                 Expression target = Expression.Constant(queryFilter.Value, queryFilter.Value?.GetType());
                 if (property.Type == typeof(Guid) && queryFilter.Value is string stringValue)
                 {
-                    MethodInfo guidParseMethod = typeof(Guid).GetMethod(nameof(Guid.Parse), new[] { typeof(string) });
+                    MethodInfo guidParseMethod = typeof(Guid).GetMethod(nameof(Guid.Parse), [typeof(string)]);
                     if (guidParseMethod == null) throw new InvalidOperationException("Guid.Parse method not found.");
                     target = Expression.Call(null, guidParseMethod, Expression.Constant(stringValue));
                 }
@@ -123,7 +123,7 @@ public static class HelperExtensions
                         Expression targetToLower = Expression.Call(target, toLowerMethod);
 
                         // Now create the Contains call on the lowercase expressions
-                        var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                        var containsMethod = typeof(string).GetMethod("Contains", [typeof(string)]);
                         comparisonExpression = Expression.Call(propertyToLower, containsMethod, targetToLower);
 
                         break;
@@ -154,7 +154,7 @@ public static class HelperExtensions
                         Expression targetToLower = Expression.Call(target, toLowerMethod);
 
                         // Now create the Contains call on the lowercase expressions
-                        var containsMethod = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
+                        var containsMethod = typeof(string).GetMethod("StartsWith", [typeof(string)]);
                         comparisonExpression = Expression.Call(propertyToLower, containsMethod, targetToLower);
                         break;
                     }
@@ -169,7 +169,7 @@ public static class HelperExtensions
                         Expression targetToLower = Expression.Call(target, toLowerMethod);
 
                         // Now create the Contains call on the lowercase expressions
-                        var containsMethod = typeof(string).GetMethod("EndsWith", new[] { typeof(string) });
+                        var containsMethod = typeof(string).GetMethod("EndsWith", [typeof(string)]);
                         comparisonExpression = Expression.Call(propertyToLower, containsMethod, targetToLower);
                         break;
                     }
@@ -198,7 +198,7 @@ public static class HelperExtensions
 
     private class FilterExpressionVisitor : ExpressionVisitor
     {
-        private List<QueryFilter> Conditions { get; set; } = new();
+        private List<QueryFilter> Conditions { get; set; } = [];
 
         protected override Expression VisitBinary(BinaryExpression node)
         {
@@ -247,7 +247,7 @@ public static class HelperExtensions
                     _ => throw new NotSupportedException($"Unsupported method call '{node.Method.Name}'")
                 };
 
-                Conditions.Add(new QueryFilter
+                Conditions.Add(new()
                 {
                     PropertyName = GetMemberName(node.Object),
                     Operation = operation,

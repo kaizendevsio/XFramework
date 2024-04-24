@@ -36,7 +36,7 @@ public class JwtService : IJwtService
             audience: _jwtOptions.ValidAudience,
             expires: DateTime.Now.AddMinutes(DateTime.Parse(_jwtOptions.AccessTokenLifespan).Minute),
             claims: authClaims,  
-            signingCredentials: new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512)  
+            signingCredentials: new(securityKey, SecurityAlgorithms.HmacSha512)  
         );
             
         var refreshToken = new RefreshToken
@@ -64,7 +64,7 @@ public class JwtService : IJwtService
             audience: _jwtOptions.ValidAudience,
             expires: DateTime.Now.AddMinutes(DateTime.Parse(_jwtOptions.AccessTokenLifespan).Minute),
             claims: authClaims,  
-            signingCredentials: new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512)  
+            signingCredentials: new(securityKey, SecurityAlgorithms.HmacSha512)  
         );
             
         var refreshToken = new RefreshToken
@@ -118,7 +118,7 @@ public class JwtService : IJwtService
         }
         var principal = new JwtSecurityTokenHandler()
             .ValidateToken(token,
-                new TokenValidationParameters
+                new()
                 {
                     ValidateIssuerSigningKey = true,
                     ValidateIssuer = true,

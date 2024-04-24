@@ -5,7 +5,7 @@
         public ViewProp()
         {
             Toolbar = new() {Visible = true};
-            Footer = new() {Title = new TitleProp() {Text = "©2021 XFramework.Client Evolve"}};
+            Footer = new() {Title = new() {Text = "©2021 XFramework.Client Evolve"}};
             NavigationTab = new();
             SideBar = new();
         }

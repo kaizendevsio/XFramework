@@ -13,7 +13,7 @@ public class HelperService : IHelperService
 {
     private readonly ILogger<HelperService> _logger;
 
-    public JsonSerializerOptions CachedSerializationOptions = new JsonSerializerOptions
+    public JsonSerializerOptions CachedSerializationOptions = new()
     {
         ReferenceHandler = ReferenceHandler.IgnoreCycles,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -24,7 +24,7 @@ public class HelperService : IHelperService
     public HelperService(IConfiguration configuration, ILogger<HelperService> logger)
     {
         _logger = logger;
-        Http = new HttpHelper(configuration);
+        Http = new(configuration);
     }
         
     public string GenerateRandomString(long size)
@@ -53,7 +53,7 @@ public class HelperService : IHelperService
     public string GenerateRandomString(int size)
     {
         var random = new Random();
-        return new string(Enumerable.Repeat(Chars, size)
+        return new(Enumerable.Repeat(Chars, size)
             .Select(s => s[random.Next(s.Length)]).ToArray());
     }
 

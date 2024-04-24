@@ -183,7 +183,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         // Extracting properties from request
         var requestServer = request.Metadata;
 
-        return new RequestMetadata
+        return new()
         {
             DeviceAgent = DeviceAgentProvider.Name,
             TenantId = requestServer?.TenantId ?? TenantId,
@@ -255,7 +255,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
 
         if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
         {
-            throw new Exception(result.Message);
+            throw new(result.Message);
         }
         return result.Response;
     }
@@ -321,11 +321,11 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 {
                     HttpStatusCode = signalRResponse.ResponseStatusCode,
                     Message = signalRResponse.Message,
-                    Response = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance))
+                    Response = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new(MessagePack.Resolvers.ContractlessStandardResolver.Instance))
                 };
             }
             default:
-                var t = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
+                var t = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
                 Logger.LogInformation("Sending request: {Request}... Done in {Duration}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
 
                 return new()
@@ -395,7 +395,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 Logger.LogInformation("Notification Received: {RequestName}", request.Name);
                 try
                 {
-                    var r = MessagePackSerializer.Deserialize<PublishRequest<TResponse>>(response.Data, new MessagePackSerializerOptions(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
+                    var r = MessagePackSerializer.Deserialize<PublishRequest<TResponse>>(response.Data, new(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
                     
                     request.OnInvoke?.Invoke(r.Data);
                 }

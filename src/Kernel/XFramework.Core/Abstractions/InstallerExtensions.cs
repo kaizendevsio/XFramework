@@ -127,6 +127,7 @@ public static class InstallerExtensions
         services.AddSingleton<CacheManager>();
         services.AddHttpClient();
         services.AddMemoryCache();
+        services.AddAntiforgery();
 
         var seqUrl = configuration["SEQ_URL"];
         
@@ -275,6 +276,7 @@ public static class InstallerExtensions
        
         app.UseCors(o => o.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
         app.UseRouting();
+        app.UseAntiforgery();
         app.UseAuthentication();
         app.UseAuthorization();
 

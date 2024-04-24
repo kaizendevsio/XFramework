@@ -4,9 +4,9 @@
     {
         public ActivityProp()
         {
-            Toolbar = new ToolbarProp {Visible = true};
-            Footer = new FooterProp(){Title = new TitleProp() {Text = "©2018 LoadManna v.3.0"}};
-            NavigationTab = new NavigationTabProp();
+            Toolbar = new() {Visible = true};
+            Footer = new(){Title = new() {Text = "©2018 LoadManna v.3.0"}};
+            NavigationTab = new();
             
         }
 

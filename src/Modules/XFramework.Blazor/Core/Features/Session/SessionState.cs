@@ -7,7 +7,7 @@ public partial class SessionState : State<SessionState>
 {
     public override void Initialize()
     {
-         NavigationHistoryList = new();
+         NavigationHistoryList = [];
          LoginVm = new();
          RegisterVm = new();
          ResetPasswordVm = new();

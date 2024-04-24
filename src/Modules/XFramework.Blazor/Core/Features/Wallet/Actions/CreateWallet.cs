@@ -59,15 +59,15 @@ public partial class WalletState
             var accountNumberExists = await walletsServiceWrapper.Wallet.GetList(
                 pageSize:2,
                 pageNumber:1,
-                filter: new List<QueryFilter>
-                {
+                filter:
+                [
                     new()
                     {
                         PropertyName = nameof(Domain.Shared.Contracts.Wallet.AccountNumber),
                         Operation = QueryFilterOperation.Equal,
                         Value = request.AccountNumber
                     }
-                }
+                ]
             );
             
             if (await HandleFailure(accountNumberExists, action, true, "Could not check account number uniqueness")) return;

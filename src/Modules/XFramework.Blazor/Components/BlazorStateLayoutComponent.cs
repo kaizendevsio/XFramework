@@ -6,13 +6,13 @@ namespace XFramework.Blazor.Components;
 
 public class BlazorStateLayoutComponent : LayoutComponentBase, IDisposable, IBlazorStateComponent
 {
-    private static readonly ConcurrentDictionary<string, int> s_InstanceCounts = new ConcurrentDictionary<string, int>();
+    private static readonly ConcurrentDictionary<string, int> s_InstanceCounts = new();
 
     public BlazorStateLayoutComponent()
     {
         string name = this.GetType().Name;
         int num = BlazorStateLayoutComponent.s_InstanceCounts.AddOrUpdate(name, 1, (Func<string, int, int>) ((aKey, aValue) => aValue + 1));
-        DefaultInterpolatedStringHandler interpolatedStringHandler = new DefaultInterpolatedStringHandler(1, 2);
+        DefaultInterpolatedStringHandler interpolatedStringHandler = new(1, 2);
         interpolatedStringHandler.AppendFormatted(name);
         interpolatedStringHandler.AppendLiteral("-");
         interpolatedStringHandler.AppendFormatted<int>(num);
@@ -50,13 +50,13 @@ public class BlazorStateLayoutComponent : LayoutComponentBase, IDisposable, IBla
 
 public class TransitionableBlazorStateLayoutComponent : TransitionableLayoutComponent, IDisposable, IBlazorStateComponent
 {
-    private static readonly ConcurrentDictionary<string, int> s_InstanceCounts = new ConcurrentDictionary<string, int>();
+    private static readonly ConcurrentDictionary<string, int> s_InstanceCounts = new();
 
     public TransitionableBlazorStateLayoutComponent()
     {
         string name = this.GetType().Name;
         int num = TransitionableBlazorStateLayoutComponent.s_InstanceCounts.AddOrUpdate(name, 1, (Func<string, int, int>) ((aKey, aValue) => aValue + 1));
-        DefaultInterpolatedStringHandler interpolatedStringHandler = new DefaultInterpolatedStringHandler(1, 2);
+        DefaultInterpolatedStringHandler interpolatedStringHandler = new(1, 2);
         interpolatedStringHandler.AppendFormatted(name);
         interpolatedStringHandler.AppendLiteral("-");
         interpolatedStringHandler.AppendFormatted<int>(num);

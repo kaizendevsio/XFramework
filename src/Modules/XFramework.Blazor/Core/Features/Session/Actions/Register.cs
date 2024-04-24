@@ -208,15 +208,15 @@ public partial class SessionState
         {
             // Check Credential Duplicates
             await ReportBusy("Validating credentials..", null);
-            var credentialExistence = await identityServerServiceWrapper.IdentityCredential.GetList(pageSize:1, pageNumber:1, filter: new()
-            {
+            var credentialExistence = await identityServerServiceWrapper.IdentityCredential.GetList(pageSize:1, pageNumber:1, filter:
+            [
                 new()
                 {
                     PropertyName = nameof(IdentityCredential.UserName),
                     Operation = QueryFilterOperation.Equal,
                     Value = CurrentState.RegisterVm.UserName
                 }
-            });
+            ]);
             if (await HandleFailure(credentialExistence, action)) return true;
             if (credentialExistence.Response.TotalItems > 0)
             {
@@ -228,15 +228,15 @@ public partial class SessionState
             await ReportBusy("Checking for duplicate phone numbers..", null);
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber))
             {
-                var phoneContactExistence = await identityServerServiceWrapper.IdentityContact.GetList(pageSize:1, pageNumber:1, filter: new()
-                {
+                var phoneContactExistence = await identityServerServiceWrapper.IdentityContact.GetList(pageSize:1, pageNumber:1, filter:
+                [
                     new()
                     {
                         PropertyName = nameof(IdentityContact.Value),
                         Operation = QueryFilterOperation.Equal,
                         Value = CurrentState.RegisterVm.PhoneNumber
                     }
-                });
+                ]);
                 
                 if (await HandleFailure(phoneContactExistence, action)) return true;
                 if (phoneContactExistence.Response.TotalItems > 0)
@@ -250,15 +250,15 @@ public partial class SessionState
             await ReportBusy("Checking for duplicate email address..", null);
             if (!string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress))
             {
-                var emailContactExistence = await identityServerServiceWrapper.IdentityContact.GetList(pageSize:1, pageNumber:1, filter: new()
-                {
+                var emailContactExistence = await identityServerServiceWrapper.IdentityContact.GetList(pageSize:1, pageNumber:1, filter:
+                [
                     new()
                     {
                         PropertyName = nameof(IdentityContact.Value),
                         Operation = QueryFilterOperation.Equal,
                         Value = CurrentState.RegisterVm.EmailAddress
                     }
-                });
+                ]);
                 if (await HandleFailure(emailContactExistence, action)) return true;
                 if (emailContactExistence.Response.TotalItems > 0)
                 {

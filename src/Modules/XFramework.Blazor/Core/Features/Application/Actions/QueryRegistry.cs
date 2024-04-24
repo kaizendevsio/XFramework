@@ -20,26 +20,24 @@ public partial class ApplicationState
             var configurationList = await registryServiceWrapper.RegistryConfiguration.GetList(
                 pageSize: action.PageSize,
                 pageNumber: action.PageIndex,
-                filter: new()
-                {
-                    new QueryFilter
+                filter:
+                [
+                    new()
                     {
                         PropertyName = $"{nameof(RegistryConfiguration.Key)}",
                         Operation = QueryFilterOperation.Equal,
                         Value = action.Key
                     },
-                    new QueryFilter
+
+                    new()
                     {
                         PropertyName = $"{nameof(RegistryConfiguration.IsEnabled)}",
                         Operation = QueryFilterOperation.Equal,
                         Value = true
                     }
-                },
+                ],
                 includeNavigations: true,
-                includes: new List<string>
-                {
-                    $"{nameof(RegistryConfiguration.Group)}"
-                });
+                includes: [$"{nameof(RegistryConfiguration.Group)}"]);
             
             if (await HandleFailure(configurationList, action)) return null;
 

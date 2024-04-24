@@ -29,7 +29,7 @@ public partial class WalletState
                 Amount = CurrentState.SendWalletVm.Amount,
                 Remarks = CurrentState.SendWalletVm.Remarks,
                 OnHold = CurrentState.SendWalletVm.OnHold,
-                CurrencyId = new Guid("7ee3621a-5878-4c16-8112-eab11f29db95")
+                CurrencyId = new("7ee3621a-5878-4c16-8112-eab11f29db95")
             });
 
             if (await HandleFailure(result, action, silent: action.Silent)) return;
