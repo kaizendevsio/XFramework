@@ -32,6 +32,24 @@ public class AuthenticateIdentity(
                 Message = "Role is required"
             };
         }
+
+        if (string.IsNullOrEmpty(request.Username))
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = "Username is required"
+            };
+        }
+        
+        if (string.IsNullOrEmpty(request.Password))
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.BadRequest,
+                Message = "Password is required"
+            };
+        }
         
         var credential = await ValidateAuthorization(request, tenant, request.AuthorizationType, cancellationToken);
         if (credential is null)
