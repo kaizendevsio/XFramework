@@ -6,7 +6,8 @@
         {
             Colors = new();
         }
-        public bool Visible { get; set; }
+
+        public bool? Visible { get; set; }
         public Func<Task>? OnClick { get; set; }
         public string Color
         {
