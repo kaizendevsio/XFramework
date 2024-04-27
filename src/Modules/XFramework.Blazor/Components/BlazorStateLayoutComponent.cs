@@ -33,7 +33,7 @@ public class BlazorStateLayoutComponent : LayoutComponentBase, IDisposable, IBla
     [Inject]
     public Subscriptions Subscriptions { get; set; }
 
-    public void ReRender() => this.StateHasChanged();
+    public void ReRender() => InvokeAsync(StateHasChanged);
 
     protected T GetState<T>()
     {

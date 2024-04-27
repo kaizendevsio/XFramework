@@ -11,6 +11,8 @@ public class XPageBase : XComponentsBase
         await base.OnAfterRenderAsync(firstRender);
         if (firstRender)
         {
+            LayoutState.View.SideBar.Visible ??= true;
+            View.SideBar.Visible ??= LayoutState.View.SideBar.Visible;
             await Mediator.Send(new LayoutState.SetState(){View = View});
         }
     }
