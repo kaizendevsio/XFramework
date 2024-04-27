@@ -1,4 +1,5 @@
-﻿using IdentityServer.Domain.Shared;
+﻿using System.Collections.Specialized;
+using IdentityServer.Domain.Shared;
 using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Core.Features.Wallet;
 using XFramework.Blazor.Entity.Models.Requests.Common;
@@ -83,37 +84,75 @@ public partial class SessionState
             // Send Create Phone Contact Request
             await ReportBusy("Creating contacts..", null);
 
-            var phoneContactType = await identityServerServiceWrapper.IdentityContactType.Get(IdentityConstants.ContactType.Phone);
-            var phoneContact = await identityServerServiceWrapper.IdentityContact.Create(new(){
-                CredentialId = credentialId,
-                TypeId = phoneContactType.Response.Id,
-                GroupId = IdentityConstants.ContactGroup.Personal,
-                Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber) ? CurrentState.RegisterVm.PhoneNumber : string.Empty,
-                /*SendOtp = !action.SkipVerification*/
-            });
-            if (await HandleFailure(phoneContact, action)) return
-                new()
+            var phoneContactType = await identityServerServiceWrapper.IdentityContactType.GetList(
+                pageSize: 2,
+                pageNumber: 1,
+                filter:
+                [
+                    new()
+                    {
+                        PropertyName = nameof(IdentityContactType.Name),
+                        Operation = QueryFilterOperation.Equal,
+                        Value = nameof(IdentityConstants.ContactType.Phone)
+                    }
+                ]
+            );
+
+            if (phoneContactType.IsSuccess && phoneContactType.Response.TotalItems > 0)
+            {
+                var phoneContact = await identityServerServiceWrapper.IdentityContact.Create(new(){
+                    CredentialId = credentialId,
+                    TypeId = phoneContactType.Response.Items.First().Id,
+                    GroupId = IdentityConstants.ContactGroup.Personal,
+                    Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber) ? CurrentState.RegisterVm.PhoneNumber : string.Empty,
+                    /*SendOtp = !action.SkipVerification*/
+                });
+                if (await HandleFailure(phoneContact, action))
                 {
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
-                    Message = "Failed to create phone contact"
-                };
+                    return new()
+                    {
+                        HttpStatusCode = HttpStatusCode.InternalServerError,
+                        Message = "Failed to create phone contact"
+                    };
+                }
+            }
+            
             
             // Send Create Email Contact Request
             await ReportBusy("Creating contacts..", null);
-            var emailContactType = await identityServerServiceWrapper.IdentityContactType.Get(IdentityConstants.ContactType.Email);
-            var emailContact = await identityServerServiceWrapper.IdentityContact.Create(new(){
-                CredentialId = credentialId,
-                TypeId = emailContactType.Response.Id,
-                GroupId = IdentityConstants.ContactGroup.Personal,
-                Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress) ? CurrentState.RegisterVm.EmailAddress : string.Empty,
-                /*SendOtp = !action.SkipVerification*/
-            });
-            if (await HandleFailure(emailContact, action)) return
-                new()
+            var emailContactType = await identityServerServiceWrapper.IdentityContactType.GetList(
+                pageSize: 2,
+                pageNumber: 1,
+                filter:
+                [
+                    new()
+                    {
+                        PropertyName = nameof(IdentityContactType.Name),
+                        Operation = QueryFilterOperation.Equal,
+                        Value = nameof(IdentityConstants.ContactType.Email)
+                    }
+                ]
+            );
+
+            if (emailContactType.IsSuccess && emailContactType.Response.TotalItems > 0)
+            {
+                var emailContact = await identityServerServiceWrapper.IdentityContact.Create(new(){
+                    CredentialId = credentialId,
+                    TypeId = emailContactType.Response.Items.First().Id,
+                    GroupId = IdentityConstants.ContactGroup.Personal,
+                    Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress) ? CurrentState.RegisterVm.EmailAddress : string.Empty,
+                    /*SendOtp = !action.SkipVerification*/
+                });
+                if (await HandleFailure(emailContact, action))
                 {
-                    HttpStatusCode = HttpStatusCode.InternalServerError,
-                    Message = "Failed to create email contact"
-                };
+                    return new()
+                    {
+                        HttpStatusCode = HttpStatusCode.InternalServerError,
+                        Message = "Failed to create email contact"
+                    };
+                }
+            }
+            
 
             // If WalletList property is provided, automatically create wallets
             if (action.WalletList is not null)
