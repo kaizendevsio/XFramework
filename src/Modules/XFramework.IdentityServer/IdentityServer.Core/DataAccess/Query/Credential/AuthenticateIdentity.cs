@@ -33,7 +33,7 @@ public class AuthenticateIdentity(
             };
         }
 
-        if (string.IsNullOrEmpty(request.Username))
+        if (string.IsNullOrEmpty(request.UserName))
         {
             return new()
             {
@@ -85,7 +85,7 @@ public class AuthenticateIdentity(
         var token = new JwtToken();
         if (request.GenerateToken)
         {
-            token = await jwtService.GenerateToken(request.Username, credential.Id, roleList.Select(i => i.TypeId ?? Guid.Empty).ToList());
+            token = await jwtService.GenerateToken(request.UserName, credential.Id, roleList.Select(i => i.TypeId ?? Guid.Empty).ToList());
         }
         //_recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
 
@@ -141,7 +141,7 @@ public class AuthenticateIdentity(
                     .AsNoTracking()
                     .FirstOrDefaultAsync(i =>
                             i.TenantId == tenant.Id & 
-                            i.UserName == request.Username,
+                            i.UserName == request.UserName,
                         cancellationToken: cancellationToken);
                 result ??= await appDbContext.IdentityContacts
                     .Include(i => i.Credential.IdentityRoles)
@@ -149,7 +149,7 @@ public class AuthenticateIdentity(
                     .AsNoTracking()
                     .Where(i => 
                         i.Credential.TenantId == tenant.Id & 
-                        i.Value == request.Username & 
+                        i.Value == request.UserName & 
                         i.Type.Name == nameof(GenericContactType.Email))
                     .Select(i => i.Credential)
                     .FirstOrDefaultAsync(cancellationToken);
@@ -159,7 +159,7 @@ public class AuthenticateIdentity(
                     .AsNoTracking()
                     .Where(i => 
                         i.Credential.TenantId == tenant.Id & 
-                        i.Value == request.Username.ValidatePhoneNumber(true) & 
+                        i.Value == request.UserName.ValidatePhoneNumber(true) & 
                         i.Type.Name == nameof(GenericContactType.Phone))
                     .Select(i => i.Credential)
                     .FirstOrDefaultAsync(cancellationToken);
@@ -169,18 +169,18 @@ public class AuthenticateIdentity(
                     .Include(i => i.IdentityInfo)
                     .Include(i => i.IdentityRoles)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(i => i.TenantId == tenant.Id & i.UserName == request.Username,
+                    .FirstOrDefaultAsync(i => i.TenantId == tenant.Id & i.UserName == request.UserName,
                         cancellationToken: cancellationToken);
                 break;
             case AuthorizationType.Email:
-                request.Username?.ValidateEmailAddress();
+                request.UserName?.ValidateEmailAddress();
                 result = await appDbContext.IdentityContacts
                     .Include(i => i.Credential.IdentityRoles)
                     .Include(i => i.Credential.IdentityInfo)
                     .AsNoTracking()
                     .Where(i => 
                         i.Credential.TenantId == tenant.Id & 
-                        i.Value == request.Username & 
+                        i.Value == request.UserName & 
                         i.Type.Name == nameof(GenericContactType.Email))
                     .Select(i => i.Credential)
                     .FirstOrDefaultAsync(cancellationToken);
@@ -192,7 +192,7 @@ public class AuthenticateIdentity(
                     .AsNoTracking()
                     .Where(i => 
                         i.Credential.TenantId == tenant.Id & 
-                        i.Value == request.Username.ValidatePhoneNumber(true) & 
+                        i.Value == request.UserName.ValidatePhoneNumber(true) & 
                         i.Type.Name == nameof(GenericContactType.Phone))
                     .Select(i => i.Credential)
                     .FirstOrDefaultAsync(cancellationToken);
@@ -202,7 +202,7 @@ public class AuthenticateIdentity(
                     .Include(i => i.IdentityRoles)
                     .Include(i => i.IdentityInfo)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(i => i.UserName == request.Username,
+                    .FirstOrDefaultAsync(i => i.UserName == request.UserName,
                         cancellationToken: cancellationToken);
                 break;
             default:
