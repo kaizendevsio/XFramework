@@ -7,7 +7,7 @@ namespace XFramework.Blazor.Entity.Validations.Session
     {
         public UserVmValidator()
         {
-            RuleFor(x => x.Username).NotEmpty()
+            RuleFor(x => x.UserName).NotEmpty()
                 .WithMessage("Please provide the required information.");
             RuleFor(x => x.Password).NotEmpty()
                 .WithMessage("Enter your password")

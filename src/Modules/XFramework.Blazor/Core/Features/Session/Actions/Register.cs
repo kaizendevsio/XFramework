@@ -186,7 +186,7 @@ public partial class SessionState
                     username = CurrentState.RegisterVm.UserName;
                 }
 
-                SessionState.LoginVm.Username = username; 
+                SessionState.LoginVm.UserName = username; 
                 SessionState.LoginVm.Password = CurrentState.RegisterVm.Password; 
                 await Mediator.Send(new Login()
                 {
