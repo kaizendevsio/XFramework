@@ -14,10 +14,15 @@
         OnSubmit="@InternalSubmit"
         Model="@Model">
 
+        <DataAnnotationsValidator/>
+        
         @if (Validator is not null)
         {
-            <DataAnnotationsValidator/>
             <FluentValidator Validator="@Validator"/>
+        }
+        else
+        {
+            <FluentValidator/>
         }
 
         <CascadingValue Value="@FormMode">
