@@ -99,6 +99,7 @@ public partial class SessionState
                     $"{nameof(IdentityCredential.IdentityInfo)}.{nameof(IdentityInformation.IdentityAddresses)}.{nameof(IdentityAddress.City)}",
                     $"{nameof(IdentityCredential.IdentityInfo)}.{nameof(IdentityInformation.IdentityAddresses)}.{nameof(IdentityAddress.Barangay)}",
                     $"{nameof(IdentityCredential.IdentityContacts)}.{nameof(IdentityContact.Type)}",
+                    $"{nameof(IdentityCredential.IdentityRoles)}.{nameof(IdentityRole.Type)}",
                 ]
             );
             var contactListResponse = identityServerServiceWrapper.IdentityContact.GetList(pageNumber: 1, pageSize: 100,
