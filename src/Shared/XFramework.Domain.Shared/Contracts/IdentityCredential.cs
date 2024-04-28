@@ -43,18 +43,6 @@ public partial class IdentityCredential : BaseModel, IHasOnlineStatus
 
     public virtual ICollection<AuthorizationLog> AuthorizationLogs { get; set; } = new List<AuthorizationLog>();
     
-    public virtual ICollection<BusinessPackage> BusinessPackageConsumedByNavigations { get; set; } =
-        new List<BusinessPackage>();
-
-    public virtual ICollection<BusinessPackage> BusinessPackageIdentityCredentials { get; set; } =
-        new List<BusinessPackage>();
-
-    public virtual ICollection<BusinessPackage> BusinessPackageRecipientIdentityCredentials { get; set; } =
-        new List<BusinessPackage>();
-
-    public virtual ICollection<BusinessPackageUpgradeTransaction> BusinessPackageUpgradeTransactions { get; set; } =
-        new List<BusinessPackageUpgradeTransaction>();
-
     public virtual ICollection<CommunityIdentity> CommunityIdentities { get; set; } = new List<CommunityIdentity>();
 
     public virtual ICollection<DepositRequest> DepositRequests { get; set; } = new List<DepositRequest>();
