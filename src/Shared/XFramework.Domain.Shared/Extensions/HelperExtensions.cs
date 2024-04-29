@@ -71,33 +71,75 @@ public static class HelperExtensions
             {
                 foreach (var value in values)
                 {
-                    object convertedValue = value;
-                    if (property.Type == typeof(Guid) && value is string stringValue)
+                    Expression target;
+                    if ((property.Type == typeof(Guid) || property.Type == typeof(Guid?)) && value is string stringValue)
                     {
-                        convertedValue = Guid.Parse(stringValue);
+                        // Parse the string to a Guid
+                        var guidValue = Guid.Parse(stringValue);
+                        target = Expression.Constant(guidValue, typeof(Guid));
+
+                        // If the property is nullable, convert the Guid to Guid?
+                        if (property.Type == typeof(Guid?))
+                        {
+                            target = Expression.Convert(target, typeof(Guid?));
+                        }
                     }
-                    
-                    var target = Expression.Constant(convertedValue, convertedValue.GetType());
-                    var equalsExpression = Expression.Equal(property, Expression.Convert(target, property.Type));
+                    else if (value == null && property.Type == typeof(Guid?))
+                    {
+                        // Handle null for nullable Guids
+                        target = Expression.Constant(null, typeof(Guid?));
+                    }
+                    else
+                    {
+                        // Use the value directly for non-Guid types or if the value is not a string
+                        target = Expression.Constant(value, value?.GetType() ?? property.Type);
+                        target = Expression.Convert(target, property.Type);
+                    }
+
+                    // Create the equality expression
+                    Expression equalsExpression = Expression.Equal(property, target);
+
+                    // Combine the expressions with OR if multiple values are present
                     comparisonExpression = comparisonExpression == null
                         ? equalsExpression
                         : Expression.OrElse(comparisonExpression, equalsExpression);
                 }
+
             }
             else // Original handling for single value cases
             {
                 // Handle the conversion for Guids and other types
-                Expression target = Expression.Constant(queryFilter.Value, queryFilter.Value?.GetType());
-                if (property.Type == typeof(Guid) && queryFilter.Value is string stringValue)
+                Expression target;
+                if ((property.Type == typeof(Guid) || property.Type == typeof(Guid?)) && queryFilter.Value is string guidString)
                 {
-                    MethodInfo guidParseMethod = typeof(Guid).GetMethod(nameof(Guid.Parse), [typeof(string)]);
-                    if (guidParseMethod == null) throw new InvalidOperationException("Guid.Parse method not found.");
-                    target = Expression.Call(null, guidParseMethod, Expression.Constant(stringValue));
+                    MethodInfo guidParseMethod = typeof(Guid).GetMethod(nameof(Guid.Parse), new Type[] { typeof(string) });
+                    if (guidParseMethod == null)
+                        throw new InvalidOperationException("Guid.Parse method not found.");
+
+                    // Use Expression.Call to invoke Guid.Parse for string to Guid conversion
+                    target = Expression.Call(null, guidParseMethod, Expression.Constant(guidString));
+                    // If the property is of type Nullable<Guid>, we need to convert the result of Guid.Parse to Guid?
+                    if (property.Type == typeof(Guid?))
+                    {
+                        target = Expression.Convert(target, typeof(Guid?));
+                    }
+                }
+                else if (queryFilter.Value == null && property.Type == typeof(Guid?))
+                {
+                    // If the value is null and the property is of type Nullable<Guid>, assign null directly
+                    target = Expression.Constant(null, typeof(Guid?));
                 }
                 else if (queryFilter.Value != null)
                 {
+                    // Create a constant expression with the value and its runtime type
                     target = Expression.Constant(queryFilter.Value, queryFilter.Value.GetType());
+                    // Convert the value to the target property type
                     target = Expression.Convert(target, property.Type);
+                }
+                else
+                {
+                    // If the value is null and property type is not nullable, throw an exception
+                    throw new InvalidOperationException($"Cannot assign null to non-nullable property type {property.Type}.");
                 }
                 
                 switch (queryFilter.Operation)
