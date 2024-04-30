@@ -131,11 +131,17 @@ public static class HelperExtensions
                 }
                 else if (queryFilter.Value != null)
                 {
-                    // Create a constant expression with the value and its runtime type
                     target = Expression.Constant(queryFilter.Value, queryFilter.Value.GetType());
-                    // Convert the value to the target property type
-                    target = Expression.Convert(target, property.Type);
+                    try
+                    {
+                        target = Expression.Convert(target, property.Type);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new InvalidOperationException($"Conversion from type {queryFilter.Value.GetType()} to {property.Type} failed.", ex);
+                    }
                 }
+
                 else
                 {
                     // If the value is null and property type is not nullable, throw an exception
