@@ -27,6 +27,7 @@ public partial class WalletState
                 WalletTypeId = CurrentState.SendWalletVm.WalletTypeId,
                 RecipientCredentialId = CurrentState.SendWalletVm.RecipientCredentialId,
                 Amount = CurrentState.SendWalletVm.Amount,
+                Fee = CurrentState.SendWalletVm.Fee,
                 Remarks = CurrentState.SendWalletVm.Remarks,
                 OnHold = CurrentState.SendWalletVm.OnHold,
                 CurrencyId = new("7ee3621a-5878-4c16-8112-eab11f29db95")
