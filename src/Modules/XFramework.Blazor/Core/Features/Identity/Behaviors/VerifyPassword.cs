@@ -23,7 +23,7 @@ public partial class IdentityState
                 CredentialId = request.CredentialId ?? CurrentState.Credential.Id,
                 Password = request.Password
             });
-            if (await HandleFailure(response, request)) return;
+            if (await HandleFailure(response, request, true)) return;
             
             await HandleSuccess(response, request, true);
             await ReportTaskCompleted();
