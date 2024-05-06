@@ -1,6 +1,6 @@
 ﻿namespace IdentityServer.Domain.Shared.Contracts.Requests;
 
-using TRequest = ResetPasswordRequest;
+using TRequest = VerifyPasswordRequest;
 using TResponse = CmdResponse;
 
 public record VerifyPasswordRequest : RequestBase,
