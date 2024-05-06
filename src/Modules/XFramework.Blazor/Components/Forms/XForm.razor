@@ -20,7 +20,7 @@
         {
             <FluentValidator Validator="@Validator"/>
         }
-        else
+        else if (DisableValidation is false && Validator is null)
         {
             <FluentValidator/>
         }
@@ -71,6 +71,8 @@
     [Parameter] public FormMode FormMode { get; set; }
 
     [Parameter] public bool FormButtonsVisible { get; set; }
+    
+    [Parameter] public bool DisableValidation { get; set; }
 
     protected async Task InternalSubmit()
     {
