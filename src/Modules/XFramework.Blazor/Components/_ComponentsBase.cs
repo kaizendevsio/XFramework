@@ -45,8 +45,8 @@ public class XComponentsBase : BlazorStateComponent
     public string FullName(IdentityCredential? item) => $"{item?.IdentityInfo.FirstName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.MiddleName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.LastName?.ToLowerInvariant().Humanize(LetterCasing.Title)}";
     public DateOnly? DateOfBirth(IdentityCredential? item) => item?.IdentityInfo.BirthDate;
     public string NickName(IdentityCredential? item) => $"{item?.IdentityInfo.FirstName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.MiddleName?.ToLowerInvariant().Humanize(LetterCasing.Title)} {item?.IdentityInfo.LastName?.ToLowerInvariant().Humanize(LetterCasing.Title)}";
-    public string PhoneNumber(IdentityCredential? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Type.Name == "Phone")?.Value}";
-    public string EmailAddress(IdentityCredential? item) => $"{item?.IdentityContacts.FirstOrDefault(i => i.Type.Name == "Email")?.Value}";
+    public string PhoneNumber(IdentityCredential? item) => item?.IdentityContacts.FirstOrDefault(i => i.Type.Name == "Phone")?.Value;
+    public string EmailAddress(IdentityCredential? item) => item?.IdentityContacts.FirstOrDefault(i => i.Type.Name == "Email")?.Value;
 
     public void ShowPreloader()
     {
