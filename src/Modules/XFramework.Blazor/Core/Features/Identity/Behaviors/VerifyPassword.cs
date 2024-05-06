@@ -4,7 +4,7 @@ namespace XFramework.Blazor.Core.Features.Identity;
 
 public partial class IdentityState
 {
-    public record VerifyPassword(string Paasword, Guid? CredentialId = null) : StateAction;
+    public record VerifyPassword(string Password, Guid? CredentialId = null) : StateAction;
     
     protected class VerifyPasswordHandler(
         IIdentityServerServiceWrapper identityServerServiceWrapper,
@@ -21,7 +21,7 @@ public partial class IdentityState
             var response = await identityServerServiceWrapper.VerifyPassword(new()
             {
                 CredentialId = request.CredentialId ?? CurrentState.Credential.Id,
-                Password = CurrentState.Credential.Password
+                Password = request.Password
             });
             if (await HandleFailure(response, request)) return;
             
