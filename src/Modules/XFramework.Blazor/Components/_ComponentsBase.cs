@@ -51,13 +51,13 @@ public class XComponentsBase : BlazorStateComponent
     public void ShowPreloader()
     {
         IsLoading = true;
-        StateHasChanged();
+        InvokeAsync(StateHasChanged);
     }
     
     public void HidePreloader()
     {
         IsLoading = false;
-        StateHasChanged();
+        InvokeAsync(StateHasChanged);
     }
     
 }
