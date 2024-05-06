@@ -99,10 +99,6 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<IdentityVerificationType> IdentityVerificationTypes { get; set; }
     
-    public virtual DbSet<IncomeType> IncomeTypes { get; set; }
-    
-    public virtual DbSet<IncomeTransaction> IncomeTransactions { get; set; }
-    
     public virtual DbSet<Message> Messages { get; set; }
 
     public virtual DbSet<MessageDelivery> MessageDeliveries { get; set; }
@@ -1198,49 +1194,6 @@ public partial class AppDbContext : DbContext
                 .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
 
             entity.Property(e => e.Name).HasMaxLength(100);
-        });
-
-        modelBuilder.Entity<IncomeType>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_IncomeType_pkey");
-
-            entity.ToTable("IncomeType", "Income");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-
-            entity.Property(e => e.IncomeTypeDescription).HasMaxLength(500);
-            entity.Property(e => e.IncomeTypeName).HasMaxLength(100);
-            entity.Property(e => e.IncomeTypeShortName).HasMaxLength(50);
-            entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-        });
-
-        modelBuilder.Entity<IncomeTransaction>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("tbl_IncomeTransactions_pkey");
-
-            entity.ToTable("IncomeTransaction", "Income");
-
-
-            entity.Property(e => e.Id)
-                .HasColumnName("ID")
-                .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
-
-            entity.Property(e => e.IncomeValue).HasPrecision(18, 10);
-            entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.Remarks).HasMaxLength(10000);
-
-            entity.HasOne(d => d.Credential).WithMany(p => p.IncomeTransactions)
-                .HasForeignKey(d => d.CredentialId)
-                .HasConstraintName("IncomeTransaction_CredentialId");
-
-            entity.HasOne(d => d.IncomeType).WithMany(p => p.IncomeTransactions)
-                .HasForeignKey(d => d.IncomeTypeId)
-                .HasConstraintName("tbl_userincometransaction_tbl_incometype_id_fk");
         });
 
         modelBuilder.Entity<Message>(entity =>

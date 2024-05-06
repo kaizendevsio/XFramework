@@ -56,9 +56,7 @@ public partial class IdentityCredential : BaseModel, IHasOnlineStatus
     public virtual ICollection<IdentityRole> IdentityRoles { get; set; } = new List<IdentityRole>();
 
     public virtual ICollection<IdentityVerification> IdentityVerifications { get; set; } = new List<IdentityVerification>();
-
-    public virtual ICollection<IncomeTransaction> IncomeTransactions { get; set; } = new List<IncomeTransaction>();
-
+    
     public virtual ICollection<MessageDirect> MessageDirectRecipientNavigations { get; set; } = new List<MessageDirect>();
 
     public virtual ICollection<MessageDirect> MessageDirectSenderNavigations { get; set; } = new List<MessageDirect>();
