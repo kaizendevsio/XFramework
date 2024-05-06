@@ -48,6 +48,9 @@ public class ResetPassword(
                 Status = (short?) GenericStatusType.Pending
             }));
 
+            // TODO: Send SMS to user with verification code
+            // TODO: Implement ResetPassword logic
+            
             await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation("Password reset request successful for identifier {Identifier}", request.PhoneEmailUsername);
