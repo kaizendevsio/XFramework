@@ -8,4 +8,5 @@ public record IncrementWalletRequest : TransactionRequestBase,
     IStreamflowRequest<TRequest, TResponse>
 {
     public required Guid WalletId { get; set; }
+    public required Guid WalletTypeId { get; set; }
 }

@@ -20,17 +20,21 @@ public class IncrementWallet(
 
         if (request.Amount <= 0)
         {
-            logger.LogWarning("Invalid increment amount for wallet ID {WalletId}", request.WalletId);
+            logger.LogWarning("Invalid increment amount for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}", request.WalletId, request.WalletTypeId, request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid increment amount" };
         }
 
-        var wallet = await dbContext.Set<Wallet>()
-            .Where(w => w.TenantId == tenant.Id && w.Id == request.WalletId)
-            .FirstOrDefaultAsync(cancellationToken);
+        var wallet = request.WalletTypeId != Guid.Empty
+            ? await dbContext.Set<Wallet>()
+                .Where(w => w.TenantId == tenant.Id && w.WalletTypeId == request.WalletTypeId && w.CredentialId == request.CredentialId)
+                .FirstOrDefaultAsync(cancellationToken)
+            : await dbContext.Set<Wallet>()
+                .Where(w => w.TenantId == tenant.Id && w.Id == request.WalletId)
+                .FirstOrDefaultAsync(cancellationToken);
 
         if (wallet == null)
         {
-            logger.LogWarning("Wallet not found for ID {WalletId}", request.WalletId);
+            logger.LogWarning("Wallet not found for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}", request.WalletId, request.WalletTypeId, request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
         }
 
