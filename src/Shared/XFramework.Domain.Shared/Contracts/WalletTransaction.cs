@@ -32,11 +32,17 @@ public partial class WalletTransaction : BaseModel
     [NotMapped]
     private decimal InternalAmount { get; set; }
 
+    public decimal NetAmount => Amount - TransactionFee - ConvenienceFee;
+    
     public bool Held { get; set; }
     
     public bool Released { get; set; }
     
     public string? Remarks { get; set; }
+
+    public decimal TransactionFee { get; set; }
+    
+    public decimal ConvenienceFee { get; set; }
     
     public string? ReferenceNumber { get; set; }
     
