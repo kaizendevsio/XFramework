@@ -27,7 +27,6 @@
 
   <ItemGroup>
     <Folder Include="BusinessObjects\" />
-    <Folder Include="Migrations\" />
   </ItemGroup>
 
 </Project>

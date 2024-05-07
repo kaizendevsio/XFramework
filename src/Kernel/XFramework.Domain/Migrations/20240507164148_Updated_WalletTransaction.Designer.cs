@@ -9,18 +9,18 @@ using XFramework.Domain.Contexts;
 
 #nullable disable
 
-namespace XFramework.Domain.Migrations.HealthEssentials
+namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20240212145942_Added IHasOnlineStatus Properties")]
-    partial class AddedIHasOnlineStatusProperties
+    [Migration("20240507164148_Updated_WalletTransaction")]
+    partial class Updated_WalletTransaction
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.0")
+                .HasAnnotation("ProductVersion", "8.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "uuid-ossp");
@@ -363,373 +363,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.HasIndex(new[] { "CredentialId" }, "IX_tbl_IdentityAuthorizationLogs_CredentialID");
 
                     b.ToTable("AuthorizationLog", "Audit");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<DateTime?>("ActivationDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("CancellationDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("CodeHash")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<string>("CodeString")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ConsumedById")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("CredentialId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ExpiryDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<short?>("PackageStatus")
-                        .HasColumnType("smallint");
-
-                    b.Property<Guid?>("RecipientCredentialId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Remarks")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TypeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("UserDepositRequestId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("UserDepositRequestID");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_BusinessPackages_pkey");
-
-                    b.HasIndex("ConsumedById");
-
-                    b.HasIndex("CredentialId");
-
-                    b.HasIndex("RecipientCredentialId");
-
-                    b.HasIndex("TypeId");
-
-                    b.HasIndex("UserDepositRequestId");
-
-                    b.ToTable("BusinessPackage", "BusinessPackage");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackageInclusion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("BusinessPackageId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("BusinessPackageID");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("StringValue")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("InclusionTypeID");
-
-                    b.Property<decimal?>("Value")
-                        .HasPrecision(16, 5)
-                        .HasColumnType("numeric(16,5)");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_BusinessPackageInclusions_pkey");
-
-                    b.HasIndex("BusinessPackageId");
-
-                    b.HasIndex("TypeId");
-
-                    b.ToTable("BusinessPackageInclusion", "BusinessPackage");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackageInclusionType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<string>("Code")
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("IconImage")
-                        .HasColumnType("character varying");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool?>("IsNumericValue")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Unit")
-                        .HasColumnType("character varying");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_BusinessPackageInclusionsType_pkey");
-
-                    b.ToTable("BusinessPackageInclusionsType", "BusinessPackage");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackageType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_BusinessPackageType_pkey");
-
-                    b.ToTable("BusinessPackageType", "BusinessPackage");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackageUpgradeTransaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("CredentialId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CurrentBusinessPackageId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("PreviousBusinessPackageId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserBusinessPackageId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id")
-                        .HasName("businesspackageupgradetransactions_pk");
-
-                    b.HasIndex("CredentialId");
-
-                    b.HasIndex("CurrentBusinessPackageId");
-
-                    b.ToTable("BusinessPackageUpgradeTransaction", "BusinessPackage");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.CommissionDeductionRequest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<decimal?>("Balance")
-                        .HasPrecision(18, 10)
-                        .HasColumnType("numeric(18,10)");
-
-                    b.Property<Guid?>("BusinessPackageId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<decimal?>("DeductionCharge")
-                        .HasPrecision(18, 10)
-                        .HasColumnType("numeric(18,10)");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("false");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValueSql("true");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<decimal?>("PrincipalAmount")
-                        .HasPrecision(18, 10)
-                        .HasColumnType("numeric(18,10)");
-
-                    b.Property<int?>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_usercommissiondeductionrequest_pk");
-
-                    b.HasIndex("BusinessPackageId");
-
-                    b.ToTable("CommissionDeductionRequest", "Affiliate");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.CommunityConnection", b =>
@@ -2177,6 +1810,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Suffix")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
@@ -2474,133 +2110,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                             Name = "KYC",
                             TenantId = new Guid("00000000-0000-0000-0000-000000000000")
                         });
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.IncomeTransaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("CredentialId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<short?>("IncomeStatus")
-                        .HasColumnType("smallint");
-
-                    b.Property<Guid?>("IncomeTypeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("IncomeValue")
-                        .HasPrecision(18, 10)
-                        .HasColumnType("numeric(18,10)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("PairMapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Remarks")
-                        .HasMaxLength(10000)
-                        .HasColumnType("character varying(10000)");
-
-                    b.Property<Guid>("SourceMapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TargetMapId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<short?>("TransactionType")
-                        .HasColumnType("smallint");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_IncomeTransactions_pkey");
-
-                    b.HasIndex("CredentialId");
-
-                    b.HasIndex("IncomeTypeId");
-
-                    b.ToTable("IncomeTransaction", "Income");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.IncomeType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ID")
-                        .HasDefaultValueSql("(uuid_generate_v4())");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("IncomeTypeDescription")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("IncomeTypeName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("IncomeTypeShortName")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool?>("IsReward")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id")
-                        .HasName("tbl_IncomeType_pkey");
-
-                    b.ToTable("IncomeType", "Income");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.Message", b =>
@@ -3953,8 +3462,7 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ApplicationId");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Unit")
                         .HasMaxLength(100)
@@ -4552,9 +4060,18 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<decimal?>("Balance")
+                    b.Property<string>("AccountNumber")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Balance")
                         .HasPrecision(24, 8)
                         .HasColumnType("numeric(24,8)");
+
+                    b.Property<decimal?>("BondBalanceRule")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("CardNumber")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -4567,6 +4084,12 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("CredentialId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("CreditOnHoldBalance")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("DebitOnHoldBalance")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -4578,6 +4101,15 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<decimal?>("MaintainingBalanceRule")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("MaxTransferRule")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("MinTransferRule")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -4585,6 +4117,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal>("TransferableBalance")
+                        .HasColumnType("numeric");
 
                     b.Property<Guid?>("WalletTypeId")
                         .HasColumnType("uuid");
@@ -4670,6 +4205,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("ConvenienceFee")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -4685,6 +4223,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)");
 
+                    b.Property<bool>("Held")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -4697,19 +4238,52 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasDefaultValueSql("now()");
 
                     b.Property<decimal>("PreviousBalance")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("PreviousCreditOnHoldBalance")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("PreviousDebitOnHoldBalance")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("PreviousTotalBalance")
                         .HasPrecision(24, 8)
                         .HasColumnType("numeric(24,8)");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Released")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Remarks")
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)");
 
+                    b.Property<decimal?>("RunningAvailableBalance")
+                        .HasColumnType("numeric");
+
                     b.Property<decimal?>("RunningBalance")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("RunningCreditOnHoldBalance")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("RunningDebitOnHoldBalance")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("RunningTotalBalance")
                         .HasPrecision(24, 8)
                         .HasColumnType("numeric(24,8)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal>("TransactionFee")
+                        .HasColumnType("numeric");
+
+                    b.Property<int?>("TransactionType")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("WalletId")
                         .HasColumnType("uuid");
@@ -4731,6 +4305,9 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasColumnType("uuid")
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<decimal?>("BondBalanceRule")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -4760,10 +4337,13 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
-                    b.Property<decimal?>("MaxTransfer")
+                    b.Property<decimal?>("MaintainingBalanceRule")
                         .HasColumnType("numeric");
 
-                    b.Property<decimal?>("MinTransfer")
+                    b.Property<decimal?>("MaxTransferRule")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("MinTransferRule")
                         .HasColumnType("numeric");
 
                     b.Property<DateTime?>("ModifiedAt")
@@ -4929,99 +4509,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                         .HasConstraintName("tbl_userauthhistory_fk");
 
                     b.Navigation("IdentityCredentials");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackage", b =>
-                {
-                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "ConsumedBy")
-                        .WithMany("BusinessPackageConsumedByNavigations")
-                        .HasForeignKey("ConsumedById")
-                        .HasConstraintName("tbl_userbusinesspackage_fk");
-
-                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "Credential")
-                        .WithMany("BusinessPackageIdentityCredentials")
-                        .HasForeignKey("CredentialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("BusinessPackage_CredentialId");
-
-                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "RecipientIdentityCredential")
-                        .WithMany("BusinessPackageRecipientIdentityCredentials")
-                        .HasForeignKey("RecipientCredentialId")
-                        .HasConstraintName("tbl_userbusinesspackage_tbl_userauth_id_fk");
-
-                    b.HasOne("XFramework.Domain.Shared.Contracts.BusinessPackageType", "Type")
-                        .WithMany("BusinessPackages")
-                        .HasForeignKey("TypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("BusinessPackage_TypeId");
-
-                    b.HasOne("XFramework.Domain.Shared.Contracts.DepositRequest", "UserDepositRequest")
-                        .WithMany("BusinessPackages")
-                        .HasForeignKey("UserDepositRequestId")
-                        .HasConstraintName("DepositRequestId");
-
-                    b.Navigation("ConsumedBy");
-
-                    b.Navigation("Credential");
-
-                    b.Navigation("RecipientIdentityCredential");
-
-                    b.Navigation("Type");
-
-                    b.Navigation("UserDepositRequest");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackageInclusion", b =>
-                {
-                    b.HasOne("XFramework.Domain.Shared.Contracts.BusinessPackage", "BusinessPackage")
-                        .WithMany("BusinessPackageInclusions")
-                        .HasForeignKey("BusinessPackageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("BusinessPackageInclusions_BusinessPackageId");
-
-                    b.HasOne("XFramework.Domain.Shared.Contracts.BusinessPackageInclusionType", "Type")
-                        .WithMany("BusinessPackageInclusions")
-                        .HasForeignKey("TypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("BusinessPackageInclusions_TypeID");
-
-                    b.Navigation("BusinessPackage");
-
-                    b.Navigation("Type");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackageUpgradeTransaction", b =>
-                {
-                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "Credential")
-                        .WithMany("BusinessPackageUpgradeTransactions")
-                        .HasForeignKey("CredentialId")
-                        .IsRequired()
-                        .HasConstraintName("ubput_tbl_identitycredentials_id_fk");
-
-                    b.HasOne("XFramework.Domain.Shared.Contracts.BusinessPackage", "CurrentBusinessPackage")
-                        .WithMany("BusinessPackageUpgradeTransactions")
-                        .HasForeignKey("CurrentBusinessPackageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("ubput_tbl_businesspackage_id_fk");
-
-                    b.Navigation("Credential");
-
-                    b.Navigation("CurrentBusinessPackage");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.CommissionDeductionRequest", b =>
-                {
-                    b.HasOne("XFramework.Domain.Shared.Contracts.BusinessPackage", "BusinessPackage")
-                        .WithMany("CommissionDeductionRequests")
-                        .HasForeignKey("BusinessPackageId")
-                        .HasConstraintName("tbl_ucdr_tbl_userbusinesspackage_id_fk");
-
-                    b.Navigation("BusinessPackage");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.CommunityConnection", b =>
@@ -5434,25 +4921,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Navigation("Credential");
 
                     b.Navigation("VerificationType");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.IncomeTransaction", b =>
-                {
-                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "Credential")
-                        .WithMany("IncomeTransactions")
-                        .HasForeignKey("CredentialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("IncomeTransaction_CredentialId");
-
-                    b.HasOne("XFramework.Domain.Shared.Contracts.IncomeType", "IncomeType")
-                        .WithMany("IncomeTransactions")
-                        .HasForeignKey("IncomeTypeId")
-                        .HasConstraintName("tbl_userincometransaction_tbl_incometype_id_fk");
-
-                    b.Navigation("Credential");
-
-                    b.Navigation("IncomeType");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.Message", b =>
@@ -5964,25 +5432,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Navigation("IdentityAddresses");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackage", b =>
-                {
-                    b.Navigation("BusinessPackageInclusions");
-
-                    b.Navigation("BusinessPackageUpgradeTransactions");
-
-                    b.Navigation("CommissionDeductionRequests");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackageInclusionType", b =>
-                {
-                    b.Navigation("BusinessPackageInclusions");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.BusinessPackageType", b =>
-                {
-                    b.Navigation("BusinessPackages");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.CommunityConnectionType", b =>
                 {
                     b.Navigation("CommunityConnections");
@@ -6045,11 +5494,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Navigation("WalletTypes");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.DepositRequest", b =>
-                {
-                    b.Navigation("BusinessPackages");
-                });
-
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.IdentityAddressType", b =>
                 {
                     b.Navigation("IdentityAddresses");
@@ -6069,14 +5513,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                 {
                     b.Navigation("AuthorizationLogs");
 
-                    b.Navigation("BusinessPackageConsumedByNavigations");
-
-                    b.Navigation("BusinessPackageIdentityCredentials");
-
-                    b.Navigation("BusinessPackageRecipientIdentityCredentials");
-
-                    b.Navigation("BusinessPackageUpgradeTransactions");
-
                     b.Navigation("CommunityIdentities");
 
                     b.Navigation("DepositRequests");
@@ -6088,8 +5524,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
                     b.Navigation("IdentityRoles");
 
                     b.Navigation("IdentityVerifications");
-
-                    b.Navigation("IncomeTransactions");
 
                     b.Navigation("MessageDirectRecipientNavigations");
 
@@ -6133,11 +5567,6 @@ namespace XFramework.Domain.Migrations.HealthEssentials
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.IdentityVerificationType", b =>
                 {
                     b.Navigation("IdentityVerifications");
-                });
-
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.IncomeType", b =>
-                {
-                    b.Navigation("IncomeTransactions");
                 });
 
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.Message", b =>

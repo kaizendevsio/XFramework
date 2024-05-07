@@ -4202,6 +4202,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("ConvenienceFee")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -4272,6 +4275,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal>("TransactionFee")
+                        .HasColumnType("numeric");
 
                     b.Property<int?>("TransactionType")
                         .HasColumnType("integer");
