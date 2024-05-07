@@ -14,12 +14,13 @@ public class GetPendingSmsMessageListHandler : IRequestHandler<GetPendingSmsMess
     
     public async Task<QueryResponse<List<MessageDirectResponse>>> Handle(GetPendingSmsMessageListRequest request, CancellationToken cancellationToken)
     {
-        var messageDirectResponses = _cachingService.PendingMessageList.ToList();
+        var messageDirectResponses = _cachingService.PendingMessageList
+            .Where(x => x.AgentClusterId == request.AgentClusterId)
+            .ToList();
 
         return new()
         {
             HttpStatusCode = HttpStatusCode.Accepted,
-            
             Response = messageDirectResponses
         };
     }

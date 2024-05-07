@@ -7,5 +7,5 @@ namespace SmsGateway.Domain.Shared.Contracts.Requests.Get;
 
 public record GetPendingSmsMessageListRequest : RequestBase, IRequest<QueryResponse<List<MessageDirectResponse>>>
 {
-    
+    public Guid AgentClusterId { get; set; }
 }

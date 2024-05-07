@@ -4,7 +4,7 @@ using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Domain.Contexts;
 
-public partial class AppDbContext : DbContext
+public partial class AppDbContext : XDbContext
 {
     public AppDbContext()
     {
