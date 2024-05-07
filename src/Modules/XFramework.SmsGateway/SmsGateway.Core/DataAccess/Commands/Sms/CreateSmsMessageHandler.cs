@@ -16,9 +16,11 @@ public class CreateSmsMessageHandler : IRequestHandler<CreateSmsMessageRequest, 
     {
         _cachingService.PendingMessageList.Add(new()
         {
+            Id = Guid.NewGuid(),
             CreatedAt = DateTime.Now,
             ModifiedAt = DateTime.Now,
             IsDeleted = false,
+            AgentClusterId = request.AgentClusterId,
             Sender = request.Sender,
             Recipient = request.Recipient,
             Intent = request.Intent,
@@ -29,8 +31,7 @@ public class CreateSmsMessageHandler : IRequestHandler<CreateSmsMessageRequest, 
         });
         return new()
         {
-            HttpStatusCode = HttpStatusCode.Accepted,
-            
+            HttpStatusCode = HttpStatusCode.Accepted
         };
     }
 }

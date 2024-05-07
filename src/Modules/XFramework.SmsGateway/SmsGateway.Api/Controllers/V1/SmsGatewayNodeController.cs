@@ -18,17 +18,19 @@ public class SmsGatewayNodeController : ControllerBase
         _mediator = mediator;
     }
         
-    [HttpGet("List")]
-    public async Task<List<SmsNodeResponse>> List()
+    [HttpGet("List/{agentClusterId}")]
+    public async Task<List<SmsNodeResponse>> List([FromRoute] Guid agentClusterId)
     {
         var itemList = _cachingService.PendingMessageList
+            .Where(x => x.AgentClusterId == agentClusterId)
             .Select(i => new SmsNodeResponse
             {
+                Id = i.Id,
                 Recipient = i.Recipient,
                 Message = i.Message
             })
             .ToList();
-        _cachingService.PendingMessageList.Clear();
+        _cachingService.PendingMessageList.RemoveAll(x => itemList.Any(i => i.Id == x.Id));
 
         return itemList;
     }
