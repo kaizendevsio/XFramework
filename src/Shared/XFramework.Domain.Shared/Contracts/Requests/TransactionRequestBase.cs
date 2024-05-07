@@ -9,5 +9,5 @@ public record TransactionRequestBase : RequestBase
     public string? Remarks { get; set; }
     public bool OnHold { get; set; }
     public string? ReferenceNumber { get; set; }
-    public required Guid CurrencyId { get; set; }
+    public Guid CurrencyId { get; set; }
 }
