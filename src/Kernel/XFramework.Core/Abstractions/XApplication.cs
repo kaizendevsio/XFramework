@@ -22,6 +22,7 @@ public static class XApplication
         
         var app = builder.Build();
         app.UseCustomMiddleware();
+        app.UseStandardMiddleware();
         app.UseConfiguredSwagger();
         app.UseXFrameworkEndpoints();
         app.UseEndpointsInAssembly(app.Environment);

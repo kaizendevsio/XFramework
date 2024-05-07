@@ -22,8 +22,9 @@ public class TransferWallet(
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
 
         // Validate the amount and fee
-        if (request.Amount <= 0 || request.Fee < 0)
+        if (request.Amount <= 0 || request.Fee < 0 || request.ConvenienceFee < 0)
         {
+            logger.LogWarning("Invalid amount or fee while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid amount or fee" };
         }
 
@@ -64,36 +65,41 @@ public class TransferWallet(
 
         if (senderUser.Result.HttpStatusCode != HttpStatusCode.OK)
         {
+            logger.LogWarning("Sender not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Sender not found" };
         }
         
         if (recipientUser.Result.HttpStatusCode != HttpStatusCode.OK)
         {
+            logger.LogWarning("Recipient not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Recipient not found" };
         }
         
         if (senderWallet == null || recipientWallet == null)
         {
+            logger.LogWarning("Wallet not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
         }
 
         // Check for self-transfer
         if (request.CredentialId == request.RecipientCredentialId)
         {
-            return new CmdResponse
-                { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Cannot transfer to the same wallet" };
+            logger.LogWarning("Cannot transfer to the same wallet while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
+            return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Cannot transfer to the same wallet" };
         }
 
         // Check if sender has enough balance
-        var totalDeduction = request.Amount + request.Fee;
+        var totalDeduction = request.Amount + request.Fee + request.ConvenienceFee;
         if (senderWallet.Balance < totalDeduction)
         {
+            logger.LogWarning("Insufficient balance while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Insufficient balance" };
         }
         
         // Check if the amount is within the transferable balance
         if (request.Amount > senderWallet.TransferableBalance)
         {
+            logger.LogWarning("Amount exceeds transferable balance while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
@@ -104,6 +110,7 @@ public class TransferWallet(
         // Check if the amount is within the min transferable amount
         if (request.Amount < senderWallet.MinTransferRule)
         {
+            logger.LogWarning("Amount is below the minimum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
@@ -114,6 +121,7 @@ public class TransferWallet(
         // Check if the amount is within the max transferable amount
         if (request.Amount > senderWallet.MaxTransferRule)
         {
+            logger.LogWarning("Amount exceeds the maximum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
@@ -124,6 +132,7 @@ public class TransferWallet(
         // Check if amount is within the bond balance rule
         if (senderWallet.BondBalanceRule.HasValue && request.Amount > senderWallet.BondBalanceRule)
         {
+            logger.LogWarning("Amount exceeds the bond balance rule while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
@@ -134,6 +143,7 @@ public class TransferWallet(
         // Check if the amount is within the maintaining balance rule
         if (senderWallet.MaintainingBalanceRule.HasValue && senderWallet.Balance - totalDeduction < senderWallet.MaintainingBalanceRule)
         {
+            logger.LogWarning("Amount exceeds the maintaining balance rule while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
@@ -144,6 +154,7 @@ public class TransferWallet(
         // Check if the recipient wallet is within the min transferable amount
         if (request.Amount < recipientWallet.MinTransferRule)
         {
+            logger.LogWarning("Amount is below the minimum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
@@ -154,6 +165,7 @@ public class TransferWallet(
         // Check if the recipient wallet is within the max transferable amount
         if (request.Amount > recipientWallet.MaxTransferRule)
         {
+            logger.LogWarning("Amount exceeds the maximum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
             {
                 HttpStatusCode = HttpStatusCode.BadRequest,
@@ -197,6 +209,8 @@ public class TransferWallet(
             CredentialId = request.CredentialId,
             WalletId = senderWallet.Id,
             Amount = totalDeduction,
+            TransactionFee = request.Fee,
+            ConvenienceFee = request.ConvenienceFee,
             PreviousBalance = previousSenderBalance,
             PreviousDebitOnHoldBalance = previousSenderDebitOnHoldBalance,
             PreviousCreditOnHoldBalance = previousSenderCreditOnHoldBalance,

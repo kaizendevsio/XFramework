@@ -18,6 +18,7 @@ using StreamFlow.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Filters;
 using XFramework.Core.Interfaces;
 using XFramework.Core.Loggers;
+using XFramework.Core.Middlewares;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Abstractions;
@@ -262,7 +263,15 @@ public static class InstallerExtensions
 
     public static IApplicationBuilder UseCustomMiddleware(this IApplicationBuilder app)
     {
+        app.UseMiddleware<RemoveEnhancedNavHeaderMiddleware>();
+        
+        return app;
+    }
+    
+    public static IApplicationBuilder UseStandardMiddleware(this IApplicationBuilder app)
+    {
         var env = app.ApplicationServices.GetRequiredService<IWebHostEnvironment>();
+
         if (env.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
