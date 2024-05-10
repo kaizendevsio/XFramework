@@ -5,7 +5,8 @@ namespace SmsGateway.Domain.Shared.Contracts.Requests.Get;
 using TRequest = GetPendingSmsMessageListRequest;
 using TResponse = QueryResponse<List<SmsNodeJob>>;
 
-public record GetPendingSmsMessageListRequest : RequestBase,
+[MemoryPackable]
+public partial record GetPendingSmsMessageListRequest : RequestBase,
     IRequest<TResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {

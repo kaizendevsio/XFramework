@@ -5,7 +5,8 @@ namespace IdentityServer.Domain.Shared.Contracts.Requests;
 using TRequest = CheckVerificationRequest;
 using TResponse = QueryResponse<CheckVerificationResponse>;
 
-public record CheckVerificationRequest : RequestBase, 
+[MemoryPackable]
+public partial record CheckVerificationRequest : RequestBase, 
     IRequest<TResponse>, 
     IStreamflowRequest<TRequest, TResponse>
 {

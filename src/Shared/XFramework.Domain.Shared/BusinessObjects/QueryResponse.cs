@@ -1,10 +1,10 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Net;
-using XFramework.Domain.Shared.Contracts.Base;
 
 namespace XFramework.Domain.Shared.BusinessObjects;
 
-public class QueryResponse<T> : IBaseResponse, IHasRequestServer, IQueryResponse
+[MemoryPackable]
+public partial class QueryResponse<T> : IBaseResponse, IHasRequestServer, IQueryResponse
 {
     public QueryResponse() { }
     

@@ -89,7 +89,7 @@ public class AuthenticateIdentity(
         }
         //_recordsService.NewAuthorizationLog(AuthenticationState.Success, cuid);
 
-        credential = helperService.RemoveCircularReference(credential);
+        //credential = helperService.RemoveCircularReference(credential);
         
         return new()
         {

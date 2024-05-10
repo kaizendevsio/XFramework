@@ -1,14 +1,10 @@
-﻿using StreamFlow.Domain.Shared.Contracts.Requests;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts.Requests;
-using XFramework.Domain.Shared.Enums;
-
-namespace Messaging.Domain.Shared.Contracts.Requests.Create;
+﻿namespace Messaging.Domain.Shared.Contracts.Requests.Create;
 
 using TRequest = CreateDirectMessageRequest;
 using TResponse = CmdResponse;
 
-public record CreateDirectMessageRequest : RequestBase,
+[MemoryPackable]
+public partial record CreateDirectMessageRequest : RequestBase,
     ICommand, 
     IStreamflowRequest<TRequest, TResponse>
 {

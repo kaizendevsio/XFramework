@@ -9,5 +9,6 @@ public class WrapperInstaller : IInstaller
     {
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
         services.AddSingleton<IMessagingServiceWrapper, MessagingServiceWrapper>();
+        services.AddSingleton<IMessagingNodeServiceWrapper, MessagingNodeServiceDriver>();
     }
 }

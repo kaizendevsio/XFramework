@@ -1,6 +1,7 @@
 ﻿namespace IdentityServer.Domain.Shared.Contracts.Requests;
 
-public class IdentityServerBaseRequest
+[MemoryPackable]
+public partial class IdentityServerBaseRequest
 {
     
 }

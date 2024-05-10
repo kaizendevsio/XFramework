@@ -3,7 +3,8 @@
 using TRequest = VerifyPasswordRequest;
 using TResponse = CmdResponse;
 
-public record VerifyPasswordRequest : RequestBase,
+[MemoryPackable]
+public partial record VerifyPasswordRequest : RequestBase,
     ICommand,
     IStreamflowRequest<TRequest, TResponse>
 {

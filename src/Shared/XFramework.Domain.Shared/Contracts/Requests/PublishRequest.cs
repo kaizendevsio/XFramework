@@ -1,5 +1,4 @@
 ﻿using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts.Base;
 
 namespace XFramework.Domain.Shared.Contracts.Requests;
 

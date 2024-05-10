@@ -1,12 +1,14 @@
 ﻿namespace XFramework.Domain.Shared.Contracts.Responses;
 
-public record PaginatedResult<T>
+[MemoryPackable]
+public partial record PaginatedResult<T>
 (
     long TotalItems,
     int PageIndex,
     int PageSize,
     IEnumerable<T> Items)
 {
+    [MemoryPackConstructor]
     public PaginatedResult() : this(0, 0, 0, new List<T>())
     {
         

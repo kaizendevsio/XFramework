@@ -3,7 +3,8 @@
 using TRequest = CreateSmsMessageRequest;
 using TResponse = CmdResponse;
 
-public record CreateSmsMessageRequest : RequestBase,
+[MemoryPackable]
+public partial record CreateSmsMessageRequest : RequestBase,
     ICommand,
     IStreamflowRequest<TRequest, TResponse>
 {

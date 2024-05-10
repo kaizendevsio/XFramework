@@ -3,7 +3,8 @@
 using TRequest = ReleaseTransactionRequest;
 using TResponse = CmdResponse;
 
-public record ReleaseTransactionRequest : RequestBase, 
+[MemoryPackable]
+public partial record ReleaseTransactionRequest : RequestBase, 
     IRequest<TResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {

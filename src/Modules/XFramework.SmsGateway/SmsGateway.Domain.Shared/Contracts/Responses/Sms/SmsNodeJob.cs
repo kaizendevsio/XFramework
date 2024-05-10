@@ -3,7 +3,8 @@ using XFramework.Domain.Shared.Enums;
 
 namespace SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 
-public class SmsNodeJob : BaseModel
+[MemoryPackable]
+public partial class SmsNodeJob : BaseModel
 {
     public Guid AgentClusterId { get; set; }
     public string? Recipient { get; set; }

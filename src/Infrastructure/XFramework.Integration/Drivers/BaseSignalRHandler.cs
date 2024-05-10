@@ -74,8 +74,7 @@ public abstract class BaseSignalRHandler
                     {
                         if (!logger.IsEnabled(LogLevel.Information)) return;
 
-                        var requestData = JsonSerializer.Serialize(r, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
-                        logger.LogInformation("[{Caller}] Request received, Invoking '{Request}' with data: {Data}", nameof(StreamflowRequestHandler), GetType().Name, requestData);
+                        logger.LogInformation("[{Caller}] Request received, Invoking '{Request}' with data: {Data}", nameof(StreamflowRequestHandler), GetType().Name, r);
                     });
 
                     var result = await internalMediator.Send(r).ConfigureAwait(false);
@@ -84,20 +83,19 @@ public abstract class BaseSignalRHandler
                     _ = Task.Run(() =>
                     {
                         if (!logger.IsEnabled(LogLevel.Information)) return;
-
-                        var resultData = JsonSerializer.Serialize(result, new JsonSerializerOptions {ReferenceHandler = ReferenceHandler.IgnoreCycles});
-
+                        
                         if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
                         {
-                            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}; {Data}", nameof(StreamflowRequestHandler), GetType().Name, result.Message, resultData);
+                            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message};", nameof(StreamflowRequestHandler), GetType().Name, result.Message);
                         }
                         else
                         {
-                            logger.LogInformation("[{Caller}] Invoking {Request}' returned {HttpStatusCode}; {Data}", nameof(StreamflowRequestHandler), GetType().Name, result.HttpStatusCode, resultData);
+                            logger.LogInformation("[{Caller}] Invoking {Request}' returned {HttpStatusCode};", nameof(StreamflowRequestHandler), GetType().Name, result.HttpStatusCode);
                         }
                     });
 
                     await RespondToInvoke(connection, response.RequestId, response.ClientId, result);
+                    response.Dispose();
                 }
             }
         }

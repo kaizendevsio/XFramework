@@ -1,6 +1,8 @@
 ﻿/*using IdentityServer.Api.SignalR;*/
 
 using Messaging.Integration.Drivers;
+using SmsGateway.Integration.Drivers;
+using SmsGateway.Integration.Interfaces;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
 
@@ -12,5 +14,6 @@ public class WrapperInstaller : IInstaller
     {
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
         services.AddSingleton<IMessagingServiceWrapper, MessagingServiceWrapper>();
+        services.AddSingleton<ISmsGatewayServiceWrapper, SmsGatewayServiceDriver>();
     }
 }

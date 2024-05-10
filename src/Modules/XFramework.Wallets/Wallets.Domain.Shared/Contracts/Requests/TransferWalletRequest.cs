@@ -3,7 +3,8 @@
 using TRequest = TransferWalletRequest;
 using TResponse = CmdResponse;
 
-public record TransferWalletRequest : TransactionRequestBase, 
+[MemoryPackable]
+public partial record TransferWalletRequest : TransactionRequestBase, 
     IRequest<TResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {

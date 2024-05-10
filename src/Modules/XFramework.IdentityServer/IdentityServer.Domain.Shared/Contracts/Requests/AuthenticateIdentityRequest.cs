@@ -5,7 +5,8 @@ namespace IdentityServer.Domain.Shared.Contracts.Requests;
 using TRequest = AuthenticateIdentityRequest;
 using TResponse = QueryResponse<AuthenticateIdentityResponse>;
 
-public record AuthenticateIdentityRequest : RequestBase, 
+[MemoryPackable]
+public partial record AuthenticateIdentityRequest : RequestBase, 
     IRequest<TResponse>, 
     IStreamflowRequest<TRequest, TResponse>
 {

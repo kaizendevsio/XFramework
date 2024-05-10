@@ -1,7 +1,8 @@
 ﻿
 namespace XFramework.Domain.Shared.BusinessObjects;
 
-public class RequestMetadata
+[MemoryPackable]
+public partial class RequestMetadata
 {
     public Guid? TenantId { get; set; }
     public string Name { get; set; }
