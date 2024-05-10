@@ -2,7 +2,8 @@
 
 namespace IdentityServer.Domain.Shared.Contracts.Responses;
 
-public record AuthenticateIdentityResponse
+[MemoryPackable]
+public partial record AuthenticateIdentityResponse
 {
     public IdentityInformation? Identity { get; set; }
     public IdentityCredential? Credential { get; set; }

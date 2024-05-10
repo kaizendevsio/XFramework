@@ -1,6 +1,5 @@
 ﻿using MediatR;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.Contracts.Responses;
 
 namespace XFramework.Domain.Shared.Contracts.Requests;
@@ -9,15 +8,20 @@ public interface ICommand : IRequest<CmdResponse>;
 public interface ICommand<T> : IRequest<CmdResponse<T>>;
 public interface IQuery<T> : IRequest<QueryResponse<T>>;
 
-public record Create<T>(T Model) : RequestBase, ICommand<T>;
+[MemoryPackable]
+public partial record Create<T>(T Model) : RequestBase, ICommand<T>;
 
-public record Patch<T>(T Model) : RequestBase, ICommand<T>;
+[MemoryPackable]
+public partial record Patch<T>(T Model) : RequestBase, ICommand<T>;
 
-public record Replace<T>(T Model) : RequestBase, ICommand<T>;
+[MemoryPackable]
+public partial record Replace<T>(T Model) : RequestBase, ICommand<T>;
 
-public record Delete<T>(T Model) : RequestBase, ICommand<T>;
+[MemoryPackable]
+public partial record Delete<T>(T Model) : RequestBase, ICommand<T>;
 
-public record GetList<T>(
+[MemoryPackable]
+public partial record GetList<T>(
     int PageSize,
     int PageNumber,
     Guid? TenantId,
@@ -27,7 +31,8 @@ public record GetList<T>(
     List<QueryFilter>? Filter = null,
     List<string>? Includes = null) : RequestBase, IQuery<PaginatedResult<T>>;
 
-public record Get<T>(
+[MemoryPackable]
+public partial record Get<T>(
     Guid Id, 
     Guid? TenantId, 
     bool NoCache = true, 
@@ -35,7 +40,8 @@ public record Get<T>(
     bool? IncludeNavigations = null,
     List<string>? Includes = null) : RequestBase, IQuery<T>;
 
-public record RequestBase : IHasRequestServer
+[MemoryPackable]
+public partial record RequestBase : IHasRequestServer
 {
     public RequestMetadata Metadata { get; set; } = new ();
 }

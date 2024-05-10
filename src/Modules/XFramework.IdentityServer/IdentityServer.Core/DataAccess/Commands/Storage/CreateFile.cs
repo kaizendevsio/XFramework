@@ -53,7 +53,7 @@ public class CreateFile(
         request.Model.FileSize = (decimal?) ByteSize.FromBytes(request.Model.FileBytes.Length).KiloBytes;
         
         var response = await baseHandler.Handle(request, cancellationToken);
-        response = helperService.RemoveCircularReference(response);
+        //response = helperService.RemoveCircularReference(response);
 
         return response;
     }

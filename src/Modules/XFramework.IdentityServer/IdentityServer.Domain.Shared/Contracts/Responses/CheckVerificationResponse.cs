@@ -2,7 +2,8 @@
 
 namespace IdentityServer.Domain.Shared.Contracts.Responses;
 
-public record CheckVerificationResponse
+[MemoryPackable]
+public partial record CheckVerificationResponse
 {
     public bool IsVerified { get; init; }
     public IdentityVerification LastVerification { get; set; }

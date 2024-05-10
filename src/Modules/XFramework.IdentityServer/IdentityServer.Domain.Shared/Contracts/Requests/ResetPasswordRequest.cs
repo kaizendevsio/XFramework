@@ -3,7 +3,8 @@
 using TRequest = ResetPasswordRequest;
 using TResponse = CmdResponse;
 
-public record ResetPasswordRequest : RequestBase,
+[MemoryPackable]
+public partial record ResetPasswordRequest : RequestBase,
     IRequest<TResponse>, 
     IStreamflowRequest<TRequest, TResponse>
 {

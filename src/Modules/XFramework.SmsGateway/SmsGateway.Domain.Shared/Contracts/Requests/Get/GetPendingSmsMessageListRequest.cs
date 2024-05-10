@@ -1,11 +1,14 @@
-﻿using MediatR;
-using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts.Requests;
+﻿using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 
 namespace SmsGateway.Domain.Shared.Contracts.Requests.Get;
 
-public record GetPendingSmsMessageListRequest : RequestBase, IRequest<QueryResponse<List<MessageDirectResponse>>>
+using TRequest = GetPendingSmsMessageListRequest;
+using TResponse = QueryResponse<List<SmsNodeJob>>;
+
+[MemoryPackable]
+public partial record GetPendingSmsMessageListRequest : RequestBase,
+    IRequest<TResponse>,
+    IStreamflowRequest<TRequest, TResponse>
 {
     public Guid AgentClusterId { get; set; }
 }

@@ -1,16 +1,21 @@
-﻿using XFramework.Domain.Shared.Contracts.Requests;
+﻿namespace Messaging.Domain.Shared.Contracts.Requests.Create;
 
-namespace Messaging.Domain.Shared.Contracts.Requests.Create;
+using TRequest = CreateDirectMessageRequest;
+using TResponse = CmdResponse;
 
-public record CreateDirectMessageRequest : RequestBase
+[MemoryPackable]
+public partial record CreateDirectMessageRequest : RequestBase,
+    ICommand, 
+    IStreamflowRequest<TRequest, TResponse>
 {
-    public Guid? MessageType { get; set; } 
-    public string Sender { get; set; }
-    public string Recipient { get; set; }
-    public string Subject { get; set; }
-    public string Intent { get; set; }
-    public string Message { get; set; }
-    public Guid? ParentMessageGuid { get; set; }
+    public Guid AgentClusterId { get; set; }
+    public Guid? MessageTypeId { get; set; }
     public DateTime? SendSchedule { get; set; }
+    public required MessageTransportType MessageTransportType { get; set; }
+    public string Sender { get; set; } = "System";
+    public required string Recipient { get; set; } = null!;
+    public string? Subject { get; set; }
+    public string Intent { get; set; } = "Notification";
+    public required string Message { get; set; } = null!;
     public bool IsScheduled { get; set; }
 }

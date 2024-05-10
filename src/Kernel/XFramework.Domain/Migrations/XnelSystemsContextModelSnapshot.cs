@@ -2284,8 +2284,10 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ExternalRecipient")
+                        .HasColumnType("text");
+
                     b.Property<string>("Intent")
-                        .IsRequired()
                         .HasColumnType("character varying");
 
                     b.Property<bool>("IsDeleted")
@@ -2300,39 +2302,33 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .IsRequired()
                         .HasColumnType("character varying");
 
+                    b.Property<int>("MessageTransportType")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("ModifiedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid>("ParentMessageId")
+                    b.Property<Guid?>("ParentMessageId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Recipient")
-                        .IsRequired()
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid>("RecipientId")
+                    b.Property<Guid?>("RecipientId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Sender")
-                        .IsRequired()
-                        .HasColumnType("character varying");
-
-                    b.Property<Guid>("SenderId")
+                    b.Property<Guid?>("SenderId")
                         .HasColumnType("uuid");
 
-                    b.Property<short>("Status")
-                        .HasColumnType("smallint");
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Subject")
-                        .IsRequired()
                         .HasColumnType("character varying");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TypeId")
+                    b.Property<Guid?>("TypeId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id")
@@ -4971,34 +4967,28 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.HasOne("XFramework.Domain.Shared.Contracts.MessageDirect", "ParentMessage")
                         .WithMany("InverseParentMessage")
                         .HasForeignKey("ParentMessageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
                         .HasConstraintName("messagedirect_messagedirect_id_fk");
 
-                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "RecipientNavigation")
+                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "Recipient")
                         .WithMany("MessageDirectRecipientNavigations")
                         .HasForeignKey("RecipientId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
                         .HasConstraintName("messagedirect_identitycredential_2_id_fk");
 
-                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "SenderNavigation")
+                    b.HasOne("XFramework.Domain.Shared.Contracts.IdentityCredential", "Sender")
                         .WithMany("MessageDirectSenderNavigations")
                         .HasForeignKey("SenderId")
-                        .IsRequired()
                         .HasConstraintName("messagedirect_identitycredential_id_fk");
 
                     b.HasOne("XFramework.Domain.Shared.Contracts.MessageType", "Type")
                         .WithMany("MessageDirects")
                         .HasForeignKey("TypeId")
-                        .IsRequired()
                         .HasConstraintName("messagedirect_messagetype_id_fk");
 
                     b.Navigation("ParentMessage");
 
-                    b.Navigation("RecipientNavigation");
+                    b.Navigation("Recipient");
 
-                    b.Navigation("SenderNavigation");
+                    b.Navigation("Sender");
 
                     b.Navigation("Type");
                 });

@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using MemoryPack;
 using XFramework.Domain.Shared.Enums;
 using MessagePack;
 using StreamFlow.Domain.Shared.Enums;
@@ -8,7 +9,7 @@ using XFramework.Domain.Shared.Extensions;
 namespace StreamFlow.Domain.Shared.Contracts.Requests;
 
 [MessagePackObject]
-public class StreamFlowMessage<T> : StreamFlowMessage
+public class StreamFlowMessage<T> : StreamFlowMessage, IDisposable
     where T : class, IHasRequestServer
 {
     public StreamFlowMessage(T requestData)
@@ -25,7 +26,12 @@ public class StreamFlowMessage<T> : StreamFlowMessage
     private void SetData(T request)
     {
         CommandName ??= typeof(T).GetTypeFullName();
-        Data = request is null ? Array.Empty<byte>() : MessagePackSerializer.Serialize(request, new(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
+        Data = request is null ? [] : MemoryPackSerializer.Serialize(request);
+    }
+
+    public void Dispose()
+    {
+        Data = null;
     }
 }
 

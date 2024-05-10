@@ -1,6 +1,8 @@
-﻿using System.Net.Http.Json;
+﻿using System.Diagnostics;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using MemoryPack;
 using MessagePack;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Hosting;
@@ -217,6 +219,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         };
         
         var result = await InvokeAsync<TRequest, CmdResponse>(r);
+        r.Dispose();
 
 #if DEBUG
         if (!HostEnvironment.IsProduction())
@@ -244,7 +247,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         };
         
         var result = await InvokeAsync<TRequest, CmdResponse<TRequest>>(r);
-        
+        r.Dispose();
 #if DEBUG
         Task.Run(() =>
         {
@@ -292,13 +295,14 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         
         var signalRResponse = await SignalRService.InvokeAsync(request);
         var tResponse = Activator.CreateInstance<TResponse>();
-        
+
         switch (signalRResponse.ResponseStatusCode)
         {
             case HttpStatusCode.Processing:
                 tResponse.Message = "Request is queued, waiting for connection to be re-established";
                 tResponse.HttpStatusCode = HttpStatusCode.Processing;
 
+                request.Dispose();
                 return new()
                 {
                     HttpStatusCode = tResponse.HttpStatusCode,
@@ -308,7 +312,8 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             {
                 tResponse.Message = "Service is currently offline";
                 tResponse.HttpStatusCode = HttpStatusCode.NotFound;
-
+               
+                request.Dispose();
                 return new()
                 {
                     HttpStatusCode = tResponse.HttpStatusCode,
@@ -317,16 +322,24 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             }
             case HttpStatusCode.InternalServerError:
             {
+                Logger.LogError("Sending request: {Request}... Failed in {Duration}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, signalRResponse.ResponseStatusCode);
+                request.Dispose();
+                
                 return new()
                 {
                     HttpStatusCode = signalRResponse.ResponseStatusCode,
                     Message = signalRResponse.Message,
-                    Response = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new(MessagePack.Resolvers.ContractlessStandardResolver.Instance))
+                    Response = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data)
                 };
             }
             default:
-                var t = MessagePackSerializer.Deserialize<TResponse>(signalRResponse.Data, new(MessagePack.Resolvers.ContractlessStandardResolver.Instance));
+                var sw = new Stopwatch();
+                sw.Start();
+                var t = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data);
+                sw.Stop();
+                Logger.LogWarning("Deserialization of response: {Request}... Done in {Duration}ms", request.CommandName, sw.ElapsedMilliseconds);
                 Logger.LogInformation("Sending request: {Request}... Done in {Duration}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
+                request.Dispose();
 
                 return new()
                 {

@@ -1,11 +1,14 @@
-﻿using MediatR;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts.Requests;
+﻿namespace SmsGateway.Domain.Shared.Contracts.Requests.Create;
 
-namespace SmsGateway.Domain.Shared.Contracts.Requests.Create;
+using TRequest = CreateSmsMessageRequest;
+using TResponse = CmdResponse;
 
-public record CreateSmsMessageRequest : TransactionRequestBase, IRequest<CmdResponse<CreateSmsMessageRequest>>
+[MemoryPackable]
+public partial record CreateSmsMessageRequest : RequestBase,
+    ICommand,
+    IStreamflowRequest<TRequest, TResponse>
 {
+    public Guid Id { get; set; }
     public Guid AgentClusterId { get; set; }
     public string? Sender { get; set; }
     public string? Recipient { get; set; }

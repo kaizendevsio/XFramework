@@ -1,7 +1,7 @@
 ﻿using XFramework.Domain.Shared.Contracts;
 using XFramework.Integration.Attributes;
 
-namespace IdentityServer.Integration.Generators;
+namespace Messaging.Integration.Generators;
 
 [StreamFlowWrapper("XFramework.Domain.Shared.Contracts",new[] {
     nameof(Message),

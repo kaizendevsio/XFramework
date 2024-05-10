@@ -34,7 +34,7 @@ public class GetTenant(
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(cancellationToken);
 
-            entity = helperService.RemoveCircularReference(entity);
+            //entity = helperService.RemoveCircularReference(entity);
 
             if (entity is not null)
             {
@@ -44,7 +44,7 @@ public class GetTenant(
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
                 };
 
-                cache.Set($"Entity-{nameof(Tenant)}-{request.Id}", entity, cacheOptions);
+                //cache.Set($"Entity-{nameof(Tenant)}-{request.Id}", entity, cacheOptions);
             }
         }
 

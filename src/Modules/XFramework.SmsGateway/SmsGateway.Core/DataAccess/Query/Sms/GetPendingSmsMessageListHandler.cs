@@ -3,7 +3,7 @@ using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 
 namespace SmsGateway.Core.DataAccess.Query.Handlers.Sms;
 
-public class GetPendingSmsMessageListHandler : IRequestHandler<GetPendingSmsMessageListRequest, QueryResponse<List<MessageDirectResponse>>>
+public class GetPendingSmsMessageListHandler : IRequestHandler<GetPendingSmsMessageListRequest, QueryResponse<List<SmsNodeJob>>>
 {
     private readonly ICachingService _cachingService;
 
@@ -12,15 +12,16 @@ public class GetPendingSmsMessageListHandler : IRequestHandler<GetPendingSmsMess
         _cachingService = cachingService;
     }
     
-    public async Task<QueryResponse<List<MessageDirectResponse>>> Handle(GetPendingSmsMessageListRequest request, CancellationToken cancellationToken)
+    public async Task<QueryResponse<List<SmsNodeJob>>> Handle(GetPendingSmsMessageListRequest request, CancellationToken cancellationToken)
     {
         var messageDirectResponses = _cachingService.PendingMessageList
-            .Where(x => x.AgentClusterId == request.AgentClusterId)
+            .Where(x => x.Value.AgentClusterId == request.AgentClusterId)
+            .Select(x => x.Value)
             .ToList();
 
         return new()
         {
-            HttpStatusCode = HttpStatusCode.Accepted,
+            HttpStatusCode = HttpStatusCode.OK,
             Response = messageDirectResponses
         };
     }

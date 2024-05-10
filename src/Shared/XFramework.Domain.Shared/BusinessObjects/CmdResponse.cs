@@ -1,15 +1,17 @@
 using System.Net;
-using XFramework.Domain.Shared.Contracts.Base;
 
 namespace XFramework.Domain.Shared.BusinessObjects;
 
-public class CmdResponse<T> : CmdResponse
+[MemoryPackable]
+public partial class CmdResponse<T> : CmdResponse
 {
     public T? Response { get; set; }
 }
-    
-public class CmdResponse : IBaseResponse, IHasRequestServer, ICmdResponse
+
+[MemoryPackable]
+public partial class CmdResponse : IBaseResponse, IHasRequestServer, ICmdResponse
 {
+    [MemoryPackConstructor]
     public CmdResponse() { }
     
     public HttpStatusCode HttpStatusCode { get; set; }
