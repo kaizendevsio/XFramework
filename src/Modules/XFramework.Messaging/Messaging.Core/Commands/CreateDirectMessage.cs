@@ -3,7 +3,7 @@ using MediatR;
 using Messaging.Domain.Shared.Contracts.Requests.Create;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using SmsGateway.Integration.Interfaces;
+using SmsGateway.Integration.Drivers;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;

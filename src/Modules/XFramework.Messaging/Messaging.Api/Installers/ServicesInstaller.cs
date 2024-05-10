@@ -1,5 +1,6 @@
 ﻿using Messaging.Core;
 using Messaging.Integration.Drivers;
+using SmsGateway.Integration.Drivers;
 using Tenant.Integration.Drivers;
 using XFramework.Integration.Extensions;
 
@@ -11,6 +12,7 @@ public class ServicesInstaller : IInstaller
     {
         services.AddTenantWrapperServices();
         services.AddMessagingWrapperServices();
+        services.AddSmsGatewayWrapperServices();
         services.AddTenantService();
 
         services.AddMediatR(o => o.RegisterServicesFromAssemblies(

@@ -1,7 +1,7 @@
 ﻿using XFramework.Domain.Shared.Contracts;
 using XFramework.Integration.Attributes;
 
-namespace Messaging.Integration.Generators;
+namespace SmsGateway.Integration.Generators;
 
 [StreamFlowWrapper("XFramework.Domain.Shared.Contracts",new[] {
     nameof(Message),
@@ -18,4 +18,4 @@ namespace Messaging.Integration.Generators;
     nameof(MessageThreadMemberRole),
     nameof(MessageThreadMemberGroup),
 })]
-public static class MessagingServiceWrapper;
+public static class SmsGatewayServiceWrapper;
