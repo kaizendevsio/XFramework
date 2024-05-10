@@ -2,17 +2,16 @@
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>12</LangVersion>
+        <LangVersion>12</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        
     </PropertyGroup>
 
     <ItemGroup>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="DataAccess\Commands\" />
-      <Folder Include="DataAccess\Query\" />
+        <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj"/>
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj"/>
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
+        <ProjectReference Include="..\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />
     </ItemGroup>
 </Project>

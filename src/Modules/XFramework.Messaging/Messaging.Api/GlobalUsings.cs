@@ -7,6 +7,7 @@ global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.EntityFrameworkCore;
 global using Messaging.Api.Extensions;
 global using Messaging.Api.Generators;
+global using Messaging.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;
 global using XFramework.Core.Abstractions;

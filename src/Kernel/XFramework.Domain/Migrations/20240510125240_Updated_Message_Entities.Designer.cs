@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
 
 #nullable disable
 
-namespace XFramework.Domain.Migrations.XnelSystems
+namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class XnelSystemsContextModelSnapshot : ModelSnapshot
+    [Migration("20240510125240_Updated_Message_Entities")]
+    partial class Updated_Message_Entities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2320,8 +2323,8 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid?>("SenderId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint");
 
                     b.Property<string>("Subject")
                         .IsRequired()

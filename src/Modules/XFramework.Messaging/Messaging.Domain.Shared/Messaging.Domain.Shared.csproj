@@ -10,5 +10,11 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
+      <ProjectReference Include="..\..\XFramework.StreamFlow\StreamFlow.Domain.Shared\StreamFlow.Domain.Shared.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Contracts\Responses\" />
+      <Folder Include="Enums\" />
     </ItemGroup>
 </Project>

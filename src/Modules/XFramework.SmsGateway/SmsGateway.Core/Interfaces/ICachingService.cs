@@ -1,10 +1,12 @@
-﻿using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
+﻿using System.Collections.Concurrent;
+using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Interfaces;
 
 namespace SmsGateway.Core.Interfaces;
 
 public interface ICachingService : IXFrameworkService
 {
-    public List<MessageDirectResponse> PendingMessageList { get; set; }
-    public List<MessageDirectResponse> ScheduledMessageList { get; set; }
+    public ConcurrentDictionary<Guid, SmsNodeJob> PendingMessageList { get; set; }
+    public ConcurrentDictionary<Guid, SmsNodeJob> ScheduledMessageList { get; set; }
 }

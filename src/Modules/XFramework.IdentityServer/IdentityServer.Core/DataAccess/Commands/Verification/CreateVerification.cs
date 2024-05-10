@@ -88,7 +88,8 @@ public class CreateVerification(
                 
                 await messagingServiceWrapper.CreateDirectMessage(new()
                 {
-                    MessageType = Guid.Parse("f4fca110-790d-41d7-a0be-b5c699c9a9db"),
+                    MessageTypeId = new Guid("f4fca110-790d-41d7-a0be-b5c699c9a9db"),
+                    MessageTransportType = MessageTransportType.Sms,
                     Sender = "+630000000000",
                     Recipient = contact,
                     Subject = "One Time Password",

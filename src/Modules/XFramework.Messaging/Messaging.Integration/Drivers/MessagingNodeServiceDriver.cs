@@ -14,7 +14,7 @@ public interface IMessagingNodeServiceWrapper : IXFrameworkService
 {
     public HubConnectionState ConnectionState { get; }
     
-    public Task<CmdResponse> ConfirmMessageSent(ConfirmMessageSentRequest request);
+    public Task<CmdResponse> ConfirmMessageSent(UpdateMessageDirectRequest request);
 }
 
 public record MessagingNodeServiceDriver : DriverBase, IMessagingNodeServiceWrapper
@@ -29,7 +29,7 @@ public record MessagingNodeServiceDriver : DriverBase, IMessagingNodeServiceWrap
         TargetClient = serviceId;
     }
     
-    public async Task<CmdResponse> ConfirmMessageSent(ConfirmMessageSentRequest request)
+    public async Task<CmdResponse> ConfirmMessageSent(UpdateMessageDirectRequest request)
     {
         return await SendVoidAsync(request);
     }

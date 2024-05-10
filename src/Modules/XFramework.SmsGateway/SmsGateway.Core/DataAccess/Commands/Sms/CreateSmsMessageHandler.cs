@@ -1,5 +1,6 @@
-﻿using Messaging.Domain.Shared.Enums;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using SmsGateway.Domain.Shared.Contracts.Requests.Create;
+using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 
 namespace SmsGateway.Core.DataAccess.Commands.Sms;
 
@@ -14,24 +15,26 @@ public class CreateSmsMessageHandler : IRequestHandler<CreateSmsMessageRequest, 
 
     public async Task<CmdResponse> Handle(CreateSmsMessageRequest request, CancellationToken cancellationToken)
     {
-        _cachingService.PendingMessageList.Add(new()
+        Retry:
+        var data = new SmsNodeJob()
         {
-            Id = Guid.NewGuid(),
+            Id = request.Id,
             CreatedAt = DateTime.Now,
             ModifiedAt = DateTime.Now,
             IsDeleted = false,
             AgentClusterId = request.AgentClusterId,
-            Sender = request.Sender,
             Recipient = request.Recipient,
-            Intent = request.Intent,
-            Subject = request.Subject,
-            Message = request.Message,
-            Guid = $"{request.ReferenceNumber}",
-            Status = (int)(request.IsScheduled ? MessageStatus.Scheduled : MessageStatus.Queued)
-        });
+            Message = request.Message
+        };
+        
+        if (_cachingService.PendingMessageList.TryAdd(Guid.NewGuid(), data) is false)
+        { 
+            goto Retry;
+        }
+        
         return new()
         {
-            HttpStatusCode = HttpStatusCode.Accepted
+            HttpStatusCode = HttpStatusCode.OK
         };
     }
 }

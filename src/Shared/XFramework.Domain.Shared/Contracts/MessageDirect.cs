@@ -1,21 +1,22 @@
 ﻿using XFramework.Domain.Shared.Contracts.Base;
+using XFramework.Domain.Shared.Enums;
 
 namespace XFramework.Domain.Shared.Contracts;
 
 public partial class MessageDirect : BaseModel
 {
-    public Guid ParentMessageId { get; set; }
+    public Guid? ParentMessageId { get; set; }
 
-    public Guid TypeId { get; set; }
+    public Guid? TypeId { get; set; }
 
-    public Guid SenderId { get; set; }
+    public Guid? SenderId { get; set; }
 
-    public Guid RecipientId { get; set; }
-
-    public string Sender { get; set; } = null!;
-
-    public string Recipient { get; set; } = null!;
-
+    public MessageTransportType MessageTransportType { get; set; }
+    
+    public Guid? RecipientId { get; set; }
+    
+    public string? ExternalRecipient { get; set; }
+    
     public string Intent { get; set; } = null!;
 
     public string Subject { get; set; } = null!;
@@ -23,15 +24,15 @@ public partial class MessageDirect : BaseModel
     public string Message { get; set; } = null!;
 
 
-    public short Status { get; set; }
+    public MessageStatus Status { get; set; }
 
-    public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = new List<MessageDirect>();
+    public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = [];
 
     public virtual MessageDirect? ParentMessage { get; set; }
 
-    public virtual IdentityCredential? RecipientNavigation { get; set; }
+    public virtual IdentityCredential? Recipient { get; set; }
 
-    public virtual IdentityCredential SenderNavigation { get; set; } = null!;
+    public virtual IdentityCredential? Sender { get; set; } = null!;
 
     public virtual MessageType Type { get; set; } = null!;
 }

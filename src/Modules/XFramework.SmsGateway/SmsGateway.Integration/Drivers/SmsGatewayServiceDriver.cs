@@ -29,14 +29,14 @@ public record SmsGatewayServiceDriver : DriverBase, ISmsGatewayServiceWrapper
         return await SendVoidAsync(request);
     }
 
-    public async Task<QueryResponse<List<MessageDirectResponse>>> GetPendingSmsMessageList(GetPendingSmsMessageListRequest request)
+    public async Task<QueryResponse<List<SmsNodeJob>>> GetPendingSmsMessageList(GetPendingSmsMessageListRequest request)
     {
-        return await SendAsync<GetPendingSmsMessageListRequest, List<MessageDirectResponse>>(request);
+        return await SendAsync<GetPendingSmsMessageListRequest, List<SmsNodeJob>>(request);
     }
 
-    public async Task<QueryResponse<List<MessageDirectResponse>>> GetScheduledSmsMessageList(GetScheduledSmsMessageListRequest request)
+    public async Task<QueryResponse<List<SmsNodeJob>>> GetScheduledSmsMessageList(GetScheduledSmsMessageListRequest request)
     {
-        return await SendAsync<GetScheduledSmsMessageListRequest, List<MessageDirectResponse>>(request);
+        return await SendAsync<GetScheduledSmsMessageListRequest, List<SmsNodeJob>>(request);
 
     }
 }   

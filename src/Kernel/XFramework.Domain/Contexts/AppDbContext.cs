@@ -1292,19 +1292,17 @@ public partial class AppDbContext : XDbContext
                 .HasDefaultValueSql("true");
             entity.Property(e => e.Message).HasColumnType("character varying");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
-            entity.Property(e => e.Recipient).HasColumnType("character varying");
-            entity.Property(e => e.Sender).HasColumnType("character varying");
             entity.Property(e => e.Subject).HasColumnType("character varying");
 
             entity.HasOne(d => d.ParentMessage).WithMany(p => p.InverseParentMessage)
                 .HasForeignKey(d => d.ParentMessageId)
                 .HasConstraintName("messagedirect_messagedirect_id_fk");
 
-            entity.HasOne(d => d.RecipientNavigation).WithMany(p => p.MessageDirectRecipientNavigations)
+            entity.HasOne(d => d.Recipient).WithMany(p => p.MessageDirectRecipientNavigations)
                 .HasForeignKey(d => d.RecipientId)
                 .HasConstraintName("messagedirect_identitycredential_2_id_fk");
 
-            entity.HasOne(d => d.SenderNavigation).WithMany(p => p.MessageDirectSenderNavigations)
+            entity.HasOne(d => d.Sender).WithMany(p => p.MessageDirectSenderNavigations)
                 .HasForeignKey(d => d.SenderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagedirect_identitycredential_id_fk");
