@@ -55,12 +55,6 @@ public class CreateWallet(
             goto checkAccountNumber;
         }
         
-        await baseHandler.Handle(request, cancellationToken);
-
-        return new()
-        {
-            Response = request.Model,
-            HttpStatusCode = HttpStatusCode.OK
-        };
+        return await baseHandler.Handle(request, cancellationToken);
     }
 }
