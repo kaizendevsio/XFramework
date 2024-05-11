@@ -10,4 +10,7 @@ public partial record UpdateMessageDirectRequest : RequestBase,
     IStreamflowRequest<UpdateMessageDirectRequest, TResponse>
 {
     public Guid? Id { get; set; }
+    public Guid AgentClusterId { get; set; }
+    public DateTime? SentAt { get; set; }
+    public DateTime? RecievedAt { get; set; }
 }

@@ -23,10 +23,22 @@ public class UpdateMessageDirect(
 {
     public async Task<CmdResponse> Handle(UpdateMessageDirectRequest request, CancellationToken cancellationToken)
     {
-        var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
+        var agent = await dbContext.Set<RegistryConfiguration>()
+            .Where(x => x.Key == "Settings:Messaging:Sms:AgentClusterId")
+            .Where(x => x.Value == request.AgentClusterId.ToString())
+            .FirstOrDefaultAsync(CancellationToken.None);
 
+        if (agent is null)
+        {
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.NotFound,
+                Message = "Agent cluster id not found"
+            };
+        }     
+        
         var record = await dbContext.Set<MessageDirect>()
-            .Where(x => x.TenantId == tenant.Id)
+            .Where(x => x.TenantId == agent.TenantId)
             .Where(x => x.Id == request.Id)
             .FirstOrDefaultAsync(CancellationToken.None);
         
@@ -39,6 +51,9 @@ public class UpdateMessageDirect(
         }
         
         record.Status = MessageStatus.Sent;
+        record.AgentClusterId = request.AgentClusterId;
+        record.SentAt = request.SentAt;
+        record.RecievedAt = request.RecievedAt;
         
         await dbContext.SaveChangesAsync(CancellationToken.None);
         

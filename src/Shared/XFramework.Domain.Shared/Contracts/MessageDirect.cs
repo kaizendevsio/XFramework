@@ -33,23 +33,31 @@ public partial class MessageDirect : BaseModel
 
     [MemoryPackOrder(8)]
     public string Message { get; set; } = null!;
-
-
+    
     [MemoryPackOrder(9)]
     public MessageStatus Status { get; set; }
-
+    
     [MemoryPackOrder(10)]
-    public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = [];
-
+    public Guid AgentClusterId { get; set; }
+    
     [MemoryPackOrder(11)]
-    public virtual MessageDirect? ParentMessage { get; set; }
-
+    public DateTime? SentAt { get; set; }
+    
     [MemoryPackOrder(12)]
-    public virtual IdentityCredential? Recipient { get; set; }
+    public DateTime? RecievedAt { get; set; }
 
     [MemoryPackOrder(13)]
-    public virtual IdentityCredential? Sender { get; set; } = null!;
+    public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = [];
 
     [MemoryPackOrder(14)]
+    public virtual MessageDirect? ParentMessage { get; set; }
+
+    [MemoryPackOrder(15)]
+    public virtual IdentityCredential? Recipient { get; set; }
+
+    [MemoryPackOrder(16)]
+    public virtual IdentityCredential? Sender { get; set; } = null!;
+
+    [MemoryPackOrder(17)]
     public virtual MessageType Type { get; set; } = null!;
 }

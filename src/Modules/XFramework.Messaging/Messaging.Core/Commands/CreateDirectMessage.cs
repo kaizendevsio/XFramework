@@ -9,6 +9,7 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Enums;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Services.Helpers;
 
 namespace Messaging.Core.Commands;
 
@@ -51,7 +52,7 @@ public class CreateDirectMessage(
                 {
                     Id = record.Id,
                     AgentClusterId = new Guid(agentClusterId),
-                    Recipient = request.Recipient,
+                    Recipient = request.Recipient.ValidatePhoneNumber(convertOnly: true),
                     Message = request.Message
                 });
 

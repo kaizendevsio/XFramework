@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
 
 #nullable disable
 
-namespace XFramework.Domain.Migrations.XnelSystems
+namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class XnelSystemsContextModelSnapshot : ModelSnapshot
+    [Migration("20240511052747_Added_AgentClusterId_MessageDirect")]
+    partial class Added_AgentClusterId_MessageDirect
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2316,17 +2319,11 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<Guid?>("ParentMessageId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("RecievedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<Guid?>("RecipientId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("SenderId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("SentAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
