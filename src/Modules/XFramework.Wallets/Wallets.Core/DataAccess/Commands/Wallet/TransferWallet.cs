@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Services;
 using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Enums;
 
 namespace Wallets.Core.DataAccess.Commands.Wallet;
@@ -13,7 +14,8 @@ public class TransferWallet(
     DbContext dbContext,
     ILogger<TransferWallet> logger,
     IIdentityServerServiceWrapper identityServerService,
-    ITenantService tenantService
+    ITenantService tenantService,
+    IMediator mediator
 )
     : IRequestHandler<TransferWalletRequest, CmdResponse>
 {
@@ -26,6 +28,13 @@ public class TransferWallet(
         {
             logger.LogWarning("Invalid amount or fee while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid amount or fee" };
+        }
+        
+        // Check if wallet type ID is provided
+        if (request.WalletTypeId == Guid.Empty)
+        {
+            logger.LogWarning("Wallet type ID is required while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
+            return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Wallet type ID is required" };
         }
 
         // Fetch the sender and recipient wallet
@@ -75,10 +84,27 @@ public class TransferWallet(
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Recipient not found" };
         }
         
-        if (senderWallet == null || recipientWallet == null)
+        if (senderWallet == null)
         {
-            logger.LogWarning("Wallet not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
+            logger.LogWarning("Sender wallet not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
+        }
+        
+        // if wallet does not exist, create a new wallet if wallet type ID is provided
+        if (recipientWallet is null)
+        {
+            var createWallet = await mediator.Send(new Create<Wallet>(new()
+            {
+                CredentialId = request.RecipientCredentialId,
+                WalletTypeId = request.WalletTypeId,
+                TenantId = tenant.Id,
+                Balance = 0
+            }));
+            if (createWallet.IsSuccess is false)
+            {
+                logger.LogWarning("Recipient wallet not found and could not be created while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
+                return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
+            }
         }
 
         // Check for self-transfer

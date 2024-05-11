@@ -32,7 +32,7 @@ public partial class WalletState
             }
 
             // Check if CredentialGuid is provided
-            if (SessionState.State is not CurrentSessionState.Active && action.CredentialId == Guid.Empty)
+            if (action.CredentialId == Guid.Empty)
             {
                 SweetAlertService.FireAsync("Error", "Could not create wallet, credentials not provided");
                 return;
@@ -41,41 +41,6 @@ public partial class WalletState
             // Map view model to request object
             var request = action.Adapt<Domain.Shared.Contracts.Wallet>();
             request.CredentialId = action.CredentialId;
-            
-            // Get the wallet type
-            var walletType = await walletsServiceWrapper.WalletType.Get(id: action.WalletTypeId);
-            if (await HandleFailure(walletType, action, true, "Could not create wallet, wallet type not found")) return;
-            
-            // Set the wallet type
-            request.WalletTypeId = walletType.Response.Id;
-            request.BondBalanceRule = walletType.Response.BondBalanceRule;
-            request.MaintainingBalanceRule = walletType.Response.MaintainingBalanceRule;
-            request.MinTransferRule = walletType.Response.MinTransferRule;
-            request.MaxTransferRule = walletType.Response.MaxTransferRule;
-            request.AccountNumber = $"{helperService.GenerateRandomNumber(1000_0000_0000, 9999_9999_9999)}";
-            
-            checkAccountNumber:
-            // check if the account number is unique
-            var accountNumberExists = await walletsServiceWrapper.Wallet.GetList(
-                pageSize:2,
-                pageNumber:1,
-                filter:
-                [
-                    new()
-                    {
-                        PropertyName = nameof(Domain.Shared.Contracts.Wallet.AccountNumber),
-                        Operation = QueryFilterOperation.Equal,
-                        Value = request.AccountNumber
-                    }
-                ]
-            );
-            
-            if (await HandleFailure(accountNumberExists, action, true, "Could not check account number uniqueness")) return;
-            if (accountNumberExists.Response.TotalItems > 0)
-            {
-                request.AccountNumber = $"{helperService.GenerateRandomNumber(1000_0000_0000, 9999_9999_9999)}";
-                goto checkAccountNumber;
-            }
             
             // Send the request
             var response = await walletsServiceWrapper.Wallet.Create(request);
