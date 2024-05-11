@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Services;
+using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Enums;
 
 namespace Wallets.Core.DataAccess.Commands.Wallet;
@@ -10,7 +11,8 @@ using XFramework.Domain.Shared.Contracts;
 public class IncrementWallet(
     DbContext dbContext,
     ILogger<ReleaseTransaction> logger,
-    ITenantService tenantService
+    ITenantService tenantService,
+    IMediator mediator
 )
     : IRequestHandler<IncrementWalletRequest, CmdResponse>
 {
@@ -32,10 +34,24 @@ public class IncrementWallet(
                 .Where(w => w.TenantId == tenant.Id && w.Id == request.WalletId)
                 .FirstOrDefaultAsync(cancellationToken);
 
-        if (wallet == null)
+        if (wallet is null)
         {
-            logger.LogWarning("Wallet not found for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}", request.WalletId, request.WalletTypeId, request.CredentialId);
-            return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
+            // if wallet does not exist, create a new wallet if wallet type ID is provided
+            if (request.WalletTypeId != Guid.Empty)
+            {
+                await mediator.Send(new Create<Wallet>(new()
+                {
+                    CredentialId = request.CredentialId,
+                    WalletTypeId = request.WalletTypeId,
+                    TenantId = tenant.Id,
+                    Balance = 0
+                }));
+            }
+            else
+            {
+                logger.LogWarning("Wallet not found for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}", request.WalletId, request.WalletTypeId, request.CredentialId);
+                return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
+            }
         }
 
         // Check if the amount is within the min transferable amount
