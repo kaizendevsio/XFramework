@@ -105,6 +105,8 @@ public class TransferWallet(
                 logger.LogWarning("Recipient wallet not found and could not be created while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
                 return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
             }
+            
+            recipientWallet = createWallet.Response;
         }
 
         // Check for self-transfer
