@@ -24,11 +24,12 @@ public class SmsGatewayNodeController : ControllerBase
         var itemList = _cachingService.PendingMessageList
             .Where(x => x.Value.AgentClusterId == agentClusterId)
             .Where(x => x.Value.Status is MessageStatus.Queued)
-            .Select(i => i.Value);
-        
-        foreach (var item in itemList)
+            .Select(i => i.Value)
+            .ToList();
+
+        foreach (var current in itemList)
         {
-            item.Status = MessageStatus.Processing;
+            current.Status = MessageStatus.Processing;
         }
 
         return itemList;
