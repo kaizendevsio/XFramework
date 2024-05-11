@@ -97,9 +97,11 @@ public class TransferWallet(
             {
                 CredentialId = request.RecipientCredentialId,
                 WalletTypeId = request.WalletTypeId,
-                TenantId = tenant.Id,
                 Balance = 0
-            }));
+            })
+            {
+                Metadata = request.Metadata
+            });
             if (createWallet.IsSuccess is false)
             {
                 logger.LogWarning("Recipient wallet not found and could not be created while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);

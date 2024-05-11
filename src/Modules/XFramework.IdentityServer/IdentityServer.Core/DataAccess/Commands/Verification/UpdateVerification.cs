@@ -27,11 +27,6 @@ public class UpdateVerification(
 
         verification.Status = (short?) GenericStatusType.Approved;
 
-        await baseHandler.Handle(new Patch<IdentityVerification>(verification) , cancellationToken);
-        
-        return new ()
-        {
-            HttpStatusCode = HttpStatusCode.Accepted
-        };
+        return await baseHandler.Handle(new Patch<IdentityVerification>(verification) , cancellationToken);
     }
 }
