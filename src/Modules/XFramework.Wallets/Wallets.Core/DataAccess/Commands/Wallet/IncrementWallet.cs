@@ -39,13 +39,15 @@ public class IncrementWallet(
             // if wallet does not exist, create a new wallet if wallet type ID is provided
             if (request.WalletTypeId != Guid.Empty)
             {
-               var createWallet= await mediator.Send(new Create<Wallet>(new()
+                var createWallet = await mediator.Send(new Create<Wallet>(new()
                 {
                     CredentialId = request.CredentialId,
                     WalletTypeId = request.WalletTypeId,
-                    TenantId = tenant.Id,
                     Balance = 0
-                }));
+                })
+                {
+                    Metadata = request.Metadata
+                });
                
                 if (createWallet.IsSuccess is false)
                 {
