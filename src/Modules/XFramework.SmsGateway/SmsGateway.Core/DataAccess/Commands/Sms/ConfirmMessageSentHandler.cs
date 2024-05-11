@@ -46,6 +46,8 @@ public class ConfirmMessageSentHandler(
             goto retry;
         }
 
+        cachingService.PendingMessageList.Remove(item.Key, out _);
+        
         return new()
         {
             HttpStatusCode = HttpStatusCode.OK
