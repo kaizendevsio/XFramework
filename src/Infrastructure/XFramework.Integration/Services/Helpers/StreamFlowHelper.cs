@@ -11,10 +11,10 @@ public static class StreamFlowHelper
         return entity.GetType().Name.Replace("Request", string.Empty);
     }
         
-    public static async Task<TQuery> AsMediatorCmd<TQuery, TResponse>(this object entity) 
+    public static TQuery AsMediatorCmd<TQuery, TResponse>(this object entity) 
         where TQuery : class, IRequest<TResponse>
     {
-        var deserializedEntity = await MemoryPackSerializer.DeserializeAsync<TQuery>(new MemoryStream(entity as byte[])); 
+        var deserializedEntity = MemoryPackSerializer.Deserialize<TQuery>(entity as byte[]); 
         return deserializedEntity;
     }
 
