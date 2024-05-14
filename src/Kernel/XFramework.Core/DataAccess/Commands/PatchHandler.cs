@@ -57,7 +57,7 @@ public class PatchHandler<TModel>(
         }
         
         entity = request.Model.Adapt(entity);
-        entity.ModifiedAt = DateTime.UtcNow;
+        entity.ModifiedAt = DateTime.Now.ToUniversalTime();
 
         if (entity is IHasConcurrencyStamp concurrencyEntity)
         {
