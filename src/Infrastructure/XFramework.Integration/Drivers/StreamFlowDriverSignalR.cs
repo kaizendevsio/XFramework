@@ -329,13 +329,13 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 {
                     HttpStatusCode = signalRResponse.ResponseStatusCode,
                     Message = signalRResponse.Message,
-                    Response = await MemoryPackSerializer.DeserializeAsync<TResponse>(new MemoryStream(signalRResponse.Data))
+                    Response = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data)
                 };
             }
             default:
                 var sw = new Stopwatch();
                 sw.Start();
-                var t = await MemoryPackSerializer.DeserializeAsync<TResponse>(new MemoryStream(signalRResponse.Data));
+                var t = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data);
                 sw.Stop();
                 Logger.LogWarning("Deserialization of response: {Request}... Done in {Duration}ms", request.CommandName, sw.ElapsedMilliseconds);
                 Logger.LogInformation("Sending request: {Request}... Done in {Duration}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
@@ -408,7 +408,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 Logger.LogInformation("Notification Received: {RequestName}", request.Name);
                 try
                 {
-                    var r = await MemoryPackSerializer.DeserializeAsync<PublishRequest<TResponse>>(new MemoryStream(response.Data));
+                    var r = MemoryPackSerializer.Deserialize<PublishRequest<TResponse>>(response.Data);
                     
                     request.OnInvoke?.Invoke(r.Data);
                 }
