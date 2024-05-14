@@ -63,7 +63,7 @@ public abstract class BaseSignalRHandler
         {
             using var scope = scopeFactory.CreateScope();
             var internalMediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-            var r = response.Data.AsMediatorCmd<TQuery, TResponse>();
+            var r = await response.Data.AsMediatorCmd<TQuery, TResponse>();
 
             using (LogContext.PushProperty("TenantId", r.Metadata?.TenantId))
             {
