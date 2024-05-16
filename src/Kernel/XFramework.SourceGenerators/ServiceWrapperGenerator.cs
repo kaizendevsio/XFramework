@@ -115,7 +115,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
                       
                       public async Task<CmdResponse<{{model}}>> Create({{model}} entity)
                       {
-                          var t = await SendAsync<Create<{{model}}>, {{model}}>(new Create<{{model}}>(entity));
+                          var t = await SendVoidAsync<Create<{{model}}>, {{model}}>(new Create<{{model}}>(entity));
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
@@ -126,7 +126,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
                   
                       public async Task<CmdResponse<{{model}}>> Patch({{model}} entity)
                       {
-                          var t = await SendAsync<Patch<{{model}}>, {{model}}>(new Patch<{{model}}>(entity));
+                          var t = await SendVoidAsync<Patch<{{model}}>, {{model}}>(new Patch<{{model}}>(entity));
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
@@ -137,7 +137,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
                   
                       public async Task<CmdResponse<{{model}}>> Replace({{model}} entity)
                       {
-                          var t = await SendAsync<Replace<{{model}}>, {{model}}>(new Replace<{{model}}>(entity));
+                          var t = await SendVoidAsync<Replace<{{model}}>, {{model}}>(new Replace<{{model}}>(entity));
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,
@@ -148,7 +148,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
                   
                       public async Task<CmdResponse> Delete({{model}} entity)
                       {
-                          var t = await SendAsync(new Delete<{{model}}>(entity));
+                          var t = await SendVoidAsync(new Delete<{{model}}>(entity));
                           return new CmdResponse
                           {
                               HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError,

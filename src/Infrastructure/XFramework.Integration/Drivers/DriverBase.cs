@@ -29,7 +29,7 @@ public record DriverBase(IMessageBusWrapper MessageBusDriver, IConfiguration Con
         }
         return await MessageBusDriver.SendVoidAsync<TRequest>(request, TargetClient);
     }
-    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request) 
+    public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request) 
         where TRequest : class, IHasRequestServer
     {
         if (string.IsNullOrEmpty(TargetClient))
@@ -37,7 +37,7 @@ public record DriverBase(IMessageBusWrapper MessageBusDriver, IConfiguration Con
             Initialize();
         }
         
-        var t = await MessageBusDriver.SendAsync(request, TargetClient);
+        var t = await MessageBusDriver.SendVoidAsync<TRequest, TResponse>(request, TargetClient);
         return t;
     }
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request) 

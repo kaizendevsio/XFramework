@@ -3,8 +3,15 @@ using System.Net;
 namespace XFramework.Domain.Shared.BusinessObjects;
 
 [MemoryPackable]
-public partial class CmdResponse<T> : CmdResponse
+public partial class CmdResponse<T> : IBaseResponse, IHasRequestServer, ICmdWithResultResponse
 {
+    [MemoryPackConstructor]
+    public CmdResponse() { }
+    
+    public HttpStatusCode HttpStatusCode { get; set; }
+    public string? Message { get; set; }
+    public bool IsSuccess => (int)HttpStatusCode >= 200 && (int)HttpStatusCode < 300;
+    public RequestMetadata? Metadata { get; set; }
     public T? Response { get; set; }
 }
 
@@ -21,3 +28,4 @@ public partial class CmdResponse : IBaseResponse, IHasRequestServer, ICmdRespons
 }
 
 public interface ICmdResponse;
+public interface ICmdWithResultResponse;

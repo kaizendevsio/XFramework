@@ -16,7 +16,7 @@ public interface IMessageBusWrapper : IXFrameworkService
 
     public Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient) 
         where TRequest : class, IHasRequestServer;
-    public Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, string recipient) 
+    public Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient) 
         where TRequest : class, IHasRequestServer;
     public Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient) 
         where TRequest : class, IHasRequestServer;
