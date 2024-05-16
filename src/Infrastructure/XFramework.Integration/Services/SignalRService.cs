@@ -110,7 +110,17 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         
                 // If you need to invoke HandleRequestCmd or other methods dynamically, you can do so here.
 
-                if (tResponse.IsAssignableTo(typeof(ICmdResponse)))
+                if (tResponse.IsAssignableTo(typeof(ICmdWithResultResponse)))
+                {
+                    // Use reflection to call HandleRequestCmd with the correct type arguments
+                    var methodInfo = GetType()
+                        .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
+                        .First(m => m.Name == nameof(HandleRequestCmd) && m.GetGenericArguments().Length == 2);
+                    
+                    var genericMethod = methodInfo.MakeGenericMethod(tRequest, tResponse.GetGenericArguments().First());
+                    genericMethod.Invoke(this, [Connection, _mediator, _baseLogger, _scopeFactory]);
+                }
+                else if (tResponse.IsAssignableTo(typeof(ICmdResponse)))
                 {
                     // Use reflection to call HandleRequestCmd with the correct type arguments
                     var methodInfo = GetType()

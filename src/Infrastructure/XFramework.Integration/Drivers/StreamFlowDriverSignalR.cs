@@ -235,7 +235,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return result.Response;
     }
 
-    public async Task<CmdResponse<TRequest>> SendAsync<TRequest>(TRequest request, string recipient)
+    public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient)
         where TRequest : class, IHasRequestServer
     {
         await SetRequestServer(request);
@@ -246,12 +246,12 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             CommandName = GetRequestFriendlyName(typeof(TRequest))
         };
         
-        var result = await InvokeAsync<TRequest, CmdResponse<TRequest>>(r);
+        var result = await InvokeAsync<TRequest, CmdResponse<TResponse>>(r);
         r.Dispose();
 #if DEBUG
         Task.Run(() =>
         {
-            var serviceRequestLog = new ServiceRequestLog<TRequest, CmdResponse<TRequest>>(Request: request, Response: result.Response);
+            var serviceRequestLog = new ServiceRequestLog<TRequest, CmdResponse<TResponse>>(Request: request, Response: result.Response);
             Logger.LogWarning("Service Request Log: {$ServiceRequestLog}", serviceRequestLog);
         });
 #endif

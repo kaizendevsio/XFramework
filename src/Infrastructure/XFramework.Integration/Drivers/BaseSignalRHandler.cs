@@ -47,7 +47,6 @@ public abstract class BaseSignalRHandler
     }
     
     protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
-        where TResponse : class
         where TCmd : class, IRequest<CmdResponse<TResponse>>, IHasRequestServer
     {
         logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
