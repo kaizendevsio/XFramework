@@ -22,10 +22,6 @@ public partial class SessionState
                 CurrentState.ResetPasswordVm.PhoneEmailUsername = CurrentState.ResetPasswordVm.PhoneEmailUsername.ValidatePhoneNumber();
                 await Mediator.Send(new InitiateVerificationCode
                 {
-                    LocalVerification = true,
-                    LocalToken = $"{helperService.GenerateRandomNumber(111111, 999999)}",
-                    ContactType = GenericContactType.Phone,
-                    Contact = SessionState.ResetPasswordVm.PhoneEmailUsername,
                     NavigateToOnSuccess = action.NavigateToOnSuccess,
                     NavigateToOnFailure = action.NavigateToOnFailure,
                     NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired,

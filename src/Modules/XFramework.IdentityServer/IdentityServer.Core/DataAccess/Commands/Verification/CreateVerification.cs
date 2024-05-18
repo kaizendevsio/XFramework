@@ -1,4 +1,6 @@
-﻿using Messaging.Integration.Drivers;
+﻿using IdentityServer.Domain.Shared;
+using Messaging.Domain.Shared;
+using Messaging.Integration.Drivers;
 using XFramework.Core.Services;
 using XFramework.Integration.Abstractions;
 
@@ -46,7 +48,7 @@ public class CreateVerification(
 
         switch (verificationType.Name)
         {
-            case "SMS":
+            case nameof(IdentityConstants.VerificationType.Sms):
                 var messageTemplate = await dbContext.Set<RegistryConfiguration>()
                     .Where(i => i.TenantId == tenant.Id)
                     .Where(i => i.Group.Name == "MessagingService_Otp")
@@ -74,7 +76,7 @@ public class CreateVerification(
                     };
                 }
                 
-                await baseHandler.Handle(new Create<IdentityVerification>(new()
+                var result = await baseHandler.Handle(new Create<IdentityVerification>(new()
                 {
                     Status = (short?)GenericStatusType.Pending,
                     StatusUpdatedOn = DateTime.SpecifyKind(DateTime.Now.ToUniversalTime(), DateTimeKind.Utc),
@@ -88,9 +90,8 @@ public class CreateVerification(
                 
                 await messagingServiceWrapper.CreateDirectMessage(new()
                 {
-                    MessageTypeId = new Guid("f4fca110-790d-41d7-a0be-b5c699c9a9db"),
                     MessageTransportType = MessageTransportType.Sms,
-                    Sender = "+630000000000",
+                    Sender = GenericSender.System,
                     Recipient = contact,
                     Subject = "One Time Password",
                     Intent = "OTP",
@@ -98,13 +99,14 @@ public class CreateVerification(
                     IsScheduled = false
                 });
 
-                //await appDbContext.SaveChangesAsync(CancellationToken.None);
+                return result;
                 break;
         }
         
         return new ()
         {
-            HttpStatusCode = HttpStatusCode.Accepted
+            HttpStatusCode = HttpStatusCode.InternalServerError,
+            Message = "Verification type not supported"
         };
     }
 }

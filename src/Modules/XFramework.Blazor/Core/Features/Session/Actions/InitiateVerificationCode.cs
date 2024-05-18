@@ -1,4 +1,5 @@
-﻿using IdentityServer.Integration.Drivers;
+﻿using IdentityServer.Domain.Shared;
+using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using XFramework.Blazor.Entity.Models.Requests.Common;
 using XFramework.Blazor.Entity.Models.Requests.Session;
@@ -9,7 +10,7 @@ public partial class SessionState
 {
     public record InitiateVerificationCode : NavigableRequest
     {
-        public Guid? CredentialGuid { get; set; }
+        public Guid CredentialId { get; set; }
         public GenericContactType ContactType { get; set; }
         public string Contact { get; set; }
         public bool? LocalVerification { get; set; }
@@ -42,17 +43,35 @@ public partial class SessionState
                     ContactType = action.ContactType,
                     Contact = action.Contact
                 });
+                
+                SessionState.VerificationVm = action.Adapt<VerificationRequest>();
             }
             else
             {
-                await identityServerServiceWrapper.IdentityVerification.Create(new()
+                var result = await identityServerServiceWrapper.IdentityVerification.Create(new()
                 {
-                    CredentialId = (Guid)action.CredentialGuid,
-                    VerificationTypeId = Guid.Parse("45a7a8a7-3735-4a58-b93f-aa9e7b24a7c4")
+                    CredentialId = action.CredentialId,
+                    VerificationTypeId = IdentityConstants.VerificationType.Sms
                 });
+
+                if (result.IsSuccess is false)
+                {
+                    await SweetAlertService.FireAsync(new()
+                    {
+                        Title = "Error",
+                        Text = result.Message,
+                        Icon = SweetAlertIcon.Error,
+                        ShowCloseButton = true,
+                        ConfirmButtonText = "Close",
+                    });
+                    return;
+                    
+                }
+                
+                SessionState.VerificationVm = action.Adapt<VerificationRequest>();
+                SessionState.VerificationVm.Id = result.Response?.Id ?? Guid.Empty;
             }
 
-            SessionState.VerificationVm = action.Adapt<VerificationRequest>();
             NavigateTo(action.NavigateToOnVerificationRequired);
         }
     }

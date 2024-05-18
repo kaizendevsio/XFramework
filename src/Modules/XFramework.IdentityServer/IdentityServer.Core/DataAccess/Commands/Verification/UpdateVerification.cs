@@ -26,6 +26,7 @@ public class UpdateVerification(
         }
 
         verification.Status = (short?) GenericStatusType.Approved;
+        verification.Status = (short?) GenericStatusType.Approved;
 
         return await baseHandler.Handle(new Patch<IdentityVerification>(verification) , cancellationToken);
     }

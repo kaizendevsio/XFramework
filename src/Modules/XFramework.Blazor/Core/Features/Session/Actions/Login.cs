@@ -64,7 +64,7 @@ public partial class SessionState
                     VerificationRequired = true;
                     await Mediator.Send(new InitiateVerificationCode
                     {
-                        CredentialGuid = response.Response.Credential.Id,
+                        CredentialId = response.Response.Credential.Id,
                         NavigateToOnSuccess = action.NavigateToOnSuccess,
                         NavigateToOnFailure = action.NavigateToOnFailure,
                         NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired
