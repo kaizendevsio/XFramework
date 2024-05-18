@@ -65,11 +65,11 @@ public partial class SessionState
                         ConfirmButtonText = "Close",
                     });
                     return;
-                    
                 }
                 
                 SessionState.VerificationVm = action.Adapt<VerificationRequest>();
                 SessionState.VerificationVm.Id = result.Response?.Id ?? Guid.Empty;
+                SessionState.VerificationVm.CredentialId = action.CredentialId;
             }
 
             NavigateTo(action.NavigateToOnVerificationRequired);

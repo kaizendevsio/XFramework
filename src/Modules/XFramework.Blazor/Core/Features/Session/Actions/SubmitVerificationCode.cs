@@ -53,7 +53,6 @@ public partial class SessionState
             }
 
             CurrentState.VerificationVm.OnSuccess?.Invoke();
-            CurrentState.VerificationVm = new();
             
             return;
         }

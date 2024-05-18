@@ -48,6 +48,7 @@ public class ChangePassword(
 
         var verification = await dbContext.Set<IdentityVerification>()
             .Where(i => i.VerificationType.Name == nameof(IdentityConstants.VerificationType.Sms))
+            .Where(i => i.CredentialId == request.CreadentialId)
             .Where(i => i.Status == (int)GenericStatusType.Approved)
             .Where(i => i.Id == request.VerificationId)
             .Where(i => i.StatusUpdatedOn >= DateTime.Now.ToUniversalTime().AddMinutes(-10))
