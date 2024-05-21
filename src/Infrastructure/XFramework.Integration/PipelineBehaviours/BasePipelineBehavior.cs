@@ -88,7 +88,7 @@ public class BasePipelineBehavior<TRequest, TResponse>
     private async Task HandleResponse(TRequest request, TResponse response, RequestHandlerDelegate<TResponse> next)
     {
         _stopwatch.Stop();
-        log.LogInformation("Invoked {HandlerName} in {ElapsedTime}ms with response: {StatusCode}:{Message}", 
+        log.LogInformation("Invoked {HandlerName} in {ResponseTime}ms with response: {StatusCode}:{Message}", 
             typeof(TRequest).GetTypeFullName(), 
             _stopwatch.ElapsedMilliseconds,
             response.HttpStatusCode,

@@ -322,7 +322,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             }
             case HttpStatusCode.InternalServerError:
             {
-                Logger.LogError("Sending request: {Request}... Failed in {Duration}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, signalRResponse.ResponseStatusCode);
+                Logger.LogError("Sending request: {Request}... Failed in {ResponseTime}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, signalRResponse.ResponseStatusCode);
                 request.Dispose();
                 
                 return new()
@@ -337,8 +337,8 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 sw.Start();
                 var t = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data);
                 sw.Stop();
-                Logger.LogWarning("Deserialization of response: {Request}... Done in {Duration}ms", request.CommandName, sw.ElapsedMilliseconds);
-                Logger.LogInformation("Sending request: {Request}... Done in {Duration}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
+                Logger.LogWarning("Deserialization of response: {Request}... Done in {ResponseTime}ms", request.CommandName, sw.ElapsedMilliseconds);
+                Logger.LogInformation("Sending request: {Request}... Done in {ResponseTime}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
                 request.Dispose();
 
                 return new()
