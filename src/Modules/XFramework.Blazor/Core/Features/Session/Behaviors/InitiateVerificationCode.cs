@@ -3,6 +3,7 @@ using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using XFramework.Blazor.Entity.Models.Requests.Common;
 using XFramework.Blazor.Entity.Models.Requests.Session;
+using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Session;
 
@@ -48,10 +49,41 @@ public partial class SessionState
             }
             else
             {
+                var identityVerificationType = await identityServerServiceWrapper.IdentityVerificationType.GetList(
+                    pageNumber: 0,
+                    pageSize: 1,
+                    filter:
+                    [
+                        new()
+                        {
+                            PropertyName = nameof(IdentityVerificationType.SystemReferenceId),
+                            Operation = QueryFilterOperation.Equal,
+                            Value = IdentityConstants.VerificationType.Sms
+                        }
+                    ]);
+
+                if (await HandleFailure(identityVerificationType, action))
+                {
+                    return;
+                }
+
+                if (identityVerificationType.Response?.TotalItems == 0)
+                {
+                    await SweetAlertService.FireAsync(new()
+                    {
+                        Title = "Error",
+                        Text = "Verification type not supported",
+                        Icon = SweetAlertIcon.Error,
+                        ShowCloseButton = true,
+                        ConfirmButtonText = "Close",
+                    });
+                    return;
+                }
+                
                 var result = await identityServerServiceWrapper.IdentityVerification.Create(new()
                 {
                     CredentialId = action.CredentialId,
-                    VerificationTypeId = IdentityConstants.VerificationType.Sms
+                    VerificationTypeId = identityVerificationType.Response?.Items.First().Id,
                 });
 
                 if (result.IsSuccess is false)

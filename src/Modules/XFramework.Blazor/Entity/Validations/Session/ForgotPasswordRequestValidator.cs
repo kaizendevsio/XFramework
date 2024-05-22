@@ -9,7 +9,6 @@ public class ForgotPasswordRequestValidator : AbstractValidator<ResetPasswordReq
     {
         RuleFor(x => x.PhoneEmailUsername)
             .NotEmpty()
-            .Matches(@"^09\d{9}$")
-            .WithMessage("Phone must be a valid phone number in the format 09000000000.");
+            .WithMessage("Phone, Email or Username is required");
     }
 }

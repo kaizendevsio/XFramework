@@ -84,76 +84,30 @@ public partial class SessionState
             // Send Create Phone Contact Request
             await ReportBusy("Creating contacts..", null);
 
-            var phoneContactType = await identityServerServiceWrapper.IdentityContactType.GetList(
-                pageSize: 2,
-                pageNumber: 1,
-                filter:
-                [
-                    new()
-                    {
-                        PropertyName = nameof(IdentityContactType.Name),
-                        Operation = QueryFilterOperation.Equal,
-                        Value = nameof(IdentityConstants.ContactType.Phone)
-                    }
-                ]
-            );
+            var phoneContact = await CreateContact(
+                action: action, 
+                credentialId: credentialId, 
+                contactTypeId: IdentityConstants.ContactType.Phone, 
+                contactGroupId: IdentityConstants.ContactGroup.Personal, 
+                contactValue: CurrentState.RegisterVm.PhoneNumber);
 
-            if (phoneContactType.IsSuccess && phoneContactType.Response.TotalItems > 0)
+            if (await HandleFailure(phoneContact, action))
             {
-                var phoneContact = await identityServerServiceWrapper.IdentityContact.Create(new(){
-                    CredentialId = credentialId,
-                    TypeId = phoneContactType.Response.Items.First().Id,
-                    GroupId = IdentityConstants.ContactGroup.Personal,
-                    Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.PhoneNumber) ? CurrentState.RegisterVm.PhoneNumber : string.Empty,
-                    /*SendOtp = !action.SkipVerification*/
-                });
-                if (await HandleFailure(phoneContact, action))
-                {
-                    return new()
-                    {
-                        HttpStatusCode = HttpStatusCode.InternalServerError,
-                        Message = "Failed to create phone contact"
-                    };
-                }
+                return phoneContact.Adapt<CmdResponse<IdentityCredential?>>();
             }
             
+            var emailContact = await CreateContact(
+                action: action, 
+                credentialId: credentialId, 
+                contactTypeId: IdentityConstants.ContactType.Email, 
+                contactGroupId: IdentityConstants.ContactGroup.Personal, 
+                contactValue: CurrentState.RegisterVm.EmailAddress);
             
-            // Send Create Email Contact Request
-            await ReportBusy("Creating contacts..", null);
-            var emailContactType = await identityServerServiceWrapper.IdentityContactType.GetList(
-                pageSize: 2,
-                pageNumber: 1,
-                filter:
-                [
-                    new()
-                    {
-                        PropertyName = nameof(IdentityContactType.Name),
-                        Operation = QueryFilterOperation.Equal,
-                        Value = nameof(IdentityConstants.ContactType.Email)
-                    }
-                ]
-            );
-
-            if (emailContactType.IsSuccess && emailContactType.Response.TotalItems > 0)
+            if (await HandleFailure(emailContact, action))
             {
-                var emailContact = await identityServerServiceWrapper.IdentityContact.Create(new(){
-                    CredentialId = credentialId,
-                    TypeId = emailContactType.Response.Items.First().Id,
-                    GroupId = IdentityConstants.ContactGroup.Personal,
-                    Value = !string.IsNullOrEmpty(CurrentState.RegisterVm.EmailAddress) ? CurrentState.RegisterVm.EmailAddress : string.Empty,
-                    /*SendOtp = !action.SkipVerification*/
-                });
-                if (await HandleFailure(emailContact, action))
-                {
-                    return new()
-                    {
-                        HttpStatusCode = HttpStatusCode.InternalServerError,
-                        Message = "Failed to create email contact"
-                    };
-                }
+                return emailContact.Adapt<CmdResponse<IdentityCredential?>>();
             }
             
-
             // If WalletList property is provided, automatically create wallets
             if (action.WalletList is not null)
             {
@@ -211,6 +165,101 @@ public partial class SessionState
                 HttpStatusCode = HttpStatusCode.OK,
                 Message = "Account created successfully",
                 Response = credential.Response
+            };
+        }
+
+        private async Task<CmdResponse> CreateContact(Register action, Guid credentialId, Guid contactTypeId, Guid contactGroupId, string? contactValue)
+        {
+            var contactType = await identityServerServiceWrapper.IdentityContactType.GetList(
+                pageSize: 2,
+                pageNumber: 1,
+                filter:
+                [
+                    new()
+                    {
+                        PropertyName = nameof(IdentityContactType.SystemReferenceId),
+                        Operation = QueryFilterOperation.Equal,
+                        Value = contactTypeId
+                    }
+                ]
+            );
+            
+            if (contactType.IsSuccess is false)
+            {
+                return contactType.Adapt<CmdResponse>();
+            }
+
+            if (contactType.Response is null || contactType.Response.TotalItems == 0)
+            {
+                await SweetAlertService.FireAsync(new()
+                {
+                    Title = "Error",
+                    Text = "Phone contact type not supported",
+                    Icon = SweetAlertIcon.Error,
+                    ShowCloseButton = true,
+                    ConfirmButtonText = "Close",
+                });
+                
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    Message = "Phone contact type not supported"
+                };
+            }
+            
+            var contactGroup = await identityServerServiceWrapper.IdentityContactGroup.GetList(
+                pageNumber: 0,
+                pageSize: 1,
+                filter:
+                [
+                    new()
+                    {
+                        PropertyName = nameof(IdentityContactGroup.SystemReferenceId),
+                        Operation = QueryFilterOperation.Equal,
+                        Value = contactGroupId
+                    }
+                ]);
+
+            if (contactGroup.IsSuccess is false)
+            {
+                return contactGroup.Adapt<CmdResponse>();
+            }
+
+            if (contactGroup.Response is null || contactGroup.Response.TotalItems == 0)
+            {
+                await SweetAlertService.FireAsync(new()
+                {
+                    Title = "Error",
+                    Text = "Contact group not supported",
+                    Icon = SweetAlertIcon.Error,
+                    ShowCloseButton = true,
+                    ConfirmButtonText = "Close",
+                });
+                
+                return new()
+                {
+                    HttpStatusCode = HttpStatusCode.InternalServerError,
+                    Message = "Contact group not supported"
+                };
+            }
+            
+            var contact = await identityServerServiceWrapper.IdentityContact.Create(new(){
+                CredentialId = credentialId,
+                TypeId = contactType.Response.Items.First().Id,
+                GroupId = contactGroup.Response.Items.First().Id,
+                Value = !string.IsNullOrEmpty(contactValue) ? contactValue : string.Empty,
+                /*SendOtp = !action.SkipVerification*/
+            });
+            
+            if (contact.IsSuccess is false)
+            {
+                return contact.Adapt<CmdResponse>();
+            }
+
+            return new()
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Contact created successfully"
             };
         }
 
