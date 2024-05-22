@@ -14,6 +14,7 @@ public partial class SessionState
         public SignInRequest LoginVm { get; set; }
         public SignUpRequest RegisterVm { get; set; }
         public ResetPasswordRequest ResetPasswordVm { get; set; }
+        public VerificationRequest VerificationVm { get; set; }
         public List<string> NavigationHistoryList { get; set; }
     }
     

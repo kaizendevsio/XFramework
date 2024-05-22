@@ -311,7 +311,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
                     await Connection.StartAsync();
                     startTimer.Stop();
-                    _logger.LogInformation("Connecting to StreamFlow server.. Done in {ElapsedMilliseconds}ms", startTimer.ElapsedMilliseconds);
+                    _logger.LogInformation("Connecting to StreamFlow server.. Done in {ResponseTime}ms", startTimer.ElapsedMilliseconds);
                 }
 
                 // If we're connected, proceed with registration.
@@ -355,7 +355,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         await Connection?.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
     
         startTimer.Stop();
-        _logger.LogInformation("Registering Connection.. Done in {ElapsedMilliseconds}ms", startTimer.ElapsedMilliseconds);
+        _logger.LogInformation("Registering Connection.. Done in {ResponseTime}ms", startTimer.ElapsedMilliseconds);
         
         _isRegistered = true;
         _isRegistering = false;
@@ -422,7 +422,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                 var streamFlowMessage = await response;
                 
                 startTimer.Stop();
-                _logger.LogWarning("Response for Invoked Method \'{SfMessageCommandName}\' received in {ElapsedMilliseconds}ms", sfMessage.CommandName, startTimer.ElapsedMilliseconds);
+                _logger.LogWarning("Response for Invoked Method \'{SfMessageCommandName}\' received in {ResponseTime}ms", sfMessage.CommandName, startTimer.ElapsedMilliseconds);
 
                 return new()
                 {

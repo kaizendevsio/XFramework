@@ -5,17 +5,17 @@ namespace XFramework.Blazor.Core.Features.Session;
 
 public partial class SessionState
 {
-    public record SendVerificationCode : NavigableRequest, IRequest<CmdResponse>;
+    public record SubmitVerificationCode : NavigableRequest, IRequest<CmdResponse>;
     
-    public class SendVerificationCodeHandler(
+    public class SubmitVerificationCodeHandler(
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : StateActionHandler<SendVerificationCode>(handlerServices, store)
+        : StateActionHandler<SubmitVerificationCode>(handlerServices, store)
     {
         public SessionState CurrentState => Store.GetState<SessionState>();
 
-        public override async Task Handle(SendVerificationCode action, CancellationToken aCancellationToken)
+        public override async Task Handle(SubmitVerificationCode action, CancellationToken aCancellationToken)
         {
             action.NavigateToOnSuccess = CurrentState.VerificationVm.NavigateToOnSuccess;
             action.NavigateToOnFailure = CurrentState.VerificationVm.NavigateToOnFailure;
@@ -53,7 +53,6 @@ public partial class SessionState
             }
 
             CurrentState.VerificationVm.OnSuccess?.Invoke();
-            CurrentState.VerificationVm = new();
             
             return;
         }
