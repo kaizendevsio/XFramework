@@ -19,4 +19,6 @@ public abstract partial class BaseModel : ISoftDeletable, IHasId, IHasConcurrenc
     public DateTime? DeletedAt { get; set; }
     [MemoryPackOrder(107)]
     public Guid TenantId { get; set; }
+    [MemoryPackOrder(108)]
+    public Guid SystemReferenceId { get; set; }
 }
