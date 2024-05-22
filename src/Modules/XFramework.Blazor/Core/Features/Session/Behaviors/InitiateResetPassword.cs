@@ -10,7 +10,7 @@ public partial class SessionState
 {
     public record InitiateResetPassword : NavigableRequest;
     
-    public class InitiateResetPasswordHandler(
+    protected class InitiateResetPasswordHandler(
         IHelperService helperService,
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices, 
@@ -58,6 +58,8 @@ public partial class SessionState
                     CredentialId = user.Response.Items.First().CredentialId,
                     NavigateToOnSuccess = action.NavigateToOnSuccess,
                     NavigateToOnFailure = action.NavigateToOnFailure,
+                    OnFailure = action.OnFailure,
+                    OnSuccess = action.OnSuccess,
                     NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired,
                 });
             }
