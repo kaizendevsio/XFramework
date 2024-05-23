@@ -2,7 +2,7 @@ namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-public partial class MessageReactionType : BaseModel
+public partial class MessageReactionType : BaseModel, IHasSystemReferenceId
 {
     
     [MemoryPackOrder(0)]
@@ -13,4 +13,7 @@ public partial class MessageReactionType : BaseModel
 
     [MemoryPackOrder(2)]
     public virtual ICollection<MessageReaction> MessageReactions { get; set; } = new List<MessageReaction>();
+
+    [MemoryPackOrder(200)]
+    public Guid SystemReferenceId { get; set; }
 }

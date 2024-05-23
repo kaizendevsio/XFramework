@@ -2,7 +2,7 @@ namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-public partial class RegistryFavoriteType : BaseModel
+public partial class RegistryFavoriteType : BaseModel, IHasSystemReferenceId
 {
     
     [MemoryPackOrder(0)]
@@ -14,4 +14,7 @@ public partial class RegistryFavoriteType : BaseModel
 
     [MemoryPackOrder(2)]
     public virtual ICollection<IdentityFavorite> IdentityFavorites { get; set; } = new List<IdentityFavorite>();
+
+    [MemoryPackOrder(200)]
+    public Guid SystemReferenceId { get; set; }
 }

@@ -2,7 +2,7 @@ namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-public partial class MessageType : BaseModel
+public partial class MessageType : BaseModel, IHasSystemReferenceId
 {
     
     [MemoryPackOrder(0)]
@@ -17,4 +17,7 @@ public partial class MessageType : BaseModel
 
     [MemoryPackOrder(3)]
     public virtual ICollection<MessageThreadType> MessageThreadTypes { get; set; } = new List<MessageThreadType>();
+
+    [MemoryPackOrder(200)]
+    public Guid SystemReferenceId { get; set; }
 }
