@@ -1,19 +1,19 @@
 ﻿using System.Diagnostics;
 using FluentValidation;
-using MediatR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Sentry;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.Extensions;
+using XFramework.Integration.PipelineBehaviours;
 
-namespace XFramework.Integration.PipelineBehaviours;
+namespace XFramework.Blazor.Core.PipelineBehaviors;
 
-public class BasePipelineBehavior<TRequest, TResponse>
+public class BlazorPipelineBehavior<TRequest, TResponse>
     (
         IEnumerable<IValidator<TRequest>> validators,
         ILogger<BasePipelineBehavior<TRequest, TResponse>> log,
-        IHostEnvironment env
+        IHostEnvironment env,
+        SweetAlertService sweetAlertService
     )
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
@@ -79,6 +79,7 @@ public class BasePipelineBehavior<TRequest, TResponse>
         responseInstance.HttpStatusCode = HttpStatusCode.BadRequest;
         
         log.LogError("Validation Error: {Message}", e.Message);
+        sweetAlertService.FireAsync("Error", e.Message, SweetAlertIcon.Error);
 
         return responseInstance;
     }
@@ -94,7 +95,7 @@ public class BasePipelineBehavior<TRequest, TResponse>
 
         if (failures.Any())
         {
-            throw new ValidationException(string.Join("; ", failures.Select(i => i.ErrorMessage)));
+            throw new ValidationException(string.Join(", ", failures.Select(i => i.ErrorMessage)));
         }
 
         await Task.FromResult(new Unit());

@@ -8,8 +8,6 @@ public partial class WalletState
     {
         public List<Domain.Shared.Contracts.Wallet>? WalletList { get; set; }
         public Domain.Shared.Contracts.Wallet? Selected { get; set; }
-        public SendWalletRequest? SendWalletVm { get; set; }
-        public SendWalletRequest? CurrentTransactionVm { get; set; }
     }
     
     protected class SetStateHandler(HandlerServices handlerServices, IStore store)

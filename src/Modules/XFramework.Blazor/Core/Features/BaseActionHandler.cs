@@ -1,3 +1,4 @@
+using FluentValidation.Results;
 using Serilog;
 using TypeSupport.Extensions;
 using XFramework.Blazor.Core.Features.Address;
@@ -35,6 +36,25 @@ public class BaseStateActionHandler
     protected CacheState CacheState => Store.GetState<CacheState>();
     protected WalletState WalletState => Store.GetState<WalletState>();
     
+    public async Task<CmdResponse> HandleFailure<TAction>(ValidationResult validationResult, TAction action)
+    {
+        await Mediator.Send(new ApplicationState.SetState() { IsBusy = false });
+
+        // Display error in a single sweet alert
+        var message = string.Join(", ", validationResult.Errors.Select(x => x.ErrorMessage));
+        SweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
+
+        // Display error to the console
+        Log.Error("Error from response: {Message}", message); 
+
+        HandleFailureHooks(action);
+        
+        return new()
+        {
+            HttpStatusCode = HttpStatusCode.InternalServerError,
+            Message = message
+        };
+    }
     public async Task<CmdResponse> HandleFailure<TAction>(TAction action, string message, bool silent = false)
     {
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = false});

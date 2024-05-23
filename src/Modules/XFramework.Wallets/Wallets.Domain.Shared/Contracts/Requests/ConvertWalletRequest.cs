@@ -1,15 +1,12 @@
 ﻿namespace Wallets.Domain.Shared.Contracts.Requests;
 
-using TRequest = ConvertWalletRequest;
 using TResponse = CmdResponse;
 
 [MemoryPackable]
-public partial record ConvertWalletRequest : RequestBase, 
+public partial record ConvertWalletRequest : TransactionRequestBase, 
     IRequest<TResponse>,
-    IStreamflowRequest<TRequest, TResponse>
+    IStreamflowRequest<ConvertWalletRequest, TResponse>
 {
-    public decimal Amount { get; set; }
-    public Guid CredentialId { get; set; }
-    public WalletType? FromWalletType { get; set; }
-    public WalletType? ToWalletType { get; set; }
+    public required Guid SourceWalletTypeId { get; set; }
+    public required Guid TargetWalletTypeId { get; set; }
 }
