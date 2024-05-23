@@ -2,7 +2,7 @@ namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-public partial class IdentityVerificationType : BaseModel
+public partial class IdentityVerificationType : BaseModel, IHasSystemReferenceId
 {
     
     [MemoryPackOrder(0)]
@@ -17,4 +17,7 @@ public partial class IdentityVerificationType : BaseModel
 
     [MemoryPackOrder(3)]
     public virtual ICollection<IdentityVerification> IdentityVerifications { get; set; } = new List<IdentityVerification>();
+
+    [MemoryPackOrder(200)]
+    public Guid SystemReferenceId { get; set; }
 }

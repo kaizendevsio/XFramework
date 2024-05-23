@@ -2,7 +2,7 @@ namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-public partial class MetaDataType : BaseModel
+public partial class MetaDataType : BaseModel, IHasSystemReferenceId
 {
     
     [MemoryPackOrder(0)]
@@ -19,4 +19,7 @@ public partial class MetaDataType : BaseModel
 
     [MemoryPackOrder(4)]
     public virtual ICollection<MetaData> MetaData { get; set; } = new List<MetaData>();
+
+    [MemoryPackOrder(200)]
+    public Guid SystemReferenceId { get; set; }
 }

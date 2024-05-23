@@ -12,8 +12,8 @@ using XFramework.Domain.Contexts;
 namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20240522122255d6f29ff-9779-44df-9900-40550bdf9d19")]
-    partial class Added_SystemReferenceId_On_BaseModel
+    [Migration("20240523090149_Added_SystemReferenceId_On_Types")]
+    partial class Added_SystemReferenceId_On_Types
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -66,9 +66,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<int?>("RegCode")
                         .HasColumnType("integer");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -124,9 +121,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<int?>("RegCode")
                         .HasColumnType("integer");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -192,9 +186,6 @@ namespace XFramework.Domain.Migrations
                         .HasMaxLength(9)
                         .HasColumnType("character varying(9)");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -243,9 +234,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<long>("RegCodeId")
                         .HasColumnType("bigint");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -299,9 +287,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<int>("PsgcCode")
                         .HasColumnType("integer");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -369,9 +354,6 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -416,9 +398,6 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("SourceSocialMediaIdentityId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SystemReferenceId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TargetSocialMediaIdentityId")
@@ -531,9 +510,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("SocialMediaIdentityId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -598,9 +574,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("StorageId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -650,9 +623,6 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("SocialMediaIdentityId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SystemReferenceId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
@@ -822,9 +792,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Tagline")
                         .HasColumnType("character varying");
 
@@ -880,9 +847,6 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("StorageId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SystemReferenceId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
@@ -1140,9 +1104,6 @@ namespace XFramework.Domain.Migrations
                         .HasPrecision(18, 10)
                         .HasColumnType("numeric(18,10)");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -1206,9 +1167,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("SourceCurrencyTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("SourceCurrencyTypeID");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TargetCurrencyTypeId")
                         .HasColumnType("uuid")
@@ -1297,9 +1255,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Subdivision")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -1470,9 +1425,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -1756,9 +1708,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("StatusMessage")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
@@ -1832,9 +1781,6 @@ namespace XFramework.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -1910,9 +1856,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Suffix")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
@@ -1957,9 +1900,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<DateTime>("RoleExpiration")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -2121,9 +2061,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTimeOffset?>("StatusUpdatedOn")
                         .HasColumnType("time with time zone");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -2268,9 +2205,6 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -2325,9 +2259,6 @@ namespace XFramework.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -2464,9 +2395,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Subject")
                         .HasColumnType("character varying");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -2525,9 +2453,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("StorageId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -2575,9 +2500,6 @@ namespace XFramework.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -2687,9 +2609,6 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("character varying");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -2759,9 +2678,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<short>("Status")
                         .HasColumnType("smallint");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -2878,9 +2794,6 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SystemReferenceId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
@@ -3034,9 +2947,6 @@ namespace XFramework.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -3221,9 +3131,6 @@ namespace XFramework.Domain.Migrations
                         .HasPrecision(3, 2)
                         .HasColumnType("numeric(3,2)");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -3276,9 +3183,6 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("character varying");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -3325,9 +3229,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Name")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -3382,9 +3283,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<int?>("StepOrder")
                         .HasColumnType("integer");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -3445,9 +3343,6 @@ namespace XFramework.Domain.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("ResponseStatusTypeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SystemReferenceId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
@@ -3656,9 +3551,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -3815,9 +3707,6 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("SessionTypeID");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -3932,9 +3821,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<Guid>("StorageFileIdentifierId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -3992,9 +3878,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("character varying");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -4148,9 +4031,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<short?>("Status")
                         .HasColumnType("smallint");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -4267,9 +4147,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<short?>("Status")
                         .HasColumnType("smallint");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -4346,9 +4223,6 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -4409,9 +4283,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<string>("Remarks")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -4512,9 +4383,6 @@ namespace XFramework.Domain.Migrations
                     b.Property<decimal?>("RunningTotalBalance")
                         .HasPrecision(24, 8)
                         .HasColumnType("numeric(24,8)");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -4652,9 +4520,6 @@ namespace XFramework.Domain.Migrations
 
                     b.Property<string>("Remarks")
                         .HasColumnType("character varying");
-
-                    b.Property<Guid>("SystemReferenceId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");

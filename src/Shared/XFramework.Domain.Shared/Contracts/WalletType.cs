@@ -2,7 +2,7 @@ namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-public partial class WalletType : BaseModel
+public partial class WalletType : BaseModel, IHasSystemReferenceId
 {
     
     [MemoryPackOrder(0)]
@@ -45,4 +45,7 @@ public partial class WalletType : BaseModel
 
     [MemoryPackOrder(13)]
     public virtual ICollection<Wallet> Wallets { get; set; } = new List<Wallet>();
+
+    [MemoryPackOrder(200)]
+    public Guid SystemReferenceId { get; set; }
 }

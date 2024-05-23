@@ -2,7 +2,7 @@ namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-public partial class PaymentGatewayType : BaseModel
+public partial class PaymentGatewayType : BaseModel, IHasSystemReferenceId
 {
     
     [MemoryPackOrder(0)]
@@ -18,4 +18,7 @@ public partial class PaymentGatewayType : BaseModel
     [MemoryPackOrder(3)]
     public virtual ICollection<PaymentGatewayResponseType> GatewayResponseTypes { get; set; } =
         new List<PaymentGatewayResponseType>();
+
+    [MemoryPackOrder(200)]
+    public Guid SystemReferenceId { get; set; }
 }

@@ -2,7 +2,7 @@ namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-public partial class IdentityRoleType : BaseModel
+public partial class IdentityRoleType : BaseModel, IHasSystemReferenceId
 {
     
     [MemoryPackOrder(0)]
@@ -22,4 +22,7 @@ public partial class IdentityRoleType : BaseModel
 
     [MemoryPackOrder(5)]
     public virtual ICollection<IdentityRole> IdentityRoles { get; set; } = new List<IdentityRole>();
+
+    [MemoryPackOrder(200)]
+    public Guid SystemReferenceId { get; set; }
 }
