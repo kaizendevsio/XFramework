@@ -1,4 +1,5 @@
 using XFramework.Blazor.Entity.Models.Requests.Wallet;
+using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Wallet;
 
@@ -8,6 +9,8 @@ public partial class WalletState
     {
         public List<Domain.Shared.Contracts.Wallet>? WalletList { get; set; }
         public Domain.Shared.Contracts.Wallet? Selected { get; set; }
+        public WalletTransaction? CurrentTransaction { get; set; }
+        public TransferWallet? PendingPayment { get; set; }
     }
     
     protected class SetStateHandler(HandlerServices handlerServices, IStore store)

@@ -2,6 +2,7 @@
 using XFramework.Blazor.Entity.Models.Requests.Common;
 using XFramework.Blazor.Entity.Models.Requests.Wallet;
 using XFramework.Blazor.Entity.Validations.Wallet;
+using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Wallet;
 
@@ -18,7 +19,7 @@ public partial class WalletState
         public decimal Fee => LineItems.Sum(x => x.Fee);
         public string? Remarks { get; set; }
         public string? ClientReference { get; set; }
-        public List<SendWalletLineItem> LineItems { get; set; } = [];
+        public List<WalletTransactionLineItem> LineItems { get; set; } = [];
         public TransactionPurpose TransactionPurpose { get; set; }
     }
     

@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
 
 #nullable disable
 
-namespace XFramework.Domain.Migrations.XnelSystems
+namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class XnelSystemsContextModelSnapshot : ModelSnapshot
+    [Migration("20240527132805_Updated_WalletTransaction_Added_WalletTramsactionLineItems")]
+    partial class Updated_WalletTransaction_Added_WalletTramsactionLineItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

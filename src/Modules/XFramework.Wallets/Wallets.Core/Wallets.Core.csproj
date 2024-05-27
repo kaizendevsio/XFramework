@@ -9,7 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="DataAccess\Query\" />
+      <Folder Include="Query\" />
     </ItemGroup>
 
     <ItemGroup>

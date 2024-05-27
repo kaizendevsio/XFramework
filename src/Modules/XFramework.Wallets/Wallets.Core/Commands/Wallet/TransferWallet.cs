@@ -1,14 +1,14 @@
 ﻿using System.Text;
 using IdentityServer.Integration.Drivers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Services;
-using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Enums;
 
-namespace Wallets.Core.DataAccess.Commands.Wallet;
-using XFramework.Domain.Shared.Contracts;
+namespace Wallets.Core.Commands.Wallet;
 
 public class TransferWallet(
     DbContext dbContext,
@@ -39,7 +39,7 @@ public class TransferWallet(
 
         // Fetch the sender and recipient wallet
         
-        IQueryable<Wallet> query = dbContext.Set<Wallet>();
+        IQueryable<XFramework.Domain.Shared.Contracts.Wallet> query = dbContext.Set<XFramework.Domain.Shared.Contracts.Wallet>();
 
         var senderWallet = await query
             .Where(x => x.TenantId == tenant.Id)
@@ -93,7 +93,7 @@ public class TransferWallet(
         // if wallet does not exist, create a new wallet if wallet type ID is provided
         if (recipientWallet is null)
         {
-            var createWallet = await mediator.Send(new Create<Wallet>(new()
+            var createWallet = await mediator.Send(new Create<XFramework.Domain.Shared.Contracts.Wallet>(new()
             {
                 CredentialId = request.RecipientCredentialId,
                 WalletTypeId = request.WalletTypeId,
