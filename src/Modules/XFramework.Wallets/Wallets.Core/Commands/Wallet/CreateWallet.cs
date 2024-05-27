@@ -2,23 +2,23 @@
 using Microsoft.Extensions.Logging;
 using XFramework.Core.DataAccess.Commands;
 using XFramework.Core.Services;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Abstractions;
 
-namespace Wallets.Core.DataAccess.Commands.Wallet;
-using XFramework.Domain.Shared.Contracts;
+namespace Wallets.Core.Commands.Wallet;
 
 public class CreateWallet(
     DbContext appDbContext,
     ILogger<CreateWallet> logger,
     ITenantService tenantService,
     IHelperService helperService,
-    IRequestHandler<Create<Wallet>, CmdResponse<Wallet>> baseHandler
+    IRequestHandler<Create<XFramework.Domain.Shared.Contracts.Wallet>, CmdResponse<XFramework.Domain.Shared.Contracts.Wallet>> baseHandler
 )
-    : ICreateHandler<Wallet>, IDecorator
+    : ICreateHandler<XFramework.Domain.Shared.Contracts.Wallet>, IDecorator
 {
-    public async Task<CmdResponse<Wallet>> Handle(Create<Wallet> request, CancellationToken cancellationToken)
+    public async Task<CmdResponse<XFramework.Domain.Shared.Contracts.Wallet>> Handle(Create<XFramework.Domain.Shared.Contracts.Wallet> request, CancellationToken cancellationToken)
     {
         var walletType = await appDbContext.Set<WalletType>()
             .Where(x => x.Id == request.Model.WalletTypeId)
@@ -46,7 +46,7 @@ public class CreateWallet(
         // check if the account number is unique
         
         checkAccountNumber:
-        var accountNumberExists = await appDbContext.Set<Wallet>()
+        var accountNumberExists = await appDbContext.Set<XFramework.Domain.Shared.Contracts.Wallet>()
             .AnyAsync(x => x.AccountNumber == request.Model.AccountNumber, cancellationToken);
 
         if (accountNumberExists)

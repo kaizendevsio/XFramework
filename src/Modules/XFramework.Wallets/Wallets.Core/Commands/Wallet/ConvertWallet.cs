@@ -1,13 +1,12 @@
-﻿using System.Text;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Services;
-using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Enums;
 
-namespace Wallets.Core.DataAccess.Commands.Wallet;
-using XFramework.Domain.Shared.Contracts;
+namespace Wallets.Core.Commands.Wallet;
 
 public class ConvertWallet(
     DbContext dbContext,
@@ -24,40 +23,44 @@ public class ConvertWallet(
         // Validate the amount and fees
         if (request.Amount <= 0 || request.Fee < 0 || request.ConvenienceFee < 0)
         {
-            logger.LogWarning("Invalid amount or fee while converting wallet type for {CredentialId}", request.CredentialId);
+            logger.LogWarning("Invalid amount or fee while converting wallet for {CredentialId}", request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid amount or fee" };
         }
 
         // Check if Source and Target wallet type IDs are provided
         if (request.SourceWalletTypeId == Guid.Empty || request.TargetWalletTypeId == Guid.Empty)
         {
-            logger.LogWarning("Source and target wallet type IDs are required for converting wallet type for {CredentialId}", request.CredentialId);
+            logger.LogWarning("Source and target wallet type IDs are required for converting wallet for {CredentialId}", request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Source and target wallet type IDs are required" };
         }
 
         // Fetch the source wallet
-        var sourceWallet = await dbContext.Set<Wallet>()
+        var sourceWallet = await dbContext.Set<XFramework.Domain.Shared.Contracts.Wallet>()
+            .Include(x => x.WalletType)
             .Where(x => x.TenantId == tenant.Id)
             .Where(x => x.CredentialId == request.CredentialId)
             .Where(x => x.WalletTypeId == request.SourceWalletTypeId)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(cancellationToken);
 
         if (sourceWallet == null)
         {
-            logger.LogWarning("Source wallet not found for converting wallet type for {CredentialId}", request.CredentialId);
+            logger.LogWarning("Source wallet not found for converting wallet for {CredentialId}", request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Source wallet not found" };
         }
 
         // Fetch or create the target wallet
-        var targetWallet = await dbContext.Set<Wallet>()
+        var targetWallet = await dbContext.Set<XFramework.Domain.Shared.Contracts.Wallet>()
+            .Include(x => x.WalletType)
             .Where(x => x.TenantId == tenant.Id)
             .Where(x => x.CredentialId == request.CredentialId)
             .Where(x => x.WalletTypeId == request.TargetWalletTypeId)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(cancellationToken);
 
         if (targetWallet == null)
         {
-            var createWallet = await mediator.Send(new Create<Wallet>(new()
+            var createWallet = await mediator.Send(new Create<XFramework.Domain.Shared.Contracts.Wallet>(new()
             {
                 CredentialId = request.CredentialId,
                 WalletTypeId = request.TargetWalletTypeId,
@@ -68,7 +71,7 @@ public class ConvertWallet(
             });
             if (!createWallet.IsSuccess)
             {
-                logger.LogWarning("Target wallet could not be created for converting wallet type for {CredentialId}", request.CredentialId);
+                logger.LogWarning("Target wallet could not be created for converting wallet for {CredentialId}", request.CredentialId);
                 return new CmdResponse { HttpStatusCode = HttpStatusCode.InternalServerError, Message = "Target wallet could not be created" };
             }
 
@@ -76,10 +79,11 @@ public class ConvertWallet(
         }
 
         // Check if source wallet has enough balance
-        var totalDeduction = request.Amount + request.Fee + request.ConvenienceFee;
+        var totalDeduction = request.Amount;
+        var totalIncrement = request.Amount - request.Fee - request.ConvenienceFee;
         if (sourceWallet.Balance < totalDeduction)
         {
-            logger.LogWarning("Insufficient balance in source wallet for converting wallet type for {CredentialId}", request.CredentialId);
+            logger.LogWarning("Insufficient balance in source wallet for converting wallet for {CredentialId}", request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Insufficient balance" };
         }
 
@@ -88,7 +92,7 @@ public class ConvertWallet(
         var previousTargetBalance = targetWallet.Balance;
 
         sourceWallet.Balance -= totalDeduction;
-        targetWallet.Balance += request.Amount;
+        targetWallet.Balance += totalIncrement;
 
         // Record the transactions
         var sourceTransaction = new WalletTransaction
@@ -97,12 +101,10 @@ public class ConvertWallet(
             CredentialId = request.CredentialId,
             WalletId = sourceWallet.Id,
             Amount = totalDeduction,
-            TransactionFee = request.Fee,
-            ConvenienceFee = request.ConvenienceFee,
             PreviousBalance = previousSourceBalance,
             RunningBalance = sourceWallet.Balance,
             Remarks = request.Remarks,
-            Description = $"Converted to {request.TargetWalletTypeId}",
+            Description = $"Converted to {targetWallet.WalletType?.Name}",
             TransactionType = TransactionType.Debit,
             Held = false,
             Released = true,
@@ -118,8 +120,10 @@ public class ConvertWallet(
             PreviousBalance = previousTargetBalance,
             RunningBalance = targetWallet.Balance,
             Remarks = request.Remarks,
-            Description = $"Converted from {request.SourceWalletTypeId}",
+            Description = $"Converted from {sourceWallet.WalletType?.Name}",
             TransactionType = TransactionType.Credit,
+            TransactionFee = request.Fee,
+            ConvenienceFee = request.ConvenienceFee,
             Held = false,
             Released = true,
             ReferenceNumber = request.ReferenceNumber
@@ -137,12 +141,12 @@ public class ConvertWallet(
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            logger.LogError(ex, "Concurrency conflict occurred while converting wallet type for {CredentialId}", request.CredentialId);
+            logger.LogError(ex, "Concurrency conflict occurred while converting wallet for {CredentialId}", request.CredentialId);
             throw new InvalidOperationException("A concurrency conflict occurred, please try again");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occurred while converting wallet type for {CredentialId}", request.CredentialId);
+            logger.LogError(ex, "An error occurred while converting wallet for {CredentialId}", request.CredentialId);
             throw new InvalidOperationException("An error occurred while processing your request");
         }
     }

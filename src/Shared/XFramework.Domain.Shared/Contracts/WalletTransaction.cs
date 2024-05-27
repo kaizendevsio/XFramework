@@ -3,11 +3,9 @@ using XFramework.Domain.Shared.Enums;
 
 namespace XFramework.Domain.Shared.Contracts;
 
-
 [MemoryPackable(GenerateType.CircularReference)]
 public partial class WalletTransaction : BaseModel
 {
-    
     [MemoryPackOrder(0)]
     public Guid CredentialId { get; set; }
 
@@ -31,15 +29,22 @@ public partial class WalletTransaction : BaseModel
                 _ => 0
             });
         }
-        set => InternalAmount = value;
+        set
+        {
+            InternalAmount = value;
+            ComputeNetAmount(); // Update NetAmount whenever Amount is set
+        }
     }
 
     [NotMapped]
+    [MemoryPackOrder(21)]
+    [MemoryPackInclude]
     private decimal InternalAmount { get; set; }
 
-    [MemoryPackIgnore]
-    public decimal NetAmount => Amount - TransactionFee - ConvenienceFee;
-    
+    // Remove MemoryPackIgnore to store NetAmount in the database
+    [MemoryPackOrder(22)]
+    public decimal NetAmount { get; private set; } // Make setter private
+
     [MemoryPackOrder(2)]
     public bool Held { get; set; }
     
@@ -50,11 +55,29 @@ public partial class WalletTransaction : BaseModel
     public string? Remarks { get; set; }
 
     [MemoryPackOrder(5)]
-    public decimal TransactionFee { get; set; }
-    
+    public decimal TransactionFee
+    {
+        get => _transactionFee;
+        set
+        {
+            _transactionFee = value;
+            ComputeNetAmount(); // Update NetAmount whenever TransactionFee is set
+        }
+    }
+    private decimal _transactionFee;
+
     [MemoryPackOrder(6)]
-    public decimal ConvenienceFee { get; set; }
-    
+    public decimal ConvenienceFee
+    {
+        get => _convenienceFee;
+        set
+        {
+            _convenienceFee = value;
+            ComputeNetAmount(); // Update NetAmount whenever ConvenienceFee is set
+        }
+    }
+    private decimal _convenienceFee;
+
     [MemoryPackOrder(7)]
     public string? ReferenceNumber { get; set; }
     
@@ -96,4 +119,13 @@ public partial class WalletTransaction : BaseModel
 
     [MemoryPackOrder(20)]
     public virtual Wallet? Wallet { get; set; }
+
+    [MemoryPackOrder(23)] 
+    public virtual ICollection<WalletTransactionLineItem>? LineItems { get; set; } = [];
+
+    // Compute the NetAmount
+    private void ComputeNetAmount()
+    {
+        NetAmount = Amount - TransactionFee - ConvenienceFee;
+    }
 }

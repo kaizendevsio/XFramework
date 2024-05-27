@@ -1,11 +1,11 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Services;
-using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Enums;
 
-namespace Wallets.Core.DataAccess.Commands.Wallet;
-using XFramework.Domain.Shared.Contracts;
+namespace Wallets.Core.Commands.Wallet;
 
 public class ReleaseTransaction(
     DbContext dbContext,
@@ -39,7 +39,7 @@ public class ReleaseTransaction(
         transaction.Released = true;
 
         // Fetch the associated wallets to update their balances
-        var wallet = await dbContext.Set<Wallet>().FirstOrDefaultAsync(i => i.Id == transaction.WalletId, cancellationToken);
+        var wallet = await dbContext.Set<XFramework.Domain.Shared.Contracts.Wallet>().FirstOrDefaultAsync(i => i.Id == transaction.WalletId, cancellationToken);
         if (wallet != null)
         {
             // Assuming the amount was deducted from the balance when put on hold,

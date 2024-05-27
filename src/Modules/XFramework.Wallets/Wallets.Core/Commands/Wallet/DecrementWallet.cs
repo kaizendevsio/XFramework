@@ -2,10 +2,10 @@
 using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Services;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Enums;
 
-namespace Wallets.Core.DataAccess.Commands.Wallet;
-using XFramework.Domain.Shared.Contracts;
+namespace Wallets.Core.Commands.Wallet;
 
 public class DecrementWallet(
     DbContext dbContext,
@@ -25,10 +25,10 @@ public class DecrementWallet(
         }
 
         var wallet = request.WalletTypeId != Guid.Empty
-            ? await dbContext.Set<Wallet>()
+            ? await dbContext.Set<XFramework.Domain.Shared.Contracts.Wallet>()
                 .Where(w => w.TenantId == tenant.Id && w.WalletTypeId == request.WalletTypeId && w.CredentialId == request.CredentialId)
                 .FirstOrDefaultAsync(cancellationToken)
-            : await dbContext.Set<Wallet>()
+            : await dbContext.Set<XFramework.Domain.Shared.Contracts.Wallet>()
                 .Where(w => w.TenantId == tenant.Id && w.Id == request.WalletId)
                 .FirstOrDefaultAsync(cancellationToken);
 
