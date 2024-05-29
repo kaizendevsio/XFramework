@@ -37,24 +37,22 @@ public partial class WalletTransaction : BaseModel
     }
 
     [NotMapped]
-    [MemoryPackOrder(21)]
-    [MemoryPackInclude]
+    [MemoryPackOrder(2)]
     private decimal InternalAmount { get; set; }
 
-    // Remove MemoryPackIgnore to store NetAmount in the database
-    [MemoryPackOrder(22)]
+    [MemoryPackOrder(3)]
     public decimal NetAmount { get; private set; } // Make setter private
 
-    [MemoryPackOrder(2)]
+    [MemoryPackOrder(4)]
     public bool Held { get; set; }
     
-    [MemoryPackOrder(3)]
+    [MemoryPackOrder(5)]
     public bool Released { get; set; }
     
-    [MemoryPackOrder(4)]
+    [MemoryPackOrder(6)]
     public string? Remarks { get; set; }
 
-    [MemoryPackOrder(5)]
+    [MemoryPackOrder(7)]
     public decimal TransactionFee
     {
         get => _transactionFee;
@@ -66,66 +64,58 @@ public partial class WalletTransaction : BaseModel
     }
     private decimal _transactionFee;
 
-    [MemoryPackOrder(6)]
-    public decimal ConvenienceFee
-    {
-        get => _convenienceFee;
-        set
-        {
-            _convenienceFee = value;
-            ComputeNetAmount(); // Update NetAmount whenever ConvenienceFee is set
-        }
-    }
-    private decimal _convenienceFee;
-
-    [MemoryPackOrder(7)]
-    public string? ReferenceNumber { get; set; }
-    
     [MemoryPackOrder(8)]
-    public string? Description { get; set; }
+    public decimal TotalFees { get; private set; }
 
     [MemoryPackOrder(9)]
-    public decimal? RunningTotalBalance { get; set; }
+    public string? ReferenceNumber { get; set; }
     
     [MemoryPackOrder(10)]
+    public string? Description { get; set; }
+
+    [MemoryPackOrder(11)]
+    public decimal? RunningTotalBalance { get; set; }
+
+    [MemoryPackOrder(12)]
     public decimal? RunningAvailableBalance { get; set; }
    
-    [MemoryPackOrder(11)]
+    [MemoryPackOrder(13)]
     public decimal? RunningBalance { get; set; }
     
-    [MemoryPackOrder(12)]
+    [MemoryPackOrder(14)]
     public decimal? RunningDebitOnHoldBalance { get; set; }
     
-    [MemoryPackOrder(13)]
+    [MemoryPackOrder(15)]
     public decimal? RunningCreditOnHoldBalance { get; set; }
     
-    [MemoryPackOrder(14)]
+    [MemoryPackOrder(16)]
     public decimal PreviousTotalBalance { get; set; }
     
-    [MemoryPackOrder(15)]
+    [MemoryPackOrder(17)]
     public decimal PreviousBalance { get; set; }
     
-    [MemoryPackOrder(16)]
+    [MemoryPackOrder(18)]
     public decimal PreviousDebitOnHoldBalance { get; set; }
     
-    [MemoryPackOrder(17)]
+    [MemoryPackOrder(19)]
     public decimal PreviousCreditOnHoldBalance { get; set; }
 
-    [MemoryPackOrder(18)]
+    [MemoryPackOrder(20)]
     public TransactionType? TransactionType { get; set; }
 
-    [MemoryPackOrder(19)]
+    [MemoryPackOrder(21)]
     public virtual IdentityCredential Credential { get; set; } = null!;
 
-    [MemoryPackOrder(20)]
+    [MemoryPackOrder(22)]
     public virtual Wallet? Wallet { get; set; }
 
     [MemoryPackOrder(23)] 
-    public virtual ICollection<WalletTransactionLineItem>? LineItems { get; set; } = [];
+    public virtual ICollection<WalletTransactionLineItem> LineItems { get; set; } = [];
 
     // Compute the NetAmount
     private void ComputeNetAmount()
     {
-        NetAmount = Amount - TransactionFee - ConvenienceFee;
+        TotalFees = TransactionFee + LineItems.Sum(x => x.Fee);
+        NetAmount = Amount - TotalFees;
     }
 }

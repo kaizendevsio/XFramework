@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using IdentityServer.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -24,7 +25,7 @@ public class TransferWallet(
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
 
         // Validate the amount and fee
-        if (request.Amount <= 0 || request.Fee < 0 || request.ConvenienceFee < 0)
+        if (request.TotalAmount <= 0 || request.Fee < 0)
         {
             logger.LogWarning("Invalid amount or fee while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid amount or fee" };
@@ -118,16 +119,69 @@ public class TransferWallet(
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Cannot transfer to the same wallet" };
         }
 
+        decimal totalDecrement = 0;
+        decimal totalIncrement = 0;
+        TransferDeductionType transferDeductionType;
+        
+        switch (request.TransferDeductionType)
+        {
+            // Check Transfer Deduction Type
+            case TransferDeductionType.Default:
+                var transferDeductionTypeConfig = await dbContext.Set<RegistryConfiguration>()
+                    .Where(x => x.TenantId == tenant.Id)
+                    .Where(x => x.Key == "Settings:Wallet:Transfer:DeductionType")
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (transferDeductionTypeConfig is null)
+                {
+                    logger.LogWarning("Transfer deduction type configuration not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
+                    return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Transfer deduction type configuration not found" };
+                }
+                
+                if (!Enum.TryParse<TransferDeductionType>(transferDeductionTypeConfig.Value, out var transferDeductionTypeFromConfig))
+                {
+                    logger.LogWarning("Invalid transfer deduction type configuration while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
+                    return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid transfer deduction type configuration" };
+                }
+                
+                switch (transferDeductionTypeFromConfig)
+                {
+                    case TransferDeductionType.DeductFromSender:
+                        totalDecrement = request.TotalAmount + request.TotalFee;
+                        totalIncrement = request.TotalAmount;
+                        break;
+                    case TransferDeductionType.DeductFromRecipient:
+                        totalDecrement = request.TotalAmount;
+                        totalIncrement = request.TotalAmount - request.TotalFee;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+                transferDeductionType = transferDeductionTypeFromConfig;
+                break;
+            case TransferDeductionType.DeductFromSender:
+                totalDecrement = request.TotalAmount + request.TotalFee;
+                totalIncrement = request.TotalAmount;
+                transferDeductionType = TransferDeductionType.DeductFromSender;
+                break;
+            case TransferDeductionType.DeductFromRecipient:
+                totalDecrement = request.TotalAmount;
+                totalIncrement = request.TotalAmount - request.TotalFee;
+                transferDeductionType = TransferDeductionType.DeductFromRecipient;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+        
         // Check if sender has enough balance
-        var totalDeduction = request.Amount + request.Fee + request.ConvenienceFee;
-        if (senderWallet.Balance < totalDeduction)
+        if (senderWallet.Balance < totalDecrement)
         {
             logger.LogWarning("Insufficient balance while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Insufficient balance" };
         }
         
         // Check if the amount is within the transferable balance
-        if (request.Amount > senderWallet.TransferableBalance)
+        if (request.TotalAmount > senderWallet.TransferableBalance)
         {
             logger.LogWarning("Amount exceeds transferable balance while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
@@ -138,7 +192,7 @@ public class TransferWallet(
         }
         
         // Check if the amount is within the min transferable amount
-        if (request.Amount < senderWallet.MinTransferRule)
+        if (request.TotalAmount < senderWallet.MinTransferRule)
         {
             logger.LogWarning("Amount is below the minimum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
@@ -149,7 +203,7 @@ public class TransferWallet(
         }
         
         // Check if the amount is within the max transferable amount
-        if (request.Amount > senderWallet.MaxTransferRule)
+        if (request.TotalAmount > senderWallet.MaxTransferRule)
         {
             logger.LogWarning("Amount exceeds the maximum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
@@ -160,7 +214,7 @@ public class TransferWallet(
         }
         
         // Check if amount is within the bond balance rule
-        if (senderWallet.BondBalanceRule.HasValue && request.Amount > senderWallet.BondBalanceRule)
+        if (senderWallet.BondBalanceRule.HasValue && request.TotalAmount > senderWallet.BondBalanceRule)
         {
             logger.LogWarning("Amount exceeds the bond balance rule while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
@@ -171,7 +225,7 @@ public class TransferWallet(
         }
         
         // Check if the amount is within the maintaining balance rule
-        if (senderWallet.MaintainingBalanceRule.HasValue && senderWallet.Balance - totalDeduction < senderWallet.MaintainingBalanceRule)
+        if (senderWallet.MaintainingBalanceRule.HasValue && senderWallet.Balance - totalDecrement < senderWallet.MaintainingBalanceRule)
         {
             logger.LogWarning("Amount exceeds the maintaining balance rule while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
@@ -182,7 +236,7 @@ public class TransferWallet(
         }
         
         // Check if the recipient wallet is within the min transferable amount
-        if (request.Amount < recipientWallet.MinTransferRule)
+        if (request.TotalAmount < recipientWallet.MinTransferRule)
         {
             logger.LogWarning("Amount is below the minimum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
@@ -193,7 +247,7 @@ public class TransferWallet(
         }
         
         // Check if the recipient wallet is within the max transferable amount
-        if (request.Amount > recipientWallet.MaxTransferRule)
+        if (request.TotalAmount > recipientWallet.MaxTransferRule)
         {
             logger.LogWarning("Amount exceeds the maximum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}", request.CredentialId, request.RecipientCredentialId);
             return new CmdResponse
@@ -218,18 +272,18 @@ public class TransferWallet(
         
         if (request.OnHold)
         {
-            senderWallet.DebitOnHoldBalance += request.Amount;
-            senderWallet.TransferableBalance -= request.Amount;
+            senderWallet.DebitOnHoldBalance += request.TotalAmount;
+            senderWallet.TransferableBalance -= request.TotalAmount;
             
-            recipientWallet.CreditOnHoldBalance += request.Amount;
+            recipientWallet.CreditOnHoldBalance += request.TotalAmount;
         }
         else
         {
-            senderWallet.Balance -= totalDeduction;
-            senderWallet.TransferableBalance -= totalDeduction;
+            senderWallet.Balance -= totalDecrement;
+            senderWallet.TransferableBalance -= totalDecrement;
             
-            recipientWallet.Balance += request.Amount;
-            recipientWallet.TransferableBalance += request.Amount;
+            recipientWallet.Balance += totalIncrement;
+            recipientWallet.TransferableBalance += totalIncrement;
         }
 
         // Record the transactions
@@ -238,9 +292,8 @@ public class TransferWallet(
             TenantId = tenant.Id,
             CredentialId = request.CredentialId,
             WalletId = senderWallet.Id,
-            Amount = totalDeduction,
-            TransactionFee = request.Fee,
-            ConvenienceFee = request.ConvenienceFee,
+            Amount = request.TotalAmount,
+            TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
             PreviousBalance = previousSenderBalance,
             PreviousDebitOnHoldBalance = previousSenderDebitOnHoldBalance,
             PreviousCreditOnHoldBalance = previousSenderCreditOnHoldBalance,
@@ -262,7 +315,8 @@ public class TransferWallet(
             TenantId = tenant.Id,
             CredentialId = request.RecipientCredentialId,
             WalletId = recipientWallet.Id,
-            Amount = request.Amount,
+            Amount = request.TotalAmount,
+            TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
             PreviousBalance = previousRecipientBalance,
             PreviousDebitOnHoldBalance = previousRecipientDebitOnHoldBalance,
             PreviousCreditOnHoldBalance = previousRecipientCreditOnHoldBalance,
@@ -279,8 +333,19 @@ public class TransferWallet(
             ReferenceNumber = request.ReferenceNumber
         };
 
-        dbContext.Set<WalletTransaction>().Add(senderTransaction);
-        dbContext.Set<WalletTransaction>().Add(recipientTransaction);
+        // Create WalletTransfer entity
+        var walletTransfer = new WalletTransfer
+        {
+            SenderTransactionId = senderTransaction.Id,
+            RecipientTransactionId = recipientTransaction.Id,
+            SenderTransaction = senderTransaction,
+            RecipientTransaction = recipientTransaction,
+            LineItems = request.LineItems,
+            TransactionPurpose = request.TransactionPurpose,
+            TransactionFee = request.Fee
+        };
+
+        dbContext.Set<WalletTransfer>().Add(walletTransfer);
 
         try
         {

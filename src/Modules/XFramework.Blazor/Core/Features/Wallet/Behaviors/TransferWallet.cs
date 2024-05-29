@@ -13,14 +13,15 @@ public partial class WalletState
         public Guid SenderCredentialId { get; set; }
         public Guid RecipientCredentialId { get; set; }
         public Guid WalletTypeId { get; set; }
+        public decimal NetAmount => Amount - TotalFee;
         public decimal Amount => LineItems.Sum(x => x.Amount ?? 0);
         public bool OnHold { get; set; }
-        public decimal TotalAmount => Amount + Fee;
-        public decimal Fee => LineItems.Sum(x => x.Fee);
+        public decimal TotalFee => LineItems.Sum(x => x.Fee) + Fee;
+        public decimal Fee { get; set; }
         public string? Remarks { get; set; }
         public string? ClientReference { get; set; }
         public List<WalletTransactionLineItem> LineItems { get; set; } = [];
-        public TransactionPurpose TransactionPurpose { get; set; }
+        public TransactionPurpose TransactionPurpose { get; set; } = TransactionPurpose.Transfer;
     }
     
     protected class TransferWalletHandler(
@@ -39,11 +40,12 @@ public partial class WalletState
                 CredentialId = action.SenderCredentialId,
                 WalletTypeId = action.WalletTypeId,
                 RecipientCredentialId = action.RecipientCredentialId,
-                Amount = action.Amount,
+                LineItems = action.LineItems,
                 Fee = action.Fee,
                 Remarks = action.Remarks,
                 OnHold = action.OnHold,
-                CurrencyId = new("7ee3621a-5878-4c16-8112-eab11f29db95")
+                CurrencyId = new("7ee3621a-5878-4c16-8112-eab11f29db95"),
+                TransactionPurpose = action.TransactionPurpose
             });
 
             if (await HandleFailure(result, action)) return result;
