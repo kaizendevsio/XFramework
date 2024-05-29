@@ -21,7 +21,7 @@ public class ConvertWallet(
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
 
         // Validate the amount and fees
-        if (request.Amount <= 0 || request.Fee < 0 || request.ConvenienceFee < 0)
+        if (request.TotalAmount <= 0 || request.Fee < 0)
         {
             logger.LogWarning("Invalid amount or fee while converting wallet for {CredentialId}", request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid amount or fee" };
@@ -77,11 +77,63 @@ public class ConvertWallet(
 
             targetWallet = createWallet.Response;
         }
+        
+        decimal totalDecrement = 0;
+        decimal totalIncrement = 0;
+        TransferDeductionType transferDeductionType;
+        
+        switch (request.TransferDeductionType)
+        {
+            // Check Transfer Deduction Type
+            case TransferDeductionType.Default:
+                var transferDeductionTypeConfig = await dbContext.Set<RegistryConfiguration>()
+                    .Where(x => x.TenantId == tenant.Id)
+                    .Where(x => x.Key == "Settings:Wallet:Convert:DeductionType")
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (transferDeductionTypeConfig is null)
+                {
+                    logger.LogWarning("Transfer deduction type configuration not found for converting wallet for {CredentialId}", request.CredentialId);
+                    return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Transfer deduction type configuration not found" };
+                }
+                
+                if (!Enum.TryParse<TransferDeductionType>(transferDeductionTypeConfig.Value, out var transferDeductionTypeFromConfig))
+                {
+                    logger.LogWarning("Invalid transfer deduction type configuration for converting wallet for {CredentialId}", request.CredentialId);                    
+                    return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid transfer deduction type configuration" };
+                }
+                
+                switch (transferDeductionTypeFromConfig)
+                {
+                    case TransferDeductionType.DeductFromSender:
+                        totalDecrement = request.TotalAmount + request.TotalFee;
+                        totalIncrement = request.TotalAmount;
+                        break;
+                    case TransferDeductionType.DeductFromRecipient:
+                        totalDecrement = request.TotalAmount;
+                        totalIncrement = request.TotalAmount - request.TotalFee;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+                transferDeductionType = transferDeductionTypeFromConfig;
+                break;
+            case TransferDeductionType.DeductFromSender:
+                totalDecrement = request.TotalAmount + request.TotalFee;
+                totalIncrement = request.TotalAmount;
+                transferDeductionType = TransferDeductionType.DeductFromSender;
+                break;
+            case TransferDeductionType.DeductFromRecipient:
+                totalDecrement = request.TotalAmount;
+                totalIncrement = request.TotalAmount - request.TotalFee;
+                transferDeductionType = TransferDeductionType.DeductFromRecipient;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
 
         // Check if source wallet has enough balance
-        var totalDeduction = request.Amount;
-        var totalIncrement = request.Amount - request.Fee - request.ConvenienceFee;
-        if (sourceWallet.Balance < totalDeduction)
+        if (sourceWallet.Balance < totalDecrement)
         {
             logger.LogWarning("Insufficient balance in source wallet for converting wallet for {CredentialId}", request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Insufficient balance" };
@@ -91,7 +143,7 @@ public class ConvertWallet(
         var previousSourceBalance = sourceWallet.Balance;
         var previousTargetBalance = targetWallet.Balance;
 
-        sourceWallet.Balance -= totalDeduction;
+        sourceWallet.Balance -= totalDecrement;
         targetWallet.Balance += totalIncrement;
 
         // Record the transactions
@@ -100,7 +152,8 @@ public class ConvertWallet(
             TenantId = tenant.Id,
             CredentialId = request.CredentialId,
             WalletId = sourceWallet.Id,
-            Amount = totalDeduction,
+            Amount = totalDecrement,
+            TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
             PreviousBalance = previousSourceBalance,
             RunningBalance = sourceWallet.Balance,
             Remarks = request.Remarks,
@@ -116,14 +169,13 @@ public class ConvertWallet(
             TenantId = tenant.Id,
             CredentialId = request.CredentialId,
             WalletId = targetWallet.Id,
-            Amount = request.Amount,
+            Amount = request.TotalAmount,
+            TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
             PreviousBalance = previousTargetBalance,
             RunningBalance = targetWallet.Balance,
             Remarks = request.Remarks,
             Description = $"Converted from {sourceWallet.WalletType?.Name}",
             TransactionType = TransactionType.Credit,
-            TransactionFee = request.Fee,
-            ConvenienceFee = request.ConvenienceFee,
             Held = false,
             Released = true,
             ReferenceNumber = request.ReferenceNumber

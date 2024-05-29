@@ -20,7 +20,7 @@ public class IncrementWallet(
     {
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
 
-        if (request.Amount <= 0)
+        if (request.TotalAmount <= 0)
         {
             logger.LogWarning("Invalid increment amount for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}", request.WalletId, request.WalletTypeId, request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid increment amount" };
@@ -65,7 +65,7 @@ public class IncrementWallet(
         }
 
         // Check if the amount is within the min transferable amount
-        if (wallet.MinTransferRule.HasValue && request.Amount < wallet.MinTransferRule.Value)
+        if (wallet.MinTransferRule.HasValue && request.TotalAmount < wallet.MinTransferRule.Value)
         {
             logger.LogWarning("Amount is below the minimum transferable amount for Wallet ID {WalletId}", wallet.Id);
             return new CmdResponse
@@ -76,7 +76,7 @@ public class IncrementWallet(
         }
 
         // Check if the amount is within the max transferable amount
-        if (wallet.MaxTransferRule.HasValue && request.Amount > wallet.MaxTransferRule.Value)
+        if (wallet.MaxTransferRule.HasValue && request.TotalAmount > wallet.MaxTransferRule.Value)
         {
             logger.LogWarning("Amount exceeds the maximum transferable amount for Wallet ID {WalletId}", wallet.Id);
             return new CmdResponse
@@ -92,11 +92,11 @@ public class IncrementWallet(
         
         if (request.OnHold)
         {
-            wallet.CreditOnHoldBalance += request.Amount;
+            wallet.CreditOnHoldBalance += request.TotalAmount;
         }
         else
         {
-            wallet.Balance += request.Amount;
+            wallet.Balance += request.TotalAmount;
         }
 
         // Ensure maintaining balance is upheld
@@ -116,9 +116,8 @@ public class IncrementWallet(
             TenantId = tenant.Id,
             CredentialId = request.CredentialId,
             WalletId = wallet.Id,
-            Amount = request.Amount,
+            Amount = request.TotalAmount,
             TransactionFee = request.Fee,
-            ConvenienceFee = request.ConvenienceFee,
             PreviousBalance = previousBalance,
             RunningBalance = wallet.Balance,
             PreviousCreditOnHoldBalance = previousCreditOnHoldBalance,

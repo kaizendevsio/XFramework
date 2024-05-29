@@ -18,7 +18,7 @@ public class DecrementWallet(
     {
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
         
-        if (request.Amount <= 0)
+        if (request.TotalAmount <= 0)
         {
             logger.LogWarning("Invalid increment amount for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}", request.WalletId, request.WalletTypeId, request.CredentialId);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Invalid increment amount" };
@@ -38,7 +38,7 @@ public class DecrementWallet(
             return new CmdResponse { HttpStatusCode = HttpStatusCode.NotFound, Message = "Wallet not found" };
         }
 
-        if (wallet.AvailableBalance < request.Amount)
+        if (wallet.AvailableBalance < request.TotalAmount)
         {
             logger.LogWarning("Insufficient funds for decrement for Wallet ID {WalletId}", wallet.Id);
             return new CmdResponse { HttpStatusCode = HttpStatusCode.BadRequest, Message = "Insufficient funds" };
@@ -49,11 +49,11 @@ public class DecrementWallet(
         
         if (request.OnHold)
         {
-            wallet.DebitOnHoldBalance += request.Amount;
+            wallet.DebitOnHoldBalance += request.TotalAmount;
         }
         else
         {
-            wallet.Balance -= request.Amount;
+            wallet.Balance -= request.TotalAmount;
         }
 
         if (wallet.MaintainingBalanceRule.HasValue && wallet.Balance < wallet.MaintainingBalanceRule.Value)
@@ -71,9 +71,8 @@ public class DecrementWallet(
             TenantId = tenant.Id,
             CredentialId = request.CredentialId,
             WalletId = wallet.Id,
-            Amount = -request.Amount,  // Negative because it's a decrement
+            Amount = -request.TotalAmount,  // Negative because it's a decrement
             TransactionFee = request.Fee,
-            ConvenienceFee = request.ConvenienceFee,
             PreviousBalance = previousBalance,
             RunningBalance = wallet.Balance,
             PreviousDebitOnHoldBalance = previousDebitOnHoldBalance,
