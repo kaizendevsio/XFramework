@@ -41,4 +41,11 @@ public class SmsGatewayNodeController : ControllerBase
         _ = _mediator.Send(new ConfirmSmsMessageSentRequest(guid));
         return Accepted();
     }
+    
+    [HttpGet("MessageReceived/{agentClusterId}")]
+    public async Task<IActionResult> MessageReceived([FromRoute] Guid agentClusterId, [FromQuery] string sender, string message)
+    {
+        //_ = _mediator.Send(new ConfirmSmsMessageReceivedRequest(guid));
+        return Accepted();
+    }
 }

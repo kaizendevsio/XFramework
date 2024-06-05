@@ -8,5 +8,7 @@ namespace Wallets.Api.Generators;
     nameof(WalletType),
     nameof(WalletAddress),
     nameof(WalletTransaction),
+    nameof(DepositRequest),
+    nameof(WithdrawalRequest),
 })]
 public static partial class WalletsApiGenerator;
