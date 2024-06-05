@@ -35,14 +35,14 @@ public partial class WalletState
                 Amount = action.Amount,
                 Fee = action.Fee,
                 Remarks = action.Remarks,
-                CurrencyId = new("7ee3621a-5878-4c16-8112-eab11f29db95")
+                CurrencyId = Constants.Currency.Php
             });
 
             if (await HandleFailure(result, action)) return result;
 
             Mediator.Send(new LoadWalletList());
 
-            await HandleSuccess(result, action);
+            await HandleSuccess(result, action, false, "Wallet Conversion Successful");
             return result;
         }
     }

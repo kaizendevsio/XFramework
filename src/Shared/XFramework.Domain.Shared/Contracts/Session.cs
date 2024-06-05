@@ -14,7 +14,6 @@ public partial class Session : BaseModel
     [MemoryPackOrder(2)]
     public string? SessionData { get; set; }
 
-
     [MemoryPackOrder(3)]
     public virtual SessionType? SessionType { get; set; }
 

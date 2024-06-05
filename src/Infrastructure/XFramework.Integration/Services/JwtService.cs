@@ -49,7 +49,8 @@ public class JwtService : IJwtService
         return new()
         {
             AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
-            RefreshToken = refreshToken.Token
+            RefreshToken = refreshToken.Token,
+            SessionId = Guid.NewGuid()
         };
     }
 
@@ -77,7 +78,8 @@ public class JwtService : IJwtService
         return new()
         {
             AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
-            RefreshToken = refreshToken.Token
+            RefreshToken = refreshToken.Token,
+            SessionId = Guid.NewGuid()
         };
     }
         

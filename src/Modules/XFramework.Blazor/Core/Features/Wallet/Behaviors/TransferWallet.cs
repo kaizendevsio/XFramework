@@ -44,7 +44,7 @@ public partial class WalletState
                 Fee = action.Fee,
                 Remarks = action.Remarks,
                 OnHold = action.OnHold,
-                CurrencyId = new("7ee3621a-5878-4c16-8112-eab11f29db95"),
+                CurrencyId = Constants.Currency.Php,
                 TransactionPurpose = action.TransactionPurpose
             });
 

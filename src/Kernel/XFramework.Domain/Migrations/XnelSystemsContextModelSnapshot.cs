@@ -307,8 +307,8 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnName("ID")
                         .HasDefaultValueSql("(uuid_generate_v4())");
 
-                    b.Property<short?>("AuthStatus")
-                        .HasColumnType("smallint");
+                    b.Property<int?>("AuthStatus")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
@@ -323,6 +323,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceAgent")
+                        .HasColumnType("text");
 
                     b.Property<string>("DeviceName")
                         .HasMaxLength(50)
@@ -350,6 +353,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");

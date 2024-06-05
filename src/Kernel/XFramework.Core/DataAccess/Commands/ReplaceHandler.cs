@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Integration.Services;
 
 namespace XFramework.Core.DataAccess.Commands;
 

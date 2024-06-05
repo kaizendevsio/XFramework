@@ -7,6 +7,7 @@ using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Extensions;
+using XFramework.Integration.Services;
 
 namespace XFramework.Core.DataAccess.Query;
 
@@ -76,13 +77,18 @@ public class GetListHandler<TModel>(
         query = query
             .AsSplitQuery()
             .AsNoTracking();
-
+        
+        int pageIndex = request.PageNumber < 1 ? 1 : request.PageNumber;
+        int pageSize = request.PageSize <= 0 ? 10 : request.PageSize;
+        
+        int offset = (pageIndex - 1) * pageSize;
+        
         var items = await query
             .Where(i => i.TenantId == tenant.Id)
             .Where(i => i.IsDeleted == false)
             .OrderBy(i => i.CreatedAt)
-            .Skip((request.PageNumber - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip(offset)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
         
         //items = helperService.RemoveCircularReference(items);

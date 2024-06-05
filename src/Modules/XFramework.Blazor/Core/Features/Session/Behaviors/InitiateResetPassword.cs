@@ -59,8 +59,7 @@ public partial class SessionState
                     NavigateToOnSuccess = action.NavigateToOnSuccess,
                     NavigateToOnFailure = action.NavigateToOnFailure,
                     OnFailure = action.OnFailure,
-                    OnSuccess = action.OnSuccess,
-                    NavigateToOnVerificationRequired = action.NavigateToOnVerificationRequired,
+                    OnSuccess = action.OnSuccess
                 });
             }
             catch (Exception e)

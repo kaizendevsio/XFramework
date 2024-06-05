@@ -37,6 +37,13 @@ public static class IdentityConstants
         public static readonly Guid Billing = new("4eec62eb-08ef-406c-9ea2-2ac2d6e0f206");
         public static readonly Guid Shipping = new("337ee33d-445f-4e6e-bc61-8709170b0ee4");
     }
+    
+    public static class SessionType
+    {
+        public static readonly Guid User = new("70b44b35-bf8e-43fc-af1a-38bdb816d51f");
+        public static readonly Guid Service = new("1e3ab070-386a-410d-823f-4f225e07a69c");
+        public static readonly Guid Rpc = new("d71cda39-4192-4d7b-af22-1c6c9289b913");
+    }
 
 
 }

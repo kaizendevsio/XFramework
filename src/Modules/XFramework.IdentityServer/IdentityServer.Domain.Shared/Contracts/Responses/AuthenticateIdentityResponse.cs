@@ -11,4 +11,5 @@ public partial record AuthenticateIdentityResponse
     public string? TokenType { get; set; }
     public int ExpiresIn { get; set; }
     public string? RefreshToken { get; set; }
+    public Guid? SessionId { get; set; }
 }

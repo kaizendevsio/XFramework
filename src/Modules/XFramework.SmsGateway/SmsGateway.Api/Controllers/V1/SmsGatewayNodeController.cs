@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using SmsGateway.Core.DataAccess.Commands.Sms;
+using SmsGateway.Core.Commands.Sms;
 using SmsGateway.Core.Interfaces;
 using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 

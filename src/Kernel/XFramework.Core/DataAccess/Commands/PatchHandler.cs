@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using TypeSupport.Extensions;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Integration.Services;
 
 namespace XFramework.Core.DataAccess.Commands;
 

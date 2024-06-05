@@ -64,37 +64,40 @@ public abstract class BaseSignalRHandler
             var internalMediator = scope.ServiceProvider.GetRequiredService<IMediator>();
             var r = response.Data.AsMediatorCmd<TQuery, TResponse>();
 
-            using (LogContext.PushProperty("TenantId", r.Metadata?.TenantId))
+            using (LogContext.PushProperty(nameof(RequestMetadata.SessionId), r.Metadata?.SessionId))
             {
-                using (LogContext.PushProperty("RequestId", r.Metadata?.RequestId))
+                using (LogContext.PushProperty(nameof(RequestMetadata.TenantId), r.Metadata?.TenantId))
                 {
-                    // Offload logging to a background task
-                    _ = Task.Run(() =>
+                    using (LogContext.PushProperty(nameof(RequestMetadata.RequestId), r.Metadata?.RequestId))
                     {
-                        if (!logger.IsEnabled(LogLevel.Information)) return;
-
-                        logger.LogInformation("[{Caller}] Request received, Invoking '{Request}' with data: {Data}", nameof(StreamflowRequestHandler), GetType().Name, r);
-                    });
-
-                    var result = await internalMediator.Send(r).ConfigureAwait(false);
-
-                    // Log result in a background task
-                    _ = Task.Run(() =>
-                    {
-                        if (!logger.IsEnabled(LogLevel.Information)) return;
-                        
-                        if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
+                        // Offload logging to a background task
+                        _ = Task.Run(() =>
                         {
-                            logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message};", nameof(StreamflowRequestHandler), GetType().Name, result.Message);
-                        }
-                        else
-                        {
-                            logger.LogInformation("[{Caller}] Invoking {Request}' returned {HttpStatusCode};", nameof(StreamflowRequestHandler), GetType().Name, result.HttpStatusCode);
-                        }
-                    });
+                            if (!logger.IsEnabled(LogLevel.Information)) return;
 
-                    await RespondToInvoke(connection, response.RequestId, response.ClientId, result);
-                    response.Dispose();
+                            logger.LogInformation("[{Caller}] Request received, Invoking '{Request}' with data: {Data}", nameof(StreamflowRequestHandler), GetType().Name, r);
+                        });
+
+                        var result = await internalMediator.Send(r).ConfigureAwait(false);
+
+                        // Log result in a background task
+                        _ = Task.Run(() =>
+                        {
+                            if (!logger.IsEnabled(LogLevel.Information)) return;
+                            
+                            if (result.HttpStatusCode is HttpStatusCode.InternalServerError)
+                            {
+                                logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message};", nameof(StreamflowRequestHandler), GetType().Name, result.Message);
+                            }
+                            else
+                            {
+                                logger.LogInformation("[{Caller}] Invoking {Request}' returned {HttpStatusCode};", nameof(StreamflowRequestHandler), GetType().Name, result.HttpStatusCode);
+                            }
+                        });
+
+                        await RespondToInvoke(connection, response.RequestId, response.ClientId, result);
+                        response.Dispose();
+                    }
                 }
             }
         }
