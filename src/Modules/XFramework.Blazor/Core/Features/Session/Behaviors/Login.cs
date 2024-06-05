@@ -4,6 +4,7 @@ using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Core.Features.Wallet;
 using XFramework.Blazor.Entity.Models.Requests.Common;
 using XFramework.Domain.Shared.Contracts;
+using XFramework.Integration.Services;
 
 namespace XFramework.Blazor.Core.Features.Session;
 
@@ -21,6 +22,7 @@ public partial class SessionState
     protected class LogInHandler(
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
+        CacheManager cache,
         IStore store)
         : StateActionHandler<Login>(handlerServices, store)
     {
@@ -77,8 +79,13 @@ public partial class SessionState
             {
                 Identity = response.Response.Identity,
                 Credential = response.Response.Credential,
-                State = CurrentSessionState.Active
+                State = CurrentSessionState.Active,
+                AccessToken = response.Response.AccessToken,
+                RefreshToken = response.Response.RefreshToken,
+                SessionId = response.Response.SessionId
             });
+
+            await cache.Set("ActiveSession:SessionId", response.Response.SessionId);
             
             // Broadcast login event
             Mediator.Publish(new LoginEvent

@@ -3,7 +3,7 @@
 public record TransactionRequestBase : RequestBase
 {
     public Guid CredentialId { get; set; }
-    public virtual decimal TotalAmount => LineItems.Sum(x => x.Amount ?? 0);
+    public virtual decimal TotalAmount => LineItems.Sum(x => x.Amount ?? 0) + Amount;
     public virtual decimal Amount { get; set; }
     public virtual decimal Fee { get; set; }
     public virtual decimal TotalFee => LineItems.Sum(x => x.Fee) + Fee;

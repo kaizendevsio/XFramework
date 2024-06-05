@@ -30,5 +30,6 @@ global using System.Text.Json.Serialization;
 global using Blazored.LocalStorage;
 global using Mapster;
 global using Microsoft.Extensions.Configuration;
+global using Wallets.Domain.Shared;
 global using XFramework.Blazor.Core.Features.Application;
 global using XFramework.Domain.Shared.Enums;

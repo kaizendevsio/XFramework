@@ -1,6 +1,6 @@
-﻿namespace StreamFlow.Domain.Shared.Contracts.Requests;
+﻿using MediatR;
+using XFramework.Domain.Shared.BusinessObjects;
 
-public interface IStreamflowRequest<TRequest, TResponse>
-{
-    
-}
+namespace StreamFlow.Domain.Shared.Contracts.Requests;
+
+public interface IStreamflowRequest<TRequest, TResponse>;

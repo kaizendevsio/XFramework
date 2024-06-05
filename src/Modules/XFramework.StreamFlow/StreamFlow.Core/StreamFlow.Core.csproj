@@ -13,12 +13,5 @@
       <ProjectReference Include="..\StreamFlow.Domain\StreamFlow.Domain.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="DataAccess\Commands\Entity\" />
-      <Folder Include="DataAccess\Commands\Handlers\" />
-      <Folder Include="DataAccess\Query\Entity\" />
-      <Folder Include="DataAccess\Query\Handlers\" />
-    </ItemGroup>
-
 </Project>
  

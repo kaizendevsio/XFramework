@@ -362,6 +362,7 @@ public class BaseStateActionHandler
             message: title,
             severity: Severity.Info
         );
+        Log.Information(title);
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy});
     }
     public async Task ReportTaskCompleted()

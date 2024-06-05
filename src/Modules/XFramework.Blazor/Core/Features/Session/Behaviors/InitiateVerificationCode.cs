@@ -31,11 +31,6 @@ public partial class SessionState
 
         public override async Task Handle(InitiateVerificationCode action, CancellationToken aCancellationToken)
         {
-            if (!hostEnvironment.IsProduction())
-            {
-                NavigateTo(action.NavigateToOnSuccess);
-            }
-             
             if (action.LocalVerification is true)
             {
                 await messagingServiceWrapper.CreateVerificationMessage(new()
@@ -50,7 +45,7 @@ public partial class SessionState
             else
             {
                 var identityVerificationType = await identityServerServiceWrapper.IdentityVerificationType.GetList(
-                    pageNumber: 0,
+                    pageNumber: 1,
                     pageSize: 1,
                     filter:
                     [
@@ -104,7 +99,7 @@ public partial class SessionState
                 SessionState.VerificationVm.CredentialId = action.CredentialId;
             }
 
-            NavigateTo(action.NavigateToOnVerificationRequired);
+            await HandleSuccess(action, "Verification code sent");
         }
     }
 }

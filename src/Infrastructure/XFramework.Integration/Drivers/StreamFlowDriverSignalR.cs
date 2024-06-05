@@ -14,6 +14,7 @@ using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Entity.Contracts.Responses;
+using XFramework.Integration.Services;
 
 namespace XFramework.Integration.Drivers;
 
@@ -22,6 +23,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     public ISignalRService SignalRService { get; set; }
     private IConfiguration Configuration { get; set; }
     private HttpClient HttpClient { get; set; }
+    public CacheManager Cache { get; }
     public IHostEnvironment HostEnvironment { get; }
     private IHttpClientFactory HttpClientFactory { get; set; }
     private DeviceAgentProvider DeviceAgentProvider { get; set; }
@@ -41,8 +43,9 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     public Action OnReconnecting { get; set; }
     public Action OnDisconnected { get; set; }
 
-    public StreamFlowDriverSignalR(IHostEnvironment hostEnvironment, ISignalRService signalRService, IConfiguration configuration, ILogger<StreamFlowDriverSignalR> logger, IHttpClientFactory httpClientFactory, DeviceAgentProvider deviceAgentProvider)
+    public StreamFlowDriverSignalR(CacheManager cache, IHostEnvironment hostEnvironment, ISignalRService signalRService, IConfiguration configuration, ILogger<StreamFlowDriverSignalR> logger, IHttpClientFactory httpClientFactory, DeviceAgentProvider deviceAgentProvider)
     {
+        Cache = cache;
         HostEnvironment = hostEnvironment;
         HttpClientFactory = httpClientFactory;
         HttpClient = HttpClientFactory.CreateClient();
@@ -191,7 +194,8 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             TenantId = requestServer?.TenantId ?? TenantId,
             Name = !string.IsNullOrEmpty(requestServer?.Name) ? requestServer.Name : ClientName,
             IpAddress = !string.IsNullOrEmpty(requestServer?.IpAddress) ? requestServer.IpAddress : ClientIpAddress,
-            RequestId = requestServer?.RequestId ?? Guid.NewGuid()
+            RequestId = requestServer?.RequestId ?? Guid.NewGuid(),
+            SessionId = request.Metadata.SessionId ?? Cache.Get<Guid>("ActiveSession:SessionId")
         };
     }
     
