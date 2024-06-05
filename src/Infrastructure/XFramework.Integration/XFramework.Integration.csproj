@@ -21,6 +21,7 @@
         <PackageReference Include="Mapster" Version="7.4.0" />
         <PackageReference Include="MediatR" Version="12.2.0" />
         <PackageReference Include="BinaryPack" Version="1.0.3" />
+        <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="8.0.0" />
         <PackageReference Include="Scrutor" Version="4.2.2" />
         <PackageReference Include="Sentry.Extensions.Logging" Version="4.1.2" />
         <PackageReference Include="Serilog" Version="3.1.1" />
@@ -51,12 +52,6 @@
       <ProjectReference Include="..\..\Modules\XFramework.PaymentGateways\PaymentGateways.Domain.Shared\PaymentGateways.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\Modules\XFramework.StreamFlow\StreamFlow.Domain.Shared\StreamFlow.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="Microsoft.Extensions.Caching.Abstractions">
-        <HintPath>..\..\..\..\..\Program Files\dotnet\shared\Microsoft.AspNetCore.App\8.0.6\Microsoft.Extensions.Caching.Abstractions.dll</HintPath>
-      </Reference>
     </ItemGroup>
 
 </Project>
