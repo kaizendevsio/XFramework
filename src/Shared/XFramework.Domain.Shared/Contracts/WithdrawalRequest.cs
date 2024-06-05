@@ -1,3 +1,5 @@
+using XFramework.Domain.Shared.Enums;
+
 namespace XFramework.Domain.Shared.Contracts;
 
 
@@ -15,7 +17,7 @@ public partial class WithdrawalRequest : BaseModel
     public decimal? TotalAmount { get; set; }
 
     [MemoryPackOrder(3)]
-    public short? WithdrawalStatus { get; set; }
+    public TransactionStatus WithdrawalStatus { get; set; }
 
     [MemoryPackOrder(4)]
     public string? Remarks { get; set; }
