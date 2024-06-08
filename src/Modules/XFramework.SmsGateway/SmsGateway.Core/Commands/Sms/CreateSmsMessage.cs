@@ -3,15 +3,8 @@ using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 
 namespace SmsGateway.Core.Commands.Sms;
 
-public class CreateSmsMessageHandler : IRequestHandler<CreateSmsMessageRequest, CmdResponse>
+public class CreateSmsMessage(ICachingService cachingService) : IRequestHandler<CreateSmsMessageRequest, CmdResponse>
 {
-    private readonly ICachingService _cachingService;
-
-    public CreateSmsMessageHandler(ICachingService cachingService)
-    {
-        _cachingService = cachingService;
-    }
-
     public async Task<CmdResponse> Handle(CreateSmsMessageRequest request, CancellationToken cancellationToken)
     {
         Retry:
@@ -26,7 +19,7 @@ public class CreateSmsMessageHandler : IRequestHandler<CreateSmsMessageRequest, 
             Message = request.Message
         };
         
-        if (_cachingService.PendingMessageList.TryAdd(Guid.NewGuid(), data) is false)
+        if (cachingService.PendingMessageList.TryAdd(Guid.NewGuid(), data) is false)
         { 
             goto Retry;
         }

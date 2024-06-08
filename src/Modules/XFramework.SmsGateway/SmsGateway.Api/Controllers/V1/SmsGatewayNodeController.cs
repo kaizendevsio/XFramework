@@ -43,9 +43,16 @@ public class SmsGatewayNodeController : ControllerBase
     }
     
     [HttpGet("MessageReceived/{agentClusterId}")]
-    public async Task<IActionResult> MessageReceived([FromRoute] Guid agentClusterId, [FromQuery] string sender, string message)
+    public async Task<IActionResult> MessageReceived([FromRoute] Guid agentClusterId, [FromQuery] string sender, [FromQuery]string message, [FromQuery]string subscriptionId, [FromQuery]string receivedAt)
     {
-        //_ = _mediator.Send(new ConfirmSmsMessageReceivedRequest(guid));
+        _ = _mediator.Send(new CreateMessageReceived()
+        {
+            Sender = sender,
+            Message = message,
+            AgentClusterId = agentClusterId,
+            SubscriptionId = subscriptionId,
+            ReceivedAt = receivedAt
+        });
         return Accepted();
     }
 }

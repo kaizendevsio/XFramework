@@ -5,8 +5,8 @@ using XFramework.Domain.Shared.Contracts.Requests;
 namespace SmsGateway.Core.Commands.Sms;
 public record ConfirmSmsMessageSentRequest(Guid Id) : RequestBase, IRequest<CmdResponse>;
 
-public class ConfirmMessageSentHandler(
-    ILogger<ConfirmMessageSentHandler> logger,
+public class ConfirmMessageSent(
+    ILogger<ConfirmMessageSent> logger,
     ICachingService cachingService,
     IMessagingServiceWrapper messagingServiceWrapper
     )
