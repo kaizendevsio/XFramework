@@ -44,23 +44,26 @@ public partial class MessageDirect : BaseModel
     public Guid AgentClusterId { get; set; }
     
     [MemoryPackOrder(12)]
-    public DateTime? SentAt { get; set; }
+    public string? SubscriptionId { get; set; }
     
     [MemoryPackOrder(13)]
+    public DateTime? SentAt { get; set; }
+    
+    [MemoryPackOrder(14)]
     public DateTime? RecievedAt { get; set; }
 
-    [MemoryPackOrder(14)]
+    [MemoryPackOrder(15)]
     public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = [];
 
-    [MemoryPackOrder(15)]
+    [MemoryPackOrder(16)]
     public virtual MessageDirect? ParentMessage { get; set; }
 
-    [MemoryPackOrder(16)]
+    [MemoryPackOrder(17)]
     public virtual IdentityCredential? Recipient { get; set; }
 
-    [MemoryPackOrder(17)]
+    [MemoryPackOrder(18)]
     public virtual IdentityCredential? Sender { get; set; } = null!;
 
-    [MemoryPackOrder(18)]
+    [MemoryPackOrder(19)]
     public virtual MessageType Type { get; set; } = null!;
 }
