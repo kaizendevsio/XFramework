@@ -2401,6 +2401,9 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Subject")
                         .HasColumnType("character varying");
 
+                    b.Property<string>("SubscriptionId")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
