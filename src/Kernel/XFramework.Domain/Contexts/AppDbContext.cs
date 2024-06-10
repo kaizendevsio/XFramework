@@ -1961,7 +1961,7 @@ public partial class AppDbContext : XDbContext
 
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
             entity.Property(e => e.Remarks).HasColumnType("character varying");
-            entity.Property(e => e.TotalAmount).HasPrecision(18, 10);
+            entity.Property(e => e.Amount).HasPrecision(18, 10);
 
             entity.HasOne(d => d.Credential).WithMany(p => p.WithdrawalRequests)
                 .HasForeignKey(d => d.CredentialId)

@@ -15,6 +15,14 @@ public static class MessageIntents
     public static readonly string Notification = nameof(Notification);
 }
 
+public static class MessageEvents
+{
+    public static readonly string SmsReceived = nameof(SmsReceived);
+    public static readonly string EmailReceived = nameof(EmailReceived);
+    public static readonly string PushReceived = nameof(PushReceived);
+    public static readonly string ChatReceived = nameof(ChatReceived);
+}
+
 
 public static class GenericSender
 {
