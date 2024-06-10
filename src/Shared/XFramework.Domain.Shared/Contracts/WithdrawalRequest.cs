@@ -14,26 +14,27 @@ public partial class WithdrawalRequest : BaseModel
     public string? Address { get; set; }
 
     [MemoryPackOrder(2)]
-    public decimal? TotalAmount { get; set; }
-
+    public decimal? Amount { get; set; }
+    
     [MemoryPackOrder(3)]
-    public TransactionStatus WithdrawalStatus { get; set; }
+    public decimal? Fee { get; set; }
 
     [MemoryPackOrder(4)]
-    public string? Remarks { get; set; }
+    public TransactionStatus WithdrawalStatus { get; set; }
 
     [MemoryPackOrder(5)]
-    public Guid WalletId { get; set; }
-
+    public string? Remarks { get; set; }
+    
     [MemoryPackOrder(6)]
-    public Guid WalletTypeId { get; set; }
+    public string? ReferenceNumber { get; set; }
 
     [MemoryPackOrder(7)]
-    public virtual IdentityCredential Credential { get; set; } = null!;
+    public Guid WalletId { get; set; }
 
     [MemoryPackOrder(8)]
-    public virtual WalletType? WalletType { get; set; }
+    public virtual IdentityCredential Credential { get; set; } = null!;
 
     [MemoryPackOrder(9)]
     public virtual Wallet? Wallet { get; set; }
+
 }
