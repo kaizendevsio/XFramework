@@ -32,7 +32,7 @@ public partial class SessionState
                         ShowCloseButton = true,
                         ConfirmButtonText = "Close",
                     });
-                    CurrentState.VerificationVm.OnFailure?.Invoke();
+                    CurrentState.VerificationVm.OnInvalidToken?.Invoke();
                     return;
                 }
                 NavigateTo(action.NavigateToOnSuccess);
@@ -43,18 +43,16 @@ public partial class SessionState
                 {
                     Token = CurrentState.VerificationVm.OtpCode,
                 });
-                
-                if (await HandleFailure(response, action, true, "Your otp code is incorrect. Please try again"))
+                if (await HandleFailure(response, action, false, "Your otp code is incorrect. Please try again"))
                 {
-                    CurrentState.VerificationVm.OnFailure?.Invoke();
+                    CurrentState.VerificationVm.OnInvalidToken?.Invoke();
                     return;
                 }
+
+                Console.WriteLine("Correct Otp");
+                CurrentState.VerificationVm.OnValidToken.Invoke();
                 await HandleSuccess(response, action, true);
             }
-
-            CurrentState.VerificationVm.OnSuccess?.Invoke();
-            
-            return;
         }
     }
 }

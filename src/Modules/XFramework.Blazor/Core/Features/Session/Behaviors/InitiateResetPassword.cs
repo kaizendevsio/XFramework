@@ -8,7 +8,11 @@ namespace XFramework.Blazor.Core.Features.Session;
 
 public partial class SessionState
 {
-    public record InitiateResetPassword : NavigableRequest;
+    public record InitiateResetPassword : NavigableRequest
+    {
+        public Action? OnValidOtp { get; set; }
+        public Action? OnInvalidOtp { get; set; }
+    };
     
     protected class InitiateResetPasswordHandler(
         IHelperService helperService,
@@ -59,7 +63,9 @@ public partial class SessionState
                     NavigateToOnSuccess = action.NavigateToOnSuccess,
                     NavigateToOnFailure = action.NavigateToOnFailure,
                     OnFailure = action.OnFailure,
-                    OnSuccess = action.OnSuccess
+                    OnSuccess = action.OnSuccess,
+                    OnValidToken = action.OnValidOtp,
+                    OnInvalidToken = action.OnInvalidOtp
                 });
             }
             catch (Exception e)

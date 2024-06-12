@@ -9,8 +9,9 @@ public partial class WalletState
     {
         public decimal? Amount { get; set; }
         public decimal? Fee { get; set; }
-        public Guid TargetWalletTypeId { get; set; }
+        public Guid WalletTypeId { get; set; }
         public Guid? CredentialId { get; set; }
+        public string? ReferenceNumber { get; set; }
     }
 
     protected class CreateWithdrawalRequestHandler(
@@ -34,7 +35,7 @@ public partial class WalletState
                 };
             }
             
-            if (action.TargetWalletTypeId == Guid.Empty)
+            if (action.WalletTypeId == Guid.Empty)
             {
                 await HandleFailure(action, "Target wallet type is required to create withdrawal request");
                 return new()
@@ -51,13 +52,13 @@ public partial class WalletState
                     new()
                     {
                         PropertyName = nameof(Domain.Shared.Contracts.Wallet.WalletTypeId),
-                        Operation = QueryFilterOperation.Contains,
-                        Value = action.TargetWalletTypeId,
+                        Operation = QueryFilterOperation.Equal,
+                        Value = action.WalletTypeId,
                     },
                     new()
                     {
                         PropertyName = nameof(Domain.Shared.Contracts.Wallet.CredentialId),
-                        Operation = QueryFilterOperation.Contains,
+                        Operation = QueryFilterOperation.Equal,
                         Value = credentialId
                     }
                 ]
@@ -96,6 +97,7 @@ public partial class WalletState
                 Amount = action.Amount!.Value,
                 WithdrawalStatus = TransactionStatus.Pending,
                 Remarks = "Withdrawal Request",
+                ReferenceNumber = action.ReferenceNumber,
                 WalletId = wallet.Response!.Items.First().Id,
             });
             
@@ -113,8 +115,8 @@ public partial class WalletState
                 Fee = action.Fee ?? 0,
                 Remarks = "Withdrawal Request",
                 OnHold = true,
-                ReferenceNumber = null,
-                CurrencyId = default,
+                ReferenceNumber = action.ReferenceNumber,
+                CurrencyId = Constants.Currency.Php,
             });
             
             await HandleSuccess(action,"Withdrawal request created successfully");
