@@ -100,7 +100,7 @@ public class BaseStateActionHandler
                     default:
                         SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                             ? $" {response.Message}"
-                            : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
+                            : $"{customMessage}", SweetAlertIcon.Error);
                         break;
                 }
             }
@@ -108,7 +108,7 @@ public class BaseStateActionHandler
             {
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $" {response.Message}"
-                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
+                    : $"{customMessage}", SweetAlertIcon.Error);
             }
         }
 
@@ -135,15 +135,15 @@ public class BaseStateActionHandler
                     default:
                         SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                             ? $" {response.Message}"
-                            : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
+                            : $"{customMessage}", SweetAlertIcon.Error);
                         break;
                 }
             }
             else
             {
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                    ? $" {response.Message}"
-                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
+                    ? $"{response.Message}"
+                    : $"{customMessage}", SweetAlertIcon.Error);
             }
         }
 
@@ -170,7 +170,7 @@ public class BaseStateActionHandler
                     default:
                         SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                             ? $" {response.Message}"
-                            : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
+                            : $"{customMessage}", SweetAlertIcon.Error);
                         break;
                 }
             }
@@ -178,7 +178,7 @@ public class BaseStateActionHandler
             {
                 SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
                     ? $" {response.Message}"
-                    : $"{customMessage}: {response.Message}", SweetAlertIcon.Error);
+                    : $"{customMessage}", SweetAlertIcon.Error);
             }
         }
 

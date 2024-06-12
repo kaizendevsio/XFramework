@@ -16,6 +16,8 @@ public partial class SessionState
         public string Contact { get; set; }
         public bool? LocalVerification { get; set; }
         public string LocalToken { get; set; }
+        public Action? OnValidToken { get; set; }
+        public Action? OnInvalidToken { get; set; }
     }
     
     protected class InitiateVerificationCodeHandler
@@ -93,10 +95,18 @@ public partial class SessionState
                     });
                     return;
                 }
-                
-                SessionState.VerificationVm = action.Adapt<VerificationRequest>();
-                SessionState.VerificationVm.Id = result.Response?.Id ?? Guid.Empty;
-                SessionState.VerificationVm.CredentialId = action.CredentialId;
+
+                await Mediator.Send(new SetState()
+                {
+                    VerificationVm = new()
+                    {
+                        Id = result.Response?.Id ?? Guid.Empty,
+                        CredentialId = action.CredentialId,
+                        OnValidToken = action.OnValidToken,
+                        OnInvalidToken = action.OnInvalidToken
+                    }
+                });
+                Console.WriteLine("Verification code sent");
             }
 
             await HandleSuccess(action, "Verification code sent");

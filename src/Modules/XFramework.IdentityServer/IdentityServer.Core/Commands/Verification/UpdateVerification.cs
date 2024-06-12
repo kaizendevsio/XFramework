@@ -28,6 +28,8 @@ public class UpdateVerification(
         verification.Status = (short?) GenericStatusType.Approved;
         verification.StatusUpdatedOn = DateTime.Now.ToUniversalTime();
 
-        return await baseHandler.Handle(new Patch<IdentityVerification>(verification) , cancellationToken);
+        return await baseHandler.Handle(new Patch<IdentityVerification>(verification){
+            Metadata = request.Metadata
+        } , cancellationToken);
     }
 }

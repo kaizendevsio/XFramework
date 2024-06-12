@@ -53,8 +53,8 @@ public class AuthenticateIdentity(
 
         AuthorizationLog? authorizationLog = null;
         
-        var credential = await ValidateAuthorization(request, tenant, request.AuthorizationType, cancellationToken);
-        if (credential is null)
+        var originalCredential = await ValidateAuthorization(request, tenant, request.AuthorizationType, cancellationToken);
+        if (originalCredential is null)
         {
             return new()
             {
@@ -63,13 +63,13 @@ public class AuthenticateIdentity(
             };
         }
             
-        credential = await ValidatePassword(request, request.AuthorizationType, credential, cancellationToken);
+        var credential = await ValidatePassword(request, request.AuthorizationType, originalCredential, cancellationToken);
         if (credential == null)
         {
             authorizationLog = new()
             {
                 TenantId = tenant.Id,
-                CredentialId = credential.Id,
+                CredentialId = originalCredential.Id,
                 Ipaddress = request.Metadata.IpAddress,
                 IsSuccess = false,
                 AuthStatus = AuthenticationState.WrongPassword,

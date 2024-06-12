@@ -39,6 +39,11 @@ static void AddMemoryPackAttributes(string directoryPath)
 
         for (var i = 0; i < lines.Length; i++)
         {
+            if (string.IsNullOrEmpty(lines[i]))
+            {
+                continue;
+            }
+            
             if (lines[i].Contains("public partial class"))
             {
                 // Check if the MemoryPackable attribute is already present within a few lines above the class declaration
@@ -48,6 +53,7 @@ static void AddMemoryPackAttributes(string directoryPath)
                 }
                 classFound = true;
                 propertyOrder = 0;
+                continue;
             }
 
             if (classFound && lines[i].Trim().StartsWith("public") && !lines[i].Contains("partial") && !lines[i].Contains("class"))
@@ -63,8 +69,10 @@ static void AddMemoryPackAttributes(string directoryPath)
                         continue;
                     }
                     lines[i] = $"{indent}[MemoryPackIgnore]\n{lines[i]}";
-                } 
-                else if (lines[i - 1].Trim().StartsWith("[MemoryPackOrder"))  // Remove existing MemoryPackOrder if present
+                    continue;
+                }
+
+                if (lines[i - 1].Trim().StartsWith("[MemoryPackOrder") && lines[i - 1].Trim().EndsWith("]"))  // Remove existing MemoryPackOrder if present
                 {
                     lines[i - 1] = $"[MemoryPackOrder({propertyOrder})]";
                 }

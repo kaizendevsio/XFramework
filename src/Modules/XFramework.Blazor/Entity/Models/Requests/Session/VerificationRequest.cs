@@ -8,8 +8,8 @@ public record VerificationRequest : NavigableRequest
     public Guid Id { get; set; }
     public Guid CredentialId { get; set; }
     public string OtpCode { get; set; }
-    public Action OnSuccess { get; set; }
-    public Action OnFailure { get; set; }
+    public Action? OnValidToken { get; set; }
+    public Action? OnInvalidToken { get; set; }
     public bool? LocalVerification { get; set; }
     public string LocalToken { get; set; }
 }
