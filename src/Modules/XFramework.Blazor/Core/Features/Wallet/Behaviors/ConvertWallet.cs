@@ -40,7 +40,7 @@ public partial class WalletState
 
             if (await HandleFailure(result, action)) return result;
 
-            Mediator.Send(new LoadWalletList());
+            _ = Mediator.Send(new LoadWalletList(), CancellationToken.None);
 
             await HandleSuccess(result, action, false, "Wallet Conversion Successful");
             return result;
