@@ -116,6 +116,6 @@ public partial class WalletTransaction : BaseModel
     private void ComputeNetAmount()
     {
         TotalFees = TransactionFee + LineItems.Sum(x => x.Fee);
-        NetAmount = Amount - TotalFees;
+        NetAmount = (Amount + LineItems.Sum(x => x.Amount) ?? 0) - TotalFees;
     }
 }
