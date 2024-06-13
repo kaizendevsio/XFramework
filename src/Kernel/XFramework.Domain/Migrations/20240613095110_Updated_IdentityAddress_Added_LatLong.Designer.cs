@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
 
 #nullable disable
 
-namespace XFramework.Domain.Migrations.XnelSystems
+namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class XnelSystemsContextModelSnapshot : ModelSnapshot
+    [Migration("20240613095110_Updated_IdentityAddress_Added_LatLong")]
+    partial class Updated_IdentityAddress_Added_LatLong
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1216,9 +1219,6 @@ namespace XFramework.Domain.Migrations.XnelSystems
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("ConsolidatedName")
-                        .HasColumnType("text");
 
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid");

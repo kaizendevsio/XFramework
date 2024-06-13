@@ -1,10 +1,8 @@
 namespace XFramework.Domain.Shared.Contracts;
 
-
 [MemoryPackable(GenerateType.CircularReference)]
 public partial class IdentityAddress : BaseModel
 {
-    
     [MemoryPackOrder(0)]
     public Guid IdentityInfoId { get; set; }
 
@@ -16,6 +14,7 @@ public partial class IdentityAddress : BaseModel
 
     [MemoryPackOrder(3)]
     public string? Building { get; set; }
+
     [MemoryPackOrder(4)]
     public string? Name { get; set; }
 
@@ -43,25 +42,36 @@ public partial class IdentityAddress : BaseModel
     [MemoryPackOrder(12)]
     public Guid CountryId { get; set; }
 
-
     [MemoryPackOrder(13)]
-    public virtual IdentityAddressType? AddressType { get; set; }
+    public double? Latitude { get; set; }
 
     [MemoryPackOrder(14)]
-    public virtual AddressBarangay? Barangay { get; set; }
+    public double? Longitude { get; set; }
 
     [MemoryPackOrder(15)]
-    public virtual AddressCity? City { get; set; }
+    public DateTime? LastUpdated { get; set; }
 
     [MemoryPackOrder(16)]
-    public virtual AddressCountry? Country { get; set; }
+    public virtual IdentityAddressType? AddressType { get; set; }
 
     [MemoryPackOrder(17)]
-    public virtual IdentityInformation? IdentityInfo { get; set; }
+    public virtual AddressBarangay? Barangay { get; set; }
 
     [MemoryPackOrder(18)]
-    public virtual AddressProvince? Province { get; set; }
+    public virtual AddressCity? City { get; set; }
 
     [MemoryPackOrder(19)]
+    public virtual AddressCountry? Country { get; set; }
+
+    [MemoryPackOrder(20)]
+    public virtual IdentityInformation? IdentityInfo { get; set; }
+
+    [MemoryPackOrder(21)]
+    public virtual AddressProvince? Province { get; set; }
+
+    [MemoryPackOrder(22)]
     public virtual AddressRegion? Region { get; set; }
+
+    [MemoryPackOrder(23)]
+    public string? ConsolidatedName { get; set; }
 }
