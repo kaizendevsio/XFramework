@@ -12,7 +12,7 @@ public partial class WalletTransaction : BaseModel
     [MemoryPackOrder(1)]
     public Guid WalletId { get; set; }
 
-    [MemoryPackIgnore]
+    [MemoryPackOrder(2)]
     public decimal Amount
     {
         get
@@ -29,93 +29,86 @@ public partial class WalletTransaction : BaseModel
                 _ => 0
             });
         }
-        set
-        {
-            InternalAmount = value;
-            ComputeNetAmount(); // Update NetAmount whenever Amount is set
-        }
+        set => InternalAmount = value;
     }
 
     [NotMapped]
-    [MemoryPackOrder(2)]
+    [MemoryPackOrder(3)]
     private decimal InternalAmount { get; set; }
 
-    [MemoryPackOrder(3)]
-    public decimal NetAmount { get; private set; } // Make setter private
-
     [MemoryPackOrder(4)]
+    public decimal NetAmount
+    {
+        get => (Amount + LineItems.Sum(x => x.Amount) ?? 0) - TotalFees;
+        set => _ = value;
+    }
+
+    [MemoryPackOrder(5)]
     public bool Held { get; set; }
     
-    [MemoryPackOrder(5)]
+    [MemoryPackOrder(6)]
     public bool Released { get; set; }
     
-    [MemoryPackOrder(6)]
+    [MemoryPackOrder(7)]
     public string? Remarks { get; set; }
 
-    [MemoryPackOrder(7)]
+    [MemoryPackOrder(8)]
     public decimal TransactionFee
     {
         get => _transactionFee;
-        set
-        {
-            _transactionFee = value;
-            ComputeNetAmount(); // Update NetAmount whenever TransactionFee is set
-        }
+        set => _transactionFee = value;
     }
     private decimal _transactionFee;
 
-    [MemoryPackOrder(8)]
-    public decimal TotalFees { get; private set; }
-
     [MemoryPackOrder(9)]
+    public decimal TotalFees { 
+        get => TransactionFee + LineItems.Sum(x => x.Fee); 
+        set => _ = value; 
+    }
+
+    [MemoryPackOrder(10)]
     public string? ReferenceNumber { get; set; }
     
-    [MemoryPackOrder(10)]
+    [MemoryPackOrder(11)]
     public string? Description { get; set; }
 
-    [MemoryPackOrder(11)]
+    [MemoryPackOrder(12)]
     public decimal? RunningTotalBalance { get; set; }
 
-    [MemoryPackOrder(12)]
+    [MemoryPackOrder(13)]
     public decimal? RunningAvailableBalance { get; set; }
    
-    [MemoryPackOrder(13)]
+    [MemoryPackOrder(14)]
     public decimal? RunningBalance { get; set; }
     
-    [MemoryPackOrder(14)]
+    [MemoryPackOrder(15)]
     public decimal? RunningDebitOnHoldBalance { get; set; }
     
-    [MemoryPackOrder(15)]
+    [MemoryPackOrder(16)]
     public decimal? RunningCreditOnHoldBalance { get; set; }
     
-    [MemoryPackOrder(16)]
+    [MemoryPackOrder(17)]
     public decimal PreviousTotalBalance { get; set; }
     
-    [MemoryPackOrder(17)]
+    [MemoryPackOrder(18)]
     public decimal PreviousBalance { get; set; }
     
-    [MemoryPackOrder(18)]
+    [MemoryPackOrder(19)]
     public decimal PreviousDebitOnHoldBalance { get; set; }
     
-    [MemoryPackOrder(19)]
+    [MemoryPackOrder(20)]
     public decimal PreviousCreditOnHoldBalance { get; set; }
 
-    [MemoryPackOrder(20)]
+    [MemoryPackOrder(21)]
     public TransactionType? TransactionType { get; set; }
 
-    [MemoryPackOrder(21)]
+    [MemoryPackOrder(22)]
     public virtual IdentityCredential Credential { get; set; } = null!;
 
-    [MemoryPackOrder(22)]
+    [MemoryPackOrder(23)]
     public virtual Wallet? Wallet { get; set; }
 
-    [MemoryPackOrder(23)] 
+    [MemoryPackOrder(24)] 
     public virtual ICollection<WalletTransactionLineItem> LineItems { get; set; } = [];
 
-    // Compute the NetAmount
-    private void ComputeNetAmount()
-    {
-        TotalFees = TransactionFee + LineItems.Sum(x => x.Fee);
-        NetAmount = (Amount + LineItems.Sum(x => x.Amount) ?? 0) - TotalFees;
-    }
 }

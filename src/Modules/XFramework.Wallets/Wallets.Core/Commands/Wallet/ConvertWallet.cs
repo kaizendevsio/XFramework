@@ -141,7 +141,14 @@ public class ConvertWallet(
 
         // Perform the conversion
         var previousSourceBalance = sourceWallet.Balance;
+        var previousSourceTotalBalance = sourceWallet.TotalBalance.Value;
+        var previousSourceCreditOnHoldBalance = sourceWallet.CreditOnHoldBalance;
+        var previousSourceDebitOnHoldBalance = sourceWallet.DebitOnHoldBalance;
+        
         var previousTargetBalance = targetWallet.Balance;
+        var previousTargetTotalBalance = targetWallet.TotalBalance.Value;
+        var previousTargetCreditOnHoldBalance = targetWallet.CreditOnHoldBalance;
+        var previousTargetDebitOnHoldBalance = targetWallet.DebitOnHoldBalance;
 
         sourceWallet.Balance -= totalDecrement;
         targetWallet.Balance += totalIncrement;
@@ -155,13 +162,20 @@ public class ConvertWallet(
             Amount = totalDecrement,
             TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
             PreviousBalance = previousSourceBalance,
+            PreviousTotalBalance = previousSourceTotalBalance,
+            PreviousDebitOnHoldBalance = previousSourceDebitOnHoldBalance,
+            PreviousCreditOnHoldBalance = previousSourceCreditOnHoldBalance,
             RunningBalance = sourceWallet.Balance,
+            RunningDebitOnHoldBalance = sourceWallet.DebitOnHoldBalance,
+            RunningCreditOnHoldBalance = sourceWallet.CreditOnHoldBalance,
+            RunningTotalBalance = sourceWallet.TotalBalance,
+            RunningAvailableBalance = sourceWallet.AvailableBalance,
             Remarks = request.Remarks,
             Description = $"Converted to {targetWallet.WalletType?.Name}",
             TransactionType = TransactionType.Debit,
             Held = false,
             Released = true,
-            ReferenceNumber = request.ReferenceNumber
+            ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber) ? Guid.NewGuid().ToString() : request.ReferenceNumber
         };
 
         var targetTransaction = new WalletTransaction
@@ -172,13 +186,20 @@ public class ConvertWallet(
             Amount = request.TotalAmount,
             TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
             PreviousBalance = previousTargetBalance,
+            PreviousTotalBalance = previousTargetTotalBalance,
+            PreviousDebitOnHoldBalance = previousTargetDebitOnHoldBalance,
+            PreviousCreditOnHoldBalance = previousTargetCreditOnHoldBalance,
             RunningBalance = targetWallet.Balance,
+            RunningDebitOnHoldBalance = targetWallet.DebitOnHoldBalance,
+            RunningCreditOnHoldBalance = targetWallet.CreditOnHoldBalance,
+            RunningTotalBalance = targetWallet.TotalBalance,
+            RunningAvailableBalance = targetWallet.AvailableBalance,
             Remarks = request.Remarks,
             Description = $"Converted from {sourceWallet.WalletType?.Name}",
             TransactionType = TransactionType.Credit,
             Held = false,
             Released = true,
-            ReferenceNumber = request.ReferenceNumber
+            ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber) ? Guid.NewGuid().ToString() : request.ReferenceNumber
         };
 
         dbContext.Set<WalletTransaction>().Add(sourceTransaction);

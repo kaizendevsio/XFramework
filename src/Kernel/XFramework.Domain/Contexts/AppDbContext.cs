@@ -160,6 +160,8 @@ public partial class AppDbContext : XDbContext
     public virtual DbSet<WalletType> WalletTypes { get; set; }
 
     public virtual DbSet<WalletTransaction> WalletTransactions { get; set; }
+    public virtual DbSet<WalletTransfer> WalletTransfers { get; set; }
+    public virtual DbSet<WalletTransactionLineItem> WalletTransactionLineItems { get; set; }
 
     public virtual DbSet<WithdrawalRequest> WithdrawalRequests { get; set; }
     
@@ -167,6 +169,16 @@ public partial class AppDbContext : XDbContext
     {
         modelBuilder.HasPostgresExtension("uuid-ossp");
 
+        modelBuilder.Entity<WalletTransfer>(entity =>
+        {
+            entity.ToTable("WalletTransfer", "Wallet"); 
+        });
+        
+        modelBuilder.Entity<WalletTransactionLineItem>(entity =>
+        {
+            entity.ToTable("WalletTransactionLineItem", "Wallet"); 
+        });
+        
         modelBuilder.Entity<AddressBarangay>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("addresses_refbrgy_pk");

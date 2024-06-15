@@ -20,6 +20,8 @@ public partial class AddressState : State<AddressState>
     public AddressProvince SelectedProvince { get; set; } = new();
     public AddressCity SelectedCity { get; set; } = new();
     public AddressBarangay SelectedBarangay { get; set; } = new();
+    
+    public IdentityAddress SelectedAddress { get; set; } = new();
     public string? CurrentAddressName { get; set; }
     public string? CurrentUnitNumber { get; set; }
 

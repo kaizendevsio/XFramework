@@ -19,16 +19,16 @@ public partial class IdentityAddress : BaseModel
     public string? Name { get; set; }
 
     [MemoryPackOrder(5)]
-    public Guid BarangayId { get; set; }
+    public Guid? BarangayId { get; set; }
 
     [MemoryPackOrder(6)]
-    public Guid CityId { get; set; }
+    public Guid? CityId { get; set; }
 
     [MemoryPackOrder(7)]
     public string? Subdivision { get; set; }
 
     [MemoryPackOrder(8)]
-    public Guid RegionId { get; set; }
+    public Guid? RegionId { get; set; }
 
     [MemoryPackOrder(9)]
     public Guid? AddressTypeId { get; set; }
@@ -37,10 +37,10 @@ public partial class IdentityAddress : BaseModel
     public bool? DefaultAddress { get; set; }
 
     [MemoryPackOrder(11)]
-    public Guid ProvinceId { get; set; }
+    public Guid? ProvinceId { get; set; }
 
     [MemoryPackOrder(12)]
-    public Guid CountryId { get; set; }
+    public Guid? CountryId { get; set; }
 
     [MemoryPackOrder(13)]
     public double? Latitude { get; set; }

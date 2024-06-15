@@ -42,7 +42,22 @@ public partial class QueryFilter
                 return;
             }
 
-            Type = value.GetType().FullName;
+            Type = value switch
+            {
+                string s => "System.String",
+                TimeSpan ts => "System.TimeSpan",
+                Guid g => "System.Guid",
+                int i => "System.Int32",
+                long l => "System.Int64",
+                double d => "System.Double",
+                float f => "System.Single",
+                decimal dec => "System.Decimal",
+                bool b => "System.Boolean",
+                DateTime dt => "System.DateTime",
+                Enum e => Enum.GetUnderlyingType(e.GetType()).FullName,
+                _ => null
+            } ?? string.Empty;
+                
             InternalValue = value switch
             {
                 string s => Encoding.UTF8.GetBytes(s),
@@ -55,12 +70,35 @@ public partial class QueryFilter
                 decimal dec => BitConverter.GetBytes((double) dec),
                 bool b => BitConverter.GetBytes(b),
                 DateTime dt => BitConverter.GetBytes(dt.Ticks),
+                Enum e => GetEnumBytes(e),
                 _ => null
             };
         }
     }
-
+    
     public string Type { get; set; }
     
     public byte[]? InternalValue { get; set; }
+
+    byte[] GetEnumBytes(Enum e)
+    {
+        var underlyingType = Enum.GetUnderlyingType(e.GetType());
+        object enumValue = Convert.ChangeType(e, underlyingType);
+
+        var y = underlyingType switch
+        {
+            Type t when t == typeof(int) => BitConverter.GetBytes((int)enumValue),
+            Type t when t == typeof(uint) => BitConverter.GetBytes((uint)enumValue),
+            Type t when t == typeof(long) => BitConverter.GetBytes((long)enumValue),
+            Type t when t == typeof(ulong) => BitConverter.GetBytes((ulong)enumValue),
+            Type t when t == typeof(short) => BitConverter.GetBytes((short)enumValue),
+            Type t when t == typeof(ushort) => BitConverter.GetBytes((ushort)enumValue),
+            Type t when t == typeof(byte) => new[] { (byte)enumValue },
+            Type t when t == typeof(sbyte) => new[] { (byte)(sbyte)enumValue },
+            _ => throw new ArgumentException("Unknown enum underlying type")
+        };
+
+        return y;
+    }
+
 }

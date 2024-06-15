@@ -15,9 +15,9 @@ public partial class WalletTransactionLineItem : BaseModel
     public string? Description { get; set; }
 
     [MemoryPackOrder(3)]
-    public Guid WalletTransactionId { get; set; }
+    public Guid WalletTransferId { get; set; }
 
-    [ForeignKey(nameof(WalletTransactionId))]
+    [ForeignKey(nameof(WalletTransferId))]
     [MemoryPackOrder(4)]
-    public virtual WalletTransaction WalletTransaction { get; set; } = null!;
+    public virtual WalletTransfer WalletTransfer { get; set; } = null!;
 }
