@@ -194,7 +194,7 @@ public partial class SessionState
                 await SweetAlertService.FireAsync(new()
                 {
                     Title = "Error",
-                    Text = "Phone contact type not supported",
+                    Text = "Contact type not supported",
                     Icon = SweetAlertIcon.Error,
                     ShowCloseButton = true,
                     ConfirmButtonText = "Close",
@@ -203,7 +203,7 @@ public partial class SessionState
                 return new()
                 {
                     HttpStatusCode = HttpStatusCode.InternalServerError,
-                    Message = "Phone contact type not supported"
+                    Message = "Contact type not supported"
                 };
             }
             

@@ -34,7 +34,7 @@ public partial class WalletState
                 TargetWalletTypeId = action.TargetWalletTypeId,
                 Amount = action.Amount,
                 Fee = action.Fee,
-                Remarks = action.Remarks,
+                Remarks = string.IsNullOrEmpty(action.Remarks) ? $"Wallet" : action.Remarks,
                 CurrencyId = Constants.Currency.Php
             });
 

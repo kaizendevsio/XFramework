@@ -88,7 +88,9 @@ public class IncrementWallet(
 
         // Increment the wallet balance
         var previousBalance = wallet.Balance;
+        var previousTotalBalance = wallet.TotalBalance.Value;
         var previousCreditOnHoldBalance = wallet.CreditOnHoldBalance;
+        var previousDebitOnHoldBalance = wallet.DebitOnHoldBalance;
         
         if (request.OnHold)
         {
@@ -119,14 +121,19 @@ public class IncrementWallet(
             Amount = request.TotalAmount,
             TransactionFee = request.Fee,
             PreviousBalance = previousBalance,
-            RunningBalance = wallet.Balance,
+            PreviousTotalBalance = previousTotalBalance,
+            PreviousDebitOnHoldBalance = previousDebitOnHoldBalance,
             PreviousCreditOnHoldBalance = previousCreditOnHoldBalance,
+            RunningBalance = wallet.Balance,
+            RunningTotalBalance = wallet.TotalBalance,
+            RunningAvailableBalance = wallet.AvailableBalance,
             RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance,
+            RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance,
             Remarks = request.Remarks,
             TransactionType = TransactionType.Credit,
             Held = request.OnHold,
             Released = !request.OnHold,
-            ReferenceNumber = request.ReferenceNumber
+            ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber) ? Guid.NewGuid().ToString() : request.ReferenceNumber
         };
 
         dbContext.Set<WalletTransaction>().Add(transaction);

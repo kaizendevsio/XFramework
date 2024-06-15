@@ -45,7 +45,9 @@ public class DecrementWallet(
         }
 
         var previousBalance = wallet.Balance;
+        var previousTotalBalance = wallet.TotalBalance.Value;
         var previousDebitOnHoldBalance = wallet.DebitOnHoldBalance;
+        var previousCreditOnHoldBalance = wallet.CreditOnHoldBalance;
         
         if (request.OnHold)
         {
@@ -74,14 +76,19 @@ public class DecrementWallet(
             Amount = -request.TotalAmount,  // Negative because it's a decrement
             TransactionFee = request.Fee,
             PreviousBalance = previousBalance,
-            RunningBalance = wallet.Balance,
+            PreviousTotalBalance = previousTotalBalance,
             PreviousDebitOnHoldBalance = previousDebitOnHoldBalance,
+            PreviousCreditOnHoldBalance = previousCreditOnHoldBalance,
+            RunningBalance = wallet.Balance,
+            RunningTotalBalance = wallet.TotalBalance,
+            RunningAvailableBalance = wallet.AvailableBalance,
+            RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance,
             RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance,
             Remarks = request.Remarks,
             TransactionType = TransactionType.Debit,
             Held = request.OnHold,
             Released = !request.OnHold,
-            ReferenceNumber = request.ReferenceNumber
+            ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber) ? Guid.NewGuid().ToString() : request.ReferenceNumber
         };
 
         dbContext.Set<WalletTransaction>().Add(transaction);

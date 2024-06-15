@@ -2,7 +2,8 @@
 
 namespace XFramework.Domain.Shared.Contracts.Requests;
 
-public record PublishRequest<T>(T? Data) : IHasRequestServer
+[MemoryPackable]
+public partial record PublishRequest<T>(T? Data) : IHasRequestServer
 {
     public RequestMetadata? Metadata { get; set; }
 }

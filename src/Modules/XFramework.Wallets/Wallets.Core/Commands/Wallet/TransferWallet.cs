@@ -262,7 +262,10 @@ public class TransferWallet(
         // Perform the transfer and deduct the fee
 
         var previousSenderBalance = senderWallet.Balance;
+        var previousSenderTotalBalance = senderWallet.TotalBalance;
+        
         var previousRecipientBalance = recipientWallet.Balance;
+        var previousRecipientTotalBalance = recipientWallet.TotalBalance;
         
         var previousSenderDebitOnHoldBalance = senderWallet.DebitOnHoldBalance;
         var previousSenderCreditOnHoldBalance = senderWallet.CreditOnHoldBalance;
@@ -295,11 +298,12 @@ public class TransferWallet(
             Amount = request.TotalAmount,
             TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
             PreviousBalance = previousSenderBalance,
+            PreviousTotalBalance = previousSenderTotalBalance.Value,
             PreviousDebitOnHoldBalance = previousSenderDebitOnHoldBalance,
             PreviousCreditOnHoldBalance = previousSenderCreditOnHoldBalance,
+            RunningBalance = senderWallet.Balance,
             RunningDebitOnHoldBalance = senderWallet.DebitOnHoldBalance,
             RunningCreditOnHoldBalance = senderWallet.CreditOnHoldBalance,
-            RunningBalance = senderWallet.Balance,
             RunningTotalBalance = senderWallet.TotalBalance,
             RunningAvailableBalance = senderWallet.AvailableBalance,
             Remarks = request.Remarks,
@@ -307,7 +311,7 @@ public class TransferWallet(
             TransactionType = TransactionType.Debit,
             Held = request.OnHold,
             Released = false,
-            ReferenceNumber = request.ReferenceNumber
+            ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber) ? Guid.NewGuid().ToString() : request.ReferenceNumber
         };
 
         var recipientTransaction = new WalletTransaction
@@ -318,6 +322,7 @@ public class TransferWallet(
             Amount = request.TotalAmount,
             TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
             PreviousBalance = previousRecipientBalance,
+            PreviousTotalBalance = previousRecipientTotalBalance.Value,
             PreviousDebitOnHoldBalance = previousRecipientDebitOnHoldBalance,
             PreviousCreditOnHoldBalance = previousRecipientCreditOnHoldBalance,
             RunningBalance = recipientWallet.Balance,
@@ -330,12 +335,19 @@ public class TransferWallet(
             TransactionType = TransactionType.Credit,
             Held = request.OnHold,
             Released = false,
-            ReferenceNumber = request.ReferenceNumber
+            ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber) ? Guid.NewGuid().ToString() : request.ReferenceNumber
         };
 
+        // Add tenant Ids to each line item
+        foreach (var lineItem in request.LineItems)
+        {
+            lineItem.TenantId = tenant.Id;
+        }
+        
         // Create WalletTransfer entity
         var walletTransfer = new WalletTransfer
         {
+            TenantId = tenant.Id,
             SenderTransactionId = senderTransaction.Id,
             RecipientTransactionId = recipientTransaction.Id,
             SenderTransaction = senderTransaction,

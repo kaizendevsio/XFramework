@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using XFramework.Domain.Contexts;
 
 #nullable disable
 
-namespace XFramework.Domain.Migrations.XnelSystems
+namespace XFramework.Domain.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class XnelSystemsContextModelSnapshot : ModelSnapshot
+    [Migration("20240613200655_Updated_WalletTransactionLineItem_Added_WalletTransferFK")]
+    partial class Updated_WalletTransactionLineItem_Added_WalletTransferFK
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1204,14 +1207,14 @@ namespace XFramework.Domain.Migrations.XnelSystems
                         .HasColumnType("uuid")
                         .HasColumnName("AddressTypeID");
 
-                    b.Property<Guid?>("BarangayId")
+                    b.Property<Guid>("BarangayId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Building")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<Guid?>("CityId")
+                    b.Property<Guid>("CityId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("ConcurrencyStamp")
@@ -1220,7 +1223,7 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("ConsolidatedName")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("CountryId")
+                    b.Property<Guid>("CountryId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1257,10 +1260,10 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.Property<string>("Name")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("ProvinceId")
+                    b.Property<Guid>("ProvinceId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("RegionId")
+                    b.Property<Guid>("RegionId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Street")
@@ -4971,16 +4974,22 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.HasOne("XFramework.Domain.Shared.Contracts.AddressBarangay", "Barangay")
                         .WithMany("IdentityAddresses")
                         .HasForeignKey("BarangayId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("tbl_identityaddresses__id_fk_brgy");
 
                     b.HasOne("XFramework.Domain.Shared.Contracts.AddressCity", "City")
                         .WithMany("IdentityAddresses")
                         .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("tbl_identityaddresses__id_fk_city");
 
                     b.HasOne("XFramework.Domain.Shared.Contracts.AddressCountry", "Country")
                         .WithMany("IdentityAddresses")
                         .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("tbl_identityaddresses_tbl_addresscountry__fk");
 
                     b.HasOne("XFramework.Domain.Shared.Contracts.IdentityInformation", "IdentityInfo")
@@ -4993,11 +5002,15 @@ namespace XFramework.Domain.Migrations.XnelSystems
                     b.HasOne("XFramework.Domain.Shared.Contracts.AddressProvince", "Province")
                         .WithMany("IdentityAddresses")
                         .HasForeignKey("ProvinceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("tbl_identityaddresses__id_fk_province");
 
                     b.HasOne("XFramework.Domain.Shared.Contracts.AddressRegion", "Region")
                         .WithMany("IdentityAddresses")
                         .HasForeignKey("RegionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("tbl_identityaddresses__id_fk");
 
                     b.Navigation("AddressType");
