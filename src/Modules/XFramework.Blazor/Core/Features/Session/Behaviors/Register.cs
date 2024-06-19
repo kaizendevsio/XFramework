@@ -4,6 +4,7 @@ using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Core.Features.Wallet;
 using XFramework.Blazor.Entity.Models.Requests.Common;
 using XFramework.Domain.Shared.Contracts;
+using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Blazor.Core.Features.Session;
 public partial class SessionState
@@ -322,7 +323,7 @@ public partial class SessionState
                     {
                         PropertyName = nameof(IdentityContact.Value),
                         Operation = QueryFilterOperation.Equal,
-                        Value = CurrentState.RegisterVm.PhoneNumber
+                        Value =  CurrentState.RegisterVm.PhoneNumber!.ValidatePhoneNumber()
                     }
                 ]);
                 
