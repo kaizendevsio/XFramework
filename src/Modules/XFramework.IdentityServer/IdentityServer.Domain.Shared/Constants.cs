@@ -45,6 +45,12 @@ public static class IdentityConstants
         public static readonly Guid Rpc = new("d71cda39-4192-4d7b-af22-1c6c9289b913");
     }
 
+    public static class RoleType
+    {
+        public static readonly Guid Admin = new("6e7b6bf5-6ad6-49fb-80b0-38e967fc35f3");
+        public static readonly Guid User = new("10da7d3d-cbd3-4f53-99f9-d680e4e19092");
+    }
+
 
 }
 
