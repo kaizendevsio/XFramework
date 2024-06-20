@@ -1,7 +1,7 @@
 ﻿@using XFramework.Blazor.Entity.Enums
 
 
-<div class="d-flex flex-row justify-content-between">
+<div class="d-flex flex-row justify-content-between pb-5" style="background-color: rgba(255,255,255,0.80); position: -webkit-sticky;  position: sticky;  bottom: 0;">
     @if (OnDelete.HasDelegate && FormMode == FormMode.Edit)
     {
         <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="() => OnDelete.InvokeAsync()">Delete</MudButton>
