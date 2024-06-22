@@ -51,7 +51,7 @@ public class GetHandler<TModel>(
             };
         }
         
-        var tenant = await tenantService.GetTenant(request.Metadata.TenantId ?? request.TenantId);
+        var tenant = await tenantService.GetTenant(request.TenantId ?? request.Metadata.TenantId);
         
         IQueryable<TModel> query = dbContext.Set<TModel>();
 
