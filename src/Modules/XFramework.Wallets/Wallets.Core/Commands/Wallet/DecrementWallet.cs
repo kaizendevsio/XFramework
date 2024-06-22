@@ -56,6 +56,7 @@ public class DecrementWallet(
         else
         {
             wallet.Balance -= request.TotalAmount;
+            wallet.TransferableBalance -= request.TotalAmount;
         }
 
         if (wallet.MaintainingBalanceRule.HasValue && wallet.Balance < wallet.MaintainingBalanceRule.Value)
