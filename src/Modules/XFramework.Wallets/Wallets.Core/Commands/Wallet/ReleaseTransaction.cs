@@ -53,6 +53,7 @@ public class ReleaseTransaction(
             else if (transaction.TransactionType is TransactionType.Debit)
             {
                 wallet.Balance -= transaction.Amount;
+                wallet.TransferableBalance -= transaction.Amount;
                 wallet.DebitOnHoldBalance -= transaction.Amount;
             }
         }

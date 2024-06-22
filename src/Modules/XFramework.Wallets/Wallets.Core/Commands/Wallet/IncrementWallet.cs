@@ -99,6 +99,7 @@ public class IncrementWallet(
         else
         {
             wallet.Balance += request.TotalAmount;
+            wallet.TransferableBalance += request.TotalAmount;
         }
 
         // Ensure maintaining balance is upheld

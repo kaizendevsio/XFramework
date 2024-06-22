@@ -151,7 +151,10 @@ public class ConvertWallet(
         var previousTargetDebitOnHoldBalance = targetWallet.DebitOnHoldBalance;
 
         sourceWallet.Balance -= totalDecrement;
+        sourceWallet.TransferableBalance -= totalDecrement;
+        
         targetWallet.Balance += totalIncrement;
+        targetWallet.TransferableBalance += totalIncrement;
 
         // Record the transactions
         var sourceTransaction = new WalletTransaction
