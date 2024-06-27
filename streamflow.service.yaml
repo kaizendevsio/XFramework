@@ -105,7 +105,7 @@ stages:
         # Check if the service file exists
         if (-Not (Test-Path -Path $serviceFilePath)) {
             # Create the service file with the specified content
-            $serviceContent | Out-File -FilePath $serviceFilePath -Encoding utf8
+            echo $serviceContent | sudo tee $serviceFilePath > /dev/null
         
             # Reload the systemd manager configuration
             sudo systemctl daemon-reload
@@ -254,7 +254,7 @@ stages:
         # Check if the service file exists
         if (-Not (Test-Path -Path $serviceFilePath)) {
             # Create the service file with the specified content
-            $serviceContent | Out-File -FilePath $serviceFilePath -Encoding utf8
+            echo $serviceContent | sudo tee $serviceFilePath > /dev/null
         
             # Reload the systemd manager configuration
             sudo systemctl daemon-reload
