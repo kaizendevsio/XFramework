@@ -7,7 +7,10 @@ stages:
   jobs:
   - deployment: DeployStreamFlowServiceToStaging
     displayName: 'Deploy StreamFlow Service to Staging'
-    environment: 'Staging'
+    environment: 
+      name: 'Staging'
+      tags: 'Staging'
+      resourceType: 'VirtualMachine'
     strategy:
       runOnce:
         deploy:
