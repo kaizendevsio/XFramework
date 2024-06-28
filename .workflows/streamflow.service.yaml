@@ -2,11 +2,11 @@ trigger:
 - Development/Main
 
 variables:
-  PublishDirectory: '/home/xnelsystems-staging/services/messaging'
-  ProjectFilePath: 'src/Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj'
-  ServiceExecutable: 'Messaging.Api.dll'
-  ServiceFilePath: '/etc/systemd/system/xframework-messaging.service'
-  ServiceName: 'xframework-messaging'
+  PublishDirectory: '/home/xnelsystems-staging/services/streamFlow'
+  ProjectFilePath: 'src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj'
+  ServiceExecutable: 'StreamFlow.Stream.dll'
+  ServiceFilePath: '/etc/systemd/system/xframework-streamFlow.service'
+  ServiceName: 'xframework-streamFlow'
   Environment: 'Staging'
   BuildConfiguration: 'Release'
   BuildPlatform: 'any cpu'
