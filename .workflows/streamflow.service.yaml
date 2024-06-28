@@ -7,8 +7,7 @@ stages:
   jobs:
   - deployment: DeployStreamFlowServiceToStaging
     displayName: 'Deploy StreamFlow Service to Staging'
-    environment: 
-      name: 'Staging'
+    environment: 'Staging'
     strategy:
       runOnce:
         deploy:
