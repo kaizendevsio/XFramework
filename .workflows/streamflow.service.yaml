@@ -33,6 +33,7 @@ stages:
                 - powershell: |
                     # Define the directory path
                     $folderPath = "$(PublishDirectory)/*"
+                    Write-Host "ProjectFilePath: $(ProjectFilePath)"
                     
                     # Check if the directory exists
                     if(Test-Path $folderPath)
