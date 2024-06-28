@@ -9,7 +9,6 @@ stages:
     displayName: 'Deploy StreamFlow Service to Staging'
     environment: 
       name: 'Staging'
-      resourceName: 'xnelsystems-staging-server'
     strategy:
       runOnce:
         deploy:
