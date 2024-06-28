@@ -1,6 +1,6 @@
 trigger:
 - Development/Main
-name: 'Production-OnPrem-StreamFlow'
+
 stages:
 - stage: DeployToStaging
   displayName: 'Deploy to Staging'
