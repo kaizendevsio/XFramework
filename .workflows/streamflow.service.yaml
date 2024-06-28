@@ -1,6 +1,16 @@
 trigger:
 - Development/Main
 
+variables:
+  PublishDirectory: '/home/xnelsystems-staging/services/messaging'
+  ProjectFilePath: 'src/Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj'
+  ServiceExecutable: 'Messaging.Api.dll'
+  ServiceFilePath: '/etc/systemd/system/xframework-messaging.service'
+  ServiceName: 'xframework-messaging'
+  Environment: 'Staging'
+  BuildConfiguration: 'Release'
+  BuildPlatform: 'any cpu'
+
 stages:
 - stage: DeployToStaging
   displayName: 'Deploy to Staging'
