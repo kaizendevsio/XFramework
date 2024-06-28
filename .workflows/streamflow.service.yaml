@@ -1,9 +1,9 @@
 trigger:
-- Development/Main
+  - Development/Main
 
 variables:
   PublishDirectory: '/home/xnelsystems-staging/services/streamFlow'
-  ProjectFilePath: 'src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj'
+  ProjectFilePath: '../src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj'
   ServiceExecutable: 'StreamFlow.Stream.dll'
   ServiceFilePath: '/etc/systemd/system/xframework-streamFlow.service'
   ServiceName: 'xframework-streamFlow'
@@ -12,258 +12,258 @@ variables:
   BuildPlatform: 'any cpu'
 
 stages:
-- stage: DeployToStaging
-  displayName: 'Deploy to Staging'
-  jobs:
-  - deployment: DeployStreamFlowServiceToStaging
-    displayName: 'Deploy StreamFlow Service to Staging'
-    environment: 
-      name: 'Staging'
-      tags: 'Staging'
-      resourceType: 'VirtualMachine'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: UseDotNet@2
-            displayName: 'Use .NET Core sdk'
-            inputs:
-              version: 8.0.x
+  - stage: DeployToStaging
+    displayName: 'Deploy to Staging'
+    jobs:
+      - deployment: DeployStreamFlowServiceToStaging
+        displayName: 'Deploy StreamFlow Service to Staging'
+        environment:
+          name: 'Staging'
+          tags: 'Staging'
+          resourceType: 'VirtualMachine'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: UseDotNet@2
+                  displayName: 'Use .NET Core sdk'
+                  inputs:
+                    version: 8.0.x
 
-          - powershell: |
-              # Define the directory path
-              $folderPath = "$(PublishDirectory)/*"
-              
-              # Check if the directory exists
-              if(Test-Path $folderPath)
-              {
-                  # Remove all files and subdirectories
-                  try
-                  {
-                      Remove-Item $folderPath -Recurse -Force -ErrorAction Stop
-                      Write-Host "Successfully cleaned up directory: $($folderPath)"
-                  }
-                  catch
-                  {
-                      Write-Host "Failed to clean up directory: $($folderPath)"
-                  }
-              }
-              else
-              {
-                  Write-Host "Directory '$folderPath' does not exist."
-              }
-            displayName: 'Clean Build Folder'
+                - powershell: |
+                    # Define the directory path
+                    $folderPath = "$(PublishDirectory)/*"
+                    
+                    # Check if the directory exists
+                    if(Test-Path $folderPath)
+                    {
+                        # Remove all files and subdirectories
+                        try
+                        {
+                            Remove-Item $folderPath -Recurse -Force -ErrorAction Stop
+                            Write-Host "Successfully cleaned up directory: $($folderPath)"
+                        }
+                        catch
+                        {
+                            Write-Host "Failed to clean up directory: $($folderPath)"
+                        }
+                    }
+                    else
+                    {
+                        Write-Host "Directory '$folderPath' does not exist."
+                    }
+                  displayName: 'Clean Build Folder'
 
-          - powershell: |
-              # Define the service file path
-              $serviceFilePath = "$(ServiceFilePath)"
-              
-              # Check if the service file exists
-              if (Test-Path -Path $serviceFilePath) {
-                  # Stop the existing service
-                  sudo systemctl stop $(ServiceName).service
-              
-                  if ($?) {
-                      Write-Host "Service stopped successfully."
-                  } else {
-                      Write-Host "Failed to stop the service."
-                      exit 1
-                  }
-              }
-            displayName: 'Stop Service'
+                - powershell: |
+                    # Define the service file path
+                    $serviceFilePath = "$(ServiceFilePath)"
+                    
+                    # Check if the service file exists
+                    if (Test-Path -Path $serviceFilePath) {
+                        # Stop the existing service
+                        sudo systemctl stop $(ServiceName).service
+                    
+                        if ($?) {
+                            Write-Host "Service stopped successfully."
+                        } else {
+                            Write-Host "Failed to stop the service."
+                            exit 1
+                        }
+                    }
+                  displayName: 'Stop Service'
 
-          - task: DotNetCoreCLI@2
-            displayName: 'dotnet publish'
-            inputs:
-              command: publish
-              publishWebProjects: false
-              projects: '$(ProjectFilePath)'
-              arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
-              zipAfterPublish: false
-              modifyOutputPath: false
+                - task: DotNetCoreCLI@2
+                  displayName: 'dotnet publish'
+                  inputs:
+                    command: publish
+                    publishWebProjects: false
+                    projects: '$(ProjectFilePath)'
+                    arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
+                    zipAfterPublish: false
+                    modifyOutputPath: false
 
-          - powershell: |
-              # Define the service file path
-              $serviceFilePath = "$(ServiceFilePath)"
-              
-              # Define the content of the service file
-              $serviceContent = @"
-              [Unit]
-              Description=$(ServiceName)
-              
-              [Service]
-              WorkingDirectory=$(PublishDirectory)
-              ExecStart=/usr/bin/dotnet $(ProjectFilePath)/$(ServiceExecutable)
-              Restart=always
-              RestartSec=10
-              SyslogIdentifier=$(ServiceName)
-              Environment=ASPNETCORE_ENVIRONMENT=$(Environment)
-              
-              # Hardening
-              SystemCallArchitectures=native
-              #MemoryDenyWriteExecute=true
-              NoNewPrivileges=true
-              
-              [Install]
-              WantedBy=multi-user.target
-              "@
-              
-              # Check if the service file exists
-              if (-Not (Test-Path -Path $serviceFilePath)) {
-                  # Create the service file with the specified content
-                  echo $serviceContent | sudo tee $serviceFilePath > /dev/null
-              
-                  # Reload the systemd manager configuration
-                  sudo systemctl daemon-reload
-              
-                  # Enable the service
-                  sudo systemctl enable $(ServiceName).service
-              
-                  Write-Host "Service created and enabled."
-              }
-            displayName: 'Ensure Service'
+                - powershell: |
+                    # Define the service file path
+                    $serviceFilePath = "$(ServiceFilePath)"
+                    
+                    # Define the content of the service file
+                    $serviceContent = @"
+                    [Unit]
+                    Description=$(ServiceName)
+                    
+                    [Service]
+                    WorkingDirectory=$(PublishDirectory)
+                    ExecStart=/usr/bin/dotnet $(ProjectFilePath)/$(ServiceExecutable)
+                    Restart=always
+                    RestartSec=10
+                    SyslogIdentifier=$(ServiceName)
+                    Environment=ASPNETCORE_ENVIRONMENT=$(Environment)
+                    
+                    # Hardening
+                    SystemCallArchitectures=native
+                    #MemoryDenyWriteExecute=true
+                    NoNewPrivileges=true
+                    
+                    [Install]
+                    WantedBy=multi-user.target
+                    "@
+                    
+                    # Check if the service file exists
+                    if (-Not (Test-Path -Path $serviceFilePath)) {
+                        # Create the service file with the specified content
+                        echo $serviceContent | sudo tee $serviceFilePath > /dev/null
+                    
+                        # Reload the systemd manager configuration
+                        sudo systemctl daemon-reload
+                    
+                        # Enable the service
+                        sudo systemctl enable $(ServiceName).service
+                    
+                        Write-Host "Service created and enabled."
+                    }
+                  displayName: 'Ensure Service'
 
-          - powershell: |
-              # Define the service file path
-              $serviceFilePath = "$(ServiceFilePath)"
-              
-              # Check if the service file exists
-              if (Test-Path -Path $serviceFilePath) {
-                  # Start the existing service
-                  sudo systemctl start $(ServiceName).service
-              
-                  if ($?) {
-                      Write-Host "Service started successfully."
-                  } else {
-                      Write-Host "Failed to start the service."
-                      exit 1
-                  }
-              }
-            displayName: 'Start Service'
+                - powershell: |
+                    # Define the service file path
+                    $serviceFilePath = "$(ServiceFilePath)"
+                    
+                    # Check if the service file exists
+                    if (Test-Path -Path $serviceFilePath) {
+                        # Start the existing service
+                        sudo systemctl start $(ServiceName).service
+                    
+                        if ($?) {
+                            Write-Host "Service started successfully."
+                        } else {
+                            Write-Host "Failed to start the service."
+                            exit 1
+                        }
+                    }
+                  displayName: 'Start Service'
 
-- stage: DeployToProduction
-  displayName: 'Deploy to Production'
-  dependsOn: DeployToStaging
-  jobs:
-  - deployment: DeployStreamFlowServiceToProduction
-    displayName: 'Deploy StreamFlow Service to Production'
-    environment: 'Production'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: UseDotNet@2
-            displayName: 'Use .NET Core sdk'
-            inputs:
-              version: 8.0.x
+  - stage: DeployToProduction
+    displayName: 'Deploy to Production'
+    dependsOn: DeployToStaging
+    jobs:
+      - deployment: DeployStreamFlowServiceToProduction
+        displayName: 'Deploy StreamFlow Service to Production'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: UseDotNet@2
+                  displayName: 'Use .NET Core sdk'
+                  inputs:
+                    version: 8.0.x
 
-          - powershell: |
-              # Define the directory path
-              $folderPath = "$(PublishDirectory)/*"
-              
-              # Check if the directory exists
-              if(Test-Path $folderPath)
-              {
-                  # Remove all files and subdirectories
-                  try
-                  {
-                      Remove-Item $folderPath -Recurse -Force -ErrorAction Stop
-                      Write-Host "Successfully cleaned up directory: $($folderPath)"
-                  }
-                  catch
-                  {
-                      Write-Host "Failed to clean up directory: $($folderPath)"
-                  }
-              }
-              else
-              {
-                  Write-Host "Directory '$folderPath' does not exist."
-              }
-            displayName: 'Clean Build Folder'
+                - powershell: |
+                    # Define the directory path
+                    $folderPath = "$(PublishDirectory)/*"
+                    
+                    # Check if the directory exists
+                    if(Test-Path $folderPath)
+                    {
+                        # Remove all files and subdirectories
+                        try
+                        {
+                            Remove-Item $folderPath -Recurse -Force -ErrorAction Stop
+                            Write-Host "Successfully cleaned up directory: $($folderPath)"
+                        }
+                        catch
+                        {
+                            Write-Host "Failed to clean up directory: $($folderPath)"
+                        }
+                    }
+                    else
+                    {
+                        Write-Host "Directory '$folderPath' does not exist."
+                    }
+                  displayName: 'Clean Build Folder'
 
-          - powershell: |
-              # Define the service file path
-              $serviceFilePath = "$(ServiceFilePath)"
-              
-              # Check if the service file exists
-              if (Test-Path -Path $serviceFilePath) {
-                  # Stop the existing service
-                  sudo systemctl stop $(ServiceName).service
-              
-                  if ($?) {
-                      Write-Host "Service stopped successfully."
-                  } else {
-                      Write-Host "Failed to stop the service."
-                      exit 1
-                  }
-              }
-            displayName: 'Stop Service'
+                - powershell: |
+                    # Define the service file path
+                    $serviceFilePath = "$(ServiceFilePath)"
+                    
+                    # Check if the service file exists
+                    if (Test-Path -Path $serviceFilePath) {
+                        # Stop the existing service
+                        sudo systemctl stop $(ServiceName).service
+                    
+                        if ($?) {
+                            Write-Host "Service stopped successfully."
+                        } else {
+                            Write-Host "Failed to stop the service."
+                            exit 1
+                        }
+                    }
+                  displayName: 'Stop Service'
 
-          - task: DotNetCoreCLI@2
-            displayName: 'dotnet publish'
-            inputs:
-              command: publish
-              publishWebProjects: false
-              projects: '$(ProjectFilePath)'
-              arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
-              zipAfterPublish: false
-              modifyOutputPath: false
+                - task: DotNetCoreCLI@2
+                  displayName: 'dotnet publish'
+                  inputs:
+                    command: publish
+                    publishWebProjects: false
+                    projects: '$(ProjectFilePath)'
+                    arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
+                    zipAfterPublish: false
+                    modifyOutputPath: false
 
-          - powershell: |
-              # Define the service file path
-              $serviceFilePath = "$(ServiceFilePath)"
-              
-              # Define the content of the service file
-              $serviceContent = @"
-              [Unit]
-              Description=$(ServiceName)
-              
-              [Service]
-              WorkingDirectory=$(PublishDirectory)
-              ExecStart=/usr/bin/dotnet $(ProjectFilePath)/$(ServiceExecutable)
-              Restart=always
-              RestartSec=10
-              SyslogIdentifier=$(ServiceName)
-              Environment=ASPNETCORE_ENVIRONMENT=$(Environment)
-              
-              # Hardening
-              SystemCallArchitectures=native
-              #MemoryDenyWriteExecute=true
-              NoNewPrivileges=true
-              
-              [Install]
-              WantedBy=multi-user.target
-              "@
-              
-              # Check if the service file exists
-              if (-Not (Test-Path -Path $serviceFilePath)) {
-                  # Create the service file with the specified content
-                  echo $serviceContent | sudo tee $serviceFilePath > /dev/null
-              
-                  # Reload the systemd manager configuration
-                  sudo systemctl daemon-reload
-              
-                  # Enable the service
-                  sudo systemctl enable $(ServiceName).service
-              
-                  Write-Host "Service created and enabled."
-              }
-            displayName: 'Ensure Service'
+                - powershell: |
+                    # Define the service file path
+                    $serviceFilePath = "$(ServiceFilePath)"
+                    
+                    # Define the content of the service file
+                    $serviceContent = @"
+                    [Unit]
+                    Description=$(ServiceName)
+                    
+                    [Service]
+                    WorkingDirectory=$(PublishDirectory)
+                    ExecStart=/usr/bin/dotnet $(ProjectFilePath)/$(ServiceExecutable)
+                    Restart=always
+                    RestartSec=10
+                    SyslogIdentifier=$(ServiceName)
+                    Environment=ASPNETCORE_ENVIRONMENT=$(Environment)
+                    
+                    # Hardening
+                    SystemCallArchitectures=native
+                    #MemoryDenyWriteExecute=true
+                    NoNewPrivileges=true
+                    
+                    [Install]
+                    WantedBy=multi-user.target
+                    "@
+                    
+                    # Check if the service file exists
+                    if (-Not (Test-Path -Path $serviceFilePath)) {
+                        # Create the service file with the specified content
+                        echo $serviceContent | sudo tee $serviceFilePath > /dev/null
+                    
+                        # Reload the systemd manager configuration
+                        sudo systemctl daemon-reload
+                    
+                        # Enable the service
+                        sudo systemctl enable $(ServiceName).service
+                    
+                        Write-Host "Service created and enabled."
+                    }
+                  displayName: 'Ensure Service'
 
-          - powershell: |
-              # Define the service file path
-              $serviceFilePath = "$(ServiceFilePath)"
-              
-              # Check if the service file exists
-              if (Test-Path -Path $serviceFilePath) {
-                  # Start the existing service
-                  sudo systemctl start $(ServiceName).service
-              
-                  if ($?) {
-                      Write-Host "Service started successfully."
-                  } else {
-                      Write-Host "Failed to start the service."
-                      exit 1
-                  }
-              }
-            displayName: 'Start Service'
+                - powershell: |
+                    # Define the service file path
+                    $serviceFilePath = "$(ServiceFilePath)"
+                    
+                    # Check if the service file exists
+                    if (Test-Path -Path $serviceFilePath) {
+                        # Start the existing service
+                        sudo systemctl start $(ServiceName).service
+                    
+                        if ($?) {
+                            Write-Host "Service started successfully."
+                        } else {
+                            Write-Host "Failed to start the service."
+                            exit 1
+                        }
+                    }
+                  displayName: 'Start Service'
