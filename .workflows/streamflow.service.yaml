@@ -22,6 +22,7 @@ stages:
         pool:
           name: Default-Linux
         steps:
+          - checkout: none
           - task: PowerShell@2
             displayName: 'Clean Build Folder'
             inputs:
