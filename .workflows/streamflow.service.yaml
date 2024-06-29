@@ -61,14 +61,21 @@ stages:
               publishWebProjects: false
               projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
               arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
-              zipAfterPublish: true
+              zipAfterPublish: false
               modifyOutputPath: false
 
+          - task: PowerShell@2
+            displayName: 'Zip Published Directory'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Compress-Archive -Path "$(PublishDirectory)/*" -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
+          
           - task: PublishBuildArtifacts@1
             displayName: 'Publish Artifact'
             inputs:
-              PathtoPublish: '$(PublishDirectory).zip'
-              ArtifactName: '$(ArtifactName)'
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
+              ArtifactName: '$(ArtifactName)'         
 
   - stage: DeployToStaging
     displayName: 'Deploy to Staging'
