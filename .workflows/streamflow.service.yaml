@@ -61,26 +61,13 @@ stages:
               publishWebProjects: false
               projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
               arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
-              zipAfterPublish: false
+              zipAfterPublish: true
               modifyOutputPath: false
 
-          - task: PowerShell@2
-            displayName: 'Zip Published Directory'
-            inputs:
-              targetType: 'inline'
-              script: |
-                Compress-Archive -Path "$(PublishDirectory)/*" -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
-              
-      - job: Upload
-        displayName: 'Upload Artifact'
-        dependsOn: CleanAndBuild
-        pool:
-          name: Default-Linux
-        steps:
           - task: PublishBuildArtifacts@1
             displayName: 'Publish Artifact'
             inputs:
-              PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
+              PathtoPublish: '$(PublishDirectory).zip'
               ArtifactName: '$(ArtifactName)'
 
   - stage: DeployToStaging
@@ -116,7 +103,7 @@ stages:
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl stop $(ServiceName).service
-                          
+                      
                           if ($?) {
                               Write-Host "Service stopped successfully."
                           } else {
@@ -163,7 +150,7 @@ stages:
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl start $(ServiceName).service
-                          
+                      
                           if ($?) {
                               Write-Host "Service started successfully."
                           } else {
@@ -202,7 +189,7 @@ stages:
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl stop $(ServiceName).service
-                          
+                      
                           if ($?) {
                               Write-Host "Service stopped successfully."
                           } else {
@@ -249,7 +236,7 @@ stages:
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl start $(ServiceName).service
-                          
+                      
                           if ($?) {
                               Write-Host "Service started successfully."
                           } else {
