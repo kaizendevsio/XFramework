@@ -23,39 +23,6 @@ stages:
           name: Default-Linux
         steps:
           - checkout: none
-          - task: PowerShell@2
-            displayName: 'Clean Build Folder'
-            inputs:
-              targetType: 'inline'
-              script: |
-                # Define the directory path
-                $folderPath = "$(PublishDirectory)/*"
-
-                # Check if the directory exists
-                if(Test-Path $folderPath)
-                {
-                    # Remove all files and subdirectories
-                    try
-                    {
-                        Remove-Item $folderPath -Recurse -Force -ErrorAction Stop
-                        Write-Host "Successfully cleaned up directory: $($folderPath)"
-                    }
-                    catch
-                    {
-                        Write-Host "Failed to clean up directory: $($folderPath)"
-                    }
-                }
-                else
-                {
-                    Write-Host "Directory '$folderPath' does not exist."
-                }
-                
-      - job: BuildUpload
-        dependsOn: Clean
-        displayName: 'Build and Upload'
-        pool:
-          name: Default-Linux
-        steps:
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
@@ -71,6 +38,35 @@ stages:
               arguments: '--configuration $(BuildConfiguration)'
               zipAfterPublish: false
               modifyOutputPath: false
+                
+      - job: BuildUpload
+        dependsOn: Clean
+        displayName: 'Build and Upload'
+        pool:
+          name: Default-Linux
+        steps:
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Project'
+            inputs:
+              command: publish
+              publishWebProjects: false
+              projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
+              arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
+              zipAfterPublish: false
+              modifyOutputPath: false
+
+          - task: PowerShell@2
+            displayName: 'Zip Published Directory'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Compress-Archive -Path "$(PublishDirectory)/*" -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
+          
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
+              ArtifactName: '$(ArtifactName)'         
 
   - stage: DeployToStaging
     displayName: 'Deploy to Staging'
