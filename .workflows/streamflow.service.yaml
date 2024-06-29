@@ -68,6 +68,7 @@ stages:
               custom: clean
               publishWebProjects: false
               projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
+              arguments: '--configuration $(BuildConfiguration)'
               zipAfterPublish: false
               modifyOutputPath: false
 
