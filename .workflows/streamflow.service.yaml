@@ -17,16 +17,11 @@ stages:
   - stage: BuildAndUpload
     displayName: 'Build and Upload'
     jobs:
-      - job: CleanAndBuild
-        displayName: 'Clean and Build'
+      - job: Clean
+        displayName: 'Clean'
         pool:
           name: Default-Linux
         steps:
-          - task: UseDotNet@2
-            displayName: 'Use .NET Core sdk'
-            inputs:
-              version: 8.0.x
-
           - task: PowerShell@2
             displayName: 'Clean Build Folder'
             inputs:
@@ -34,7 +29,7 @@ stages:
               script: |
                 # Define the directory path
                 $folderPath = "$(PublishDirectory)/*"
-                
+
                 # Check if the directory exists
                 if(Test-Path $folderPath)
                 {
@@ -53,6 +48,17 @@ stages:
                 {
                     Write-Host "Directory '$folderPath' does not exist."
                 }
+                
+      - job: BuildUpload
+        dependsOn: Clean
+        displayName: 'Build and Upload'
+        pool:
+          name: Default-Linux
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Use .NET Core sdk'
+            inputs:
+              version: 8.0.x
 
           - task: DotNetCoreCLI@2
             displayName: 'Publish Project'
