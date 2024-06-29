@@ -68,7 +68,7 @@ stages:
                 Compress-Archive -Path "$(PublishDirectory)/*" -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
           
           - task: PublishBuildArtifacts@1
-            displayName: 'Publish Artifact'
+            displayName: 'Upload Artifact'
             inputs:
               PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
               ArtifactName: '$(ArtifactName)'         
@@ -88,7 +88,7 @@ stages:
             deploy:
               steps:
                 - download: current
-                  artifact: $(ArtifactName)
+                  artifact: '$(ArtifactName)'
 
                 - task: PowerShell@2
                   displayName: 'Unzip Artifact'
