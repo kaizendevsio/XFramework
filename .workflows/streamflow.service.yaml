@@ -64,7 +64,8 @@ stages:
           - task: DotNetCoreCLI@2
             displayName: 'Clean Project'
             inputs:
-              command: clean
+              command: custom
+              custom: clean
               publishWebProjects: false
               projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
               zipAfterPublish: false
