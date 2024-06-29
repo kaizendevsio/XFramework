@@ -67,11 +67,11 @@ stages:
               script: |
                 Compress-Archive -Path "$(PublishDirectory)/*" -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
           
-          - task: PublishBuildArtifacts@1
+          - task: PublishPipelineArtifact@1
             displayName: 'Upload Artifact'
             inputs:
-              PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
-              ArtifactName: '$(ArtifactName)'         
+              targetPath: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
+              artifactName: '$(ArtifactName)'         
 
   - stage: DeployToStaging
     displayName: 'Deploy to Staging'
