@@ -66,6 +66,9 @@ stages:
                   }
               }
             displayName: 'Stop Service'
+          - powershell: |
+              Write-Host "Current Directory: $(System.DefaultWorkingDirectory)/$(ProjectFilePath)"
+            displayName: 'Print Current Directory'
 
       - deployment: DeployStreamFlowServiceToStaging
         displayName: 'Deploy StreamFlow Service to Staging'
