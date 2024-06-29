@@ -62,6 +62,15 @@ stages:
               version: 8.0.x
 
           - task: DotNetCoreCLI@2
+            displayName: 'Clean Project'
+            inputs:
+              command: clean
+              publishWebProjects: false
+              projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
+              zipAfterPublish: false
+              modifyOutputPath: false
+
+          - task: DotNetCoreCLI@2
             displayName: 'Publish Project'
             inputs:
               command: publish
