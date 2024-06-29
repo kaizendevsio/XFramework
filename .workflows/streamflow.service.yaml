@@ -7,7 +7,6 @@ variables:
   ServiceExecutable: 'StreamFlow.Stream.dll'
   ServiceFilePath: '/etc/systemd/system/xframework-streamFlow.service'
   ServiceName: 'xframework-streamFlow'
-  Environment: 'Staging'
   BuildConfiguration: 'Release'
   BuildPlatform: 'any cpu'
   ArtifactName: 'streamFlowArtifact'
@@ -95,7 +94,7 @@ stages:
                   inputs:
                     targetType: 'inline'
                     script: |
-                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath "$(PublishDirectory)"
+                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath "$(System.DefaultWorkingDirectory)/$(ServiceName)"
 
                 - task: PowerShell@2
                   displayName: 'Stop Service'
@@ -103,6 +102,7 @@ stages:
                     targetType: 'inline'
                     script: |
                       $serviceFilePath = "$(ServiceFilePath)"
+                      Write-Host "DefaultWorkingDirectory: $(System.DefaultWorkingDirectory)"
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl stop $(ServiceName).service
@@ -126,12 +126,12 @@ stages:
                       Description=$(ServiceName)
                       
                       [Service]
-                      WorkingDirectory=$(PublishDirectory)
+                      WorkingDirectory=$(ServiceName)
                       ExecStart=/usr/bin/dotnet $(ServiceExecutable)
                       Restart=always
                       RestartSec=10
                       SyslogIdentifier=$(ServiceName)
-                      Environment=ASPNETCORE_ENVIRONMENT=$(Environment)
+                      Environment=ASPNETCORE_ENVIRONMENT=Staging
                       
                       [Install]
                       WantedBy=multi-user.target
@@ -217,7 +217,7 @@ stages:
                       Restart=always
                       RestartSec=10
                       SyslogIdentifier=$(ServiceName)
-                      Environment=ASPNETCORE_ENVIRONMENT=$(Environment)
+                      Environment=ASPNETCORE_ENVIRONMENT=Production
                       
                       [Install]
                       WantedBy=multi-user.target
