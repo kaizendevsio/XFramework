@@ -52,7 +52,8 @@ stages:
                 else
                 {
                     Write-Host "Directory '$folderPath' does not exist."
-                
+                }
+
           - task: DotNetCoreCLI@2
             displayName: 'Publish Project'
             inputs:
@@ -108,7 +109,7 @@ stages:
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl stop $(ServiceName).service
-                          
+                      
                           if ($?) {
                               Write-Host "Service stopped successfully."
                           } else {
@@ -155,7 +156,7 @@ stages:
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl start $(ServiceName).service
-                          
+                      
                           if ($?) {
                               Write-Host "Service started successfully."
                           } else {
@@ -194,7 +195,7 @@ stages:
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl stop $(ServiceName).service
-                          
+                      
                           if ($?) {
                               Write-Host "Service stopped successfully."
                           } else {
@@ -241,7 +242,7 @@ stages:
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl start $(ServiceName).service
-                          
+                      
                           if ($?) {
                               Write-Host "Service started successfully."
                           } else {
