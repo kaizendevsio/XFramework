@@ -142,12 +142,12 @@ stages:
                       WantedBy=multi-user.target
                       "@
                       
-                      if (-Not (Test-Path -Path $serviceFilePath)) {
-                          echo $serviceContent | sudo tee $serviceFilePath > /dev/null
-                          sudo systemctl daemon-reload
-                          sudo systemctl enable $(ServiceName).service
-                          Write-Host "Service created and enabled."
-                      }
+                      
+                      echo $serviceContent | sudo tee $serviceFilePath > /dev/null
+                      sudo systemctl daemon-reload
+                      sudo systemctl enable $(ServiceName).service
+                      Write-Host "Service created and enabled."
+                      
 
                 - task: PowerShell@2
                   displayName: 'Start Service'
