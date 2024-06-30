@@ -78,8 +78,8 @@ stages:
     displayName: 'Deploy to Staging'
     dependsOn: BuildAndUpload
     jobs:
-      - deployment: DeployCommunityServiceToStaging
-        displayName: 'Deploy Community Service to Staging'
+      - deployment: DeployStaging
+        displayName: 'Deploy Staging'
         environment:
           name: 'Staging'
           tags: 'Staging'
@@ -174,8 +174,8 @@ stages:
     displayName: 'Deploy to Production'
     dependsOn: DeployToStaging
     jobs:
-      - deployment: DeployCommunityServiceToProduction
-        displayName: 'Deploy Community Service to Production'
+      - deployment: DeployProduction
+        displayName: 'DeployProduction'
         environment:
           name: 'Production'
           tags: 'Production'
@@ -264,4 +264,3 @@ stages:
                               exit 1
                           }
                       }
-
