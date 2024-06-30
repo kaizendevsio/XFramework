@@ -90,13 +90,6 @@ stages:
                   artifact: '$(ArtifactName)'
 
                 - task: PowerShell@2
-                  displayName: 'Unzip Artifact'
-                  inputs:
-                    targetType: 'inline'
-                    script: |
-                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath "$(System.DefaultWorkingDirectory)/$(ServiceName)"
-
-                - task: PowerShell@2
                   displayName: 'Stop Service'
                   inputs:
                     targetType: 'inline'
@@ -113,6 +106,19 @@ stages:
                               exit 1
                           }
                       }
+                      
+                - task: PowerShell@2
+                  displayName: 'Unzip Artifact'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $destinationPath = "$(System.DefaultWorkingDirectory)/$(ServiceName)"
+                      if (Test-Path $destinationPath) {
+                        Remove-Item -Recurse -Force $destinationPath
+                        Write-Host "Removed existing directory: $destinationPath"
+                      }
+                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath $destinationPath
+                      Write-Host "Unzipped artifact to: $destinationPath"
 
                 - task: PowerShell@2
                   displayName: 'Ensure Service'
@@ -176,13 +182,6 @@ stages:
                   artifact: $(ArtifactName)
 
                 - task: PowerShell@2
-                  displayName: 'Unzip Artifact'
-                  inputs:
-                    targetType: 'inline'
-                    script: |
-                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath "$(System.DefaultWorkingDirectory)/$(ServiceName)"
-
-                - task: PowerShell@2
                   displayName: 'Stop Service'
                   inputs:
                     targetType: 'inline'
@@ -199,6 +198,19 @@ stages:
                               exit 1
                           }
                       }
+                      
+                - task: PowerShell@2
+                  displayName: 'Unzip Artifact'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $destinationPath = "$(System.DefaultWorkingDirectory)/$(ServiceName)"
+                      if (Test-Path $destinationPath) {
+                        Remove-Item -Recurse -Force $destinationPath
+                        Write-Host "Removed existing directory: $destinationPath"
+                      }
+                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath $destinationPath
+                      Write-Host "Unzipped artifact to: $destinationPath"
 
                 - task: PowerShell@2
                   displayName: 'Ensure Service'
