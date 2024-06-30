@@ -176,7 +176,10 @@ stages:
     jobs:
       - deployment: DeployCommunityServiceToProduction
         displayName: 'Deploy Community Service to Production'
-        environment: 'Production'
+        environment:
+          name: 'Production'
+          tags: 'Production'
+          resourceType: 'VirtualMachine'
         strategy:
           runOnce:
             deploy:
