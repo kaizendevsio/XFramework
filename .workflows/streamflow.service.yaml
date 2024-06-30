@@ -1,6 +1,8 @@
 trigger:
   - Main
 
+pr: none
+
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/streamFlow'
   ProjectFilePath: 'src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj'
