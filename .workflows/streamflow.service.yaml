@@ -102,7 +102,6 @@ stages:
                     targetType: 'inline'
                     script: |
                       $serviceFilePath = "$(ServiceFilePath)"
-                      Write-Host "DefaultWorkingDirectory: $(System.DefaultWorkingDirectory)"
                       
                       if (Test-Path -Path $serviceFilePath) {
                           sudo systemctl stop $(ServiceName).service
@@ -127,7 +126,7 @@ stages:
                       
                       [Service]
                       WorkingDirectory=$(ServiceName)
-                      ExecStart=/usr/bin/dotnet $(ServiceExecutable)
+                      ExecStart=/usr/bin/dotnet $(System.DefaultWorkingDirectory)/$(ServiceName)/$(ServiceExecutable)
                       Restart=always
                       RestartSec=10
                       SyslogIdentifier=$(ServiceName)
@@ -181,7 +180,7 @@ stages:
                   inputs:
                     targetType: 'inline'
                     script: |
-                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath "$(PublishDirectory)"
+                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath "$(System.DefaultWorkingDirectory)/$(ServiceName)"
 
                 - task: PowerShell@2
                   displayName: 'Stop Service'
@@ -213,7 +212,7 @@ stages:
                       
                       [Service]
                       WorkingDirectory=$(PublishDirectory)
-                      ExecStart=/usr/bin/dotnet $(ServiceExecutable)
+                      ExecStart=/usr/bin/dotnet $(System.DefaultWorkingDirectory)/$(ServiceName)/$(ServiceExecutable)
                       Restart=always
                       RestartSec=10
                       SyslogIdentifier=$(ServiceName)
