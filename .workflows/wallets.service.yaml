@@ -1,6 +1,8 @@
 trigger:
   - Main
 
+pr: none
+
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/wallets'
   ProjectFilePath: 'src/Modules/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj'

@@ -1,6 +1,8 @@
 trigger:
   - Main
 
+pr: none
+
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/identity'
   ProjectFilePath: 'src/Modules/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj'
