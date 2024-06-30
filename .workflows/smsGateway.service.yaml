@@ -1,6 +1,8 @@
 trigger:
   - Main
 
+pr: none
+
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/smsGateway'
   ProjectFilePath: 'src/Modules/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj'

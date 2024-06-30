@@ -1,6 +1,8 @@
 trigger:
   - Main
 
+pr: none
+
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/community'
   ProjectFilePath: 'src/Modules/XFramework.Community/Community.Api/Community.Api.csproj'
