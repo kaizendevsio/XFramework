@@ -10,5 +10,6 @@ public static class Constants
     public static class WalletEvents
     {
         public static readonly string WalletUpdated = nameof(WalletUpdated);
+        public static readonly string WalletCreated = nameof(WalletCreated);
     }
 }
