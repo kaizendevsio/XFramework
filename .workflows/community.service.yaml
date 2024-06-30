@@ -18,7 +18,7 @@ stages:
   - stage: BuildAndUpload
     displayName: 'Build and Upload'
     jobs:
-      - job: Pull And Clean
+      - job: PullAndClean
         displayName: 'Pull and Clean'
         pool:
           name: Default-Linux
@@ -40,7 +40,7 @@ stages:
               modifyOutputPath: false
 
       - job: BuildUpload
-        dependsOn: Clean
+        dependsOn: PullAndClean
         displayName: 'Build and Upload'
         pool:
           name: Default-Linux
