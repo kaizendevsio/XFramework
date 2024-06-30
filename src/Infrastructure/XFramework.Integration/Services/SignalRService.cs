@@ -63,9 +63,23 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             _logger.LogWarning("StreamFlow configuration is not set, therefore SignalR client service is disabled");
             return;
         }
-        
+
+        var serverUrl = StreamFlowConfiguration?.ServerUrls?.FirstOrDefault() ?? new Uri(envConfig);
         Connection = new HubConnectionBuilder()
-            .WithUrl(StreamFlowConfiguration?.ServerUrls?.FirstOrDefault() ?? new Uri(envConfig))
+            .WithUrl(serverUrl, (opts) =>
+            {
+                if (serverUrl.AbsoluteUri.StartsWith("https://localhost", StringComparison.OrdinalIgnoreCase)
+                    || serverUrl.AbsoluteUri.StartsWith("https://127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                {
+                    opts.HttpMessageHandlerFactory = (message) =>
+                    {
+                        if (message is HttpClientHandler clientHandler)
+                            // always verify the SSL certificate
+                            clientHandler.ServerCertificateCustomValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;
+                        return message;
+                    };
+                }
+            })
             .WithAutomaticReconnect(Enumerable.Repeat(TimeSpan.FromSeconds(2), 2000).ToArray())
             .AddMessagePackProtocol()
             .Build();
