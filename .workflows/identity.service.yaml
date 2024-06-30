@@ -18,12 +18,11 @@ stages:
   - stage: BuildAndUpload
     displayName: 'Build and Upload'
     jobs:
-      - job: Clean
-        displayName: 'Clean'
+      - job: Pull And Clean
+        displayName: 'Pull and Clean'
         pool:
           name: Default-Linux
         steps:
-          - checkout: none
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
@@ -46,6 +45,7 @@ stages:
         pool:
           name: Default-Linux
         steps:
+          - checkout: none
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
@@ -78,8 +78,8 @@ stages:
     displayName: 'Deploy to Staging'
     dependsOn: BuildAndUpload
     jobs:
-      - deployment: DeployIdentityServerServiceToStaging
-        displayName: 'Deploy IdentityServer Service to Staging'
+      - deployment: DeployCommunityServiceToStaging
+        displayName: 'Deploy Community Service to Staging'
         environment:
           name: 'Staging'
           tags: 'Staging'
@@ -174,8 +174,8 @@ stages:
     displayName: 'Deploy to Production'
     dependsOn: DeployToStaging
     jobs:
-      - deployment: DeployIdentityServerServiceToProduction
-        displayName: 'Deploy IdentityServer Service to Production'
+      - deployment: DeployCommunityServiceToProduction
+        displayName: 'Deploy Community Service to Production'
         environment: 'Production'
         strategy:
           runOnce:

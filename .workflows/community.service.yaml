@@ -18,12 +18,11 @@ stages:
   - stage: BuildAndUpload
     displayName: 'Build and Upload'
     jobs:
-      - job: Clean
-        displayName: 'Clean'
+      - job: Pull And Clean
+        displayName: 'Pull and Clean'
         pool:
           name: Default-Linux
         steps:
-          - checkout: none
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
@@ -46,6 +45,7 @@ stages:
         pool:
           name: Default-Linux
         steps:
+          - checkout: none
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
