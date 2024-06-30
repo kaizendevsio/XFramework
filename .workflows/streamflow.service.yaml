@@ -1,11 +1,5 @@
 trigger:
-  branches:
-    include:
-      - Main
-
-pr:
-  branches:
-    include: []
+  - Main
 
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/streamFlow'
