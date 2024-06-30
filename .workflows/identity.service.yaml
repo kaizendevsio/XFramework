@@ -1,5 +1,5 @@
 trigger:
-  - Development/Main
+  - Main
 
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/identity'
