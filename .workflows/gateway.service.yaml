@@ -1,6 +1,8 @@
 trigger:
   - Main
 
+pr: none
+
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/gateway'
   ProjectFilePath: 'src/Gateways/XFramework.Gateway/XFramework.Gateway.csproj'

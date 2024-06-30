@@ -1,6 +1,8 @@
 trigger:
   - Main
 
+pr: none
+
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/messaging'
   ProjectFilePath: 'src/Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj'
