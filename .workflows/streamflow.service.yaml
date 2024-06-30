@@ -1,285 +1,261 @@
 trigger:
-- Development/Main
+  - Main
+
+variables:
+  PublishDirectory: '$(Build.ArtifactStagingDirectory)/streamFlow'
+  ProjectFilePath: 'src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj'
+  ServiceExecutable: 'StreamFlow.Stream.dll'
+  ServiceFilePath: '/etc/systemd/system/xframework-streamFlow.service'
+  ServiceName: 'xframework-streamFlow'
+  BuildConfiguration: 'Release'
+  BuildPlatform: 'any cpu'
+  ArtifactName: 'streamFlowArtifact'
+  ZipFile: 'streamFlow.zip'
 
 stages:
-- stage: DeployToStaging
-  displayName: 'Deploy to Staging'
-  jobs:
-  - job: DeployStreamFlowServiceToStaging
-    displayName: 'Deploy StreamFlow Service to Staging'
-    pool:
-      name: Deployment-OnPrem-Staging  # Specify the staging agent pool
-    variables:
-      PublishDirectory: '/home/xnelsystems-staging/services/streamFlow'
-      ProjectFilePath: 'src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj'
-      ServiceExecutable: 'StreamFlow.Stream.dll'
-      ServiceFilePath: '/etc/systemd/system/xframework-streamFlow.service'
-      ServiceName: 'xframework-streamFlow'
-      Environment: 'Staging'
-      BuildConfiguration: 'Release'
-      BuildPlatform: 'any cpu'
-    steps:
-    - task: UseDotNet@2
-      displayName: 'Use .NET Core sdk '
-      inputs:
-        version: 8.0.x
+  - stage: BuildAndUpload
+    displayName: 'Build and Upload'
+    jobs:
+      - job: Clean
+        displayName: 'Clean'
+        pool:
+          name: Default-Linux
+        steps:
+          - checkout: none
+          - task: UseDotNet@2
+            displayName: 'Use .NET Core sdk'
+            inputs:
+              version: 8.0.x
 
-    - powershell: |
-        # Define the directory path
-        $folderPath = "$(PublishDirectory)/*"
-        
-        # Check if the directory exists
-        if(Test-Path $folderPath)
-        {
-            # Remove all files and subdirectories
-            try
-            {
-                Remove-Item $folderPath -Recurse -Force -ErrorAction Stop
-                Write-Host "Successfully cleaned up directory: $($folderPath)"
-            }
-            catch
-            {
-                Write-Host "Failed to clean up directory: $($folderPath)"
-            }
-        }
-        else
-        {
-            Write-Host "Directory '$folderPath' does not exist."
-        }
-      displayName: 'Clean Build Folder'
+          - task: DotNetCoreCLI@2
+            displayName: 'Clean Project'
+            inputs:
+              command: custom
+              custom: clean
+              publishWebProjects: false
+              projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
+              arguments: '--configuration $(BuildConfiguration)'
+              zipAfterPublish: false
+              modifyOutputPath: false
+                
+      - job: BuildUpload
+        dependsOn: Clean
+        displayName: 'Build and Upload'
+        pool:
+          name: Default-Linux
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Use .NET Core sdk'
+            inputs:
+              version: 8.0.x
+              
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Project'
+            inputs:
+              command: publish
+              publishWebProjects: false
+              projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
+              arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
+              zipAfterPublish: false
+              modifyOutputPath: false
 
-    - powershell: |
-        # Define the service file path
-        $serviceFilePath = "$(ServiceFilePath)"
-        
-        # Check if the service file exists
-        if (Test-Path -Path $serviceFilePath) {
-            # Stop the existing service
-            sudo systemctl stop $(ServiceName).service
-        
-            if ($?) {
-                Write-Host "Service stopped successfully."
-            } else {
-                Write-Host "Failed to stop the service."
-                exit 1
-            }
-        }
-      displayName: 'Stop Service'
+          - task: PowerShell@2
+            displayName: 'Zip Published Directory'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Compress-Archive -Path "$(PublishDirectory)/*" -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
+          
+          - task: PublishPipelineArtifact@1
+            displayName: 'Upload Artifact'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
+              artifactName: '$(ArtifactName)'         
 
-    - task: DotNetCoreCLI@2
-      displayName: 'dotnet publish'
-      inputs:
-        command: publish
-        publishWebProjects: false
-        projects: '$(ProjectFilePath)'
-        arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
-        zipAfterPublish: false
-        modifyOutputPath: false
+  - stage: DeployToStaging
+    displayName: 'Deploy to Staging'
+    dependsOn: BuildAndUpload
+    jobs:
+      - deployment: DeployStreamFlowServiceToStaging
+        displayName: 'Deploy StreamFlow Service to Staging'
+        environment:
+          name: 'Staging'
+          tags: 'Staging'
+          resourceType: 'VirtualMachine'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: '$(ArtifactName)'
 
-    - powershell: |
-        # Define the service file path
-        $serviceFilePath = "$(ServiceFilePath)"
-        
-        # Define the content of the service file
-        $serviceContent = @"
-        [Unit]
-        Description=$(ServiceName)
-        
-        [Service]
-        WorkingDirectory=$(PublishDirectory)
-        ExecStart=/usr/bin/dotnet $(ProjectFilePath)/$(ServiceExecutable)
-        Restart=always
-        RestartSec=10
-        SyslogIdentifier=$(ServiceName)
-        Environment=ASPNETCORE_ENVIRONMENT=$(Environment)
-        
-        # Hardening
-        SystemCallArchitectures=native
-        #MemoryDenyWriteExecute=true
-        NoNewPrivileges=true
-        
-        [Install]
-        WantedBy=multi-user.target
-        "@
-        
-        # Check if the service file exists
-        if (-Not (Test-Path -Path $serviceFilePath)) {
-            # Create the service file with the specified content
-            echo $serviceContent | sudo tee $serviceFilePath > /dev/null
-        
-            # Reload the systemd manager configuration
-            sudo systemctl daemon-reload
-        
-            # Enable the service
-            sudo systemctl enable $(ServiceName).service
-        
-            Write-Host "Service created and enabled."
-        }
-      displayName: 'Ensure Service'
+                - task: PowerShell@2
+                  displayName: 'Stop Service'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $serviceFilePath = "$(ServiceFilePath)"
+                      
+                      if (Test-Path -Path $serviceFilePath) {
+                          sudo systemctl stop $(ServiceName).service
+                      
+                          if ($?) {
+                              Write-Host "Service stopped successfully."
+                          } else {
+                              Write-Host "Failed to stop the service."
+                              exit 1
+                          }
+                      }
+                      
+                - task: PowerShell@2
+                  displayName: 'Unzip Artifact'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $destinationPath = "$(System.DefaultWorkingDirectory)/$(ServiceName)"
+                      if (Test-Path $destinationPath) {
+                        Remove-Item -Recurse -Force $destinationPath
+                        Write-Host "Removed existing directory: $destinationPath"
+                      }
+                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath $destinationPath
+                      Write-Host "Unzipped artifact to: $destinationPath"
 
-    - powershell: |
-        # Define the service file path
-        $serviceFilePath = "$(ServiceFilePath)"
-        
-        # Check if the service file exists
-        if (Test-Path -Path $serviceFilePath) {
-            # Start the existing service
-            sudo systemctl start $(ServiceName).service
-        
-            if ($?) {
-                Write-Host "Service started successfully."
-            } else {
-                Write-Host "Failed to start the service."
-                exit 1
-            }
-        }
-      displayName: 'Start Service'
+                - task: PowerShell@2
+                  displayName: 'Ensure Service'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $serviceFilePath = "$(ServiceFilePath)"
+                      $serviceContent = @"
+                      [Unit]
+                      Description=$(ServiceName)
+                      
+                      [Service]
+                      WorkingDirectory=$(System.DefaultWorkingDirectory)/$(ServiceName)
+                      ExecStart=/usr/bin/dotnet $(System.DefaultWorkingDirectory)/$(ServiceName)/$(ServiceExecutable)
+                      Restart=always
+                      RestartSec=10
+                      SyslogIdentifier=$(ServiceName)
+                      Environment=ASPNETCORE_ENVIRONMENT=Staging
+                      
+                      [Install]
+                      WantedBy=multi-user.target
+                      "@
+                      
+                      if (-Not (Test-Path -Path $serviceFilePath)) {
+                          echo $serviceContent | sudo tee $serviceFilePath > /dev/null
+                          sudo systemctl daemon-reload
+                          sudo systemctl enable $(ServiceName).service
+                          Write-Host "Service created and enabled."
+                      }
+                      
 
-- stage: Approval
-  displayName: 'Approval to Production'
-  jobs:
-  - job: WaitForApproval
-    displayName: 'Wait for Approval'
-    pool: server
-    steps:
-    - task: ManualValidation@1
-      timeoutInMinutes: 1440 # task times out in 1 day
-      inputs:
-        notifyUsers: 'xnel.systems@outlook.com'
-        approvers: 'xnel.systems@outlook.com'
-        instructions: 'Deploy to Production'
-        onTimeout: 'reject'
+                - task: PowerShell@2
+                  displayName: 'Start Service'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $serviceFilePath = "$(ServiceFilePath)"
+                      
+                      if (Test-Path -Path $serviceFilePath) {
+                          sudo systemctl start $(ServiceName).service
+                      
+                          if ($?) {
+                              Write-Host "Service started successfully."
+                          } else {
+                              Write-Host "Failed to start the service."
+                              exit 1
+                          }
+                      }
 
-- stage: DeployToProduction
-  displayName: 'Deploy to Production'
-  dependsOn: Approval
-  jobs:
-  - job: DeployStreamFlowServiceToProduction
-    displayName: 'Deploy StreamFlow Service to Production'
-    pool:
-      name: Deployment-OnPrem-Production  # Specify the production agent pool
-    variables:
-      PublishDirectory: '/home/xnelsystems-production/services/streamFlow'
-      ProjectFilePath: 'src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj'
-      ServiceExecutable: 'StreamFlow.Stream.dll'
-      ServiceFilePath: '/etc/systemd/system/xframework-streamFlow.service'
-      ServiceName: 'xframework-streamFlow'
-      Environment: 'Production'
-      BuildConfiguration: 'Release'
-      BuildPlatform: 'any cpu'
-    steps:
-    - task: UseDotNet@2
-      displayName: 'Use .NET Core sdk '
-      inputs:
-        version: 8.0.x
+  - stage: DeployToProduction
+    displayName: 'Deploy to Production'
+    dependsOn: DeployToStaging
+    jobs:
+      - deployment: DeployStreamFlowServiceToProduction
+        displayName: 'Deploy StreamFlow Service to Production'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: $(ArtifactName)
 
-    - powershell: |
-        # Define the directory path
-        $folderPath = "$(PublishDirectory)/*"
-        
-        # Check if the directory exists
-        if(Test-Path $folderPath)
-        {
-            # Remove all files and subdirectories
-            try
-            {
-                Remove-Item $folderPath -Recurse -Force -ErrorAction Stop
-                Write-Host "Successfully cleaned up directory: $($folderPath)"
-            }
-            catch
-            {
-                Write-Host "Failed to clean up directory: $($folderPath)"
-            }
-        }
-        else
-        {
-            Write-Host "Directory '$folderPath' does not exist."
-        }
-      displayName: 'Clean Build Folder'
+                - task: PowerShell@2
+                  displayName: 'Stop Service'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $serviceFilePath = "$(ServiceFilePath)"
+                      
+                      if (Test-Path -Path $serviceFilePath) {
+                          sudo systemctl stop $(ServiceName).service
+                      
+                          if ($?) {
+                              Write-Host "Service stopped successfully."
+                          } else {
+                              Write-Host "Failed to stop the service."
+                              exit 1
+                          }
+                      }
+                      
+                - task: PowerShell@2
+                  displayName: 'Unzip Artifact'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $destinationPath = "$(System.DefaultWorkingDirectory)/$(ServiceName)"
+                      if (Test-Path $destinationPath) {
+                        Remove-Item -Recurse -Force $destinationPath
+                        Write-Host "Removed existing directory: $destinationPath"
+                      }
+                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath $destinationPath
+                      Write-Host "Unzipped artifact to: $destinationPath"
 
-    - powershell: |
-        # Define the service file path
-        $serviceFilePath = "$(ServiceFilePath)"
-        
-        # Check if the service file exists
-        if (Test-Path -Path $serviceFilePath) {
-            # Stop the existing service
-            sudo systemctl stop $(ServiceName).service
-        
-            if ($?) {
-                Write-Host "Service stopped successfully."
-            } else {
-                Write-Host "Failed to stop the service."
-                exit 1
-            }
-        }
-      displayName: 'Stop Service'
+                - task: PowerShell@2
+                  displayName: 'Ensure Service'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $serviceFilePath = "$(ServiceFilePath)"
+                      $serviceContent = @"
+                      [Unit]
+                      Description=$(ServiceName)
+                      
+                      [Service]
+                      WorkingDirectory=$(System.DefaultWorkingDirectory)/$(ServiceName)
+                      ExecStart=/usr/bin/dotnet $(System.DefaultWorkingDirectory)/$(ServiceName)/$(ServiceExecutable)
+                      Restart=always
+                      RestartSec=10
+                      SyslogIdentifier=$(ServiceName)
+                      Environment=ASPNETCORE_ENVIRONMENT=Production
+                      
+                      [Install]
+                      WantedBy=multi-user.target
+                      "@
+                      
+                      if (-Not (Test-Path -Path $serviceFilePath)) {
+                          echo $serviceContent | sudo tee $serviceFilePath > /dev/null
+                          sudo systemctl daemon-reload
+                          sudo systemctl enable $(ServiceName).service
+                          Write-Host "Service created and enabled."
+                      }
 
-    - task: DotNetCoreCLI@2
-      displayName: 'dotnet publish'
-      inputs:
-        command: publish
-        publishWebProjects: false
-        projects: '$(ProjectFilePath)'
-        arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
-        zipAfterPublish: false
-        modifyOutputPath: false
-
-    - powershell: |
-        # Define the service file path
-        $serviceFilePath = "$(ServiceFilePath)"
-        
-        # Define the content of the service file
-        $serviceContent = @"
-        [Unit]
-        Description=$(ServiceName)
-        
-        [Service]
-        WorkingDirectory=$(PublishDirectory)
-        ExecStart=/usr/bin/dotnet $(ProjectFilePath)/$(ServiceExecutable)
-        Restart=always
-        RestartSec=10
-        SyslogIdentifier=$(ServiceName)
-        Environment=ASPNETCORE_ENVIRONMENT=$(Environment)
-        
-        # Hardening
-        SystemCallArchitectures=native
-        #MemoryDenyWriteExecute=true
-        NoNewPrivileges=true
-        
-        [Install]
-        WantedBy=multi-user.target
-        "@
-        
-        # Check if the service file exists
-        if (-Not (Test-Path -Path $serviceFilePath)) {
-            # Create the service file with the specified content
-            echo $serviceContent | sudo tee $serviceFilePath > /dev/null
-        
-            # Reload the systemd manager configuration
-            sudo systemctl daemon-reload
-        
-            # Enable the service
-            sudo systemctl enable $(ServiceName).service
-        
-            Write-Host "Service created and enabled."
-        }
-      displayName: 'Ensure Service'
-
-    - powershell: |
-        # Define the service file path
-        $serviceFilePath = "$(ServiceFilePath)"
-        
-        # Check if the service file exists
-        if (Test-Path -Path $serviceFilePath) {
-            # Start the existing service
-            sudo systemctl start $(ServiceName).service
-        
-            if ($?) {
-                Write-Host "Service started successfully."
-            } else {
-                Write-Host "Failed to start the service."
-                exit 1
-            }
-        }
-      displayName: 'Start Service'
+                - task: PowerShell@2
+                  displayName: 'Start Service'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $serviceFilePath = "$(ServiceFilePath)"
+                      
+                      if (Test-Path -Path $serviceFilePath) {
+                          sudo systemctl start $(ServiceName).service
+                      
+                          if ($?) {
+                              Write-Host "Service started successfully."
+                          } else {
+                              Write-Host "Failed to start the service."
+                              exit 1
+                          }
+                      }
