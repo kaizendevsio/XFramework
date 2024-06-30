@@ -18,12 +18,11 @@ stages:
   - stage: BuildAndUpload
     displayName: 'Build and Upload'
     jobs:
-      - job: Clean
-        displayName: 'Clean'
+      - job: Pull And Clean
+        displayName: 'Pull and Clean'
         pool:
           name: Default-Linux
         steps:
-          - checkout: none
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
@@ -39,18 +38,19 @@ stages:
               arguments: '--configuration $(BuildConfiguration)'
               zipAfterPublish: false
               modifyOutputPath: false
-                
+
       - job: BuildUpload
         dependsOn: Clean
         displayName: 'Build and Upload'
         pool:
           name: Default-Linux
         steps:
+          - checkout: none
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
               version: 8.0.x
-              
+
           - task: DotNetCoreCLI@2
             displayName: 'Publish Project'
             inputs:
@@ -67,19 +67,19 @@ stages:
               targetType: 'inline'
               script: |
                 Compress-Archive -Path "$(PublishDirectory)/*" -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
-          
+
           - task: PublishPipelineArtifact@1
             displayName: 'Upload Artifact'
             inputs:
               targetPath: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
-              artifactName: '$(ArtifactName)'         
+              artifactName: '$(ArtifactName)'
 
   - stage: DeployToStaging
     displayName: 'Deploy to Staging'
     dependsOn: BuildAndUpload
     jobs:
-      - deployment: DeployStreamFlowServiceToStaging
-        displayName: 'Deploy StreamFlow Service to Staging'
+      - deployment: DeployCommunityServiceToStaging
+        displayName: 'Deploy Community Service to Staging'
         environment:
           name: 'Staging'
           tags: 'Staging'
@@ -108,7 +108,7 @@ stages:
                               exit 1
                           }
                       }
-                      
+
                 - task: PowerShell@2
                   displayName: 'Unzip Artifact'
                   inputs:
@@ -150,7 +150,7 @@ stages:
                           sudo systemctl enable $(ServiceName).service
                           Write-Host "Service created and enabled."
                       }
-                      
+
 
                 - task: PowerShell@2
                   displayName: 'Start Service'
@@ -174,8 +174,8 @@ stages:
     displayName: 'Deploy to Production'
     dependsOn: DeployToStaging
     jobs:
-      - deployment: DeployStreamFlowServiceToProduction
-        displayName: 'Deploy StreamFlow Service to Production'
+      - deployment: DeployCommunityServiceToProduction
+        displayName: 'Deploy Community Service to Production'
         environment: 'Production'
         strategy:
           runOnce:
@@ -201,7 +201,7 @@ stages:
                               exit 1
                           }
                       }
-                      
+
                 - task: PowerShell@2
                   displayName: 'Unzip Artifact'
                   inputs:
@@ -261,3 +261,4 @@ stages:
                               exit 1
                           }
                       }
+
