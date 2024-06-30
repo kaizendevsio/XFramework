@@ -131,7 +131,7 @@ stages:
                       Description=$(ServiceName)
                       
                       [Service]
-                      WorkingDirectory=$(ServiceName)
+                      WorkingDirectory=$(System.DefaultWorkingDirectory)/$(ServiceName)
                       ExecStart=/usr/bin/dotnet $(System.DefaultWorkingDirectory)/$(ServiceName)/$(ServiceExecutable)
                       Restart=always
                       RestartSec=10
@@ -223,7 +223,7 @@ stages:
                       Description=$(ServiceName)
                       
                       [Service]
-                      WorkingDirectory=$(PublishDirectory)
+                      WorkingDirectory=$(System.DefaultWorkingDirectory)/$(ServiceName)
                       ExecStart=/usr/bin/dotnet $(System.DefaultWorkingDirectory)/$(ServiceName)/$(ServiceExecutable)
                       Restart=always
                       RestartSec=10
