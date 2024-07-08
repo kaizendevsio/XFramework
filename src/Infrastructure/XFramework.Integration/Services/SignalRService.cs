@@ -68,6 +68,8 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         Connection = new HubConnectionBuilder()
             .WithUrl(serverUrl, (opts) =>
             {
+                if (OperatingSystem.IsBrowser()) return;
+                
                 if (serverUrl.AbsoluteUri.StartsWith("https://localhost", StringComparison.OrdinalIgnoreCase)
                     || serverUrl.AbsoluteUri.StartsWith("https://127.0.0.1", StringComparison.OrdinalIgnoreCase))
                 {
