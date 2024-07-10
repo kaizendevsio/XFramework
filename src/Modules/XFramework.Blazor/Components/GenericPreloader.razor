@@ -1,6 +1,6 @@
 ﻿@inherits XComponentsBase
 
-@if (ApplicationState.IsBusy && !ApplicationState.NoSpinner)
+@if (ApplicationState is { IsBusy: true, NoSpinner: false })
 {
     <MudPaper Class="pa-6 ma-2 generic-preloader" Elevation="3">
         <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center">
