@@ -67,6 +67,12 @@ public partial class SessionState
                     OnValidToken = action.OnValidOtp,
                     OnInvalidToken = action.OnInvalidOtp
                 });
+                
+                SessionState.ResetPasswordVm.Initiated = true;
+                await Mediator.Send(new SetState()
+                {
+                    ResetPasswordVm = SessionState.ResetPasswordVm
+                });
             }
             catch (Exception e)
             {
