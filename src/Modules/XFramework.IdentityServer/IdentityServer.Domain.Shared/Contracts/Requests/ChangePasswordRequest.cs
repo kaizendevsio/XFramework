@@ -10,4 +10,5 @@ public partial record ChangePasswordRequest : RequestBase,
     public Guid CreadentialId { get; set; }
     public string? NewPassword { get; set; }
     public Guid VerificationId { get; set; }
+    public bool RequireVerificationId { get; set; } = true;
 }

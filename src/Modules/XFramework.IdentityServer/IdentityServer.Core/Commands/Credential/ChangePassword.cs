@@ -45,23 +45,27 @@ public class ChangePassword(
             };
         }
 
-        var verification = await dbContext.Set<IdentityVerification>()
-            .Where(i => i.VerificationType.Name == nameof(IdentityConstants.VerificationType.Sms))
-            .Where(i => i.CredentialId == request.CreadentialId)
-            .Where(i => i.Status == (int)GenericStatusType.Approved)
-            .Where(i => i.Id == request.VerificationId)
-            .Where(i => i.StatusUpdatedOn >= DateTime.Now.ToUniversalTime().AddMinutes(-10))
-            .FirstOrDefaultAsync(CancellationToken.None);
-        
-        if (verification == null)
+        if (request.RequireVerificationId)
         {
-            logger.LogWarning("Invalid verification code or expired for credential {CredentialId}", request.CreadentialId);
-            return new CmdResponse
+            var verification = await dbContext.Set<IdentityVerification>()
+                .Where(i => i.VerificationType.Name == nameof(IdentityConstants.VerificationType.Sms))
+                .Where(i => i.CredentialId == request.CreadentialId)
+                .Where(i => i.Status == (int)GenericStatusType.Approved)
+                .Where(i => i.Id == request.VerificationId)
+                .Where(i => i.StatusUpdatedOn >= DateTime.Now.ToUniversalTime().AddMinutes(-10))
+                .FirstOrDefaultAsync(CancellationToken.None);
+            
+            if (verification == null)
             {
-                HttpStatusCode = HttpStatusCode.NotFound,
-                Message = "Invalid verification code or expired"
-            };
+                logger.LogWarning("Invalid verification code or expired for credential {CredentialId}", request.CreadentialId);
+                return new CmdResponse
+                {
+                    HttpStatusCode = HttpStatusCode.NotFound,
+                    Message = "Invalid verification code or expired"
+                };
+            }
         }
+        
         
         var hashPasswordByte = Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: request.NewPassword, workFactor:11));
         credential.PasswordByte = hashPasswordByte;
