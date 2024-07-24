@@ -35,7 +35,6 @@ public partial class SessionState
             
             // If Success URL property is provided, navigate to the given URL
             await HandleSuccess(result, action, true, "Password changed successfully");
-            return;
         }
     }
 }
