@@ -15,7 +15,11 @@ public class ServiceWrapperGenerator : ISourceGenerator
 
     public void Execute(GeneratorExecutionContext context)
     {
-        var serviceName = context.Compilation.AssemblyName?.Split(".").First();
+        var assemblyName = context.Compilation.AssemblyName;
+        var serviceName =  assemblyName!.Contains('.') 
+            ? assemblyName.Split(".").First()
+            : assemblyName;
+        
         var namespaceName = BaseSourceGenerator.GetNamespace(context, "StreamFlowWrapper");
         var classes = BaseSourceGenerator.GetClasses(context, "StreamFlowWrapper", "ServiceWrapper");
         var serviceId = serviceName.ToSha256();

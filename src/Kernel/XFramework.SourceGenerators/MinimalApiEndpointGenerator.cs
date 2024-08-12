@@ -15,10 +15,13 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
 
     public void Execute(GeneratorExecutionContext context)
     {
-        var serviceName = context.Compilation.AssemblyName?.Split(".").First();
-        var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateApiFromNamespace");
-
-        var models = BaseSourceGenerator.GetModels(context, "GenerateApiFromNamespace", $"{serviceName}ApiGenerator");
+        var assemblyName = context.Compilation.AssemblyName;
+        var serviceName =  assemblyName!.Contains('.') 
+            ? assemblyName.Split(".").First()
+            : assemblyName;
+        
+        var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateEndpoints");
+        var models = BaseSourceGenerator.GetModels(context, "GenerateEndpoints", $"{serviceName}Endpoints");
         var codeBuilder = new StringBuilder();
 
         if (models.Count == 0)
@@ -42,10 +45,10 @@ public class MinimalApiEndpointGenerator : ISourceGenerator
         using Asp.Versioning.Conventions;
 
 
-        namespace {serviceName}.Api.Generators
+        namespace {assemblyName}.Endpoints
         {{
         using {namespaceName};
-            public static partial class {serviceName}ApiGenerator
+            public static partial class {serviceName}Endpoints
             {{
                 public static IApplicationBuilder GenerateMinimalApi(this IApplicationBuilder appBuilder)
                 {{
