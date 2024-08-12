@@ -16,9 +16,14 @@ public class StreamflowRequestHandlerGenerator : ISourceGenerator
 
     public void Execute(GeneratorExecutionContext context)
     {
-        var serviceName = context.Compilation.AssemblyName?.Split(".").First();
-        var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateApiFromNamespace");
-        var models = BaseSourceGenerator.GetModels(context,"GenerateApiFromNamespace", $"{serviceName}ApiGenerator");
+        var assemblyName = context.Compilation.AssemblyName;
+
+        var serviceName = context.Compilation.AssemblyName!.Contains('.') 
+            ? context.Compilation.AssemblyName?.Split(".").First()
+            : context.Compilation.AssemblyName;
+        
+        var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateEndpoints");
+        var models = BaseSourceGenerator.GetModels(context,"GenerateEndpoints", $"{serviceName}Endpoints");
         var codeBuilder = new StringBuilder();
         
         if (models.Count == 0)
@@ -45,7 +50,7 @@ public class StreamflowRequestHandlerGenerator : ISourceGenerator
         using Asp.Versioning.Conventions;
         using Microsoft.AspNetCore.Components;
 
-        namespace {serviceName}.Api.SignalR.Handlers
+        namespace {assemblyName}.SignalR.Handlers
         {{
         using {namespaceName};
                

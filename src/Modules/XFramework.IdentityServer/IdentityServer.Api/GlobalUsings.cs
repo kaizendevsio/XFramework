@@ -7,7 +7,7 @@ global using IdentityServer.Integration.Drivers;
 global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.EntityFrameworkCore;
 global using IdentityServer.Api.Extensions;
-global using IdentityServer.Api.Generators;
+global using IdentityServer.Api.Endpoints;
 global using XFramework.Core.Abstractions;
 global using XFramework.Core.Interfaces;
 global using XFramework.Domain.Contexts;

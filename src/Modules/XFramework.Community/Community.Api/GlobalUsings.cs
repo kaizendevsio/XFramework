@@ -1,5 +1,6 @@
 ﻿global using System;
 global using System.Collections.Generic;
+global using Community.Api.Endpoints;
 global using Community.Api.Extensions;
 global using Microsoft.Extensions.Configuration;
 global using XFramework.Domain.Shared.BusinessObjects;

@@ -5,8 +5,8 @@ pr: none
 
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/gateway'
-  ProjectFilePath: 'src/Gateways/XFramework.Gateway/XFramework.Gateway.csproj'
-  ServiceExecutable: 'XFramework.Gateway.dll'
+  ProjectFilePath: 'src/Presentation/Gateway/Gateway.csproj'
+  ServiceExecutable: 'Gateway.dll'
   ServiceFilePath: '/etc/systemd/system/xframework-gateway.service'
   ServiceName: 'xframework-gateway'
   BuildConfiguration: 'Release'

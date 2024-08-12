@@ -3,7 +3,7 @@
   "profiles": {
     "Generators": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "../../../XFramework.Subsystems/XFramework.IdentityServer/IdentityServer.Integration/IdentityServer.Integration.csproj"
+      "targetProject": "../../Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj"
     }
   }
 }

@@ -195,7 +195,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             Name = !string.IsNullOrEmpty(requestServer?.Name) ? requestServer.Name : ClientName,
             IpAddress = !string.IsNullOrEmpty(requestServer?.IpAddress) ? requestServer.IpAddress : ClientIpAddress,
             RequestId = requestServer?.RequestId ?? Guid.NewGuid(),
-            SessionId = request.Metadata.SessionId ?? Cache.Get<Guid>("ActiveSession:SessionId")
+            SessionId = request.Metadata?.SessionId ?? Cache.Get<Guid>("ActiveSession:SessionId")
         };
     }
     

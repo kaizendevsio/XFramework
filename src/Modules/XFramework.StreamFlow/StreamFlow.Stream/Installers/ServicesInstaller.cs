@@ -1,5 +1,4 @@
 ﻿using StreamFlow.Core.Services;
-using Tenant.Integration.Drivers;
 using ICachingService = StreamFlow.Core.Interfaces.ICachingService;
 
 namespace StreamFlow.Stream.Installers;

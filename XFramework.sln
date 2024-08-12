@@ -79,9 +79,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Core", "src\Modu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmsGateway.Domain", "src\Modules\XFramework.SmsGateway\SmsGateway.Domain\SmsGateway.Domain.csproj", "{10954868-564D-448E-AB17-811B8DC5574C}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Gateways", "Gateways", "{41398AE5-FD00-46BA-AF0B-B9313794B8C0}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Presentation", "Presentation", "{41398AE5-FD00-46BA-AF0B-B9313794B8C0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Gateway", "src\Gateways\XFramework.Gateway\XFramework.Gateway.csproj", "{718EC8CB-9CC4-43FC-A5C3-8D4E4D4DD0EE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gateway", "src\Presentation\Gateway\Gateway.csproj", "{718EC8CB-9CC4-43FC-A5C3-8D4E4D4DD0EE}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Blazor", "Blazor", "{AE5E9EEE-0624-45A4-A97A-C43A4501BD5A}"
 EndProject
@@ -102,6 +102,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.Api", "src\Modules\XFramework.Community\Community.Api\Community.Api.csproj", "{6645E6E6-00A3-4E13-886F-DB92C15B5791}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFramework.Utilities", "src\Shared\XFramework.Utilities\XFramework.Utilities.csproj", "{CCBD06A5-5A9E-4559-9CBD-AB4EBE431BC8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlPanel", "src\Presentation\ControlPanel\ControlPanel.csproj", "{F689393E-E409-4372-84D5-A158FB0554E6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -257,6 +259,10 @@ Global
 		{CCBD06A5-5A9E-4559-9CBD-AB4EBE431BC8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CCBD06A5-5A9E-4559-9CBD-AB4EBE431BC8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CCBD06A5-5A9E-4559-9CBD-AB4EBE431BC8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F689393E-E409-4372-84D5-A158FB0554E6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F689393E-E409-4372-84D5-A158FB0554E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F689393E-E409-4372-84D5-A158FB0554E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F689393E-E409-4372-84D5-A158FB0554E6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -310,5 +316,6 @@ Global
 		{7C225E8E-7943-4F4F-8A1C-A60FB805315E} = {450DDF86-A628-461A-9637-424DD841BE6C}
 		{6645E6E6-00A3-4E13-886F-DB92C15B5791} = {450DDF86-A628-461A-9637-424DD841BE6C}
 		{CCBD06A5-5A9E-4559-9CBD-AB4EBE431BC8} = {22C195C6-DB0F-411C-B8F9-7AF22F732694}
+		{F689393E-E409-4372-84D5-A158FB0554E6} = {41398AE5-FD00-46BA-AF0B-B9313794B8C0}
 	EndGlobalSection
 EndGlobal

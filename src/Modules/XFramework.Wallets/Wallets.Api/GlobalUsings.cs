@@ -12,6 +12,6 @@ global using XFramework.Core.Interfaces;
 global using XFramework.Domain.Contexts;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;
+global using Wallets.Api.Endpoints;
 global using Wallets.Api.Extensions;
-global using Wallets.Api.Generators;
 global using Wallets.Domain.Shared.Contracts.Requests;

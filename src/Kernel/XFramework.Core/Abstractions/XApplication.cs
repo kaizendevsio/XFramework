@@ -7,6 +7,12 @@ public static class XApplication
 {
     public static IApplicationBuilder Build<T>()
     {
+        var builder = Configure<T>();
+        return Build(builder);
+    }
+
+    public static WebApplicationBuilder Configure<T>()
+    {
         var builder = WebApplication.CreateBuilder();
         builder.Host.UseSerilog();
         
@@ -20,17 +26,22 @@ public static class XApplication
         services.InstallStandardServices<T>(configuration);
         services.InstallRuntimeServices(configuration);
         
+        return builder;
+    }
+    
+    public static IApplicationBuilder Build(this WebApplicationBuilder builder)
+    {
         var app = builder.Build();
         app.UseCustomMiddleware();
         app.UseStandardMiddleware();
         app.UseConfiguredSwagger();
         app.UseXFrameworkEndpoints();
         app.UseEndpointsInAssembly(app.Environment);
-        app.WarmUpServices(services, ServiceLifetime.Singleton);
+        app.WarmUpServices(builder.Services, ServiceLifetime.Singleton);
        
         return app;
     }
-
+    
     public static IApplicationBuilder UseCustomRequestsInAssembly<T>(this IApplicationBuilder app)
     {
         var signalRService = app.ApplicationServices.GetRequiredService<ISignalRService>();
