@@ -53,7 +53,7 @@ public class MediatRRegistrationGenerator : ISourceGenerator
             codeBuilder.Append("                    ");
             codeBuilder.AppendLine($@"services.AddTransient<IRequestHandler<Create<{model}>, CmdResponse<{model}>>, CreateHandler<{model}>>();");
             codeBuilder.Append("                    ");
-            codeBuilder.AppendLine($@"services.AddTransient<IRequestHandler<Delete<{model}>, CmdResponse<{model}>>, DeleteHandler<{model}>>();");
+            codeBuilder.AppendLine($@"services.AddTransient<IRequestHandler<Delete<{model}>, CmdResponse>, DeleteHandler<{model}>>();");
             codeBuilder.Append("                    ");
             codeBuilder.AppendLine($@"services.AddTransient<IRequestHandler<Patch<{model}>, CmdResponse<{model}>>, PatchHandler<{model}>>();");
             codeBuilder.Append("                    ");
