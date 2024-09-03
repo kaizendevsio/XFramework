@@ -17,6 +17,7 @@ public partial class SessionState
         public bool AutoRefreshWallets { get; set; }
         public TimeSpan AutoRefreshWalletsInterval { get; set; }
         public Guid Role { get; set; }
+        public AuthorizationType AuthorizationType { get; set; } = AuthorizationType.Default;
     }
 
     protected class LogInHandler(
@@ -37,6 +38,7 @@ public partial class SessionState
             // Map view model to request object
             var request = CurrentState.LoginVm.Adapt<AuthenticateIdentityRequest>();
             request.RoleId = action.Role;
+            request.AuthorizationType = action.AuthorizationType;
             
             // Send the request
             var response = await identityServerServiceWrapper.AuthenticateIdentity(request);

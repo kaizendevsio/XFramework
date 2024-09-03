@@ -123,7 +123,7 @@ public class StreamflowRequestHandlerGenerator : ISourceGenerator
             codeBuilder.AppendLine("                         {");
             codeBuilder.AppendLine("                             public void Handle(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)");
             codeBuilder.AppendLine("                             {");
-            codeBuilder.AppendLine($"                                 HandleRequestCmd<Delete<{model}>, {model}>(connection, mediator, logger, scopeFactory);");
+            codeBuilder.AppendLine($"                                 HandleRequestCmd<Delete<{model}>>(connection, mediator, logger, scopeFactory);");
             codeBuilder.AppendLine("                             }");
             codeBuilder.AppendLine("                         }");
             

@@ -18,7 +18,7 @@ public partial record Patch<T>(T Model) : RequestBase, ICommand<T>;
 public partial record Replace<T>(T Model) : RequestBase, ICommand<T>;
 
 [MemoryPackable]
-public partial record Delete<T>(T Model) : RequestBase, ICommand<T>;
+public partial record Delete<T>(T Model) : RequestBase, ICommand;
 
 [MemoryPackable]
 public partial record GetList<T>(

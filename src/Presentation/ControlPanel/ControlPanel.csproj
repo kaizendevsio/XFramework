@@ -15,4 +15,10 @@
       <ProjectReference Include="..\..\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Core\Installers\" />
+      <Folder Include="Core\Services\" />
+      <Folder Include="Modules\Session\" />
+    </ItemGroup>
+
 </Project>
