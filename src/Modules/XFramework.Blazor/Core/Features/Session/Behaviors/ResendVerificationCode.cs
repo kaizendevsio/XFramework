@@ -12,7 +12,6 @@ public partial class SessionState
     }
     
     protected class ResendVerificationCodeHandler(IMessagingServiceWrapper messagingServiceWrapper,
-        IWebAssemblyHostEnvironment hostEnvironment,
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)

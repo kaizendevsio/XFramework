@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using FluentValidation;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.Extensions;

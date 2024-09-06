@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using XFramework.Domain.Shared.Extensions;
 using XFramework.Integration.Abstractions;
+using XFramework.Integration.Extensions;
 
-namespace XFramework.Core.Abstractions;
+namespace XFramework.Core.Extensions;
 
 public static class XApplication
 {
@@ -19,7 +21,7 @@ public static class XApplication
         var configuration = builder.Configuration;
         var services = builder.Services;
         
-        services.InstallServicesInAssembly<T>(configuration);
+        services.InstallServicesInAssembly<T>(configuration, builder.Environment);
         services.InstallSwagger(configuration);
         services.InstallOData(configuration);
         services.InstallJwt(configuration);
@@ -53,7 +55,7 @@ public static class XApplication
     public static IApplicationBuilder EnsureDatabase<TDbContext>(this IApplicationBuilder app)
         where TDbContext : DbContext
     {
-        using var serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>().CreateScope();
+        using var serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>()!.CreateScope();
         var dbContext = serviceScope.ServiceProvider.GetRequiredService<TDbContext>();
 
         var canMigrate = dbContext.Database.GetPendingMigrations().Any();
@@ -71,6 +73,21 @@ public static class XApplication
     
     public static void Run(this IApplicationBuilder app)
     {
-        (app as WebApplication).Run();
+        (app as WebApplication)!.Run();
+    }
+    
+    public static async Task RunAsync(this IApplicationBuilder app)
+    {
+        await (app as WebApplication)!.RunAsync();
+    }
+    
+    public static IApplicationBuilder UseBlazor<TApp>(this IApplicationBuilder app)
+    {
+        (app as WebApplication)!
+            .MapRazorComponents<TApp>()
+            .AddInteractiveServerRenderMode();
+      
+        app.UseStaticFiles();
+        return app;
     }
 }

@@ -1,8 +1,10 @@
-﻿namespace StreamFlow.Stream.Installers;
+﻿using XFramework.Domain.Shared.Interfaces;
+
+namespace StreamFlow.Stream.Installers;
 
 public class DependencyInstaller : IInstaller
 {
-    public void InstallServices(IServiceCollection services, IConfiguration configuration)
+    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         
     }

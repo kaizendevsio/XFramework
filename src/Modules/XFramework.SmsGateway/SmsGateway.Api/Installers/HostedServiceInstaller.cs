@@ -1,8 +1,10 @@
-﻿namespace SmsGateway.Api.Installers;
+﻿using XFramework.Domain.Shared.Interfaces;
+
+namespace SmsGateway.Api.Installers;
 
 public class HostedServiceInstaller : IInstaller
 {
-    public void InstallServices(IServiceCollection services, IConfiguration configuration)
+    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         //services.AddHostedService<ProcessMonitorHostedService>();
     }

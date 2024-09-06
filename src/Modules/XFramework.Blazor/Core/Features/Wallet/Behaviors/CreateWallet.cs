@@ -1,5 +1,4 @@
 ﻿using Wallets.Integration.Drivers;
-using XFramework.Integration.Abstractions;
 
 namespace XFramework.Blazor.Core.Features.Wallet;
 

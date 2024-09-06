@@ -1,8 +1,10 @@
-﻿namespace Wallets.Api.Installers;
+﻿using XFramework.Domain.Shared.Interfaces;
+
+namespace Wallets.Api.Installers;
 
 public class DependencyInstaller : IInstaller
 {
-    public void InstallServices(IServiceCollection services, IConfiguration configuration)
+    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         services.AddMediatRHandlers();
     }

@@ -1,10 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore.Diagnostics;
+using XFramework.Domain.Shared.Interfaces;
 
 namespace Wallets.Api.Installers;
 
 public class DbInstaller : IInstaller
 {
-    public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
+    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         services.AddDbContext<DbContext, AppDbContext>(options => options
             .UseNpgsql(string.IsNullOrEmpty(configuration["DefaultDatabaseConnection"])
