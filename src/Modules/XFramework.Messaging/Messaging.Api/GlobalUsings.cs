@@ -10,7 +10,5 @@ global using Messaging.Api.Extensions;
 global using Messaging.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;
-global using XFramework.Core.Abstractions;
 global using XFramework.Core.Attributes;
-global using XFramework.Core.Interfaces;
 global using XFramework.Domain.Contexts;

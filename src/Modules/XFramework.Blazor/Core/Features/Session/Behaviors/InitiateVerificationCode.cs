@@ -23,7 +23,6 @@ public partial class SessionState
     protected class InitiateVerificationCodeHandler
     (
         IMessagingServiceWrapper messagingServiceWrapper,
-        IWebAssemblyHostEnvironment hostEnvironment,
         IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)

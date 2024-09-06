@@ -23,11 +23,13 @@
         <PackageReference Include="PPioli.FluentValidation.Blazor" Version="11.1.0" />
         <PackageReference Include="BlazorDownloadFile" Version="2.4.0.2" />
         <PackageReference Include="Microsoft.Net.Compilers.Razor.Toolset" Version="9.0.0-preview.24359.2" Condition=" '$(UsingMicrosoftNETSdkRazor)' == 'true' " />
+        <PackageReference Include="Toolbelt.Blazor.ViewTransition" Version="1.0.3" />
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="Components\Modals\" />
       <Folder Include="Core\Features\Base" />
+      <Folder Include="Core\WebAssemblyExtensions\" />
       <Folder Include="Entity\Models\Responses" />
     </ItemGroup>
 

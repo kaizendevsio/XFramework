@@ -1,6 +1,5 @@
 ﻿using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Entity.Models.Requests.Common;
-using XFramework.Integration.Abstractions;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Blazor.Core.Features.Affiliate;

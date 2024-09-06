@@ -1,20 +1,14 @@
 ﻿using Address.Integration.Drivers;
 using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
-using Microsoft.Extensions.DependencyInjection;
 using Registry.Integration.Drivers;
 using Wallets.Integration.Drivers;
-using XFramework.Blazor.Interfaces;
-using XFramework.Integration.Abstractions;
-using XFramework.Integration.Abstractions.Wrappers;
-using XFramework.Integration.Drivers;
-using XFramework.Integration.Services;
 
-namespace XFramework.Blazor.Installers;
+namespace XFramework.Blazor.Core.Installers;
 
 public class ServiceWrapperInstaller : IInstaller
 {
-    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IWebAssemblyHostEnvironment webAssemblyHostEnvironment)
+    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         services.AddSingleton<ISignalRService, SignalRService>();
         services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();

@@ -1,8 +1,6 @@
 ﻿using IdentityServer.Domain.Shared.Contracts.Responses;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using XFramework.Blazor.Interfaces;
-using XFramework.Integration.Abstractions.Wrappers;
+using XFramework.Blazor.Core.Interfaces;
 
 namespace XFramework.Blazor.Core.Features.Session;
 

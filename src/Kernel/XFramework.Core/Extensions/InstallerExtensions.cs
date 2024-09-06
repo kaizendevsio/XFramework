@@ -13,23 +13,18 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Serilog.Context;
-using StreamFlow.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Filters;
-using XFramework.Core.Interfaces;
 using XFramework.Core.Loggers;
 using XFramework.Core.Middlewares;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Abstractions;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.PipelineBehaviours;
 using XFramework.Integration.Services;
-using XFramework.Integration.Services.Helpers;
 using Log = Serilog.Log;
 
-namespace XFramework.Core.Abstractions;
+namespace XFramework.Core.Extensions;
 
 public static class InstallerExtensions
 {
@@ -51,17 +46,6 @@ public static class InstallerExtensions
         _logger.LogInformation("Start Time: {StartTime}", DateTime.Now);
         _logger.LogInformation("Version: {Version}", Environment.Version);
         _logger.LogInformation("Runtime Version: {RuntimeVersion}", Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName);
-    }
-    
-    public static void InstallServicesInAssembly<TAssembly>(this IServiceCollection services, IConfiguration configuration)
-    {
-        var installers = typeof(TAssembly).Assembly.ExportedTypes
-            .Where(x => typeof(IInstaller).IsAssignableFrom(x) && !x.IsInterface && !x.IsAbstract)
-            .Select(Activator.CreateInstance)
-            .Cast<IInstaller>()
-            .ToList();
-
-        installers.ForEach(installer => installer.InstallServices(services, configuration));
     }
 
     public static void InstallStreamflowRequestHandlers()

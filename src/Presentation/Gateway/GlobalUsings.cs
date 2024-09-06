@@ -15,8 +15,6 @@ global using Microsoft.EntityFrameworkCore;
 
 global using Gateway.Endpoints;
 global using Gateway.Installers;
-global using XFramework.Core.Abstractions;
-global using XFramework.Core.Interfaces;
 global using XFramework.Core.Services;
 global using XFramework.Domain.Contexts;
 global using XFramework.Domain.Shared.Contracts;
