@@ -16,7 +16,7 @@ public class DeleteHandler<TModel>(
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
 {
 
-    public async Task<CmdResponse<TModel>> Handle(Delete<TModel> request, CancellationToken cancellationToken)
+    public async Task<CmdResponse> Handle(Delete<TModel> request, CancellationToken cancellationToken)
     {
         if (request.Model?.Id is null)
         {
@@ -79,10 +79,10 @@ public class DeleteHandler<TModel>(
 
 
         // Return a successful response.
-        return new CmdResponse<TModel>
+        return new CmdResponse
         {
-            Response = entity,
-            HttpStatusCode = HttpStatusCode.OK
+            HttpStatusCode = HttpStatusCode.OK,
+            Message = "Entity successfully deleted"
         };
     }
 }
