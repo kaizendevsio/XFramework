@@ -1,9 +1,11 @@
 ﻿using System.Reflection;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
+using XFramework.Blazor.Core.Extensions.WebAssembly;
 using XFramework.Domain.Shared.Extensions;
 
-namespace XFramework.Blazor.Core.Extensions.WebAssembly;
+// ReSharper disable once CheckNamespace
+namespace XFramework.Extensions.WebAssembly;
 
 public static class XApplication
 {

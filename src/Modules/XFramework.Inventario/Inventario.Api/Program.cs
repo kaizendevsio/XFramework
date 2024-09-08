@@ -3,5 +3,5 @@ using XFramework.Extensions;
 XApplication
     .Build<Program>()
     .GenerateMinimalApi()
-    .UseCustomRequestsInAssembly<WalletsBaseRequest>()
+    .EnsureDatabase<DbContext>()
     .Run();

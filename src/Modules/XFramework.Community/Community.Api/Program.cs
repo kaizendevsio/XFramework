@@ -1,4 +1,4 @@
-using XFramework.Core.Extensions;
+using XFramework.Extensions;
 
 XApplication
     .Build<Program>()
