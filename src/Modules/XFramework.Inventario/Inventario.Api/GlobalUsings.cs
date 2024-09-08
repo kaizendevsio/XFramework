@@ -1,0 +1,12 @@
+﻿global using System;
+global using System.Collections.Generic;
+global using Microsoft.Extensions.Configuration;
+global using XFramework.Domain.Shared.BusinessObjects;
+global using XFramework.Domain.Shared.Contracts.Responses;
+global using Inventario.Integration.Drivers;
+global using Microsoft.AspNetCore.Mvc;
+global using Microsoft.EntityFrameworkCore;
+global using Inventario.Api.Endpoints;
+global using XFramework.Domain.Contexts;
+global using XFramework.Domain.Shared.Contracts;
+global using XFramework.Integration.Abstractions;

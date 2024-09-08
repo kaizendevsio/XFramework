@@ -11,6 +11,5 @@
       <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
       <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
       <ProjectReference Include="..\Community.Domain.Shared\Community.Domain.Shared.csproj" />
-      <ProjectReference Include="..\Community.Domain\Community.Domain.csproj" />
     </ItemGroup>
 </Project>

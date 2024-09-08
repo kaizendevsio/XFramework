@@ -4,6 +4,7 @@ using Messaging.Integration.Drivers;
 using SmsGateway.Integration.Drivers;
 using Tenant.Integration.Drivers;
 using XFramework.Core.Extensions;
+using XFramework.Extensions;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Extensions;
 

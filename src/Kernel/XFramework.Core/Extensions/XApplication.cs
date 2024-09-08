@@ -1,9 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using XFramework.Core.Extensions;
+using XFramework.Extensions;
 using XFramework.Domain.Shared.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Extensions;
 
-namespace XFramework.Core.Extensions;
+// ReSharper disable once CheckNamespace
+namespace XFramework.Extensions;
 
 public static class XApplication
 {

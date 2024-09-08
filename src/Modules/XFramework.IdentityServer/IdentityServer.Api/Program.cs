@@ -1,5 +1,5 @@
 using IdentityServer.Domain.Shared.Contracts.Requests;
-using XFramework.Core.Extensions;
+using XFramework.Extensions;
 
 XApplication
     .Build<Program>()

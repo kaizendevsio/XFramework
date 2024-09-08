@@ -12,7 +12,6 @@
         <ProjectReference Include="..\..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"  OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
         <ProjectReference Include="..\Wallets.Core\Wallets.Core.csproj" />
         <ProjectReference Include="..\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
-        <ProjectReference Include="..\Wallets.Domain\Wallets.Domain.csproj" />
         <ProjectReference Include="..\Wallets.Integration\Wallets.Integration.csproj" />
         
     </ItemGroup>

@@ -14,7 +14,6 @@
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
         <ProjectReference Include="..\Community.Core\Community.Core.csproj" />
         <ProjectReference Include="..\Community.Domain.Shared\Community.Domain.Shared.csproj" />
-        <ProjectReference Include="..\Community.Domain\Community.Domain.csproj" />
         <ProjectReference Include="..\Community.Integration\Community.Integration.csproj" />
     </ItemGroup>
     

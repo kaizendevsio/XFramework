@@ -1,13 +1,10 @@
-﻿using IdentityServer.Core;
-using IdentityServer.Domain.Shared.Contracts.Requests;
-using Messaging.Integration.Drivers;
+﻿using IdentityServer.Domain.Shared.Contracts.Requests;
 using Tenant.Integration.Drivers;
 using XFramework.Core.Extensions;
-using XFramework.Extensions;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Extensions;
 
-namespace IdentityServer.Api.Installers;
+namespace Inventario.Api.Installers;
 
 public class ServicesInstaller : IInstaller
 {
