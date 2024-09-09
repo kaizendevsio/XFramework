@@ -203,9 +203,9 @@ public static class InstallerExtensions
             x.Run(async context =>
             {
                 var errorFeature = context.Features.Get<IExceptionHandlerFeature>();
-                var exception = errorFeature.Error;
+                var exception = errorFeature!.Error;
                 string errorText = "";
-                IEnumerable<(string, string)> errors = null;
+                IEnumerable<(string, string)> errors = [];
 
                 if (!(exception is ValidationException validationException))
                 {
@@ -292,13 +292,13 @@ public static class InstallerExtensions
     
     public static void UseXFrameworkEndpoints(this WebApplication app)
     {
-        app.MapGet("/startup", async (IMediator mediator) =>
+        app.MapGet("/startup", () =>
         {
             return new ApiStatus
             {
-                ApplicationName = Assembly.GetEntryAssembly()?.GetName().Name?.Split(".")[0],
+                ApplicationName = Assembly.GetEntryAssembly()?.GetName().Name?.Split(".")[0]!,
                 StartupTime = DateTime.Now,
-                Environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                Environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")!,
                 Host = new Domain.Shared.BusinessObjects.Host
                 {
                     Platform = Environment.OSVersion.Platform.ToString(),
@@ -309,7 +309,7 @@ public static class InstallerExtensions
                     SystemPageSize = Environment.SystemPageSize,
                     TickCount64 = Environment.TickCount64,
                     Version = Environment.OSVersion.ToString(),
-                    RuntimeVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName
+                    RuntimeVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName!
                 },
                 Status = "Running"
             };

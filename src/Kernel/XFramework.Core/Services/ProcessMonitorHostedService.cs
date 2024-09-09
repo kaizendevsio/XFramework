@@ -5,10 +5,11 @@ namespace XFramework.Core.Services;
 
 public class ProcessMonitorHostedService(ProcessMonitorService processMonitorService) : IHostedService
 {
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         //throw new System.NotImplementedException();
-        processMonitorService.ProcessMonitor(cancellationToken);
+        _ = processMonitorService.ProcessMonitor(cancellationToken);
+        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

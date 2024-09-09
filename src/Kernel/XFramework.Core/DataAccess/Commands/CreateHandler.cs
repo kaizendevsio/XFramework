@@ -10,7 +10,6 @@ namespace XFramework.Core.DataAccess.Commands;
 
 public class CreateHandler<TModel>(
         DbContext dbContext,
-        CacheManager cache,
         ILogger<CreateHandler<TModel>> logger,
         ITenantService tenantService
     )
