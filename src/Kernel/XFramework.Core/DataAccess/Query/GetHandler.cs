@@ -13,8 +13,7 @@ public class GetHandler<TModel>(
         ILogger<GetHandler<TModel>> logger,
         DbContext dbContext,
         CacheManager cache,
-        ITenantService tenantService,
-        IHelperService helperService
+        ITenantService tenantService
     )
     : IGetHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
@@ -125,7 +124,7 @@ public class GetHandler<TModel>(
 
     private IQueryable<TModel> IncludeNavigationsForProperty(IQueryable<TModel> query, Type model, string propertyName, int maxDepth, int currentDepth)
     {
-        var propertyType = model.GetProperty(propertyName).PropertyType;
+        var propertyType = model.GetProperty(propertyName)!.PropertyType;
         var isCollection = typeof(IEnumerable).IsAssignableFrom(propertyType);
         var elementType = isCollection ? propertyType.GetGenericArguments()[0] : propertyType;
 

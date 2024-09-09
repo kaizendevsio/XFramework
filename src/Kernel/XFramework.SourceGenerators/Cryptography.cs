@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+#pragma warning disable SYSLIB0021
 
 namespace XFramework.SourceGenerators;
 

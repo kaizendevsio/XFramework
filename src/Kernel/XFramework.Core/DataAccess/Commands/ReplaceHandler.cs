@@ -10,7 +10,6 @@ namespace XFramework.Core.DataAccess.Commands;
 
 public class ReplaceHandler<TModel>(
         DbContext dbContext,
-        CacheManager cache,
         ILogger<ReplaceHandler<TModel>> logger,
         ITenantService tenantService
     )
