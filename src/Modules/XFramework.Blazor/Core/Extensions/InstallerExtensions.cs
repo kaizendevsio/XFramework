@@ -14,13 +14,6 @@ public static class InstallerExtensions
         services.AddScoped<HandlerServices>();
         
         services.InstallServicesInAssembly<XFramework.Blazor.Base>(configuration, hostEnvironment);
-        InstallRuntimeServices(services, configuration, hostEnvironment);
-    }
-    
-    public static void InstallRuntimeServices(this IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
-    {
-        services.AddSingleton(o => new DeviceAgentProvider(Environment.MachineName));
-        services.AddScoped<HandlerServices>();
     }
     
     public static void AddSerilog(this IServiceCollection services, IConfiguration configuration)
