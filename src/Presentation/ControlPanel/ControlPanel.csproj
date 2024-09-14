@@ -9,16 +9,19 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.8"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.8" PrivateAssets="all"/>
+        <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.0" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Core\Installers\" />
-      <Folder Include="Core\Services\" />
-      <Folder Include="Modules\Session\" />
+        <Folder Include="Core\Data\" />
+        <Folder Include="Modules\Finance\" />
+        <Folder Include="Modules\Identity\" />
+        <Folder Include="Modules\Session\" />
+        <Folder Include="Modules\Tennant\" />
     </ItemGroup>
 
 </Project>
