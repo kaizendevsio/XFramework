@@ -12,11 +12,9 @@ using XFramework.Integration.Services;
 namespace XFramework.Core.DataAccess.Query;
 
 public class GetListHandler<TModel>(
-        ILogger<GetListHandler<TModel>> logger,
         DbContext dbContext,
         CacheManager cache,
-        ITenantService tenantService,
-        IHelperService helperService
+        ITenantService tenantService
     ) 
     : IGetListHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
@@ -71,7 +69,7 @@ public class GetListHandler<TModel>(
         if (request.Filter != null && request.Filter.Any())
         {
             var expression = request.Filter.ToExpression<TModel>();
-            query = query.Where(expression);
+            query = query.Where(expression!);
         }
 
         query = query
@@ -137,7 +135,7 @@ public class GetListHandler<TModel>(
 
     private IQueryable<TModel> IncludeNavigationsForProperty(IQueryable<TModel> query, Type model, string propertyName, int maxDepth, int currentDepth)
     {
-        var propertyType = model.GetProperty(propertyName).PropertyType;
+        var propertyType = model.GetProperty(propertyName)!.PropertyType;
         var isCollection = typeof(IEnumerable).IsAssignableFrom(propertyType);
         var elementType = isCollection ? propertyType.GetGenericArguments()[0] : propertyType;
 

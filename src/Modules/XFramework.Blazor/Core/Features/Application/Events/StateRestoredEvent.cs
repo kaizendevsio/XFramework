@@ -1,5 +1,4 @@
-﻿using XFramework.Blazor.Interfaces;
-using XFramework.Integration.Abstractions.Wrappers;
+﻿using XFramework.Blazor.Core.Interfaces;
 
 namespace XFramework.Blazor.Core.Features.Application;
 

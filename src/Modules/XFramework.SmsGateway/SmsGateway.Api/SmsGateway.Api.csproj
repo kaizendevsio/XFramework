@@ -13,7 +13,6 @@
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\SmsGateway.Core\SmsGateway.Core.csproj"/>
-        <ProjectReference Include="..\SmsGateway.Domain\SmsGateway.Domain.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

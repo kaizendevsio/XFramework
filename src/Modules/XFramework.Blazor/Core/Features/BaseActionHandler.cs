@@ -20,7 +20,7 @@ public class BaseStateActionHandler
     public ISnackbar Snackbar { get; set; }
     protected SweetAlertService SweetAlertService { get; set; }
     protected NavigationManager NavigationManager { get; set; }
-    protected IWebAssemblyHostEnvironment HostEnvironment { get; set; }
+    protected IHostEnvironment HostEnvironment { get; set; }
     protected IHttpClient HttpClient { get; set; }
     protected HttpClient BaseHttpClient { get; set; }
     protected IJSRuntime JsRuntime { get; set; }

@@ -14,7 +14,6 @@
         <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj"/>
         <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
-        <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
     </ItemGroup>
 
     <ItemGroup>

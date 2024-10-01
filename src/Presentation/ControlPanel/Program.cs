@@ -1,8 +1,6 @@
-using ControlPanel;
-using XFramework.Blazor.Extensions;
+using XFramework.Extensions.WebAssembly;
 
 await XApplication
-    .Configure<App>()
-    .Build()
+    .Build<App>()
+    .UseBlazor<App>()
     .RunAsync();
-

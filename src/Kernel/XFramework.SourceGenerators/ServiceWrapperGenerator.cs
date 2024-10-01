@@ -30,7 +30,7 @@ public class ServiceWrapperGenerator : ISourceGenerator
         }
     }
 
-    private static void Generate(GeneratorExecutionContext context, string namespaceName, string serviceId, ClassDeclarationSyntax classDeclarationSyntax)
+    private static void Generate(GeneratorExecutionContext context, string? namespaceName, string serviceId, ClassDeclarationSyntax classDeclarationSyntax)
     {
         var models = BaseSourceGenerator.GetModels(classDeclarationSyntax, "StreamFlowWrapper");
         var codeBuilder = new StringBuilder();

@@ -5,6 +5,7 @@
     <LangVersion>12</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +20,7 @@
   </ItemGroup>
   
   <ItemGroup>
+    <Folder Include="Interfaces\" />
     <Folder Include="Validations\" />
   </ItemGroup>
 

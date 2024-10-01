@@ -5,12 +5,12 @@ namespace XFramework.SourceGenerators;
 
 public static class BaseSourceGenerator
 {
-    public static string GetNamespace(GeneratorExecutionContext context, string attribute)
+    public static string? GetNamespace(GeneratorExecutionContext context, string attribute)
     {
         return GetAttributeParameterValue(context, attribute, 0);
     }
-    
-    public static string GetAttributeParameterValue(GeneratorExecutionContext context, string attribute, int parameterIndex)
+
+    private static string? GetAttributeParameterValue(GeneratorExecutionContext context, string attribute, int parameterIndex)
     {
         return (from attributeSyntax in (from syntaxTree in context.Compilation.SyntaxTrees
                 let semanticModel = context.Compilation.GetSemanticModel(syntaxTree)
@@ -19,7 +19,7 @@ public static class BaseSourceGenerator
                 let classSymbol = semanticModel.GetDeclaredSymbol(classNode)
                 select Enumerable.SelectMany<AttributeListSyntax, AttributeSyntax>(classNode.AttributeLists, a => a.Attributes)
                     .FirstOrDefault(attr => attr.Name.ToString().Contains(attribute))).OfType<AttributeSyntax>()
-            select attributeSyntax.ArgumentList.Arguments[parameterIndex]
+            select attributeSyntax!.ArgumentList!.Arguments[parameterIndex]
             into namespaceArgumentSyntax
             select SyntaxNodeExtensions.NormalizeWhitespace<ExpressionSyntax>(namespaceArgumentSyntax.Expression).ToFullString()
             into parameterValue
@@ -45,7 +45,7 @@ public static class BaseSourceGenerator
 
                 if (attributeSyntax == null) continue;
                 
-                var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[0];
+                var namespaceArgumentSyntax = attributeSyntax.ArgumentList!.Arguments[0];
                 var typesArgumentSyntax = attributeSyntax.ArgumentList.Arguments[1];
 
                 var namespaceValue = namespaceArgumentSyntax.Expression.NormalizeWhitespace().ToFullString();
@@ -108,7 +108,7 @@ public static class BaseSourceGenerator
 
         if (attributeSyntax == null) return models;
         
-        var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[0];
+        var namespaceArgumentSyntax = attributeSyntax.ArgumentList!.Arguments[0];
         var typesArgumentSyntax = attributeSyntax.ArgumentList.Arguments[1];
 
         var namespaceValue = namespaceArgumentSyntax.Expression.NormalizeWhitespace().ToFullString();
@@ -142,7 +142,7 @@ public static class BaseSourceGenerator
         var attributeSyntax = syntax as AttributeSyntax;
         if (attributeSyntax == null) return null;
 
-        var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[parameterIndex];
+        var namespaceArgumentSyntax = attributeSyntax.ArgumentList!.Arguments[parameterIndex];
         var parameterValue = SyntaxNodeExtensions.NormalizeWhitespace<ExpressionSyntax>(namespaceArgumentSyntax.Expression).ToFullString();
         var s = parameterValue.Replace("\"", string.Empty);
         return s;
@@ -155,8 +155,8 @@ public static class BaseSourceGenerator
         var attributeSyntax = syntax;
         if (attributeSyntax == null) return null;
         
-        var namespaceArgumentSyntax = attributeSyntax.ArgumentList.Arguments[parameterIndex].Expression as TypeOfExpressionSyntax;
-        var typeInfo = semanticModel.GetTypeInfo(namespaceArgumentSyntax);
+        var namespaceArgumentSyntax = attributeSyntax.ArgumentList!.Arguments[parameterIndex].Expression as TypeOfExpressionSyntax;
+        var typeInfo = semanticModel.GetTypeInfo(namespaceArgumentSyntax!.Type);
         return typeInfo.Type?.ToDisplayString();
     }
 }

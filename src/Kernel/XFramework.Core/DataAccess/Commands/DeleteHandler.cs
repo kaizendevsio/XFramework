@@ -8,7 +8,6 @@ namespace XFramework.Core.DataAccess.Commands;
 
 public class DeleteHandler<TModel>(
         DbContext dbContext,
-        CacheManager cache,
         ILogger<DeleteHandler<TModel>> logger,
         ITenantService tenantService
     ) 

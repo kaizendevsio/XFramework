@@ -13,7 +13,6 @@
                           ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\IdentityServer.Core\IdentityServer.Core.csproj" />
         <ProjectReference Include="..\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
-        <ProjectReference Include="..\IdentityServer.Domain\IdentityServer.Domain.csproj" />
         <ProjectReference Include="..\IdentityServer.Integration\IdentityServer.Integration.csproj" />
     </ItemGroup>
 

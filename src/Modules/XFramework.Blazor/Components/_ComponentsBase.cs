@@ -6,7 +6,6 @@ using XFramework.Blazor.Core.Features.Identity;
 using XFramework.Blazor.Core.Features.Layout;
 using XFramework.Blazor.Core.Features.Wallet;
 using XFramework.Domain.Shared.Contracts;
-using XFramework.Integration.Abstractions.Wrappers;
 
 namespace XFramework.Blazor.Components;
 
