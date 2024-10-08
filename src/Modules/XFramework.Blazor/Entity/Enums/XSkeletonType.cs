@@ -8,4 +8,5 @@ public enum XSkeletonType
     Image,
     Paragraph,
     Heading,
+    Loader,
 }
