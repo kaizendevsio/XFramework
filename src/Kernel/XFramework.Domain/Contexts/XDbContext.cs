@@ -34,12 +34,10 @@ public class XDbContext : DbContext
 
             var parameter = Expression.Parameter(clrType, "p");
             var propIsDeleted = Expression.Property(parameter, isDeletedProperty.Name);
-            var propIsEnabled = Expression.Property(parameter, isEnabledProperty.Name);
             var falseValue = Expression.Constant(false);
             var trueValue = Expression.Constant(true);
             var isNotDeleted = Expression.Equal(propIsDeleted, falseValue);
-            var isEnabled = Expression.Equal(propIsEnabled, trueValue);
-            var finalExpression = Expression.AndAlso(isNotDeleted, isEnabled);
+            var finalExpression = isNotDeleted;
             var filter = Expression.Lambda(finalExpression, parameter);
             modelBuilder.Entity(clrType).HasQueryFilter((LambdaExpression)filter);
         }
@@ -73,7 +71,7 @@ public class XDbContext : DbContext
                 switch (property.Metadata.Name)
                 {
                     case nameof(BaseModel.IsEnabled):
-                        property.CurrentValue = true;
+                        property.CurrentValue ??= true;
                         break;
                     case nameof(BaseModel.CreatedAt):
                         if (entry.State == EntityState.Added)
