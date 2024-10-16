@@ -1,0 +1,33 @@
+﻿@page "/tenants"
+@using XFramework.Blazor.Entity.Constants
+
+<SectionContent SectionName="@LayoutConstants.HeaderButton">
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Inherit" OnClick="ButtonAction">
+        Add
+    </MudButton>  
+</SectionContent>
+<Skeleton
+    Item="@List"
+    SkeletonType="@XSkeletonType.Table">
+    <MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false"
+                 RowClick="ShowDetails">  
+        <Columns>
+            <PropertyColumn Property="x => x.Name" />
+            <PropertyColumn Property="x => x.Description" />
+            <PropertyColumn Property="x => x.Version"/>
+            <PropertyColumn Property="x => x.Status"/>
+            <PropertyColumn Property="x => x.CreatedAt"/>
+            <TemplateColumn Title="Is Enabled">
+                <CellTemplate>
+                    <MudSwitch @bind-Value="@context.Item.IsEnabled" Color="Color.Primary" />
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn>
+                <CellTemplate>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">View</MudButton>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+</Skeleton>
+
