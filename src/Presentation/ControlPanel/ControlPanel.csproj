@@ -21,7 +21,7 @@
         <Folder Include="Modules\Finance\" />
         <Folder Include="Modules\Identity\" />
         <Folder Include="Modules\Session\" />
-        <Folder Include="Modules\Tennant\" />
+        <Folder Include="Modules\Tenants\Components\" />
     </ItemGroup>
 
 </Project>

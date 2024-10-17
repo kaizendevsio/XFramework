@@ -1,0 +1,30 @@
+﻿@page "/columns"
+
+<MudButton Color="Color.Primary" OnClick="OpenCreateColumnModal">Create New Column</MudButton>
+
+<MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false">
+    <Columns>
+        <PropertyColumn Property="x => x.Name"/>
+        <PropertyColumn Property="x => x.Type"/>
+        <TemplateColumn CellClass="d-flex justify-end">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudSwitch @bind-Value="@context.Item.Unique" />
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn CellClass="d-flex justify-end">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               Color="@Color.Primary">Edit</MudButton>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled"
+                               StartIcon="@Icons.Material.Filled.Delete"
+                               Color="@Color.Error"
+                               OnClick="() => DeleteColumn(context.Item)">Delete</MudButton>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</MudDataGrid>

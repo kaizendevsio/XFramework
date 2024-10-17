@@ -1,0 +1,16 @@
+﻿<div class="d-flex flex-row justify-content-between align-items-center">
+    <div class="d-flex flex-row align-items-center gap-2">
+        @if (LayoutState.View.Toolbar.BackButton.Visible is true)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Color="Color.Inherit" Edge="Edge.Start"/>
+        }
+        <MudText Typo="Typo.h5">@LayoutState.View.Title</MudText>
+    </div>
+    <div class="d-flex flex-row align-items-center gap-2">
+        @ButtonFragment
+    </div>
+</div>
+
+@code {
+    [Parameter] [EditorRequired] public RenderFragment? ButtonFragment { get; set; }
+}

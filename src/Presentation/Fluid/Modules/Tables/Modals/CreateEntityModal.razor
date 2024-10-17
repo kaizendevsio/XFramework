@@ -1,0 +1,33 @@
+@using Fluid.Core.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="NewEntity" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <MudTextField @bind-Value="NewEntity.Name" Label="Name" Required="true" />
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Submit</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private MudDialogInstance MudDialog { get; set; }
+
+    private Entity NewEntity { get; set; } = new Entity();
+
+    private void Submit()
+    {
+        DbContext.Entities.Add(NewEntity);
+        DbContext.SaveChanges();
+        MudDialog.Close(DialogResult.Ok(NewEntity)); // Close the dialog with the new entity
+    }
+
+    private void Cancel() => MudDialog.Cancel(); // Cancel the dialog
+}
