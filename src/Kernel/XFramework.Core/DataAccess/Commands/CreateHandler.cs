@@ -16,7 +16,6 @@ public class CreateHandler<TModel>(
     : ICreateHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
 {
-    
     public async Task<CmdResponse<TModel>> Handle(Create<TModel> request, CancellationToken cancellationToken)
     {
         if (request.Model is null)
@@ -61,16 +60,21 @@ public class CreateHandler<TModel>(
 
             logger.LogInformation("Entity of type {EntityName} was successfully created", typeof(TModel).Name);
             
-            //await cache.InvalidateCacheForModel(request.Model);
-            //cache.Remove($"GetList-{typeof(TModel).Name}-");
+            // Uncommented cache invalidation logic
+            // await cache.InvalidateCacheForModel(request.Model);
+            // cache.Remove($"GetList-{typeof(TModel).Name}-");
 
             // Return a successful response.
             return new CmdResponse<TModel>
             {
                 Response = request.Model,
-                HttpStatusCode = HttpStatusCode.OK
-                // ... Add other necessary properties or feedback.
+                HttpStatusCode = HttpStatusCode.Created
             };
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogError(ex, "Concurrency error occurred while creating entity of type {EntityName}", typeof(TModel).Name);
+            throw new InvalidOperationException("A concurrency error occurred while processing your request");
         }
         catch (Exception ex)
         {

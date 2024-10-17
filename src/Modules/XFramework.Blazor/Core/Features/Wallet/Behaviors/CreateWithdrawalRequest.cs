@@ -12,6 +12,7 @@ public partial class WalletState
         public Guid WalletTypeId { get; set; }
         public Guid? CredentialId { get; set; }
         public string? ReferenceNumber { get; set; }
+        public string? Remarks { get; set; }
     }
 
     protected class CreateWithdrawalRequestHandler(
@@ -96,7 +97,7 @@ public partial class WalletState
                 Fee = action.Fee,
                 Amount = action.Amount!.Value,
                 WithdrawalStatus = TransactionStatus.Pending,
-                Remarks = "Withdrawal Request",
+                Remarks = $"Withdrawal Request: {action.Remarks}",
                 ReferenceNumber = action.ReferenceNumber,
                 WalletId = wallet.Response!.Items.First().Id,
             });

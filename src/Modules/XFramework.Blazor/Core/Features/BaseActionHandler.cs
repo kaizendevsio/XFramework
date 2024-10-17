@@ -92,16 +92,19 @@ public class BaseStateActionHandler
         {
             if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
             {
-                switch (response.HttpStatusCode)
+                if (response.IsSuccess is false)
                 {
-                    case HttpStatusCode.InternalServerError:
-                        SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
-                        break;
-                    default:
-                        SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                            ? $" {response.Message}"
-                            : $"{customMessage}", SweetAlertIcon.Error);
-                        break;
+                    switch (response.HttpStatusCode)
+                    {
+                        case HttpStatusCode.InternalServerError:
+                            SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
+                            break;
+                        default:
+                            SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                                ? $" {response.Message}"
+                                : $"{customMessage}", SweetAlertIcon.Error);
+                            break;
+                    }
                 }
             }
             else
@@ -127,17 +130,20 @@ public class BaseStateActionHandler
         {
             if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
             {
-                switch (response.HttpStatusCode)
+                if (response.IsSuccess is false)
                 {
-                    case HttpStatusCode.InternalServerError:
-                        SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
-                        break;
-                    default:
-                        SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                            ? $" {response.Message}"
-                            : $"{customMessage}", SweetAlertIcon.Error);
-                        break;
-                }
+                    switch (response.HttpStatusCode)
+                    {
+                        case HttpStatusCode.InternalServerError:
+                            SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
+                            break;
+                        default:
+                            SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                                ? $" {response.Message}"
+                                : $"{customMessage}", SweetAlertIcon.Error);
+                            break;
+                    }
+                }                
             }
             else
             {
@@ -162,16 +168,19 @@ public class BaseStateActionHandler
         {
             if (HostEnvironment.IsProduction() || HostEnvironment.IsStaging())
             {
-                switch (response.HttpStatusCode)
+                if (response.IsSuccess is false)
                 {
-                    case HttpStatusCode.InternalServerError:
-                        SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
-                        break;
-                    default:
-                        SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
-                            ? $" {response.Message}"
-                            : $"{customMessage}", SweetAlertIcon.Error);
-                        break;
+                    switch (response.HttpStatusCode)
+                    {
+                        case HttpStatusCode.InternalServerError:
+                            SweetAlertService.FireAsync("Error", "There was an error while trying to process your request, please try again later", SweetAlertIcon.Error);
+                            break;
+                        default:
+                            SweetAlertService.FireAsync("Error", string.IsNullOrEmpty(customMessage)
+                                ? $" {response.Message}"
+                                : $"{customMessage}", SweetAlertIcon.Error);
+                            break;
+                    }
                 }
             }
             else

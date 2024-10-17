@@ -23,7 +23,7 @@ public static class XApplication
         hostBuilder.RootComponents.Add<T>("#app");
         hostBuilder.RootComponents.Add<HeadOutlet>("head::after");
         
-        hostBuilder.Services.AddScoped<IHostEnvironment, WebAssemblyHostEnvironmentWrapper>();
+        hostBuilder.Services.AddSingleton<IHostEnvironment, WebAssemblyHostEnvironmentWrapper>();
         
         hostBuilder.Services.InstallServicesInAssembly<T>(hostBuilder.Configuration, hostBuilder.HostEnvironment.ToHostEnvironment());
         hostBuilder.Logging.AddSentry(o => o.InitializeSdk = false);

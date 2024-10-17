@@ -10,6 +10,9 @@
     {
         @switch (SkeletonType)
         {
+            case XSkeletonType.Loader:
+                <MudProgressCircular Color="Color.Default" Indeterminate="true" />
+                break;
             case XSkeletonType.Text:
                 <MudSkeleton Animation="Animation.Wave" SkeletonType="MudBlazor.SkeletonType.Text" />
                 break;

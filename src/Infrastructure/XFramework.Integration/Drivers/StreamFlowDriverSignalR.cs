@@ -36,7 +36,6 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     public List<string> TopicList { get; init; }
     public static Dictionary<Type, string> TypeFriendlyNameCache = new();
 
-
     public HubConnectionState ConnectionState => SignalRService.Connection.State;
 
     public Action OnReconnected { get; set; }
@@ -54,9 +53,45 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         Configuration = configuration;
         Logger = logger;
 
-        SignalRService.Connection.Reconnected += async (e) => OnReconnected?.Invoke();
-        SignalRService.Connection.Reconnecting += async (e) => OnReconnecting?.Invoke();
-        SignalRService.Connection.Closed += async (e) => OnDisconnected?.Invoke();
+        SignalRService.Connection.Reconnected += async (e) => 
+        {
+            Logger.LogInformation("Reconnected to SignalR.");
+            OnReconnected?.Invoke();
+        };
+        SignalRService.Connection.Reconnecting += async (e) => 
+        {
+            Logger.LogWarning("Attempting to reconnect to SignalR...");
+            OnReconnecting?.Invoke();
+        };
+        SignalRService.Connection.Closed += async (e) => 
+        {
+            Logger.LogError("Connection to SignalR closed. Attempting to reconnect...");
+            await AttemptReconnect();
+            OnDisconnected?.Invoke();
+        };
+    }
+
+    private async Task AttemptReconnect()
+    {
+        const int maxRetries = 1_000_000;
+        int retryCount = 0;
+        while (retryCount < maxRetries)
+        {
+            try
+            {
+                Logger.LogInformation("Reconnection attempt {RetryCount}...", retryCount + 1);
+                await SignalRService.EnsureConnection();
+                Logger.LogInformation("Successfully reconnected to SignalR.");
+                return;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Reconnection attempt {RetryCount} failed: {ErrorMessage}", retryCount + 1, ex.Message);
+                retryCount++;
+                await Task.Delay(TimeSpan.FromSeconds(5)); // Exponential backoff
+            }
+        }
+        Logger.LogError("Failed to reconnect to SignalR after {MaxRetries} attempts.", maxRetries);
     }
     
     private static string GetRequestFriendlyName(Type type)
@@ -117,7 +152,6 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         {
             if (string.IsNullOrEmpty(ClientIpAddress))
             {
-                
                 var retryCount = 0;
                 const int maxRetryCount = 5;
                 
@@ -137,7 +171,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 catch (Exception e)
                 {
                     ClientIpAddressLastFailedFetch = DateTime.Now;
-                    Logger.LogError("Unable to get client IP address");
+                    Logger.LogError("Unable to get client IP address: {ErrorMessage}", e.Message);
                     ClientIpAddress = string.Empty;
                 }
             }
@@ -170,7 +204,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             }
             catch (Exception e)
             {
-                Logger.LogError("Unable to get client IP address");
+                Logger.LogError("Unable to get client IP address: {ErrorMessage}", e.Message);
                 ClientIpAddressLastFailedFetch = DateTime.Now;
                 ClientIpAddress = string.Empty;
             }

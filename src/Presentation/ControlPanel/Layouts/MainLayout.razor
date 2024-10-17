@@ -1,16 +1,40 @@
-﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
+﻿@using XFramework.Blazor.Entity.Constants
+@using MudBlazor
+@inherits XFramework.Blazor.Components.XLayoutBase
+
+<MudThemeProvider/>
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())"/>
+        <MudSpacer/>
+        <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End"/>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2">
+        <MudDrawerHeader Class="d-flex flex-column px-0">
+            <MudText Typo="Typo.h6" Class="px-4">FLEXX</MudText>
+            <MudText Typo="Typo.body2" Class="px-4 mud-text-secondary">The ultimate business platform</MudText>
+        </MudDrawerHeader>
         <NavMenu/>
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
+    </MudDrawer>
+    <MudMainContent>
+        <div class="px-5 pt-4 d-flex flex-column gap-4">
+            <FHeader>
+                <ButtonFragment>
+                    <SectionOutlet SectionName="@LayoutConstants.HeaderButton"/>
+                </ButtonFragment>
+            </FHeader>
             @Body
-        </article>
-    </main>
-</div>
+        </div>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    bool _drawerOpen = true;
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+}

@@ -1,0 +1,34 @@
+@using Fluid.Core.Models
+@using MudBlazor
+
+
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="NewColumn" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <MudTextField @bind-Value="NewColumn.Name" Label="Name" Required="true" />
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Submit</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private MudDialogInstance MudDialog { get; set; }
+
+    private EntityColumn NewColumn { get; set; } = new EntityColumn();
+
+    private void Submit()
+    {
+        DbContext.EntityColumns.Add(NewColumn);
+        DbContext.SaveChanges();
+        MudDialog.Close(DialogResult.Ok(NewColumn)); // Close the dialog with the new entity
+    }
+
+    private void Cancel() => MudDialog.Cancel(); // Cancel the dialog
+}

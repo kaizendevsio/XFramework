@@ -1,0 +1,22 @@
+﻿@page "/tables"
+<MudButton Color="Color.Primary" OnClick="OpenCreateEntityModal">Create New Entity</MudButton>
+
+<MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false">
+    <Columns>
+        <PropertyColumn Property="x => x.Name"/>
+        <PropertyColumn Property="x => x.Columns.Count" Title="Columns"/>
+        <TemplateColumn CellClass="d-flex justify-end">
+            <CellTemplate>
+                <MudStack Row>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               Color="@Color.Primary">Edit</MudButton>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled"
+                               StartIcon="@Icons.Material.Filled.Delete"
+                               Color="@Color.Error"
+                               OnClick="() => DeleteEntity(context.Item)">Delete</MudButton>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</MudDataGrid>
