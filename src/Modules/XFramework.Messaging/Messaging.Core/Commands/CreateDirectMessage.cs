@@ -24,13 +24,28 @@ public class CreateDirectMessage(
     public async Task<CmdResponse> Handle(CreateDirectMessageRequest request, CancellationToken cancellationToken)
     {
         var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
+        var configuration = await dbContext.Set<RegistryConfiguration>()
+            .Where(x => x.TenantId == tenant.Id)
+            .Where(x => x.Key == "Settings:Messaging:Sms:AgentClusterId")
+            .FirstOrDefaultAsync(CancellationToken.None);
 
+        var agentClusterId = string.Empty;
+        if (request.AgentClusterId != Guid.Empty)
+        {
+            agentClusterId = request.AgentClusterId.ToString();    
+        }
+        else
+        {
+            agentClusterId = configuration?.Value ?? throw new("Agent cluster id not found");
+        }
+        
         var record = new MessageDirect()
         {
             TenantId = tenant.Id,
             MessageTransportType = MessageTransportType.Sms,
             ExternalRecipient = request.Recipient,
             Message = request.Message,
+            AgentClusterId = Guid.Parse(agentClusterId),
             Status = MessageStatus.Queued
         };
 
@@ -41,13 +56,6 @@ public class CreateDirectMessage(
         {
             case MessageTransportType.Sms:
             {
-                var configuration = await dbContext.Set<RegistryConfiguration>()
-                    .Where(x => x.TenantId == tenant.Id)
-                    .Where(x => x.Key == "Settings:Messaging:Sms:AgentClusterId")
-                    .FirstOrDefaultAsync(CancellationToken.None);
-                
-                var agentClusterId = configuration?.Value ?? throw new("Agent cluster id not found");
-                
                 var result = await smsGatewayServiceWrapper.CreateSmsMessage(new()
                 {
                     Id = record.Id,
