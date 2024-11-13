@@ -2,6 +2,6 @@
 
 namespace ControlPanel.Modules.Tenants.Pages;
 
-public partial class TenantDetails : ComponentBase
+public partial class TenantDetails
 {
 }

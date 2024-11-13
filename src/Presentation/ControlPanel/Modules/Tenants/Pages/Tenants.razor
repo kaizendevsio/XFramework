@@ -9,8 +9,7 @@
 <Skeleton
     Item="@List"
     SkeletonType="@XSkeletonType.Table">
-    <MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false"
-                 RowClick="ShowDetails">  
+    <MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false">  
         <Columns>
             <PropertyColumn Property="x => x.Name" />
             <PropertyColumn Property="x => x.Description" />

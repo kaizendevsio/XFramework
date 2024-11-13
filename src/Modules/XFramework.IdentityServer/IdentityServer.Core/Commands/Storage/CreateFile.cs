@@ -17,6 +17,15 @@ public class CreateFile(
 {
     public async Task<CmdResponse<StorageFile>> Handle(Create<StorageFile> request, CancellationToken cancellationToken)
     {
+        if (request.Model.FileBytes is null)
+        {
+            return new ()
+            {
+                Message = "Cannot upload empty file",
+                HttpStatusCode = HttpStatusCode.BadRequest
+            };
+        }
+        
         var storageFileType = await dbContext.Set<StorageFileType>().FirstOrDefaultAsync(i => i.Id == request.Model.TypeId, cancellationToken);
         if (storageFileType == null)
         {
@@ -40,13 +49,35 @@ public class CreateFile(
         // Upload Files to azure blob storage
         var connectionConfig = await dbContext.Set<RegistryConfigurationGroup>()
             .Include(i => i.RegistryConfigurations)
-            .FirstOrDefaultAsync(i => i.Name == "AzureBlobStorage", CancellationToken.None);
+            .Where(i => i.Name == "AzureBlobStorage")
+            .Where(i => i.TenantId == request.Metadata.TenantId)
+            .FirstOrDefaultAsync(CancellationToken.None);
 
-        var blobServiceClient = new BlobServiceClient(connectionConfig.RegistryConfigurations.FirstOrDefault(i => i.Key == "ConnectionString").Value);
+        var connectionString = connectionConfig?.RegistryConfigurations
+            .FirstOrDefault(i => i.Key == "ConnectionString")?.Value;
+
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            return new ()
+            {
+                Message = $"Azure blob storage connection string not found",
+                HttpStatusCode = HttpStatusCode.InternalServerError
+            };
+        }
+        var blobServiceClient = new BlobServiceClient(connectionString);
 
         var client = blobServiceClient.GetBlobContainerClient(request.Model.BlobContainer);
         var blob = client.GetBlobClient(request.Model.ContentPath.Replace($"{request.Model.BlobContainer}/", ""));
-        await blob.UploadAsync(BinaryData.FromBytes(request.Model.FileBytes), new BlobUploadOptions {HttpHeaders = new() {ContentType = request.Model.ContentType}}, CancellationToken.None);
+        await blob.UploadAsync(
+            content: BinaryData.FromBytes(request.Model.FileBytes),
+            options: new BlobUploadOptions
+            {
+                HttpHeaders = new()
+                {
+                    ContentType = request.Model.ContentType
+                }
+            }, 
+            cancellationToken: CancellationToken.None);
 
         request.Model.Type = storageFileType;
         request.Model.StorageFileIdentifier = fileIdentifier;
