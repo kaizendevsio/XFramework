@@ -1,0 +1,27 @@
+﻿@using XFramework.Blazor.Entity.Constants
+@page "/finance/wallets"
+
+
+<SectionContent SectionName="@LayoutConstants.HeaderButton">
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Inherit" OnClick="ButtonAction">
+        Add
+    </MudButton>
+</SectionContent>
+<Skeleton
+    Item="@List"
+    SkeletonType="@XSkeletonType.Table">
+    <MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false">
+        <Columns>
+            <PropertyColumn Property="x => x.WalletType" />
+            <PropertyColumn Property="x => x.Balance" />
+            <PropertyColumn Property="x => x.Currency" />
+            <PropertyColumn Property="x => x.Status" />
+            <PropertyColumn Property="x => x.LastTransactionDate" />
+            <TemplateColumn>
+                <CellTemplate>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">Details</MudButton>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+</Skeleton>

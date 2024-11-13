@@ -1,0 +1,27 @@
+﻿@using XFramework.Blazor.Entity.Constants
+@page "/storage"
+
+
+<SectionContent SectionName="@LayoutConstants.HeaderButton">
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Inherit" OnClick="ButtonAction">
+        Add
+    </MudButton>
+</SectionContent>
+<Skeleton
+    Item="@List"
+    SkeletonType="@XSkeletonType.Table">
+    <MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false">
+        <Columns>
+            <PropertyColumn Property="x => x.ItemName" />
+            <PropertyColumn Property="x => x.Quantity" />
+            <PropertyColumn Property="x => x.Location" />
+            <PropertyColumn Property="x => x.Status" />
+            <PropertyColumn Property="x => x.LastUpdated" />
+            <TemplateColumn>
+                <CellTemplate>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">Details</MudButton>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+</Skeleton>

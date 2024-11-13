@@ -7,6 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Bogus" Version="35.6.1" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.10"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.10" PrivateAssets="all"/>
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.0" />
@@ -18,9 +19,7 @@
 
     <ItemGroup>
         <Folder Include="Core\Data\" />
-        <Folder Include="Modules\Finance\" />
-        <Folder Include="Modules\Identity\" />
-        <Folder Include="Modules\Session\" />
+        <Folder Include="Modules\Identity\Components\" />
         <Folder Include="Modules\Tenants\Components\" />
     </ItemGroup>
 

@@ -1,0 +1,27 @@
+﻿@using XFramework.Blazor.Entity.Constants
+@page "/identity/roles"
+
+
+<SectionContent SectionName="@LayoutConstants.HeaderButton">
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Inherit" OnClick="ButtonAction">
+        Add
+    </MudButton>
+</SectionContent>
+<Skeleton
+    Item="@List"
+    SkeletonType="@XSkeletonType.Table">
+    <MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false">
+        <Columns>
+            <PropertyColumn Property="x => x.Name" />
+            <PropertyColumn Property="x => x.Description" />
+            <PropertyColumn Property="x => x.Permissions" />
+            <PropertyColumn Property="x => x.NumberOfUsers" />
+            <PropertyColumn Property="x => x.CreatedAt" />
+            <TemplateColumn>
+                <CellTemplate>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">Edit</MudButton>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+</Skeleton>
