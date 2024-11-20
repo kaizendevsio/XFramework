@@ -4,6 +4,7 @@ using XFramework.Blazor.Core.Features.Affiliate;
 using XFramework.Blazor.Core.Features.Cache;
 using XFramework.Blazor.Core.Features.Identity;
 using XFramework.Blazor.Core.Features.Layout;
+using XFramework.Blazor.Core.Features.Tenant;
 using XFramework.Blazor.Core.Features.Wallet;
 using XFramework.Domain.Shared.Contracts;
 
@@ -31,6 +32,7 @@ public class XComponentsBase : BlazorStateComponent
     public AddressState AddressState => GetState<AddressState>();
     public CacheState CacheState => GetState<CacheState>();
     public WalletState WalletState => GetState<WalletState>();
+    public TenantState TenantState => GetState<TenantState>();
 
     [Parameter] public bool? IsLoading { get; set; }
     public string Cursor => IsLoading is true ? "progress" : "arrow";

@@ -2,6 +2,7 @@
 using XFramework.Blazor.Core.Features.Cache;
 using XFramework.Blazor.Core.Features.Identity;
 using XFramework.Blazor.Core.Features.Layout;
+using XFramework.Blazor.Core.Features.Tenant;
 using XFramework.Blazor.Core.Features.Wallet;
 
 namespace XFramework.Blazor.Components;
@@ -27,6 +28,7 @@ public class XLayoutBase : BlazorStateLayoutComponent
     public AddressState AddressState => Store.GetState<AddressState>();
     public CacheState CacheState => GetState<CacheState>();
     public WalletState WalletState => GetState<WalletState>();
+    public TenantState TenantState => GetState<TenantState>();
 
     public void NavigateTo(string path) => NavigationManager.NavigateTo(path);
     public async Task NavigateBack() => await JsRuntime.InvokeVoidAsync("history.back");

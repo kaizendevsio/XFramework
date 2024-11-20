@@ -1,6 +1,6 @@
-using XFramework.Extensions.WebAssembly;
+    using XFramework.Extensions.WebAssembly;
 
-await XApplication
-    .Build<App>()
-    .UseBlazor<App>()
-    .RunAsync();
+    await XApplication
+        .Build<App>()
+        .UseBlazor<App>()
+        .RunAsync();

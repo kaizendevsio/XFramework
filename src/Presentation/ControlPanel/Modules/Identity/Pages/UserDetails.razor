@@ -1,0 +1,28 @@
+﻿@page "/identity/users/details/{UserId:int}"
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<h3>User Details</h3>
+
+@if (user == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <MudPaper>
+        <MudTextField Label="Username" @bind-Value="user.UserName" Variant="Variant.Outlined" />
+        <MudTextField Label="Email" @bind-Value="user.Email" Variant="Variant.Outlined" />
+        <MudTextField Label="Status" @bind-Value="user.Status" Variant="Variant.Outlined" />
+        <MudTextField Label="Role" @bind-Value="user.Role" Variant="Variant.Outlined" />
+        <MudTextField Label="Last Login" @bind-Value="user.LastLogin" Variant="Variant.Outlined" Disabled="true" />
+        <MudTextField Label="Created At" @bind-Value="user.CreatedAt" Variant="Variant.Outlined" Disabled="true" />
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveChanges">Save</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DeleteUser">Delete</MudButton>
+        <MudButton Color="Color.Secondary" Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+    </MudPaper>
+}
+
+@code {
+ 
+}

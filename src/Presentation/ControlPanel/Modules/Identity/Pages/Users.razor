@@ -1,6 +1,7 @@
 ﻿@using XFramework.Blazor.Entity.Constants
+@using ControlPanel.Modules.Identity.Components.Modals
 @page "/identity/users"
-
+@inject IDialogService DialogService
 
 <SectionContent SectionName="@LayoutConstants.HeaderButton">
     <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Inherit" OnClick="ButtonAction">
@@ -10,14 +11,14 @@
 <Skeleton
     Item="@List"
     SkeletonType="@XSkeletonType.Table">
-    <MudDataGrid Items="@List" Filterable="false" SortMode="@SortMode.None" Groupable="false">
+    <MudDataGrid Items="@List?.Items" Filterable="false" SortMode="@SortMode.None" Groupable="false">
         <Columns>
-            <PropertyColumn Property="x => x.UserName" />
-            <PropertyColumn Property="x => x.Email" />
+            <PropertyColumn Property="x => x.UserName"/>
+            <PropertyColumn Property="x => x.Email"/>
             <PropertyColumn Property="x => x.Status"/>
-            <PropertyColumn Property="x => x.Role" />
-            <PropertyColumn Property="x => x.LastLogin" />
-            <PropertyColumn Property="x => x.CreatedAt" />
+            <PropertyColumn Property="x => x.Role"/>
+            <PropertyColumn Property="x => x.LastLogin"/>
+            <PropertyColumn Property="x => x.CreatedAt"/>
             @*<PropertyColumn Property="x => x.Version"/>
             <PropertyColumn Property="x => x.Status"/>
             <PropertyColumn Property="x => x.CreatedAt"/>
@@ -28,7 +29,7 @@
             </TemplateColumn>*@
             <TemplateColumn>
                 <CellTemplate>
-                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">View</MudButton>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" OnClick="ShowDetails">View</MudButton>
                 </CellTemplate>
             </TemplateColumn>
         </Columns>

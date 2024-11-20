@@ -1,0 +1,20 @@
+﻿@using ControlPanel.Modules.Identity.ViewModels
+@inject MudDialogInstance MudDialog
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="User.UserName" Label="Username" Variant="Variant.Outlined"/>
+        <MudTextField @bind-Value="User.Email" Label="Email" Variant="Variant.Outlined"/>
+        <MudTextField @bind-Value="User.Role" Label="Role" Variant="Variant.Outlined"/>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="Save" Color="Color.Primary">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    [Parameter] public UserVm User { get; set; } = new();
+    private void Save() => MudDialog.Close(DialogResult.Ok(true));
+    private void Cancel() => MudDialog.Cancel();
+}

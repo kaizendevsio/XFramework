@@ -2,6 +2,7 @@
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Components;
 using Tenant.Integration.Drivers;
+using XFramework.Domain.Shared.Contracts.Responses;
 
 namespace ControlPanel.Modules.Tenants.Pages;
 
@@ -14,7 +15,7 @@ public partial class Tenants
         View.Title = "Tenants";
     }
 
-    private List<XFramework.Domain.Shared.Contracts.Tenant>? List { get; set; }
+    private PaginatedResult<XFramework.Domain.Shared.Contracts.Tenant>? List { get; set; }
 
     private void ButtonAction()
     {
@@ -24,15 +25,14 @@ public partial class Tenants
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-        await Task.Delay(TimeSpan.FromSeconds(2));
         var apiResult = await TenantServiceWrapper.Tenant.GetList(pageSize: 100, pageNumber: 0);
-        List = apiResult.Response?.Items.ToList();
-        Console.WriteLine($"Total Items: {apiResult.Response?.TotalItems}");
+        List = apiResult.Response;
+        StateHasChanged();
     }
 
-    public void ShowDetails()
+    public void ShowDetails(Guid? id)
     {
-        NavigationManager.NavigateTo("tenant/details");
+        NavigationManager.NavigateTo($"tenant/details/{id}");
     }
 
 }

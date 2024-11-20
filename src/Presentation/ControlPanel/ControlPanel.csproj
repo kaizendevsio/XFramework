@@ -19,7 +19,6 @@
 
     <ItemGroup>
         <Folder Include="Core\Data\" />
-        <Folder Include="Modules\Identity\Components\" />
         <Folder Include="Modules\Tenants\Components\" />
     </ItemGroup>
 

@@ -1,5 +1,20 @@
-﻿@page "/Tenant/Details"
-<h3>TenantDetails</h3>
+﻿@page "/tenant/details/{TenantId:guid}"
+@layout TenantDetailLayout
+
+<h3>@TenantState.SelectedTenant?.Name</h3>
+
+<XForm Model="TenantState.SelectedTenant" 
+       DisableValidation="true" 
+       FormMode="FormMode.Edit" 
+       FormButtonsVisible="true" OnValidSubmit="Save"
+       >
+    <MudTextField @bind-Value="TenantState.SelectedTenant!.Name" 
+                  Variant="Variant.Outlined" 
+                  For="() => TenantState.SelectedTenant!.Name"/>
+    <MudTextField @bind-Value="TenantState.SelectedTenant!.Description" 
+                  Variant="Variant.Outlined" 
+                  For="() => TenantState.SelectedTenant!.Description"/>
+</XForm>
 
 @code {
     

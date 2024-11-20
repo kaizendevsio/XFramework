@@ -6,23 +6,15 @@
     <MudNavMenu Class="mud-width-full">
         <MudDivider Class="my-2" />
         <MudNavLink Href="/tenants" Icon="@Icons.Material.Filled.Apartment">Tenants</MudNavLink>
-        <MudNavGroup Title="Identity" Icon="@Icons.Material.Filled.Person2">
-            <MudNavLink Href="/identity/users" Icon="@Icons.Material.Filled.People">Users</MudNavLink>
-            <MudNavLink Href="/identity/roles" Icon="@Icons.Material.Filled.AssignmentInd">Roles</MudNavLink>
-            <MudNavLink Href="/identity/addresses" Icon="@Icons.Material.Filled.LocationOn">Addresses</MudNavLink>
-            <MudNavLink Href="/identity/contacts" Icon="@Icons.Material.Filled.ContactPhone">Contacts</MudNavLink>
-            <MudNavLink Href="/identity/verifications" Icon="@Icons.Material.Filled.VerifiedUser">Verifications</MudNavLink>
-            <MudNavLink Href="/identity/sessions" Icon="@Icons.Material.Filled.History">Sessions</MudNavLink>
-        </MudNavGroup>
-        <MudNavLink Href="/configurations" Icon="@Icons.Material.Filled.Settings">Configurations</MudNavLink>
-        <MudNavGroup Title="Finance" Icon="@Icons.Material.Filled.AttachMoney">
-            <MudNavLink Href="/finance/wallets" Icon="@Icons.Material.Filled.AccountBalanceWallet" IconColor="Color.Success">Wallets</MudNavLink>
-            <MudNavLink Href="/finance/transactions" Icon="@Icons.Material.Filled.Receipt" IconColor="Color.Info">Transactions</MudNavLink>
-        </MudNavGroup>
-        <MudNavLink Href="/storage" Icon="@Icons.Material.Filled.Storage">Storage</MudNavLink>
     </MudNavMenu>
 </SectionContent>
 
 <SectionContent SectionName="@LayoutConstants.Content">
-    @Body
+    <div class="d-flex flex-column gap-3 align-content-start p-3">
+        <div>
+            <SectionOutlet SectionName="@LayoutConstants.HeaderButton"/>
+        </div>
+        
+        @Body
+    </div>
 </SectionContent>
