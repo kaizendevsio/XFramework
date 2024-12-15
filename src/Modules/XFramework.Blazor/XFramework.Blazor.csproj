@@ -22,7 +22,7 @@
         <PackageReference Include="TG.Blazor.IndexedDB" Version="1.5.0-preview" />
         <PackageReference Include="PPioli.FluentValidation.Blazor" Version="11.1.0" />
         <PackageReference Include="BlazorDownloadFile" Version="2.4.0.2" />
-        <PackageReference Include="Microsoft.Net.Compilers.Razor.Toolset" Version="9.0.0-preview.24610.2" Condition=" '$(UsingMicrosoftNETSdkRazor)' == 'true' ">
+        <PackageReference Include="Microsoft.Net.Compilers.Razor.Toolset" Version="9.0.0-preview.24612.1" Condition=" '$(UsingMicrosoftNETSdkRazor)' == 'true' ">
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
           <PrivateAssets>all</PrivateAssets>
         </PackageReference>
