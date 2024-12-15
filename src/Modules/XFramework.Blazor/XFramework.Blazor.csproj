@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
-        <LangVersion>12</LangVersion>
+        <TargetFramework>net9.0</TargetFramework>
+        <LangVersion>13</LangVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <Features>enable-generator-cache</Features>
@@ -14,15 +14,18 @@
         <PackageReference Include="Blazored.SessionStorage" Version="2.4.0" />
         <PackageReference Include="BlazorTransitionableRoute" Version="4.0.0" />
         <PackageReference Include="CurrieTechnologies.Razor.SweetAlert2" Version="5.6.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.10" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.Analyzers" Version="8.0.10" />
-        <PackageReference Include="MudBlazor" Version="7.8.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.Analyzers" Version="9.0.0" />
+        <PackageReference Include="MudBlazor" Version="7.15.0" />
         <PackageReference Include="Reshiru.Blazor.IndexedDB.Framework" Version="1.0.1" />
         <PackageReference Include="Serilog.Sinks.BrowserHttp" Version="1.0.0-dev-00032" />
         <PackageReference Include="TG.Blazor.IndexedDB" Version="1.5.0-preview" />
         <PackageReference Include="PPioli.FluentValidation.Blazor" Version="11.1.0" />
         <PackageReference Include="BlazorDownloadFile" Version="2.4.0.2" />
-        <PackageReference Include="Microsoft.Net.Compilers.Razor.Toolset" Version="9.0.0-preview.24359.2" Condition=" '$(UsingMicrosoftNETSdkRazor)' == 'true' " />
+        <PackageReference Include="Microsoft.Net.Compilers.Razor.Toolset" Version="9.0.0-preview.24610.2" Condition=" '$(UsingMicrosoftNETSdkRazor)' == 'true' ">
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
         <PackageReference Include="Toolbelt.Blazor.ViewTransition" Version="1.0.3" />
     </ItemGroup>
 

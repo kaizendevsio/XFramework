@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="postgres@xeonmhi.tailed40e.ts.net" uuid="3aabeb0c-98fc-4522-b856-960c65283647">
+    <data-source source="LOCAL" name="Local" uuid="3aabeb0c-98fc-4522-b856-960c65283647">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
@@ -32,6 +32,14 @@
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/src/Presentation/Fluid/Fluid.db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
+    <data-source source="LOCAL" name="XnelSystems@localhost" uuid="d90b115a-fa16-48b6-90c0-a626423303c2">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <configured-by-url>true</configured-by-url>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://localhost/XnelSystems?connectTimeout=300&amp;password=BqzX%7DV%7E%2C%2Fp%3A7%5DK%28FRH-bun%216PG%3F_g%5E%3C%23h2EdtAQM%5B35x8&amp;user=xnelsystems-migration</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>
