@@ -19,7 +19,7 @@ public class StreamflowRequestHandlerGenerator : ISourceGenerator
         var assemblyName = context.Compilation.AssemblyName;
 
         var serviceName = context.Compilation.AssemblyName!.Contains('.') 
-            ? context.Compilation.AssemblyName?.Split(".").First()
+            ? context.Compilation.AssemblyName?.Split('.').First()
             : context.Compilation.AssemblyName;
         
         var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateEndpoints");

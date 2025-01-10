@@ -82,7 +82,8 @@ public static class BaseSourceGenerator
             var semanticModel = context.Compilation.GetSemanticModel(syntaxTree);
             var classNodes = syntaxTree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>();
             
-            foreach (var classNode in classNodes.Where(i => i.Identifier.Text.Contains(classNameSuffix, StringComparison.InvariantCultureIgnoreCase)))
+            foreach (var classNode in classNodes
+                         .Where(i => i.Identifier.Text.IndexOf(classNameSuffix, StringComparison.InvariantCultureIgnoreCase) >= 0))
             {
                 var attributeSyntax = classNode.AttributeLists
                     .SelectMany(a => a.Attributes)

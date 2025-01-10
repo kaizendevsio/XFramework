@@ -3,7 +3,7 @@ using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Integration.Generators;
 
-[StreamFlowWrapper(" XFramework.Domain.Shared.Contracts", new[]
+[StreamFlowWrapper("XFramework.Domain.Shared.Contracts", new[]
 {
     nameof(IdentityInformation),
     nameof(IdentityCredential),
@@ -23,20 +23,20 @@ namespace IdentityServer.Integration.Generators;
 })]
 public static class IdentityServerServiceWrapper;
 
-[StreamFlowWrapper(" XFramework.Domain.Shared.Contracts", new[]
+[StreamFlowWrapper("XFramework.Domain.Shared.Contracts", new[]
 {
     nameof(Tenant)
 })]
 public static class TenantServiceWrapper;
 
-[StreamFlowWrapper(" XFramework.Domain.Shared.Contracts", new[]
+[StreamFlowWrapper("XFramework.Domain.Shared.Contracts", new[]
 {
     nameof(RegistryConfiguration),
     nameof(RegistryConfigurationGroup),
 })]
 public static class RegistryServiceWrapper;
 
-[StreamFlowWrapper(" XFramework.Domain.Shared.Contracts", new[]
+[StreamFlowWrapper("XFramework.Domain.Shared.Contracts", new[]
 {
     nameof(AddressBarangay),
     nameof(AddressCity),
