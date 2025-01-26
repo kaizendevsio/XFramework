@@ -16,7 +16,7 @@ public class MediatRRegistrationGenerator : ISourceGenerator
     {
         var assemblyName = context.Compilation.AssemblyName;
         var serviceName =  assemblyName!.Contains('.') 
-            ? assemblyName.Split(".").First()
+            ? assemblyName.Split('.').First()
             : assemblyName;
         
         var namespaceName = BaseSourceGenerator.GetNamespace(context, "GenerateEndpoints");

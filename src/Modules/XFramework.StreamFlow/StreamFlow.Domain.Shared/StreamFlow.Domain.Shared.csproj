@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>12</LangVersion>
+        <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>13</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
@@ -11,7 +11,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="MessagePack" Version="2.5.140" />
-      <PackageReference Include="MessagePack.Annotations" Version="2.5.140" />
+      <PackageReference Include="MessagePack" Version="3.1.0" />
+      <PackageReference Include="MessagePack.Annotations" Version="3.1.0" />
     </ItemGroup>
 </Project>

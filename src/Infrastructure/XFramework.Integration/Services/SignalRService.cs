@@ -252,19 +252,6 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             _logger.LogInformation("Connection to StreamFlow server restored");
 
             await RegisterConnection();
-
-            if (!_queueList.Any()) return;
-
-            _logger.LogInformation($"Dequeuing items from cache..");
-
-            foreach (var valueTuple in _queueList)
-            {
-                // Awaiting to preserve transactional order
-                await InvokeVoidAsync(valueTuple.MethodName, valueTuple.StreamFlowMessage);
-            }
-
-            _logger.LogInformation("Dequeued {QueueListCount} item(s) from cache", _queueList.Count);
-            _queueList.Clear();
         };
     }
 
@@ -357,7 +344,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         var startTimer = Stopwatch.StartNew();
         _logger.LogInformation("Registering Connection..");
         
-        var serviceName = Assembly.GetEntryAssembly()?.GetName().Name.Split(".").First() ?? throw new ArgumentException("Assembly name is not set");
+        var serviceName = Assembly.GetEntryAssembly()!.GetName().Name!.Split(".").First() ?? throw new ArgumentException("Assembly name is not set");
         var serviceId = serviceName.ToSha256();
         
         _clientId = StreamFlowConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Streamflow client Id is not set");
@@ -368,13 +355,26 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             Id = _clientId,
             Name = StreamFlowConfiguration.ClientName
         };
-        await Connection?.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
+        await Connection!.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
     
         startTimer.Stop();
         _logger.LogInformation("Registering Connection.. Done in {ResponseTime}ms", startTimer.ElapsedMilliseconds);
         
         _isRegistered = true;
         _isRegistering = false;
+        
+        if (!_queueList.Any()) return;
+
+        _logger.LogInformation($"Dequeuing items from cache..");
+
+        foreach (var valueTuple in _queueList)
+        {
+            // Awaiting to preserve transactional order
+            await InvokeVoidAsync(valueTuple.MethodName, valueTuple.StreamFlowMessage);
+        }
+
+        _logger.LogInformation("Dequeued {QueueListCount} item(s) from cache", _queueList.Count);
+        _queueList.Clear();
     }
 
     public async Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage) 
@@ -388,7 +388,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             }
             
             _logger.LogInformation("Invoked Method \'{MethodName}\' is queued, waiting for connection to be re-established", methodName);
-            _queueList.Add(new(methodName, sfMessage as StreamFlowMessage ));
+            _queueList.Add(new(methodName, sfMessage));
             return HttpStatusCode.Processing;
 
         }
@@ -428,7 +428,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                 };
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300_000));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
             cts.Token.Register(() => methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out")));
 
             _logger.LogWarning("Awaiting response for Invoked Method \'{SfMessageCommandName}\'", sfMessage.CommandName);

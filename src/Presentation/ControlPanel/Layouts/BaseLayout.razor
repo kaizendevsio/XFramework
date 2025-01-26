@@ -1,8 +1,7 @@
 ﻿@using XFramework.Blazor.Entity.Constants
-@using MudBlazor
 @inherits XFramework.Blazor.Components.XLayoutBase
-
-<MudThemeProvider/>
+<MudThemeProvider IsDarkMode="@true"/>
+<MudPopoverProvider/>
 
 <MudLayout>
     <MudAppBar Elevation="1">
@@ -12,22 +11,17 @@
     </MudAppBar>
     <MudDrawer @bind-Open="_drawerOpen" Elevation="2">
         <MudDrawerHeader Class="d-flex flex-column px-0">
-            <MudText Typo="Typo.h6" Class="px-4">FLEXX</MudText>
+            <MudText Typo="Typo.h6" Class="px-4">Control Panel</MudText>
             <MudText Typo="Typo.body2" Class="px-4 mud-text-secondary">The ultimate business platform</MudText>
         </MudDrawerHeader>
-        <NavMenu/>
+        <SectionOutlet SectionName="@LayoutConstants.Sidebar"/>
     </MudDrawer>
     <MudMainContent>
-        <div class="px-5 pt-4 d-flex flex-column gap-4">
-            <FHeader>
-                <ButtonFragment>
-                    <SectionOutlet SectionName="@LayoutConstants.HeaderButton"/>
-                </ButtonFragment>
-            </FHeader>
-            @Body
-        </div>
+        <SectionOutlet SectionName="@LayoutConstants.Content"/>
     </MudMainContent>
 </MudLayout>
+
+@Body
 
 @code {
     bool _drawerOpen = true;
