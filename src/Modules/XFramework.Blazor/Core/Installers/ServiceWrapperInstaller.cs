@@ -1,6 +1,7 @@
 ﻿using Address.Integration.Drivers;
 using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Registry.Integration.Drivers;
 using Tenant.Integration.Drivers;
 using Wallets.Integration.Drivers;
@@ -11,14 +12,14 @@ public class ServiceWrapperInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddSingleton<ISignalRService, SignalRService>();
-        services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
-        services.AddSingleton<IIdentityServerServiceWrapper, IdentityServerServiceWrapper>();
-        services.AddSingleton<IAddressServiceWrapper, AddressServiceWrapper>();
-        services.AddSingleton<IWalletsServiceWrapper, WalletsServiceWrapper>();
-        services.AddSingleton<IMessagingServiceWrapper, MessagingServiceWrapper>();
-        services.AddSingleton<IRegistryServiceWrapper, RegistryServiceWrapper>(); 
-        services.AddSingleton<ITenantServiceWrapper, TenantServiceWrapper>(); 
-        services.AddSingleton<IHelperService, HelperService>();
+        services.TryAddSingleton<ISignalRService, SignalRService>();
+        services.TryAddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
+        services.TryAddSingleton<IIdentityServerServiceWrapper, IdentityServerServiceWrapper>();
+        services.TryAddSingleton<IAddressServiceWrapper, AddressServiceWrapper>();
+        services.TryAddSingleton<IWalletsServiceWrapper, WalletsServiceWrapper>();
+        services.TryAddSingleton<IMessagingServiceWrapper, MessagingServiceWrapper>();
+        services.TryAddSingleton<IRegistryServiceWrapper, RegistryServiceWrapper>(); 
+        services.TryAddSingleton<ITenantServiceWrapper, TenantServiceWrapper>(); 
+        services.TryAddSingleton<IHelperService, HelperService>();
     }
 }
