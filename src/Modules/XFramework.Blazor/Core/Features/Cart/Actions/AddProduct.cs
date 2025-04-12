@@ -8,14 +8,18 @@ public partial class CartState
 
     public class AddProductHandler : StateActionHandler<AddProduct>
     {
-        private CartState CurrentState => Store.GetState<CartState>();
-
         public AddProductHandler(HandlerServices handlerServices, IStore store) : base(handlerServices, store) {}
 
-        public override async Task Handle(AddProduct action, CancellationToken cancellationToken)
+        public override async Task Handle(AddProduct action, CancellationToken aCancellationToken)
         {
-            CurrentState.Products.Add(action.Product);
-            await Task.CompletedTask;
+            var currentState = Store.GetState<CartState>();
+            var productViewModel = new CartProductViewModel
+            {
+                Product = action.Product,
+                Quantity = 1 // Default quantity
+            };
+            currentState.Products?.Add(productViewModel);
+            await Persist(currentState);
         }
     }
 }

@@ -4,7 +4,7 @@ namespace XFramework.Blazor.Core.Features.Cart;
 
 public partial class CartState
 {
-    public record RemoveProduct(Product Product) : StateAction;
+    public record RemoveProduct(CartProductViewModel Product) : StateAction;
 
     public class RemoveProductHandler : StateActionHandler<RemoveProduct>
     {
