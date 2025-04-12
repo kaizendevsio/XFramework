@@ -1,0 +1,269 @@
+﻿@page "/"
+
+@using System.Text.Json
+@using SerializerPerfTest.Models
+@using MemoryPack
+
+<div class="container my-4">
+    <h2>Serialization Performance Test</h2>
+
+    <!-- Control Panel: Iterations & Run Button -->
+    <div class="row mb-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label fw-bold" for="iterationsInput">Iterations</label>
+            <input type="number" class="form-control" id="iterationsInput" @bind="Iterations" min="1" />
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-primary" @onclick="RunTest" disabled="@isLoading">
+                @(isLoading ? "Running..." : "Run Test")
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    @if (isLoading)
+    {
+        <div class="mt-3 d-flex align-items-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Running tests...</span>
+        </div>
+    }
+
+    <!-- Results Grid -->
+    @if (!isLoading && testsCompleted)
+    {
+        <div class="row mt-4">
+
+            <!-- System.Text.Json Serialization -->
+            <div class="col-md-6">
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">System.Text.Json Serialization</h5>
+                        <p class="card-text">
+                            <strong>Total Time (ms):</strong> @SystemTextJsonSerTimeMs.ToString("N2")<br />
+                            <strong>Ops per second:</strong> @SystemTextJsonSerOpsPerSec.ToString("N2")<br />
+                            <strong>Latency (ms/op):</strong> @SystemTextJsonSerLatency.ToString("N6")
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System.Text.Json Deserialization -->
+            <div class="col-md-6">
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">System.Text.Json Deserialization</h5>
+                        <p class="card-text">
+                            <strong>Total Time (ms):</strong> @SystemTextJsonDeserTimeMs.ToString("N2")<br />
+                            <strong>Ops per second:</strong> @SystemTextJsonDeserOpsPerSec.ToString("N2")<br />
+                            <strong>Latency (ms/op):</strong> @SystemTextJsonDeserLatency.ToString("N6")
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MemoryPack Serialization -->
+            <div class="col-md-6">
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">MemoryPack Serialization</h5>
+                        <p class="card-text">
+                            <strong>Total Time (ms):</strong> @MempackSerTimeMs.ToString("N2")<br />
+                            <strong>Ops per second:</strong> @MempackSerOpsPerSec.ToString("N2")<br />
+                            <strong>Latency (ms/op):</strong> @MempackSerLatency.ToString("N6")
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MemoryPack Deserialization -->
+            <div class="col-md-6">
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">MemoryPack Deserialization</h5>
+                        <p class="card-text">
+                            <strong>Total Time (ms):</strong> @MempackDeserTimeMs.ToString("N2")<br />
+                            <strong>Ops per second:</strong> @MempackDeserOpsPerSec.ToString("N2")<br />
+                            <strong>Latency (ms/op):</strong> @MempackDeserLatency.ToString("N6")
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="row mt-4">
+            <div class="col">
+                <div class="card border-info shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            <strong>Serialization Comparison:</strong><br />
+                            @if (SystemTextJsonSerTimeMs < MempackSerTimeMs)
+                            {
+                                var ratio = MempackSerTimeMs / SystemTextJsonSerTimeMs;
+                                <span>
+                                    System.Text.Json is <strong>@ratio.ToString("N2") times faster</strong> than MemoryPack.
+                                </span>
+                            }
+                            else if (MempackSerTimeMs < SystemTextJsonSerTimeMs)
+                            {
+                                var ratio = SystemTextJsonSerTimeMs / MempackSerTimeMs;
+                                <span>
+                                    MemoryPack is <strong>@ratio.ToString("N2") times faster</strong> than System.Text.Json.
+                                </span>
+                            }
+                            else
+                            {
+                                <span>Both serializers perform equally for serialization.</span>
+                            }
+                        </p>
+                        <p class="card-text">
+                            <strong>Deserialization Comparison:</strong><br />
+                            @if (SystemTextJsonDeserTimeMs < MempackDeserTimeMs)
+                            {
+                                var ratio = MempackDeserTimeMs / SystemTextJsonDeserTimeMs;
+                                <span>
+                                    System.Text.Json is <strong>@ratio.ToString("N2") times faster</strong> than MemoryPack.
+                                </span>
+                            }
+                            else if (MempackDeserTimeMs < SystemTextJsonDeserTimeMs)
+                            {
+                                var ratio = SystemTextJsonDeserTimeMs / MempackDeserTimeMs;
+                                <span>
+                                    MemoryPack is <strong>@ratio.ToString("N2") times faster</strong> than System.Text.Json.
+                                </span>
+                            }
+                            else
+                            {
+                                <span>Both serializers perform equally for deserialization.</span>
+                            }
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = false;
+    private bool testsCompleted = false;
+
+    // Number of iterations (default to 10,000)
+    private int Iterations { get; set; } = 10000;
+
+    // Metric fields
+    private double SystemTextJsonSerTimeMs;
+    private double SystemTextJsonSerOpsPerSec;
+    private double SystemTextJsonDeserTimeMs;
+    private double SystemTextJsonDeserOpsPerSec;
+    private double MempackSerTimeMs;
+    private double MempackSerOpsPerSec;
+    private double MempackDeserTimeMs;
+    private double MempackDeserOpsPerSec;
+
+    // Derived latencies (ms per operation)
+    private double SystemTextJsonSerLatency => SystemTextJsonSerTimeMs / Iterations;
+    private double SystemTextJsonDeserLatency => SystemTextJsonDeserTimeMs / Iterations;
+    private double MempackSerLatency => MempackSerTimeMs / Iterations;
+    private double MempackDeserLatency => MempackDeserTimeMs / Iterations;
+
+    private async Task RunTest()
+    {
+        isLoading = true;
+        testsCompleted = false; 
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(100);
+        
+        // Create a sample instance of our complex model.
+        var sample = new SampleMessage
+        {
+            Id = 123,
+            Name = "Test Message",
+            Timestamp = DateTime.UtcNow,
+            IsActive = true,
+            Values = Enumerable.Range(1, 100).ToArray(),
+            Nested = new NestedData
+            {
+                Description = "Nested data structure",
+                Amount = 99.99,
+                Tags = new List<string> { "tag1", "tag2", "tag3" }
+            },
+            AdditionalData = new Dictionary<string, string>
+            {
+                { "Key1", "Value1" },
+                { "Key2", "Value2" },
+                { "Key3", "Value3" }
+            }
+        };
+
+        // Warm-up to avoid first-use overhead.
+        var json = JsonSerializer.Serialize(sample);
+        _ = JsonSerializer.Deserialize<SampleMessage>(json);
+
+        var mempackBytes = MemoryPackSerializer.Serialize(sample);
+        _ = MemoryPackSerializer.Deserialize<SampleMessage>(mempackBytes);
+
+        var sw = new System.Diagnostics.Stopwatch();
+
+        // -------------------------
+        // System.Text.Json Serialization
+        // -------------------------
+        sw.Start();
+        string jsonResult = string.Empty;
+        for (int i = 0; i < Iterations; i++)
+        {
+            jsonResult = JsonSerializer.Serialize(sample);
+        }
+        sw.Stop();
+        SystemTextJsonSerTimeMs = sw.Elapsed.TotalMilliseconds;
+        SystemTextJsonSerOpsPerSec = Iterations / sw.Elapsed.TotalSeconds;
+
+        // -------------------------
+        // System.Text.Json Deserialization
+        // -------------------------
+        sw.Restart();
+        for (int i = 0; i < Iterations; i++)
+        {
+            _ = JsonSerializer.Deserialize<SampleMessage>(jsonResult);
+        }
+        sw.Stop();
+        SystemTextJsonDeserTimeMs = sw.Elapsed.TotalMilliseconds;
+        SystemTextJsonDeserOpsPerSec = Iterations / sw.Elapsed.TotalSeconds;
+
+        // -------------------------
+        // MemoryPack Serialization
+        // -------------------------
+        sw.Restart();
+        byte[] mempackResult = null;
+        for (int i = 0; i < Iterations; i++)
+        {
+            mempackResult = MemoryPackSerializer.Serialize(sample);
+        }
+        sw.Stop();
+        MempackSerTimeMs = sw.Elapsed.TotalMilliseconds;
+        MempackSerOpsPerSec = Iterations / sw.Elapsed.TotalSeconds;
+
+        // -------------------------
+        // MemoryPack Deserialization
+        // -------------------------
+        sw.Restart();
+        for (int i = 0; i < Iterations; i++)
+        {
+            _ = MemoryPackSerializer.Deserialize<SampleMessage>(mempackResult);
+        }
+        sw.Stop();
+        MempackDeserTimeMs = sw.Elapsed.TotalMilliseconds;
+        MempackDeserOpsPerSec = Iterations / sw.Elapsed.TotalSeconds;
+
+        isLoading = false;
+        testsCompleted = true;
+        await InvokeAsync(StateHasChanged);
+    }
+}
