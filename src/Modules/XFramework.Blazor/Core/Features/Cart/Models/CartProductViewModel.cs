@@ -20,7 +20,6 @@ public class CartProductViewModel : BaseModel
     }
     public CartProductViewModel()
     {
-        Product = new Product();
         Quantity = 1; // Default quantity
         CreatedAt = DateTime.UtcNow; // Automatically set CreatedAt
         IsEnabled = true; // Automatically set IsEnabled

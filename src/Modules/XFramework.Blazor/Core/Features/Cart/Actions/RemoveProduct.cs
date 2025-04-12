@@ -14,7 +14,7 @@ public partial class CartState
 
         public override async Task Handle(RemoveProduct action, CancellationToken cancellationToken)
         {
-            CurrentState.Products.Remove(action.Product);
+            CurrentState.Products?.Remove(action.Product);
             await Task.CompletedTask;
         }
     }
