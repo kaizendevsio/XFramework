@@ -11,4 +11,6 @@ public partial class CartState : State<CartState>
     }
 
     public List<CartProductViewModel>? Products { get; set; } = new();
+    public decimal Total => Products?.Sum(p => p.Total) ?? 0;
+    public int TotalItems => Products?.Sum(p => p.Quantity) ?? 0;
 }
