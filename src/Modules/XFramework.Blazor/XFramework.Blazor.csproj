@@ -36,9 +36,7 @@
       <ProjectReference Include="..\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
       <ProjectReference Include="..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
       <ProjectReference Include="..\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
     </ItemGroup>
+
 </Project>
