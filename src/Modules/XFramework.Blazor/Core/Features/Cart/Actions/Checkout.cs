@@ -15,7 +15,7 @@ public partial class CartState
             {
                 await action.Callback.InvokeAsync(null);
             }
-            currentState.Products?.Clear();
+            currentState.Items?.Clear();
             await Persist(currentState);
         }
     }

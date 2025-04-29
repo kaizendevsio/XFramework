@@ -7,10 +7,10 @@ public partial class CartState : State<CartState>
 {
     public override void Initialize()
     {
-        Products = new List<CartProductViewModel>();
+        Items = [];
     }
 
-    public List<CartProductViewModel>? Products { get; set; } = new();
-    public decimal Total => Products?.Sum(p => p.Total) ?? 0;
-    public int TotalItems => Products?.Sum(p => p.Quantity) ?? 0;
+    public List<CartItemVm>? Items { get; set; } = [];
+    public decimal Total => Items?.Sum(p => p.Total) ?? 0;
+    public int TotalItems => Items?.Sum(p => p.Quantity) ?? 0;
 }
