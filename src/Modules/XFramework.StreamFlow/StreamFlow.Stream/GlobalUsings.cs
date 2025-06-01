@@ -13,3 +13,4 @@ global using XFramework.Core.Services;
 global using XFramework.Domain.Contexts;
 global using XFramework.Integration.Abstractions;
 global using XFramework.Integration.Services;
+global using XFramework.Extensions;

@@ -14,3 +14,4 @@ global using SmsGateway.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Contexts;
 global using XFramework.Integration.Abstractions;
 global using XFramework.Integration.Drivers;
+global using XFramework.Extensions;

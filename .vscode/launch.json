@@ -2,34 +2,203 @@
     "version": "0.2.0",
     "configurations": [
         {
-            // Use IntelliSense to find out which attributes exist for C# debugging
-            // Use hover for the description of the existing attributes
-            // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
-            "name": ".NET Core Launch (web)",
+            "name": "Run All & Debug Wallets",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
-            // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/XFramework/XFramework/Server/XFramework.Api/bin/Debug/net6.0/XFramework.Api.dll",
+            "preLaunchTask": "Run Wallets Task",
+            "program": "${workspaceFolder}/src/Modules/XFramework.Wallets/Wallets.Api/bin/Debug/net8.0/Wallets.Api.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/XFramework/XFramework/Server/XFramework.Api",
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.Wallets/Wallets.Api",
             "stopAtEntry": false,
-            // Enable launching a web browser when ASP.NET Core starts. For more information: https://aka.ms/VSCode-CS-LaunchJson-WebBrowser
+            "console": "internalConsole",
             "serverReadyAction": {
-                "action": "openExternally",
-                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-            },
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            },
-            "sourceFileMap": {
-                "/Views": "${workspaceFolder}/Views"
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
             }
         },
         {
-            "name": ".NET Core Attach",
+            "name": "Run All & Debug IdentityServer",
             "type": "coreclr",
-            "request": "attach"
+            "request": "launch",
+            "preLaunchTask": "Run IdentityServer Task",
+            "program": "${workspaceFolder}/src/Modules/XFramework.IdentityServer/IdentityServer.Api/bin/Debug/net8.0/IdentityServer.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.IdentityServer/IdentityServer.Api",
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Run All & Debug StreamFlow",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "Run StreamFlow Task",
+            "program": "${workspaceFolder}/src/Modules/XFramework.StreamFlow/StreamFlow.Stream/bin/Debug/net8.0/StreamFlow.Stream.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.StreamFlow/StreamFlow.Stream",
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Run All & Debug Messaging",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "Run Messaging Task",
+            "program": "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api/bin/Debug/net8.0/Messaging.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Run All & Debug SmsGateway",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "Run SmsGateway Task",
+            "program": "${workspaceFolder}/src/Modules/XFramework.SmsGateway/SmsGateway.Api/bin/Debug/net8.0/SmsGateway.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.SmsGateway/SmsGateway.Api",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Run All & Debug Community",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "Run Community Task",
+            "program": "${workspaceFolder}/src/Modules/XFramework.Community/Community.Api/bin/Debug/net8.0/Community.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.Community/Community.Api",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Launch StreamFlow for Debug",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Modules/XFramework.StreamFlow/StreamFlow.Stream/bin/Debug/net8.0/StreamFlow.Stream.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.StreamFlow/StreamFlow.Stream",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Launch IdentityServer for Debug",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Modules/XFramework.IdentityServer/IdentityServer.Api/bin/Debug/net8.0/IdentityServer.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.IdentityServer/IdentityServer.Api",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Launch Wallets for Debug",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Modules/XFramework.Wallets/Wallets.Api/bin/Debug/net8.0/Wallets.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.Wallets/Wallets.Api",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Launch Messaging for Debug",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api/bin/Debug/net8.0/Messaging.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Launch SmsGateway for Debug",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Modules/XFramework.SmsGateway/SmsGateway.Api/bin/Debug/net8.0/SmsGateway.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.SmsGateway/SmsGateway.Api",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Launch Community for Debug",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Modules/XFramework.Community/Community.Api/bin/Debug/net8.0/Community.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Modules/XFramework.Community/Community.Api",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Debug All Services",
+            "configurations": [
+                "Launch StreamFlow for Debug",
+                "Launch IdentityServer for Debug",
+                "Launch Wallets for Debug",
+                "Launch Messaging for Debug",
+                "Launch SmsGateway for Debug",
+                "Launch Community for Debug"
+            ],
+            "preLaunchTask": "Run Community Task", // This task starts all services in sequence
+            "stopAll": true // Stops all debug sessions when one is stopped
         }
     ]
 }
