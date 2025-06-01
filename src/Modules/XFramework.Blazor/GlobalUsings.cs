@@ -40,3 +40,4 @@ global using XFramework.Integration.Abstractions;
 global using XFramework.Integration.Abstractions.Wrappers;
 global using XFramework.Integration.Drivers;
 global using XFramework.Integration.Services;
+global using XFramework.Inventario.Domain.Shared.Contracts;

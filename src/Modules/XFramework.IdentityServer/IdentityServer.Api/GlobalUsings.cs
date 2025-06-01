@@ -8,6 +8,8 @@ global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.EntityFrameworkCore;
 global using IdentityServer.Api.Extensions;
 global using IdentityServer.Api.Endpoints;
+global using IdentityServer.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Contexts;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;
+global using XFramework.Extensions;

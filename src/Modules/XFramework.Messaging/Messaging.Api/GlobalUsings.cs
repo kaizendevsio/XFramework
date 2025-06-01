@@ -12,3 +12,4 @@ global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;
 global using XFramework.Core.Attributes;
 global using XFramework.Domain.Contexts;
+global using XFramework.Extensions;

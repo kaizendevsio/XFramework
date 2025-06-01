@@ -2,19 +2,18 @@
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
-    <LangVersion>13</LangVersion>
+        <LangVersion>13</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
-      <ProjectReference Include="..\..\XFramework.StreamFlow\StreamFlow.Domain.Shared\StreamFlow.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj"/>
+        <ProjectReference Include="..\..\XFramework.StreamFlow\StreamFlow.Domain.Shared\StreamFlow.Domain.Shared.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Contracts\Responses\" />
-      <Folder Include="Enums\" />
+        <Folder Include="Contracts\Responses\"/>
+        <Folder Include="Enums\"/>
     </ItemGroup>
 </Project>

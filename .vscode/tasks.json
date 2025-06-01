@@ -1,0 +1,130 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run StreamFlow Task",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "csharp",
+                "fileLocation": "absolute",
+                "pattern": {
+                     "regexp": ".*",
+                    "file": 1,
+                    "message": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Application started\\.",
+                    "endsPattern": "Application is shutting down\\."
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "streamflow"
+            }
+        },
+        {
+            "label": "Run IdentityServer Task",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/src/Modules/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj"
+            ],
+            "isBackground": true,
+            "dependsOn": ["Run StreamFlow Task"],
+            "problemMatcher": {
+                "owner": "csharp",
+                "fileLocation": "absolute",
+                "pattern": {"regexp": "^.*\\bNow listening on:\\s+(https?://\\S+)","file": 1,"message": 1},
+                "background": {"activeOnStart": true,"beginsPattern": "^.*\\bApplication started\\. Press Ctrl\\+C to shut down\\.\\b.*$","endsPattern": "^.*\\bApplication is shutting down\\.\\.\\.\\b.*$"}
+            },
+            "presentation": {"reveal": "always","panel": "dedicated","group": "identity"}
+        },
+        {
+            "label": "Run Wallets Task",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/src/Modules/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj"
+            ],
+            "isBackground": true,
+            "dependsOn": ["Run IdentityServer Task"],
+            "problemMatcher": {
+                "owner": "csharp",
+                "fileLocation": "absolute",
+                "pattern": {"regexp": "^.*\\bNow listening on:\\s+(https?://\\S+)","file": 1,"message": 1},
+                "background": {"activeOnStart": true,"beginsPattern": "^.*\\bApplication started\\. Press Ctrl\\+C to shut down\\.\\b.*$","endsPattern": "^.*\\bApplication is shutting down\\.\\.\\.\\b.*$"}
+            },
+            "presentation": {"reveal": "always","panel": "dedicated","group": "wallets"}
+        },
+        {
+            "label": "Run Messaging Task",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/src/Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj"
+            ],
+            "isBackground": true,
+            "dependsOn": ["Run Wallets Task"],
+            "problemMatcher": {
+                "owner": "csharp",
+                "fileLocation": "absolute",
+                "pattern": {"regexp": "^.*\\bNow listening on:\\s+(https?://\\S+)","file": 1,"message": 1},
+                "background": {"activeOnStart": true,"beginsPattern": "^.*\\bApplication started\\. Press Ctrl\\+C to shut down\\.\\b.*$","endsPattern": "^.*\\bApplication is shutting down\\.\\.\\.\\b.*$"}
+            },
+            "presentation": {"reveal": "always","panel": "dedicated","group": "messaging"}
+        },
+        {
+            "label": "Run SmsGateway Task",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/src/Modules/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj"
+            ],
+            "isBackground": true,
+            "dependsOn": ["Run Messaging Task"],
+            "problemMatcher": {
+                "owner": "csharp",
+                "fileLocation": "absolute",
+                "pattern": {"regexp": "^.*\\bNow listening on:\\s+(https?://\\S+)","file": 1,"message": 1},
+                "background": {"activeOnStart": true,"beginsPattern": "^.*\\bApplication started\\. Press Ctrl\\+C to shut down\\.\\b.*$","endsPattern": "^.*\\bApplication is shutting down\\.\\.\\.\\b.*$"}
+            },
+            "presentation": {"reveal": "always","panel": "dedicated","group": "smsgateway"}
+        },
+        {
+            "label": "Run Community Task",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/src/Modules/XFramework.Community/Community.Api/Community.Api.csproj"
+            ],
+            "isBackground": true,
+            "dependsOn": ["Run SmsGateway Task"],
+            "problemMatcher": {
+                "owner": "csharp",
+                "fileLocation": "absolute",
+                "pattern": {"regexp": "^.*\\bNow listening on:\\s+(https?://\\S+)","file": 1,"message": 1},
+                "background": {"activeOnStart": true,"beginsPattern": "^.*\\bApplication started\\. Press Ctrl\\+C to shut down\\.\\b.*$","endsPattern": "^.*\\bApplication is shutting down\\.\\.\\.\\b.*$"}
+            },
+            "presentation": {"reveal": "always","panel": "dedicated","group": "community"}
+        }
+    ]
+}

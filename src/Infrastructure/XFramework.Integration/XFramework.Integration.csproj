@@ -49,7 +49,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
-      <ProjectReference Include="..\..\Modules\XFramework.PaymentGateways\PaymentGateways.Domain.Shared\PaymentGateways.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\Modules\XFramework.StreamFlow\StreamFlow.Domain.Shared\StreamFlow.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
     </ItemGroup>

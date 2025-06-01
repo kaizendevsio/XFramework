@@ -6,4 +6,16 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+        <Folder Include="BusinessObjects\" />
+        <Folder Include="Contracts\" />
+        <Folder Include="Enums\" />
+        <Folder Include="Extensions\" />
+        <Folder Include="Interfaces\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
+    </ItemGroup>
+
 </Project>

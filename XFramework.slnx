@@ -1,0 +1,72 @@
+﻿<Solution>
+  <Folder Name="/Infrastructure/">
+    <Project Path="src\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Kernel/">
+    <Project Path="src\Kernel\XFramework.Core\XFramework.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Kernel\XFramework.Domain\XFramework.Domain.csproj" Type="Classic C#" />
+    <Project Path="src\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/" />
+  <Folder Name="/Modules/Blazor/">
+    <Project Path="src\Modules\XFramework.Blazor\XFramework.Blazor.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/Community/">
+    <Project Path="src\Modules\XFramework.Community\Community.Api\Community.Api.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Community\Community.Core\Community.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Community\Community.Domain.Shared\Community.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Community\Community.Integration\Community.Integration.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/IdentityServer/">
+    <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Core\IdentityServer.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/Inventario/">
+    <Project Path="src\Modules\XFramework.Inventario\Inventario.Api\Inventario.Api.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Inventario\Inventario.Core\Inventario.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Inventario\Inventario.Integration\Inventario.Integration.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/Messaging/">
+    <Project Path="src\Modules\XFramework.Messaging\Messaging.Api\Messaging.Api.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Messaging\Messaging.Core\Messaging.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Messaging\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/Payments/">
+    <Project Path="src\Modules\XFramework.Payments\Payments.Core\Payments.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Payments\Payments.Domain.Shared\Payments.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Payments\Payments.Integration\Payments.Integration.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/SmsGateway/">
+    <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Core\SmsGateway.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/StreamFlow/">
+    <Project Path="src\Modules\XFramework.StreamFlow\StreamFlow.Core\StreamFlow.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.StreamFlow\StreamFlow.Domain.Shared\StreamFlow.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.StreamFlow\StreamFlow.Stream\StreamFlow.Stream.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Modules/Wallets/">
+    <Project Path="src\Modules\XFramework.Wallets\Wallets.Api\Wallets.Api.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Wallets\Wallets.Core\Wallets.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Modules\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Presentation/">
+    <Project Path="src\Presentation\ControlPanel\ControlPanel.csproj" Type="Classic C#" />
+    <Project Path="src\Presentation\Fluid\Fluid.csproj" Type="Classic C#" />
+    <Project Path="src\Presentation\Gateway\Gateway.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="src\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" Type="Classic C#" />
+    <Project Path="src\Shared\XFramework.Utilities\XFramework.Utilities.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="src\Tests\SerializerPerfTest\SerializerPerfTest.csproj" Type="Classic C#" />
+  </Folder>
+</Solution>
