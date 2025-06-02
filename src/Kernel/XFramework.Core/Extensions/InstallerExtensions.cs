@@ -154,6 +154,8 @@ public static class InstallerExtensions
         services.AddSingleton(jwtOptions);
 
         // Install JWT Authentication
+        ArgumentException.ThrowIfNullOrEmpty(jwtOptions.Secret);
+        
         services.AddAuthentication(x =>
             {
                 x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

@@ -36,7 +36,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     public List<string> TopicList { get; init; }
     public static Dictionary<Type, string> TypeFriendlyNameCache = new();
 
-    public HubConnectionState ConnectionState => SignalRService.Connection.State;
+    public HubConnectionState ConnectionState => SignalRService.Connection?.State ?? HubConnectionState.Disconnected;
 
     public Action OnReconnected { get; set; }
     public Action OnReconnecting { get; set; }
@@ -53,22 +53,27 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         Configuration = configuration;
         Logger = logger;
 
-        SignalRService.Connection.Reconnected += async (e) => 
+        if (SignalRService.Connection is not null)
         {
-            Logger.LogInformation("Reconnected to SignalR.");
-            OnReconnected?.Invoke();
-        };
-        SignalRService.Connection.Reconnecting += async (e) => 
-        {
-            Logger.LogWarning("Attempting to reconnect to SignalR...");
-            OnReconnecting?.Invoke();
-        };
-        SignalRService.Connection.Closed += async (e) => 
-        {
-            Logger.LogError("Connection to SignalR closed. Attempting to reconnect...");
-            await AttemptReconnect();
-            OnDisconnected?.Invoke();
-        };
+            SignalRService.Connection.Reconnected += (e) =>
+            {
+                Logger.LogInformation("Reconnected to SignalR.");
+                OnReconnected?.Invoke();
+                return Task.CompletedTask;
+            };
+            SignalRService.Connection.Reconnecting += (e) =>
+            {
+                Logger.LogWarning("Attempting to reconnect to SignalR...");
+                OnReconnecting?.Invoke();
+                return Task.CompletedTask;
+            };
+            SignalRService.Connection.Closed += async (e) =>
+            {
+                Logger.LogError("Connection to SignalR closed. Attempting to reconnect...");
+                await AttemptReconnect();
+                OnDisconnected?.Invoke();
+            };
+        }
     }
 
     private async Task AttemptReconnect()

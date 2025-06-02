@@ -43,7 +43,8 @@ public static class XApplication
         app.UseXFrameworkEndpoints();
         app.UseEndpointsInAssembly(app.Environment);
         app.WarmUpServices(builder.Services, ServiceLifetime.Singleton);
-       
+        app.UseHttpsRedirection();
+        
         return app;
     }
     
@@ -88,9 +89,15 @@ public static class XApplication
     {
         (app as WebApplication)!
             .MapRazorComponents<TApp>()
+            .WithStaticAssets()
             .AddInteractiveServerRenderMode();
+
+        (app as WebApplication)!.MapStaticAssets();
       
+        app.UseAntiforgery();
         app.UseStaticFiles();
+        app.UseWebOptimizer();
+        
         return app;
     }
 }
