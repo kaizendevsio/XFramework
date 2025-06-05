@@ -6,4 +6,9 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+      <ProjectReference Include="..\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
+    </ItemGroup>
+
 </Project>
