@@ -7,11 +7,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj"/>
-        <ProjectReference Include="..\..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
-                          OutputItemType="Analyzer"
-                          ReferenceOutputAssembly="false"/>
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+        <ProjectReference Include="..\..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
         <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+        <ProjectReference Include="..\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
     </ItemGroup>
 
 </Project>

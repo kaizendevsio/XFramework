@@ -1,11 +1,9 @@
-﻿using XFramework.Core.Attributes;
+﻿using Inventario.Domain.Shared.Contracts;
+using XFramework.Core.Attributes;
 
 namespace Inventario.Api.Endpoints;
 
-[GenerateEndpoints("XFramework.Domain.Shared.Contracts",new[] {
-    
-    nameof(Tenant),
-    nameof(IdentityContact),
-    nameof(IdentityInformation)
+[GenerateEndpoints("Inventario.Domain.Shared.Contracts",new[] {
+    nameof(Service)
 })]
 public static partial class InventarioEndpoints;
