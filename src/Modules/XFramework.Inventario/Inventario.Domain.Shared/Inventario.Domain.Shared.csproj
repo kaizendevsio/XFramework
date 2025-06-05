@@ -8,6 +8,7 @@
 
     <ItemGroup>
         <Folder Include="BusinessObjects\" />
+        <Folder Include="Contracts\" />
         <Folder Include="Enums\" />
         <Folder Include="Extensions\" />
         <Folder Include="Interfaces\" />
