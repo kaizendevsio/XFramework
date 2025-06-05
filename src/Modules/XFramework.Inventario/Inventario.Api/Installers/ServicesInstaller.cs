@@ -16,7 +16,7 @@ public class ServicesInstaller : IInstaller
         services.AddIdentityServerWrapperServices();
         services.AddTenantWrapperServices();
         services.AddMessagingWrapperServices();
-        //services.AddDecoratorHandlers(typeof(IdentityServerCore).Assembly);
+        services.AddDecoratorHandlers(typeof(InventarioCore).Assembly);
         services.AddTenantService();
         
         services.AddMediatR(o => o.RegisterServicesFromAssemblies(
