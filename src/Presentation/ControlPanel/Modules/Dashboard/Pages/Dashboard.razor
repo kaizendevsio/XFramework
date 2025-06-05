@@ -1,6 +1,56 @@
 ﻿@page "/"
+@using Inventario.Domain.Shared.Contracts
+@using Inventario.Integration.Drivers
+@using XFramework.Domain.Shared.Enums
+@inject IInventarioServiceWrapper InventarioService
+
 <h3>Dashboard</h3>
 
 @code {
-    
+
+    private async Task SampleCall()
+    {
+        // Use Custom Service Endpoint
+        var result1 = await InventarioService.SampleMethod(new()
+        {
+            SomeParameterToPass = null
+        });
+        
+        // Use auto-generated Crud
+        var result2 = await InventarioService.Service.Create(new());
+        
+        var result3 = await InventarioService.Service.Patch(new());
+        
+        var result4 = await InventarioService.Service.Replace(new());
+        
+        var result5 = await InventarioService.Service.Delete(new());
+        
+        var result6 = await InventarioService.Service.Get(Guid.Parse("<Sample Guid>"));
+        
+        var result7 = await InventarioService.Service.GetList(
+            pageSize:50,
+            pageNumber:1,
+            noCache: true,
+            includeNavigations: true,
+            includes: [
+                nameof(Service.SomeNavigation),
+                nameof(Service.SomeMoreNavigation)
+            ],
+            filter: [
+                new()
+                {
+                    PropertyName = nameof(Service.Name),
+                    Operation = QueryFilterOperation.Equal,
+                    Value = "Some Value",
+                    Type = nameof(String)
+                },
+                new()
+                {
+                    PropertyName = nameof(Service.Name),
+                    Operation = QueryFilterOperation.Equal,
+                    Value = "Some Value",
+                    Type = nameof(String)
+                },
+            ]);
+    }
 }

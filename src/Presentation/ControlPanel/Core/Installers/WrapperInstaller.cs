@@ -1,3 +1,5 @@
+using Inventario.Integration.Drivers;
+
 namespace ControlPanel.Core.Installers;
 
 public class WrapperInstaller : IInstaller
@@ -9,5 +11,6 @@ public class WrapperInstaller : IInstaller
     {
         // Install base Blazor Services
         services.InstallBlazorBaseServices(configuration, hostEnvironment);
+        services.AddInventarioWrapperServices();
     }
 }
