@@ -26,7 +26,7 @@ stages:
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
-              version: 8.0.x
+              version: 9.0.x
 
           - task: DotNetCoreCLI@2
             displayName: 'Clean Project'
@@ -49,7 +49,7 @@ stages:
           - task: UseDotNet@2
             displayName: 'Use .NET Core sdk'
             inputs:
-              version: 8.0.x
+              version: 9.0.x
 
           - task: DotNetCoreCLI@2
             displayName: 'Publish Project'
