@@ -12,6 +12,7 @@
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
+        <ProjectReference Include="..\Inventario.Integration\Inventario.Integration.csproj" />
     </ItemGroup>
 
 </Project>
