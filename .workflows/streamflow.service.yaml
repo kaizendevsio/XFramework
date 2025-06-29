@@ -10,13 +10,9 @@ pr: none
 # ─── RUN-TIME CHOICES ──────────────────────────────────────────────────
 parameters:
   # Choose targets when you queue the pipeline.
-  - name: deployToVm
+  - name: deployToProdOnPrem
     type: boolean
     default: false        # keep current behaviour
-
-  - name: deployToAppService
-    type: boolean
-    default: true       # tick this to push to App Service
 
 # ─── VARIABLES ─────────────────────────────────────────────────────────
 variables:
@@ -89,7 +85,7 @@ stages:
   # ─── DEPLOY TO VM (STAGING) ────────────────────────────────────────────
   - stage: DeployToStaging
     displayName: 'Deploy to Staging (VM)'
-    condition: and(succeeded(), eq(${{ parameters.deployToVm }}, true))
+    condition: succeeded()
     dependsOn: BuildAndUpload
     jobs:
       - deployment: DeployStaging
@@ -172,7 +168,7 @@ stages:
 # ─── DEPLOY TO VM (PRODUCTION) ─────────────────────────────────────────
   - stage: DeployToProduction
     displayName: 'Deploy to Production (VM)'
-    condition: and(succeeded(), eq(${{ parameters.deployToVm }}, true))
+    condition: and(succeeded(), eq(${{ parameters.deployToProdOnPrem }}, true))
     dependsOn: DeployToStaging            # keep promotion flow
     jobs:
       - deployment: DeployProduction
@@ -253,7 +249,7 @@ stages:
  # ─── DEPLOY TO APP SERVICE (PRODUCTION) ────────────────────────────────
   - stage: DeployToProductionAppSvc
     displayName: 'Deploy to Production (App Service)'
-    condition: and(succeeded(), eq(${{ parameters.deployToAppService }}, true))
+    condition: succeeded()
     dependsOn: DeployToStaging      
     jobs:
       - deployment: DeployProdAppSvc
