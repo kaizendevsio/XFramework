@@ -65,8 +65,11 @@ stages:
             displayName: 'Publish Project'
             inputs:
               command: publish
+              publishWebProjects: false
               projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
               arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
+              zipAfterPublish: false
+              modifyOutputPath: false
 
           - task: PowerShell@2
             displayName: 'Zip Published Directory'
