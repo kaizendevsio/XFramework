@@ -154,9 +154,20 @@ stages:
                 - task: PowerShell@2
                   displayName: 'Start Service'
                   inputs:
-                    targetType: inline
+                    targetType: 'inline'
                     script: |
-                      sudo systemctl start $(ServiceName).service
+                      $serviceFilePath = "$(ServiceFilePath)"
+
+                      if (Test-Path -Path $serviceFilePath) {
+                          sudo systemctl start $(ServiceName).service
+
+                          if ($?) {
+                              Write-Host "Service started successfully."
+                          } else {
+                              Write-Host "Failed to start the service."
+                              exit 1
+                          }
+                      }
 
 # ─── DEPLOY TO APP SERVICE (STAGING) ───────────────────────────────────
   - stage: DeployToStagingAppSvc
@@ -250,9 +261,20 @@ stages:
                 - task: PowerShell@2
                   displayName: 'Start Service'
                   inputs:
-                  targetType: inline
-                  script: |
-                   sudo systemctl start $(ServiceName).service
+                    targetType: 'inline'
+                    script: |
+                      $serviceFilePath = "$(ServiceFilePath)"
+
+                      if (Test-Path -Path $serviceFilePath) {
+                          sudo systemctl start $(ServiceName).service
+
+                          if ($?) {
+                              Write-Host "Service started successfully."
+                          } else {
+                              Write-Host "Failed to start the service."
+                              exit 1
+                          }
+                      }
               
  # ─── DEPLOY TO APP SERVICE (PRODUCTION) ────────────────────────────────
   - stage: DeployToProductionAppSvc
