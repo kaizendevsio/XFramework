@@ -260,6 +260,7 @@ stages:
         environment:
           name: 'Production'
           tags: 'Production,AppService'
+          resourceType: 'Azure Web App'
         strategy:
           runOnce:
             deploy:
