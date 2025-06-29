@@ -254,7 +254,7 @@ stages:
   - stage: DeployToProductionAppSvc
     displayName: 'Deploy to Production (App Service)'
     condition: and(succeeded(), eq(${{ parameters.deployToAppService }}, true))
-    dependsOn: DeployToStagingAppSvc      # promote after AppSvc staging
+    dependsOn: DeployToStaging      
     jobs:
       - deployment: DeployProdAppSvc
         environment:
