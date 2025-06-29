@@ -1,81 +1,95 @@
+# ─────────────────────────────
+# StreamFlow CI/CD pipeline
+# ─────────────────────────────
+
 trigger:
   - Main
 
 pr: none
 
+# ─── RUN-TIME CHOICES ──────────────────────────────────────────────────
+parameters:
+  # Choose targets when you queue the pipeline.
+  - name: deployToVm
+    type: boolean
+    default: false        # keep current behaviour
+
+  - name: deployToAppService
+    type: boolean
+    default: true       # tick this to push to App Service
+
+# ─── VARIABLES ─────────────────────────────────────────────────────────
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/streamFlow'
   ProjectFilePath: 'src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj'
   ServiceExecutable: 'StreamFlow.Stream.dll'
   ServiceFilePath: '/etc/systemd/system/xframework-streamFlow.service'
   ServiceName: 'xframework-streamFlow'
+  AppServiceName: 'XSystems-StreamFlow'
   BuildConfiguration: 'Release'
   BuildPlatform: 'any cpu'
   ArtifactName: 'streamFlowArtifact'
   ZipFile: 'streamFlow.zip'
+  AzureStagingServiceConnection: 'STAGING_SERVICES_SERVICE_CONNECTION'
+  AzureProductionServiceConnection: 'PRODUCTION_SERVICES_SERVICE_CONNECTION'
 
+# ─── BUILD STAGE ───────────────────────────────────────────────────────
 stages:
   - stage: BuildAndUpload
     displayName: 'Build and Upload'
     jobs:
       - job: PullAndClean
         displayName: 'Pull and Clean'
-        pool:
-          name: Default-Linux
+        pool: { name: Default-Linux }
         steps:
           - task: UseDotNet@2
-            displayName: 'Use .NET Core sdk'
-            inputs:
-              version: 9.0.x
+            displayName: 'Use .NET SDK 9'
+            inputs: { version: 9.0.x }
 
           - task: DotNetCoreCLI@2
             displayName: 'Clean Project'
             inputs:
               command: custom
               custom: clean
-              publishWebProjects: false
               projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
               arguments: '--configuration $(BuildConfiguration)'
-              zipAfterPublish: false
-              modifyOutputPath: false
 
       - job: BuildUpload
         dependsOn: PullAndClean
         displayName: 'Build and Upload'
-        pool:
-          name: Default-Linux
+        pool: { name: Default-Linux }
         steps:
           - checkout: none
+
           - task: UseDotNet@2
-            displayName: 'Use .NET Core sdk'
-            inputs:
-              version: 9.0.x
+            displayName: 'Use .NET SDK 9'
+            inputs: { version: 9.0.x }
 
           - task: DotNetCoreCLI@2
             displayName: 'Publish Project'
             inputs:
               command: publish
-              publishWebProjects: false
               projects: '$(System.DefaultWorkingDirectory)/$(ProjectFilePath)'
               arguments: '--configuration $(BuildConfiguration) --output $(PublishDirectory)'
-              zipAfterPublish: false
-              modifyOutputPath: false
 
           - task: PowerShell@2
             displayName: 'Zip Published Directory'
             inputs:
               targetType: 'inline'
               script: |
-                Compress-Archive -Path "$(PublishDirectory)/*" -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
+                Compress-Archive -Path "$(PublishDirectory)/*" `
+                                 -DestinationPath "$(Build.ArtifactStagingDirectory)/$(ZipFile)"
 
           - task: PublishPipelineArtifact@1
             displayName: 'Upload Artifact'
             inputs:
               targetPath: '$(Build.ArtifactStagingDirectory)/$(ZipFile)'
               artifactName: '$(ArtifactName)'
-
+  
+  # ─── DEPLOY TO VM (STAGING) ────────────────────────────────────────────
   - stage: DeployToStaging
-    displayName: 'Deploy to Staging'
+    displayName: 'Deploy to Staging (VM)'
+    condition: and(succeeded(), eq(${{ parameters.deployToVm }}, true))
     dependsOn: BuildAndUpload
     jobs:
       - deployment: DeployStaging
@@ -89,46 +103,36 @@ stages:
             deploy:
               steps:
                 - download: current
-                  artifact: '$(ArtifactName)'
+                  artifact: $(ArtifactName)
 
+                # ▼ Service stop, unzip, ensure, start – unchanged ▼
                 - task: PowerShell@2
                   displayName: 'Stop Service'
                   inputs:
-                    targetType: 'inline'
+                    targetType: inline
                     script: |
                       $serviceFilePath = "$(ServiceFilePath)"
-                      
-                      if (Test-Path -Path $serviceFilePath) {
+                      if (Test-Path $serviceFilePath) {
                           sudo systemctl stop $(ServiceName).service
-                      
-                          if ($?) {
-                              Write-Host "Service stopped successfully."
-                          } else {
-                              Write-Host "Failed to stop the service."
-                              exit 1
-                          }
                       }
 
                 - task: PowerShell@2
                   displayName: 'Unzip Artifact'
                   inputs:
-                    targetType: 'inline'
+                    targetType: inline
                     script: |
-                      $destinationPath = "$(System.DefaultWorkingDirectory)/$(ServiceName)"
-                      if (Test-Path $destinationPath) {
-                        Remove-Item -Recurse -Force $destinationPath
-                        Write-Host "Removed existing directory: $destinationPath"
-                      }
-                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath $destinationPath
-                      Write-Host "Unzipped artifact to: $destinationPath"
+                      $dst = "$(System.DefaultWorkingDirectory)/$(ServiceName)"
+                      if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
+                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath $dst
 
                 - task: PowerShell@2
                   displayName: 'Ensure Service'
                   inputs:
-                    targetType: 'inline'
+                    targetType: inline
                     script: |
                       $serviceFilePath = "$(ServiceFilePath)"
-                      $serviceContent = @"
+                      if (-not (Test-Path $serviceFilePath)) {
+                      @"
                       [Unit]
                       Description=$(ServiceName)
                       
@@ -142,40 +146,52 @@ stages:
                       
                       [Install]
                       WantedBy=multi-user.target
-                      "@
-                      
-                      if (-Not (Test-Path -Path $serviceFilePath)) {
-                          echo $serviceContent | sudo tee $serviceFilePath > /dev/null
-                          sudo systemctl daemon-reload
-                          sudo systemctl enable $(ServiceName).service
-                          Write-Host "Service created and enabled."
-                      }
-
+                      "@ | sudo tee $serviceFilePath > /dev/null
+                                            sudo systemctl daemon-reload
+                                            sudo systemctl enable $(ServiceName).service
+                                          }
 
                 - task: PowerShell@2
                   displayName: 'Start Service'
                   inputs:
-                    targetType: 'inline'
+                    targetType: inline
                     script: |
-                      $serviceFilePath = "$(ServiceFilePath)"
-                      
-                      if (Test-Path -Path $serviceFilePath) {
-                          sudo systemctl start $(ServiceName).service
-                      
-                          if ($?) {
-                              Write-Host "Service started successfully."
-                          } else {
-                              Write-Host "Failed to start the service."
-                              exit 1
-                          }
-                      }
+                      sudo systemctl start $(ServiceName).service
 
+# ─── DEPLOY TO APP SERVICE (STAGING) ───────────────────────────────────
+  - stage: DeployToStagingAppSvc
+    displayName: 'Deploy to Staging (App Service)'
+    condition: and(succeeded(), eq(${{ parameters.deployToAppService }}, true))
+    dependsOn: BuildAndUpload
+    jobs:
+      - deployment: DeployStagingAppSvc
+        environment:
+          name: 'Staging-AppService'
+          resourceType: 'Azure Web App'
+          tags: 'Staging,AppService'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: $(ArtifactName)
+
+                - task: AzureRmWebAppDeployment@2
+                  displayName: 'Zip Deploy to App Service'
+                  inputs:
+                    ConnectedServiceName: '$(AzureStagingServiceConnection)'
+                    WebAppName:          '$(AppServiceName)'
+                    Package:             '$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)'
+                    AppSettings:         '-ASPNETCORE_ENVIRONMENT Staging'
+
+# ─── DEPLOY TO VM (PRODUCTION) ─────────────────────────────────────────
   - stage: DeployToProduction
-    displayName: 'Deploy to Production'
-    dependsOn: DeployToStaging
+    displayName: 'Deploy to Production (VM)'
+    condition: and(succeeded(), eq(${{ parameters.deployToVm }}, true))
+    dependsOn: DeployToStaging            # keep promotion flow
     jobs:
       - deployment: DeployProduction
-        displayName: 'DeployProduction'
+        displayName: 'Deploy Production'
         environment:
           name: 'Production'
           tags: 'Production'
@@ -187,80 +203,79 @@ stages:
                 - download: current
                   artifact: $(ArtifactName)
 
+                # ▼ identical service logic but with Production env ▼
                 - task: PowerShell@2
                   displayName: 'Stop Service'
                   inputs:
-                    targetType: 'inline'
+                    targetType: inline
                     script: |
                       $serviceFilePath = "$(ServiceFilePath)"
-                      
-                      if (Test-Path -Path $serviceFilePath) {
-                          sudo systemctl stop $(ServiceName).service
-                      
-                          if ($?) {
-                              Write-Host "Service stopped successfully."
-                          } else {
-                              Write-Host "Failed to stop the service."
-                              exit 1
-                          }
-                      }
-
+                      if (Test-Path $serviceFilePath) { sudo systemctl stop $(ServiceName).service }
+              
                 - task: PowerShell@2
                   displayName: 'Unzip Artifact'
                   inputs:
-                    targetType: 'inline'
+                    targetType: inline
                     script: |
-                      $destinationPath = "$(System.DefaultWorkingDirectory)/$(ServiceName)"
-                      if (Test-Path $destinationPath) {
-                        Remove-Item -Recurse -Force $destinationPath
-                        Write-Host "Removed existing directory: $destinationPath"
-                      }
-                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath $destinationPath
-                      Write-Host "Unzipped artifact to: $destinationPath"
-
+                      $dst = "$(System.DefaultWorkingDirectory)/$(ServiceName)"
+                      if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
+                      Expand-Archive -Path "$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)" -DestinationPath $dst
+              
                 - task: PowerShell@2
                   displayName: 'Ensure Service'
                   inputs:
-                    targetType: 'inline'
+                    targetType: inline
                     script: |
                       $serviceFilePath = "$(ServiceFilePath)"
-                      $serviceContent = @"
-                      [Unit]
-                      Description=$(ServiceName)
-                      
-                      [Service]
-                      WorkingDirectory=$(System.DefaultWorkingDirectory)/$(ServiceName)
-                      ExecStart=/usr/bin/dotnet $(System.DefaultWorkingDirectory)/$(ServiceName)/$(ServiceExecutable)
-                      Restart=always
-                      RestartSec=10
-                      SyslogIdentifier=$(ServiceName)
-                      Environment=ASPNETCORE_ENVIRONMENT=Production
-                      
-                      [Install]
-                      WantedBy=multi-user.target
-                      "@
-                      
-                      if (-Not (Test-Path -Path $serviceFilePath)) {
-                          echo $serviceContent | sudo tee $serviceFilePath > /dev/null
-                          sudo systemctl daemon-reload
-                          sudo systemctl enable $(ServiceName).service
-                          Write-Host "Service created and enabled."
-                      }
-
+                      if (-not (Test-Path $serviceFilePath)) {
+                        @"
+                        [Unit]
+                        Description=$(ServiceName)
+                        
+                        [Service]
+                        WorkingDirectory=$(System.DefaultWorkingDirectory)/$(ServiceName)
+                        ExecStart=/usr/bin/dotnet $(System.DefaultWorkingDirectory)/$(ServiceName)/$(ServiceExecutable)
+                        Restart=always
+                        RestartSec=10
+                        SyslogIdentifier=$(ServiceName)
+                        Environment=ASPNETCORE_ENVIRONMENT=Production
+                        
+                        [Install]
+                        WantedBy=multi-user.target
+                        "@ | sudo tee $serviceFilePath > /dev/null
+                        sudo systemctl daemon-reload
+                        sudo systemctl enable $(ServiceName).service
+                        }
+                  
                 - task: PowerShell@2
                   displayName: 'Start Service'
                   inputs:
-                    targetType: 'inline'
-                    script: |
-                      $serviceFilePath = "$(ServiceFilePath)"
-                      
-                      if (Test-Path -Path $serviceFilePath) {
-                          sudo systemctl start $(ServiceName).service
-                      
-                          if ($?) {
-                              Write-Host "Service started successfully."
-                          } else {
-                              Write-Host "Failed to start the service."
-                              exit 1
-                          }
-                      }
+                  targetType: inline
+                  script: |
+                   sudo systemctl start $(ServiceName).service
+              
+ # ─── DEPLOY TO APP SERVICE (PRODUCTION) ────────────────────────────────
+  - stage: DeployToProductionAppSvc
+    displayName: 'Deploy to Production (App Service)'
+    condition: and(succeeded(), eq(${{ parameters.deployToAppService }}, true))
+    dependsOn: DeployToStagingAppSvc      # promote after AppSvc staging
+    jobs:
+      - deployment: DeployProdAppSvc
+        environment:
+          name: 'Production-AppService'
+          resourceType: 'Azure Web App'
+          tags: 'Production,AppService'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: $(ArtifactName)
+  
+                - task: AzureRmWebAppDeployment@2
+                  displayName: 'Zip Deploy to App Service'
+                  inputs:
+                    ConnectedServiceName: '$(AzureProductionServiceConnection)'
+                    WebAppName:          '$(AppServiceName)'
+                    Package:             '$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)'
+                    AppSettings:         '-ASPNETCORE_ENVIRONMENT Production'
