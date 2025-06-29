@@ -169,32 +169,6 @@ stages:
                           }
                       }
 
-# ─── DEPLOY TO APP SERVICE (STAGING) ───────────────────────────────────
-  - stage: DeployToStagingAppSvc
-    displayName: 'Deploy to Staging (App Service)'
-    condition: and(succeeded(), eq(${{ parameters.deployToAppService }}, true))
-    dependsOn: BuildAndUpload
-    jobs:
-      - deployment: DeployStagingAppSvc
-        environment:
-          name: 'Staging-AppService'
-          resourceType: 'Azure Web App'
-          tags: 'Staging,AppService'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: current
-                  artifact: $(ArtifactName)
-
-                - task: AzureRmWebAppDeployment@2
-                  displayName: 'Zip Deploy to App Service'
-                  inputs:
-                    ConnectedServiceName: '$(AzureStagingServiceConnection)'
-                    WebAppName:          '$(AppServiceName)'
-                    Package:             '$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)'
-                    AppSettings:         '-ASPNETCORE_ENVIRONMENT Staging'
-
 # ─── DEPLOY TO VM (PRODUCTION) ─────────────────────────────────────────
   - stage: DeployToProduction
     displayName: 'Deploy to Production (VM)'
@@ -284,8 +258,7 @@ stages:
     jobs:
       - deployment: DeployProdAppSvc
         environment:
-          name: 'Production-AppService'
-          resourceType: 'Azure Web App'
+          name: 'Production'
           tags: 'Production,AppService'
         strategy:
           runOnce:
