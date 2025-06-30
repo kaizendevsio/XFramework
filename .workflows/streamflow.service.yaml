@@ -256,10 +256,7 @@ stages:
     condition: succeeded()
     jobs:
       - deployment: DeployProdAppSvc
-        environment:
-          name: 'Production-AppService'
-          resourceType: 'AzureWebApp'
-          resourceName: $(AppServiceName)
+        environment: 'Production'
         strategy:
           runOnce:
             deploy:
