@@ -257,9 +257,9 @@ stages:
     jobs:
       - deployment: DeployProdAppSvc
         environment:
-          name: 'Production'
-          tags: 'Production'
+          name: 'Production-AppService'
           resourceType: 'Azure Web App'
+          resourceName: $(AppServiceName)
         strategy:
           runOnce:
             deploy:
