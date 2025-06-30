@@ -1,7 +1,20 @@
+# ─────────────────────────────
+# Identity CI/CD pipeline
+# ─────────────────────────────
+
 trigger:
   - Main
 
 pr: none
+
+# ─── RUN-TIME CHOICES ──────────────────────────────────────────────────
+parameters:
+  # Choose targets when you queue the pipeline.
+  - name: deployToProdOnPrem
+    type: boolean
+    default: false        # keep current behaviour
+
+
 
 variables:
   PublishDirectory: '$(Build.ArtifactStagingDirectory)/identity'
@@ -9,10 +22,13 @@ variables:
   ServiceExecutable: 'IdentityServer.Api.dll'
   ServiceFilePath: '/etc/systemd/system/xframework-identity.service'
   ServiceName: 'xframework-identity'
+  AppServiceName: 'XSystems-Identity'
   BuildConfiguration: 'Release'
   BuildPlatform: 'any cpu'
   ArtifactName: 'identityArtifact'
   ZipFile: 'identity.zip'
+  AzureStagingServiceConnection: 'STAGING_SERVICES_SERVICE_CONNECTION'
+  AzureProductionServiceConnection: 'PRODUCTION_SERVICES_SERVICE_CONNECTION'
 
 stages:
   - stage: BuildAndUpload
@@ -24,7 +40,7 @@ stages:
           name: Default-Linux
         steps:
           - task: UseDotNet@2
-            displayName: 'Use .NET Core sdk'
+            displayName: 'Use .NET SDK 9'
             inputs:
               version: 9.0.x
 
@@ -47,7 +63,7 @@ stages:
         steps:
           - checkout: none
           - task: UseDotNet@2
-            displayName: 'Use .NET Core sdk'
+            displayName: 'Use .NET SDK 9'
             inputs:
               version: 9.0.x
 
@@ -171,6 +187,7 @@ stages:
                       }
 
   - stage: DeployToProduction
+    condition: and(succeeded(), eq(${{ parameters.deployToProdOnPrem }}, true))
     displayName: 'Deploy to Production'
     dependsOn: DeployToStaging
     jobs:
@@ -264,3 +281,29 @@ stages:
                               exit 1
                           }
                       }
+# ─── DEPLOY TO APP SERVICE (PRODUCTION) ────────────────────────────────
+  - stage: DeployToProductionAppSvc
+    displayName: 'Deploy to Production (App Service)'
+    dependsOn: DeployToStaging
+    condition: succeeded()
+    jobs:
+      - deployment: DeployProdAppSvc
+        environment: 'Production'
+        pool: { name: Default-Linux }
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: $(ArtifactName)
+                
+                - task: AzureWebApp@1
+                  displayName: 'Azure Web App Deploy: XSystems-Identity'
+                  inputs:
+                    azureSubscription: $(AzureProductionServiceConnection)
+                    appType:          webAppLinux
+                    appName:          $(AppServiceName)
+                    package:          '$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)'
+                    runtimeStack:     'DOTNETCORE|9.0'
+                    startUpCommand:   'dotnet $(ServiceExecutable)'
+
