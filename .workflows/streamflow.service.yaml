@@ -249,16 +249,16 @@ stages:
                           }
                       }
               
- # ─── DEPLOY TO APP SERVICE (PRODUCTION) ────────────────────────────────
+  # ─── DEPLOY TO APP SERVICE (PRODUCTION) ────────────────────────────────
   - stage: DeployToProductionAppSvc
     displayName: 'Deploy to Production (App Service)'
+    dependsOn: DeployToStaging
     condition: succeeded()
-    dependsOn: DeployToStaging      
     jobs:
       - deployment: DeployProdAppSvc
         environment:
           name: 'Production-AppService'
-          resourceType: 'Azure Web App'
+          resourceType: 'AzureWebApp'
           resourceName: $(AppServiceName)
         strategy:
           runOnce:
@@ -266,11 +266,14 @@ stages:
               steps:
                 - download: current
                   artifact: $(ArtifactName)
-  
-                - task: AzureRmWebAppDeployment@2
-                  displayName: 'Zip Deploy to App Service'
+                
+                - task: AzureWebApp@1
+                  displayName: 'Azure Web App Deploy: XSystems-StreamFlow'
                   inputs:
-                    ConnectedServiceName: '$(AzureProductionServiceConnection)'
-                    WebAppName:          '$(AppServiceName)'
-                    Package:             '$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)'
-                    AppSettings:         '-ASPNETCORE_ENVIRONMENT Production'
+                    azureSubscription: $(AzureProductionServiceConnection)
+                    appType:          webAppLinux
+                    appName:          $(AppServiceName)
+                    package:          '$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)'
+                    runtimeStack:     'DOTNETCORE|9.0'
+                    startUpCommand:   'dotnet StreamFlow.Stream.dll'
+
