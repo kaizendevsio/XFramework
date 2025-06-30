@@ -271,9 +271,9 @@ stages:
                   displayName: 'Azure Web App Deploy: XSystems-StreamFlow'
                   inputs:
                     azureSubscription: $(AzureProductionServiceConnection)
-                    appType:          webAppLinux           # or "webApp" for Windows
-                    appName:          $(AppServiceName)     # XSystems-StreamFlow
+                    appType:          webAppLinux
+                    appName:          $(AppServiceName)
                     package:          '$(Pipeline.Workspace)/$(ArtifactName)/$(ZipFile)'
-                    runtimeStack:     'DOTNETCORE|9.0'      # match portal
+                    runtimeStack:     'DOTNETCORE|9.0'
                     startUpCommand:   'dotnet StreamFlow.Stream.dll'
 
