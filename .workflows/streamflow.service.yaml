@@ -257,6 +257,7 @@ stages:
     jobs:
       - deployment: DeployProdAppSvc
         environment: 'Production'
+        pool: { name: Default-Linux }
         strategy:
           runOnce:
             deploy:
