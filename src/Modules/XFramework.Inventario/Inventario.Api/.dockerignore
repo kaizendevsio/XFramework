@@ -1,0 +1,14 @@
+# Ignore files and directories that are not needed in the Docker image
+bin/
+obj/
+.vs/
+.vscode/
+.git/
+.github/
+*.sln
+*.suo
+*.user
+*.log
+*.pdb
+*.nupkg
+appsettings*.Development.json

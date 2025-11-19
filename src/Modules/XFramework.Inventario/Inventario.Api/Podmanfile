@@ -1,0 +1,37 @@
+# Stage 1: Build the application
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Copy the solution file and restore dependencies
+COPY XFramework.sln .
+COPY src/Modules/XFramework.Inventario/Inventario.Api/Inventario.Api.csproj src/Modules/XFramework.Inventario/Inventario.Api/
+COPY src/Modules/XFramework.Inventario/Inventario.Integration/Inventario.Integration.csproj src/Modules/XFramework.Inventario/Inventario.Integration/
+COPY src/Kernel/XFramework.Core/XFramework.Core.csproj src/Kernel/XFramework.Core/
+COPY src/Kernel/XFramework.SourceGenerators/XFramework.SourceGenerators.csproj src/Kernel/XFramework.SourceGenerators/
+COPY src/Modules/XFramework.Messaging/Messaging.Integration/Messaging.Integration.csproj src/Modules/XFramework.Messaging/Messaging.Integration/
+# Add other project references as needed for a successful restore
+# For a full solution build, it's often easier to copy all project files and then restore the solution.
+# However, for specific API projects, explicitly listing dependencies can be more efficient.
+
+RUN dotnet restore "XFramework.sln"
+
+# Copy the rest of the source code
+COPY . .
+
+# Publish the Inventario.Api project
+WORKDIR /src/src/Modules/XFramework.Inventario/Inventario.Api
+RUN dotnet publish "Inventario.Api.csproj" -c Release -o /app/publish --no-restore
+
+# Stage 2: Create the final runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+WORKDIR /app
+
+# Copy the published output from the build stage
+COPY --from=build /app/publish .
+
+# Expose the port the application listens on (default for ASP.NET Core is 80/443)
+EXPOSE 80
+EXPOSE 443
+
+# Set the entry point for the application
+ENTRYPOINT ["dotnet", "Inventario.Api.dll"]

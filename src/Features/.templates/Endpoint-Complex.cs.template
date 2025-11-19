@@ -1,0 +1,74 @@
+namespace Features.{EntityName}.{Action};
+
+/// <summary>
+/// {Action} {EntityName} endpoint
+/// Complex endpoint with inline command logic
+/// </summary>
+public static class Endpoint
+{
+    public record Request(/* Add parameters here */);
+    
+    public record Response(/* Add response properties here */);
+    
+    public static async Task<Results<Ok<Response>, NotFound, BadRequest<string>>> Handle(
+        [AsParameters] Request request,
+        AppDbContext db,
+        ILogger<Endpoint> logger,
+        CancellationToken ct)
+    {
+        // Validation
+        if (/* validation logic */)
+        {
+            return TypedResults.BadRequest("Validation error message");
+        }
+        
+        try
+        {
+            // Business logic here
+            var entity = await db.{EntityName}s
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.Id == request.Id, ct);
+            
+            if (entity == null)
+            {
+                return TypedResults.NotFound();
+            }
+            
+            // Process entity
+            // ...
+            
+            await db.SaveChangesAsync(ct);
+            
+            logger.LogInformation(
+                "{Action} {EntityName} {Id} completed successfully",
+                nameof({Action}),
+                nameof({EntityName}),
+                entity.Id);
+            
+            var response = new Response(/* map from entity */);
+            return TypedResults.Ok(response);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error {Action} {EntityName}", nameof({Action}), nameof({EntityName}));
+            return TypedResults.BadRequest("An error occurred");
+        }
+    }
+    
+    public static void MapEndpoint(IEndpointRouteBuilder app)
+    {
+        app.Map{HttpMethod}("/api/{route}", Handle)
+           .WithName("{Action}{EntityName}")
+           .WithTags("{EntityName}")
+           .RequireAuthorization();
+    }
+}
+
+// Instructions:
+// 1. Replace {EntityName} with your entity name (e.g., Product)
+// 2. Replace {Action} with your action name (e.g., Get, Create, Update, Delete)
+// 3. Replace {HttpMethod} with appropriate method (Get, Post, Put, Patch, Delete)
+// 4. Replace {route} with your route (e.g., products/{id})
+// 5. Add request/response properties
+// 6. Implement validation and business logic
+// 7. Delete these instructions

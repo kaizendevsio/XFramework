@@ -1,0 +1,49 @@
+namespace Features.{EntityName}.{Action};
+
+/// <summary>
+/// {Action} {EntityName} endpoint
+/// Simple endpoint that delegates to service layer
+/// </summary>
+public static class Endpoint
+{
+    public record Request(/* Add parameters here */);
+    
+    public record Response(/* Add response properties here */);
+    
+    public static async Task<Results<Ok<Response>, NotFound, BadRequest>> Handle(
+        [AsParameters] Request request,
+        {EntityName}Service service,
+        CancellationToken ct)
+    {
+        // Call service method
+        var result = await service.{Action}Async(/* parameters */, ct);
+        
+        if (!result.IsSuccess)
+        {
+            return TypedResults.BadRequest();
+        }
+        
+        // Map to response DTO
+        var response = new Response(/* map from result.Data */);
+        
+        return TypedResults.Ok(response);
+    }
+    
+    public static void MapEndpoint(IEndpointRouteBuilder app)
+    {
+        app.Map{HttpMethod}("/api/{route}", Handle)
+           .WithName("{Action}{EntityName}")
+           .WithTags("{EntityName}")
+           .RequireAuthorization();
+           // .CacheOutput(policy => policy.Expire(TimeSpan.FromMinutes(5))); // Add for GET operations
+    }
+}
+
+// Instructions:
+// 1. Replace {EntityName} with your entity name (e.g., Product)
+// 2. Replace {Action} with your action name (e.g., Get, Create, Update, Delete)
+// 3. Replace {HttpMethod} with appropriate method (Get, Post, Put, Patch, Delete)
+// 4. Replace {route} with your route (e.g., products/{id})
+// 5. Add request/response properties
+// 6. Implement Handle logic
+// 7. Delete these instructions
