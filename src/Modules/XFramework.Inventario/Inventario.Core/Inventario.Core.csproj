@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
@@ -8,6 +8,13 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
+      <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+      <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
     </ItemGroup>
 
 </Project>

@@ -13,6 +13,11 @@
                           ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
         <ProjectReference Include="..\Inventario.Integration\Inventario.Integration.csproj" />
+        <ProjectReference Include="..\Inventario.Core\Inventario.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
     </ItemGroup>
 
 </Project>
