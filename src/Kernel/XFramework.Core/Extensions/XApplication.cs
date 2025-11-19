@@ -37,13 +37,34 @@ public static class XApplication
     public static IApplicationBuilder Build(this WebApplicationBuilder builder)
     {
         var app = builder.Build();
+        
+        // Custom middleware (headers, etc.)
         app.UseCustomMiddleware();
+        
+        // Standard middleware (exception handling, HTTPS, CORS, routing, auth)
         app.UseStandardMiddleware();
+        
+        // Response compression (must come BEFORE output caching)
+        app.UseConfiguredResponseCompression();
+        
+        // Output caching (caches compressed responses)
+        app.UseConfiguredOutputCaching();
+        
+        // API Documentation
         app.UseConfiguredSwagger();
+        
+        // Health check endpoints
+        app.UseXFrameworkHealthChecks();
+        
+        // Application endpoints
         app.UseXFrameworkEndpoints();
         app.UseEndpointsInAssembly(app.Environment);
+        
+        // Warm up singleton services
         app.WarmUpServices(builder.Services, ServiceLifetime.Singleton);
-        app.UseHttpsRedirection();
+        
+        // HTTPS redirection (moved to UseStandardMiddleware for proper ordering)
+        // app.UseHttpsRedirection(); // Already in UseStandardMiddleware
         
         return app;
     }
