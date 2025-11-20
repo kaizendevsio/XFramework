@@ -557,18 +557,123 @@ app.MapGeneratedEndpoints();  // Or equivalent registration call
 3. Verify user has required roles (if `Roles` specified)
 4. Check authentication scheme matches configuration
 
+## Auto-Discovery Integration
+
+### The Complete Pipeline
+
+The `[GenerateEndpoints]` attribute is the starting point of a fully automated pipeline:
+
+1. **Attribute Application** → You apply `[GenerateEndpoints]` to entity
+2. **Source Generation** → Generators create service and endpoint code
+3. **Auto-Discovery** → Extensions automatically register everything
+4. **Runtime** → Application runs with zero manual configuration
+
+### Auto-Discovery Behavior
+
+When you apply `[GenerateEndpoints]`, the auto-discovery system will:
+
+✅ **Automatically Find**: Generated endpoint classes ending with "Endpoints"
+✅ **Automatically Map**: Invoke `Map*Endpoints()` methods
+✅ **Automatically Register**: Service interface/implementation pairs
+✅ **Zero Configuration**: Works immediately without manual registration
+
+### Using Auto-Discovery
+
+Instead of manual registration:
+
+```csharp
+// ❌ OLD WAY: Manual registration required
+app.MapProductEndpoints();
+app.MapOrderEndpoints();
+// ... one call per entity
+```
+
+Use auto-discovery in `Program.cs`:
+
+```csharp
+// ✅ NEW WAY: Single call discovers all
+using XFramework.Core.Extensions;
+
+// Auto-register all generated services
+builder.Services.AddGeneratedServices();
+
+// Auto-map all generated endpoints
+app.MapGeneratedEndpoints();
+```
+
+### Complete Example with Auto-Discovery
+
+```csharp
+// 1. Apply attribute to entity
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.All,
+    RoutePrefix = "api/products"
+)]
+public partial class Product : BaseEntity
+{
+    public string Name { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+}
+
+// 2. Update Program.cs ONCE (works for all entities)
+using XFramework.Core.Extensions;
+
+var builder = XApplication.Configure<Program>();
+
+// Auto-discover services
+builder.Services.AddGeneratedServices();
+
+var app = (WebApplication)builder.Build();
+
+// Auto-discover endpoints
+app.MapGeneratedEndpoints();
+
+app.Run();
+
+// 3. That's it! No manual registration needed.
+//    When you add a new entity with [GenerateEndpoints],
+//    it automatically appears without touching Program.cs.
+```
+
+### Opt-Out When Needed
+
+For special cases requiring manual control, exclude from auto-discovery:
+
+```csharp
+using XFramework.Core.Attributes;
+
+[GenerateEndpoints(...)]
+[ExcludeFromAutoDiscovery("Requires custom authorization setup")]
+public partial class AdminEntity : BaseEntity
+{
+    // This will be generated but NOT auto-discovered
+    // You must manually register it
+}
+
+// Then in Program.cs:
+app.MapGeneratedEndpoints(); // Discovers all others
+app.MapEndpoint<AdminEntityEndpoints>(); // Manual for excluded
+```
+
 ## Next Steps
 
 After defining attributes:
 
-1. **Phase 5.2**: Implement `EntityServiceGenerator` to consume these attributes
-2. **Phase 5.3**: Implement `EntityEndpointGenerator` for REST endpoints
-3. **Phase 5.4**: Create `MapGeneratedEndpoints()` extension method
-4. **Testing**: Add integration tests for generated code
-5. **Migration**: Apply attributes to existing entities
+1. **✅ Phase 5.2**: `EntityServiceGenerator` - Completed
+2. **✅ Phase 5.3**: `EntityEndpointGenerator` - Completed
+3. **✅ Phase 5.4**: Auto-Discovery & Registration - Completed
+4. **Phase 5.5**: Testing - Add integration tests for generated code
+5. **Phase 5.6**: Migration - Apply to all existing entities
+
+**Ready to use the full pipeline!** See:
+- [Auto-Discovery Guide](./auto-discovery-guide.md) - Complete usage documentation
+- [Migration Guide](./migration-to-auto-discovery.md) - Migrate existing projects
 
 ## Related Documentation
 
+- [Auto-Discovery Guide](./auto-discovery-guide.md) - Automatic registration system
+- [Migration Guide](./migration-to-auto-discovery.md) - Migrating to auto-discovery
 - [VSA Architecture Guide](../architecture/vsa-guide.md)
 - [Source Generators Overview](../source-generators/overview.md)
 - [Caching Strategy](../caching-strategy.md)
@@ -576,6 +681,6 @@ After defining attributes:
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: 2025-11-20  
-**Phase**: 5.1 - Attribute Definition
+**Version**: 1.1
+**Last Updated**: 2025-11-20
+**Phase**: 5.4 - Auto-Discovery & Registration (Updated)
