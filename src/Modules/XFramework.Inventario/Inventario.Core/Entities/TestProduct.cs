@@ -7,8 +7,10 @@ namespace XFramework.Inventario.Core.Entities;
 /// This entity has all CRUD operations enabled.
 /// </summary>
 [GenerateEndpoints(
-    Type = EndpointType.Service,
+    Type = EndpointType.Both,
     Actions = EndpointActions.All,
+    RoutePrefix = "api/testproducts",
+    RequireAuthorization = true,
     CacheDurationSeconds = 600,
     CacheKeyPrefix = "testproducts"
 )]
