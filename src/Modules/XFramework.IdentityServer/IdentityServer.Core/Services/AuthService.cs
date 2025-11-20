@@ -7,6 +7,7 @@ using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using Messaging.Domain.Shared;
 using Messaging.Integration.Drivers;
+using XFramework.Core.Loggers;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -67,17 +68,13 @@ public class AuthService : IAuthService
             _dbContext.IdentityCredentials.Add(request.Model);
             await _dbContext.SaveChangesAsync(ct);
 
-            _logger.LogInformation(
-                "Credential created. CredentialId: {CredentialId}, Username: {Username}",
-                request.Model.Id, request.Model.UserName);
+            _logger.EntityCreated("IdentityCredential", request.Model.Id);
 
             return Result<IdentityCredential>.Success(request.Model);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, 
-                "Error creating credential for username: {Username}", 
-                request.Model.UserName);
+            _logger.OperationFailed("CreateCredential", "IdentityCredential", Guid.Empty, ex.Message, ex);
             return Result<IdentityCredential>.Failure(
                 "An error occurred while creating the credential", 500);
         }
@@ -105,17 +102,13 @@ public class AuthService : IAuthService
             
             await _dbContext.SaveChangesAsync(ct);
 
-            _logger.LogInformation(
-                "Credential updated. CredentialId: {CredentialId}",
-                credential.Id);
+            _logger.EntityUpdated("IdentityCredential", credential.Id);
 
             return Result<IdentityCredential>.Success(credential);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, 
-                "Error updating credential: {CredentialId}", 
-                request.Model.Id);
+            _logger.OperationFailed("UpdateCredential", "IdentityCredential", request.Model.Id, ex.Message, ex);
             return Result<IdentityCredential>.Failure(
                 "An error occurred while updating the credential", 500);
         }
@@ -130,13 +123,13 @@ public class AuthService : IAuthService
         {
             if (request.CreadentialId == Guid.Empty)
             {
-                _logger.LogWarning("Attempt to reset password with a null or empty identifier");
+                _logger.ValidationFailed("ChangePassword", "Identifier is required");
                 return Result.Failure("Identifier is required", 400);
             }
 
             if (string.IsNullOrWhiteSpace(request.NewPassword))
             {
-                _logger.LogWarning("Attempt to reset password with a null or empty password");
+                _logger.ValidationFailed("ChangePassword", "Password is required");
                 return Result.Failure("Password is required", 400);
             }
 
@@ -148,7 +141,7 @@ public class AuthService : IAuthService
 
             if (credential == null)
             {
-                _logger.LogWarning("Credential with ID {CredentialId} not found", request.CreadentialId);
+                _logger.EntityNotFound("IdentityCredential", request.CreadentialId);
                 return Result.NotFound("User not found");
             }
 
@@ -165,9 +158,7 @@ public class AuthService : IAuthService
 
                 if (verification == null)
                 {
-                    _logger.LogWarning(
-                        "Invalid verification code or expired for credential {CredentialId}", 
-                        request.CreadentialId);
+                    _logger.TokenValidationFailed(request.CreadentialId, "Invalid verification code or expired");
                     return Result.NotFound("Invalid verification code or expired");
                 }
             }
@@ -179,24 +170,18 @@ public class AuthService : IAuthService
 
             await _dbContext.SaveChangesAsync(ct);
 
-            _logger.LogInformation(
-                "Password changed successfully for credential {CredentialId}", 
-                request.CreadentialId);
+            _logger.PasswordChanged(request.CreadentialId);
 
             return Result.Success("Password reset request successful");
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            _logger.LogError(ex, 
-                "Concurrency conflict occurred while resetting password for credential {CredentialId}", 
-                request.CreadentialId);
+            _logger.ConcurrencyConflict("IdentityCredential", request.CreadentialId);
             return Result.Failure("A concurrency conflict occurred, please try again", 409);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, 
-                "Error occurred while resetting password for credential {CredentialId}", 
-                request.CreadentialId);
+            _logger.OperationFailed("ChangePassword", "IdentityCredential", request.CreadentialId, ex.Message, ex);
             return Result.Failure("An error occurred while processing your request", 500);
         }
     }
@@ -210,13 +195,13 @@ public class AuthService : IAuthService
         {
             if (string.IsNullOrEmpty(request.Password))
             {
-                _logger.LogWarning("Attempt to verify password with a null or empty password");
+                _logger.ValidationFailed("VerifyPassword", "Password is required");
                 return Result<bool>.Failure("Please provide a valid password", 400);
             }
 
             if (request.CredentialId == Guid.Empty)
             {
-                _logger.LogWarning("Attempt to verify password with an empty identifier");
+                _logger.ValidationFailed("VerifyPassword", "Identifier is required");
                 return Result<bool>.Failure("An error occurred while processing your request", 400);
             }
 
@@ -225,7 +210,7 @@ public class AuthService : IAuthService
 
             if (user == null)
             {
-                _logger.LogWarning("User not found with identifier {Identifier}", request.CredentialId);
+                _logger.EntityNotFound("IdentityCredential", request.CredentialId);
                 return Result<bool>.NotFound("User not found");
             }
 
@@ -236,21 +221,15 @@ public class AuthService : IAuthService
 
             if (!isPasswordValid)
             {
-                _logger.LogWarning("Invalid password for user with identifier {Identifier}", request.CredentialId);
+                _logger.TokenValidationFailed(request.CredentialId, "Invalid password");
                 return Result<bool>.Failure("Invalid password", 400);
             }
-
-            _logger.LogInformation(
-                "Password verification successful for user with identifier {Identifier}", 
-                request.CredentialId);
 
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, 
-                "An error occurred while verifying password for user with identifier {Identifier}", 
-                request.CredentialId);
+            _logger.OperationFailed("VerifyPassword", "IdentityCredential", request.CredentialId, ex.Message, ex);
             return Result<bool>.Failure("An error occurred while processing your request", 500);
         }
     }
@@ -370,9 +349,7 @@ public class AuthService : IAuthService
 
             await _dbContext.SaveChangesAsync(ct);
 
-            _logger.LogInformation(
-                "Identity authenticated. CredentialId: {CredentialId}, SessionId: {SessionId}",
-                credential.Id, token.SessionId);
+            _logger.UserAuthenticated(credential.Id, request.Metadata.IpAddress);
 
             return Result<AuthenticateIdentityResponse>.Success(
                 new AuthenticateIdentityResponse
@@ -386,9 +363,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
-                "Error authenticating identity. UserName: {UserName}",
-                request.UserName);
+            _logger.OperationFailed("Authenticate", "IdentityCredential", Guid.Empty, ex.Message, ex);
             return Result<AuthenticateIdentityResponse>.Failure(
                 "An error occurred during authentication", 500);
         }
@@ -496,9 +471,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
-                "Error creating verification for credential: {CredentialId}",
-                request.Model.CredentialId);
+            _logger.OperationFailed("CreateVerification", "IdentityVerification", Guid.Empty, ex.Message, ex);
             return Result<IdentityVerification>.Failure(
                 "An error occurred while creating verification", 500);
         }
@@ -528,17 +501,13 @@ public class AuthService : IAuthService
 
             await _dbContext.SaveChangesAsync(ct);
 
-            _logger.LogInformation(
-                "Verification approved. VerificationId: {VerificationId}",
-                verification.Id);
+            _logger.EntityUpdated("IdentityVerification", verification.Id);
 
             return Result<IdentityVerification>.Success(verification);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
-                "Error updating verification with token: {Token}",
-                request.Model.Token);
+            _logger.OperationFailed("UpdateVerification", "IdentityVerification", Guid.Empty, ex.Message, ex);
             return Result<IdentityVerification>.Failure(
                 "An error occurred while updating verification", 500);
         }
@@ -614,9 +583,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
-                "Error checking verification for credential: {CredentialId}",
-                request.CredentialId);
+            _logger.OperationFailed("CheckVerification", "IdentityVerification", Guid.Empty, ex.Message, ex);
             return Result<CheckVerificationResponse>.Failure(
                 "An error occurred while checking verification", 500);
         }
@@ -697,17 +664,13 @@ public class AuthService : IAuthService
             _dbContext.StorageFiles.Add(request.Model);
             await _dbContext.SaveChangesAsync(ct);
 
-            _logger.LogInformation(
-                "File uploaded successfully. FileId: {FileId}, Path: {Path}",
-                request.Model.Id, request.Model.ContentPath);
+            _logger.EntityCreated("StorageFile", request.Model.Id);
 
             return Result<StorageFile>.Success(request.Model);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
-                "Error uploading file. Path: {Path}",
-                request.Model.ContentPath);
+            _logger.OperationFailed("UploadFile", "StorageFile", Guid.Empty, ex.Message, ex);
             return Result<StorageFile>.Failure(
                 "An error occurred while uploading the file", 500);
         }

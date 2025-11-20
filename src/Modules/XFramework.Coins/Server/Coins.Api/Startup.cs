@@ -43,6 +43,9 @@ namespace Coins.Api
 
             app.UseCors(x => x.AllowAnyOrigin().AllowAnyHeader());
 
+            // Add correlation ID middleware early in the pipeline for request tracing
+            app.UseMiddleware<XFramework.Core.Middlewares.CorrelationIdMiddleware>();
+
             app.UseStaticFiles();
             
             app.UseHttpsRedirection();

@@ -3,6 +3,7 @@ using IdentityServer.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Loggers;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts;
@@ -56,8 +57,7 @@ public class WalletService : IWalletService
 
             if (walletType is null)
             {
-                _logger.LogWarning("Error creating wallet. Wallet type not found, wallet type ID {WalletTypeId} credential ID {CredentialId}",
-                    walletTypeId, credentialId);
+                _logger.EntityNotFound("WalletType", walletTypeId);
                 return Result<Wallet>.Failure("Wallet type not found", 404);
             }
 
@@ -90,14 +90,13 @@ public class WalletService : IWalletService
             _dbContext.Set<Wallet>().Add(wallet);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Wallet created successfully. WalletId: {WalletId}, CredentialId: {CredentialId}",
-                wallet.Id, credentialId);
+            _logger.EntityCreated("Wallet", wallet.Id);
 
             return Result<Wallet>.Success(wallet);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating wallet for CredentialId: {CredentialId}", credentialId);
+            _logger.OperationFailed("CreateWallet", "Wallet", Guid.Empty, ex.Message, ex);
             return Result<Wallet>.Failure("An error occurred while creating the wallet", 500);
         }
     }
@@ -125,7 +124,7 @@ public class WalletService : IWalletService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving wallet. WalletId: {WalletId}", walletId);
+            _logger.OperationFailed("GetWallet", "Wallet", walletId, ex.Message, ex);
             return Result<Wallet>.Failure("An error occurred while retrieving the wallet", 500);
         }
     }
@@ -148,7 +147,7 @@ public class WalletService : IWalletService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving wallets for CredentialId: {CredentialId}", credentialId);
+            _logger.OperationFailed("GetWalletsByCredential", "Wallet", Guid.Empty, ex.Message, ex);
             return Result<List<Wallet>>.Failure("An error occurred while retrieving wallets", 500);
         }
     }
@@ -164,8 +163,7 @@ public class WalletService : IWalletService
 
             if (request.TotalAmount <= 0)
             {
-                _logger.LogWarning("Invalid increment amount for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}",
-                    request.WalletId, request.WalletTypeId, request.CredentialId);
+                _logger.ValidationFailed("IncrementWallet", "Invalid increment amount");
                 return Result.Failure("Invalid increment amount", 400);
             }
 
@@ -192,8 +190,7 @@ public class WalletService : IWalletService
 
                     if (!createResult.IsSuccess)
                     {
-                        _logger.LogWarning("Error creating wallet for wallet type ID {WalletTypeId}, credential ID {CredentialId}",
-                            request.WalletTypeId, request.CredentialId);
+                        _logger.OperationFailed("AutoCreateWallet", "Wallet", Guid.Empty, "Wallet creation failed during increment");
                         return Result.Failure("Error creating wallet", 500);
                     }
 
@@ -201,8 +198,7 @@ public class WalletService : IWalletService
                 }
                 else
                 {
-                    _logger.LogWarning("Wallet not found for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}",
-                        request.WalletId, request.WalletTypeId, request.CredentialId);
+                    _logger.EntityNotFound("Wallet", request.WalletId);
                     return Result.NotFound("Wallet not found");
                 }
             }
@@ -210,14 +206,14 @@ public class WalletService : IWalletService
             // Validate min transfer rule
             if (wallet.MinTransferRule.HasValue && request.TotalAmount < wallet.MinTransferRule.Value)
             {
-                _logger.LogWarning("Amount is below the minimum transferable amount for Wallet ID {WalletId}", wallet.Id);
+                _logger.BusinessRuleViolation("IncrementWallet", $"Amount {request.TotalAmount} below minimum {wallet.MinTransferRule.Value}");
                 return Result.Failure($"Amount must be at least {wallet.MinTransferRule.Value}", 400);
             }
 
             // Validate max transfer rule
             if (wallet.MaxTransferRule.HasValue && request.TotalAmount > wallet.MaxTransferRule.Value)
             {
-                _logger.LogWarning("Amount exceeds the maximum transferable amount for Wallet ID {WalletId}", wallet.Id);
+                _logger.BusinessRuleViolation("IncrementWallet", $"Amount {request.TotalAmount} exceeds maximum {wallet.MaxTransferRule.Value}");
                 return Result.Failure($"Amount must not exceed {wallet.MaxTransferRule.Value}", 400);
             }
 
@@ -241,7 +237,7 @@ public class WalletService : IWalletService
             // Validate maintaining balance rule
             if (wallet.MaintainingBalanceRule.HasValue && wallet.Balance < wallet.MaintainingBalanceRule.Value)
             {
-                _logger.LogWarning("Incrementing would violate maintaining balance rule for Wallet ID {WalletId}", wallet.Id);
+                _logger.BusinessRuleViolation("IncrementWallet", $"Balance {wallet.Balance} below maintaining rule {wallet.MaintainingBalanceRule.Value}");
                 return Result.Failure($"Balance after increment must not drop below {wallet.MaintainingBalanceRule.Value}", 400);
             }
 
@@ -273,17 +269,18 @@ public class WalletService : IWalletService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Wallet balance incremented successfully for Wallet ID {WalletId}", wallet.Id);
+            _logger.WalletIncremented(wallet.Id, request.TotalAmount, "Primary", wallet.Balance);
+            _logger.TransactionCreated(transaction.Id, wallet.Id, "Credit", request.TotalAmount);
             return Result.Success();
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            _logger.LogError(ex, "Concurrency conflict occurred while incrementing wallet balance for Wallet ID {WalletId}", request.WalletId);
+            _logger.ConcurrencyConflict("Wallet", request.WalletId);
             return Result.Failure("A concurrency conflict occurred, please try again", 409);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while incrementing wallet balance for Wallet ID {WalletId}", request.WalletId);
+            _logger.OperationFailed("IncrementWallet", "Wallet", request.WalletId, ex.Message, ex);
             return Result.Failure("An error occurred while processing your request", 500);
         }
     }
@@ -299,8 +296,7 @@ public class WalletService : IWalletService
 
             if (request.TotalAmount <= 0)
             {
-                _logger.LogWarning("Invalid decrement amount for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}",
-                    request.WalletId, request.WalletTypeId, request.CredentialId);
+                _logger.ValidationFailed("DecrementWallet", "Invalid decrement amount");
                 return Result.Failure("Invalid decrement amount", 400);
             }
 
@@ -315,15 +311,14 @@ public class WalletService : IWalletService
 
             if (wallet == null)
             {
-                _logger.LogWarning("Wallet not found for wallet ID {WalletId}, wallet type ID {WalletTypeId}, credential ID {CredentialId}",
-                    request.WalletId, request.WalletTypeId, request.CredentialId);
+                _logger.EntityNotFound("Wallet", request.WalletId);
                 return Result.NotFound("Wallet not found");
             }
 
             // Check sufficient balance
             if (wallet.AvailableBalance < request.TotalAmount)
             {
-                _logger.LogWarning("Insufficient funds for decrement for Wallet ID {WalletId}", wallet.Id);
+                _logger.InsufficientBalance(wallet.Id, request.TotalAmount, wallet.AvailableBalance);
                 return Result.Failure("Insufficient funds", 400);
             }
 
@@ -347,7 +342,7 @@ public class WalletService : IWalletService
             // Validate maintaining balance rule
             if (wallet.MaintainingBalanceRule.HasValue && wallet.Balance < wallet.MaintainingBalanceRule.Value)
             {
-                _logger.LogWarning("Decrementing would violate maintaining balance rule for Wallet ID {WalletId}", wallet.Id);
+                _logger.BusinessRuleViolation("DecrementWallet", $"Balance {wallet.Balance} below maintaining rule {wallet.MaintainingBalanceRule.Value}");
                 return Result.Failure($"Balance after decrement must not drop below {wallet.MaintainingBalanceRule.Value}", 400);
             }
 
@@ -379,17 +374,18 @@ public class WalletService : IWalletService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Wallet balance decremented successfully for Wallet ID {WalletId}", wallet.Id);
+            _logger.WalletDecremented(wallet.Id, request.TotalAmount, "Primary", wallet.Balance);
+            _logger.TransactionCreated(transaction.Id, wallet.Id, "Debit", request.TotalAmount);
             return Result.Success();
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            _logger.LogError(ex, "Concurrency conflict occurred while decrementing wallet balance for Wallet ID {WalletId}", request.WalletId);
+            _logger.ConcurrencyConflict("Wallet", request.WalletId);
             return Result.Failure("A concurrency conflict occurred, please try again", 409);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while decrementing wallet balance for Wallet ID {WalletId}", request.WalletId);
+            _logger.OperationFailed("DecrementWallet", "Wallet", request.WalletId, ex.Message, ex);
             return Result.Failure("An error occurred while processing your request", 500);
         }
     }
@@ -406,16 +402,14 @@ public class WalletService : IWalletService
             // Validate amount and fee
             if (request.TotalAmount <= 0 || request.Fee < 0)
             {
-                _logger.LogWarning("Invalid amount or fee while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.ValidationFailed("TransferWallet", "Invalid amount or fee");
                 return Result.Failure("Invalid amount or fee", 400);
             }
 
             // Validate wallet type ID
             if (request.WalletTypeId == Guid.Empty)
             {
-                _logger.LogWarning("Wallet type ID is required while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.ValidationFailed("TransferWallet", "Wallet type ID is required");
                 return Result.Failure("Wallet type ID is required", 400);
             }
 
@@ -454,22 +448,19 @@ public class WalletService : IWalletService
 
             if (senderUser.HttpStatusCode != HttpStatusCode.OK)
             {
-                _logger.LogWarning("Sender not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.EntityNotFound("Sender", request.CredentialId);
                 return Result.NotFound("Sender not found");
             }
 
             if (recipientUser.HttpStatusCode != HttpStatusCode.OK)
             {
-                _logger.LogWarning("Recipient not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.EntityNotFound("Recipient", request.RecipientCredentialId);
                 return Result.NotFound("Recipient not found");
             }
 
             if (senderWallet == null)
             {
-                _logger.LogWarning("Sender wallet not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.EntityNotFound("SenderWallet", Guid.Empty);
                 return Result.NotFound("Wallet not found");
             }
 
@@ -485,8 +476,7 @@ public class WalletService : IWalletService
 
                 if (!createResult.IsSuccess)
                 {
-                    _logger.LogWarning("Recipient wallet not found and could not be created while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                        request.CredentialId, request.RecipientCredentialId);
+                    _logger.OperationFailed("AutoCreateRecipientWallet", "Wallet", Guid.Empty, "Recipient wallet creation failed during transfer");
                     return Result.Failure("Recipient wallet not found and could not be created", 404);
                 }
 
@@ -496,8 +486,7 @@ public class WalletService : IWalletService
             // Check for self-transfer
             if (request.CredentialId == request.RecipientCredentialId)
             {
-                _logger.LogWarning("Cannot transfer to the same wallet while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.BusinessRuleViolation("TransferWallet", "Cannot transfer to the same wallet");
                 return Result.Failure("Cannot transfer to the same wallet", 400);
             }
 
@@ -516,15 +505,13 @@ public class WalletService : IWalletService
 
                 if (transferDeductionTypeConfig is null)
                 {
-                    _logger.LogWarning("Transfer deduction type configuration not found while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                        request.CredentialId, request.RecipientCredentialId);
+                    _logger.ValidationFailed("TransferWallet", "Transfer deduction type configuration not found");
                     return Result.Failure("Transfer deduction type configuration not found", 400);
                 }
 
                 if (!Enum.TryParse<TransferDeductionType>(transferDeductionTypeConfig.Value, out var transferDeductionTypeFromConfig))
                 {
-                    _logger.LogWarning("Invalid transfer deduction type configuration while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                        request.CredentialId, request.RecipientCredentialId);
+                    _logger.ValidationFailed("TransferWallet", "Invalid transfer deduction type configuration");
                     return Result.Failure("Invalid transfer deduction type configuration", 400);
                 }
 
@@ -553,64 +540,56 @@ public class WalletService : IWalletService
             // Validate sender has enough balance
             if (senderWallet.Balance < totalDecrement)
             {
-                _logger.LogWarning("Insufficient balance while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.InsufficientBalance(senderWallet.Id, totalDecrement, senderWallet.Balance);
                 return Result.Failure("Insufficient balance", 400);
             }
 
             // Validate transferable balance
             if (request.TotalAmount > senderWallet.TransferableBalance)
             {
-                _logger.LogWarning("Amount exceeds transferable balance while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.BusinessRuleViolation("TransferWallet", "Amount exceeds transferable balance");
                 return Result.Failure("Amount exceeds transferable balance", 400);
             }
 
             // Validate min transfer rule
             if (request.TotalAmount < senderWallet.MinTransferRule)
             {
-                _logger.LogWarning("Amount is below the minimum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.BusinessRuleViolation("TransferWallet", $"Amount {request.TotalAmount} below sender minimum {senderWallet.MinTransferRule}");
                 return Result.Failure($"Amount must be at least {senderWallet.MinTransferRule}", 400);
             }
 
             // Validate max transfer rule
             if (request.TotalAmount > senderWallet.MaxTransferRule)
             {
-                _logger.LogWarning("Amount exceeds the maximum transferable amount while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.BusinessRuleViolation("TransferWallet", $"Amount {request.TotalAmount} exceeds sender maximum {senderWallet.MaxTransferRule}");
                 return Result.Failure($"Amount must not exceed {senderWallet.MaxTransferRule}", 400);
             }
 
             // Validate bond balance rule
             if (senderWallet.BondBalanceRule.HasValue && request.TotalAmount > senderWallet.BondBalanceRule)
             {
-                _logger.LogWarning("Amount exceeds the bond balance rule while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.BusinessRuleViolation("TransferWallet", $"Amount {request.TotalAmount} exceeds bond balance {senderWallet.BondBalanceRule}");
                 return Result.Failure($"Amount must not exceed {senderWallet.BondBalanceRule}", 400);
             }
 
             // Validate maintaining balance rule
             if (senderWallet.MaintainingBalanceRule.HasValue && senderWallet.Balance - totalDecrement < senderWallet.MaintainingBalanceRule)
             {
-                _logger.LogWarning("Amount exceeds the maintaining balance rule while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.BusinessRuleViolation("TransferWallet", $"Transfer violates maintaining balance {senderWallet.MaintainingBalanceRule}");
                 return Result.Failure($"Balance after transfer must not drop below {senderWallet.MaintainingBalanceRule}", 400);
             }
 
             // Validate recipient wallet min transfer rule
             if (request.TotalAmount < recipientWallet.MinTransferRule)
             {
-                _logger.LogWarning("Amount is below the minimum transferable amount for recipient while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.BusinessRuleViolation("TransferWallet", $"Amount {request.TotalAmount} below recipient minimum {recipientWallet.MinTransferRule}");
                 return Result.Failure($"Amount must be at least {recipientWallet.MinTransferRule}", 400);
             }
 
             // Validate recipient wallet max transfer rule
             if (request.TotalAmount > recipientWallet.MaxTransferRule)
             {
-                _logger.LogWarning("Amount exceeds the maximum transferable amount for recipient while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                    request.CredentialId, request.RecipientCredentialId);
+                _logger.BusinessRuleViolation("TransferWallet", $"Amount {request.TotalAmount} exceeds recipient maximum {recipientWallet.MaxTransferRule}");
                 return Result.Failure($"Amount must not exceed {recipientWallet.MaxTransferRule}", 400);
             }
 
@@ -714,21 +693,17 @@ public class WalletService : IWalletService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Wallet transfer from {SenderCredentialId} to {RecipientCredentialId} was successful",
-                request.CredentialId, request.RecipientCredentialId);
-
+            _logger.WalletTransfer(senderWallet.Id, recipientWallet.Id, request.TotalAmount, "Primary");
             return Result.Success();
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            _logger.LogError(ex, "Concurrency conflict occurred while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                request.CredentialId, request.RecipientCredentialId);
+            _logger.ConcurrencyConflict("WalletTransfer", Guid.Empty);
             return Result.Failure("A concurrency conflict occurred, please try again", 409);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while transferring wallet from {SenderCredentialId} to {RecipientCredentialId}",
-                request.CredentialId, request.RecipientCredentialId);
+            _logger.OperationFailed("TransferWallet", "Wallet", Guid.Empty, ex.Message, ex);
             return Result.Failure("An error occurred while processing your request", 500);
         }
     }
@@ -745,14 +720,14 @@ public class WalletService : IWalletService
             // Validate amount and fees
             if (request.TotalAmount <= 0 || request.Fee < 0)
             {
-                _logger.LogWarning("Invalid amount or fee while converting wallet for {CredentialId}", request.CredentialId);
+                _logger.ValidationFailed("ConvertWallet", "Invalid amount or fee");
                 return Result.Failure("Invalid amount or fee", 400);
             }
 
             // Validate wallet type IDs
             if (request.SourceWalletTypeId == Guid.Empty || request.TargetWalletTypeId == Guid.Empty)
             {
-                _logger.LogWarning("Source and target wallet type IDs are required for converting wallet for {CredentialId}", request.CredentialId);
+                _logger.ValidationFailed("ConvertWallet", "Source and target wallet type IDs are required");
                 return Result.Failure("Source and target wallet type IDs are required", 400);
             }
 
@@ -767,7 +742,7 @@ public class WalletService : IWalletService
 
             if (sourceWallet == null)
             {
-                _logger.LogWarning("Source wallet not found for converting wallet for {CredentialId}", request.CredentialId);
+                _logger.EntityNotFound("SourceWallet", Guid.Empty);
                 return Result.NotFound("Source wallet not found");
             }
 
@@ -791,7 +766,7 @@ public class WalletService : IWalletService
 
                 if (!createResult.IsSuccess)
                 {
-                    _logger.LogWarning("Target wallet could not be created for converting wallet for {CredentialId}", request.CredentialId);
+                    _logger.OperationFailed("AutoCreateTargetWallet", "Wallet", Guid.Empty, "Target wallet creation failed during conversion");
                     return Result.Failure("Target wallet could not be created", 500);
                 }
 
@@ -813,13 +788,13 @@ public class WalletService : IWalletService
 
                 if (transferDeductionTypeConfig is null)
                 {
-                    _logger.LogWarning("Transfer deduction type configuration not found for converting wallet for {CredentialId}", request.CredentialId);
+                    _logger.ValidationFailed("ConvertWallet", "Transfer deduction type configuration not found");
                     return Result.Failure("Transfer deduction type configuration not found", 400);
                 }
 
                 if (!Enum.TryParse<TransferDeductionType>(transferDeductionTypeConfig.Value, out var transferDeductionTypeFromConfig))
                 {
-                    _logger.LogWarning("Invalid transfer deduction type configuration for converting wallet for {CredentialId}", request.CredentialId);
+                    _logger.ValidationFailed("ConvertWallet", "Invalid transfer deduction type configuration");
                     return Result.Failure("Invalid transfer deduction type configuration", 400);
                 }
 
@@ -848,7 +823,7 @@ public class WalletService : IWalletService
             // Validate source wallet has enough balance
             if (sourceWallet.Balance < totalDecrement)
             {
-                _logger.LogWarning("Insufficient balance in source wallet for converting wallet for {CredentialId}", request.CredentialId);
+                _logger.InsufficientBalance(sourceWallet.Id, totalDecrement, sourceWallet.Balance);
                 return Result.Failure("Insufficient balance", 400);
             }
 
@@ -924,17 +899,17 @@ public class WalletService : IWalletService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Wallet type conversion successful for {CredentialId}", request.CredentialId);
+            _logger.OperationCompleted("ConvertWallet", (DateTime.UtcNow - DateTime.UtcNow).Milliseconds);
             return Result.Success();
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            _logger.LogError(ex, "Concurrency conflict occurred while converting wallet for {CredentialId}", request.CredentialId);
+            _logger.ConcurrencyConflict("WalletConversion", Guid.Empty);
             return Result.Failure("A concurrency conflict occurred, please try again", 409);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while converting wallet for {CredentialId}", request.CredentialId);
+            _logger.OperationFailed("ConvertWallet", "Wallet", Guid.Empty, ex.Message, ex);
             return Result.Failure("An error occurred while processing your request", 500);
         }
     }
@@ -954,13 +929,13 @@ public class WalletService : IWalletService
 
             if (transaction == null)
             {
-                _logger.LogInformation("Transaction with Id {Id} not found", request.Id);
+                _logger.EntityNotFound("WalletTransaction", request.Id);
                 return Result.NotFound("Transaction not found");
             }
 
             if (!transaction.Held)
             {
-                _logger.LogInformation("Transaction with Id {Id} is not on hold", request.Id);
+                _logger.BusinessRuleViolation("ReleaseTransaction", "Transaction is not on hold");
                 return Result.Failure("Transaction is not on hold", 400);
             }
 
@@ -991,17 +966,17 @@ public class WalletService : IWalletService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Transaction with Id {Id} released successfully", request.Id);
+            _logger.OperationCompleted("ReleaseTransaction", 0);
             return Result.Success();
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            _logger.LogError(ex, "A concurrency conflict occurred while releasing transaction with Id {Id}", request.Id);
+            _logger.ConcurrencyConflict("WalletTransaction", request.Id);
             return Result.Failure("A concurrency conflict occurred, please try again", 409);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while releasing transaction with Id {Id}", request.Id);
+            _logger.OperationFailed("ReleaseTransaction", "WalletTransaction", request.Id, ex.Message, ex);
             return Result.Failure("An error occurred while processing your request", 500);
         }
     }

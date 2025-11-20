@@ -8,6 +8,7 @@ using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Integration.Abstractions.Wrappers;
+using XFramework.Core.Loggers;
 
 namespace SmsGateway.Core.Services;
 
@@ -66,8 +67,7 @@ public class SmsService : ISmsService
                 
                 if (retryCount >= maxRetries)
                 {
-                    _logger.LogError("Failed to confirm message sent after {RetryCount} attempts, reason: {Reason}",
-                        retryCount, result.Message);
+                    _logger.SmsConfirmationFailed(retryCount, result.Message);
                     return Result<CmdResponse>.Failure(
                         $"Failed to confirm message after {maxRetries} retry attempts",
                         500
@@ -75,8 +75,7 @@ public class SmsService : ISmsService
                 }
 
                 await Task.Delay(1500, CancellationToken.None);
-                _logger.LogWarning("Failed to confirm message sent, reason: {Reason}, retry count: {RetryCount}", 
-                    result.Message, retryCount);
+                _logger.SmsConfirmationRetrying(result.Message, retryCount);
                 goto retry;
             }
 
@@ -86,7 +85,7 @@ public class SmsService : ISmsService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error confirming message sent for ID: {Id}", id);
+            _logger.SmsConfirmationError(id, ex);
             return Result<CmdResponse>.Failure($"Error confirming message: {ex.Message}", 500);
         }
     }
@@ -117,18 +116,16 @@ public class SmsService : ISmsService
 
                     if (result.IsSuccess is false)
                     {
-                        _logger.LogWarning("Failed to create message received record, reason: {Reason}", result.Message);
+                        _logger.SmsMessageReceivedCreationFailed(result.Message);
                     }
                     else
                     {
-                        _logger.LogInformation("Message received record created successfully for AgentClusterId: {AgentClusterId}",
-                            request.AgentClusterId);
+                        _logger.SmsMessageReceivedCreated(request.AgentClusterId);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error in background task creating message received for AgentClusterId: {AgentClusterId}", 
-                        request.AgentClusterId);
+                    _logger.SmsMessageReceivedBackgroundError(request.AgentClusterId, ex);
                 }
             }, CancellationToken.None);
 
@@ -140,8 +137,7 @@ public class SmsService : ISmsService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating message received for AgentClusterId: {AgentClusterId}",
-                request.AgentClusterId);
+            _logger.SmsCreateMessageReceivedError(request.AgentClusterId, ex);
             return Result<CmdResponse>.Failure($"Error creating message received: {ex.Message}", 500);
         }
     }
@@ -174,8 +170,7 @@ public class SmsService : ISmsService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating SMS message for AgentClusterId: {AgentClusterId}",
-                request.AgentClusterId);
+            _logger.SmsCreateMessageError(request.AgentClusterId, ex);
             return Result<CmdResponse>.Failure($"Error creating SMS message: {ex.Message}", 500);
         }
     }
@@ -196,8 +191,7 @@ public class SmsService : ISmsService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting pending SMS messages for AgentClusterId: {AgentClusterId}",
-                request.AgentClusterId);
+            _logger.SmsGetPendingError(request.AgentClusterId, ex);
             return Result<List<SmsNodeJob>>.Failure($"Error getting pending SMS messages: {ex.Message}", 500);
         }
     }
@@ -218,8 +212,7 @@ public class SmsService : ISmsService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting scheduled SMS messages for AgentClusterId: {AgentClusterId}",
-                request.AgentClusterId);
+            _logger.SmsGetScheduledError(request.AgentClusterId, ex);
             return Result<List<SmsNodeJob>>.Failure($"Error getting scheduled SMS messages: {ex.Message}", 500);
         }
     }

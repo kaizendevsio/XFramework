@@ -1,6 +1,11 @@
 using XFramework.Extensions;
+using XFramework.Core.Extensions;
 
-XApplication
+var app = XApplication
     .Build<Program>()
-    .GenerateMinimalApi()
-    .Run();
+    .GenerateMinimalApi();
+
+// Add correlation ID middleware early in the pipeline for request tracing
+app.UseCorrelationId();
+
+app.Run();

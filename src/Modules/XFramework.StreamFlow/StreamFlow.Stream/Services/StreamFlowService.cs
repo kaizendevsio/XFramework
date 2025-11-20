@@ -9,6 +9,7 @@ using StreamFlow.Stream.Hubs;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Configurations;
 using StreamFlow.Core.Services;
+using XFramework.Core.Loggers;
 
 namespace StreamFlow.Stream.Services;
 
@@ -47,8 +48,7 @@ public class StreamFlowService : IStreamFlowService
         var client = _cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == context.ConnectionId);
         if (client.Value == null)
         {
-            _logger.LogWarning("Unknown or unauthorized client detected. ConnectionId: {ConnectionId}",
-                context.ConnectionId);
+            _logger.StreamFlowClientUnauthorized(context.ConnectionId);
             
             await _hubContext.Clients.Client(context.ConnectionId)
                 .SendAsync("TelemetryCall", "Client Unknown or Unauthorized", cancellationToken);
@@ -64,8 +64,7 @@ public class StreamFlowService : IStreamFlowService
                 case MessageExchangeType.FanOut:
                     await _hubContext.Clients.All.SendAsync(message.CommandName, message,
                         cancellationToken: cancellationToken);
-                    _logger.LogInformation("FanOut message sent. RequestId: {RequestId}, Sender: {SenderName}",
-                        message.RequestId, client.Value.Name);
+                    _logger.StreamFlowFanOutSent(message.RequestId, client.Value.Name);
                     break;
 
                 case MessageExchangeType.Direct:
@@ -75,8 +74,7 @@ public class StreamFlowService : IStreamFlowService
                 case MessageExchangeType.Topic:
                     await _hubContext.Clients.Group(message.Topic)
                         .SendAsync(message.CommandName, message, cancellationToken: cancellationToken);
-                    _logger.LogInformation("Topic message sent. RequestId: {RequestId}, Topic: {Topic}, Sender: {SenderName}",
-                        message.RequestId, message.Topic, client.Value.Name);
+                    _logger.StreamFlowTopicSent(message.RequestId, message.Topic, client.Value.Name);
                     break;
 
                 default:
@@ -88,7 +86,7 @@ public class StreamFlowService : IStreamFlowService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error pushing message. RequestId: {RequestId}", message.RequestId);
+            _logger.StreamFlowPushError(message.RequestId, ex);
             return Result.Failure("An error occurred processing the message", 500);
         }
     }
@@ -126,18 +124,14 @@ public class StreamFlowService : IStreamFlowService
 
         if (!added)
         {
-            _logger.LogError(
-                "Failed to register client after {MaxAttempts} attempts. ConnectionId: {ConnectionId}, ClientId: {ClientId}",
-                maxAttempts, context.ConnectionId, client.Id);
+            _logger.StreamFlowClientRegistrationFailed(maxAttempts, context.ConnectionId, client.Id);
             return Result.Failure("Failed to register client", 500);
         }
 
         RememberClient(client, context);
 
         var transportType = context.Features.Get<IHttpTransportFeature>()?.TransportType.ToString() ?? "Unknown";
-        _logger.LogInformation(
-            "Client registered. ConnectionId: {ConnectionId}, ClientId: {ClientId}, Transport: {TransportType}, Name: {ClientName}",
-            context.ConnectionId, client.Id, transportType, client.Name);
+        _logger.StreamFlowClientRegistered(context.ConnectionId, client.Id, transportType, client.Name);
 
         return Result.Success("Client registered successfully");
     }
@@ -159,7 +153,7 @@ public class StreamFlowService : IStreamFlowService
 
             if (!queued)
             {
-                _logger.LogWarning("Failed to queue method call. RequestId: {RequestId}", message.RequestId);
+                _logger.StreamFlowMethodCallQueueFailed(message.RequestId);
                 return Result<StreamFlowInvokeResponse>.Failure("Failed to queue method call", 500);
             }
 
@@ -170,7 +164,7 @@ public class StreamFlowService : IStreamFlowService
 
             if (completedTask != responseTask)
             {
-                _logger.LogWarning("Method invocation timed out. RequestId: {RequestId}", message.RequestId);
+                _logger.StreamFlowMethodInvocationTimeout(message.RequestId);
                 return Result<StreamFlowInvokeResponse>.Failure("Method invocation timed out", 408);
             }
 
@@ -187,7 +181,7 @@ public class StreamFlowService : IStreamFlowService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error invoking method. RequestId: {RequestId}", message.RequestId);
+            _logger.StreamFlowMethodInvocationError(message.RequestId, ex);
             return Result<StreamFlowInvokeResponse>.Failure("An error occurred invoking the method", 500);
         }
     }
@@ -203,13 +197,13 @@ public class StreamFlowService : IStreamFlowService
             // Find the waiting TaskCompletionSource and complete it
             // Note: The actual TCS lookup and completion would be done by the processor
             // For now, we just log the response received
-            _logger.LogInformation("Method response received. RequestId: {RequestId}", message.RequestId);
+            _logger.StreamFlowMethodResponseReceived(message.RequestId);
 
             return Result.Success("Response received");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing method response. RequestId: {RequestId}", message.RequestId);
+            _logger.StreamFlowMethodResponseError(message.RequestId, ex);
             return Result.Failure("An error occurred processing the response", 500);
         }
     }
@@ -224,7 +218,7 @@ public class StreamFlowService : IStreamFlowService
         // This method can be used to trigger immediate delivery of queued messages
         // for the newly connected client
         
-        _logger.LogDebug("Dequeue request for client. ClientId: {ClientId}", client.Id);
+        _logger.StreamFlowDequeueRequest(client.Id);
         
         // The StreamFlowProcessor continuously processes the message queue
         // Messages for this client will be delivered when the processor finds them
@@ -261,9 +255,8 @@ public class StreamFlowService : IStreamFlowService
         if (currentClient != null)
         {
             // Client is online, deliver immediately
-            _logger.LogInformation(
-                "Direct message sent. ExchangeType: {ExchangeType}, RequestId: {RequestId}, Sender: {SenderName} -> Recipient: {RecipientName}, Status: {StatusCode}",
-                message.ExchangeType, message.RequestId, sender.Name, currentClient.Name, message.ResponseStatusCode);
+            _logger.StreamFlowDirectSent(message.ExchangeType.ToString(), message.RequestId,
+                sender.Name, currentClient.Name, message.ResponseStatusCode);
 
             await _hubContext.Clients.Client(currentClient.StreamId)
                 .SendAsync(message.CommandName, message, cancellationToken);
@@ -273,17 +266,13 @@ public class StreamFlowService : IStreamFlowService
         // Client is not online - check if known and queue if enabled
         if (_cachingService.AbsoluteClients.All(x => x.Value.Id != message.RecipientId))
         {
-            _logger.LogWarning(
-                "Invalid recipient for message. RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}",
-                message.RequestId, sender.Name, message.RecipientId);
+            _logger.StreamFlowInvalidRecipient(message.RequestId, sender.Name, message.RecipientId);
             return;
         }
 
         if (!_configuration.QueueMessages)
         {
-            _logger.LogInformation(
-                "Message queueing disabled. Message dropped. RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}",
-                message.RequestId, sender.Name, message.RecipientId);
+            _logger.StreamFlowMessageQueuingDisabled(message.RequestId, sender.Name, message.RecipientId);
             return;
         }
 
@@ -294,22 +283,16 @@ public class StreamFlowService : IStreamFlowService
 
             if (queued)
             {
-                _logger.LogInformation(
-                    "Message queued for offline recipient. RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}",
-                    message.RequestId, sender.Name, message.RecipientId);
+                _logger.StreamFlowMessageQueued(message.RequestId, sender.Name, message.RecipientId);
             }
             else
             {
-                _logger.LogWarning(
-                    "Failed to queue message (channel closed). RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}",
-                    message.RequestId, sender.Name, message.RecipientId);
+                _logger.StreamFlowMessageQueueFailed(message.RequestId, sender.Name, message.RecipientId);
             }
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation(
-                "Message queueing cancelled. RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}",
-                message.RequestId, sender.Name, message.RecipientId);
+            _logger.StreamFlowMessageQueueCancelled(message.RequestId, sender.Name, message.RecipientId);
         }
     }
 
@@ -345,8 +328,7 @@ public class StreamFlowService : IStreamFlowService
 
             if (attempts >= maxAttempts)
             {
-                _logger.LogWarning("Failed to cache latest client after {MaxAttempts} attempts. ClientId: {ClientId}",
-                    maxAttempts, selectedClient.Id);
+                _logger.StreamFlowClientCacheFailed(maxAttempts, selectedClient.Id);
             }
         }
         else
@@ -387,8 +369,7 @@ public class StreamFlowService : IStreamFlowService
 
             if (addAttempts >= maxAddAttempts)
             {
-                _logger.LogWarning("Failed to update latest client cache after {MaxAttempts} attempts. ClientId: {ClientId}",
-                    maxAddAttempts, selectedClient.Id);
+                _logger.StreamFlowClientCacheUpdateFailed(maxAddAttempts, selectedClient.Id);
             }
         }
 
@@ -433,13 +414,11 @@ public class StreamFlowService : IStreamFlowService
 
             if (added)
             {
-                _logger.LogDebug("Client added to absolute clients. ClientId: {ClientId}", client.Id);
+                _logger.StreamFlowClientAddedToAbsolute(client.Id);
             }
             else
             {
-                _logger.LogWarning(
-                    "Failed to add client to absolute clients after {MaxAttempts} attempts. ClientId: {ClientId}",
-                    maxAttempts, client.Id);
+                _logger.StreamFlowAbsoluteClientAddFailed(maxAttempts, client.Id);
             }
         }
         else
@@ -450,7 +429,7 @@ public class StreamFlowService : IStreamFlowService
             {
                 existingClient.Value.StreamId = context.ConnectionId;
                 existingClient.Value.ConnectedAt = DateTime.UtcNow;
-                _logger.LogDebug("Updated connection ID for existing client. ClientId: {ClientId}", client.Id);
+                _logger.StreamFlowClientConnectionUpdated(client.Id);
             }
         }
     }

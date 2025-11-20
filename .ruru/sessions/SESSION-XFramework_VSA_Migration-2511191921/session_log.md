@@ -1077,3 +1077,64 @@ app.MapGeneratedEndpoints(); // 🎯 Automatic!
 - **Reduction**: ~95% less boilerplate for new entities
 
 **Next**: Phase 5.5 - Final testing and validation (optional documentation)
+## 2025-11-20T16:14:30Z - 🚀 PHASE 6 INITIATED: Observability & Polish
+**Action**: Starting Phase 6 - Observability (Weeks 13-14 of original plan)
+**Focus**: Structured logging, OpenTelemetry, health checks, documentation
+**First Task**: Phase 6.1 - Structured Logging with LoggerMessage Source Generators
+
+## 2025-11-20T16:15:00Z - Phase 6.1: Structured Logging Task Created
+**Action**: Created comprehensive MDTM task for structured logging implementation
+**Task ID**: TASK-PHASE6-1-STRUCTURED-LOGGING-20251120-161430
+**Path**: `.ruru/tasks/PHASE6_Observability/TASK-PHASE6-1-STRUCTURED-LOGGING-20251120-161430.md`
+**Scope**: Implement high-performance structured logging using LoggerMessage source generators
+**Complexity**: Moderate
+**Estimated Effort**: 4-6 hours
+**Key Deliverables**:
+  - Centralized LogMessages.cs with LoggerMessage attributes
+  - Standard templates for CRUD, errors, performance, cache operations
+  - CorrelationIdMiddleware for request tracing
+  - Apply to all 8 service modules (7 backend + Inventario)
+  - Serilog configuration with enrichers
+  - Logging standards documentation
+**Goal**: 3-5x faster logging with zero allocations, consistent structured data across all services
+**Status**: Pending delegation to util-senior-dev
+## 2025-11-20T16:51:00Z - 🎉 PHASE 6.1 COMPLETE: Structured Logging
+**Status**: 🟢 Done (100%)
+**Delegated To**: util-senior-dev  
+**Task ID**: TASK-PHASE6-1-STRUCTURED-LOGGING-20251120-161430
+**Duration**: ~35 minutes (2 iterations)
+**Files Created**: 3 (LogMessages.cs, CorrelationIdMiddleware, logging-standards.md)
+**Files Modified**: 40+ (9 services + 8 module configs + 7 Program.cs files)
+**Build Status**: ✅ 0 errors, 2.46s build time
+**Runtime Verified**: ✅ X-Correlation-ID header confirmed (3e6927e1-2767-4504-aad2-c1fcdae97a3b)
+
+**Key Achievements**:
+- Created centralized LogMessages.cs (770+ lines total, 100+ structured log methods)
+- Event ID ranges: 1000-12999 across 13 categories
+- Created CorrelationIdMiddleware (89 lines) for distributed tracing
+- Updated ALL 9 services with structured logging:
+  - ProductService ✅
+  - WalletService + BatchWalletService ✅
+  - AuthService ✅ (security events)
+  - StreamFlowService ✅ (23 new methods)
+  - SmsService ✅ (10 new methods)
+  - MessagingService ✅ (7 new methods)
+  - CommunityService ✅ (11 new methods)
+  - BlockchainService ✅
+- Configured Serilog for ALL 8 modules (appsettings.json)
+- Registered CorrelationIdMiddleware in ALL 8 modules (Program.cs)
+- Created comprehensive logging-standards.md (394 lines)
+
+**Performance Benefits**:
+- Zero-allocation logging (3-5x faster expected)
+- Compile-time safety via source generators
+- Structured JSON output for production
+- Correlation IDs for distributed tracing
+
+**Documentation**:
+- Event ID conventions by category
+- Log level guidelines
+- Security considerations (data masking)
+- Troubleshooting guide
+
+**Next**: Phase 6.2 - OpenTelemetry (will integrate with structured logs)

@@ -10,6 +10,7 @@ using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Enums;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Services.Helpers;
+using XFramework.Core.Loggers;
 
 namespace Messaging.Core.Services;
 
@@ -42,7 +43,7 @@ public class MessagingService(
             {
                 if (configuration?.Value == null)
                 {
-                    logger.LogError("Agent cluster id not found for tenant {TenantId}", tenant.Id);
+                    logger.MessagingAgentClusterNotFound(tenant.Id);
                     return Result<CmdResponse>.Failure("Agent cluster id not found");
                 }
                 agentClusterId = configuration.Value;
@@ -78,17 +79,17 @@ public class MessagingService(
                 case MessageTransportType.Email:
                 case MessageTransportType.Push:
                 case MessageTransportType.Webhook:
-                    logger.LogWarning("Message transport type {Type} not implemented", request.MessageTransportType);
+                    logger.MessagingTransportNotImplemented(request.MessageTransportType.ToString());
                     return Result<CmdResponse>.Failure($"Message transport type {request.MessageTransportType} not implemented");
                 
                 default:
-                    logger.LogError("Unknown message transport type: {Type}", request.MessageTransportType);
+                    logger.MessagingUnknownTransportType(request.MessageTransportType.ToString());
                     return Result<CmdResponse>.Failure($"Unknown message transport type: {request.MessageTransportType}");
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error creating direct message for recipient {Recipient}", request.Recipient);
+            logger.MessagingCreateDirectError(request.Recipient, ex);
             return Result<CmdResponse>.Failure($"Error creating direct message: {ex.Message}");
         }
     }
@@ -105,7 +106,7 @@ public class MessagingService(
 
             if (agent is null)
             {
-                logger.LogWarning("Agent cluster id {AgentClusterId} not found", request.AgentClusterId);
+                logger.MessagingAgentClusterIdNotFound(request.AgentClusterId);
                 return Result<CmdResponse>.Failure("Agent cluster id not found");
             }
             
@@ -116,7 +117,7 @@ public class MessagingService(
             
             if (record is null)
             {
-                logger.LogWarning("Message {MessageId} not found for agent {AgentClusterId}", request.Id, request.AgentClusterId);
+                logger.MessagingMessageNotFound(request.Id, request.AgentClusterId);
                 return Result<CmdResponse>.Failure("Message not found");
             }
             
@@ -135,7 +136,7 @@ public class MessagingService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error updating message {MessageId}", request.Id);
+            logger.MessagingUpdateError(request.Id, ex);
             return Result<CmdResponse>.Failure($"Error updating message: {ex.Message}");
         }
     }

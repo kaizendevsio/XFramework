@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Loggers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Enums;
@@ -53,9 +54,7 @@ public class BatchWalletService : IBatchWalletService
                     $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.", 400);
             }
 
-            _logger.LogInformation(
-                "Starting batch increment operation for {Count} items, TenantId: {TenantId}, AllowPartialSuccess: {AllowPartialSuccess}",
-                requests.Count, tenantId, allowPartialSuccess);
+            _logger.BatchWalletOperationStarted("Increment", requests.Count);
 
             // Start transaction
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -214,28 +213,27 @@ public class BatchWalletService : IBatchWalletService
                 result.FailureCount = result.Errors.Count;
                 result.Duration = stopwatch.Elapsed;
 
-                _logger.LogInformation(
-                    "Batch increment completed: {Success}/{Total} succeeded in {Duration}ms",
-                    result.SuccessCount, result.TotalProcessed, result.Duration.TotalMilliseconds);
+                _logger.BatchWalletOperationCompleted("Increment", result.SuccessCount, result.TotalProcessed);
+                _logger.OperationCompleted("BatchIncrement", stopwatch.ElapsedMilliseconds);
 
                 return Result<BatchOperationResult>.Success(result);
             }
             catch (DbUpdateConcurrencyException ex)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "Concurrency conflict during batch increment");
+                _logger.ConcurrencyConflict("BatchWalletIncrement", Guid.Empty);
                 return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "Batch increment failed");
+                _logger.OperationFailed("BatchIncrement", "Wallet", Guid.Empty, ex.Message, ex);
                 return Result<BatchOperationResult>.Failure($"Batch operation failed: {ex.Message}", 500);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in batch increment");
+            _logger.OperationFailed("BatchIncrement", "Wallet", Guid.Empty, ex.Message, ex);
             return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
         }
     }
@@ -264,9 +262,7 @@ public class BatchWalletService : IBatchWalletService
                     $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.", 400);
             }
 
-            _logger.LogInformation(
-                "Starting batch decrement operation for {Count} items, TenantId: {TenantId}, AllowPartialSuccess: {AllowPartialSuccess}",
-                requests.Count, tenantId, allowPartialSuccess);
+            _logger.BatchWalletOperationStarted("Decrement", requests.Count);
 
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -394,28 +390,27 @@ public class BatchWalletService : IBatchWalletService
                 result.FailureCount = result.Errors.Count;
                 result.Duration = stopwatch.Elapsed;
 
-                _logger.LogInformation(
-                    "Batch decrement completed: {Success}/{Total} succeeded in {Duration}ms",
-                    result.SuccessCount, result.TotalProcessed, result.Duration.TotalMilliseconds);
+                _logger.BatchWalletOperationCompleted("Decrement", result.SuccessCount, result.TotalProcessed);
+                _logger.OperationCompleted("BatchDecrement", stopwatch.ElapsedMilliseconds);
 
                 return Result<BatchOperationResult>.Success(result);
             }
             catch (DbUpdateConcurrencyException ex)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "Concurrency conflict during batch decrement");
+                _logger.ConcurrencyConflict("BatchWalletDecrement", Guid.Empty);
                 return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "Batch decrement failed");
+                _logger.OperationFailed("BatchDecrement", "Wallet", Guid.Empty, ex.Message, ex);
                 return Result<BatchOperationResult>.Failure($"Batch operation failed: {ex.Message}", 500);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in batch decrement");
+            _logger.OperationFailed("BatchDecrement", "Wallet", Guid.Empty, ex.Message, ex);
             return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
         }
     }
@@ -444,9 +439,7 @@ public class BatchWalletService : IBatchWalletService
                     $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.", 400);
             }
 
-            _logger.LogInformation(
-                "Starting batch transfer operation for {Count} items, TenantId: {TenantId}, AllowPartialSuccess: {AllowPartialSuccess}",
-                requests.Count, tenantId, allowPartialSuccess);
+            _logger.BatchWalletOperationStarted("Transfer", requests.Count);
 
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -616,28 +609,27 @@ public class BatchWalletService : IBatchWalletService
                 result.FailureCount = result.Errors.Count;
                 result.Duration = stopwatch.Elapsed;
 
-                _logger.LogInformation(
-                    "Batch transfer completed: {Success}/{Total} succeeded in {Duration}ms",
-                    result.SuccessCount, result.TotalProcessed, result.Duration.TotalMilliseconds);
+                _logger.BatchWalletOperationCompleted("Transfer", result.SuccessCount, result.TotalProcessed);
+                _logger.OperationCompleted("BatchTransfer", stopwatch.ElapsedMilliseconds);
 
                 return Result<BatchOperationResult>.Success(result);
             }
             catch (DbUpdateConcurrencyException ex)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "Concurrency conflict during batch transfer");
+                _logger.ConcurrencyConflict("BatchWalletTransfer", Guid.Empty);
                 return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "Batch transfer failed");
+                _logger.OperationFailed("BatchTransfer", "Wallet", Guid.Empty, ex.Message, ex);
                 return Result<BatchOperationResult>.Failure($"Batch operation failed: {ex.Message}", 500);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in batch transfer");
+            _logger.OperationFailed("BatchTransfer", "Wallet", Guid.Empty, ex.Message, ex);
             return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
         }
     }
@@ -664,9 +656,7 @@ public class BatchWalletService : IBatchWalletService
                     $"Batch size exceeds maximum allowed ({MaxBatchSize}). Please split into smaller batches.", 400);
             }
 
-            _logger.LogInformation(
-                "Starting ProcessTransactionsAsync for {Count} transactions, TenantId: {TenantId}",
-                transactions.Count, tenantId);
+            _logger.BatchWalletOperationStarted("ProcessTransactions", transactions.Count);
 
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -682,28 +672,26 @@ public class BatchWalletService : IBatchWalletService
                 result.FailureCount = 0;
                 result.Duration = stopwatch.Elapsed;
 
-                _logger.LogInformation(
-                    "ProcessTransactionsAsync completed: {Count} transactions in {Duration}ms",
-                    transactions.Count, result.Duration.TotalMilliseconds);
+                _logger.OperationCompleted("ProcessTransactions", stopwatch.ElapsedMilliseconds);
 
                 return Result<BatchOperationResult>.Success(result);
             }
             catch (DbUpdateConcurrencyException ex)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "Concurrency conflict during ProcessTransactionsAsync");
+                _logger.ConcurrencyConflict("ProcessTransactions", Guid.Empty);
                 return Result<BatchOperationResult>.Failure("A concurrency conflict occurred. Please retry the operation.", 409);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogError(ex, "ProcessTransactionsAsync failed");
+                _logger.OperationFailed("ProcessTransactions", "WalletTransaction", Guid.Empty, ex.Message, ex);
                 return Result<BatchOperationResult>.Failure($"Batch operation failed: {ex.Message}", 500);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in ProcessTransactionsAsync");
+            _logger.OperationFailed("ProcessTransactions", "WalletTransaction", Guid.Empty, ex.Message, ex);
             return Result<BatchOperationResult>.Failure($"Unexpected error: {ex.Message}", 500);
         }
     }

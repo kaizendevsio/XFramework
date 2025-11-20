@@ -7,6 +7,7 @@ using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
 using Community.Domain.Shared.Enums;
+using XFramework.Core.Loggers;
 
 namespace Community.Core.Services;
 
@@ -48,7 +49,7 @@ public class CommunityService : ICommunityService
 
             if (credential == null)
             {
-                _logger.LogWarning("Credential with Id {CredentialId} not found", request.CredentialId);
+                _logger.CommunityCredentialNotFound(request.CredentialId);
                 return Result<CmdResponse>.NotFound($"Credential with Id {request.CredentialId} does not exist");
             }
 
@@ -58,7 +59,7 @@ public class CommunityService : ICommunityService
 
             if (communityIdentityType == null)
             {
-                _logger.LogWarning("Community identity type with Id {TypeId} not found", request.CommunityIdentityTypeId);
+                _logger.CommunityIdentityTypeNotFound(request.CommunityIdentityTypeId);
                 return Result<CmdResponse>.NotFound($"Community identity entity with Id {request.CommunityIdentityTypeId} does not exist");
             }
 
@@ -108,7 +109,7 @@ public class CommunityService : ICommunityService
             _dbContext.CommunityIdentities.Add(entity);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Community identity created successfully for Credential {CredentialId}", request.CredentialId);
+            _logger.CommunityIdentityCreated(request.CredentialId);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -118,7 +119,7 @@ public class CommunityService : ICommunityService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating community identity for Credential {CredentialId}", request.CredentialId);
+            _logger.CommunityIdentityCreationError(request.CredentialId, ex);
             return Result<CmdResponse>.Failure("An error occurred while creating community identity", 500);
         }
     }
@@ -136,7 +137,7 @@ public class CommunityService : ICommunityService
 
             if (communityIdentity == null)
             {
-                _logger.LogWarning("Community identity with Id {Id} not found", request.Id);
+                _logger.CommunityIdentityNotFound(request.Id);
                 return Result<CmdResponse>.NotFound($"Community identity with id {request.Id} does not exist");
             }
 
@@ -151,7 +152,7 @@ public class CommunityService : ICommunityService
 
                 if (credential == null)
                 {
-                    _logger.LogWarning("Credential with Id {CredentialId} not found", request.CredentialId);
+                    _logger.CommunityCredentialNotFound(request.CredentialId);
                     return Result<CmdResponse>.NotFound($"Credential with id {request.CredentialId} does not exist");
                 }
 
@@ -166,7 +167,7 @@ public class CommunityService : ICommunityService
 
                 if (communityIdentityType == null)
                 {
-                    _logger.LogWarning("Community identity type with Id {TypeId} not found", request.CommunityIdentityTypeId);
+                    _logger.CommunityIdentityTypeNotFound(request.CommunityIdentityTypeId);
                     return Result<CmdResponse>.NotFound($"Community Identity Type with id {request.CommunityIdentityTypeId} does not exist");
                 }
 
@@ -176,7 +177,7 @@ public class CommunityService : ICommunityService
             _dbContext.CommunityIdentities.Update(communityIdentity);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Community identity {Id} updated successfully", request.Id);
+            _logger.CommunityIdentityUpdated(request.Id);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -186,7 +187,7 @@ public class CommunityService : ICommunityService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating community identity {Id}", request.Id);
+            _logger.CommunityIdentityUpdateError(request.Id, ex);
             return Result<CmdResponse>.Failure("An error occurred while updating community identity", 500);
         }
     }
@@ -205,7 +206,7 @@ public class CommunityService : ICommunityService
 
             if (connectionType == null)
             {
-                _logger.LogWarning("Connection type with Id {TypeId} not found", request.ConnectionTypeId);
+                _logger.CommunityConnectionTypeNotFound(request.ConnectionTypeId);
                 return Result<List<CommunityConnection>>.NotFound($"Connection entity with id {request.ConnectionTypeId} does not exist");
             }
 
@@ -216,7 +217,7 @@ public class CommunityService : ICommunityService
 
             if (communityIdentity == null)
             {
-                _logger.LogWarning("Community identity with Id {IdentityId} not found", request.CommunityIdentityId);
+                _logger.CommunityIdentityNotFound(request.CommunityIdentityId);
                 return Result<List<CommunityConnection>>.NotFound($"Community identity with id {request.CommunityIdentityId} does not exist");
             }
 
@@ -234,18 +235,17 @@ public class CommunityService : ICommunityService
 
             if (!connectionList.Any())
             {
-                _logger.LogInformation("No connections found for community identity {IdentityId}", request.CommunityIdentityId);
+                _logger.CommunityNoConnectionsFound(request.CommunityIdentityId);
                 return Result<List<CommunityConnection>>.Success(new List<CommunityConnection>());
             }
 
-            _logger.LogInformation("Retrieved {Count} connections for community identity {IdentityId}", 
-                connectionList.Count, request.CommunityIdentityId);
+            _logger.CommunityConnectionsRetrieved(connectionList.Count, request.CommunityIdentityId);
 
             return Result<List<CommunityConnection>>.Success(connectionList);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving connections for community identity {IdentityId}", request.CommunityIdentityId);
+            _logger.CommunityConnectionsError(request.CommunityIdentityId, ex);
             return Result<List<CommunityConnection>>.Failure("An error occurred while retrieving connections", 500);
         }
     }

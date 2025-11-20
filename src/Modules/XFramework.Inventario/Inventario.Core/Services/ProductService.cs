@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using XFramework.Core.Loggers;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.Caching;
 using XFramework.Domain.Contexts;
@@ -33,10 +34,12 @@ public class ProductService
     {
         try
         {
-            _logger.LogInformation("Creating new product: {ProductName}", request.Name);
+            var productId = Guid.NewGuid();
+            _logger.EntityCreating("Product", productId, null);
 
             var product = new Product
             {
+                Id = productId,
                 Name = request.Name,
                 Description = request.Description,
                 Price = request.Price,
@@ -58,12 +61,12 @@ public class ProductService
                 absoluteExpiration: TimeSpan.FromMinutes(10), 
                 cancellationToken: ct);
 
-            _logger.LogInformation("Product created successfully with ID: {ProductId}", product.Id);
+            _logger.EntityCreated("Product", product.Id);
             return Result<Product>.Success(product, 201, "Product created successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating product: {ProductName}", request.Name);
+            _logger.OperationFailed("Create", "Product", Guid.Empty, ex.Message, ex);
             return Result<Product>.Failure("An error occurred while creating the product", 500);
         }
     }
@@ -81,9 +84,11 @@ public class ProductService
             var cached = await _cacheService.GetAsync<Product>(cacheKey, ct);
             if (cached.IsSuccess && cached.Data != null)
             {
-                _logger.LogDebug("Product {ProductId} retrieved from cache", id);
+                _logger.CacheHit(cacheKey);
                 return Result<Product>.Success(cached.Data);
             }
+
+            _logger.CacheMiss(cacheKey);
 
             // Query database (NoTracking default from Phase 1.5)
             var product = await _dbContext.Set<Product>()
@@ -92,21 +97,22 @@ public class ProductService
 
             if (product == null)
             {
-                _logger.LogWarning("Product {ProductId} not found", id);
+                _logger.EntityNotFound("Product", id);
                 return Result<Product>.NotFound($"Product with ID {id} not found");
             }
 
             // Cache the result
             await _cacheService.SetAsync(cacheKey, product,
-                absoluteExpiration: TimeSpan.FromMinutes(10), 
+                absoluteExpiration: TimeSpan.FromMinutes(10),
                 cancellationToken: ct);
+            _logger.CacheSetting(cacheKey, 10);
 
-            _logger.LogInformation("Product {ProductId} retrieved successfully", id);
+            _logger.EntityRetrieved("Product", id);
             return Result<Product>.Success(product);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving product {ProductId}", id);
+            _logger.OperationFailed("Retrieve", "Product", id, ex.Message, ex);
             return Result<Product>.Failure("An error occurred retrieving the product", 500);
         }
     }
@@ -120,8 +126,7 @@ public class ProductService
     {
         try
         {
-            _logger.LogInformation("Retrieving products list - Page: {Page}, PageSize: {PageSize}", 
-                request.Page, request.PageSize);
+            _logger.EntityListing("Product", request.Page, request.PageSize);
 
             var query = _dbContext.Set<Product>()
                 .Include(p => p.Category)
@@ -168,14 +173,13 @@ public class ProductService
                 TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
             };
 
-            _logger.LogInformation("Retrieved {Count} products (page {Page} of {TotalPages})", 
-                products.Count, result.Page, result.TotalPages);
+            _logger.EntityQueryCompleted(products.Count, "Product");
 
             return Result<PaginatedList<Product>>.Success(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving products list");
+            _logger.OperationFailed("List", "Product", Guid.Empty, ex.Message, ex);
             return Result<PaginatedList<Product>>.Failure("An error occurred retrieving products", 500);
         }
     }
@@ -187,7 +191,7 @@ public class ProductService
     {
         try
         {
-            _logger.LogInformation("Updating product {ProductId}", id);
+            _logger.EntityUpdating("Product", id);
 
             // Use AsTracking for update operation
             var product = await _dbContext.Set<Product>()
@@ -196,7 +200,7 @@ public class ProductService
 
             if (product == null)
             {
-                _logger.LogWarning("Product {ProductId} not found for update", id);
+                _logger.EntityNotFound("Product", id);
                 return Result<Product>.NotFound($"Product with ID {id} not found");
             }
 
@@ -218,14 +222,16 @@ public class ProductService
             // Invalidate cache
             var cacheKey = $"products:{id}";
             await _cacheService.RemoveAsync(cacheKey, ct);
+            _logger.CacheInvalidated(cacheKey);
             await _cacheService.RemoveByPrefixAsync("products:list:", ct);
+            _logger.CacheCleared("products:list:*");
 
-            _logger.LogInformation("Product {ProductId} updated successfully", id);
+            _logger.EntityUpdated("Product", id);
             return Result<Product>.Success(product, "Product updated successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating product {ProductId}", id);
+            _logger.OperationFailed("Update", "Product", id, ex.Message, ex);
             return Result<Product>.Failure("An error occurred updating the product", 500);
         }
     }
@@ -237,14 +243,14 @@ public class ProductService
     {
         try
         {
-            _logger.LogInformation("Deleting product {ProductId}", id);
+            _logger.EntityDeleting("Product", id);
 
             var product = await _dbContext.Set<Product>()
                 .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct);
 
             if (product == null)
             {
-                _logger.LogWarning("Product {ProductId} not found for deletion", id);
+                _logger.EntityNotFound("Product", id);
                 return Result.NotFound($"Product with ID {id} not found");
             }
 
@@ -255,14 +261,16 @@ public class ProductService
             // Invalidate cache
             var cacheKey = $"products:{id}";
             await _cacheService.RemoveAsync(cacheKey, ct);
+            _logger.CacheInvalidated(cacheKey);
             await _cacheService.RemoveByPrefixAsync("products:list:", ct);
+            _logger.CacheCleared("products:list:*");
 
-            _logger.LogInformation("Product {ProductId} deleted successfully", id);
+            _logger.EntityDeleted("Product", id);
             return Result.Success("Product deleted successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting product {ProductId}", id);
+            _logger.OperationFailed("Delete", "Product", id, ex.Message, ex);
             return Result.Failure("An error occurred deleting the product", 500);
         }
     }

@@ -1,5 +1,11 @@
-XApplication
+using XFramework.Core.Extensions;
+
+var app = XApplication
     .Build<Program>()
     .GenerateMinimalApi()
-    .UseCustomRequestsInAssembly<MessagingBaseRequest>()
-    .Run();
+    .UseCustomRequestsInAssembly<MessagingBaseRequest>();
+
+// Add correlation ID middleware early in the pipeline for request tracing
+app.UseCorrelationId();
+
+app.Run();

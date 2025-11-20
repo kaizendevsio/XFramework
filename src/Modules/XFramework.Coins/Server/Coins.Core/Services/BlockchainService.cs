@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Coins.Core.Interfaces.Wrappers;
 using Coins.Domain.BusinessObjects;
+using Microsoft.Extensions.Logging;
+using XFramework.Core.Loggers;
 
 namespace Coins.Core.Services
 {
@@ -15,10 +17,14 @@ namespace Coins.Core.Services
     public class BlockchainService : IBlockchainService
     {
         private readonly IBtcBlockchainWrapper _btcBlockchainWrapper;
+        private readonly ILogger<BlockchainService> _logger;
 
-        public BlockchainService(IBtcBlockchainWrapper btcBlockchainWrapper)
+        public BlockchainService(
+            IBtcBlockchainWrapper btcBlockchainWrapper,
+            ILogger<BlockchainService> logger)
         {
             _btcBlockchainWrapper = btcBlockchainWrapper ?? throw new ArgumentNullException(nameof(btcBlockchainWrapper));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <summary>
@@ -36,6 +42,7 @@ namespace Coins.Core.Services
                 // Validate input
                 if (transactionList == null || transactionList.Count == 0)
                 {
+                    _logger.ValidationFailed("BulkSend", "Transaction list cannot be null or empty");
                     return new BlockchainResponse
                     {
                         HttpStatusCode = HttpStatusCode.BadRequest,
@@ -43,8 +50,20 @@ namespace Coins.Core.Services
                     };
                 }
 
+                _logger.LogInformation("Initiating bulk send operation for {Count} transactions", transactionList.Count);
+
                 // Execute bulk send operation via blockchain wrapper
                 var response = await _btcBlockchainWrapper.SendToMany(transactionList);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Bulk send operation completed successfully for {Count} transactions", transactionList.Count);
+                }
+                else
+                {
+                    _logger.LogWarning("Bulk send operation returned status {StatusCode}: {Reason}",
+                        response.StatusCode, response.ReasonPhrase);
+                }
 
                 // Build and return response object
                 return new BlockchainResponse
@@ -55,6 +74,8 @@ namespace Coins.Core.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error executing bulk send operation for {Count} transactions", transactionList?.Count ?? 0);
+                
                 // Build and return error response
                 return new BlockchainResponse
                 {
