@@ -10,6 +10,9 @@
       <ProjectReference Include="..\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
       <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
+      <ProjectReference Include="..\..\..\SourceGenerators\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+                        OutputItemType="Analyzer"
+                        ReferenceOutputAssembly="false" />
     </ItemGroup>
 
     <ItemGroup>
