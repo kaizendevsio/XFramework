@@ -1,4 +1,5 @@
 using StreamFlow.Core.Services;
+using StreamFlow.Stream.Services;
 using XFramework.Domain.Shared.Interfaces;
 using ICachingService = StreamFlow.Core.Interfaces.ICachingService;
 
@@ -6,7 +7,7 @@ namespace StreamFlow.Stream.Installers;
 
 /// <summary>
 /// Installer for StreamFlow core services.
-/// Registers message queue and caching services as singletons.
+/// Registers message queue, caching, and StreamFlow services.
 /// </summary>
 public class ServicesInstaller : IInstaller
 {
@@ -18,5 +19,9 @@ public class ServicesInstaller : IInstaller
         
         // Register CachingService as singleton (requires StreamFlowMessageQueue)
         services.AddSingleton<ICachingService, CachingService>();
+        
+        // Register StreamFlowService as scoped service (VSA pattern)
+        // Replaces MediatR handlers with direct service injection
+        services.AddScoped<IStreamFlowService, StreamFlowService>();
     }
 }

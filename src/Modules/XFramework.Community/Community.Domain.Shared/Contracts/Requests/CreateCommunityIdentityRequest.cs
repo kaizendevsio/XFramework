@@ -1,10 +1,9 @@
-﻿using MediatR;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;
 
 namespace Community.Domain.Shared.Contracts.Requests;
 
-public record CreateCommunityIdentityRequest : RequestBase, IRequest<CmdResponse>
+public record CreateCommunityIdentityRequest : RequestBase
 {
     public Guid CredentialId { get; set; }
     public Guid CommunityIdentityTypeId { get; set; }

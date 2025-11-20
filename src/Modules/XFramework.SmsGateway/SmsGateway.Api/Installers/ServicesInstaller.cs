@@ -1,5 +1,4 @@
-﻿using Messaging.Integration.Drivers;
-using SmsGateway.Core;
+using Messaging.Integration.Drivers;
 using SmsGateway.Core.Interfaces;
 using SmsGateway.Core.Services;
 using XFramework.Domain.Shared.Interfaces;
@@ -14,9 +13,7 @@ public class ServicesInstaller : IInstaller
         services.AddSingleton<ICachingService, CachingService>();
         services.AddMessagingWrapperServices();
         
-        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
-            typeof(SmsGatewayBaseRequest).Assembly,
-            typeof(SmsGatewayCore).Assembly
-        ));
+        // Register SMS service (VSA migration - replaced MediatR)
+        services.AddScoped<ISmsService, SmsService>();
     }
 }

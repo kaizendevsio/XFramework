@@ -1,6 +1,7 @@
 ﻿using Tenant.Integration.Drivers;
 using XFramework.Core.Extensions;
 using XFramework.Extensions;
+using Community.Core.Services;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Extensions;
 
@@ -14,5 +15,8 @@ public class ServicesInstaller : IInstaller
         services.AddTenantService();
         services.AddTenantWrapperServices();
         services.AddCommunityWrapperServices();
+        
+        // Register Community Service
+        services.AddScoped<ICommunityService, CommunityService>();
     }
 }

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using SmsGateway.Core.Commands.Sms;
 using SmsGateway.Core.Interfaces;
+using SmsGateway.Core.Services;
+using SmsGateway.Domain.Shared.Contracts.Requests.Create;
 using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 
 namespace SmsGateway.Api.Controllers.V1;
@@ -10,12 +11,12 @@ namespace SmsGateway.Api.Controllers.V1;
 public class SmsGatewayNodeController : ControllerBase
 {
     private readonly ICachingService _cachingService;
-    private readonly IMediator _mediator;
+    private readonly ISmsService _smsService;
 
-    public SmsGatewayNodeController(ICachingService cachingService, IMediator mediator)
+    public SmsGatewayNodeController(ICachingService cachingService, ISmsService smsService)
     {
         _cachingService = cachingService;
-        _mediator = mediator;
+        _smsService = smsService;
     }
         
     [HttpGet("List/{agentClusterId}")]
@@ -38,14 +39,14 @@ public class SmsGatewayNodeController : ControllerBase
     [HttpPatch("MessageSent")]
     public async Task<IActionResult> MessageSent([FromQuery] Guid guid)
     {
-        _ = _mediator.Send(new ConfirmSmsMessageSentRequest(guid));
+        _ = _smsService.ConfirmMessageSentAsync(guid);
         return Accepted();
     }
     
     [HttpGet("MessageReceived/{agentClusterId}")]
     public async Task<IActionResult> MessageReceived([FromRoute] Guid agentClusterId, [FromQuery] string sender, [FromQuery]string message, [FromQuery]string subscriptionId, [FromQuery]string receivedAt)
     {
-        _ = _mediator.Send(new CreateMessageReceived()
+        _ = _smsService.CreateMessageReceivedAsync(new CreateMessageReceivedRequest()
         {
             Sender = sender,
             Message = message,

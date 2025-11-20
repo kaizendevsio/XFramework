@@ -1,22 +1,22 @@
-﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Core.Interfaces;
+using StreamFlow.Core.Services;
 using StreamFlow.Domain.Shared.Abstractions;
 using StreamFlow.Domain.Shared.BusinessObjects;
-using StreamFlow.Stream.Services.Entity.Events;
 
 namespace StreamFlow.Stream.Hubs;
 
 public class MessageQueueHub : Hub<IStreamFlow>
 {
-    private IMediator _mediator;
-    private ICachingService _cachingService;
+    private readonly IStreamFlowService _streamFlowService;
+    private readonly ICachingService _cachingService;
     private readonly ILogger<MessageQueueHub> _logger;
 
-    public MessageQueueHub(IMediator mediator, ICachingService cachingService, ILogger<MessageQueueHub> logger) 
+    public MessageQueueHub(IStreamFlowService streamFlowService, ICachingService cachingService, ILogger<MessageQueueHub> logger)
     {
-        _cachingService = cachingService;
-        _logger = logger;
-        _mediator = mediator;
+        _streamFlowService = streamFlowService ?? throw new ArgumentNullException(nameof(streamFlowService));
+        _cachingService = cachingService ?? throw new ArgumentNullException(nameof(cachingService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
     public override async Task OnConnectedAsync()
     {
@@ -37,33 +37,29 @@ public class MessageQueueHub : Hub<IStreamFlow>
 
     public StreamFlowInvokeResponse Invoke(StreamFlowMessage request)
     {
-        var entity = new InvokeMethodQuery()
+        var result = _streamFlowService.InvokeMethodAsync(request, Context, CancellationToken.None).Result;
+        
+        if (result.IsSuccess && result.Data != null)
         {
-            Context = Context,
-            MessageQueue = request
+            return result.Data;
+        }
+        
+        // Return error response
+        return new StreamFlowInvokeResponse
+        {
+            HttpStatusCode = (HttpStatusCode)result.StatusCode,
+            Message = result.Message ?? "Method invocation failed"
         };
-        var response = _mediator.Send(entity).Result;
-        return response.Response;
     }
     public async Task<HttpStatusCode> InvokeResponse(StreamFlowMessage request)
     {
-        var entity = new InvokeMethodResponseCmd()
-        {
-            Context = Context,
-            MessageQueue = request
-        };
-        var response = await _mediator.Send(entity).ConfigureAwait(false);
-        return response.HttpStatusCode;
+        var result = await _streamFlowService.InvokeResponseAsync(request, Context);
+        return (HttpStatusCode)result.StatusCode;
     }
     public async Task<HttpStatusCode> Push(StreamFlowMessage request)
     {
-        var entity = new PushMessageCmd()
-        {
-            Context = Context,
-            Message = request
-        };
-        var response = await _mediator.Send(entity).ConfigureAwait(false);
-        return response.HttpStatusCode;
+        var result = await _streamFlowService.PushMessageAsync(request, Context);
+        return (HttpStatusCode)result.StatusCode;
     }
     public async Task<HttpStatusCode> Subscribe(StreamFlowClient request)
     {
@@ -72,15 +68,12 @@ public class MessageQueueHub : Hub<IStreamFlow>
     }
     public async Task<HttpStatusCode> Register(StreamFlowClient request)
     {
-        var entity = new RegisterClientCmd()
-        {
-            Context = Context,
-            Client = request
-        };
-        var response = await _mediator.Send(entity).ConfigureAwait(false);
-        await _mediator.Send(new DequeueMessagesCmd(){Client = request, Context = Context}).ConfigureAwait(false);
+        var result = await _streamFlowService.RegisterClientAsync(request, Context);
+        
+        // Trigger dequeue for newly registered client
+        await _streamFlowService.DequeueMessagesAsync(request, Context);
             
-        return response.HttpStatusCode;
+        return (HttpStatusCode)result.StatusCode;
     }
     public async Task<HttpStatusCode> Unsubscribe(StreamFlowClient request)
     {

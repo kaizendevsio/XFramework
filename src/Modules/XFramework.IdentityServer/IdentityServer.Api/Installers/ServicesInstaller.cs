@@ -1,5 +1,5 @@
-﻿using IdentityServer.Core;
-using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Core;
+using IdentityServer.Core.Services;
 using Messaging.Integration.Drivers;
 using Tenant.Integration.Drivers;
 using XFramework.Core.Extensions;
@@ -20,9 +20,7 @@ public class ServicesInstaller : IInstaller
         services.AddDecoratorHandlers(typeof(IdentityServerCore).Assembly);
         services.AddTenantService();
         
-        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
-            typeof(IdentityServerBaseRequest).Assembly,
-            typeof(IdentityServerCore).Assembly
-        ));
+        // Register AuthService for VSA pattern
+        services.AddScoped<IAuthService, AuthService>();
     }
 }

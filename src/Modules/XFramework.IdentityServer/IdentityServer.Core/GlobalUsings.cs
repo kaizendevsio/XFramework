@@ -1,9 +1,9 @@
-﻿global using System;
+global using System;
 global using System.Net;
 global using System.Threading;
 global using System.Threading.Tasks;
 global using Mapster;
-global using MediatR;
+global using XFramework.Core.Patterns;
 global using XFramework.Domain.Shared.BusinessObjects;
 global using Microsoft.EntityFrameworkCore;
 global using System.Text;

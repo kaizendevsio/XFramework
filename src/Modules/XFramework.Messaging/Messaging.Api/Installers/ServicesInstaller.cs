@@ -1,5 +1,6 @@
-﻿using IdentityServer.Integration.Drivers;
+using IdentityServer.Integration.Drivers;
 using Messaging.Core;
+using Messaging.Core.Services;
 using Messaging.Integration.Drivers;
 using SmsGateway.Integration.Drivers;
 using Tenant.Integration.Drivers;
@@ -19,9 +20,7 @@ public class ServicesInstaller : IInstaller
         services.AddSmsGatewayWrapperServices();
         services.AddTenantService();
 
-        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
-            typeof(MessagingBaseRequest).Assembly,
-            typeof(MessagingCore).Assembly
-        ));
+        // Register MessagingService
+        services.AddScoped<IMessagingService, MessagingService>();
     }
 }

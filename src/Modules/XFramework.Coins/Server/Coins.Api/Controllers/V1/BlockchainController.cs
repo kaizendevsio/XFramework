@@ -1,8 +1,7 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
-using Coins.Core.DataAccess.Commands.Entity.Bitcoin;
+using Coins.Core.Services;
 using Coins.Domain.BusinessObjects;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Coins.Api.Controllers.V1
@@ -11,18 +10,18 @@ namespace Coins.Api.Controllers.V1
     [ApiController]
     public class BlockchainController : ControllerBase
     {
-        private IMediator Mediator { get; set; }
-        public BlockchainController(IMediator mediator)
+        private readonly IBlockchainService _blockchainService;
+
+        public BlockchainController(IBlockchainService blockchainService)
         {
-            Mediator = mediator;
+            _blockchainService = blockchainService;
         }
         
         [HttpPost("Send")]
         public async Task<JsonResult> Post(List<BtcTransactionBO> transactionList)
         {
-           var request = new BulkSendCmd() {TransactionList = transactionList};
-           var cmdResponseBo = await Mediator.Send(request);
-           return new JsonResult(cmdResponseBo);
+            var response = await _blockchainService.BulkSendAsync(transactionList);
+            return new JsonResult(response);
         }
     }
 }

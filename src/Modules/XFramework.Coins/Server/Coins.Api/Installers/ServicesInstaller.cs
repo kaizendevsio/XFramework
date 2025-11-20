@@ -1,4 +1,4 @@
-﻿using Coins.Core.Drivers;
+using Coins.Core.Drivers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Coins.Core.Interfaces;
@@ -18,7 +18,9 @@ namespace Coins.Api.Installers
             services.AddSingleton<IJwtService, JwtService>();
 
             services.AddScoped<IBtcBlockchainWrapper, BlockchainInfoDriver>();
-
+            
+            // VSA Service Registration
+            services.AddScoped<IBlockchainService, BlockchainService>();
         }
     }
 }

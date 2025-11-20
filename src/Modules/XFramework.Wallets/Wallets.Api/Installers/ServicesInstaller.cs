@@ -1,6 +1,7 @@
-﻿using IdentityServer.Integration.Drivers;
+using IdentityServer.Integration.Drivers;
 using Tenant.Integration.Drivers;
 using Wallets.Core;
+using Wallets.Core.Services;
 using XFramework.Core.Extensions;
 using XFramework.Extensions;
 using XFramework.Domain.Shared.Interfaces;
@@ -16,11 +17,9 @@ public class ServicesInstaller : IInstaller
         services.AddTenantService();
         services.AddTenantWrapperServices();
         services.AddIdentityServerWrapperServices();
-        services.AddDecoratorHandlers(typeof(WalletsCore).Assembly);
         
-        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
-            typeof(WalletsBaseRequest).Assembly,
-            typeof(WalletsCore).Assembly
-        ));
+        // Register wallet services
+        services.AddScoped<IWalletService, WalletService>();
+        services.AddScoped<IBatchWalletService, BatchWalletService>();
     }
 }
