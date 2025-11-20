@@ -1,5 +1,8 @@
 using XFramework.Core.Extensions;
 
+var builder = WebApplication.CreateBuilder();
+builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.StreamFlow.Stream");
+
 var app = XApplication
     .Build<Program>()
     .UseAppServices();

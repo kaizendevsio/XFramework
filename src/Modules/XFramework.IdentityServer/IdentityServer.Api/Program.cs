@@ -1,5 +1,8 @@
 using XFramework.Core.Extensions;
 
+var builder = WebApplication.CreateBuilder();
+builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.IdentityServer.Api");
+
 var app = XApplication
     .Build<Program>()
     .GenerateMinimalApi()

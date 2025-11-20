@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Text;
 using IdentityServer.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Loggers;
+using XFramework.Core.Observability;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts;
@@ -157,9 +159,18 @@ public class WalletService : IWalletService
         IncrementWalletRequest request,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySources.Wallet.StartActivity("Wallet.IncrementBalance");
+        activity?.SetTag("wallet.id", request.WalletId);
+        activity?.SetTag("wallet.amount", request.TotalAmount);
+        activity?.SetTag("wallet.on_hold", request.OnHold);
+        activity?.SetTag("credential.id", request.CredentialId);
+        
+        var stopwatch = Stopwatch.StartNew();
+        
         try
         {
             var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            activity?.SetTag("tenant.id", tenant.Id);
 
             if (request.TotalAmount <= 0)
             {
@@ -269,17 +280,52 @@ public class WalletService : IWalletService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
+            stopwatch.Stop();
+            
+            // Record metrics
+            XFrameworkMetrics.WalletIncrements.Add(1,
+                new KeyValuePair<string, object?>("tenant.id", tenant.Id.ToString()),
+                new KeyValuePair<string, object?>("on_hold", request.OnHold));
+            XFrameworkMetrics.WalletOperationDuration.Record(stopwatch.ElapsedMilliseconds,
+                new KeyValuePair<string, object?>("operation", "increment"),
+                new KeyValuePair<string, object?>("result", "success"));
+            XFrameworkMetrics.WalletTransactionAmount.Record(request.TotalAmount,
+                new KeyValuePair<string, object?>("operation", "increment"));
+            
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            activity?.SetTag("operation.duration_ms", stopwatch.ElapsedMilliseconds);
+            activity?.SetTag("wallet.new_balance", wallet.Balance);
+            
             _logger.WalletIncremented(wallet.Id, request.TotalAmount, "Primary", wallet.Balance);
             _logger.TransactionCreated(transaction.Id, wallet.Id, "Credit", request.TotalAmount);
             return Result.Success();
         }
         catch (DbUpdateConcurrencyException ex)
         {
+            stopwatch.Stop();
+            XFrameworkMetrics.WalletOperationDuration.Record(stopwatch.ElapsedMilliseconds,
+                new KeyValuePair<string, object?>("operation", "increment"),
+                new KeyValuePair<string, object?>("result", "concurrency_error"));
+            
+            activity?.SetStatus(ActivityStatusCode.Error, "Concurrency conflict");
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            activity?.SetTag("exception.message", ex.Message);
+            
             _logger.ConcurrencyConflict("Wallet", request.WalletId);
             return Result.Failure("A concurrency conflict occurred, please try again", 409);
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+            XFrameworkMetrics.WalletOperationDuration.Record(stopwatch.ElapsedMilliseconds,
+                new KeyValuePair<string, object?>("operation", "increment"),
+                new KeyValuePair<string, object?>("result", "error"));
+            
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            activity?.SetTag("exception.message", ex.Message);
+            activity?.SetTag("exception.stacktrace", ex.StackTrace);
+            
             _logger.OperationFailed("IncrementWallet", "Wallet", request.WalletId, ex.Message, ex);
             return Result.Failure("An error occurred while processing your request", 500);
         }

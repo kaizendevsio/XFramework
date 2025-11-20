@@ -5,6 +5,9 @@ using XFramework.Core.Middlewares;
 
 var builder = XApplication.Configure<Program>();
 
+// Configure OpenTelemetry for distributed tracing and metrics
+builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Inventario.Api");
+
 // Register caching services (required by ProductService)
 builder.Services.AddMemoryCaching();
 

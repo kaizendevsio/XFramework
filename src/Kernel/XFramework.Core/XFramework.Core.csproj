@@ -16,10 +16,25 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0"/>
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0"/>
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0"/>
+    <PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0"/>
     <PackageReference Include="Serilog.Sinks.Seq" Version="8.0.0"/>
     <PackageReference Include="StackExchange.Redis" Version="2.8.16"/>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0"/>
     <PackageReference Include="LigerShark.WebOptimizer.Core" Version="3.0.433"/>
+    
+    <!-- OpenTelemetry Core -->
+    <PackageReference Include="OpenTelemetry" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
+    
+    <!-- OpenTelemetry Instrumentation -->
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.12" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.StackExchangeRedis" Version="1.0.0-rc9.14" />
+    
+    <!-- OpenTelemetry Exporters -->
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
   </ItemGroup>
   
   <ItemGroup>

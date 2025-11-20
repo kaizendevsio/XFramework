@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Loggers;
+using XFramework.Core.Observability;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.Caching;
 using XFramework.Domain.Contexts;
@@ -32,9 +34,18 @@ public class ProductService
     /// </summary>
     public async Task<Result<Product>> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
     {
+        using var activity = ActivitySources.Product.StartActivity("Product.Create");
+        activity?.SetTag("product.name", request.Name);
+        activity?.SetTag("product.price", request.Price);
+        activity?.SetTag("product.category_id", request.CategoryId);
+        
+        var stopwatch = Stopwatch.StartNew();
+        
         try
         {
             var productId = Guid.NewGuid();
+            activity?.SetTag("product.id", productId);
+            
             _logger.EntityCreating("Product", productId, null);
 
             var product = new Product
@@ -57,15 +68,36 @@ public class ProductService
 
             // Cache the newly created product
             var cacheKey = $"products:{product.Id}";
-            await _cacheService.SetAsync(cacheKey, product, 
-                absoluteExpiration: TimeSpan.FromMinutes(10), 
+            await _cacheService.SetAsync(cacheKey, product,
+                absoluteExpiration: TimeSpan.FromMinutes(10),
                 cancellationToken: ct);
 
+            stopwatch.Stop();
+            
+            // Record metrics
+            XFrameworkMetrics.ProductsCreated.Add(1,
+                new KeyValuePair<string, object?>("category_id", request.CategoryId.ToString()));
+            XFrameworkMetrics.ProductCreationDuration.Record(stopwatch.ElapsedMilliseconds,
+                new KeyValuePair<string, object?>("result", "success"));
+            
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            activity?.SetTag("operation.duration_ms", stopwatch.ElapsedMilliseconds);
+            
             _logger.EntityCreated("Product", product.Id);
             return Result<Product>.Success(product, 201, "Product created successfully");
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+            
+            XFrameworkMetrics.ProductCreationDuration.Record(stopwatch.ElapsedMilliseconds,
+                new KeyValuePair<string, object?>("result", "error"));
+            
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            activity?.SetTag("exception.message", ex.Message);
+            activity?.SetTag("exception.stacktrace", ex.StackTrace);
+            
             _logger.OperationFailed("Create", "Product", Guid.Empty, ex.Message, ex);
             return Result<Product>.Failure("An error occurred while creating the product", 500);
         }

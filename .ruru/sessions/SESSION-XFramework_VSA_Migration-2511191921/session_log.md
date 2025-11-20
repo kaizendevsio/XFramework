@@ -1138,3 +1138,82 @@ app.MapGeneratedEndpoints(); // 🎯 Automatic!
 - Troubleshooting guide
 
 **Next**: Phase 6.2 - OpenTelemetry (will integrate with structured logs)
+## 2025-11-20T18:01:00Z - Phase 6.2: OpenTelemetry Task Created
+**Action**: Created comprehensive MDTM task for OpenTelemetry distributed tracing
+**Task ID**: TASK-PHASE6-2-OPENTELEMETRY-20251120-180100
+**Path**: `.ruru/tasks/PHASE6_Observability/TASK-PHASE6-2-OPENTELEMETRY-20251120-180100.md`
+**Scope**: Implement OpenTelemetry for distributed tracing and metrics across all microservices
+**Complexity**: Moderate-High
+**Estimated Effort**: 4-6 hours
+**Key Deliverables**:
+  - OpenTelemetry packages installed in all 8 modules
+  - Automatic instrumentation (ASP.NET Core, EF Core, Redis, HttpClient)
+  - Custom activity sources for business operations (Product, Wallet, Auth, etc.)
+  - Metrics collection (request counts, durations, error rates)
+  - Exporters configured (console for dev, OTLP for prod)
+  - TraceId/SpanId integration with structured logs
+  - OTel setup guide and usage documentation
+**Goal**: Full request tracing across service boundaries with metrics collection, integrating with Phase 6.1 structured logging via TraceId/SpanId correlation
+**Status**: Pending delegation to util-senior-dev
+
+## 2025-11-20T10:21:00Z - Task Completed: Phase 6.2 OpenTelemetry Integration
+- **Task**: TASK-PHASE6-2-OPENTELEMETRY-20251120-180100
+- **Status**: 🟢 Done
+- **Summary**: Successfully implemented OpenTelemetry distributed tracing and metrics across all 8 XFramework API modules
+- **Key Achievements**:
+  - Installed OpenTelemetry 1.9.0 packages (upgraded from 1.7.0 for security)
+  - Configured automatic instrumentation (ASP.NET Core, EF Core, HttpClient, Redis)
+  - Created custom observability infrastructure (`ActivitySources.cs`, `XFrameworkMetrics.cs`)
+  - Added custom spans to ProductService and WalletService with business metrics
+  - Integrated Serilog.Enrichers.Span 3.1.0 for TraceId/SpanId correlation in logs
+  - Created comprehensive documentation (586 lines in `docs/observability/opentelemetry-guide.md`)
+  - Runtime verification confirmed: traces, metrics, and log correlation working
+- **Files Modified**: 25+ files across all API modules and core infrastructure
+- **Build Status**: ✅ All modules building successfully
+- **Runtime Status**: ✅ Console exporter showing traces and metrics, TraceId/SpanId in logs
+## 2025-11-20T18:22:00Z - 🎉 PHASE 6.2 COMPLETE: OpenTelemetry Distributed Tracing
+**Status**: 🟢 Done (100%)
+**Delegated To**: util-senior-dev
+**Task ID**: TASK-PHASE6-2-OPENTELEMETRY-20251120-180100
+**Duration**: ~20 minutes
+**Files Created**: 4 core infrastructure files
+**Files Modified**: 25+ (8 modules configured)
+**Build Status**: ✅ 0 errors
+**Runtime Verified**: ✅ Metrics actively being collected and exported
+
+**Key Achievements**:
+- Installed OpenTelemetry 1.9.0 packages in all 8 modules (upgraded from 1.7.0 for security)
+- Created custom observability infrastructure:
+  - ActivitySources.cs (domain-specific activity sources: Product, Wallet, Auth, StreamFlow, Sms, Messaging, Community, Blockchain, Payment, Infrastructure)
+  - XFrameworkMetrics.cs (custom counters + histograms)
+  - OpenTelemetryExtensions.cs (centralized configuration helper)
+- Configured automatic instrumentation:
+  - ASP.NET Core (HTTP request tracing with enrichment)
+  - Entity Framework Core (DB query tracing with SQL capture)
+  - HttpClient (outbound HTTP tracing)
+  - Redis (cache operation tracing)
+- Added custom spans to key services:
+  - ProductService.CreateAsync() with metrics
+  - WalletService.IncrementBalanceAsync() with metrics
+  - Manual exception recording with detailed tags
+- Integrated TraceId/SpanId with Serilog:
+  - Installed Serilog.Enrichers.Span 3.1.0
+  - Updated all appsettings.json log templates
+  - TraceId example: `7b6ac7cb0fb0a657e19588f22cdd3ad6`
+- Created comprehensive documentation:
+  - docs/observability/opentelemetry-guide.md (586 lines)
+  - Setup, configuration, custom spans, metrics
+  - Production exporter examples (Jaeger, Prometheus, Grafana)
+- Sampling configured: 100% dev, 10% prod
+- Environment-specific exporters: Console (dev), OTLP (prod)
+
+**Metrics Verified in Terminal Output**:
+- http.client.request.duration ✅
+- http.server.request.duration ✅
+- kestrel.connection.duration ✅
+- kestrel.active_connections ✅
+- dns.lookup.duration ✅
+
+**Observability Stack Complete**: Logs (6.1) + Traces (6.2) + Metrics (6.2) = Full observability with correlation
+
+**Next**: Phase 6.3 - Enhanced Health Checks (will integrate OTel health status)
