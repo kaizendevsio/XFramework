@@ -747,3 +747,96 @@ Coordinator should proceed with next module in Phase 4 VSA migration.
 - **Duration**: ~90 minutes (Phase 4 module migrations)
 
 **Next**: Phase 5 - Source Generator Enhancement
+## 2025-11-20T14:58:00Z - Phase 4 Committed & Tagged Successfully
+**Action**: Git operations completed for Phase 4 milestone
+**Commit**: 16321d7 - "feat: Complete Phase 4 - VSA Migration for All 7 Backend Modules"
+**Tag**: phase-4-complete (pushed to origin)
+**Repository**: https://github.com/kaizendevsio/XFramework.git
+**Branch**: feature/vsa-migration
+**Changes**: 95 files (7,934 insertions, 3,209 deletions)
+**Status**: Phase 4 preserved in git history with comprehensive documentation
+**Security Note**: 2 moderate Dependabot vulnerabilities detected on remote (pre-existing, not migration-related)
+**Next**: Beginning Phase 5 - Source Generator Enhancement
+## 2025-11-20T14:59:00Z - 🚀 PHASE 5 INITIATED: Source Generator Enhancement
+**Action**: Created MDTM task for Phase 5.1 (Define Attributes)
+**Task ID**: TASK-PHASE5-1-ATTRIBUTES-20251120-145820
+**Path**: `.ruru/tasks/PHASE5_SourceGenerators/TASK-PHASE5-1-ATTRIBUTES-20251120-145820.md`
+**Scope**: Create GenerateEndpointsAttribute, EndpointType enum, EndpointActions flags enum
+**Goal**: Foundation for entity-centric code generation to reduce boilerplate
+**Assigned To**: util-senior-dev
+**Status**: Pending delegation
+**Estimated Effort**: ~2.5 hours
+**Phase Context**: Phase 5 focuses on source generators to automatically generate services/endpoints from entity attributes
+
+## 2025-11-20T07:05:40Z - Phase 5.1: Attributes Completed
+
+**Mode**: `util-senior-dev`  
+**Task**: TASK-PHASE5-1-ATTRIBUTES-20251120-145820  
+**Status**: ✅ Completed
+
+### Summary
+Successfully created foundational source generator attributes for entity-centric code generation in Phase 5.
+
+### Files Created
+1. **`src/Kernel/XFramework.Core/Attributes/EndpointType.cs`** (59 lines)
+   - Enum defining generation types: Service, Rest, Both
+   - Comprehensive XML documentation with examples
+
+2. **`src/Kernel/XFramework.Core/Attributes/EndpointActions.cs`** (163 lines)
+   - Flags enum for CRUD operations: Create, Get, GetList, Update, Delete
+   - Convenience combinations: All, ReadOnly, WriteOnly, Standard
+   - Detailed XML docs for each flag
+
+3. **`src/Kernel/XFramework.Core/Attributes/GenerateEndpointsAttribute.cs`** (282 lines)
+   - Complete attribute implementation with 7 properties
+   - All properties have comprehensive XML documentation
+   - Secure defaults (RequireAuthorization = true, CacheDurationSeconds = 300)
+
+4. **`docs/source-generators/attribute-usage-guide.md`** (666 lines)
+   - Complete usage guide with 6+ detailed examples
+   - Design decision documentation
+   - Best practices and troubleshooting section
+
+### Build Verification
+- ✅ Project compiled successfully with 0 errors
+- ⚠️ 198 pre-existing warnings (unrelated to new code)
+
+### Key Features Delivered
+- Opt-in attribute system for entity code generation
+- Flexible generation control (service/endpoints/both)
+- Granular CRUD operation selection via flags
+- Configurable routing, authorization, caching
+- Extensive XML documentation for IntelliSense
+- Comprehensive usage guide with real-world examples
+
+### Design Decisions
+1. **Opt-in**: Entities must explicitly use attribute
+2. **Flags Enum**: Concise operation combinations (Create | Get)
+3. **Secure Defaults**: Authorization required by default
+4. **Separate Concerns**: Type (what) vs Actions (which)
+5. **Optional Validation**: Deferred to generators (Phase 5.2+)
+
+### Next Steps
+Ready for Phase 5.2: Entity Service Generator implementation
+- Generator will consume these attributes
+- Read EndpointType, Actions to determine what to generate
+- Use RoutePrefix, Auth, Cache properties for configuration
+
+### Success Metrics Met
+- ✅ All 3 attribute files created
+- ✅ Comprehensive XML documentation (282 lines in attribute alone)
+- ✅ Usage guide with 6+ examples
+- ✅ Compiles without errors
+- ✅ MDTM task checklist updated to 🟢 Done
+## 2025-11-20T15:06:30Z - Phase 5.1: Source Generator Attributes Completed ✅
+**Status**: 🟢 Done
+**Files Created**: 4 (3 attribute files + 1 comprehensive guide)
+**Total Lines**: 1,170 lines (504 code + 666 documentation)
+**Build Status**: ✅ 0 errors
+**Key Deliverables**:
+  - GenerateEndpointsAttribute (282 lines) - 7 configurable properties
+  - EndpointType enum (59 lines) - Service/Rest/Both
+  - EndpointActions flags enum (163 lines) - CRUD operation flags with combinations
+  - Comprehensive usage guide (666 lines) - 6 examples, best practices, troubleshooting
+**Design Highlights**: Opt-in system, flags pattern for operations, secure defaults, IntelliSense-ready
+**Next**: Phase 5.2 - Entity Service Generator (will consume these attributes)
