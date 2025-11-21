@@ -83,7 +83,11 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                 }
             })
             .WithAutomaticReconnect(Enumerable.Repeat(TimeSpan.FromSeconds(2), 2000).ToArray())
-            .AddMessagePackProtocol()
+            .AddMessagePackProtocol(options =>
+            {
+                options.SerializerOptions = MessagePack.MessagePackSerializerOptions.Standard
+                    .WithResolver(MessagePack.Resolvers.ContractlessStandardResolver.Instance);
+            })
             .Build();
         
         HandleEvents();

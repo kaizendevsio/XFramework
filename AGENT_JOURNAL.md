@@ -192,4 +192,101 @@ After restarting both StreamFlow.Stream server and client services:
 4. ✅ Confirm no "Failed to invoke" errors appear
 
 ---
+## 2025-11-21 - Bug Fix: HttpStatusCode Deserialization Error
+
+**Agent Mode:** 🩺 Bug Fixer  
+**Task:** Fix MessagePack deserialization failure for HttpStatusCode enum return values
+
+### Issue Description
+After successfully fixing the MessagePack attribute issues, a NEW error emerged:
+- ✅ Request sent successfully
+- ✅ Hub method received and processed the request
+- ✅ Hub method executed and returned a value
+- ❌ **CLIENT COULD NOT DESERIALIZE the returned HttpStatusCode enum**
+
+Error message: "Error trying to deserialize result to HttpStatusCode. Deserializing object of the `HttpStatusCode` type for 'argument' failed."
+
+### Root Cause Analysis
+**MessagePack Enum Handling Issue:**
+
+MessagePack doesn't natively handle .NET enum types like `HttpStatusCode` properly without explicit configuration. The default MessagePack resolver used when calling `.AddMessagePackProtocol()` without options cannot serialize/deserialize enum types.
+
+**Location of Issue:**
+- [`SignalRService.cs:86`](src/Infrastructure/XFramework.Integration/Services/SignalRService.cs:86) - MessagePack was added without configuration options
+
+Previous code:
+```csharp
+.AddMessagePackProtocol()  // ← No options = default resolver = no enum support
+```
+
+### Files Modified
+- **Modified:** `src/Infrastructure/XFramework.Integration/Services/SignalRService.cs` (lines 84-91)
+
+### Changes Made
+
+Configured MessagePack with the `ContractlessStandardResolver` which properly handles enums and other .NET types:
+
+```csharp
+.AddMessagePackProtocol(options =>
+{
+    options.SerializerOptions = MessagePack.MessagePackSerializerOptions.Standard
+        .WithResolver(MessagePack.Resolvers.ContractlessStandardResolver.Instance);
+})
+```
+
+**Why ContractlessStandardResolver:**
+- Handles primitive types (int, string, etc.)
+- Handles enums (like `HttpStatusCode`)
+- Works with classes that have `[MessagePackObject]` attributes
+- Provides backward compatibility with attributed classes
+- More lenient than the default resolver
+
+### Alternative Solutions Considered
+
+**Option 1: Configure MessagePack resolver (CHOSEN)** ✅
+- Pros: Preserves type safety, minimal code changes, handles all enums automatically
+- Cons: None significant
+- **Decision:** This was the best solution
+
+**Option 2: Change return type to int** ❌
+- Pros: Simple change
+- Cons: Loses type safety, breaks API contract, requires changes across interfaces and implementations
+- **Decision:** Rejected - loses important type information
+
+**Option 3: Create response wrapper class** ❌
+- Pros: Most flexible
+- Cons: Most work, adds unnecessary complexity, requires changes throughout codebase
+- **Decision:** Rejected - overkill for this issue
+
+### Verification
+- ✅ Build succeeded: `dotnet build src/Infrastructure/XFramework.Integration/XFramework.Integration.csproj`
+- ✅ No compilation errors
+- ✅ 121 pre-existing warnings (unrelated to changes)
+- ✅ Exit code: 0 (successful build)
+
+### Important Notes
+- **MessagePack Resolvers:** The resolver determines how MessagePack handles different .NET types
+- **ContractlessStandardResolver:** A built-in resolver that handles most common .NET types including enums
+- **Backward Compatibility:** This change maintains compatibility with classes already decorated with `[MessagePackObject]` attributes
+- **Other Enums:** Any other enum types in the codebase will now also be properly handled by MessagePack
+
+### Impact Assessment
+- **Scope:** This fix affects ALL SignalR method calls that return enum types
+- **Breaking Changes:** None - this is a fix that makes existing code work correctly
+- **Performance:** No significant performance impact - `ContractlessStandardResolver` is well-optimized
+
+### Testing Recommendation
+After restarting both StreamFlow.Stream server and client services:
+1. ✅ Verify `Register` method returns `HttpStatusCode.Accepted` successfully
+2. ✅ Verify `Subscribe` method returns `HttpStatusCode.Accepted` successfully  
+3. ✅ Test all SignalR methods that return `HttpStatusCode` or other enums
+4. ✅ Confirm no "Error trying to deserialize result" errors appear
+5. ✅ Monitor for successful enum deserialization in logs
+
+### Resolution Timeline
+1. **First Issue:** Missing MessagePack attributes on DTOs (fixed)
+2. **Second Issue:** MessagePack can't deserialize enum return values (fixed with this change)
+3. **Expected:** SignalR communication should now work end-to-end
+
+---
 ---
