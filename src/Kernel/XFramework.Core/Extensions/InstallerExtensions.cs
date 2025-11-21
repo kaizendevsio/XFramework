@@ -67,6 +67,7 @@ public static class InstallerExtensions
         // Swagger
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(options => {
+            // Security Definitions
             options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
             {
                 Name = "Authorization",
@@ -77,25 +78,85 @@ public static class InstallerExtensions
                 Description = "Enter 'Bearer' [space] and then your valid token in the text input below.\r\n\r\nExample: \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\""
             });
                 
-            options.AddSecurityRequirement(new OpenApiSecurityRequirement{ 
+            options.AddSecurityRequirement(new OpenApiSecurityRequirement{
                 {
                     new OpenApiSecurityScheme{
                         Reference = new OpenApiReference{
-                            Id = "Bearer", //The name of the previously defined security scheme.
+                            Id = "Bearer",
                             Type = ReferenceType.SecurityScheme
                         }
                     },new List<string>()
                 }
             });
         
+            // Operation Filters
             options.OperationFilter<ApiVersionOperationFilter>();
             options.OperationFilter<ODataOperationFilter>();
+            
+            // API Information
             options.SwaggerDoc("v3", new OpenApiInfo
             {
-                Title = "XFramework API v3", 
-                Version = "v3",
-                Description = "XFramework API v3",
+                Title = "XFramework API",
+                Version = "v3.0",
+                Description = @"
+# XFramework API v3.0
+
+## Overview
+XFramework is a modular, high-performance .NET 9 framework built on **Vertical Slice Architecture (VSA)** principles.
+
+## Key Features
+- 🚀 **Performance**: Direct service injection, compiled queries, hybrid caching (Memory + Redis)
+- 📊 **Observability**: OpenTelemetry tracing, Serilog structured logging, comprehensive health checks
+- 🔒 **Security**: JWT Bearer authentication, tenant isolation, role-based authorization
+- 🎯 **VSA Architecture**: Feature-focused organization, Result<T> pattern, minimal vertical coupling
+
+## Architecture
+- **No CQRS/MediatR**: Direct service calls for maximum performance
+- **Result Pattern**: Consistent error handling across all endpoints
+- **EF Core Optimizations**: AsNoTracking by default, split queries, audit interceptors
+- **Hybrid Caching**: Memory cache with Redis fallback for distributed scenarios
+
+## Health Endpoints
+- `GET /health` - Overall health status (detailed)
+- `GET /health/live` - Liveness probe (Kubernetes)
+- `GET /health/ready` - Readiness probe (Kubernetes)
+
+## Authentication
+All endpoints require JWT Bearer token authentication unless marked as `[AllowAnonymous]`.
+
+**Header Format**: `Authorization: Bearer <your-jwt-token>`
+
+## Rate Limiting
+API endpoints are subject to rate limiting. Refer to the `X-RateLimit-*` response headers.
+
+## Versioning
+API version is specified via the `api-version` header. Default version: `3.0`
+",
+                Contact = new OpenApiContact
+                {
+                    Name = "XFramework API Support",
+                    Email = "support@xframework.dev"
+                },
+                License = new OpenApiLicense
+                {
+                    Name = "MIT License",
+                    Url = new Uri("https://opensource.org/licenses/MIT")
+                }
             });
+            
+            // Include XML comments for better documentation
+            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+            if (File.Exists(xmlPath))
+            {
+                options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+            }
+            
+            // Enable annotations for richer documentation
+            options.EnableAnnotations();
+            
+            // Describe all enums as strings
+            options.SchemaFilter<ExcludeReferenceTypePropertiesSchemaFilter>();
         });
     }
 

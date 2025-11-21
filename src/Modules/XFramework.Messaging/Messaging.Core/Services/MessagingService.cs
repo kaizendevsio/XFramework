@@ -117,7 +117,7 @@ public class MessagingService(
             
             if (record is null)
             {
-                logger.MessagingMessageNotFound(request.Id, request.AgentClusterId);
+                logger.MessagingMessageNotFound(request.Id ?? Guid.Empty, request.AgentClusterId);
                 return Result<CmdResponse>.Failure("Message not found");
             }
             
@@ -136,7 +136,7 @@ public class MessagingService(
         }
         catch (Exception ex)
         {
-            logger.MessagingUpdateError(request.Id, ex);
+            logger.MessagingUpdateError(request.Id ?? Guid.Empty, ex);
             return Result<CmdResponse>.Failure($"Error updating message: {ex.Message}");
         }
     }

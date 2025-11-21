@@ -64,7 +64,7 @@ public class StreamFlowService : IStreamFlowService
                 case MessageExchangeType.FanOut:
                     await _hubContext.Clients.All.SendAsync(message.CommandName, message,
                         cancellationToken: cancellationToken);
-                    _logger.StreamFlowFanOutSent(message.RequestId, client.Value.Name);
+                    _logger.StreamFlowFanOutSent(message.RequestId.ToString(), client.Value.Name);
                     break;
 
                 case MessageExchangeType.Direct:
@@ -74,7 +74,7 @@ public class StreamFlowService : IStreamFlowService
                 case MessageExchangeType.Topic:
                     await _hubContext.Clients.Group(message.Topic)
                         .SendAsync(message.CommandName, message, cancellationToken: cancellationToken);
-                    _logger.StreamFlowTopicSent(message.RequestId, message.Topic, client.Value.Name);
+                    _logger.StreamFlowTopicSent(message.RequestId.ToString(), message.Topic, client.Value.Name);
                     break;
 
                 default:
@@ -86,7 +86,7 @@ public class StreamFlowService : IStreamFlowService
         }
         catch (Exception ex)
         {
-            _logger.StreamFlowPushError(message.RequestId, ex);
+            _logger.StreamFlowPushError(message.RequestId.ToString(), ex);
             return Result.Failure("An error occurred processing the message", 500);
         }
     }
@@ -153,7 +153,7 @@ public class StreamFlowService : IStreamFlowService
 
             if (!queued)
             {
-                _logger.StreamFlowMethodCallQueueFailed(message.RequestId);
+                _logger.StreamFlowMethodCallQueueFailed(message.RequestId.ToString());
                 return Result<StreamFlowInvokeResponse>.Failure("Failed to queue method call", 500);
             }
 
@@ -164,7 +164,7 @@ public class StreamFlowService : IStreamFlowService
 
             if (completedTask != responseTask)
             {
-                _logger.StreamFlowMethodInvocationTimeout(message.RequestId);
+                _logger.StreamFlowMethodInvocationTimeout(message.RequestId.ToString());
                 return Result<StreamFlowInvokeResponse>.Failure("Method invocation timed out", 408);
             }
 
@@ -181,7 +181,7 @@ public class StreamFlowService : IStreamFlowService
         }
         catch (Exception ex)
         {
-            _logger.StreamFlowMethodInvocationError(message.RequestId, ex);
+            _logger.StreamFlowMethodInvocationError(message.RequestId.ToString(), ex);
             return Result<StreamFlowInvokeResponse>.Failure("An error occurred invoking the method", 500);
         }
     }
@@ -197,13 +197,13 @@ public class StreamFlowService : IStreamFlowService
             // Find the waiting TaskCompletionSource and complete it
             // Note: The actual TCS lookup and completion would be done by the processor
             // For now, we just log the response received
-            _logger.StreamFlowMethodResponseReceived(message.RequestId);
+            _logger.StreamFlowMethodResponseReceived(message.RequestId.ToString());
 
             return Result.Success("Response received");
         }
         catch (Exception ex)
         {
-            _logger.StreamFlowMethodResponseError(message.RequestId, ex);
+            _logger.StreamFlowMethodResponseError(message.RequestId.ToString(), ex);
             return Result.Failure("An error occurred processing the response", 500);
         }
     }
@@ -255,8 +255,8 @@ public class StreamFlowService : IStreamFlowService
         if (currentClient != null)
         {
             // Client is online, deliver immediately
-            _logger.StreamFlowDirectSent(message.ExchangeType.ToString(), message.RequestId,
-                sender.Name, currentClient.Name, message.ResponseStatusCode);
+            _logger.StreamFlowDirectSent(message.ExchangeType.ToString(), message.RequestId.ToString(),
+                sender.Name, currentClient.Name, (int)message.ResponseStatusCode);
 
             await _hubContext.Clients.Client(currentClient.StreamId)
                 .SendAsync(message.CommandName, message, cancellationToken);
@@ -266,13 +266,13 @@ public class StreamFlowService : IStreamFlowService
         // Client is not online - check if known and queue if enabled
         if (_cachingService.AbsoluteClients.All(x => x.Value.Id != message.RecipientId))
         {
-            _logger.StreamFlowInvalidRecipient(message.RequestId, sender.Name, message.RecipientId);
+            _logger.StreamFlowInvalidRecipient(message.RequestId.ToString(), sender.Name, message.RecipientId);
             return;
         }
 
         if (!_configuration.QueueMessages)
         {
-            _logger.StreamFlowMessageQueuingDisabled(message.RequestId, sender.Name, message.RecipientId);
+            _logger.StreamFlowMessageQueuingDisabled(message.RequestId.ToString(), sender.Name, message.RecipientId);
             return;
         }
 
@@ -283,16 +283,16 @@ public class StreamFlowService : IStreamFlowService
 
             if (queued)
             {
-                _logger.StreamFlowMessageQueued(message.RequestId, sender.Name, message.RecipientId);
+                _logger.StreamFlowMessageQueued(message.RequestId.ToString(), sender.Name, message.RecipientId);
             }
             else
             {
-                _logger.StreamFlowMessageQueueFailed(message.RequestId, sender.Name, message.RecipientId);
+                _logger.StreamFlowMessageQueueFailed(message.RequestId.ToString(), sender.Name, message.RecipientId);
             }
         }
         catch (OperationCanceledException)
         {
-            _logger.StreamFlowMessageQueueCancelled(message.RequestId, sender.Name, message.RecipientId);
+            _logger.StreamFlowMessageQueueCancelled(message.RequestId.ToString(), sender.Name, message.RecipientId);
         }
     }
 

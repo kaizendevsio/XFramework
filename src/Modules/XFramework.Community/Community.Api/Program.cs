@@ -1,14 +1,19 @@
 using XFramework.Extensions;
 using XFramework.Core.Extensions;
+using XFramework.Core.Health;
+using XFramework.Core.Middlewares;
 
-var builder = WebApplication.CreateBuilder();
+var builder = XApplication.Configure<Program>();
+
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Community.Api");
+builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
+    builder.Configuration,
+    "Community");
 
-var app = XApplication
-    .Build<Program>()
-    .GenerateMinimalApi();
+var app = (WebApplication)builder.Build();
 
-// Add correlation ID middleware early in the pipeline for request tracing
 app.UseCorrelationId();
+app.EnsureDatabase<AppDbContext>();
+app.MapXFrameworkHealthChecks("Community");
 
 app.Run();

@@ -6,6 +6,7 @@ public class DependencyInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-       services.AddMediatRHandlers();
+        // REMOVED: services.AddMediatRHandlers();
+        // MediatR removed - VSA architecture uses direct service injection
     }
 }

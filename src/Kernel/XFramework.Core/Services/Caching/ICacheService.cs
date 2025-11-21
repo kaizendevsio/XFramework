@@ -4,7 +4,7 @@ namespace XFramework.Core.Services.Caching;
 
 /// <summary>
 /// Provides caching operations with hybrid in-memory (L1) and distributed Redis (L2) support.
-/// All operations return Result<T> for consistent error handling.
+/// All operations return Result&lt;T&gt; for consistent error handling.
 /// </summary>
 public interface ICacheService
 {

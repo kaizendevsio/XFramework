@@ -53,9 +53,6 @@ public static class XApplication
         // API Documentation
         app.UseConfiguredSwagger();
         
-        // Health check endpoints
-        app.UseXFrameworkHealthChecks();
-        
         // Application endpoints
         app.UseXFrameworkEndpoints();
         app.UseEndpointsInAssembly(app.Environment);
