@@ -1,5 +1,6 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Integration.Services;
 
 namespace XFramework.Core.DataAccess.Query;
 
@@ -46,6 +47,6 @@ public static class XQuery
     }
 }
 
-public interface IGetHandler<TModel> : IRequestHandler<Get<TModel>, QueryResponse<TModel>>;
-public interface IGetListHandler<TModel> : IRequestHandler<GetList<TModel>, QueryResponse<PaginatedResult<TModel>>>;
+public interface IGetHandler<TModel> : IQueryHandler<Get<TModel>, QueryResponse<TModel>>;
+public interface IGetListHandler<TModel> : IQueryHandler<GetList<TModel>, QueryResponse<PaginatedResult<TModel>>>;
 

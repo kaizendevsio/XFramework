@@ -1,6 +1,5 @@
-﻿// Global using directives
+// Global using directives
 
-global using MediatR;
 global using MemoryPack;
 global using StreamFlow.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Shared.BusinessObjects;

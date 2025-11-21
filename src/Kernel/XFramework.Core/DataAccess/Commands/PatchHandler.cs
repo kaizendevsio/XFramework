@@ -14,7 +14,7 @@ public class PatchHandler<TModel>(
         DbContext dbContext,
         ITenantService tenantService,
         ILogger<PatchHandler<TModel>> logger,
-        IMediator mediator
+        ICommandQueryDispatcher dispatcher
     )
     : IPatchHandler<TModel>
     where TModel : class, IHasId, IAuditable, IHasConcurrencyStamp, ISoftDeletable, IHasTenantId
@@ -43,7 +43,7 @@ public class PatchHandler<TModel>(
             logger.LogWarning("Entity of type {EntityName} with ID {EntityId} not found during patching attempt, creating new record", typeof(TModel).Name, request.Model.Id);
             
             // Create new record if not found (upsert)
-            return await mediator.Send(new Create<TModel>(request.Model), cancellationToken);
+            return await dispatcher.Send(new Create<TModel>(request.Model), cancellationToken);
         }
         
         // strip navigation properties

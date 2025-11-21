@@ -4,8 +4,8 @@ using TRequest = IncrementWalletRequest;
 using TResponse = CmdResponse;
 
 [MemoryPackable]
-public partial record IncrementWalletRequest : TransactionRequestBase, 
-    IRequest<TResponse>,
+public partial record IncrementWalletRequest : TransactionRequestBase,
+    ICommand<TResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {
     public Guid WalletId { get; set; }

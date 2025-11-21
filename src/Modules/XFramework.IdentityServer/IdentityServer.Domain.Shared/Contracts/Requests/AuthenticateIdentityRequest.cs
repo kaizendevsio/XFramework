@@ -6,8 +6,8 @@ using TRequest = AuthenticateIdentityRequest;
 using TResponse = QueryResponse<AuthenticateIdentityResponse>;
 
 [MemoryPackable]
-public partial record AuthenticateIdentityRequest : RequestBase, 
-    IRequest<TResponse>, 
+public partial record AuthenticateIdentityRequest : RequestBase,
+    IQuery<TResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {
     public Guid RoleId { get; set; }

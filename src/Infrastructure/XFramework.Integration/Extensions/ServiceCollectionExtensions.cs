@@ -1,6 +1,6 @@
-﻿using System.Reflection;
-using MediatR;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using XFramework.Integration.Services;
 
 namespace XFramework.Integration.Extensions;
 
@@ -14,12 +14,19 @@ public static class ServiceCollectionExtensions
 
         foreach (var handlerImplementation in handlerImplementations)
         {
+            // Find ICommandHandler<,> or IQueryHandler<,> interface
             var interfaceType = handlerImplementation.GetInterfaces()
-                .First(interfaceType => interfaceType.IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(IRequestHandler<,>));
-            services.Decorate(interfaceType, handlerImplementation);
+                .FirstOrDefault(i => i.IsGenericType &&
+                    (i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
+                     i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>)));
+            
+            if (interfaceType != null)
+            {
+                services.Decorate(interfaceType, handlerImplementation);
+            }
         }
 
         return services;
-    } 
+    }
 }
 

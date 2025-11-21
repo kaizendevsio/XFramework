@@ -9,7 +9,6 @@ global using Microsoft.Extensions.Configuration;
 global using XFramework.Domain.Shared.BusinessObjects;
 global using XFramework.Domain.Shared.Contracts.Responses;
 global using XFramework.Domain.Shared.Interfaces;
-global using MediatR;
 global using Microsoft.AspNetCore.Builder;
 global using Microsoft.Extensions.DependencyInjection;
 global using Serilog;

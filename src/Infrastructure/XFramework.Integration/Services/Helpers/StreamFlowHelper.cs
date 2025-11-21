@@ -1,6 +1,6 @@
-﻿using MediatR;
 using MemoryPack;
 using MessagePack;
+using XFramework.Domain.Shared.Contracts.Requests;
 
 namespace XFramework.Integration.Services.Helpers;
 
@@ -11,10 +11,10 @@ public static class StreamFlowHelper
         return entity.GetType().Name.Replace("Request", string.Empty);
     }
         
-    public static TQuery AsMediatorCmd<TQuery, TResponse>(this object entity) 
-        where TQuery : class, IRequest<TResponse>
+    public static TRequest AsCommandQuery<TRequest>(this object entity)
+        where TRequest : class
     {
-        var deserializedEntity = MemoryPackSerializer.Deserialize<TQuery>(entity as byte[]); 
+        var deserializedEntity = MemoryPackSerializer.Deserialize<TRequest>(entity as byte[]);
         return deserializedEntity;
     }
 

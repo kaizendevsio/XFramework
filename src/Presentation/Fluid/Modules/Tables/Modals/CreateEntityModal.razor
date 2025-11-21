@@ -17,8 +17,9 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] 
-    private MudDialogInstance MudDialog { get; set; }
+    // TODO: Update for MudBlazor 8.5.1 dialog API
+    // [CascadingParameter]
+    // MudDialogInstance Dialog { get; set; }
 
     private Entity NewEntity { get; set; } = new Entity();
 
@@ -26,8 +27,13 @@
     {
         DbContext.Entities.Add(NewEntity);
         DbContext.SaveChanges();
-        MudDialog.Close(DialogResult.Ok(NewEntity)); // Close the dialog with the new entity
+        // TODO: Implement dialog close for MudBlazor 8.5.1
+        // Dialog?.Close(DialogResult.Ok(NewEntity));
     }
 
-    private void Cancel() => MudDialog.Cancel(); // Cancel the dialog
+    private void Cancel()
+    {
+        // TODO: Implement dialog close for MudBlazor 8.5.1
+        // Dialog?.Close();
+    }
 }

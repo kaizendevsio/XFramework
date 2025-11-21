@@ -5,7 +5,7 @@ using TResponse = CmdResponse;
 
 [MemoryPackable]
 public partial record DecrementWalletRequest : TransactionRequestBase,
-    IRequest<TResponse>,
+    ICommand<TResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {
     public Guid WalletId { get; set; }

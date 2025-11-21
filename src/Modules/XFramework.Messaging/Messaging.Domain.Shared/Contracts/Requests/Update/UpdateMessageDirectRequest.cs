@@ -1,5 +1,3 @@
-﻿using MediatR;
-
 namespace Messaging.Domain.Shared.Contracts.Requests.Update;
 
 using TResponse = CmdResponse;

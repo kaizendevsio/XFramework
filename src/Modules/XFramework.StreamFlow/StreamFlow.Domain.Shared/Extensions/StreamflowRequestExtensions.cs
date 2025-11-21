@@ -1,4 +1,3 @@
-﻿using MediatR;
 using StreamFlow.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Requests;

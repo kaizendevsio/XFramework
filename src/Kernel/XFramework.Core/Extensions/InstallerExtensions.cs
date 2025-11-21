@@ -21,7 +21,6 @@ using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Extensions;
-using XFramework.Integration.PipelineBehaviours;
 using XFramework.Integration.Services;
 using Log = Serilog.Log;
 
@@ -162,12 +161,36 @@ API version is specified via the `api-version` header. Default version: `3.0`
 
     public static void InstallStandardServices<T>(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
-            typeof(XFrameworkCore).Assembly,
-            typeof(T).Assembly
-        ));
+        // Register CommandQueryDispatcher
+        services.TryAddSingleton<ICommandQueryDispatcher, CommandQueryDispatcher>();
+        
+        // Register all Command and Query Handlers from specified assemblies
+        var assemblies = new[] { typeof(XFrameworkCore).Assembly, typeof(T).Assembly };
+        foreach (var assembly in assemblies)
+        {
+            var handlerTypes = assembly.GetTypes()
+                .Where(t => !t.IsInterface && !t.IsAbstract && t.GetInterfaces().Any(i =>
+                    i.IsGenericType && (
+                        i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
+                        i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>)
+                    )));
+
+            foreach (var handlerType in handlerTypes)
+            {
+                var interfaces = handlerType.GetInterfaces()
+                    .Where(i => i.IsGenericType && (
+                        i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
+                        i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>)
+                    ));
+
+                foreach (var interfaceType in interfaces)
+                {
+                    services.AddTransient(interfaceType, handlerType);
+                }
+            }
+        }
+        
         services.AddValidatorsFromAssembly(typeof(RequestBase).GetTypeInfo().Assembly);
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(BasePipelineBehavior<,>));
         services.TryAddSingleton<ISignalRService, SignalRService>();
         services.TryAddSingleton<IHelperService, HelperService>();
         services.TryAddSingleton<IJwtService, JwtService>();

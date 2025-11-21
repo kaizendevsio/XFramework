@@ -1,14 +1,16 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
-using MediatR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog.Context;
 using StreamFlow.Domain.Shared.Abstractions;
 using StreamFlow.Domain.Shared.Contracts.Requests;
+using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Base;
+using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Extensions;
+using XFramework.Integration.Services;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Drivers;
@@ -31,38 +33,37 @@ public abstract class BaseSignalRHandler
         return await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Push), request);
     }
 
-    protected virtual void HandleRequestQuery<TQuery, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
+    protected virtual void HandleRequestQuery<TQuery, TResponse>(HubConnection connection, ICommandQueryDispatcher dispatcher, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
         where TResponse : class
-        where TQuery : class, IRequest<QueryResponse<TResponse>>, IHasRequestServer
+        where TQuery : class, IQuery<QueryResponse<TResponse>>, IHasRequestServer
     {
         logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TQuery).GetTypeFullName());
-        connection.On(typeof(TQuery).GetTypeFullName(), (StreamFlowMessage<TQuery> response) => StreamflowRequestHandler<TQuery, QueryResponse<TResponse>>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
+        connection.On(typeof(TQuery).GetTypeFullName(), (StreamFlowMessage<TQuery> response) => StreamflowRequestHandler<TQuery, QueryResponse<TResponse>>(response, connection, dispatcher, logger, scopeFactory).ConfigureAwait(false));
     }
    
-    protected virtual void HandleRequestCmd<TCmd>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
-        where TCmd : class, IRequest<CmdResponse>, IHasRequestServer
+    protected virtual void HandleRequestCmd<TCmd>(HubConnection connection, ICommandQueryDispatcher dispatcher, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
+        where TCmd : class, ICommand<CmdResponse>, IHasRequestServer
     {
         logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
-        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
+        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse>(response, connection, dispatcher, logger, scopeFactory).ConfigureAwait(false));
     }
     
-    protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
-        where TCmd : class, IRequest<CmdResponse<TResponse>>, IHasRequestServer
+    protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, ICommandQueryDispatcher dispatcher, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
+        where TCmd : class, ICommand<CmdResponse<TResponse>>, IHasRequestServer
     {
         logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
-        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse<TResponse>>(response, connection, mediator, logger, scopeFactory).ConfigureAwait(false));
+        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse<TResponse>>(response, connection, dispatcher, logger, scopeFactory).ConfigureAwait(false));
     }
 
-    private async Task StreamflowRequestHandler<TQuery, TResponse>(StreamFlowMessage<TQuery> response, HubConnection connection, IMediator mediator, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory) 
-        where TQuery : class, IRequest<TResponse>, IHasRequestServer
+    private async Task StreamflowRequestHandler<TRequest, TResponse>(StreamFlowMessage<TRequest> response, HubConnection connection, ICommandQueryDispatcher dispatcher, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
+        where TRequest : class, IHasRequestServer
         where TResponse : class, IBaseResponse, IHasRequestServer
     {
-
         try
         {
             using var scope = scopeFactory.CreateScope();
-            var internalMediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-            var r = response.Data.AsMediatorCmd<TQuery, TResponse>();
+            var internalDispatcher = scope.ServiceProvider.GetRequiredService<ICommandQueryDispatcher>();
+            var r = response.Data.AsCommandQuery<TRequest>();
 
             using (LogContext.PushProperty(nameof(RequestMetadata.SessionId), r.Metadata?.SessionId))
             {
@@ -77,8 +78,21 @@ public abstract class BaseSignalRHandler
 
                             logger.LogInformation("[{Caller}] Request received, Invoking '{Request}' with data: {Data}", nameof(StreamflowRequestHandler), GetType().Name, r);
                         });
-
-                        var result = await internalMediator.Send(r).ConfigureAwait(false);
+    
+                        // Dispatch based on request type
+                        TResponse result;
+                        if (r is ICommand<TResponse> command)
+                        {
+                            result = await internalDispatcher.Send(command).ConfigureAwait(false);
+                        }
+                        else if (r is IQuery<TResponse> query)
+                        {
+                            result = await internalDispatcher.Send(query).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException($"Request type {typeof(TRequest).Name} does not implement ICommand or IQuery");
+                        }
 
                         // Log result in a background task
                         _ = Task.Run(() =>

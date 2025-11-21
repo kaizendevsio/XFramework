@@ -5,8 +5,8 @@ namespace Wallets.Domain.Shared.Contracts.Requests;
 using TResponse = CmdResponse;
 
 [MemoryPackable]
-public partial record ConvertWalletRequest : TransactionRequestBase, 
-    IRequest<TResponse>,
+public partial record ConvertWalletRequest : TransactionRequestBase,
+    ICommand<TResponse>,
     IStreamflowRequest<ConvertWalletRequest, TResponse>
 {
     public TransferDeductionType TransferDeductionType { get; set; } = TransferDeductionType.Default;

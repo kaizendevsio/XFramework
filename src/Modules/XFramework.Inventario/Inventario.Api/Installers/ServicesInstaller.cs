@@ -27,9 +27,8 @@ public class ServicesInstaller : IInstaller
         // Register FluentValidation validators
         services.AddValidatorsFromAssemblyContaining<Program>();
         
-        services.AddMediatR(o => o.RegisterServicesFromAssemblies(
-            typeof(IdentityServerBaseRequest).Assembly
-            //typeof(IdentityServerCore).Assembly
-        ));
+        // VSA: Command/Query handlers are now registered via InstallStandardServices
+        // See: XFramework.Core.Extensions.InstallerExtensions.InstallStandardServices
+        // Handlers from IdentityServer.Domain.Shared will be auto-discovered and registered
     }
 }
