@@ -290,3 +290,101 @@ After restarting both StreamFlow.Stream server and client services:
 
 ---
 ---
+
+## 2025-11-21 - Configuration: Disable OpenTelemetry Console Metrics Output
+
+**Agent Mode:** 🩺 Bug Fixer  
+**Task:** Clean Up OpenTelemetry Console Metrics Output
+
+### Issue Description
+Console logs were cluttered with detailed OpenTelemetry metrics output, making it difficult to read structured application logs. The metrics included:
+- `http.client.open_connections`
+- `http.client.request.time_in_queue`
+- `dns.lookup.duration`
+- Full histogram data with buckets and values
+
+This verbosity obscured important application log messages and made debugging more difficult.
+
+### Root Cause Analysis
+**Location:** [`OpenTelemetryExtensions.cs:30`](src/Kernel/XFramework.Core/Extensions/OpenTelemetryExtensions.cs:30)
+
+The OpenTelemetry configuration was reading the `OpenTelemetry:Exporters:Console:Enabled` setting with a default value of `true`:
+
+```csharp
+var consoleExporterEnabled = configuration.GetValue<bool>("OpenTelemetry:Exporters:Console:Enabled", true);
+```
+
+This caused both trace exporter (line 101) and metrics exporter (line 127) to output to the console by default, even in production scenarios where metrics should only go to proper observability backends.
+
+### Files Modified
+- **Modified:** `src/Kernel/XFramework.Core/Extensions/OpenTelemetryExtensions.cs` (line 30)
+
+### Changes Made
+Changed the default value for console exporter from `true` to `false`:
+
+```csharp
+// Before:
+var consoleExporterEnabled = configuration.GetValue<bool>("OpenTelemetry:Exporters:Console:Enabled", true);
+
+// After:
+var consoleExporterEnabled = configuration.GetValue<bool>("OpenTelemetry:Exporters:Console:Enabled", false);
+```
+
+### Impact & Benefits
+- ✅ **Clean Console Output:** Console now only shows structured application logs (via Serilog)
+- ✅ **Telemetry Still Active:** OpenTelemetry collection remains fully operational for production monitoring
+- ✅ **Proper Export Paths:** Metrics and traces still exported to appropriate backends (OTLP/Jaeger/Prometheus)
+- ✅ **Configuration Override:** Can re-enable console output in development by adding to `appsettings.Development.json`:
+  ```json
+  {
+    "OpenTelemetry": {
+      "Exporters": {
+        "Console": {
+          "Enabled": true
+        }
+      }
+    }
+  }
+  ```
+- ✅ **No Performance Impact:** Only changes default output destination, not collection behavior
+
+### OpenTelemetry Configuration Reference
+The `InstallOpenTelemetry` extension method supports the following configuration keys:
+
+| Configuration Key | Default | Purpose |
+|-------------------|---------|---------|
+| `OpenTelemetry:Sampling:Probability` | `1.0` (100%) | Trace sampling rate |
+| `OpenTelemetry:Exporters:Console:Enabled` | `false` (changed) | Enable console exporter for traces/metrics |
+| `OpenTelemetry:Exporters:OTLP:Enabled` | `false` | Enable OTLP exporter (for Jaeger, etc.) |
+| `OpenTelemetry:Exporters:OTLP:Endpoint` | `http://localhost:4317` | OTLP endpoint URL |
+
+### Verification
+- ✅ Build succeeded: `dotnet build src/Kernel/XFramework.Core/XFramework.Core.csproj`
+- ✅ Exit code: 0 (successful)
+- ✅ No compilation errors
+- ✅ 198 pre-existing warnings (unrelated to this change)
+
+### Affected Modules
+All modules using `InstallOpenTelemetry`:
+- `XFramework.Wallets.Api`
+- `XFramework.StreamFlow.Stream`
+- `XFramework.SmsGateway.Api`
+- `XFramework.Messaging.Api`
+- `XFramework.Inventario.Api`
+- `XFramework.IdentityServer.Api`
+- `XFramework.Community.Api`
+
+### Testing Recommendation
+1. Start any XFramework API module (e.g., `Wallets.Api`)
+2. ✅ Verify console shows only Serilog application logs
+3. ✅ Confirm NO metrics histograms or telemetry data appears in console
+4. ✅ If OTLP is configured, verify traces/metrics still appear in monitoring tools (Jaeger, Prometheus, etc.)
+5. ✅ Check that application logging remains unchanged and readable
+
+### Important Notes
+- **Production Ready:** This configuration is appropriate for production deployments where metrics should go to proper observability platforms
+- **Development Override:** Developers can still enable console output for debugging by adding the configuration key
+- **Telemetry Preserved:** This change ONLY affects console output; all telemetry collection and instrumentation remains active
+- **Best Practice:** Console exporters are typically for development/debugging, not production use
+
+---

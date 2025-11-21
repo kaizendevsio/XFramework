@@ -27,7 +27,7 @@ public static class OpenTelemetryExtensions
     {
         // Get configuration values
         var samplingProbability = configuration.GetValue<double>("OpenTelemetry:Sampling:Probability", 1.0);
-        var consoleExporterEnabled = configuration.GetValue<bool>("OpenTelemetry:Exporters:Console:Enabled", true);
+        var consoleExporterEnabled = configuration.GetValue<bool>("OpenTelemetry:Exporters:Console:Enabled", false);
         var otlpExporterEnabled = configuration.GetValue<bool>("OpenTelemetry:Exporters:OTLP:Enabled", false);
         var otlpEndpoint = configuration.GetValue<string>("OpenTelemetry:Exporters:OTLP:Endpoint", "http://localhost:4317");
 
