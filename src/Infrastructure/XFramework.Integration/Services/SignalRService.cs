@@ -353,7 +353,8 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         var request = new StreamFlowClient()
         {
             Id = _clientId,
-            Name = StreamFlowConfiguration.ClientName
+            Name = StreamFlowConfiguration.ClientName,
+            Queue = new StreamFlowQueue()
         };
         await Connection!.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
     
