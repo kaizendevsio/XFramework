@@ -1,22 +1,18 @@
-﻿using Tenant.Integration.Drivers;
 using XFramework.Core.Extensions;
 using XFramework.Extensions;
-using Community.Core.Services;
+using Community.Api.Services;
 using XFramework.Domain.Shared.Interfaces;
-using XFramework.Integration.Extensions;
 
 namespace Community.Api.Installers;
 
-public class ServicesInstaller : IInstaller
+public sealed class ServicesInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         /*services.AddSingleton<ICachingService, CachingService>();*/
         services.AddTenantService();
-        services.AddTenantWrapperServices();
-        services.AddCommunityWrapperServices();
         
-        // Register Community Service
+        // Register Community Service (VSA Architecture)
         services.AddScoped<ICommunityService, CommunityService>();
     }
 }

@@ -5,39 +5,33 @@ namespace XFramework.Core.Patterns;
 /// Provides a consistent way to handle success and failure states across the application.
 /// </summary>
 /// <typeparam name="T">The type of data returned by the operation</typeparam>
-public record Result<T>
+public sealed record Result<T>
 {
     /// <summary>
     /// The data returned by the operation (null if operation failed)
     /// </summary>
-    public T? Data { get; init; }
-    
+    public T? Data { get; internal init; }
+
     /// <summary>
     /// Indicates whether the operation was successful
     /// </summary>
-    public bool IsSuccess { get; init; }
-    
+    public bool IsSuccess { get; internal init; }
+
     /// <summary>
     /// A message describing the result (typically used for errors)
     /// </summary>
-    public string? Message { get; init; }
-    
+    public string? Message { get; internal init; }
+
     /// <summary>
     /// HTTP status code for the result (200, 404, 400, etc.)
     /// </summary>
-    public int StatusCode { get; init; }
-    
+    public int StatusCode { get; internal init; }
+
     /// <summary>
     /// Validation errors, keyed by field name
     /// </summary>
-    public Dictionary<string, string[]>? Errors { get; init; }
+    public IReadOnlyDictionary<string, string[]>? Errors { get; internal init; }
 
-    /// <summary>
-    /// Creates a successful result with data
-    /// </summary>
-    /// <param name="data">The data to return</param>
-    /// <param name="message">Optional success message</param>
-    /// <returns>A successful Result</returns>
     public static Result<T> Success(T data, string? message = null) => new()
     {
         Data = data,
@@ -46,13 +40,6 @@ public record Result<T>
         Message = message
     };
 
-    /// <summary>
-    /// Creates a successful result with custom status code
-    /// </summary>
-    /// <param name="data">The data to return</param>
-    /// <param name="statusCode">HTTP status code (e.g., 201 for Created)</param>
-    /// <param name="message">Optional success message</param>
-    /// <returns>A successful Result</returns>
     public static Result<T> Success(T data, int statusCode, string? message = null) => new()
     {
         Data = data,
@@ -61,12 +48,6 @@ public record Result<T>
         Message = message
     };
 
-    /// <summary>
-    /// Creates a failed result with an error message
-    /// </summary>
-    /// <param name="message">Error message</param>
-    /// <param name="statusCode">HTTP status code (default: 400)</param>
-    /// <returns>A failed Result</returns>
     public static Result<T> Failure(string message, int statusCode = 400) => new()
     {
         IsSuccess = false,
@@ -74,12 +55,6 @@ public record Result<T>
         StatusCode = statusCode
     };
 
-    /// <summary>
-    /// Creates a failed result with validation errors
-    /// </summary>
-    /// <param name="errors">Dictionary of validation errors</param>
-    /// <param name="message">Optional error message</param>
-    /// <returns>A failed Result with validation errors</returns>
     public static Result<T> ValidationError(
         Dictionary<string, string[]> errors,
         string? message = "Validation failed") => new()
@@ -90,11 +65,6 @@ public record Result<T>
         Errors = errors
     };
 
-    /// <summary>
-    /// Creates a failed result indicating the resource was not found
-    /// </summary>
-    /// <param name="message">Not found message</param>
-    /// <returns>A failed Result with 404 status</returns>
     public static Result<T> NotFound(string? message = "Resource not found") => new()
     {
         IsSuccess = false,
@@ -102,11 +72,6 @@ public record Result<T>
         StatusCode = 404
     };
 
-    /// <summary>
-    /// Creates a failed result indicating unauthorized access
-    /// </summary>
-    /// <param name="message">Unauthorized message</param>
-    /// <returns>A failed Result with 401 status</returns>
     public static Result<T> Unauthorized(string? message = "Unauthorized") => new()
     {
         IsSuccess = false,
@@ -114,11 +79,6 @@ public record Result<T>
         StatusCode = 401
     };
 
-    /// <summary>
-    /// Creates a failed result indicating forbidden access
-    /// </summary>
-    /// <param name="message">Forbidden message</param>
-    /// <returns>A failed Result with 403 status</returns>
     public static Result<T> Forbidden(string? message = "Forbidden") => new()
     {
         IsSuccess = false,
@@ -126,11 +86,6 @@ public record Result<T>
         StatusCode = 403
     };
 
-    /// <summary>
-    /// Creates a failed result indicating a conflict
-    /// </summary>
-    /// <param name="message">Conflict message</param>
-    /// <returns>A failed Result with 409 status</returns>
     public static Result<T> Conflict(string? message = "Conflict") => new()
     {
         IsSuccess = false,
@@ -142,33 +97,28 @@ public record Result<T>
 /// <summary>
 /// Non-generic Result for operations that don't return data
 /// </summary>
-public record Result
+public sealed record Result
 {
     /// <summary>
     /// Indicates whether the operation was successful
     /// </summary>
-    public bool IsSuccess { get; init; }
-    
+    public bool IsSuccess { get; internal init; }
+
     /// <summary>
     /// A message describing the result
     /// </summary>
-    public string? Message { get; init; }
-    
+    public string? Message { get; internal init; }
+
     /// <summary>
     /// HTTP status code for the result
     /// </summary>
-    public int StatusCode { get; init; }
-    
+    public int StatusCode { get; internal init; }
+
     /// <summary>
     /// Validation errors, keyed by field name
     /// </summary>
-    public Dictionary<string, string[]>? Errors { get; init; }
+    public IReadOnlyDictionary<string, string[]>? Errors { get; internal init; }
 
-    /// <summary>
-    /// Creates a successful result
-    /// </summary>
-    /// <param name="message">Optional success message</param>
-    /// <returns>A successful Result</returns>
     public static Result Success(string? message = null) => new()
     {
         IsSuccess = true,
@@ -176,12 +126,13 @@ public record Result
         Message = message
     };
 
-    /// <summary>
-    /// Creates a failed result
-    /// </summary>
-    /// <param name="message">Error message</param>
-    /// <param name="statusCode">HTTP status code (default: 400)</param>
-    /// <returns>A failed Result</returns>
+    public static Result Success(int statusCode, string? message = null) => new()
+    {
+        IsSuccess = true,
+        StatusCode = statusCode,
+        Message = message
+    };
+
     public static Result Failure(string message, int statusCode = 400) => new()
     {
         IsSuccess = false,
@@ -189,12 +140,6 @@ public record Result
         StatusCode = statusCode
     };
 
-    /// <summary>
-    /// Creates a failed result with validation errors
-    /// </summary>
-    /// <param name="errors">Dictionary of validation errors</param>
-    /// <param name="message">Optional error message</param>
-    /// <returns>A failed Result with validation errors</returns>
     public static Result ValidationError(
         Dictionary<string, string[]> errors,
         string? message = "Validation failed") => new()
@@ -205,15 +150,31 @@ public record Result
         Errors = errors
     };
 
-    /// <summary>
-    /// Creates a failed result indicating the resource was not found
-    /// </summary>
-    /// <param name="message">Not found message</param>
-    /// <returns>A failed Result with 404 status</returns>
     public static Result NotFound(string? message = "Resource not found") => new()
     {
         IsSuccess = false,
         Message = message,
         StatusCode = 404
+    };
+
+    public static Result Unauthorized(string? message = "Unauthorized") => new()
+    {
+        IsSuccess = false,
+        Message = message,
+        StatusCode = 401
+    };
+
+    public static Result Forbidden(string? message = "Forbidden") => new()
+    {
+        IsSuccess = false,
+        Message = message,
+        StatusCode = 403
+    };
+
+    public static Result Conflict(string? message = "Conflict") => new()
+    {
+        IsSuccess = false,
+        Message = message,
+        StatusCode = 409
     };
 }

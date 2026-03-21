@@ -1,41 +1,41 @@
-﻿using IdentityServer.Integration.Drivers;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Tenant.Integration.Drivers;
-
-namespace XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts;
 
+namespace XFramework.Core.Services;
+
+/// <summary>
+/// Service for retrieving tenant information with caching support.
+/// </summary>
 public interface ITenantService
 {
-    public Task<Tenant> GetTenant(Guid? id);
-} 
+    /// <summary>
+    /// Gets a tenant by ID.
+    /// </summary>
+    /// <param name="id">The tenant ID.</param>
+    /// <returns>The tenant entity.</returns>
+    Task<Tenant> GetTenant(Guid? id);
+}
 
-public class TenantService(ITenantServiceWrapper tenantService, IMemoryCache cache) : ITenantService
+/// <summary>
+/// Implementation of ITenantService with memory caching.
+/// TODO: Re-implement tenant service wrapper when IdentityServer.Api exposes tenant endpoints.
+/// </summary>
+public sealed class TenantService(IMemoryCache cache) : ITenantService
 {
-    public async Task<Tenant> GetTenant(Guid? id)
+    /// <inheritdoc />
+    public Task<Tenant> GetTenant(Guid? id)
     {
         if (id is null || id == Guid.Empty) throw new ArgumentNullException(nameof(id));
 
-        if (!cache.TryGetValue($"GetTenant-{id}", out Tenant? entity))
+        if (cache.TryGetValue($"GetTenant-{id}", out Tenant? entity) && entity is not null)
         {
-            var response = await tenantService.Tenant.Get(id.Value);
-            entity = response.Response;
+            return Task.FromResult(entity);
         }
         
-        if (entity is null)
-        {
-            throw new Exception($"Tenant with id '{id}' not found");
-        }
-        
-        var cacheOptions = new MemoryCacheEntryOptions
-        {
-            // Set the cache expiration as needed
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(2)
-        };
-
-        cache.Set($"GetTenant-{id}", entity, cacheOptions);
-
-        return entity;
+        // TODO: Implement actual tenant retrieval from IdentityServer.Api
+        // For now, throw an exception indicating the service needs to be configured
+        throw new InvalidOperationException(
+            $"Tenant service is not fully configured. Cannot retrieve tenant with id '{id}'. " +
+            "Please configure a tenant service wrapper or direct API access.");
     }
 }

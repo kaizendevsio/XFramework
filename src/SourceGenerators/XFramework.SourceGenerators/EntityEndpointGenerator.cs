@@ -171,7 +171,7 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                     {
                         var group = app.MapGroup("{{entity.RoutePrefix}}")
                             .WithTags("{{entityPlural}}")
-                            .WithOpenApi();
+                            .ExcludeFromDescription();
                         
             {{methods}}
                         return app;
@@ -197,7 +197,7 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                         I{{entityName}}Service service,
                         CancellationToken ct) =>
                     {
-                        var result = await service.GetByIdAsync(id, ct);
+                        var result = await service.GetByIdAsync(id, includeNavigations: false, navigationDepth: 1, ct: ct);
                         
                         return result.IsSuccess
                             ? Results.Ok(result.Data)
@@ -229,7 +229,7 @@ public class EntityEndpointGenerator : IIncrementalGenerator
                         I{{entityName}}Service service,
                         CancellationToken ct) =>
                     {
-                        var result = await service.GetListAsync(request, ct);
+                        var result = await service.GetListAsync(request, includeNavigations: false, navigationDepth: 1, ct: ct);
                         
                         return result.IsSuccess
                             ? Results.Ok(result.Data)

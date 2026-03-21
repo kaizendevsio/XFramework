@@ -5,7 +5,7 @@ namespace XFramework.Core.Services.Caching;
 /// <summary>
 /// Configuration options for the hybrid caching service.
 /// </summary>
-public class CacheOptions
+public sealed class CacheOptions
 {
     /// <summary>
     /// Configuration section name in appsettings.json

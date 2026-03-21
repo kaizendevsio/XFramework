@@ -1,4 +1,4 @@
-﻿global using System;
+global using System;
 global using System.Collections.Generic;
 global using Microsoft.Extensions.Configuration;
 global using XFramework.Domain.Shared.BusinessObjects;
@@ -7,6 +7,7 @@ global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.EntityFrameworkCore;
 global using Messaging.Api.Endpoints;
 global using Messaging.Api.Extensions;
+global using Messaging.Api.Services;
 global using Messaging.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;

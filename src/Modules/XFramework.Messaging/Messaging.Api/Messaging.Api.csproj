@@ -2,27 +2,31 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-    <LangVersion>14</LangVersion>
+        <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-
     </PropertyGroup>
 
     <ItemGroup>
+        <!-- Core and Domain -->
         <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
-        <ProjectReference Include="..\..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
-                          OutputItemType="Analyzer"
-                          ReferenceOutputAssembly="false"/>
-        <ProjectReference Include="..\Messaging.Core\Messaging.Core.csproj" />
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
+        
+        <!-- Infrastructure -->
+        <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+        
+        <!-- SmsGateway Domain Shared (required for ISmsGatewayServiceWrapper) -->
+        <ProjectReference Include="..\..\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
+        
+        <!-- Domain Shared (contracts and DTOs) -->
         <ProjectReference Include="..\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />
-        <ProjectReference Include="..\Messaging.Integration\Messaging.Integration.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="HostedService\" />
-    </ItemGroup>
-
-    <ItemGroup>
+        <!-- Validation -->
+        <PackageReference Include="FluentValidation" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+        
         <!-- OpenTelemetry Core -->
         <PackageReference Include="OpenTelemetry" />
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
@@ -39,4 +43,3 @@
     </ItemGroup>
 
 </Project>
-

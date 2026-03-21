@@ -25,7 +25,6 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     private readonly ILogger<SignalRService> _logger;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IConfiguration _configuration;
-    private readonly ICommandQueryDispatcher _dispatcher;
     private readonly ILogger<BaseSignalRHandler> _baseLogger;
     private readonly IServiceScopeFactory _scopeFactory;
     private string _clientId;
@@ -40,11 +39,10 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     public StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
     public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessage>> PendingMethodCalls { get; set; } = new();
 
-    public SignalRService(IHostEnvironment hostEnvironment, IConfiguration configuration, ILogger<SignalRService> logger, ICommandQueryDispatcher dispatcher, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
+    public SignalRService(IHostEnvironment hostEnvironment, IConfiguration configuration, ILogger<SignalRService> logger, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
     {
         _hostEnvironment = hostEnvironment;
         _configuration = configuration;
-        _dispatcher = dispatcher;
         _baseLogger = baseLogger;
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -63,7 +61,10 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             return;
         }
 
-        var serverUrl = StreamFlowConfiguration?.ServerUrls?.FirstOrDefault() ?? new Uri(envConfig);
+        // Environment variable takes precedence (Docker override), then appsettings config
+        var serverUrl = !string.IsNullOrEmpty(envConfig)
+            ? new Uri(envConfig)
+            : StreamFlowConfiguration?.ServerUrls?.FirstOrDefault();
         Connection = new HubConnectionBuilder()
             .WithUrl(serverUrl, (opts) =>
             {
@@ -137,7 +138,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                         .First(m => m.Name == nameof(HandleRequestCmd) && m.GetGenericArguments().Length == 2);
                     
                     var genericMethod = methodInfo.MakeGenericMethod(tRequest, tResponse.GetGenericArguments().First());
-                    genericMethod.Invoke(this, [Connection, _dispatcher, _baseLogger, _scopeFactory]);
+                    genericMethod.Invoke(this, [Connection, _baseLogger, _scopeFactory]);
                 }
                 else if (tResponse.IsAssignableTo(typeof(ICmdResponse)))
                 {
@@ -147,13 +148,13 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                         .First(m => m.Name == nameof(HandleRequestCmd) && m.GetGenericArguments().Length == 1);
                     
                     var genericMethod = methodInfo.MakeGenericMethod(tRequest);
-                    genericMethod.Invoke(this, [Connection, _dispatcher, _baseLogger, _scopeFactory]);
+                    genericMethod.Invoke(this, [Connection, _baseLogger, _scopeFactory]);
                 }
                 else if (tResponse.IsAssignableTo(typeof(IQueryResponse)))
                 {
                     var methodInfo = GetType().GetMethod(nameof(HandleRequestQuery), BindingFlags.NonPublic | BindingFlags.Instance);
                     var genericMethod = methodInfo.MakeGenericMethod(tRequest, tResponse.GetGenericArguments().First());
-                    genericMethod.Invoke(this, [Connection, _dispatcher, _baseLogger, _scopeFactory]);
+                    genericMethod.Invoke(this, [Connection, _baseLogger, _scopeFactory]);
                 }
             }
         }
@@ -168,7 +169,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             .Cast<ISignalREventHandler>()
             .ToList();
         
-        installers.ForEach(installer => installer.Handle(Connection, _dispatcher, _baseLogger, _scopeFactory));
+        installers.ForEach(installer => installer.Handle(Connection, _baseLogger, _scopeFactory));
     }
 
     public async Task StartEventListener(string topic)

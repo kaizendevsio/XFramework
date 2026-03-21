@@ -1,26 +1,39 @@
-using Coins.Core.Drivers;
+using Coins.Api.BusinessObjects;
+using Coins.Api.Configurations;
+using Coins.Api.Drivers;
+using Coins.Api.Features.Blockchain.Send;
+using Coins.Api.Interfaces;
+using Coins.Api.Interfaces.Wrappers;
+using Coins.Api.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Coins.Core.Interfaces;
-using Coins.Core.Interfaces.Wrappers;
-using Coins.Core.Services;
-using XFramework.Integration.Interfaces;
-using XFramework.Integration.Services;
+using Microsoft.Extensions.Hosting;
+using XFramework.Domain.Shared.Interfaces;
 
-namespace Coins.Api.Installers
+namespace Coins.Api.Installers;
+
+/// <summary>
+/// Services installer for Coins module
+/// </summary>
+public class ServicesInstaller : IInstaller
 {
-    public class ServicesInstaller : IInstaller
+    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        public virtual void InstallServices(IServiceCollection services, IConfiguration configuration)
-        {
-            services.AddSingleton<ICachingService, CachingService>();
-            services.AddSingleton<IHelperService, HelperService>();
-            services.AddSingleton<IJwtService, JwtService>();
+        // Register configuration
+        var btcConfig = new BtcBlockchainConfiguration();
+        configuration.GetSection(nameof(BtcBlockchainConfiguration)).Bind(btcConfig);
+        services.AddSingleton(btcConfig);
 
-            services.AddScoped<IBtcBlockchainWrapper, BlockchainInfoDriver>();
-            
-            // VSA Service Registration
-            services.AddScoped<IBlockchainService, BlockchainService>();
-        }
+        // Register HttpClient for blockchain operations
+        services.AddHttpClient<IBtcBlockchainWrapper, BlockchainInfoDriver>();
+
+        // Register services
+        services.AddSingleton<ICachingService, CachingService>();
+        
+        // Register blockchain service
+        services.AddScoped<IBlockchainService, BlockchainService>();
+
+        // Register validators
+        services.AddScoped<IValidator<List<BtcTransactionBO>>, SendTransactionsValidator>();
     }
 }

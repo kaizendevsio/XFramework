@@ -1,21 +1,26 @@
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
+using Coins.Api.Features.Blockchain;
+using XFramework.Extensions;
+using XFramework.Core.Extensions;
+using XFramework.Core.Middlewares;
 
-namespace Coins.Api
+var builder = XApplication.Configure<Program>();
+
+// Add OpenTelemetry if available
+try
 {
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            CreateHostBuilder(args).Build().Run();
-        }
-
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder.UseStartup<Startup>();
-                    webBuilder.UseUrls("https://0.0.0.0:7201");
-                });
-    }
+    builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Coins.Api");
 }
+catch
+{
+    // OpenTelemetry not configured, continue
+}
+
+var app = (WebApplication)builder.Build();
+
+// Add correlation ID middleware
+app.UseCorrelationId();
+
+// Map VSA Feature Endpoints
+app.MapBlockchainEndpoints();
+
+app.Run();

@@ -11,7 +11,7 @@ public class ProcessMonitorOptions
     public string MemoryLimit { get; set; }
 }
 
-public class ProcessMonitorService(IHostApplicationLifetime hostApplicationLifetime, IOptions<ProcessMonitorOptions> options, ILogger<ProcessMonitorService> logger)
+public sealed class ProcessMonitorService(IHostApplicationLifetime hostApplicationLifetime, IOptions<ProcessMonitorOptions> options, ILogger<ProcessMonitorService> logger)
 {
     private  ByteSize _memoryLimit;
 

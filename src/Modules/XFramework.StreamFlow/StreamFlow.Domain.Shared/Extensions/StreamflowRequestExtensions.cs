@@ -16,7 +16,7 @@ public abstract record XCommand<TRequest, TResponse> : RequestBase, ICommand<TRe
 /// Extends XFramwork's ICommand to inherit RequestBase and support IStreamflowRequest and register this as streamflow request
 /// </summary>
 /// <typeparam name="TRequest">Request type</typeparam>
-public abstract record XCommand<TRequest> : RequestBase, ICommand,
+public abstract record XCommand<TRequest> : RequestBase, ICommand<CmdResponse>,
     IStreamflowRequest<TRequest, CmdResponse>;
 
 /// <summary>

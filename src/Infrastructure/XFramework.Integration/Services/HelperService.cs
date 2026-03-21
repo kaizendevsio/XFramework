@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -9,71 +9,54 @@ using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Integration.Services;
 
-public class HelperService : IHelperService
+public sealed class HelperService(IConfiguration configuration, ILogger<HelperService> logger) : IHelperService
 {
-    private readonly ILogger<HelperService> _logger;
-
     public JsonSerializerOptions CachedSerializationOptions = new()
     {
         ReferenceHandler = ReferenceHandler.IgnoreCycles,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
-    public HttpHelper Http { get; }
+
+    public HttpHelper Http { get; } = new(configuration);
     private const string Chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz1234567890";
 
-    public HelperService(IConfiguration configuration, ILogger<HelperService> logger)
-    {
-        _logger = logger;
-        Http = new(configuration);
-    }
-        
     public string GenerateRandomString(long size)
     {
         var b = new byte[size];
-        new RNGCryptoServiceProvider().GetBytes(b);
+        RandomNumberGenerator.Fill(b);
         return Encoding.ASCII.GetString(b);
     }
+
     public long GenerateRandomNumber(int start, int end)
     {
-        var rnd = new Random();
-        var n  = rnd.Next(start, end);
-        return n;
+        return Random.Shared.Next(start, end);
     }
-        
+
     public long GenerateRandomNumber(long min, long max)
     {
-        var rand = new Random();
-        byte[] buf = new byte[8];
-        rand.NextBytes(buf);
-        long longRand = BitConverter.ToInt64(buf, 0);
-
-        return (Math.Abs(longRand % (max - min)) + min);
+        return Random.Shared.NextInt64(min, max);
     }
 
     public string GenerateRandomString(int size)
     {
-        var random = new Random();
         return new(Enumerable.Repeat(Chars, size)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+            .Select(s => s[Random.Shared.Next(s.Length)]).ToArray());
     }
 
     public string GenerateReferenceString()
     {
-        var ticks = new DateTime(2021,1,1).Ticks;
+        var ticks = new DateTime(2021, 1, 1).Ticks;
         var ans = DateTime.Now.Ticks - ticks;
-        var uniqueId = ans.ToString("x").ToUpper();
-        return uniqueId;
+        return ans.ToString("x").ToUpper();
     }
-    
+
     public T? RemoveCircularReference<T>(T obj)
     {
-        var sw = new Stopwatch();
-        
-        sw.Start();
-        var json = JsonSerializer.Serialize(obj,CachedSerializationOptions).AsSpan();
+        var sw = Stopwatch.StartNew();
+        var json = JsonSerializer.Serialize(obj, CachedSerializationOptions).AsSpan();
         var result = JsonSerializer.Deserialize<T>(json);
         sw.Stop();
-        _logger.LogInformation($"Circular reference removal took {sw.ElapsedMilliseconds}ms");
+        logger.LogInformation("Circular reference removal took {ElapsedMs}ms", sw.ElapsedMilliseconds);
         return result;
     }
 }

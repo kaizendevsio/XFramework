@@ -9,7 +9,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
-      <ProjectReference Include="..\StreamFlow.Core\StreamFlow.Core.csproj" />
       <ProjectReference Include="..\StreamFlow.Domain.Shared\StreamFlow.Domain.Shared.csproj" />
     </ItemGroup>
 

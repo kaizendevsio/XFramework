@@ -1,7 +1,6 @@
-using StreamFlow.Core.Services;
+using StreamFlow.Stream.Interfaces;
 using StreamFlow.Stream.Services;
 using XFramework.Domain.Shared.Interfaces;
-using ICachingService = StreamFlow.Core.Interfaces.ICachingService;
 
 namespace StreamFlow.Stream.Installers;
 
@@ -9,9 +8,9 @@ namespace StreamFlow.Stream.Installers;
 /// Installer for StreamFlow core services.
 /// Registers message queue, caching, and StreamFlow services.
 /// </summary>
-public class ServicesInstaller : IInstaller
+public sealed class ServicesInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         // Register StreamFlowMessageQueue as singleton for channel-based message queueing
         // Capacity: 10,000 messages with backpressure handling

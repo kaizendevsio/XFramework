@@ -4,9 +4,9 @@ using XFramework.Domain.Interceptors;
 
 namespace SmsGateway.Api.Installers;
 
-public class DbInstaller : IInstaller
+public sealed class DbInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         // Register HttpContextAccessor for audit tracking
         services.AddHttpContextAccessor();

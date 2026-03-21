@@ -13,4 +13,7 @@ public enum QueryFilterOperation
     LessThanOrEqual,
     And,
     Or,
+    IsType,
+    IsNotType,
+    In,
 }

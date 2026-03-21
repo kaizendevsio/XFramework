@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.SignalR;
-using StreamFlow.Core.Interfaces;
-using StreamFlow.Core.Services;
 using StreamFlow.Domain.Shared.Abstractions;
 using StreamFlow.Domain.Shared.BusinessObjects;
+using StreamFlow.Stream.Interfaces;
+using StreamFlow.Stream.Services;
 
 namespace StreamFlow.Stream.Hubs;
 
@@ -10,12 +10,18 @@ public class MessageQueueHub : Hub<IStreamFlow>
 {
     private readonly IStreamFlowService _streamFlowService;
     private readonly ICachingService _cachingService;
+    private readonly IQueryExecutionService _queryExecutionService;
     private readonly ILogger<MessageQueueHub> _logger;
 
-    public MessageQueueHub(IStreamFlowService streamFlowService, ICachingService cachingService, ILogger<MessageQueueHub> logger)
+    public MessageQueueHub(
+        IStreamFlowService streamFlowService,
+        ICachingService cachingService,
+        IQueryExecutionService queryExecutionService,
+        ILogger<MessageQueueHub> logger)
     {
         _streamFlowService = streamFlowService ?? throw new ArgumentNullException(nameof(streamFlowService));
         _cachingService = cachingService ?? throw new ArgumentNullException(nameof(cachingService));
+        _queryExecutionService = queryExecutionService ?? throw new ArgumentNullException(nameof(queryExecutionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
     public override async Task OnConnectedAsync()
@@ -35,15 +41,15 @@ public class MessageQueueHub : Hub<IStreamFlow>
         _logger.LogInformation("Connection Lost and Unregistered with ID {ContextConnectionId} : {ValueGuid} : {ValueName}", Context.ConnectionId, a?.Id, a?.Name);
     }
 
-    public StreamFlowInvokeResponse Invoke(StreamFlowMessage request)
+    public async Task<StreamFlowInvokeResponse> Invoke(StreamFlowMessage request)
     {
-        var result = _streamFlowService.InvokeMethodAsync(request, Context, CancellationToken.None).Result;
-        
+        var result = await _streamFlowService.InvokeMethodAsync(request, Context, CancellationToken.None);
+
         if (result.IsSuccess && result.Data != null)
         {
             return result.Data;
         }
-        
+
         // Return error response
         return new StreamFlowInvokeResponse
         {
@@ -79,5 +85,25 @@ public class MessageQueueHub : Hub<IStreamFlow>
     {
         await Groups.RemoveFromGroupAsync(request.StreamId, request.Queue.Id.ToString());
         return HttpStatusCode.Accepted;
+    }
+
+    public async Task<byte[]> ExecuteQuery(byte[] queryDescriptorBytes)
+    {
+        return await _queryExecutionService.ExecuteAsync(queryDescriptorBytes, Context.ConnectionAborted);
+    }
+
+    public async IAsyncEnumerable<byte[]> StreamQuery(
+        byte[] queryDescriptorBytes,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await foreach (var chunk in _queryExecutionService.ExecuteStreamAsync(queryDescriptorBytes, ct))
+        {
+            yield return chunk;
+        }
+    }
+
+    public async Task<byte[]> ExecuteChanges(byte[] saveChangesRequestBytes)
+    {
+        return await _queryExecutionService.ExecuteChangesAsync(saveChangesRequestBytes, Context.ConnectionAborted);
     }
 }

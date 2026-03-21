@@ -1,13 +1,14 @@
 ﻿
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using XFramework.Core.DataContext;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Domain.Interceptors;
 
 namespace IdentityServer.Api.Installers;
 
-public class DbInstaller : IInstaller
+public sealed class DbInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         // Register HttpContextAccessor for audit tracking
         services.AddHttpContextAccessor();
@@ -24,5 +25,7 @@ public class DbInstaller : IInstaller
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
             .AddInterceptors(serviceProvider.GetRequiredService<AuditInterceptor>())
         );
+
+        services.AddServerDataContext<AppDbContext>();
     }
 }

@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY Directory.Packages.props Directory.Build.props* ./
+COPY XFramework.slnx ./
+COPY src/ src/
+
+RUN dotnet restore "src/Tools/XFramework.MigrationRunner/XFramework.MigrationRunner.csproj"
+
+RUN dotnet publish "src/Tools/XFramework.MigrationRunner/XFramework.MigrationRunner.csproj" \
+    -c Release \
+    -o /app/publish \
+    --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "XFramework.MigrationRunner.dll"]

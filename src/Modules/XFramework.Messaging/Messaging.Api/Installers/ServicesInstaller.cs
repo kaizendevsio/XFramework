@@ -1,9 +1,5 @@
-using IdentityServer.Integration.Drivers;
-using Messaging.Core;
-using Messaging.Core.Services;
-using Messaging.Integration.Drivers;
-using SmsGateway.Integration.Drivers;
-using Tenant.Integration.Drivers;
+using Messaging.Api.Services;
+using SmsGateway.Domain.Shared.Drivers;
 using XFramework.Core.Extensions;
 using XFramework.Extensions;
 using XFramework.Domain.Shared.Interfaces;
@@ -11,13 +7,12 @@ using XFramework.Integration.Extensions;
 
 namespace Messaging.Api.Installers;
 
-public class ServicesInstaller : IInstaller
+public sealed class ServicesInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddTenantWrapperServices();
-        services.AddMessagingWrapperServices();
-        services.AddSmsGatewayWrapperServices();
+        // Register SmsGateway service wrapper
+        services.AddSingleton<ISmsGatewayServiceWrapper, SmsGatewayServiceWrapper>();
         services.AddTenantService();
 
         // Register MessagingService

@@ -1,6 +1,6 @@
 ﻿namespace Gateway.HostedServices;
 
-public class SampleService : IHostedService
+public sealed class SampleService : IHostedService
 {
 
     public SampleService()

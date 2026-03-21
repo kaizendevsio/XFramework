@@ -5,20 +5,24 @@
         <LangVersion>14</LangVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+        <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)\generated</CompilerGeneratedFilesOutputPath>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj"/>
-        <ProjectReference Include="..\..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj"/>
+        <ProjectReference Include="..\..\..\SourceGenerators\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\..\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />
-        <ProjectReference Include="..\Inventario.Integration\Inventario.Integration.csproj" />
-        <ProjectReference Include="..\Inventario.Core\Inventario.Core.csproj" />
+        <ProjectReference Include="..\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     </ItemGroup>
 
     <ItemGroup>

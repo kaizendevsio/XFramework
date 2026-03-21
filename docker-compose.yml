@@ -1,0 +1,132 @@
+# Usage:
+#   Local dev (default):  podman-compose up --build
+#   Staging:              ASPNETCORE_ENVIRONMENT=Staging podman-compose up --build
+#   Production:           podman-compose --env-file .env.production up --build
+#
+# Service config lives in appsettings.Docker.json per service.
+# Only secrets and infra overrides go in env vars / .env files.
+
+x-common-env: &common-env
+  ASPNETCORE_URLS: http://+:8080
+  ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Docker}
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-XFramework}
+      POSTGRES_USER: ${DB_USER:-dbAdmin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-4*5WD-K8%f*NqmPY}
+    ports:
+      - "${DB_EXPOSE_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dbAdmin} -d ${DB_NAME:-XFramework}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Database Migration Runner (runs once, then exits) ───────
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Tools/XFramework.MigrationRunner/XFramework.MigrationRunner.csproj
+    entrypoint: ["dotnet", "XFramework.MigrationRunner.dll"]
+    environment:
+      DefaultDatabaseConnection: Host=${DB_HOST:-postgres};Port=${DB_PORT:-5432};Database=${DB_NAME:-XFramework};Username=${DB_USER:-dbAdmin};Password=${DB_PASSWORD:-4*5WD-K8%f*NqmPY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ── StreamFlow Server (must be healthy before services start) ─
+  streamflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${STREAMFLOW_EXPOSE_PORT:-7000}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
+  # ── Identity Server ─────────────────────────────────────────
+  identityserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.IdentityServer/IdentityServer.Api/IdentityServer.Api.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${IDENTITY_EXPOSE_PORT:-8261}:8080"
+    depends_on:
+      streamflow:
+        condition: service_healthy
+
+  # ── Messaging Server ────────────────────────────────────────
+  messaging:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.Messaging/Messaging.Api/Messaging.Api.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${MESSAGING_EXPOSE_PORT:-5148}:8080"
+    depends_on:
+      streamflow:
+        condition: service_healthy
+
+  # ── SMS Gateway ─────────────────────────────────────────────
+  smsgateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.SmsGateway/SmsGateway.Api/SmsGateway.Api.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${SMSGATEWAY_EXPOSE_PORT:-5274}:8080"
+    depends_on:
+      streamflow:
+        condition: service_healthy
+
+  # ── Wallets Server ──────────────────────────────────────────
+  wallets:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.Wallets/Wallets.Api/Wallets.Api.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${WALLETS_EXPOSE_PORT:-9696}:8080"
+    depends_on:
+      streamflow:
+        condition: service_healthy
+
+volumes:
+  pgdata:

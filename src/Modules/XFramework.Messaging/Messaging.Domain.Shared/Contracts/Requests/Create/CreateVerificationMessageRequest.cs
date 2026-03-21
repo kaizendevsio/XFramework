@@ -5,7 +5,7 @@ using TResponse = CmdResponse;
 
 [MemoryPackable]
 public partial record CreateVerificationMessageRequest : RequestBase,
-    ICommand, 
+    ICommand<CmdResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {
     public string? VerificationToken { get; set; }

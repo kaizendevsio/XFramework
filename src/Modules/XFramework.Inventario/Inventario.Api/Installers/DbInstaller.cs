@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using XFramework.Core.DataContext;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Domain.Interceptors;
 
@@ -23,5 +24,7 @@ public class DbInstaller : IInstaller
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning))
             .AddInterceptors(serviceProvider.GetRequiredService<AuditInterceptor>())
         );
+
+        services.AddServerDataContext<AppDbContext>();
     }
 }

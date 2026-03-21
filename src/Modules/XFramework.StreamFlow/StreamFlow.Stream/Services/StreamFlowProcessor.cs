@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
-using StreamFlow.Core.Interfaces;
-using StreamFlow.Core.Services;
 using StreamFlow.Stream.Hubs;
+using StreamFlow.Stream.Interfaces;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.Configurations;
 

@@ -13,8 +13,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using XFramework.Core.Filters;
+using Scalar.AspNetCore;
 using XFramework.Core.Loggers;
 using XFramework.Core.Middlewares;
 using XFramework.Core.Services;
@@ -55,141 +54,35 @@ public static class InstallerExtensions
     
     public static void InstallSwagger(this IServiceCollection services, IConfiguration configuration)
     {
-        // Swagger Versioning
+        // API Versioning
         services.AddApiVersioning(options => {
             options.DefaultApiVersion = new ApiVersion(3, 0);
             options.ReportApiVersions = true;
             options.AssumeDefaultVersionWhenUnspecified = true;
             options.ApiVersionReader = new HeaderApiVersionReader("api-version");
         });
-        
-        // Swagger
-        services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen(options => {
-            // Security Definitions
-            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
-            {
-                Name = "Authorization",
-                Type = SecuritySchemeType.ApiKey,
-                Scheme = "Bearer",
-                BearerFormat = "JWT",
-                In = ParameterLocation.Header,
-                Description = "Enter 'Bearer' [space] and then your valid token in the text input below.\r\n\r\nExample: \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\""
-            });
-                
-            options.AddSecurityRequirement(new OpenApiSecurityRequirement{
-                {
-                    new OpenApiSecurityScheme{
-                        Reference = new OpenApiReference{
-                            Id = "Bearer",
-                            Type = ReferenceType.SecurityScheme
-                        }
-                    },new List<string>()
-                }
-            });
-        
-            // Operation Filters
-            options.OperationFilter<ApiVersionOperationFilter>();
-            options.OperationFilter<ODataOperationFilter>();
-            
-            // API Information
-            options.SwaggerDoc("v3", new OpenApiInfo
-            {
-                Title = "XFramework API",
-                Version = "v3.0",
-                Description = @"
-# XFramework API v3.0
 
-## Overview
-XFramework is a modular, high-performance .NET 9 framework built on **Vertical Slice Architecture (VSA)** principles.
+        // .NET 10 built-in OpenAPI (replaces Swashbuckle)
+        // ReferenceHandler.IgnoreCycles prevents circular reference errors in JSON responses
+        services.ConfigureHttpJsonOptions(options =>
+        {
+            options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        });
 
-## Key Features
-- 🚀 **Performance**: Direct service injection, compiled queries, hybrid caching (Memory + Redis)
-- 📊 **Observability**: OpenTelemetry tracing, Serilog structured logging, comprehensive health checks
-- 🔒 **Security**: JWT Bearer authentication, tenant isolation, role-based authorization
-- 🎯 **VSA Architecture**: Feature-focused organization, Result<T> pattern, minimal vertical coupling
+        services.AddOpenApi(options =>
+        {
+            options.CreateSchemaReferenceId = (type) => type.Type.Name;
 
-## Architecture
-- **No CQRS/MediatR**: Direct service calls for maximum performance
-- **Result Pattern**: Consistent error handling across all endpoints
-- **EF Core Optimizations**: AsNoTracking by default, split queries, audit interceptors
-- **Hybrid Caching**: Memory cache with Redis fallback for distributed scenarios
-
-## Health Endpoints
-- `GET /health` - Overall health status (detailed)
-- `GET /health/live` - Liveness probe (Kubernetes)
-- `GET /health/ready` - Readiness probe (Kubernetes)
-
-## Authentication
-All endpoints require JWT Bearer token authentication unless marked as `[AllowAnonymous]`.
-
-**Header Format**: `Authorization: Bearer <your-jwt-token>`
-
-## Rate Limiting
-API endpoints are subject to rate limiting. Refer to the `X-RateLimit-*` response headers.
-
-## Versioning
-API version is specified via the `api-version` header. Default version: `3.0`
-",
-                Contact = new OpenApiContact
-                {
-                    Name = "XFramework API Support",
-                    Email = "support@xframework.dev"
-                },
-                License = new OpenApiLicense
-                {
-                    Name = "MIT License",
-                    Url = new Uri("https://opensource.org/licenses/MIT")
-                }
-            });
-            
-            // Include XML comments for better documentation
-            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-            if (File.Exists(xmlPath))
-            {
-                options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
-            }
-            
-            // Enable annotations for richer documentation
-            options.EnableAnnotations();
-            
-            // Describe all enums as strings
-            options.SchemaFilter<ExcludeReferenceTypePropertiesSchemaFilter>();
+            // Workaround for dotnet/aspnetcore#63857: JsonSchemaExporter can't handle
+            // circular navigation properties in EF entities. Exclude any endpoint whose
+            // request/response types reference entity models with navigation loops.
+            // Services can opt specific endpoints out via .ExcludeFromDescription().
+            // Source-generated entity CRUD endpoints are already excluded in the generator.
         });
     }
 
     public static void InstallStandardServices<T>(this IServiceCollection services, IConfiguration configuration)
     {
-        // Register CommandQueryDispatcher
-        services.TryAddSingleton<ICommandQueryDispatcher, CommandQueryDispatcher>();
-        
-        // Register all Command and Query Handlers from specified assemblies
-        var assemblies = new[] { typeof(XFrameworkCore).Assembly, typeof(T).Assembly };
-        foreach (var assembly in assemblies)
-        {
-            var handlerTypes = assembly.GetTypes()
-                .Where(t => !t.IsInterface && !t.IsAbstract && t.GetInterfaces().Any(i =>
-                    i.IsGenericType && (
-                        i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
-                        i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>)
-                    )));
-
-            foreach (var handlerType in handlerTypes)
-            {
-                var interfaces = handlerType.GetInterfaces()
-                    .Where(i => i.IsGenericType && (
-                        i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
-                        i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>)
-                    ));
-
-                foreach (var interfaceType in interfaces)
-                {
-                    services.AddTransient(interfaceType, handlerType);
-                }
-            }
-        }
-        
         services.AddValidatorsFromAssembly(typeof(RequestBase).GetTypeInfo().Assembly);
         services.TryAddSingleton<ISignalRService, SignalRService>();
         services.TryAddSingleton<IHelperService, HelperService>();
@@ -320,15 +213,8 @@ API version is specified via the `api-version` header. Default version: `3.0`
 
     public static IApplicationBuilder UseConfiguredSwagger(this IApplicationBuilder app)
     {
-        app.UseSwagger();
-        app.UseSwaggerUI(c =>
-        {
-            c.SwaggerEndpoint("/swagger/v3/swagger.json", "XFramework API v3");
-            // If you have more versions or groups, add them similarly:
-            // c.SwaggerEndpoint("/swagger/v2/swagger.json", "Version 2 of My API");
-            c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.None);
-        });
-
+        // OpenAPI + Scalar UI are mapped as endpoints in XApplication.Build()
+        // (they require WebApplication.MapOpenApi which must be called after routing is configured)
         return app;
     }
 

@@ -6,9 +6,9 @@ namespace StreamFlow.Stream.Installers;
 /// <summary>
 /// Installer for StreamFlow hosted background services.
 /// </summary>
-public class HostedServiceInstaller : IInstaller
+public sealed class HostedServiceInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         // Register StreamFlowProcessor as hosted service for background message processing
         // Processes queued messages from channels with proper backpressure and error handling

@@ -8,9 +8,9 @@ namespace StreamFlow.Stream.Installers;
 /// <summary>
 /// Installer for StreamFlow SignalR services with optimized MessagePack protocol configuration.
 /// </summary>
-public class StreamInstaller : IInstaller
+public sealed class StreamInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         // Configure SignalR with MessagePack for binary serialization and performance optimization
         services.AddSignalR(options =>

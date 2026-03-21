@@ -5,19 +5,13 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\XFramework\Server\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
-                          OutputItemType="Analyzer"
-                          ReferenceOutputAssembly="false"/>
-        <ProjectReference Include="..\SmsGateway.Core\SmsGateway.Core.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Folder Include="Controllers\V1"/>
-        <Folder Include="HostedService\"/>
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
+        <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+        <ProjectReference Include="..\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -34,7 +28,10 @@
         <!-- OpenTelemetry Exporters -->
         <PackageReference Include="OpenTelemetry.Exporter.Console" />
         <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+        
+        <!-- FluentValidation -->
+        <PackageReference Include="FluentValidation" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     </ItemGroup>
 
 </Project>
-

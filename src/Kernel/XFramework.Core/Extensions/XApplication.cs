@@ -1,4 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Scalar.AspNetCore;
 using XFramework.Core.Extensions;
 using XFramework.Extensions;
 using XFramework.Domain.Shared.Extensions;
@@ -50,9 +52,6 @@ public static class XApplication
         // Output caching (caches compressed responses)
         app.UseConfiguredOutputCaching();
         
-        // API Documentation
-        app.UseConfiguredSwagger();
-        
         // Application endpoints
         app.UseXFrameworkEndpoints();
         app.UseEndpointsInAssembly(app.Environment);
@@ -77,15 +76,18 @@ public static class XApplication
     public static IApplicationBuilder EnsureDatabase<TDbContext>(this IApplicationBuilder app)
         where TDbContext : DbContext
     {
+        // When running in Docker, migrations are handled by the MigrationRunner init container.
+        // Set SKIP_DB_MIGRATION=true in docker-compose to skip self-migration.
+        var configuration = app.ApplicationServices.GetRequiredService<IConfiguration>();
+        if (configuration.GetValue<bool>("SKIP_DB_MIGRATION"))
+        {
+            return app;
+        }
+
         using var serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>()!.CreateScope();
         var dbContext = serviceScope.ServiceProvider.GetRequiredService<TDbContext>();
 
-        var canMigrate = dbContext.Database.GetPendingMigrations().Any();
-        if (!canMigrate)
-        {
-            dbContext.Database.EnsureCreated();
-        }
-        else
+        if (dbContext.Database.GetPendingMigrations().Any())
         {
             dbContext.Database.Migrate();
         }
@@ -93,6 +95,13 @@ public static class XApplication
         return app;
     }
     
+    public static WebApplication MapApiDocumentation(this WebApplication app)
+    {
+        app.MapOpenApi();
+        app.MapScalarApiReference();
+        return app;
+    }
+
     public static void Run(this IApplicationBuilder app)
     {
         (app as WebApplication)!.Run();

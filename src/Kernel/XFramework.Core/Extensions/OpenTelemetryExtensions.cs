@@ -63,11 +63,7 @@ public static class OpenTelemetryExtensions
                             activity.SetTag("http.response_content_length", response.ContentLength);
                         };
                     })
-                    .AddEntityFrameworkCoreInstrumentation(options =>
-                    {
-                        options.SetDbStatementForText = true;
-                        options.SetDbStatementForStoredProcedure = true;
-                    })
+                    .AddEntityFrameworkCoreInstrumentation()
                     .AddHttpClientInstrumentation(options =>
                     {
                         options.RecordException = true;

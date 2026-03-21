@@ -9,19 +9,26 @@
     </PropertyGroup>
     
     <ItemGroup>
+        <!-- Direct kernel project references (VSA Architecture) -->
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+        <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
         <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
-        <ProjectReference Include="..\..\..\Kernel\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+        <ProjectReference Include="..\..\..\SourceGenerators\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-        <ProjectReference Include="..\Community.Core\Community.Core.csproj" />
         <ProjectReference Include="..\Community.Domain.Shared\Community.Domain.Shared.csproj" />
-        <ProjectReference Include="..\Community.Integration\Community.Integration.csproj" />
     </ItemGroup>
     
     <ItemGroup>
       <Folder Include="HostedService\" />
+      <Folder Include="Features\" />
+      <Folder Include="Services\" />
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Validation -->
+        <PackageReference Include="FluentValidation" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+        
         <!-- OpenTelemetry Core -->
         <PackageReference Include="OpenTelemetry" />
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />

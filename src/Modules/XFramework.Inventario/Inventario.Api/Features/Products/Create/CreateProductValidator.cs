@@ -1,5 +1,5 @@
 using FluentValidation;
-using Inventario.Core.Services;
+using XFramework.Inventario.Api.Services;
 
 namespace Inventario.Api.Features.Products.Create;
 

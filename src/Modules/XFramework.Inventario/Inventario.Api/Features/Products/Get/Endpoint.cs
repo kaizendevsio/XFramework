@@ -1,4 +1,4 @@
-using Inventario.Core.Services;
+using XFramework.Inventario.Api.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Inventario.Api.Features.Products.Get;

@@ -1,4 +1,4 @@
-﻿using  XFramework.Domain.Shared.Contracts;
+using XFramework.Domain.Shared.Contracts;
 using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Integration.Generators;

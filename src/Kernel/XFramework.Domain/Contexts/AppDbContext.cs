@@ -1,4 +1,5 @@
-﻿using IdentityServer.Domain.Shared;
+using IdentityServer.Domain.Shared;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Shared.Contracts;
 
@@ -12,6 +13,11 @@ public partial class AppDbContext : XDbContext
 
     public AppDbContext(DbContextOptions options)
         : base(options)
+    {
+    }
+    
+    public AppDbContext(DbContextOptions options, IHttpContextAccessor httpContextAccessor)
+        : base(options, httpContextAccessor)
     {
     }
 
@@ -1988,6 +1994,9 @@ public partial class AppDbContext : XDbContext
 
         OnModelCreatingPartial(modelBuilder);
         SeedDatabase(modelBuilder);
+
+        // CRITICAL: Call base to apply global query filters (soft-delete + multi-tenancy)
+        base.OnModelCreating(modelBuilder);
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

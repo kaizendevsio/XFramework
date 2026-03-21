@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
@@ -11,8 +12,9 @@ namespace XFramework.Core.Services.Caching;
 /// <summary>
 /// Hybrid caching service that combines in-memory (L1) and distributed Redis (L2) caching.
 /// Provides graceful fallback to L1 only if Redis is unavailable.
+/// Includes stampede protection via per-key locking in GetOrSetAsync.
 /// </summary>
-public class HybridCacheService : ICacheService, IDisposable
+public sealed class HybridCacheService : ICacheService, IDisposable
 {
     private readonly IMemoryCache _memoryCache;
     private readonly IDistributedCache? _distributedCache;
@@ -20,12 +22,14 @@ public class HybridCacheService : ICacheService, IDisposable
     private readonly CacheOptions _options;
     private readonly ILogger<HybridCacheService> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
-    
+
+    // Stampede protection: per-key semaphores for GetOrSetAsync
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _keyLocks = new();
+
     // Statistics tracking
     private long _totalGets;
     private long _hits;
     private long _misses;
-    private bool _redisAvailable;
 
     public HybridCacheService(
         IMemoryCache memoryCache,
@@ -46,83 +50,86 @@ public class HybridCacheService : ICacheService, IDisposable
             WriteIndented = false
         };
 
-        // Check Redis availability
-        _redisAvailable = CheckRedisAvailability();
-        
-        if (!_redisAvailable && _options.EnableL2Cache)
+        if (!IsRedisAvailable && _options.EnableL2Cache)
         {
             _logger.LogWarning("Redis is not available. Cache will operate in L1 (memory) only mode");
         }
     }
 
+    /// <summary>
+    /// Dynamically checks Redis availability on each call.
+    /// If Redis reconnects after a transient failure, operations resume automatically.
+    /// </summary>
+    private bool IsRedisAvailable =>
+        _options.EnableL2Cache && _redisConnection is { IsConnected: true };
+
+    /// <summary>
+    /// Applies the configured key prefix (RedisInstanceName) to ensure
+    /// keys don't collide with other applications sharing the same Redis instance.
+    /// </summary>
+    private string PrefixKey(string key) =>
+        string.IsNullOrEmpty(_options.RedisInstanceName) ? key : $"{_options.RedisInstanceName}{key}";
+
     /// <inheritdoc />
     public async Task<Result<T?>> GetAsync<T>(string key, CancellationToken cancellationToken = default)
     {
         if (!_options.Enabled)
-        {
             return Result<T?>.Success(default, "Caching is disabled");
-        }
 
         if (string.IsNullOrWhiteSpace(key))
-        {
             return Result<T?>.Failure("Cache key cannot be null or empty", 400);
-        }
 
         try
         {
             if (_options.EnableStatistics)
-            {
                 Interlocked.Increment(ref _totalGets);
-            }
+
+            var prefixedKey = PrefixKey(key);
 
             // Try L1 (Memory) first
-            if (_options.EnableL1Cache && _memoryCache.TryGetValue(key, out T? cachedValue))
+            if (_options.EnableL1Cache && _memoryCache.TryGetValue(prefixedKey, out T? cachedValue))
             {
                 if (_options.EnableStatistics)
-                {
                     Interlocked.Increment(ref _hits);
-                }
-                
+
                 _logger.LogTrace("Cache hit (L1) for key: {Key}", key);
                 return Result<T?>.Success(cachedValue);
             }
 
             // Try L2 (Redis) if available
-            if (_options.EnableL2Cache && _redisAvailable && _distributedCache != null)
+            if (IsRedisAvailable && _distributedCache != null)
             {
-                var redisValue = await _distributedCache.GetStringAsync(key, cancellationToken);
-                
+                var redisValue = await _distributedCache.GetStringAsync(prefixedKey, cancellationToken);
+
                 if (!string.IsNullOrEmpty(redisValue))
                 {
                     var deserializedValue = JsonSerializer.Deserialize<T>(redisValue, _jsonOptions);
-                    
+
                     // Populate L1 cache
                     if (_options.EnableL1Cache)
-                    {
-                        SetInMemoryCache(key, deserializedValue);
-                    }
+                        SetInMemoryCache(prefixedKey, deserializedValue);
 
                     if (_options.EnableStatistics)
-                    {
                         Interlocked.Increment(ref _hits);
-                    }
-                    
+
                     _logger.LogTrace("Cache hit (L2) for key: {Key}", key);
                     return Result<T?>.Success(deserializedValue);
                 }
             }
 
             if (_options.EnableStatistics)
-            {
                 Interlocked.Increment(ref _misses);
-            }
-            
+
             _logger.LogTrace("Cache miss for key: {Key}", key);
             return Result<T?>.Success(default, "Cache miss");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving cache key: {Key}", key);
+
+            if (_options.EnableGracefulDegradation)
+                return Result<T?>.Success(default, "Cache retrieval failed, returning default");
+
             return Result<T?>.Failure($"Cache retrieval failed: {ex.Message}", 500);
         }
     }
@@ -136,30 +143,25 @@ public class HybridCacheService : ICacheService, IDisposable
         CancellationToken cancellationToken = default)
     {
         if (!_options.Enabled)
-        {
             return Result.Success("Caching is disabled");
-        }
 
         if (string.IsNullOrWhiteSpace(key))
-        {
             return Result.Failure("Cache key cannot be null or empty", 400);
-        }
+
+        var prefixedKey = PrefixKey(key);
 
         try
         {
             // Set in L1 (Memory)
             if (_options.EnableL1Cache)
-            {
-                SetInMemoryCache(key, value, absoluteExpiration, slidingExpiration);
-            }
+                SetInMemoryCache(prefixedKey, value, absoluteExpiration, slidingExpiration);
 
             // Set in L2 (Redis)
-            if (_options.EnableL2Cache && _redisAvailable && _distributedCache != null)
+            if (IsRedisAvailable && _distributedCache != null)
             {
                 var jsonValue = JsonSerializer.Serialize(value, _jsonOptions);
                 var options = CreateDistributedCacheOptions(absoluteExpiration, slidingExpiration);
-                
-                await _distributedCache.SetStringAsync(key, jsonValue, options, cancellationToken);
+                await _distributedCache.SetStringAsync(prefixedKey, jsonValue, options, cancellationToken);
             }
 
             _logger.LogTrace("Cache set for key: {Key}", key);
@@ -168,13 +170,11 @@ public class HybridCacheService : ICacheService, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting cache key: {Key}", key);
-            
+
             // If Redis failed but memory cache succeeded, consider it partial success
             if (_options.EnableGracefulDegradation && _options.EnableL1Cache)
-            {
                 return Result.Success("Cache entry set in L1 only (L2 unavailable)");
-            }
-            
+
             return Result.Failure($"Cache set failed: {ex.Message}", 500);
         }
     }
@@ -183,23 +183,17 @@ public class HybridCacheService : ICacheService, IDisposable
     public async Task<Result> RemoveAsync(string key, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(key))
-        {
             return Result.Failure("Cache key cannot be null or empty", 400);
-        }
+
+        var prefixedKey = PrefixKey(key);
 
         try
         {
-            // Remove from L1 (Memory)
             if (_options.EnableL1Cache)
-            {
-                _memoryCache.Remove(key);
-            }
+                _memoryCache.Remove(prefixedKey);
 
-            // Remove from L2 (Redis)
-            if (_options.EnableL2Cache && _redisAvailable && _distributedCache != null)
-            {
-                await _distributedCache.RemoveAsync(key, cancellationToken);
-            }
+            if (IsRedisAvailable && _distributedCache != null)
+                await _distributedCache.RemoveAsync(prefixedKey, cancellationToken);
 
             _logger.LogTrace("Cache removed for key: {Key}", key);
             return Result.Success("Cache entry removed successfully");
@@ -215,23 +209,19 @@ public class HybridCacheService : ICacheService, IDisposable
     public async Task<Result<bool>> ExistsAsync(string key, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(key))
-        {
             return Result<bool>.Failure("Cache key cannot be null or empty", 400);
-        }
+
+        var prefixedKey = PrefixKey(key);
 
         try
         {
-            // Check L1 (Memory) first
-            if (_options.EnableL1Cache && _memoryCache.TryGetValue(key, out _))
-            {
+            if (_options.EnableL1Cache && _memoryCache.TryGetValue(prefixedKey, out _))
                 return Result<bool>.Success(true);
-            }
 
-            // Check L2 (Redis)
-            if (_options.EnableL2Cache && _redisAvailable && _redisConnection != null)
+            if (IsRedisAvailable && _redisConnection != null)
             {
                 var db = _redisConnection.GetDatabase();
-                var exists = await db.KeyExistsAsync(key);
+                var exists = await db.KeyExistsAsync(prefixedKey);
                 return Result<bool>.Success(exists);
             }
 
@@ -245,6 +235,11 @@ public class HybridCacheService : ICacheService, IDisposable
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Uses per-key locking to prevent cache stampede (thundering herd).
+    /// Only one caller per key will execute the factory; others wait for the result.
+    /// Factory exceptions are NOT swallowed — they propagate to the caller.
+    /// </remarks>
     public async Task<Result<T>> GetOrSetAsync<T>(
         string key,
         Func<CancellationToken, Task<T>> factory,
@@ -253,43 +248,47 @@ public class HybridCacheService : ICacheService, IDisposable
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(key))
-        {
             return Result<T>.Failure("Cache key cannot be null or empty", 400);
-        }
 
-        if (factory == null)
-        {
-            return Result<T>.Failure("Factory function cannot be null", 400);
-        }
+        ArgumentNullException.ThrowIfNull(factory);
 
+        // Try cache first (no lock needed for reads)
+        var getResult = await GetAsync<T>(key, cancellationToken);
+
+        if (getResult is { IsSuccess: true, Data: not null })
+            return Result<T>.Success(getResult.Data);
+
+        // Cache miss — acquire per-key lock to prevent stampede
+        var keyLock = _keyLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+
+        await keyLock.WaitAsync(cancellationToken);
         try
         {
-            // Try to get from cache
-            var getResult = await GetAsync<T>(key, cancellationToken);
-            
-            if (getResult.IsSuccess && getResult.Data != null)
-            {
-                return Result<T>.Success(getResult.Data);
-            }
+            // Double-check after acquiring the lock (another thread may have populated the cache)
+            getResult = await GetAsync<T>(key, cancellationToken);
 
-            // Cache miss - execute factory
+            if (getResult is { IsSuccess: true, Data: not null })
+                return Result<T>.Success(getResult.Data);
+
+            // Execute factory — exceptions propagate to caller
             _logger.LogTrace("Cache miss, executing factory for key: {Key}", key);
             var value = await factory(cancellationToken);
 
-            // Set in cache
+            // Set in cache (fire-and-forget is OK — cache failures don't break the operation)
             var setResult = await SetAsync(key, value, absoluteExpiration, slidingExpiration, cancellationToken);
-            
+
             if (!setResult.IsSuccess)
-            {
                 _logger.LogWarning("Failed to cache value for key {Key}: {Message}", key, setResult.Message);
-            }
 
             return Result<T>.Success(value);
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(ex, "Error in GetOrSetAsync for key: {Key}", key);
-            return Result<T>.Failure($"GetOrSet operation failed: {ex.Message}", 500);
+            keyLock.Release();
+
+            // Clean up the semaphore if no one else is waiting
+            if (keyLock.CurrentCount == 1)
+                _keyLocks.TryRemove(key, out _);
         }
     }
 
@@ -297,36 +296,29 @@ public class HybridCacheService : ICacheService, IDisposable
     public async Task<Result<int>> RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(prefix))
-        {
             return Result<int>.Failure("Prefix cannot be null or empty", 400);
-        }
 
         try
         {
-            int removedCount = 0;
+            var removedCount = 0;
+            var prefixedPattern = PrefixKey(prefix);
 
             // Note: L1 (MemoryCache) doesn't support pattern-based removal efficiently
-            // This is a limitation of IMemoryCache. We can only remove from L2 (Redis).
-            _logger.LogWarning("L1 cache does not support prefix-based removal. Only L2 (Redis) entries will be removed");
+            _logger.LogDebug("L1 cache does not support prefix-based removal. Only L2 (Redis) entries will be removed");
 
             // Remove from L2 (Redis) using SCAN
-            if (_options.EnableL2Cache && _redisAvailable && _redisConnection != null)
+            if (IsRedisAvailable && _redisConnection != null)
             {
                 var db = _redisConnection.GetDatabase();
                 var server = _redisConnection.GetServer(_redisConnection.GetEndPoints().First());
-                
-                var pattern = $"{prefix}*";
-                var keys = server.Keys(pattern: pattern, pageSize: 1000);
 
-                foreach (var key in keys)
+                var pattern = $"{prefixedPattern}*";
+                var keys = server.Keys(pattern: pattern, pageSize: 1000).ToArray();
+
+                if (keys.Length > 0)
                 {
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        break;
-                    }
-
-                    await db.KeyDeleteAsync(key);
-                    removedCount++;
+                    await db.KeyDeleteAsync(keys);
+                    removedCount = keys.Length;
                 }
 
                 _logger.LogInformation("Removed {Count} cache entries with prefix: {Prefix}", removedCount, prefix);
@@ -344,47 +336,56 @@ public class HybridCacheService : ICacheService, IDisposable
     /// <inheritdoc />
     public Result<CacheStatistics> GetStatistics()
     {
-        try
+        var stats = new CacheStatistics
         {
-            var stats = new CacheStatistics
-            {
-                TotalGets = _totalGets,
-                Hits = _hits,
-                Misses = _misses,
-                L1EntryCount = GetMemoryCacheCount(),
-                L2Available = _redisAvailable
-            };
+            TotalGets = _totalGets,
+            Hits = _hits,
+            Misses = _misses,
+            L1EntryCount = -1, // IMemoryCache doesn't expose count
+            L2Available = IsRedisAvailable
+        };
 
-            return Result<CacheStatistics>.Success(stats);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving cache statistics");
-            return Result<CacheStatistics>.Failure($"Statistics retrieval failed: {ex.Message}", 500);
-        }
+        return Result<CacheStatistics>.Success(stats);
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Uses prefix-based removal instead of FlushDatabase to avoid nuking
+    /// other applications' data when sharing a Redis instance.
+    /// </remarks>
     public async Task<Result> ClearAllAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            // Clear L1 (Memory) - note: IMemoryCache doesn't have a built-in Clear method
-            // We would need to implement a wrapper or use reflection, but for safety we'll skip this
             _logger.LogWarning("L1 cache clearing is not fully supported by IMemoryCache. Only L2 will be cleared");
 
-            // Clear L2 (Redis) by removing all keys
-            if (_options.EnableL2Cache && _redisAvailable && _redisConnection != null)
+            // Clear L2 (Redis) using prefix-based removal — NOT FlushDatabase
+            if (IsRedisAvailable && _redisConnection != null)
             {
+                var db = _redisConnection.GetDatabase();
                 var server = _redisConnection.GetServer(_redisConnection.GetEndPoints().First());
-                await server.FlushDatabaseAsync();
-                _logger.LogWarning("L2 (Redis) cache cleared");
+
+                var prefix = _options.RedisInstanceName;
+                if (!string.IsNullOrEmpty(prefix))
+                {
+                    var keys = server.Keys(pattern: $"{prefix}*", pageSize: 1000).ToArray();
+                    if (keys.Length > 0)
+                    {
+                        await db.KeyDeleteAsync(keys);
+                        _logger.LogWarning("L2 (Redis) cleared {Count} keys with prefix '{Prefix}'", keys.Length, prefix);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("No Redis key prefix configured — skipping L2 clear to prevent data loss. " +
+                                       "Set CacheOptions.RedisInstanceName to enable ClearAllAsync");
+                }
             }
 
             // Reset statistics
-            _totalGets = 0;
-            _hits = 0;
-            _misses = 0;
+            Interlocked.Exchange(ref _totalGets, 0);
+            Interlocked.Exchange(ref _hits, 0);
+            Interlocked.Exchange(ref _misses, 0);
 
             return Result.Success("Cache cleared successfully");
         }
@@ -395,7 +396,7 @@ public class HybridCacheService : ICacheService, IDisposable
         }
     }
 
-    // Private helper methods
+    // Private helpers
 
     private void SetInMemoryCache<T>(
         string key,
@@ -405,26 +406,21 @@ public class HybridCacheService : ICacheService, IDisposable
     {
         var cacheOptions = new MemoryCacheEntryOptions();
 
-        // Use provided expiration or defaults
-        var absExp = absoluteExpiration 
-            ?? (_options.DefaultAbsoluteExpirationSeconds.HasValue 
-                ? TimeSpan.FromSeconds(_options.DefaultAbsoluteExpirationSeconds.Value) 
-                : (TimeSpan?)null);
+        var absExp = absoluteExpiration
+            ?? (_options.DefaultAbsoluteExpirationSeconds.HasValue
+                ? TimeSpan.FromSeconds(_options.DefaultAbsoluteExpirationSeconds.Value)
+                : null);
 
-        var slideExp = slidingExpiration 
-            ?? (_options.DefaultSlidingExpirationSeconds.HasValue 
-                ? TimeSpan.FromSeconds(_options.DefaultSlidingExpirationSeconds.Value) 
-                : (TimeSpan?)null);
+        var slideExp = slidingExpiration
+            ?? (_options.DefaultSlidingExpirationSeconds.HasValue
+                ? TimeSpan.FromSeconds(_options.DefaultSlidingExpirationSeconds.Value)
+                : null);
 
         if (absExp.HasValue)
-        {
             cacheOptions.AbsoluteExpirationRelativeToNow = absExp;
-        }
 
         if (slideExp.HasValue)
-        {
             cacheOptions.SlidingExpiration = slideExp;
-        }
 
         _memoryCache.Set(key, value, cacheOptions);
     }
@@ -435,58 +431,31 @@ public class HybridCacheService : ICacheService, IDisposable
     {
         var options = new DistributedCacheEntryOptions();
 
-        var absExp = absoluteExpiration 
-            ?? (_options.DefaultAbsoluteExpirationSeconds.HasValue 
-                ? TimeSpan.FromSeconds(_options.DefaultAbsoluteExpirationSeconds.Value) 
-                : (TimeSpan?)null);
+        var absExp = absoluteExpiration
+            ?? (_options.DefaultAbsoluteExpirationSeconds.HasValue
+                ? TimeSpan.FromSeconds(_options.DefaultAbsoluteExpirationSeconds.Value)
+                : null);
 
-        var slideExp = slidingExpiration 
-            ?? (_options.DefaultSlidingExpirationSeconds.HasValue 
-                ? TimeSpan.FromSeconds(_options.DefaultSlidingExpirationSeconds.Value) 
-                : (TimeSpan?)null);
+        var slideExp = slidingExpiration
+            ?? (_options.DefaultSlidingExpirationSeconds.HasValue
+                ? TimeSpan.FromSeconds(_options.DefaultSlidingExpirationSeconds.Value)
+                : null);
 
         if (absExp.HasValue)
-        {
             options.AbsoluteExpirationRelativeToNow = absExp;
-        }
 
         if (slideExp.HasValue)
-        {
             options.SlidingExpiration = slideExp;
-        }
 
         return options;
     }
 
-    private bool CheckRedisAvailability()
-    {
-        if (!_options.EnableL2Cache || _redisConnection == null)
-        {
-            return false;
-        }
-
-        try
-        {
-            return _redisConnection.IsConnected;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to check Redis availability");
-            return false;
-        }
-    }
-
-    private int GetMemoryCacheCount()
-    {
-        // IMemoryCache doesn't expose count directly
-        // This is a limitation - we would need a wrapper to track this
-        // For now, return -1 to indicate unknown
-        return -1;
-    }
-
     public void Dispose()
     {
-        // IConnectionMultiplexer should be managed by DI container
-        // Don't dispose it here as it's injected
+        // Dispose per-key semaphores
+        foreach (var kvp in _keyLocks)
+            kvp.Value.Dispose();
+
+        _keyLocks.Clear();
     }
 }

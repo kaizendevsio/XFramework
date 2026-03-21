@@ -4,7 +4,7 @@ using TResponse = CmdResponse;
 
 [MemoryPackable]
 public partial record UpdateMessageDirectRequest : RequestBase,
-    ICommand,
+    ICommand<CmdResponse>,
     IStreamflowRequest<UpdateMessageDirectRequest, TResponse>
 {
     public Guid? Id { get; set; }

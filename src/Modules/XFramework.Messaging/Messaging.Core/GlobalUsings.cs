@@ -1,9 +1,0 @@
-global using System;
-global using System.Threading;
-global using System.Threading.Tasks;
-global using Messaging.Domain.Shared.Contracts.Requests.Create;
-global using Messaging.Domain.Shared.Contracts.Requests.Update;
-global using XFramework;
-global using XFramework.Core.Patterns;
-global using XFramework.Domain.Shared.BusinessObjects;
-global using XFramework.Domain.Shared.Contracts;

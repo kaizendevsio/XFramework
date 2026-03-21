@@ -1,15 +1,14 @@
 using Microsoft.AspNetCore.Http.Connections.Features;
 using Microsoft.AspNetCore.SignalR;
-using StreamFlow.Core.Interfaces;
 using StreamFlow.Domain.Shared.BusinessObjects;
 using StreamFlow.Domain.Shared.Contracts.Requests;
 using StreamFlow.Domain.Shared.Contracts.Responses;
 using StreamFlow.Domain.Shared.Enums;
 using StreamFlow.Stream.Hubs;
+using StreamFlow.Stream.Interfaces;
+using XFramework.Core.Loggers;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Configurations;
-using StreamFlow.Core.Services;
-using XFramework.Core.Loggers;
 
 namespace StreamFlow.Stream.Services;
 
@@ -18,7 +17,7 @@ namespace StreamFlow.Stream.Services;
 /// Consolidates handler logic from MediatR handlers into direct service methods.
 /// Preserves all Channel-based queueing and performance optimizations.
 /// </summary>
-public class StreamFlowService : IStreamFlowService
+public sealed class StreamFlowService : IStreamFlowService
 {
     private readonly ICachingService _cachingService;
     private readonly IHubContext<MessageQueueHub> _hubContext;

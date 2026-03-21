@@ -5,7 +5,7 @@ using TResponse = CmdResponse;
 
 [MemoryPackable]
 public partial record VerifyPasswordRequest : RequestBase,
-    ICommand,
+    ICommand<CmdResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {
     public Guid CredentialId { get; set; }

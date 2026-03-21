@@ -3,18 +3,15 @@ using XFramework.Integration.Services;
 
 namespace XFramework.Core.Services;
 
-public class ProcessMonitorHostedService(ProcessMonitorService processMonitorService) : IHostedService
+public sealed class ProcessMonitorHostedService(ProcessMonitorService processMonitorService) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        //throw new System.NotImplementedException();
-        _ = processMonitorService.ProcessMonitor(cancellationToken);
-        return Task.CompletedTask;
+        return processMonitorService.ProcessMonitor(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        //throw new System.NotImplementedException();
         return Task.CompletedTask;
     }
 }

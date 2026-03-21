@@ -5,7 +5,7 @@ using TResponse = CmdResponse;
 
 [MemoryPackable]
 public partial record CreateCashInRequest : Contracts.TransactionRequestBase,
-    ICommand, 
+    ICommand<CmdResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {
     public PaymentGateway? PaymentGateway { get; set; }

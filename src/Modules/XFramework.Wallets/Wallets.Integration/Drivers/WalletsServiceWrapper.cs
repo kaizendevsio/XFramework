@@ -1,4 +1,4 @@
-﻿using Wallets.Domain.Shared.Contracts.Requests;
+using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.BusinessObjects;
 
 namespace Wallets.Integration.Drivers;

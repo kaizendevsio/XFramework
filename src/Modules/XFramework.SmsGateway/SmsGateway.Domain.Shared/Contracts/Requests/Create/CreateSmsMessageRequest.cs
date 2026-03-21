@@ -5,7 +5,7 @@ using TResponse = CmdResponse;
 
 [MemoryPackable]
 public partial record CreateSmsMessageRequest : RequestBase,
-    ICommand,
+    ICommand<CmdResponse>,
     IStreamflowRequest<TRequest, TResponse>
 {
     public Guid Id { get; set; }

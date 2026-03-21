@@ -1,11 +1,12 @@
-﻿using XFramework.Domain.Shared.Interfaces;
+﻿using StreamFlow.Stream.Services;
+using XFramework.Domain.Shared.Interfaces;
 
 namespace StreamFlow.Stream.Installers;
 
-public class DependencyInstaller : IInstaller
+public sealed class DependencyInstaller : IInstaller
 {
-    public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
+    public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        
+        services.AddScoped<IQueryExecutionService, QueryExecutionService>();
     }
 }

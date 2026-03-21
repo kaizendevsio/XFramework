@@ -8,5 +8,5 @@ namespace XFramework.Integration.Abstractions;
 
 public interface ISignalREventHandler
 {
-    public void Handle(HubConnection connection, ICommandQueryDispatcher dispatcher, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory);
+    public void Handle(HubConnection connection, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory);
 }

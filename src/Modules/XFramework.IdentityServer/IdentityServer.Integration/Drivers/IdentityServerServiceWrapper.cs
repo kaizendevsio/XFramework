@@ -1,4 +1,4 @@
-﻿using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.BusinessObjects;
 
@@ -11,7 +11,6 @@ public partial interface IIdentityServerServiceWrapper
     public Task<CmdResponse> VerifyPassword(VerifyPasswordRequest request);
     public Task<CmdResponse> ChangePassword(ChangePasswordRequest request);
     public Task<CmdResponse> CreateAffiliateSubscription(CreateAffiliateSubscriptionRequest request);
-
 }
 
 public partial record IdentityServerServiceWrapper
@@ -25,7 +24,7 @@ public partial record IdentityServerServiceWrapper
     {
         return SendAsync<CheckVerificationRequest, CheckVerificationResponse>(request);
     }
-    
+
     public Task<CmdResponse> VerifyPassword(VerifyPasswordRequest request)
     {
         return SendVoidAsync(request);
