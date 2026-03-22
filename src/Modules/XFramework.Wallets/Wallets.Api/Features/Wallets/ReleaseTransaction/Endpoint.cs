@@ -1,8 +1,8 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
+using FluentValidation;
 using Wallets.Api.Services;
 using Wallets.Domain.Shared.Contracts.Requests;
+using XFramework.Core.Patterns;
+using XFramework.Integration.Attributes;
 
 namespace Wallets.Api.Features.Wallets.ReleaseTransaction;
 
@@ -11,50 +11,25 @@ namespace Wallets.Api.Features.Wallets.ReleaseTransaction;
 /// </summary>
 public static class ReleaseTransactionEndpoint
 {
-    public static void MapReleaseTransaction(this IEndpointRouteBuilder app)
-    {
-        app.MapPost("/api/wallets/release-transaction", Handle)
-            .WithName("ReleaseTransaction")
-            .WithTags("Wallets")
-            .WithOpenApi(op =>
-            {
-                op.Summary = "Release a held transaction";
-                op.Description = "Releases a transaction that was previously placed on hold. Moves the amount from on-hold balances to available balances.";
-                return op;
-            })
-            .Produces(StatusCodes.Status200OK)
-            .ProducesValidationProblem()
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status500InternalServerError);
-    }
-
-    private static async Task<Results<Ok, ValidationProblem, ProblemHttpResult>> Handle(
-        [FromBody] ReleaseTransactionRequest request,
-        [FromServices] IWalletService walletService,
+    [StreamFlowHandler]
+    [MapPost("/api/wallets/release-transaction", Tags = ["Wallets"],
+        Summary = "Release a held transaction",
+        Description = "Releases a transaction that was previously placed on hold. Moves the amount from on-hold balances to available balances.",
+        ExcludeFromOpenApi = true)]
+    public static async Task<Result> Handle(
+        ReleaseTransactionRequest request,
+        IWalletService walletService,
         CancellationToken ct)
     {
-        // Basic validation
-        if (request.Id == Guid.Empty)
-        {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                { "Id", new[] { "Transaction ID is required" } }
-            });
-        }
+        return await walletService.ReleaseTransactionAsync(request, ct);
+    }
+}
 
-        // Call service
-        var result = await walletService.ReleaseTransactionAsync(request, ct);
-
-        if (!result.IsSuccess)
-        {
-            return TypedResults.Problem(
-                title: "Error releasing transaction",
-                detail: result.Message,
-                statusCode: result.StatusCode
-            );
-        }
-
-        return TypedResults.Ok();
+public class ReleaseTransactionValidator : AbstractValidator<ReleaseTransactionRequest>
+{
+    public ReleaseTransactionValidator()
+    {
+        RuleFor(x => x.Id)
+            .NotEmpty().WithMessage("Transaction ID is required");
     }
 }

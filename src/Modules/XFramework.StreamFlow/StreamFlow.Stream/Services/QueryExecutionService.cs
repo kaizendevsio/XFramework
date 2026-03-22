@@ -26,7 +26,7 @@ public sealed class QueryExecutionService(
 
     public async Task<byte[]> ExecuteAsync(byte[] queryDescriptorBytes, CancellationToken ct = default)
     {
-        var descriptor = MemoryPack.MemoryPackSerializer.Deserialize<QueryDescriptor>(queryDescriptorBytes);
+        var descriptor = MemoryPack.MemoryPackSerializer.Deserialize<QueryDescriptor>((ReadOnlySpan<byte>)queryDescriptorBytes);
         if (descriptor is null)
             return SerializeError("Failed to deserialize QueryDescriptor.");
 
@@ -52,7 +52,7 @@ public sealed class QueryExecutionService(
         byte[] queryDescriptorBytes,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var descriptor = MemoryPack.MemoryPackSerializer.Deserialize<QueryDescriptor>(queryDescriptorBytes);
+        var descriptor = MemoryPack.MemoryPackSerializer.Deserialize<QueryDescriptor>((ReadOnlySpan<byte>)queryDescriptorBytes);
         if (descriptor is null)
             yield break;
 
@@ -70,7 +70,7 @@ public sealed class QueryExecutionService(
 
     public async Task<byte[]> ExecuteChangesAsync(byte[] saveChangesRequestBytes, CancellationToken ct = default)
     {
-        var request = MemoryPack.MemoryPackSerializer.Deserialize<SaveChangesRequest>(saveChangesRequestBytes);
+        var request = MemoryPack.MemoryPackSerializer.Deserialize<SaveChangesRequest>((ReadOnlySpan<byte>)saveChangesRequestBytes);
         if (request is null)
             return SerializeError("Failed to deserialize SaveChangesRequest.");
 
@@ -84,7 +84,7 @@ public sealed class QueryExecutionService(
                 if (!_entityTypes.TryGetValue(change.EntityTypeName, out var entityType))
                     return SerializeError($"Entity type '{change.EntityTypeName}' is not registered.");
 
-                var entity = MemoryPack.MemoryPackSerializer.Deserialize(entityType, change.SerializedEntity);
+                var entity = MemoryPack.MemoryPackSerializer.Deserialize(entityType, (ReadOnlySpan<byte>)change.SerializedEntity);
                 if (entity is null)
                     return SerializeError($"Failed to deserialize entity of type '{change.EntityTypeName}'.");
 

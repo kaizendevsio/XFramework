@@ -11,11 +11,10 @@ public static class StreamFlowHelper
         return entity.GetType().Name.Replace("Request", string.Empty);
     }
         
-    public static TRequest AsCommandQuery<TRequest>(this object entity)
+    public static TRequest AsCommandQuery<TRequest>(this ReadOnlyMemory<byte> data)
         where TRequest : class
     {
-        var deserializedEntity = MemoryPackSerializer.Deserialize<TRequest>(entity as byte[]);
-        return deserializedEntity;
+        return MemoryPackSerializer.Deserialize<TRequest>(data.Span);
     }
 
 }

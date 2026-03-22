@@ -20,4 +20,12 @@ public class StreamFlowClient
     
     [Key(4)]
     public DateTime ConnectedAt { get; set; }
+
+    [Key(5)]
+    public DateTime LastSeenAt { get; set; }
+
+    [IgnoreMember] public int SuccessCount;
+    [IgnoreMember] public int FailureCount;
+    [IgnoreMember] public DateTime LastFailureAt;
+    [IgnoreMember] public bool IsCircuitOpen;
 }

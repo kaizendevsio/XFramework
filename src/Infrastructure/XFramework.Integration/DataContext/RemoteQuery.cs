@@ -114,21 +114,21 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     {
         _descriptor.Mode = QueryExecutionMode.ToList;
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<List<T>>(resultBytes) ?? [];
+        return MemoryPack.MemoryPackSerializer.Deserialize<List<T>>((ReadOnlySpan<byte>)resultBytes) ?? [];
     }
 
     public async Task<T?> FirstOrDefaultAsync(CancellationToken ct = default)
     {
         _descriptor.Mode = QueryExecutionMode.FirstOrDefault;
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<T>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
     {
         _descriptor.Mode = QueryExecutionMode.SingleOrDefault;
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<T>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async IAsyncEnumerable<T> ToAsyncEnumerable([EnumeratorCancellation] CancellationToken ct = default)
@@ -138,7 +138,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
 
         await foreach (var chunk in _connection.StreamAsync<byte[]>("StreamQuery", descriptorBytes, ct))
         {
-            var item = MemoryPack.MemoryPackSerializer.Deserialize<T>(chunk);
+            var item = MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)chunk);
             if (item is not null)
                 yield return item;
         }
@@ -148,14 +148,14 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     {
         _descriptor.Mode = QueryExecutionMode.Count;
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<int>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<int>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<bool> AnyAsync(CancellationToken ct = default)
     {
         _descriptor.Mode = QueryExecutionMode.Any;
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<bool>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<bool>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
@@ -163,7 +163,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.AnyWithPredicate;
         _descriptor.PredicateFilters = QueryExpressionVisitor.Parse(predicate);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<bool>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<bool>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<bool> AllAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
@@ -171,7 +171,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.All;
         _descriptor.PredicateFilters = QueryExpressionVisitor.Parse(predicate);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<bool>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<bool>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<TResult?> MinAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
@@ -179,7 +179,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.Min;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<TResult>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<TResult>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<TResult?> MaxAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
@@ -187,7 +187,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.Max;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<TResult>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<TResult>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<T?> MinByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
@@ -195,7 +195,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.MinBy;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(keySelector);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<T>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<T?> MaxByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
@@ -203,7 +203,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.MaxBy;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(keySelector);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<T>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<decimal> SumAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
@@ -211,7 +211,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.Sum;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<decimal>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<decimal>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<double> AverageAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
@@ -219,7 +219,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.Average;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<double>(resultBytes);
+        return MemoryPack.MemoryPackSerializer.Deserialize<double>((ReadOnlySpan<byte>)resultBytes);
     }
 
     public async Task<List<GroupResult<TKey, T>>> GroupByAsync<TKey>(
@@ -229,7 +229,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.GroupBy;
         _descriptor.GroupByProperty = SortExpressionParser.GetPropertyName(keySelector);
         var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<List<GroupResult<TKey, T>>>(resultBytes) ?? [];
+        return MemoryPack.MemoryPackSerializer.Deserialize<List<GroupResult<TKey, T>>>((ReadOnlySpan<byte>)resultBytes) ?? [];
     }
 
     private async Task<byte[]> ExecuteAsync(CancellationToken ct)

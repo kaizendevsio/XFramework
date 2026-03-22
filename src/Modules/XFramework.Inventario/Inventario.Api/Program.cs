@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
 using XFramework.Core.Extensions;
@@ -21,6 +22,9 @@ builder.Services.AddMemoryCaching();
 builder.Services.AddSingleton<IDistributedCache>(sp => null!);
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp => null!);
 
+// Register FluentValidation validators from this assembly
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
 // Auto-discover and register all generated services
 builder.Services.AddGeneratedServices();
 
@@ -31,8 +35,11 @@ app.UseCorrelationId();
 
 app.EnsureDatabase<DbContext>();
 
-// Auto-discover and map all generated endpoints
-app.MapGeneratedEndpoints();
+// Auto-discover and map entity-generated endpoints (from [GenerateEndpoints] attribute)
+EndpointDiscoveryExtensions.MapGeneratedEndpoints(app);
+
+// Map feature endpoints (source-generated from [MapPost/Get/...] attributes)
+Inventario.Api.Generated.GeneratedEndpointRoutes.MapGeneratedEndpoints(app);
 
 // Map health check endpoints (liveness, readiness, and detailed health)
 app.MapXFrameworkHealthChecks("Inventario");

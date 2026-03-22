@@ -1,36 +1,25 @@
 using Coins.Api.BusinessObjects;
 using Coins.Api.Services;
+using XFramework.Core.Patterns;
+using XFramework.Integration.Attributes;
 
 namespace Coins.Api.Features.Blockchain.Send;
 
-/// <summary>
-/// POST /Blockchain/Send endpoint - Bulk send Bitcoin transactions
-/// </summary>
 public static class SendEndpoint
 {
-    public static async Task<IResult> HandleAsync(
+    [MapPost("/Blockchain/Send", Tags = ["Blockchain"],
+        Summary = "Send Bitcoin transactions",
+        Description = "Execute bulk send operation to multiple Bitcoin addresses",
+        ExcludeFromOpenApi = true)]
+    public static async Task<Result<BlockchainResponse>> Handle(
         List<BtcTransactionBO> transactionList,
         IBlockchainService blockchainService,
-        IValidator<List<BtcTransactionBO>> validator,
-        CancellationToken cancellationToken = default)
+        CancellationToken ct)
     {
-        // Validate request
-        var validationResult = await validator.ValidateAsync(transactionList, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
-            return Results.BadRequest(new { Errors = errors });
-        }
+        var response = await blockchainService.BulkSendAsync(transactionList, ct);
 
-        // Execute bulk send
-        var response = await blockchainService.BulkSendAsync(transactionList, cancellationToken);
-
-        return response.HttpStatusCode switch
-        {
-            HttpStatusCode.OK => Results.Ok(response),
-            HttpStatusCode.Accepted => Results.Accepted(null, response),
-            HttpStatusCode.BadRequest => Results.BadRequest(response),
-            _ => Results.StatusCode((int)response.HttpStatusCode)
-        };
+        return response.IsSuccess
+            ? Result<BlockchainResponse>.Success(response)
+            : Result<BlockchainResponse>.Failure(response.Message, (int)response.HttpStatusCode);
     }
 }

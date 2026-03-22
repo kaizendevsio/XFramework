@@ -1,5 +1,5 @@
 using FluentValidation;
-using SmsGateway.Api.Features.Sms;
+using SmsGateway.Api.Generated;
 using SmsGateway.Api.Services;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -27,13 +27,11 @@ var app = (WebApplication)builder.Build();
 // Add correlation ID middleware early in the pipeline for request tracing
 app.UseCorrelationId();
 
-app.UseCustomRequestsInAssembly<SmsGatewayBaseRequest>();
-
-// Map SMS endpoints
-app.MapSmsEndpoints();
-
 // Map health check endpoints (liveness, readiness, and detailed health)
 app.MapXFrameworkHealthChecks("SmsGateway");
 app.MapApiDocumentation();
+
+// Map feature endpoints (source-generated from [MapPost/Get/...] attributes)
+app.MapGeneratedEndpoints();
 
 app.Run();

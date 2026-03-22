@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using MemoryPack;
@@ -153,66 +152,40 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     
     public async Task<bool> Connect()
     {
-        Task.Run(async () =>
-        {
-            if (string.IsNullOrEmpty(ClientIpAddress))
-            {
-                var retryCount = 0;
-                const int maxRetryCount = 5;
-                
-                try
-                {
-                    Logger.LogInformation("Attempting to get client IP address");
-                    
-                    var ipAddress = await new HttpClient()
-                    {
-                        Timeout = TimeSpan.FromMilliseconds(500)
-                    }.GetStringAsync("https://api.ipify.org/");
-                    ClientIpAddress = ipAddress;
-                    
-                    Logger.LogInformation("Client IP address acquired: {ClientIpAddress}", ClientIpAddress);
-
-                }
-                catch (Exception e)
-                {
-                    ClientIpAddressLastFailedFetch = DateTime.Now;
-                    Logger.LogError("Unable to get client IP address: {ErrorMessage}", e.Message);
-                    ClientIpAddress = string.Empty;
-                }
-            }
-        });
+        _ = FetchClientIpAddressOnceAsync();
         return await SignalRService.EnsureConnection();
+    }
+
+    private async Task FetchClientIpAddressOnceAsync()
+    {
+        if (ClientIpAddress is not null) return;
+
+        try
+        {
+            Logger.LogInformation("Attempting to get client IP address");
+
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromMilliseconds(500);
+            var ipAddress = await httpClient.GetStringAsync("https://api.ipify.org/");
+            ClientIpAddress = ipAddress;
+
+            Logger.LogInformation("Client IP address acquired: {ClientIpAddress}", ClientIpAddress);
+        }
+        catch (Exception e)
+        {
+            ClientIpAddressLastFailedFetch = DateTime.Now;
+            Logger.LogError("Unable to get client IP address: {ErrorMessage}", e.Message);
+            ClientIpAddress = string.Empty;
+        }
     }
 
     private async Task<RequestMetadata> GetRequestServer<TRequest>(TRequest request)
         where TRequest : IHasRequestServer
     {
-        // Retrieving Client IP address
+        // Ensure client IP address is fetched (lazy one-time)
         if (string.IsNullOrEmpty(ClientIpAddress))
         {
-            try
-            {
-                if (ClientIpAddressFetchTimeout < TimeSpan.FromMinutes(2))
-                {
-                    Logger.LogError("Unable to get client IP address");
-                    ClientIpAddress = string.Empty; 
-                }
-                Logger.LogInformation("Attempting to get client IP address");
-
-                var ipAddress = await new HttpClient()
-                {
-                    Timeout = TimeSpan.FromMilliseconds(500)
-                }.GetStringAsync("https://api.ipify.org/");
-                ClientIpAddress = ipAddress;
-
-                Logger.LogInformation("Client IP address acquired: {ClientIpAddress}", ClientIpAddress);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError("Unable to get client IP address: {ErrorMessage}", e.Message);
-                ClientIpAddressLastFailedFetch = DateTime.Now;
-                ClientIpAddress = string.Empty;
-            }
+            await FetchClientIpAddressOnceAsync();
         }
 
         // ApplicationId validation and assignment
@@ -334,34 +307,27 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         where TModel : class, IHasRequestServer
         where TResponse : class, IBaseResponse
     {
-        Logger.LogInformation("Sending request {Request}...", request.CommandName);
-        
+        Logger.LogDebug("Sending request {Request}...", request.CommandName);
+
         var signalRResponse = await SignalRService.InvokeAsync(request);
-        var tResponse = Activator.CreateInstance<TResponse>();
 
         switch (signalRResponse.ResponseStatusCode)
         {
             case HttpStatusCode.Processing:
-                tResponse.Message = "Request is queued, waiting for connection to be re-established";
-                tResponse.HttpStatusCode = HttpStatusCode.Processing;
-
+            {
                 request.Dispose();
-                return new()
-                {
-                    HttpStatusCode = tResponse.HttpStatusCode,
-                    Response = tResponse,
-                };
+                var err = Activator.CreateInstance<TResponse>();
+                err.Message = "Request is queued, waiting for connection to be re-established";
+                err.HttpStatusCode = HttpStatusCode.Processing;
+                return new() { HttpStatusCode = err.HttpStatusCode, Response = err };
+            }
             case HttpStatusCode.NotFound:
             {
-                tResponse.Message = "Service is currently offline";
-                tResponse.HttpStatusCode = HttpStatusCode.NotFound;
-               
                 request.Dispose();
-                return new()
-                {
-                    HttpStatusCode = tResponse.HttpStatusCode,
-                    Response = tResponse
-                };
+                var err = Activator.CreateInstance<TResponse>();
+                err.Message = "Service is currently offline";
+                err.HttpStatusCode = HttpStatusCode.NotFound;
+                return new() { HttpStatusCode = err.HttpStatusCode, Response = err };
             }
             case HttpStatusCode.InternalServerError:
             {
@@ -372,16 +338,12 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 {
                     HttpStatusCode = signalRResponse.ResponseStatusCode,
                     Message = signalRResponse.Message,
-                    Response = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data)
+                    Response = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data.Span)
                 };
             }
             default:
-                var sw = new Stopwatch();
-                sw.Start();
-                var t = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data);
-                sw.Stop();
-                Logger.LogWarning("Deserialization of response: {Request}... Done in {ResponseTime}ms", request.CommandName, sw.ElapsedMilliseconds);
-                Logger.LogInformation("Sending request: {Request}... Done in {ResponseTime}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
+                var t = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data.Span);
+                Logger.LogDebug("Request {Request} completed in {ResponseTime}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
                 request.Dispose();
 
                 return new()
@@ -451,7 +413,7 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
                 Logger.LogInformation("Notification Received: {RequestName}", request.Name);
                 try
                 {
-                    var r = MemoryPackSerializer.Deserialize<PublishRequest<TResponse>>(response.Data);
+                    var r = MemoryPackSerializer.Deserialize<PublishRequest<TResponse>>(response.Data.Span);
                     
                     request.OnInvoke?.Invoke(r.Data);
                 }

@@ -1,4 +1,5 @@
-using Coins.Api.Features.Blockchain;
+using Coins.Api.Generated;
+using FluentValidation;
 using XFramework.Extensions;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
@@ -15,12 +16,15 @@ catch
     // OpenTelemetry not configured, continue
 }
 
+// Register FluentValidation validators from this assembly
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
 var app = (WebApplication)builder.Build();
 
 // Add correlation ID middleware
 app.UseCorrelationId();
 
-// Map VSA Feature Endpoints
-app.MapBlockchainEndpoints();
+// Map feature endpoints (source-generated from [MapPost/Get/...] attributes)
+app.MapGeneratedEndpoints();
 
 app.Run();

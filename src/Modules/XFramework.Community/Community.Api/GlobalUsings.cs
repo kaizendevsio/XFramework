@@ -5,8 +5,6 @@ global using System.Threading;
 global using System.Threading.Tasks;
 global using Community.Api.Extensions;
 global using Community.Api.Services;
-global using Community.Api.Features.CommunityIdentities;
-global using Community.Api.Features.Connections;
 global using Community.Domain.Shared.Contracts.Requests;
 global using Community.Domain.Shared.Enums;
 global using FluentValidation;

@@ -12,6 +12,11 @@ public sealed class StreamInstaller : IInstaller
 {
     public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
+        // Bind StreamFlow configuration early so it's available for SignalR options
+        var streamFlowConfiguration = new StreamFlowConfiguration();
+        configuration.Bind(nameof(StreamFlowConfiguration), streamFlowConfiguration);
+        services.AddSingleton(streamFlowConfiguration);
+
         // Configure SignalR with MessagePack for binary serialization and performance optimization
         services.AddSignalR(options =>
         {
@@ -26,6 +31,9 @@ public sealed class StreamInstaller : IInstaller
             options.HandshakeTimeout = TimeSpan.FromSeconds(30);
             options.KeepAliveInterval = TimeSpan.FromSeconds(15);
             
+            // Allow concurrent hub method invocations per connection (default is 1 = sequential)
+            options.MaximumParallelInvocationsPerClient = streamFlowConfiguration.MaxParallelInvocationsPerClient;
+
             // Optimize for streaming scenarios
             options.StreamBufferCapacity = 10;
         })
@@ -44,9 +52,6 @@ public sealed class StreamInstaller : IInstaller
                 new[] { "application/octet-stream" });
         });
             
-        // Register StreamFlow configuration
-        var streamFlowConfiguration = new StreamFlowConfiguration();
-        configuration.Bind(nameof(streamFlowConfiguration), streamFlowConfiguration);
-        services.AddSingleton(streamFlowConfiguration);
+        // StreamFlow configuration already registered above
     }
 }

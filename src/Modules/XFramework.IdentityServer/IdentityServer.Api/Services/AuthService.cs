@@ -350,7 +350,13 @@ public sealed class AuthService : IAuthService
                 AuthenticationState.Authenticated,
                 token.SessionId);
 
-            await _dataContext.SaveChangesAsync(ct);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+            {
+                _logger.OperationFailed("Authenticate", "SaveChanges", credential.Id, saveResult.Message, null);
+                return Result<AuthenticateIdentityResponse>.Failure(
+                    "Failed to persist authentication session", 500);
+            }
 
             _logger.UserAuthenticated(credential.Id, request.Metadata.IpAddress);
 

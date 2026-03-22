@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <RootNamespace>IdentityServer.IntegrationTests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="NUnit" />
+        <PackageReference Include="NUnit3TestAdapter" />
+        <PackageReference Include="coverlet.collector" />
+        <PackageReference Include="FluentAssertions" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.StreamFlow\StreamFlow.Stream\StreamFlow.Stream.csproj" />
+    </ItemGroup>
+
+</Project>

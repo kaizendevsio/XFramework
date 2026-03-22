@@ -16,7 +16,7 @@ public class ClientCacheService : IClientCacheService
                 return Task.FromResult<T?>(default);
             }
 
-            var value = MemoryPack.MemoryPackSerializer.Deserialize<T>(entry.Data);
+            var value = MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)entry.Data);
             return Task.FromResult(value);
         }
 

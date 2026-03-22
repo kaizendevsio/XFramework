@@ -8,6 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\..\SourceGenerators\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"/>
         <!-- Core and Domain -->
         <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
         <ProjectReference Include="..\..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />

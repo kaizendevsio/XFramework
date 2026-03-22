@@ -1,5 +1,5 @@
 using FluentValidation;
-using IdentityServer.Api.Features;
+using IdentityServer.Api.Generated;
 using IdentityServer.Api.Services;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -30,13 +30,15 @@ var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
 app.EnsureDatabase<DbContext>();
-app.UseCustomRequestsInAssembly<IdentityServerBaseRequest>();
+// StreamFlow handlers are now source-generated from [StreamFlowHandler] on endpoint methods.
+// UseCustomRequestsInAssembly is no longer needed — the generated ISignalREventHandler
+// implementations are auto-discovered by ScanAndRegisterHandlers() at startup.
 app.MapXFrameworkHealthChecks("IdentityServer");
 
 // API Documentation
 app.MapApiDocumentation();
 
-// Map VSA Feature Endpoints
-app.MapIdentityServerFeatureEndpoints();
+// Map feature endpoints (source-generated from [MapPost/Get/...] attributes)
+app.MapGeneratedEndpoints();
 
 app.Run();

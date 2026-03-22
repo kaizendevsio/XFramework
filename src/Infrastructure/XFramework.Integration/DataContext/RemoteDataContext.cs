@@ -63,7 +63,7 @@ public class RemoteDataContext : IDataContext
         var requestBytes = MemoryPack.MemoryPackSerializer.Serialize(request);
         var resultBytes = await connection.InvokeAsync<byte[]>("ExecuteChanges", requestBytes, ct);
 
-        var result = MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(resultBytes);
+        var result = MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>((ReadOnlySpan<byte>)resultBytes);
 
         if (result?.IsSuccess == true)
         {

@@ -1,5 +1,5 @@
 using FluentValidation;
-using Messaging.Api.Features.Messages;
+using Messaging.Api.Generated;
 using Messaging.Api.Services;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -21,18 +21,17 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 var app = (WebApplication)builder.Build();
 
-// Add correlation ID middleware early in the pipeline for request tracing
+// Add correlation ID middleware early in the pipeline
 app.UseCorrelationId();
 
-// Database migration and custom request handling
+// Database migration
 app.EnsureDatabase<AppDbContext>();
-app.UseCustomRequestsInAssembly<MessagingBaseRequest>();
-
-// Map VSA feature endpoints
-app.MapMessageEndpoints();
 
 // Map health check endpoints
 app.MapXFrameworkHealthChecks("Messaging");
 app.MapApiDocumentation();
+
+// Map feature endpoints (source-generated from [MapPost/Patch/...] attributes)
+app.MapGeneratedEndpoints();
 
 app.Run();

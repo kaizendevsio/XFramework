@@ -13,5 +13,5 @@ public class StreamFlowInvokeResponse
     public string Message { get; set; }
     
     [Key(2)]
-    public object Response { get; set; }
+    public ReadOnlyMemory<byte> Response { get; set; }
 }

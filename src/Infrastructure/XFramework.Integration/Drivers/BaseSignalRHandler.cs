@@ -30,7 +30,7 @@ public abstract class BaseSignalRHandler
             CommandName = nameof(IStreamFlow.InvokeResponseHandler)
         };
         
-        return await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Push), request);
+        return await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.InvokeResponse), request);
     }
 
     protected virtual void HandleRequestQuery<TQuery, TResponse>(HubConnection connection, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)

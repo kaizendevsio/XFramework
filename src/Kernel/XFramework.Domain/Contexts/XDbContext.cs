@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Shared.Contracts.Base;
 
 namespace XFramework.Domain.Contexts;
@@ -8,6 +9,7 @@ namespace XFramework.Domain.Contexts;
 public class XDbContext : DbContext
 {
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly IConfiguration? _configuration;
 
     /// <summary>
     /// Parameterless constructor for EF Core design-time tooling only.
@@ -26,6 +28,13 @@ public class XDbContext : DbContext
         : base(options)
     {
         _httpContextAccessor = httpContextAccessor;
+    }
+
+    public XDbContext(DbContextOptions options, IHttpContextAccessor httpContextAccessor, IConfiguration configuration)
+        : base(options)
+    {
+        _httpContextAccessor = httpContextAccessor;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -93,10 +102,10 @@ public class XDbContext : DbContext
     }
 
     /// <summary>
-    /// Retrieves the current tenant ID from HttpContext claims.
-    /// Looks for 'tenantId', 'TenantId', or 'tid' claims.
-    /// Throws InvalidOperationException if tenant cannot be resolved in an authenticated context.
-    /// Returns Guid.Empty only for unauthenticated/system operations.
+    /// Retrieves the current tenant ID from (in priority order):
+    ///   1. HttpContext claims (tenantId / TenantId / tid)
+    ///   2. Configuration fallback (Tenant:DefaultId) — for unauthenticated endpoints like auth/verify
+    ///   3. Guid.Empty — design-time / migration-only (global filter excludes everything)
     /// </summary>
     private Guid GetCurrentTenantId()
     {
@@ -112,14 +121,18 @@ public class XDbContext : DbContext
                 return tenantId;
             }
 
-            // Authenticated user without a tenant claim — this is a configuration error
             throw new InvalidOperationException(
                 "Authenticated user does not have a tenant ID claim. " +
                 "Ensure the authentication provider includes a 'tenantId' or 'tid' claim.");
         }
 
-        // Unauthenticated requests (system operations, health checks, migrations)
-        // return Guid.Empty — these are filtered out by the tenant query filter
+        // Unauthenticated requests (auth, verify, register) — use configured default tenant
+        var defaultTenantId = _configuration?["Tenant:DefaultId"];
+        if (!string.IsNullOrEmpty(defaultTenantId) && Guid.TryParse(defaultTenantId, out var defaultId))
+        {
+            return defaultId;
+        }
+
         return Guid.Empty;
     }
 

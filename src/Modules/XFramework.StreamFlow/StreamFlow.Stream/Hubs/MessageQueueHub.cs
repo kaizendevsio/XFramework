@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
 using StreamFlow.Domain.Shared.Abstractions;
 using StreamFlow.Domain.Shared.BusinessObjects;
@@ -32,13 +33,31 @@ public class MessageQueueHub : Hub<IStreamFlow>
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var client = _cachingService.Clients.FirstOrDefault(i => i.Value.StreamId == Context.ConnectionId);
-        var cachedClient = _cachingService.LatestClients.FirstOrDefault(x => x.Value.StreamId == Context.ConnectionId);
-        _cachingService.Clients.Remove(client.Key, out var a);
-        _cachingService.LatestClients.Remove(cachedClient.Key, out _);
+        StreamFlowClient removedClient = null;
+
+        if (_cachingService.ClientKeyByStreamId.TryRemove(Context.ConnectionId, out var clientKey))
+        {
+            _cachingService.Clients.TryRemove(clientKey, out removedClient);
+
+            // Clean up ClientsByServiceId reverse index
+            if (removedClient != null &&
+                _cachingService.ClientsByServiceId.TryGetValue(removedClient.Id, out var bag))
+            {
+                // ConcurrentBag does not support removal; rebuild without the removed key
+                var updated = new ConcurrentBag<int>(bag.Where(k => k != clientKey));
+                if (updated.IsEmpty)
+                {
+                    _cachingService.ClientsByServiceId.TryRemove(removedClient.Id, out _);
+                }
+                else
+                {
+                    _cachingService.ClientsByServiceId[removedClient.Id] = updated;
+                }
+            }
+        }
 
         await base.OnDisconnectedAsync(exception);
-        _logger.LogInformation("Connection Lost and Unregistered with ID {ContextConnectionId} : {ValueGuid} : {ValueName}", Context.ConnectionId, a?.Id, a?.Name);
+        _logger.LogInformation("Connection Lost and Unregistered with ID {ContextConnectionId} : {ValueGuid} : {ValueName}", Context.ConnectionId, removedClient?.Id, removedClient?.Name);
     }
 
     public async Task<StreamFlowInvokeResponse> Invoke(StreamFlowMessage request)

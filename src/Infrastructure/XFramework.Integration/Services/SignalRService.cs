@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using StreamFlow.Domain.Shared.Abstractions;
 using StreamFlow.Domain.Shared.BusinessObjects;
 using StreamFlow.Domain.Shared.Contracts.Requests;
+using StreamFlow.Domain.Shared.Contracts.Responses;
 using TypeSupport.Extensions;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Contracts.Base;
@@ -32,12 +33,12 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     private bool _isRegistering;
     private bool _subscriptionsEventHandle;
 
-    private readonly List<(string MethodName, StreamFlowMessage  StreamFlowMessage)> _queueList = [];
+    private readonly ConcurrentQueue<(string MethodName, StreamFlowMessage StreamFlowMessage)> _offlineQueue = new();
     protected TaskCompletionSource TaskCompletionSource { get; set; } = new();
     public HubConnection? Connection { get; set; }
     
     public StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
-    public ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessage>> PendingMethodCalls { get; set; } = new();
+    public ConcurrentDictionary<Guid, PooledRpcCall> PendingMethodCalls { get; set; } = new();
 
     public SignalRService(IHostEnvironment hostEnvironment, IConfiguration configuration, ILogger<SignalRService> logger, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
     {
@@ -86,6 +87,8 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             .AddMessagePackProtocol(options =>
             {
                 options.SerializerOptions = MessagePack.MessagePackSerializerOptions.Standard
+                    .WithCompression(MessagePack.MessagePackCompression.Lz4BlockArray)
+                    .WithSecurity(MessagePack.MessagePackSecurity.UntrustedData)
                     .WithResolver(MessagePack.Resolvers.ContractlessStandardResolver.Instance);
             })
             .Build();
@@ -202,7 +205,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             {
                 try
                 {
-                    if (PendingMethodCalls.TryRemove(response.RequestId, out TaskCompletionSource<StreamFlowMessage> methodCallCompletionSource))
+                    if (PendingMethodCalls.TryRemove(response.RequestId, out var rpcCall))
                     {
                         var result = new StreamFlowMessage()
                         {
@@ -212,7 +215,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                             Message = response.Message,
                             ResponseStatusCode = response.ResponseStatusCode
                         };
-                        await Task.Run(() => methodCallCompletionSource.SetResult(result));
+                        rpcCall.SetResult(result);
                     }
                     //StopWatch.Stop("Response for Invoked Method Received"); 
                 }
@@ -227,7 +230,15 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     {
         Connection!.Closed += async connectionId =>
         {
-            _logger.LogInformation("Connection to StreamFlow server close, connectionId: {ConnectionId}", connectionId);
+            _logger.LogInformation("Connection to StreamFlow server closed, connectionId: {ConnectionId}", connectionId);
+
+            // Cancel all pending RPCs to prevent orphaned calls
+            foreach (var (id, _) in PendingMethodCalls)
+            {
+                if (PendingMethodCalls.TryRemove(id, out var rpcCall))
+                    rpcCall.SetException(new InvalidOperationException("Connection lost"));
+            }
+
             _isRegistered = false;
             await EnsureConnection();
         };
@@ -348,7 +359,10 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         var startTimer = Stopwatch.StartNew();
         _logger.LogInformation("Registering Connection..");
         
-        var serviceName = Assembly.GetEntryAssembly()!.GetName().Name!.Split(".").First() ?? throw new ArgumentException("Assembly name is not set");
+        var serviceName = !string.IsNullOrEmpty(StreamFlowConfiguration.ClientName)
+            ? StreamFlowConfiguration.ClientName.Split(".").First()
+            : Assembly.GetEntryAssembly()!.GetName().Name!.Split(".").First()
+              ?? throw new ArgumentException("Assembly name is not set");
         var serviceId = serviceName.ToSha256();
         
         _clientId = StreamFlowConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Streamflow client Id is not set");
@@ -368,18 +382,36 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         _isRegistered = true;
         _isRegistering = false;
         
-        if (!_queueList.Any()) return;
+        if (_offlineQueue.IsEmpty) return;
 
-        _logger.LogInformation($"Dequeuing items from cache..");
+        _logger.LogInformation("Dequeuing items from cache..");
 
-        foreach (var valueTuple in _queueList)
+        var dequeued = 0;
+        while (_offlineQueue.TryDequeue(out var item))
         {
-            // Awaiting to preserve transactional order
-            await InvokeVoidAsync(valueTuple.MethodName, valueTuple.StreamFlowMessage);
+            var sent = false;
+            for (int attempt = 0; attempt < 3 && !sent; attempt++)
+            {
+                try
+                {
+                    await Connection.InvokeAsync<HttpStatusCode>(item.MethodName, item.StreamFlowMessage);
+                    sent = true;
+                }
+                catch (Exception ex) when (attempt < 2)
+                {
+                    _logger.LogWarning("Retry {Attempt}/3 for offline message '{Command}': {Error}",
+                        attempt + 1, item.MethodName, ex.Message);
+                    await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)));
+                }
+            }
+            if (!sent)
+            {
+                _logger.LogError("Failed to send offline message '{Command}' after 3 attempts", item.MethodName);
+            }
+            dequeued++;
         }
 
-        _logger.LogInformation("Dequeued {QueueListCount} item(s) from cache", _queueList.Count);
-        _queueList.Clear();
+        _logger.LogInformation("Dequeued {DequeueCount} item(s) from cache", dequeued);
     }
 
     public async Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage) 
@@ -388,12 +420,19 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         {
             if (Connection?.State is HubConnectionState.Connected && _isRegistered is true && !_isRegistering)
             {
-                var y = sfMessage.Adapt<StreamFlowMessage>();
-                return await Connection?.InvokeAsync<HttpStatusCode>(methodName, y);
+                return await Connection?.InvokeAsync<HttpStatusCode>(methodName, sfMessage);
             }
             
+            var maxQueue = StreamFlowConfiguration.QueueDepth > 0 ? StreamFlowConfiguration.QueueDepth : 10_000;
+            if (_offlineQueue.Count >= maxQueue)
+            {
+                _logger.LogError("Offline queue full ({Count}), dropping message '{CommandName}'",
+                    _offlineQueue.Count, sfMessage.CommandName);
+                return HttpStatusCode.ServiceUnavailable;
+            }
+
             _logger.LogInformation("Invoked Method \'{MethodName}\' is queued, waiting for connection to be re-established", methodName);
-            _queueList.Add(new(methodName, sfMessage));
+            _offlineQueue.Enqueue(new(methodName, sfMessage));
             return HttpStatusCode.Processing;
 
         }
@@ -408,62 +447,50 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     {
         var startTimer = Stopwatch.StartNew();
         sfMessage.ClientId = _clientId;
-        
-        _logger.LogWarning("Invoking Method \'{SfMessageCommandName}\' on {SfMessageRecipientId}", sfMessage.CommandName, sfMessage.RecipientId);
-        
-        var methodCallCompletionSource = new TaskCompletionSource<StreamFlowMessage>();
+
+        _logger.LogDebug("Invoking Method \'{SfMessageCommandName}\' on {SfMessageRecipientId}", sfMessage.CommandName, sfMessage.RecipientId);
 
         try
         {
-            if (!PendingMethodCalls.TryAdd(sfMessage.RequestId, methodCallCompletionSource))
+            if (Connection?.State is not HubConnectionState.Connected || !_isRegistered || _isRegistering)
             {
-                return CreateErrorResponse(sfMessage, HttpStatusCode.InternalServerError, $"Error while invoking method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
-            }
-
-            var response = methodCallCompletionSource.Task.ConfigureAwait(false);
-            var signalRResponse = await InvokeVoidAsync(nameof(IStreamFlow.Push), sfMessage);
-            
-            if (signalRResponse is HttpStatusCode.ServiceUnavailable or HttpStatusCode.NotFound)
-            {
-                startTimer.Stop();
-                _logger.LogWarning("Invoked Method \'{SfMessageCommandName}\' resulted in {ResponseStatusCode} response", sfMessage.CommandName, signalRResponse);
-                return new()
+                // Queue for offline delivery
+                var maxQueue = StreamFlowConfiguration.QueueDepth > 0 ? StreamFlowConfiguration.QueueDepth : 10_000;
+                if (_offlineQueue.Count >= maxQueue)
                 {
-                    ResponseStatusCode = signalRResponse
-                };
+                    return CreateErrorResponse(sfMessage, HttpStatusCode.ServiceUnavailable, "Offline queue full");
+                }
+                _offlineQueue.Enqueue(new(nameof(IStreamFlow.Push), sfMessage));
+                return new() { ResponseStatusCode = HttpStatusCode.Processing };
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
-            cts.Token.Register(() => methodCallCompletionSource.TrySetException(new ArgumentException("Connection timed out")));
+            // Use hub's Invoke — hub routes to recipient, waits for response, returns directly
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(StreamFlowConfiguration.RpcTimeoutSeconds));
+            var invokeResponse = await Connection.InvokeAsync<StreamFlowInvokeResponse>(
+                "Invoke", sfMessage, cts.Token);
 
-            _logger.LogWarning("Awaiting response for Invoked Method \'{SfMessageCommandName}\'", sfMessage.CommandName);
+            startTimer.Stop();
+            _logger.LogDebug("Invoked Method \'{SfMessageCommandName}\' completed in {ResponseTime}ms", sfMessage.CommandName, startTimer.ElapsedMilliseconds);
 
-            try
+            return new()
             {
-                var streamFlowMessage = await response;
-                
-                startTimer.Stop();
-                _logger.LogWarning("Response for Invoked Method \'{SfMessageCommandName}\' received in {ResponseTime}ms", sfMessage.CommandName, startTimer.ElapsedMilliseconds);
-
-                return new()
-                {
-                    ResponseStatusCode = HttpStatusCode.Accepted,
-                    Data = streamFlowMessage.Data,
-                    Message = streamFlowMessage.Message,
-                    Duration = startTimer.Elapsed
-                };
-            }
-            catch (Exception e)
-            {
-                _logger.LogError("Exception while awaiting response: {EMessage} : {InnerExceptionMessage}", e.Message, e.InnerException?.Message);
-                return CreateErrorResponse(sfMessage, HttpStatusCode.RequestTimeout,
-                    $"Error while awaiting response for method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
-            }
+                ResponseStatusCode = invokeResponse.HttpStatusCode,
+                Data = invokeResponse.Response,
+                Message = invokeResponse.Message,
+                Duration = startTimer.Elapsed
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogError("RPC timeout for method '{SfMessageCommandName}' after {Timeout}s", sfMessage.CommandName, StreamFlowConfiguration.RpcTimeoutSeconds);
+            return CreateErrorResponse(sfMessage, HttpStatusCode.RequestTimeout,
+                $"RPC timeout for method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
         }
         catch (Exception e)
         {
-            _logger.LogError("Invoked Method \'push\' resulted in Exception: {EMessage} : {InnerExceptionMessage}", e.Message, e.InnerException?.Message);
-            return CreateErrorResponse(sfMessage, HttpStatusCode.InternalServerError, $"Error while invoking method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
+            _logger.LogError("Invoke '{SfMessageCommandName}' failed: {EMessage}", sfMessage.CommandName, e.Message);
+            return CreateErrorResponse(sfMessage, HttpStatusCode.InternalServerError,
+                $"Error invoking method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
         }
     }
 

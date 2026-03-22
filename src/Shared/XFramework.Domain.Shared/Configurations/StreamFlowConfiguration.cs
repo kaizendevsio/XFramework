@@ -12,6 +12,8 @@ public class StreamFlowConfiguration
     public int QueueDepth { get; set; }
     public bool QueueMessages { get; set; }
     public bool Anonymous { get; set; }
-        
-        
+    public int RpcTimeoutSeconds { get; set; } = 30;
+    public int MaxPendingRpcCalls { get; set; } = 1000;
+    public int DeadLetterQueueCapacity { get; set; } = 100_000;
+    public int MaxParallelInvocationsPerClient { get; set; } = 64;
 }

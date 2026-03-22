@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Contracts.Base;
 
 namespace StreamFlow.Stream.Services;
@@ -31,15 +32,12 @@ public sealed class StreamFlowMessageQueue : IDisposable
     private long _methodCallsProcessed;
 
     /// <summary>
-    /// Initializes a new instance of StreamFlowMessageQueue with the specified capacity.
+    /// Initializes a new instance of StreamFlowMessageQueue with capacity from configuration.
     /// </summary>
-    /// <param name="capacity">Maximum number of messages that can be queued. Default is 10,000.</param>
-    public StreamFlowMessageQueue(int capacity = 10000)
+    /// <param name="configuration">StreamFlow configuration. Uses QueueDepth if > 0, otherwise defaults to 10,000.</param>
+    public StreamFlowMessageQueue(StreamFlowConfiguration configuration)
     {
-        if (capacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity must be greater than zero");
-        }
+        var capacity = configuration.QueueDepth > 0 ? configuration.QueueDepth : 10_000;
 
         var messageOptions = new BoundedChannelOptions(capacity)
         {

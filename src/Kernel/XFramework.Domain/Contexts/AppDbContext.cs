@@ -1,6 +1,7 @@
 using IdentityServer.Domain.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Domain.Contexts;
@@ -15,9 +16,14 @@ public partial class AppDbContext : XDbContext
         : base(options)
     {
     }
-    
+
     public AppDbContext(DbContextOptions options, IHttpContextAccessor httpContextAccessor)
         : base(options, httpContextAccessor)
+    {
+    }
+
+    public AppDbContext(DbContextOptions options, IHttpContextAccessor httpContextAccessor, IConfiguration configuration)
+        : base(options, httpContextAccessor, configuration)
     {
     }
 

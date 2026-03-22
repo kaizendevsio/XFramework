@@ -1,73 +1,28 @@
 using FluentValidation;
 using IdentityServer.Api.Services;
-using Microsoft.AspNetCore.Http.HttpResults;
+using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Requests;
+using XFramework.Integration.Attributes;
 using CreateFileRequest = XFramework.Domain.Shared.Contracts.Requests.Create<XFramework.Domain.Shared.Contracts.StorageFile>;
 
 namespace IdentityServer.Api.Features.Files.Upload;
 
-/// <summary>
-/// Upload file endpoint - Uploads file to Azure Blob Storage
-/// </summary>
 public static class UploadFileEndpoint
 {
-    public static void MapUploadFile(this IEndpointRouteBuilder app)
-    {
-        app.MapPost("/api/files", Handle)
-            .WithName("UploadFile")
-            .WithTags("Files")
-            .WithOpenApi(op =>
-            {
-                op.Summary = "Upload a file";
-                op.Description = "Uploads a file to Azure Blob Storage.";
-                return op;
-            })
-            .ExcludeFromDescription(); // Workaround: dotnet/aspnetcore#63857
-    }
-
-    private static async Task<Results<Created<StorageFile>, ValidationProblem, NotFound, ProblemHttpResult>> Handle(
+    [MapPost("/api/files", Tags = ["Files"],
+        Summary = "Upload a file",
+        Description = "Uploads a file to Azure Blob Storage.",
+        ExcludeFromOpenApi = true)]
+    public static async Task<Result<StorageFile>> Handle(
         CreateFileRequest request,
         IAuthService authService,
-        IValidator<CreateFileRequest> validator,
         CancellationToken ct)
     {
-        // Validate request
-        var validationResult = await validator.ValidateAsync(request, ct);
-        if (!validationResult.IsValid)
-        {
-            var errors = validationResult.Errors
-                .GroupBy(e => e.PropertyName)
-                .ToDictionary(
-                    g => g.Key,
-                    g => g.Select(e => e.ErrorMessage).ToArray()
-                );
-            
-            return TypedResults.ValidationProblem(errors);
-        }
-
-        var result = await authService.CreateFileAsync(request, ct);
-
-        if (!result.IsSuccess)
-        {
-            return result.StatusCode switch
-            {
-                404 => TypedResults.NotFound(),
-                _ => TypedResults.Problem(
-                    title: "Error uploading file",
-                    detail: result.Message,
-                    statusCode: result.StatusCode
-                )
-            };
-        }
-
-        return TypedResults.Created($"/api/files/{result.Data!.Id}", result.Data);
+        return await authService.CreateFileAsync(request, ct);
     }
 }
 
-/// <summary>
-/// Validator for Create StorageFile request
-/// </summary>
 public class UploadFileRequestValidator : AbstractValidator<CreateFileRequest>
 {
     public UploadFileRequestValidator()

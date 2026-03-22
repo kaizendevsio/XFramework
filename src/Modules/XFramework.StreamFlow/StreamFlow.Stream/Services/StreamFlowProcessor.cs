@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
+using StreamFlow.Domain.Shared.BusinessObjects;
 using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Interfaces;
 using XFramework.Domain.Shared.Contracts.Base;
@@ -33,19 +35,23 @@ public sealed class StreamFlowProcessor : BackgroundService
     private readonly IHubContext<MessageQueueHub> _hubContext;
     private readonly StreamFlowConfiguration _configuration;
     private readonly ILogger<StreamFlowProcessor> _logger;
+    private readonly DeadLetterQueue _dlq;
+    private readonly ConcurrentQueue<(StreamFlowMessage Msg, DateTime RetryAfter)> _retryQueue = new();
 
     public StreamFlowProcessor(
         StreamFlowMessageQueue messageQueue,
         ICachingService cachingService,
         IHubContext<MessageQueueHub> hubContext,
         StreamFlowConfiguration configuration,
-        ILogger<StreamFlowProcessor> logger)
+        ILogger<StreamFlowProcessor> logger,
+        DeadLetterQueue dlq)
     {
         _messageQueue = messageQueue ?? throw new ArgumentNullException(nameof(messageQueue));
         _cachingService = cachingService ?? throw new ArgumentNullException(nameof(cachingService));
         _hubContext = hubContext ?? throw new ArgumentNullException(nameof(hubContext));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dlq = dlq ?? throw new ArgumentNullException(nameof(dlq));
     }
 
     /// <summary>
@@ -75,50 +81,102 @@ public sealed class StreamFlowProcessor : BackgroundService
     }
 
     /// <summary>
-    /// Processes queued messages from the message channel.
+    /// Processes queued messages from the message channel,
+    /// draining due retry items before reading new messages.
     /// </summary>
     private async Task ProcessMessagesAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Starting message processor loop");
 
-        await foreach (var message in _messageQueue.MessageReader.ReadAllAsync(stoppingToken))
+        while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            // First, drain retry items that are due
+            DrainDueRetries(stoppingToken);
+
+            // Try to read a message from the channel (non-blocking check first, then async wait)
+            if (_messageQueue.MessageReader.TryRead(out var message))
             {
-                await ProcessSingleMessageAsync(message, stoppingToken);
-                _messageQueue.MarkMessageProcessed();
+                await ProcessAndTrack(message, stoppingToken);
+                continue;
             }
-            catch (Exception ex)
+
+            // No message available right now; if retry queue has items, short-sleep then loop
+            if (!_retryQueue.IsEmpty)
             {
-                _logger.LogError(ex, 
-                    "Error processing message. RequestId: {RequestId}, RecipientId: {RecipientId}",
-                    message.RequestId, message.RecipientId);
+                await Task.Delay(100, stoppingToken);
+                continue;
+            }
+
+            // Nothing pending at all; wait for the next channel message
+            if (await _messageQueue.MessageReader.WaitToReadAsync(stoppingToken))
+            {
+                while (_messageQueue.MessageReader.TryRead(out var msg))
+                {
+                    await ProcessAndTrack(msg, stoppingToken);
+                }
             }
         }
 
         _logger.LogInformation("Message processor loop completed");
     }
 
+    private async Task ProcessAndTrack(StreamFlowMessage message, CancellationToken stoppingToken)
+    {
+        try
+        {
+            await ProcessSingleMessageAsync(message, stoppingToken);
+            _messageQueue.MarkMessageProcessed();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Error processing message. RequestId: {RequestId}, RecipientId: {RecipientId}",
+                message.RequestId, message.RecipientId);
+        }
+    }
+
+    private void DrainDueRetries(CancellationToken stoppingToken)
+    {
+        var now = DateTime.UtcNow;
+        var count = _retryQueue.Count;
+        for (var i = 0; i < count && !stoppingToken.IsCancellationRequested; i++)
+        {
+            if (!_retryQueue.TryPeek(out var item))
+                break;
+
+            if (item.RetryAfter > now)
+                break; // Queue is roughly ordered; stop when we hit a future item
+
+            if (_retryQueue.TryDequeue(out item))
+            {
+                // Re-enqueue into the main channel for processing
+                _ = _messageQueue.TryEnqueueMessageAsync(item.Msg, stoppingToken);
+            }
+        }
+    }
+
     /// <summary>
-    /// Processes queued method calls from the method call channel.
+    /// Drains queued method calls from the method call channel.
+    /// Method invocations are now handled directly via _pendingInvocations in StreamFlowService.
+    /// This loop exists only to drain any legacy items and keep the channel from filling up.
     /// </summary>
     private async Task ProcessMethodCallsAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Starting method call processor loop");
+        _logger.LogInformation("Starting method call processor loop (drain-only mode)");
 
         await foreach (var (id, tcs) in _messageQueue.MethodCallReader.ReadAllAsync(stoppingToken))
         {
             try
             {
-                // Process method call and complete the TaskCompletionSource
-                // This can be expanded based on specific requirements
+                // Legacy drain: complete the TCS with a cancellation so callers don't hang
+                tcs.TrySetCanceled();
                 _messageQueue.MarkMethodCallProcessed();
-                
-                _logger.LogDebug("Processed method call. Id: {MethodCallId}", id);
+
+                _logger.LogDebug("Drained legacy method call. Id: {MethodCallId}", id);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing method call. Id: {MethodCallId}", id);
+                _logger.LogError(ex, "Error draining method call. Id: {MethodCallId}", id);
                 tcs.TrySetException(ex);
             }
         }
@@ -128,20 +186,30 @@ public sealed class StreamFlowProcessor : BackgroundService
 
     /// <summary>
     /// Processes a single message with retry logic.
+    /// Uses reverse index for O(1) recipient lookup and non-blocking retry queue for offline clients.
     /// </summary>
     private async Task ProcessSingleMessageAsync(StreamFlowMessage message, CancellationToken stoppingToken)
     {
-        const int maxRetries = 3;
+        var maxRetries = _configuration.MaxRetry > 0 ? _configuration.MaxRetry : 3;
         int retryCount = 0;
 
         while (retryCount < maxRetries)
         {
             try
             {
-                // Find the recipient client
-                var recipientClient = _cachingService.Clients
-                    .Select(x => x.Value)
-                    .FirstOrDefault(c => c.Id == message.RecipientId);
+                // Find the recipient client using O(1) reverse index
+                StreamFlowClient recipientClient = null;
+                if (_cachingService.ClientsByServiceId.TryGetValue(message.RecipientId, out var clientKeys))
+                {
+                    foreach (var key in clientKeys)
+                    {
+                        if (_cachingService.Clients.TryGetValue(key, out var client))
+                        {
+                            recipientClient = client;
+                            break; // Take the first available
+                        }
+                    }
+                }
 
                 if (recipientClient != null)
                 {
@@ -158,40 +226,32 @@ public sealed class StreamFlowProcessor : BackgroundService
                 }
                 else
                 {
-                    // Check if client exists in AbsoluteClients (known client but offline)
-                    var knownClient = _cachingService.AbsoluteClients
-                        .Select(x => x.Value)
-                        .FirstOrDefault(c => c.Id == message.RecipientId);
+                    // Check if client exists in AbsoluteClients (known client but offline) — O(1) via reverse index
+                    var isKnownClient = _cachingService.AbsoluteClientKeyByServiceId.ContainsKey(message.RecipientId);
 
-                    if (knownClient != null)
+                    if (isKnownClient)
                     {
-                        // Client is known but offline, re-queue for later
+                        // Client is known but offline, add to retry queue for later (non-blocking)
                         if (!_configuration.QueueMessages)
                         {
                             _logger.LogWarning(
                                 "Message queueing disabled. Dropping message. RequestId: {RequestId}, RecipientId: {RecipientId}",
                                 message.RequestId, message.RecipientId);
+                            _dlq.Enqueue(message, "QueueDisabledOnRetry");
                             return;
                         }
 
-                        // Wait a bit before re-queuing
-                        await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
-                        
-                        // Re-queue the message
-                        var requeued = await _messageQueue.TryEnqueueMessageAsync(message, stoppingToken);
-                        
-                        if (requeued)
+                        if (_retryQueue.Count >= 10_000)
                         {
-                            _logger.LogDebug(
-                                "Re-queued message for offline client. RequestId: {RequestId}, RecipientId: {RecipientId}",
-                                message.RequestId, message.RecipientId);
+                            _dlq.Enqueue(message, "RetryQueueFull");
+                            return;
                         }
-                        else
-                        {
-                            _logger.LogWarning(
-                                "Failed to re-queue message (channel closed). RequestId: {RequestId}, RecipientId: {RecipientId}",
-                                message.RequestId, message.RecipientId);
-                        }
+
+                        _retryQueue.Enqueue((message, DateTime.UtcNow.AddSeconds(1)));
+
+                        _logger.LogDebug(
+                            "Added message to retry queue for offline client. RequestId: {RequestId}, RecipientId: {RecipientId}",
+                            message.RequestId, message.RecipientId);
 
                         return;
                     }
@@ -201,6 +261,7 @@ public sealed class StreamFlowProcessor : BackgroundService
                         _logger.LogWarning(
                             "Unknown recipient for queued message. RequestId: {RequestId}, RecipientId: {RecipientId}",
                             message.RequestId, message.RecipientId);
+                        _dlq.Enqueue(message, "UnknownRecipient");
                         return;
                     }
                 }
@@ -219,6 +280,7 @@ public sealed class StreamFlowProcessor : BackgroundService
         _logger.LogError(
             "Failed to process message after {MaxRetries} attempts. RequestId: {RequestId}, RecipientId: {RecipientId}",
             maxRetries, message.RequestId, message.RecipientId);
+        _dlq.Enqueue(message, "MaxRetriesExceeded", retryCount);
     }
 
     /// <summary>

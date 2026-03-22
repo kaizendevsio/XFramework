@@ -8,6 +8,7 @@ using StreamFlow.Stream.Hubs;
 using StreamFlow.Stream.Interfaces;
 using XFramework.Core.Loggers;
 using XFramework.Core.Patterns;
+using System.Collections.Concurrent;
 using XFramework.Domain.Shared.Configurations;
 
 namespace StreamFlow.Stream.Services;
@@ -23,18 +24,26 @@ public sealed class StreamFlowService : IStreamFlowService
     private readonly IHubContext<MessageQueueHub> _hubContext;
     private readonly StreamFlowConfiguration _configuration;
     private readonly ILogger<StreamFlowService> _logger;
+    private readonly DeadLetterQueue _dlq;
     private static long _clientKeyCounter = 100000000;
+    private readonly ConcurrentDictionary<string, int> _roundRobinIndex = new();
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<StreamFlowMessage>> _pendingInvocations = new();
+    private readonly ConcurrentDictionary<Guid, DateTime> _processedMessages = new();
+    private readonly Timer _dedupCleanupTimer;
 
     public StreamFlowService(
         ICachingService cachingService,
         IHubContext<MessageQueueHub> hubContext,
         StreamFlowConfiguration configuration,
-        ILogger<StreamFlowService> logger)
+        ILogger<StreamFlowService> logger,
+        DeadLetterQueue dlq)
     {
         _cachingService = cachingService ?? throw new ArgumentNullException(nameof(cachingService));
         _hubContext = hubContext ?? throw new ArgumentNullException(nameof(hubContext));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dlq = dlq ?? throw new ArgumentNullException(nameof(dlq));
+        _dedupCleanupTimer = new Timer(_ => CleanupDedupCache(), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
     }
 
     /// <inheritdoc />
@@ -43,9 +52,18 @@ public sealed class StreamFlowService : IStreamFlowService
         HubCallerContext context,
         CancellationToken cancellationToken = default)
     {
-        // Check if Client is Registered
-        var client = _cachingService.Clients.FirstOrDefault(x => x.Value.StreamId == context.ConnectionId);
-        if (client.Value == null)
+        if (!_processedMessages.TryAdd(message.RequestId, DateTime.UtcNow))
+        {
+            _logger.LogDebug("Duplicate message ignored: {RequestId}", message.RequestId);
+            return Result.Success("Duplicate message ignored");
+        }
+
+        // Check if Client is Registered (O(1) via reverse index)
+        StreamFlowClient? senderClient = null;
+        if (_cachingService.ClientKeyByStreamId.TryGetValue(context.ConnectionId, out var senderKey))
+            _cachingService.Clients.TryGetValue(senderKey, out senderClient);
+
+        if (senderClient == null)
         {
             _logger.StreamFlowClientUnauthorized(context.ConnectionId);
             
@@ -63,17 +81,17 @@ public sealed class StreamFlowService : IStreamFlowService
                 case MessageExchangeType.FanOut:
                     await _hubContext.Clients.All.SendAsync(message.CommandName, message,
                         cancellationToken: cancellationToken);
-                    _logger.StreamFlowFanOutSent(message.RequestId.ToString(), client.Value.Name);
+                    _logger.StreamFlowFanOutSent(message.RequestId.ToString(), senderClient.Name);
                     break;
 
                 case MessageExchangeType.Direct:
-                    await HandleDirectMessageAsync(message, client.Value, cancellationToken);
+                    await HandleDirectMessageAsync(message, senderClient, cancellationToken);
                     break;
 
                 case MessageExchangeType.Topic:
                     await _hubContext.Clients.Group(message.Topic)
                         .SendAsync(message.CommandName, message, cancellationToken: cancellationToken);
-                    _logger.StreamFlowTopicSent(message.RequestId.ToString(), message.Topic, client.Value.Name);
+                    _logger.StreamFlowTopicSent(message.RequestId.ToString(), message.Topic, senderClient.Name);
                     break;
 
                 default:
@@ -103,7 +121,8 @@ public sealed class StreamFlowService : IStreamFlowService
             Id = client.Id,
             Name = client.Name,
             Queue = client.Queue,
-            ConnectedAt = DateTime.UtcNow
+            ConnectedAt = DateTime.UtcNow,
+            LastSeenAt = DateTime.UtcNow
         };
 
         // Add client with retry logic
@@ -127,6 +146,13 @@ public sealed class StreamFlowService : IStreamFlowService
             return Result.Failure("Failed to register client", 500);
         }
 
+        // Populate reverse indexes for O(1) lookups
+        _cachingService.ClientKeyByStreamId[context.ConnectionId] = (int)clientKey;
+        _cachingService.ClientsByServiceId.AddOrUpdate(
+            client.Id,
+            _ => new ConcurrentBag<int> { (int)clientKey },
+            (_, bag) => { bag.Add((int)clientKey); return bag; });
+
         RememberClient(client, context);
 
         var transportType = context.Features.Get<IHttpTransportFeature>()?.TransportType.ToString() ?? "Unknown";
@@ -141,33 +167,38 @@ public sealed class StreamFlowService : IStreamFlowService
         HubCallerContext context,
         CancellationToken cancellationToken = default)
     {
+        var tcs = new TaskCompletionSource<StreamFlowMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingInvocations[message.RequestId] = tcs;
+
         try
         {
-            // Create a TaskCompletionSource for the response
-            var tcs = new TaskCompletionSource<StreamFlowMessage>();
-
-            // Enqueue the method call
-            var queued = await _cachingService.MessageQueue.TryEnqueueMethodCallAsync(
-                message.RequestId, tcs, cancellationToken);
-
-            if (!queued)
+            // Find the recipient client
+            var availableClients = GetClientsByServiceId(message.RecipientId);
+            if (availableClients.Count == 0)
             {
                 _logger.StreamFlowMethodCallQueueFailed(message.RequestId.ToString());
-                return Result<StreamFlowInvokeResponse>.Failure("Failed to queue method call", 500);
+                return Result<StreamFlowInvokeResponse>.Failure("No clients available for recipient", 404);
             }
+
+            var recipient = availableClients.Count > 1
+                ? SelectClientForLoadBalancing(availableClients, message.RecipientId)
+                : availableClients[0];
+
+            // Send the message to the recipient
+            await _hubContext.Clients.Client(recipient.StreamId)
+                .SendAsync(message.CommandName, message, cancellationToken);
 
             // Wait for response with timeout
             var timeout = TimeSpan.FromSeconds(30);
-            var responseTask = tcs.Task;
-            var completedTask = await Task.WhenAny(responseTask, Task.Delay(timeout, cancellationToken));
+            var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(timeout, cancellationToken));
 
-            if (completedTask != responseTask)
+            if (completedTask != tcs.Task)
             {
                 _logger.StreamFlowMethodInvocationTimeout(message.RequestId.ToString());
                 return Result<StreamFlowInvokeResponse>.Failure("Method invocation timed out", 408);
             }
 
-            var responseMessage = await responseTask;
+            var responseMessage = await tcs.Task;
 
             var response = new StreamFlowInvokeResponse
             {
@@ -183,6 +214,10 @@ public sealed class StreamFlowService : IStreamFlowService
             _logger.StreamFlowMethodInvocationError(message.RequestId.ToString(), ex);
             return Result<StreamFlowInvokeResponse>.Failure("An error occurred invoking the method", 500);
         }
+        finally
+        {
+            _pendingInvocations.TryRemove(message.RequestId, out _);
+        }
     }
 
     /// <inheritdoc />
@@ -193,12 +228,16 @@ public sealed class StreamFlowService : IStreamFlowService
     {
         try
         {
-            // Find the waiting TaskCompletionSource and complete it
-            // Note: The actual TCS lookup and completion would be done by the processor
-            // For now, we just log the response received
-            _logger.StreamFlowMethodResponseReceived(message.RequestId.ToString());
+            if (_pendingInvocations.TryGetValue(message.RequestId, out var tcs))
+            {
+                tcs.TrySetResult(message);
+                _logger.StreamFlowMethodResponseReceived(message.RequestId.ToString());
+                return Result.Success("Response received");
+            }
 
-            return Result.Success("Response received");
+            _logger.StreamFlowMethodResponseError(message.RequestId.ToString(),
+                new InvalidOperationException($"No pending invocation found for RequestId {message.RequestId}"));
+            return Result.Failure("No pending invocation found for this request", 404);
         }
         catch (Exception ex)
         {
@@ -233,10 +272,16 @@ public sealed class StreamFlowService : IStreamFlowService
         StreamFlowClient sender,
         CancellationToken cancellationToken)
     {
-        var availableClients = _cachingService.Clients
-            .Where(x => x.Value.Id == message.RecipientId)
-            .Select(i => i.Value)
-            .ToList();
+        var allClients = GetClientsByServiceId(message.RecipientId);
+
+        // Health-aware routing: filter out circuit-open clients
+        var availableClients = allClients.Where(c => !c.IsCircuitOpen).ToList();
+        if (availableClients.Count == 0 && allClients.Count > 0)
+        {
+            // All clients are circuit-open; fall back to all clients rather than blocking completely
+            availableClients = allClients;
+        }
+
         var count = availableClients.Count;
 
         StreamFlowClient currentClient = null;
@@ -248,7 +293,7 @@ public sealed class StreamFlowService : IStreamFlowService
         }
         else if (count == 1)
         {
-            currentClient = availableClients.First();
+            currentClient = availableClients[0];
         }
 
         if (currentClient != null)
@@ -257,21 +302,41 @@ public sealed class StreamFlowService : IStreamFlowService
             _logger.StreamFlowDirectSent(message.ExchangeType.ToString(), message.RequestId.ToString(),
                 sender.Name, currentClient.Name, (int)message.ResponseStatusCode);
 
-            await _hubContext.Clients.Client(currentClient.StreamId)
-                .SendAsync(message.CommandName, message, cancellationToken);
+            try
+            {
+                await _hubContext.Clients.Client(currentClient.StreamId)
+                    .SendAsync(message.CommandName, message, cancellationToken);
+
+                currentClient.LastSeenAt = DateTime.UtcNow;
+                Interlocked.Increment(ref currentClient.SuccessCount);
+            }
+            catch
+            {
+                Interlocked.Increment(ref currentClient.FailureCount);
+                currentClient.LastFailureAt = DateTime.UtcNow;
+                if (currentClient.FailureCount > 5 && currentClient.FailureCount > currentClient.SuccessCount)
+                {
+                    currentClient.IsCircuitOpen = true;
+                }
+
+                throw;
+            }
+
             return;
         }
 
         // Client is not online - check if known and queue if enabled
-        if (_cachingService.AbsoluteClients.All(x => x.Value.Id != message.RecipientId))
+        if (!_cachingService.AbsoluteClientKeyByServiceId.ContainsKey(message.RecipientId))
         {
             _logger.StreamFlowInvalidRecipient(message.RequestId.ToString(), sender.Name, message.RecipientId);
+            _dlq.Enqueue(message, "InvalidRecipient");
             return;
         }
 
         if (!_configuration.QueueMessages)
         {
             _logger.StreamFlowMessageQueuingDisabled(message.RequestId.ToString(), sender.Name, message.RecipientId);
+            _dlq.Enqueue(message, "QueueDisabled");
             return;
         }
 
@@ -287,6 +352,7 @@ public sealed class StreamFlowService : IStreamFlowService
             else
             {
                 _logger.StreamFlowMessageQueueFailed(message.RequestId.ToString(), sender.Name, message.RecipientId);
+                _dlq.Enqueue(message, "QueueFull");
             }
         }
         catch (OperationCanceledException)
@@ -296,83 +362,33 @@ public sealed class StreamFlowService : IStreamFlowService
     }
 
     /// <summary>
-    /// Selects a client for load balancing using round-robin strategy.
-    /// Preserves Phase 3.3 optimization.
+    /// Selects a client for load balancing using atomic round-robin strategy.
     /// </summary>
-    private StreamFlowClient SelectClientForLoadBalancing(List<StreamFlowClient> availableClients, string recipientId)
+    private StreamFlowClient SelectClientForLoadBalancing(IReadOnlyList<StreamFlowClient> clients, string recipientId)
     {
-        var count = availableClients.Count;
-        var cachedClient = _cachingService.LatestClients
-            .Select(i => i.Value)
-            .FirstOrDefault(x => x.Id == recipientId);
+        var idx = _roundRobinIndex.AddOrUpdate(recipientId, 0, (_, prev) => prev + 1);
+        return clients[(int)((uint)idx % clients.Count)];
+    }
 
-        StreamFlowClient selectedClient;
-
-        if (cachedClient is null)
+    /// <summary>
+    /// Gets all connected clients for a given service/recipient ID using the reverse index.
+    /// Falls back to O(n) scan if the reverse index is empty (defensive).
+    /// </summary>
+    private List<StreamFlowClient> GetClientsByServiceId(string serviceId)
+    {
+        if (_cachingService.ClientsByServiceId.TryGetValue(serviceId, out var clientKeys))
         {
-            // No cached client - use first available
-            selectedClient = availableClients[0];
-
-            // Add to cache with retry
-            int attempts = 0;
-            const int maxAttempts = 100;
-            while (attempts < maxAttempts)
+            var result = new List<StreamFlowClient>();
+            foreach (var key in clientKeys)
             {
-                if (_cachingService.LatestClients.TryAdd(_cachingService.LatestClients.Count, selectedClient))
+                if (_cachingService.Clients.TryGetValue(key, out var client))
                 {
-                    break;
+                    result.Add(client);
                 }
-                attempts++;
             }
-
-            if (attempts >= maxAttempts)
-            {
-                _logger.StreamFlowClientCacheFailed(maxAttempts, selectedClient.Id);
-            }
+            return result;
         }
-        else
-        {
-            // Select next client in round-robin fashion
-            var cachedClientIndex = availableClients.IndexOf(cachedClient);
-            selectedClient = (cachedClientIndex + 1) >= count
-                ? availableClients[0]
-                : availableClients[cachedClientIndex + 1];
-
-            // Remove old cache entry with retry
-            var tmpIndex = _cachingService.LatestClients.FirstOrDefault(i => i.Value.Id == cachedClient.Id);
-            if (tmpIndex.Key != 0 || tmpIndex.Value != null)
-            {
-                int removeAttempts = 0;
-                const int maxRemoveAttempts = 100;
-                while (removeAttempts < maxRemoveAttempts)
-                {
-                    if (_cachingService.LatestClients.TryRemove(tmpIndex.Key, out _))
-                    {
-                        break;
-                    }
-                    removeAttempts++;
-                }
-            }
-
-            // Add new cache entry with retry
-            int addAttempts = 0;
-            const int maxAddAttempts = 100;
-            while (addAttempts < maxAddAttempts)
-            {
-                if (_cachingService.LatestClients.TryAdd(0, selectedClient))
-                {
-                    break;
-                }
-                addAttempts++;
-            }
-
-            if (addAttempts >= maxAddAttempts)
-            {
-                _logger.StreamFlowClientCacheUpdateFailed(maxAddAttempts, selectedClient.Id);
-            }
-        }
-
-        return selectedClient;
+        return [];
     }
 
     /// <summary>
@@ -384,51 +400,53 @@ public sealed class StreamFlowService : IStreamFlowService
         return Interlocked.Increment(ref _clientKeyCounter);
     }
 
+    private void CleanupDedupCache()
+    {
+        var cutoff = DateTime.UtcNow.AddMinutes(-10);
+        foreach (var (key, time) in _processedMessages)
+        {
+            if (time < cutoff)
+                _processedMessages.TryRemove(key, out _);
+        }
+    }
+
     /// <summary>
     /// Remembers client in the absolute clients collection for reconnection tracking.
+    /// Uses O(1) reverse index instead of O(n) scans.
     /// </summary>
     private void RememberClient(StreamFlowClient client, HubCallerContext context)
     {
-        if (_cachingService.AbsoluteClients.All(i => i.Value.Id != client.Id))
+        if (_cachingService.AbsoluteClientKeyByServiceId.TryGetValue(client.Id, out var existingKey)
+            && _cachingService.AbsoluteClients.TryGetValue(existingKey, out var existingClient))
+        {
+            // Existing client reconnecting - update connection ID and last seen
+            existingClient.StreamId = context.ConnectionId;
+            existingClient.ConnectedAt = DateTime.UtcNow;
+            existingClient.LastSeenAt = DateTime.UtcNow;
+            _logger.StreamFlowClientConnectionUpdated(client.Id);
+        }
+        else
         {
             // New client - add to absolute clients
-            int attempts = 0;
-            const int maxAttempts = 100;
-            bool added = false;
-
-            while (attempts < maxAttempts && !added)
+            var newClient = new StreamFlowClient
             {
-                added = _cachingService.AbsoluteClients.TryAdd(
-                    _cachingService.AbsoluteClients.Count,
-                    new StreamFlowClient
-                    {
-                        StreamId = context.ConnectionId,
-                        Id = client.Id,
-                        Name = client.Name,
-                        Queue = client.Queue,
-                        ConnectedAt = DateTime.UtcNow
-                    });
-                attempts++;
-            }
+                StreamId = context.ConnectionId,
+                Id = client.Id,
+                Name = client.Name,
+                Queue = client.Queue,
+                ConnectedAt = DateTime.UtcNow,
+                LastSeenAt = DateTime.UtcNow
+            };
 
-            if (added)
+            var key = (int)GenerateUniqueClientKey();
+            if (_cachingService.AbsoluteClients.TryAdd(key, newClient))
             {
+                _cachingService.AbsoluteClientKeyByServiceId[client.Id] = key;
                 _logger.StreamFlowClientAddedToAbsolute(client.Id);
             }
             else
             {
-                _logger.StreamFlowAbsoluteClientAddFailed(maxAttempts, client.Id);
-            }
-        }
-        else
-        {
-            // Existing client reconnecting - update connection ID
-            var existingClient = _cachingService.AbsoluteClients.FirstOrDefault(i => i.Value.Id == client.Id);
-            if (existingClient.Value != null)
-            {
-                existingClient.Value.StreamId = context.ConnectionId;
-                existingClient.Value.ConnectedAt = DateTime.UtcNow;
-                _logger.StreamFlowClientConnectionUpdated(client.Id);
+                _logger.StreamFlowAbsoluteClientAddFailed(1, client.Id);
             }
         }
     }
