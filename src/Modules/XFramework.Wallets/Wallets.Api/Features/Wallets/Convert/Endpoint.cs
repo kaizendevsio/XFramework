@@ -17,7 +17,7 @@ public static class ConvertEndpoint
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ConvertWalletRequest request,
-        IWalletService walletService,
+        IWalletOperationsService walletService,
         CancellationToken ct)
     {
         return await walletService.ConvertWalletAsync(request, ct);

@@ -249,7 +249,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("        private readonly ICacheService _cacheService;");
         if (entity.HasTenantId)
         {
-            sb.AppendLine("        private readonly ITenantService _tenantService;");
+            sb.AppendLine("        private readonly ITenantResolver _tenantService;");
         }
         sb.AppendLine();
 
@@ -259,7 +259,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         if (entity.HasTenantId)
         {
             sb.AppendLine("            ICacheService cacheService,");
-            sb.AppendLine("            ITenantService tenantService)");
+            sb.AppendLine("            ITenantResolver tenantService)");
         }
         else
         {

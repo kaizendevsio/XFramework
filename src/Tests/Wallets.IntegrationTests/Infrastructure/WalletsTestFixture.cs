@@ -103,12 +103,12 @@ public class WalletsTestFixture
 
     private static WebApplication StartWallets()
     {
-        var builder = XApplication.Configure<Wallets.Api.Services.WalletService>();
+        var builder = XApplication.Configure<Wallets.Api.Services.WalletOperationsService>();
         builder.WebHost.UseUrls(WalletsUrl);
         OverrideConfig(builder, "Wallets.Test", "4902761a-822d-4c6b-8e2d-323fd501bcd6");
         builder.Configuration["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue";
 
-        builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletService>();
+        builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletOperationsService>();
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
@@ -176,7 +176,7 @@ public class WalletsTestFixture
         var logger = _walletsApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
         var scopeFactory = _walletsApp.Services.GetRequiredService<IServiceScopeFactory>();
 
-        var handlers = typeof(Wallets.Api.Services.IWalletService).Assembly.GetExportedTypes()
+        var handlers = typeof(Wallets.Api.Services.IWalletOperationsService).Assembly.GetExportedTypes()
             .Where(t => typeof(ISignalREventHandler).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
             .Select(Activator.CreateInstance)
             .Cast<ISignalREventHandler>();

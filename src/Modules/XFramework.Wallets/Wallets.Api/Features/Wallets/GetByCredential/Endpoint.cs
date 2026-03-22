@@ -23,7 +23,7 @@ public static class GetWalletsByCredentialEndpoint
     public static async Task<Results<Ok<List<WalletResponse>>, ProblemHttpResult>> Handle(
         [FromRoute] Guid credentialId,
         [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
-        [FromServices] IWalletService walletService,
+        [FromServices] IWalletOperationsService walletService,
         CancellationToken ct)
     {
         var result = await walletService.GetWalletsByCredentialAsync(credentialId, tenantId, ct);

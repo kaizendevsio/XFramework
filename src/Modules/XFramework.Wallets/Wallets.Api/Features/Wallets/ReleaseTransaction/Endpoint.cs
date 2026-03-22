@@ -18,7 +18,7 @@ public static class ReleaseTransactionEndpoint
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ReleaseTransactionRequest request,
-        IWalletService walletService,
+        IWalletOperationsService walletService,
         CancellationToken ct)
     {
         return await walletService.ReleaseTransactionAsync(request, ct);

@@ -19,12 +19,12 @@ namespace Community.Api.Services;
 public sealed class CommunityService : ICommunityService
 {
     private readonly IDataContext _dataContext;
-    private readonly ITenantService _tenantService;
+    private readonly ITenantResolver _tenantService;
     private readonly ILogger<CommunityService> _logger;
 
     public CommunityService(
         IDataContext dataContext,
-        ITenantService tenantService,
+        ITenantResolver tenantService,
         ILogger<CommunityService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));

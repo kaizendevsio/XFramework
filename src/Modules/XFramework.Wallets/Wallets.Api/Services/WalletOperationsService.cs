@@ -18,18 +18,18 @@ namespace Wallets.Api.Services;
 /// Service for managing wallet operations including balance changes, transfers, and conversions.
 /// Consolidates all wallet operation logic previously handled by MediatR command handlers.
 /// </summary>
-public sealed class WalletService : IWalletService
+public sealed class WalletOperationsService : IWalletOperationsService
 {
     private readonly IDataContext _dataContext;
-    private readonly ITenantService _tenantService;
+    private readonly ITenantResolver _tenantService;
     private readonly IHelperService _helperService;
-    private readonly ILogger<WalletService> _logger;
+    private readonly ILogger<WalletOperationsService> _logger;
 
-    public WalletService(
+    public WalletOperationsService(
         IDataContext dataContext,
-        ITenantService tenantService,
+        ITenantResolver tenantService,
         IHelperService helperService,
-        ILogger<WalletService> logger)
+        ILogger<WalletOperationsService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _tenantService = tenantService ?? throw new ArgumentNullException(nameof(tenantService));

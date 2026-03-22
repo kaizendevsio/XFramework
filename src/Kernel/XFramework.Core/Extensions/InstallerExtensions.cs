@@ -157,9 +157,9 @@ public static class InstallerExtensions
             });
     }
     
-    public static void AddTenantService(this IServiceCollection services)
+    public static void AddTenantResolver(this IServiceCollection services)
     {
-        services.AddScoped<ITenantService, TenantService>();
+        services.AddScoped<ITenantResolver, TenantResolver>();
     }
     
     public static void UseEndpointsInAssembly(this IApplicationBuilder app, IWebHostEnvironment env)

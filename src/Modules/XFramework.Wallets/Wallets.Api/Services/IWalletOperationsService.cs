@@ -8,7 +8,7 @@ namespace Wallets.Api.Services;
 /// Service for managing wallet operations including balance changes, transfers, and conversions.
 /// Provides direct service-based access to wallet functionality without MediatR indirection.
 /// </summary>
-public interface IWalletService
+public interface IWalletOperationsService
 {
     /// <summary>
     /// Creates a new wallet for a credential with the specified wallet type.

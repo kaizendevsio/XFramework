@@ -10,7 +10,7 @@ public sealed class ServicesInstaller : IInstaller
     public void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         /*services.AddSingleton<ICachingService, CachingService>();*/
-        services.AddTenantService();
+        services.AddTenantResolver();
         
         // Register Community Service (VSA Architecture)
         services.AddScoped<ICommunityService, CommunityService>();

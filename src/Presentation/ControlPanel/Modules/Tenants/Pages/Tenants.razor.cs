@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Components;
-using Tenant.Integration.Drivers;
+// Tenant wrapper is now part of IIdentityServerServiceWrapper
 using XFramework.Domain.Shared.Contracts.Responses;
 using IdentityServer.Domain.Shared.Contracts;
 
@@ -10,7 +10,7 @@ namespace ControlPanel.Modules.Tenants.Pages;
 public partial class Tenants
 {
     [Inject]
-    private ITenantServiceWrapper TenantServiceWrapper { get; set; }
+    private IIdentityServerServiceWrapper IdentityServerServiceWrapper { get; set; }
     public Tenants()
     {
         View.Title = "Tenants";
@@ -26,7 +26,7 @@ public partial class Tenants
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-        var apiResult = await TenantServiceWrapper.Tenant.GetList(pageSize: 100, pageNumber: 0);
+        var apiResult = await IdentityServerServiceWrapper.Tenant.GetList(pageSize: 100, pageNumber: 0);
         List = apiResult.Response;
     }
 

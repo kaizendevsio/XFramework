@@ -11,7 +11,7 @@ public class ServicesInstaller : IInstaller
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         services.AddMessagingWrapperServices();
-        services.AddTenantService();
+        services.AddTenantResolver();
 
         // Register ProductService
         services.AddScoped<ProductService>();

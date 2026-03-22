@@ -6,7 +6,7 @@ namespace XFramework.Core.Services;
 /// <summary>
 /// Service for retrieving tenant information with caching support.
 /// </summary>
-public interface ITenantService
+public interface ITenantResolver
 {
     /// <summary>
     /// Gets a tenant by ID.
@@ -17,10 +17,10 @@ public interface ITenantService
 }
 
 /// <summary>
-/// Implementation of ITenantService with memory caching.
+/// Implementation of ITenantResolver with memory caching.
 /// TODO: Re-implement tenant service wrapper when IdentityServer.Api exposes tenant endpoints.
 /// </summary>
-public sealed class TenantService(IMemoryCache cache) : ITenantService
+public sealed class TenantResolver(IMemoryCache cache) : ITenantResolver
 {
     /// <inheritdoc />
     public Task<Tenant> GetTenant(Guid? id)

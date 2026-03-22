@@ -1,4 +1,4 @@
-﻿using Address.Integration.Drivers;
+using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Entity.Enums;
 using XFramework.Domain.Shared.Contracts;
 
@@ -12,7 +12,7 @@ public partial class AddressState
     }
 
     protected class FetchHandler(
-        IAddressServiceWrapper addressServiceWrapper,
+        IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
         : StateActionHandler<Fetch>(handlerServices, store)
@@ -26,12 +26,12 @@ public partial class AddressState
                 case AddressType.NotSpecified:
                     break;
                 case AddressType.Country:
-                    var countryResponse = await addressServiceWrapper.AddressCountry.GetList(500, 1);
+                    var countryResponse = await identityServerServiceWrapper.AddressCountry.GetList(500, 1);
                     await HandleFailure(countryResponse, action, false);
                     CurrentState.CountryList = countryResponse.Response?.Items.ToList();
                     break;
                 case AddressType.Region:
-                    var regionResponse = await addressServiceWrapper.AddressRegion.GetList(
+                    var regionResponse = await identityServerServiceWrapper.AddressRegion.GetList(
                         pageSize: 500, 
                         pageNumber: 1,
                         filter: [new ()
@@ -48,7 +48,7 @@ public partial class AddressState
                     CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.Province:
-                    var provinceResponse = await addressServiceWrapper.AddressProvince.GetList(
+                    var provinceResponse = await identityServerServiceWrapper.AddressProvince.GetList(
                         pageSize: 500, 
                         pageNumber: 1,
                         filter: [new ()
@@ -65,7 +65,7 @@ public partial class AddressState
                     CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.City:
-                    var cityResponse = await addressServiceWrapper.AddressCity.GetList(
+                    var cityResponse = await identityServerServiceWrapper.AddressCity.GetList(
                         pageSize: 500, 
                         pageNumber: 1,
                         filter: [new ()
@@ -81,7 +81,7 @@ public partial class AddressState
                     CurrentState.SelectedBarangay = new();
                     break;
                 case AddressType.Barangay:
-                    var barangayResponse = await addressServiceWrapper.AddressBarangay.GetList(
+                    var barangayResponse = await identityServerServiceWrapper.AddressBarangay.GetList(
                         pageSize: 500, 
                         pageNumber: 1,
                         filter: [new ()

@@ -23,7 +23,7 @@ public static class Endpoint
     public static async Task<IResult> HandleAsync(
         [FromBody] BatchDecrementRequestWrapper request,
         [FromServices] IBatchWalletService batchService,
-        [FromServices] ITenantService tenantService,
+        [FromServices] ITenantResolver tenantService,
         CancellationToken cancellationToken = default)
     {
         if (request?.Requests == null || request.Requests.Count == 0)

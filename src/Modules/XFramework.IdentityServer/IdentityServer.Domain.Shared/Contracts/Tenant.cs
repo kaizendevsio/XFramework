@@ -4,7 +4,14 @@ namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-// [GenerateEndpoints] disabled — ITenantService name conflicts with XFramework.Core.Services.ITenantService
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/tenants",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 1800,
+    CacheKeyPrefix = "tenants"
+)]
 public partial class Tenant : BaseModel
 {
     

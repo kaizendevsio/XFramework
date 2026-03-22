@@ -15,7 +15,7 @@ public static class ReverseTransactionEndpoint
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         ReverseTransactionRequest request,
-        IWalletService walletService,
+        IWalletOperationsService walletService,
         CancellationToken ct)
     {
         return await walletService.ReverseTransactionAsync(request, ct);

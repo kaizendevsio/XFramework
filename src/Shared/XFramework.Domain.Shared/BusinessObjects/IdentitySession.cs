@@ -3,7 +3,7 @@ using XFramework.Domain.Shared.Enums;
 
 namespace XFramework.Domain.Shared.BusinessObjects;
 
-public class Session
+public class SessionInfo
 {
     public string Token { get; set; }
     public Guid Guid { get; set; }

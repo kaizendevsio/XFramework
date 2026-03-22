@@ -19,7 +19,7 @@ public static class CreateWalletEndpoint
         ExcludeFromOpenApi = true)]
     public static async Task<Result<WalletResponse>> Handle(
         CreateWalletRequest request,
-        IWalletService walletService,
+        IWalletOperationsService walletService,
         CancellationToken ct)
     {
         var result = await walletService.CreateWalletAsync(

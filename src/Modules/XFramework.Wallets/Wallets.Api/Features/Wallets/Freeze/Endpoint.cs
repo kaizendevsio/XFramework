@@ -15,7 +15,7 @@ public static class FreezeWalletEndpoint
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         FreezeWalletRequest request,
-        IWalletService walletService,
+        IWalletOperationsService walletService,
         CancellationToken ct)
     {
         return await walletService.FreezeWalletAsync(request, ct);

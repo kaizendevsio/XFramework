@@ -17,7 +17,7 @@ namespace Messaging.Api.Services;
 public sealed class MessagingService(
     IDataContext dataContext,
     IHelperService helperService,
-    ITenantService tenantService,
+    ITenantResolver tenantService,
     ISmsGatewayServiceWrapper smsGatewayServiceWrapper,
     ILogger<MessagingService> logger
 ) : IMessagingService

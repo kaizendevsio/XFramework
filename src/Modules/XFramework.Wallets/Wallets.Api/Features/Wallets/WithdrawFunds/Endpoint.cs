@@ -17,7 +17,7 @@ public static class WithdrawFundsEndpoint
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         DecrementWalletRequest request,
-        IWalletService walletService,
+        IWalletOperationsService walletService,
         CancellationToken ct)
     {
         return await walletService.DecrementBalanceAsync(request, ct);

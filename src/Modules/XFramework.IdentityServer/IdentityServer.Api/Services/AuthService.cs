@@ -31,7 +31,7 @@ namespace IdentityServer.Api.Services;
 public sealed class AuthService : IAuthService
 {
     private readonly IDataContext _dataContext;
-    private readonly ITenantService _tenantService;
+    private readonly ITenantResolver _tenantService;
     private readonly IJwtService _jwtService;
     private readonly IHelperService _helperService;
     private readonly CacheManager _cache;
@@ -40,7 +40,7 @@ public sealed class AuthService : IAuthService
 
     public AuthService(
         IDataContext dataContext,
-        ITenantService tenantService,
+        ITenantResolver tenantService,
         IJwtService jwtService,
         IHelperService helperService,
         CacheManager cache,

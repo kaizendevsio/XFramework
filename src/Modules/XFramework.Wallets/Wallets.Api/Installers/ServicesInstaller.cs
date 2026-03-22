@@ -8,10 +8,10 @@ public class ServicesInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddTenantService();
+        services.AddTenantResolver();
 
         // Register wallet services
-        services.AddScoped<IWalletService, WalletService>();
+        services.AddScoped<IWalletOperationsService, WalletOperationsService>();
         services.AddScoped<IBatchWalletService, BatchWalletService>();
     }
 }

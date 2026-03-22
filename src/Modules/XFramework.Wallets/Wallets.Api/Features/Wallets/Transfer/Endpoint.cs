@@ -17,7 +17,7 @@ public static class TransferEndpoint
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         TransferWalletRequest request,
-        IWalletService walletService,
+        IWalletOperationsService walletService,
         CancellationToken ct)
     {
         return await walletService.TransferAsync(request, ct);

@@ -5,8 +5,14 @@ namespace Wallets.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
-// Note: Wallet CRUD is handled by manual endpoints in Features/Wallets/
-// [GenerateEndpoints] not used here to avoid conflicts with IWalletService
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.Get | EndpointActions.GetList,
+    RoutePrefix = "api/wallets",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 300,
+    CacheKeyPrefix = "wallets"
+)]
 public partial class Wallet : BaseModel
 {
     

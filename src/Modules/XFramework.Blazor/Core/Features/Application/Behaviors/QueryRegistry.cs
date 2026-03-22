@@ -1,5 +1,5 @@
+using IdentityServer.Integration.Drivers;
 ﻿using IdentityServer.Integration.Drivers;
-using Registry.Integration.Drivers;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Responses;
 
@@ -10,14 +10,14 @@ public partial class ApplicationState
     public record QueryRegistry(string Key) : QueryAction<PaginatedResult<RegistryConfiguration>?>;
     
     protected class QueryRegistryHandler(
-        IRegistryServiceWrapper registryServiceWrapper,
+        IIdentityServerServiceWrapper identityServerServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
         : StateActionHandler<QueryRegistry, PaginatedResult<RegistryConfiguration>?>(handlerServices, store)
     {
         public override async Task<PaginatedResult<RegistryConfiguration>?> Handle(QueryRegistry action, CancellationToken aCancellationToken)
         {
-            var configurationList = await registryServiceWrapper.RegistryConfiguration.GetList(
+            var configurationList = await identityServerServiceWrapper.RegistryConfiguration.GetList(
                 pageSize: action.PageSize,
                 pageNumber: action.PageIndex,
                 filter:

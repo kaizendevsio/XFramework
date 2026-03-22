@@ -1,9 +1,5 @@
-﻿using Address.Integration.Drivers;
 using IdentityServer.Integration.Drivers;
-using Messaging.Integration.Drivers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Registry.Integration.Drivers;
-using Tenant.Integration.Drivers;
 using Wallets.Integration.Drivers;
 
 namespace XFramework.Blazor.Core.Installers;
@@ -14,12 +10,11 @@ public class ServiceWrapperInstaller : IInstaller
     {
         services.TryAddSingleton<ISignalRService, SignalRService>();
         services.TryAddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
-        services.TryAddSingleton<IIdentityServerServiceWrapper, IdentityServerServiceWrapper>();
-        services.TryAddSingleton<IAddressServiceWrapper, AddressServiceWrapper>();
-        services.TryAddSingleton<IWalletsServiceWrapper, WalletsServiceWrapper>();
-        services.TryAddSingleton<IMessagingServiceWrapper, MessagingServiceWrapper>();
-        services.TryAddSingleton<IRegistryServiceWrapper, RegistryServiceWrapper>(); 
-        services.TryAddSingleton<ITenantServiceWrapper, TenantServiceWrapper>(); 
+
+        // Service wrappers are auto-generated from [GenerateEndpoints] entities
+        services.AddIdentityServerWrapperServices();
+        services.AddWalletsWrapperServices();
+
         services.TryAddSingleton<IHelperService, HelperService>();
     }
 }

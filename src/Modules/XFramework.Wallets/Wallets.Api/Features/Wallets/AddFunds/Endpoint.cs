@@ -17,7 +17,7 @@ public static class AddFundsEndpoint
         ExcludeFromOpenApi = true)]
     public static async Task<Result> Handle(
         IncrementWalletRequest request,
-        IWalletService walletService,
+        IWalletOperationsService walletService,
         CancellationToken ct)
     {
         return await walletService.IncrementBalanceAsync(request, ct);
