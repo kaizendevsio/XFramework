@@ -23,6 +23,7 @@
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.StreamFlow\StreamFlow.Stream\StreamFlow.Stream.csproj" />
+        <ProjectReference Include="..\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     </ItemGroup>
 
 </Project>

@@ -205,56 +205,7 @@ public class WalletsTestFixture
 
         await using var db = new AppDbContext(options);
         await db.Database.MigrateAsync();
-
-        if (!await db.Set<Contracts.Tenant>().AnyAsync(t => t.Id == TestTenantId))
-        {
-            db.Set<Contracts.Tenant>().Add(new Contracts.Tenant
-            {
-                Id = TestTenantId, TenantId = TestTenantId,
-                Name = "Test Tenant", Description = "Wallets test tenant"
-            });
-        }
-
-        if (!await db.Set<Contracts.WalletType>().AnyAsync(w => w.Id == TestWalletTypeId))
-        {
-            db.Set<Contracts.WalletType>().Add(new Contracts.WalletType
-            {
-                Id = TestWalletTypeId,
-                Code = "TST",
-                Name = "TestCoin",
-                TenantId = TestTenantId,
-                MinTransferRule = 0,
-                MaxTransferRule = 1_000_000
-            });
-        }
-
-        // Seed registry config for transfer deduction type
-        var registryGroupId = Guid.Parse("c1c2c3d4-e5f6-7890-abcd-ef1234567890");
-        if (!await db.Set<Contracts.RegistryConfigurationGroup>().AnyAsync(g => g.Id == registryGroupId))
-        {
-            db.Set<Contracts.RegistryConfigurationGroup>().Add(new Contracts.RegistryConfigurationGroup
-            {
-                Id = registryGroupId,
-                Name = "Wallet",
-                Description = "Wallet configuration",
-                TenantId = TestTenantId
-            });
-        }
-
-        if (!await db.Set<Contracts.RegistryConfiguration>().AnyAsync(r =>
-                r.Key == "Settings:Wallet:Transfer:DeductionType" && r.TenantId == TestTenantId))
-        {
-            db.Set<Contracts.RegistryConfiguration>().Add(new Contracts.RegistryConfiguration
-            {
-                Id = Guid.NewGuid(),
-                Key = "Settings:Wallet:Transfer:DeductionType",
-                Value = "DeductFromSender",
-                GroupId = registryGroupId,
-                TenantId = TestTenantId
-            });
-        }
-
-        await db.SaveChangesAsync();
+        await XFramework.TestInfrastructure.TestSeedData.SeedAll(db);
     }
 
     private static async Task WaitForHealth(string url, int timeoutSeconds = 30)

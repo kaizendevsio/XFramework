@@ -21,6 +21,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\Modules\XFramework.Inventario\Inventario.Api\Inventario.Api.csproj" />
         <ProjectReference Include="..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+        <ProjectReference Include="..\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     </ItemGroup>
 
 </Project>

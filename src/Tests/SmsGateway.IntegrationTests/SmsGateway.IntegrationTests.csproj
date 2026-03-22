@@ -21,6 +21,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\Modules\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj" />
         <ProjectReference Include="..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+        <ProjectReference Include="..\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     </ItemGroup>
 
 </Project>

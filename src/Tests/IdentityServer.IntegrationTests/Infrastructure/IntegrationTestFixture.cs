@@ -233,96 +233,7 @@ public class IntegrationTestFixture
 
         await using var db = new AppDbContext(options);
         await db.Database.MigrateAsync();
-
-        if (!await db.Set<Contracts.Tenant>().AnyAsync(t => t.Id == TestTenantId))
-        {
-            db.Set<Contracts.Tenant>().Add(new Contracts.Tenant
-            {
-                Id = TestTenantId,
-                TenantId = TestTenantId,
-                Name = "Test Tenant",
-                Description = "Integration test tenant"
-            });
-        }
-
-        if (!await db.Set<Contracts.IdentityVerificationType>().AnyAsync(v => v.Name == "Sms"))
-        {
-            db.Set<Contracts.IdentityVerificationType>().Add(new Contracts.IdentityVerificationType
-            {
-                Id = Guid.NewGuid(),
-                Name = "Sms",
-                TenantId = TestTenantId
-            });
-        }
-
-        var roleGroupId = Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567890");
-        if (!await db.Set<Contracts.IdentityRoleTypeGroup>().AnyAsync(g => g.Id == roleGroupId))
-        {
-            db.Set<Contracts.IdentityRoleTypeGroup>().Add(new Contracts.IdentityRoleTypeGroup
-            {
-                Id = roleGroupId,
-                Name = "Default",
-                Description = "Default role group",
-                TenantId = TestTenantId
-            });
-        }
-
-        if (!await db.Set<Contracts.IdentityRoleType>().AnyAsync(r => r.Id == TestData.RoleTypeId))
-        {
-            db.Set<Contracts.IdentityRoleType>().Add(new Contracts.IdentityRoleType
-            {
-                Id = TestData.RoleTypeId,
-                Name = "User",
-                GroupId = roleGroupId,
-                TenantId = TestTenantId
-            });
-        }
-
-        var registryGroupId = Guid.Parse("c1c2c3d4-e5f6-7890-abcd-ef1234567890");
-        if (!await db.Set<Contracts.RegistryConfigurationGroup>().AnyAsync(g => g.Id == registryGroupId))
-        {
-            db.Set<Contracts.RegistryConfigurationGroup>().Add(new Contracts.RegistryConfigurationGroup
-            {
-                Id = registryGroupId,
-                Name = "Auth",
-                Description = "Authentication configuration",
-                TenantId = TestTenantId
-            });
-        }
-
-        if (!await db.Set<Contracts.RegistryConfiguration>().AnyAsync(r => r.Key == "DefaultAuthorizeBy" && r.TenantId == TestTenantId))
-        {
-            db.Set<Contracts.RegistryConfiguration>().Add(new Contracts.RegistryConfiguration
-            {
-                Id = Guid.NewGuid(),
-                Key = "DefaultAuthorizeBy",
-                Value = "1",
-                GroupId = registryGroupId,
-                TenantId = TestTenantId
-            });
-        }
-
-        var sessionTypes = new (string Name, Guid SystemReferenceId)[]
-        {
-            ("User", Guid.Parse("70b44b35-bf8e-43fc-af1a-38bdb816d51f")),
-            ("Service", Guid.Parse("1e3ab070-386a-410d-823f-4f225e07a69c")),
-            ("Token", Guid.Parse("d71cda39-4192-4d7b-af22-1c6c9289b913"))
-        };
-        foreach (var (name, sysRefId) in sessionTypes)
-        {
-            if (!await db.Set<Contracts.SessionType>().AnyAsync(s => s.Name == name && s.TenantId == TestTenantId))
-            {
-                db.Set<Contracts.SessionType>().Add(new Contracts.SessionType
-                {
-                    Id = Guid.NewGuid(),
-                    Name = name,
-                    SystemReferenceId = sysRefId,
-                    TenantId = TestTenantId
-                });
-            }
-        }
-
-        await db.SaveChangesAsync();
+        await XFramework.TestInfrastructure.TestSeedData.SeedAll(db);
     }
 
     private static async Task WaitForHealth(string url, Task? appTask = null, int timeoutSeconds = 30)
@@ -361,5 +272,5 @@ public class IntegrationTestFixture
 
 public static class TestData
 {
-    public static readonly Guid RoleTypeId = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    public static readonly Guid RoleTypeId = XFramework.TestInfrastructure.TestConstants.RoleTypeId;
 }
