@@ -61,6 +61,8 @@
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
   </Folder>
   <Folder Name="/src/" />
+  <Folder Name="/src/Infrastructure/" />
+  <Folder Name="/src/Kernel/" />
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/XFramework.IdentityServer/" />
   <Folder Name="/src/Modules/XFramework.Inventario/" />
@@ -72,6 +74,7 @@
     <Project Path="src/Tests/Inventario.IntegrationTests/Inventario.IntegrationTests.csproj" />
     <Project Path="src/Tests/SmsGateway.IntegrationTests/SmsGateway.IntegrationTests.csproj" />
     <Project Path="src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj" />
+    <Project Path="src/Tests/XFramework.TestInfrastructure/XFramework.TestInfrastructure.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
