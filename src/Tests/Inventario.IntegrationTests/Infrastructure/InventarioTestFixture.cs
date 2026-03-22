@@ -3,13 +3,13 @@ using Microsoft.AspNetCore.Hosting;
 using XFramework.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
+using XFramework.TestInfrastructure;
 using Contracts = XFramework.Domain.Shared.Contracts;
 
 namespace Inventario.IntegrationTests;
@@ -22,10 +22,7 @@ public class InventarioTestFixture
     private static Task? _appTask;
 
     public static string ConnectionString { get; private set; } = null!;
-    public static string AppUrl => "http://localhost:18461";
-
-    public static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
-    public static readonly Guid TestCategoryId = Guid.Parse("f1f2f3f4-e5f6-7890-abcd-ef1234567890");
+    public static string AppUrl => TestConstants.Ports.InventarioServer;
 
     [OneTimeSetUp]
     public async Task GlobalSetup()
@@ -39,10 +36,11 @@ public class InventarioTestFixture
         await _postgres.StartAsync();
         ConnectionString = _postgres.GetConnectionString();
 
-        await MigrateAndSeed();
-
         _app = StartApp();
-        await WaitForHealth($"{AppUrl}/health/live", _appTask);
+        await StreamFlowTestHelper.WaitForHealth($"{AppUrl}/health/live", _appTask);
+
+        // Seed data using the app's DbContext (which has Inventario entity mappings)
+        await SeedData();
     }
 
     [OneTimeTearDown]
@@ -60,7 +58,7 @@ public class InventarioTestFixture
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = ConnectionString,
-            ["Tenant:DefaultId"] = TestTenantId.ToString(),
+            ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Warning"
         });
 
@@ -74,7 +72,7 @@ public class InventarioTestFixture
         app.UseCorrelationId();
         app.EnsureDatabase<AppDbContext>();
 
-        // Map feature endpoints (source-generated with [AsParameters] for GET binding)
+        // Map feature endpoints (source-generated)
         Inventario.Api.Generated.GeneratedEndpointRoutes.MapGeneratedEndpoints(app);
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
@@ -82,49 +80,36 @@ public class InventarioTestFixture
         return app;
     }
 
-    private static async Task MigrateAndSeed()
+    private static async Task SeedData()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(ConnectionString)
-            .Options;
+        using var scope = _app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        await using var db = new AppDbContext(options);
-        await db.Database.MigrateAsync();
-
-        if (!await db.Set<Contracts.Tenant>().AnyAsync(t => t.Id == TestTenantId))
+        // Seed tenant
+        if (!await db.Set<Contracts.Tenant>().AnyAsync(t => t.Id == TestConstants.TenantId))
         {
             db.Set<Contracts.Tenant>().Add(new Contracts.Tenant
             {
-                Id = TestTenantId, TenantId = TestTenantId,
-                Name = "Test Tenant", Description = "Inventario test tenant"
+                Id = TestConstants.TenantId,
+                TenantId = TestConstants.TenantId,
+                Name = "Test Tenant",
+                Description = "Inventario test tenant"
             });
         }
 
-        await db.SaveChangesAsync();
-    }
-
-    private static async Task WaitForHealth(string url, Task? appTask = null, int timeoutSeconds = 30)
-    {
-        using var client = new HttpClient();
-        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
+        // Seed product category (uses app's DbContext which has Inventario entity mappings)
+        if (!await db.Set<XFramework.Inventario.Domain.Shared.Contracts.ProductCategory>()
+                .AnyAsync(c => c.Id == TestConstants.ProductCategoryId))
         {
-            if (appTask is { IsFaulted: true })
-                throw new InvalidOperationException(
-                    $"App crashed: {appTask.Exception?.GetBaseException().Message}",
-                    appTask.Exception?.GetBaseException());
-            try
-            {
-                var response = await client.GetAsync(url);
-                if (response.IsSuccessStatusCode) return;
-            }
-            catch { }
-            await Task.Delay(500);
+            db.Set<XFramework.Inventario.Domain.Shared.Contracts.ProductCategory>().Add(
+                new XFramework.Inventario.Domain.Shared.Contracts.ProductCategory
+                {
+                    Id = TestConstants.ProductCategoryId,
+                    Name = "Test Category",
+                    TenantId = TestConstants.TenantId
+                });
         }
-        if (appTask is { IsFaulted: true })
-            throw new InvalidOperationException(
-                $"App crashed: {appTask.Exception?.GetBaseException().Message}",
-                appTask.Exception?.GetBaseException());
-        throw new TimeoutException($"Service at {url} did not become healthy within {timeoutSeconds}s");
+
+        await db.SaveChangesAsync();
     }
 }
