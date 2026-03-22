@@ -2,7 +2,6 @@
   <Folder Name="/Shared/">
     <Project Path="src\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
     <Project Path="src\Shared\XFramework.Utilities\XFramework.Utilities.csproj" />
-    <Project Path="src\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
   </Folder>
   <Folder Name="/Kernel/">
     <Project Path="src\Kernel\XFramework.Core\XFramework.Core.csproj" />
@@ -27,7 +26,6 @@
     <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" />
     <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
     <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
-    <Project Path="src/Tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Services/Inventario/">
     <Project Path="src\Modules\XFramework.Inventario\Inventario.Api\Inventario.Api.csproj" />
@@ -56,18 +54,17 @@
     <Project Path="src\Modules\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
   </Folder>
   <Folder Name="/Presentation/">
+    <Project Path="src\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
     <Project Path="src\Presentation\ControlPanel\ControlPanel.csproj" />
     <Project Path="src\Presentation\Fluid\Fluid.csproj" />
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
   </Folder>
-  <Folder Name="/src/" />
-  <Folder Name="/src/Tests/">
-    <Project Path="src/Tests/IdentityServer.Benchmarks/IdentityServer.Benchmarks.csproj" />
-    <Project Path="src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj" />
-    <Project Path="src/Tests/XFramework.TestInfrastructure/XFramework.TestInfrastructure.csproj" />
-  </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
+    <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
+    <Project Path="src\Tests\IdentityServer.IntegrationTests\IdentityServer.IntegrationTests.csproj" />
+    <Project Path="src\Tests\IdentityServer.Benchmarks\IdentityServer.Benchmarks.csproj" />
+    <Project Path="src\Tests\Wallets.IntegrationTests\Wallets.IntegrationTests.csproj" />
     <Project Path="src\Tests\SerializerPerfTest\SerializerPerfTest.csproj" />
   </Folder>
   <Folder Name="/Tools/">
