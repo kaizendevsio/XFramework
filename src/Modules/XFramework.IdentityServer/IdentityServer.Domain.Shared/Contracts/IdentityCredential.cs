@@ -1,10 +1,19 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using XFramework.Domain.Shared.Attributes;
 
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.Get | EndpointActions.GetList,
+    RoutePrefix = "api/identity-credentials",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 300,
+    CacheKeyPrefix = "identity-credentials"
+)]
 public partial class IdentityCredential : BaseModel, IHasOnlineStatus
 {
     
@@ -82,4 +91,13 @@ public partial class IdentityCredential : BaseModel, IHasOnlineStatus
     [MemoryPackOrder(27)]
     public virtual ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
 
+}
+
+public class GetIdentityCredentialListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public string? UserName { get; set; }
+    public Guid? IdentityInfoId { get; set; }
 }

@@ -1,7 +1,10 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+// [GenerateEndpoints] disabled — ITenantService name conflicts with XFramework.Core.Services.ITenantService
 public partial class Tenant : BaseModel
 {
     
@@ -40,4 +43,12 @@ public partial class Tenant : BaseModel
     public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; set; } =
         new List<RegistryConfiguration>();
 
+}
+
+public class GetTenantListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public short? Status { get; set; }
 }

@@ -1,9 +1,18 @@
+using XFramework.Domain.Shared.Attributes;
 using XFramework.Domain.Shared.Enums;
 
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/authorization-logs",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 60,
+    CacheKeyPrefix = "authorization-logs"
+)]
 public partial class AuthorizationLog : BaseModel
 {
     
@@ -33,4 +42,13 @@ public partial class AuthorizationLog : BaseModel
     
     [MemoryPackOrder(8)]
     public virtual IdentityCredential IdentityCredentials { get; set; } = null!;
+}
+
+public class GetAuthorizationLogListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public Guid? CredentialId { get; set; }
+    public bool? IsSuccess { get; set; }
 }

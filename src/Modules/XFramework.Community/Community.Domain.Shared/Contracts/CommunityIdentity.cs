@@ -1,7 +1,17 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace Community.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/community-identities",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 300,
+    CacheKeyPrefix = "community-identities"
+)]
 public partial class CommunityIdentity : BaseModel
 {
     
@@ -55,4 +65,16 @@ public partial class CommunityIdentity : BaseModel
 
     [MemoryPackOrder(14)]
     public virtual IdentityCredential Credential { get; set; } = null!;
+}
+
+// CreateCommunityIdentityRequest and UpdateCommunityIdentityRequest are in Contracts/Requests/
+
+public class GetCommunityIdentityListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public Guid? CredentialId { get; set; }
+    public Guid? TypeId { get; set; }
+    public int? Status { get; set; }
 }

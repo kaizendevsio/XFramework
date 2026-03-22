@@ -1,7 +1,17 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace Community.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.All,
+    RoutePrefix = "api/community-content",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 300,
+    CacheKeyPrefix = "community-content"
+)]
 public partial class CommunityContent : BaseModel
 {
     
@@ -45,4 +55,35 @@ public partial class CommunityContent : BaseModel
 
     [MemoryPackOrder(12)]
     public virtual CommunityIdentity SocialMediaIdentity { get; set; } = null!;
+}
+
+public class CreateCommunityContentRequest
+{
+    public string? Title { get; set; }
+    public string? Text { get; set; }
+    public Guid SocialMediaIdentityId { get; set; }
+    public Guid TypeId { get; set; }
+    public Guid? ParentContentId { get; set; }
+    public Guid CommunityGroupId { get; set; }
+}
+
+public class UpdateCommunityContentRequest
+{
+    public string? Title { get; set; }
+    public string? Text { get; set; }
+    public Guid SocialMediaIdentityId { get; set; }
+    public Guid TypeId { get; set; }
+    public Guid? ParentContentId { get; set; }
+    public Guid CommunityGroupId { get; set; }
+}
+
+public class GetCommunityContentListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public Guid? SocialMediaIdentityId { get; set; }
+    public Guid? TypeId { get; set; }
+    public Guid? ParentContentId { get; set; }
+    public Guid? CommunityGroupId { get; set; }
 }

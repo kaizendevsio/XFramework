@@ -1,7 +1,17 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/identity-verifications",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 300,
+    CacheKeyPrefix = "identity-verifications"
+)]
 public partial class IdentityVerification : BaseModel
 {
     
@@ -29,4 +39,13 @@ public partial class IdentityVerification : BaseModel
 
     [MemoryPackOrder(7)]
     public virtual IdentityVerificationType? VerificationType { get; set; }
+}
+
+public class GetIdentityVerificationListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public Guid? CredentialId { get; set; }
+    public Guid? VerificationTypeId { get; set; }
 }

@@ -1,7 +1,17 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/address-barangays",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 3600,
+    CacheKeyPrefix = "address-barangays"
+)]
 public partial class AddressBarangay : BaseModel
 {
     
@@ -26,4 +36,12 @@ public partial class AddressBarangay : BaseModel
 
     [MemoryPackOrder(6)]
     public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; } = new List<IdentityAddress>();
+}
+
+public class GetAddressBarangayListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public long? CityCodeId { get; set; }
 }

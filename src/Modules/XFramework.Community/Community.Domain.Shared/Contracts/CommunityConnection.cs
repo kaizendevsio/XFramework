@@ -1,7 +1,10 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace Community.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+// [GenerateEndpoints] disabled — has manual endpoints in Features/Connections/ with custom request types
 public partial class CommunityConnection : BaseModel
 {
     
@@ -24,3 +27,5 @@ public partial class CommunityConnection : BaseModel
     [MemoryPackOrder(5)]
     public virtual CommunityIdentity TargetSocialMediaIdentity { get; set; } = null!;
 }
+
+// Create/Update/GetList handled by manual endpoints in Features/Connections/

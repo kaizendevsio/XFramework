@@ -1,10 +1,19 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using XFramework.Domain.Shared.Attributes;
 
 namespace XFramework.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.All,
+    RoutePrefix = "api/storage-files",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 300,
+    CacheKeyPrefix = "storage-files"
+)]
 public partial class StorageFile : BaseModel
 {
     
@@ -48,4 +57,42 @@ public partial class StorageFile : BaseModel
 
     [MemoryPackOrder(15)]
     public virtual StorageFileIdentifier? StorageFileIdentifier { get; set; }
+}
+
+public class CreateStorageFileRequest
+{
+    public string ContentPath { get; set; } = null!;
+    public Guid TypeId { get; set; }
+    public Guid Identifier { get; set; }
+    public decimal? FileSize { get; set; }
+    public DateTime? ExpireAt { get; set; }
+    public Guid StorageFileIdentifierId { get; set; }
+    public string? Hash { get; set; }
+    public string? Name { get; set; }
+    public string? ContentType { get; set; }
+    public string? BlobContainer { get; set; }
+}
+
+public class UpdateStorageFileRequest
+{
+    public string ContentPath { get; set; } = null!;
+    public Guid TypeId { get; set; }
+    public Guid Identifier { get; set; }
+    public decimal? FileSize { get; set; }
+    public DateTime? ExpireAt { get; set; }
+    public Guid StorageFileIdentifierId { get; set; }
+    public string? Hash { get; set; }
+    public string? Name { get; set; }
+    public string? ContentType { get; set; }
+    public string? BlobContainer { get; set; }
+}
+
+public class GetStorageFileListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public Guid? TypeId { get; set; }
+    public Guid? Identifier { get; set; }
+    public Guid? StorageFileIdentifierId { get; set; }
 }

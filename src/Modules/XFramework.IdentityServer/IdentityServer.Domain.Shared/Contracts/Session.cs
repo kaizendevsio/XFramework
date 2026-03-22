@@ -1,9 +1,18 @@
+using XFramework.Domain.Shared.Attributes;
 using XFramework.Domain.Shared.Enums;
 
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/sessions",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 60,
+    CacheKeyPrefix = "sessions"
+)]
 public partial class Session : BaseModel
 {
     
@@ -24,4 +33,13 @@ public partial class Session : BaseModel
 
     [MemoryPackOrder(4)]
     public virtual IdentityCredential Credential { get; set; } = null!;
+}
+
+public class GetSessionListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public Guid? CredentialId { get; set; }
+    public CurrentSessionState? Status { get; set; }
 }

@@ -71,13 +71,16 @@ public class EntityServiceGenerator : IIncrementalGenerator
 
             // Check if entity implements IHasTenantId
             var hasTenantId = classSymbol.AllInterfaces.Any(i => i.Name == "IHasTenantId");
+            var isBaseModel = classSymbol.BaseType?.Name == "BaseModel" ||
+                              classSymbol.BaseType?.BaseType?.Name == "BaseModel";
 
             return new ServiceInfo
             {
                 ClassName = classSymbol.Name,
                 Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
                 Actions = actions,
-                HasTenantId = hasTenantId
+                HasTenantId = hasTenantId,
+                IsBaseModel = isBaseModel
             };
         }
 
@@ -148,14 +151,16 @@ public class EntityServiceGenerator : IIncrementalGenerator
                     if (attrType != 1 && attrType != 3) // Service or Both
                         continue;
 
-                    // Skip tenant filtering for referenced assembly entities
-                    // — tenant isolation is handled by middleware/DataContext layer
+                    var isBaseModel = type.BaseType?.Name == "BaseModel" ||
+                                     type.BaseType?.BaseType?.Name == "BaseModel";
+
                     results.Add(new ServiceInfo
                     {
                         ClassName = type.Name,
                         Namespace = type.ContainingNamespace.ToDisplayString(),
                         Actions = actions,
-                        HasTenantId = false
+                        HasTenantId = false,
+                        IsBaseModel = isBaseModel
                     });
 
                     break;
@@ -198,6 +203,7 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("using System.Threading;");
         sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using Microsoft.EntityFrameworkCore;");
+        sb.AppendLine("using Mapster;");
         sb.AppendLine("using XFramework.Core.Patterns;");
         sb.AppendLine("using XFramework.Core.Services.Caching;");
         sb.AppendLine("using XFramework.Core.Services;");
@@ -285,27 +291,27 @@ public class EntityServiceGenerator : IIncrementalGenerator
         // Generate CRUD methods
         if ((entity.Actions & 1) != 0) // Create
         {
-            GenerateCreateMethod(sb, entityName, entity.HasTenantId);
+            GenerateCreateMethod(sb, entity);
         }
 
         if ((entity.Actions & 2) != 0) // Get
         {
-            GenerateGetByIdMethod(sb, entityName, entity.HasTenantId);
+            GenerateGetByIdMethod(sb, entity);
         }
 
         if ((entity.Actions & 4) != 0) // GetList
         {
-            GenerateGetListMethod(sb, entityName, entity.HasTenantId);
+            GenerateGetListMethod(sb, entity);
         }
 
         if ((entity.Actions & 8) != 0) // Update
         {
-            GenerateUpdateMethod(sb, entityName, entity.HasTenantId);
+            GenerateUpdateMethod(sb, entity);
         }
 
         if ((entity.Actions & 16) != 0) // Delete
         {
-            GenerateDeleteMethod(sb, entityName, entity.HasTenantId);
+            GenerateDeleteMethod(sb, entity);
         }
 
         // Navigation loading helper method
@@ -324,15 +330,22 @@ public class EntityServiceGenerator : IIncrementalGenerator
         return sb.ToString();
     }
 
-    private static void GenerateCreateMethod(StringBuilder sb, string entityName, bool hasTenantId)
+    private static void GenerateCreateMethod(StringBuilder sb, ServiceInfo entity)
     {
+        var entityName = entity.ClassName;
+        var hasTenantId = entity.HasTenantId;
         sb.AppendLine($"        /// <inheritdoc/>");
         sb.AppendLine($"        public virtual async Task<Result<{entityName}>> CreateAsync(Create{entityName}Request request, CancellationToken ct = default)");
         sb.AppendLine("        {");
         sb.AppendLine("            try");
         sb.AppendLine("            {");
-        sb.AppendLine($"                // Map request to entity - this partial method can be implemented in a separate file");
-        sb.AppendLine($"                var entity = MapCreateRequestToEntity(request);");
+        sb.AppendLine($"                var entity = request.Adapt<{entityName}>();");
+        sb.AppendLine("                entity.Id = Guid.NewGuid();");
+        if (entity.IsBaseModel)
+        {
+            sb.AppendLine("                entity.CreatedAt = DateTime.UtcNow;");
+            sb.AppendLine("                entity.IsDeleted = false;");
+        }
         sb.AppendLine();
         if (hasTenantId)
         {
@@ -350,16 +363,12 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("            }");
         sb.AppendLine("        }");
         sb.AppendLine();
-        sb.AppendLine($"        /// <summary>");
-        sb.AppendLine($"        /// Maps a Create{entityName}Request to a {entityName} entity.");
-        sb.AppendLine($"        /// Implement this partial method in a separate file to provide mapping logic.");
-        sb.AppendLine($"        /// </summary>");
-        sb.AppendLine($"        protected virtual partial {entityName} MapCreateRequestToEntity(Create{entityName}Request request);");
-        sb.AppendLine();
     }
 
-    private static void GenerateGetByIdMethod(StringBuilder sb, string entityName, bool hasTenantId)
+    private static void GenerateGetByIdMethod(StringBuilder sb, ServiceInfo entity)
     {
+        var entityName = entity.ClassName;
+        var hasTenantId = entity.HasTenantId;
         sb.AppendLine($"        /// <inheritdoc/>");
         sb.AppendLine($"        public virtual async Task<Result<{entityName}>> GetByIdAsync(Guid id, bool includeNavigations = false, int navigationDepth = 1, CancellationToken ct = default)");
         sb.AppendLine("        {");
@@ -395,8 +404,10 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine();
     }
 
-    private static void GenerateGetListMethod(StringBuilder sb, string entityName, bool hasTenantId)
+    private static void GenerateGetListMethod(StringBuilder sb, ServiceInfo entity)
     {
+        var entityName = entity.ClassName;
+        var hasTenantId = entity.HasTenantId;
         sb.AppendLine($"        /// <inheritdoc/>");
         sb.AppendLine($"        public virtual async Task<Result<List<{entityName}>>> GetListAsync(Get{entityName}ListRequest request, bool includeNavigations = false, int navigationDepth = 1, CancellationToken ct = default)");
         sb.AppendLine("        {");
@@ -410,9 +421,6 @@ public class EntityServiceGenerator : IIncrementalGenerator
             sb.AppendLine("                query = query.Where(e => ((IHasTenantId)e).TenantId == tenantId);");
             sb.AppendLine();
         }
-        sb.AppendLine("                // Apply custom filters - override ApplyFilters to customize");
-        sb.AppendLine("                query = ApplyFilters(query, request);");
-        sb.AppendLine();
         sb.AppendLine("                if (includeNavigations)");
         sb.AppendLine("                {");
         sb.AppendLine($"                    query = IncludeNavigations(query, typeof({entityName}), navigationDepth);");
@@ -431,16 +439,12 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("            }");
         sb.AppendLine("        }");
         sb.AppendLine();
-        sb.AppendLine($"        /// <summary>");
-        sb.AppendLine($"        /// Applies filters to the query based on the request.");
-        sb.AppendLine($"        /// Implement this partial method in a separate file to add custom filtering logic.");
-        sb.AppendLine($"        /// </summary>");
-        sb.AppendLine($"        protected virtual partial IQueryable<{entityName}> ApplyFilters(IQueryable<{entityName}> query, Get{entityName}ListRequest request);");
-        sb.AppendLine();
     }
 
-    private static void GenerateUpdateMethod(StringBuilder sb, string entityName, bool hasTenantId)
+    private static void GenerateUpdateMethod(StringBuilder sb, ServiceInfo entity)
     {
+        var entityName = entity.ClassName;
+        var hasTenantId = entity.HasTenantId;
         sb.AppendLine($"        /// <inheritdoc/>");
         sb.AppendLine($"        public virtual async Task<Result<{entityName}>> UpdateAsync(Guid id, Update{entityName}Request request, CancellationToken ct = default)");
         sb.AppendLine("        {");
@@ -461,8 +465,11 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine($"                    return Result<{entityName}>.NotFound($\"{entityName} with ID {{id}} not found\");");
         sb.AppendLine("                }");
         sb.AppendLine();
-        sb.AppendLine("                // Map request to entity - this partial method can be implemented in a separate file");
-        sb.AppendLine("                MapUpdateRequestToEntity(request, entity);");
+        sb.AppendLine("                request.Adapt(entity);");
+        if (entity.IsBaseModel)
+        {
+            sb.AppendLine("                entity.ModifiedAt = DateTime.UtcNow;");
+        }
         sb.AppendLine();
         sb.AppendLine("                await _context.SaveChangesAsync(ct);");
         sb.AppendLine($"                return Result<{entityName}>.Success(entity, \"{entityName} updated successfully\");");
@@ -473,16 +480,12 @@ public class EntityServiceGenerator : IIncrementalGenerator
         sb.AppendLine("            }");
         sb.AppendLine("        }");
         sb.AppendLine();
-        sb.AppendLine($"        /// <summary>");
-        sb.AppendLine($"        /// Maps an Update{entityName}Request to an existing {entityName} entity.");
-        sb.AppendLine($"        /// Implement this partial method in a separate file to provide mapping logic.");
-        sb.AppendLine($"        /// </summary>");
-        sb.AppendLine($"        protected virtual partial void MapUpdateRequestToEntity(Update{entityName}Request request, {entityName} entity);");
-        sb.AppendLine();
     }
 
-    private static void GenerateDeleteMethod(StringBuilder sb, string entityName, bool hasTenantId)
+    private static void GenerateDeleteMethod(StringBuilder sb, ServiceInfo entity)
     {
+        var entityName = entity.ClassName;
+        var hasTenantId = entity.HasTenantId;
         sb.AppendLine($"        /// <inheritdoc/>");
         sb.AppendLine("        public virtual async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)");
         sb.AppendLine("        {");
@@ -576,5 +579,6 @@ internal class ServiceInfo
     public string ClassName { get; set; } = string.Empty;
     public string Namespace { get; set; } = string.Empty;
     public int Actions { get; set; }
+    public bool IsBaseModel { get; set; }
     public bool HasTenantId { get; set; }
 }

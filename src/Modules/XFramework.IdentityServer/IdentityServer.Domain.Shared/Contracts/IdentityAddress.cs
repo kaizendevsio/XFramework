@@ -1,6 +1,16 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace IdentityServer.Domain.Shared.Contracts;
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.All,
+    RoutePrefix = "api/identity-addresses",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 300,
+    CacheKeyPrefix = "identity-addresses"
+)]
 public partial class IdentityAddress : BaseModel
 {
     [MemoryPackOrder(0)]
@@ -74,4 +84,57 @@ public partial class IdentityAddress : BaseModel
 
     [MemoryPackOrder(23)]
     public string? ConsolidatedName { get; set; }
+}
+
+public class CreateIdentityAddressRequest
+{
+    public Guid IdentityInfoId { get; set; }
+    public string? UnitNumber { get; set; }
+    public string? Street { get; set; }
+    public string? Building { get; set; }
+    public string? Name { get; set; }
+    public Guid? BarangayId { get; set; }
+    public Guid? CityId { get; set; }
+    public string? Subdivision { get; set; }
+    public Guid? RegionId { get; set; }
+    public Guid? AddressTypeId { get; set; }
+    public bool? DefaultAddress { get; set; }
+    public Guid? ProvinceId { get; set; }
+    public Guid? CountryId { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? ConsolidatedName { get; set; }
+}
+
+public class UpdateIdentityAddressRequest
+{
+    public Guid IdentityInfoId { get; set; }
+    public string? UnitNumber { get; set; }
+    public string? Street { get; set; }
+    public string? Building { get; set; }
+    public string? Name { get; set; }
+    public Guid? BarangayId { get; set; }
+    public Guid? CityId { get; set; }
+    public string? Subdivision { get; set; }
+    public Guid? RegionId { get; set; }
+    public Guid? AddressTypeId { get; set; }
+    public bool? DefaultAddress { get; set; }
+    public Guid? ProvinceId { get; set; }
+    public Guid? CountryId { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? ConsolidatedName { get; set; }
+}
+
+public class GetIdentityAddressListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public Guid? IdentityInfoId { get; set; }
+    public Guid? AddressTypeId { get; set; }
+    public Guid? CityId { get; set; }
+    public Guid? ProvinceId { get; set; }
+    public Guid? RegionId { get; set; }
+    public Guid? CountryId { get; set; }
 }

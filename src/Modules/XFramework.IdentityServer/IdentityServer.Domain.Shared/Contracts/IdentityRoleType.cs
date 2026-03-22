@@ -1,7 +1,17 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/identity-role-types",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 3600,
+    CacheKeyPrefix = "identity-role-types"
+)]
 public partial class IdentityRoleType : BaseModel, IHasSystemReferenceId
 {
     
@@ -25,4 +35,12 @@ public partial class IdentityRoleType : BaseModel, IHasSystemReferenceId
 
     [MemoryPackOrder(200)]
     public Guid SystemReferenceId { get; set; }
+}
+
+public class GetIdentityRoleTypeListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public Guid? GroupId { get; set; }
 }

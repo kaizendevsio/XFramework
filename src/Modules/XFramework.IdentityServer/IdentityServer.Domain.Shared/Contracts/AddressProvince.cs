@@ -1,7 +1,17 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/address-provinces",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 3600,
+    CacheKeyPrefix = "address-provinces"
+)]
 public partial class AddressProvince : BaseModel
 {
     
@@ -26,4 +36,12 @@ public partial class AddressProvince : BaseModel
 
     [MemoryPackOrder(6)]
     public virtual AddressRegion RegCode { get; set; } = null!;
+}
+
+public class GetAddressProvinceListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public long? RegCodeId { get; set; }
 }

@@ -1,7 +1,17 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace IdentityServer.Domain.Shared.Contracts;
 
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/address-countries",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 3600,
+    CacheKeyPrefix = "address-countries"
+)]
 public partial class AddressCountry : BaseModel
 {
     
@@ -29,4 +39,13 @@ public partial class AddressCountry : BaseModel
 
     [MemoryPackOrder(8)]
     public virtual ICollection<IdentityAddress> IdentityAddresses { get; set; } = new List<IdentityAddress>();
+}
+
+public class GetAddressCountryListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string? SearchTerm { get; set; }
+    public string? IsoCode2 { get; set; }
+    public string? IsoCode3 { get; set; }
 }
