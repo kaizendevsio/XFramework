@@ -43,17 +43,8 @@ public partial class StorageFile : BaseModel
     [MemoryPackOrder(10)]
     public byte[]? FileBytes { get; set; }
 
-    [MemoryPackOrder(11)]
-    public virtual ICollection<CommunityContentFile> CommunityContentFiles { get; set; } = new List<CommunityContentFile>();
-
-    [MemoryPackOrder(12)]
-    public virtual ICollection<CommunityIdentityFile> CommunityIdentityFiles { get; set; } = new List<CommunityIdentityFile>();
-
     [MemoryPackOrder(13)]
     public virtual StorageFileType Type { get; set; } = null!;
-
-    [MemoryPackOrder(14)]
-    public virtual ICollection<MessageFile> MessageFiles { get; set; } = new List<MessageFile>();
 
     [MemoryPackOrder(15)]
     public virtual StorageFileIdentifier? StorageFileIdentifier { get; set; }

@@ -35,7 +35,7 @@ public partial class WalletState
                     pageNumber: 1,
                     includeNavigations: true,
                     includes:[
-                        $"{nameof(WithdrawalRequest.Wallet)}.{nameof(Domain.Shared.Contracts.Wallet.WalletType)}",
+                        $"{nameof(WithdrawalRequest.Wallet)}.{nameof(Wallets.Domain.Shared.Contracts.Wallet.WalletType)}",
                     ]
                 );
             }
@@ -61,7 +61,7 @@ public partial class WalletState
                     ],
                     includeNavigations: true,
                     includes:[
-                        $"{nameof(WithdrawalRequest.Wallet)}.{nameof(Domain.Shared.Contracts.Wallet.WalletType)}",
+                        $"{nameof(WithdrawalRequest.Wallet)}.{nameof(Wallets.Domain.Shared.Contracts.Wallet.WalletType)}",
                     ]
                 );
             }

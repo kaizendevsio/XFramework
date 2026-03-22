@@ -151,4 +151,26 @@ public interface IWalletService
     Task<Result> ReleaseTransactionAsync(
         ReleaseTransactionRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reverses a transaction or a full transfer (paired transactions).
+    /// Creates inverse transactions and updates wallet balances.
+    /// </summary>
+    Task<Result> ReverseTransactionAsync(
+        ReverseTransactionRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Freezes a wallet, preventing all financial operations.
+    /// </summary>
+    Task<Result> FreezeWalletAsync(
+        FreezeWalletRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Unfreezes a wallet, restoring it to Active status.
+    /// </summary>
+    Task<Result> UnfreezeWalletAsync(
+        UnfreezeWalletRequest request,
+        CancellationToken cancellationToken = default);
 }

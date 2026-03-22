@@ -5,6 +5,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Requests;
 
 namespace IdentityServer.IntegrationTests.Tests;

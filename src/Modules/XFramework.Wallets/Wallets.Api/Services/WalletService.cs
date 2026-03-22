@@ -49,7 +49,7 @@ public sealed class WalletService : IWalletService
         {
             var tenant = await _tenantService.GetTenant(tenantId);
 
-            var walletType = await _dataContext.Query<XFramework.Domain.Shared.Contracts.WalletType>()
+            var walletType = await _dataContext.Query<Wallets.Domain.Shared.Contracts.WalletType>()
                 .Where(x => x.Id == walletTypeId)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -210,6 +210,9 @@ public sealed class WalletService : IWalletService
                 }
             }
 
+            var statusCheck = CheckWalletStatus(wallet, "IncrementWallet");
+            if (statusCheck is not null) return statusCheck;
+
             // Validate min transfer rule
             if (wallet.MinTransferRule.HasValue && request.TotalAmount < wallet.MinTransferRule.Value)
             {
@@ -343,6 +346,9 @@ public sealed class WalletService : IWalletService
                 _logger.EntityNotFound("Wallet", request.WalletId);
                 return Result.NotFound("Wallet not found");
             }
+
+            var statusCheck = CheckWalletStatus(wallet, "DecrementWallet");
+            if (statusCheck is not null) return statusCheck;
 
             // Check sufficient balance
             if (wallet.AvailableBalance < request.TotalAmount)
@@ -479,6 +485,9 @@ public sealed class WalletService : IWalletService
                 _logger.EntityNotFound("SenderWallet", Guid.Empty);
                 return Result.NotFound("Wallet not found");
             }
+
+            var statusCheck = CheckWalletStatus(senderWallet, "Transfer");
+            if (statusCheck is not null) return statusCheck;
 
             // Auto-create recipient wallet if it doesn't exist
             if (recipientWallet is null)
@@ -759,6 +768,9 @@ public sealed class WalletService : IWalletService
                 return Result.NotFound("Source wallet not found");
             }
 
+            var statusCheck = CheckWalletStatus(sourceWallet, "ConvertWallet");
+            if (statusCheck is not null) return statusCheck;
+
             // Fetch or create target wallet
             var targetWallet = await _dataContext.Query<Wallet>()
                 .Include(x => x.WalletType)
@@ -962,6 +974,9 @@ public sealed class WalletService : IWalletService
 
             if (wallet != null)
             {
+                var statusCheck = CheckWalletStatus(wallet, "ReleaseTransaction");
+                if (statusCheck is not null) return statusCheck;
+
                 // Update balances based on transaction type
                 if (transaction.TransactionType is TransactionType.Credit)
                 {
@@ -1029,5 +1044,349 @@ public sealed class WalletService : IWalletService
         }
 
         return maskedNameBuilder.ToString();
+    }
+
+    private Result? CheckWalletStatus(Wallet wallet, string operation)
+    {
+        return wallet.Status switch
+        {
+            WalletStatus.Frozen => Result.Failure("Wallet is frozen. No operations allowed.", 403),
+            WalletStatus.Suspended => Result.Failure("Wallet is suspended. No operations allowed.", 403),
+            WalletStatus.Closed => Result.Failure("Wallet is closed. No operations allowed.", 403),
+            _ => null
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> ReverseTransactionAsync(
+        ReverseTransactionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+
+            if (request.WalletTransferId != Guid.Empty)
+            {
+                return await ReversePairedTransfer(tenant.Id, request, cancellationToken);
+            }
+
+            if (request.TransactionId != Guid.Empty)
+            {
+                return await ReverseSingleTransaction(tenant.Id, request, cancellationToken);
+            }
+
+            return Result.Failure("Either TransactionId or WalletTransferId must be provided", 400);
+        }
+        catch (Exception ex)
+        {
+            var id = request.TransactionId != Guid.Empty ? request.TransactionId : request.WalletTransferId;
+            _logger.OperationFailed("ReverseTransaction", "WalletTransaction", id, ex.Message, ex);
+            return Result.Failure("An error occurred while reversing the transaction", 500);
+        }
+    }
+
+    private async Task<Result> ReverseSingleTransaction(
+        Guid tenantId, ReverseTransactionRequest request, CancellationToken ct)
+    {
+        var transaction = await _dataContext.Query<WalletTransaction>()
+            .Where(t => t.Id == request.TransactionId && t.TenantId == tenantId)
+            .FirstOrDefaultAsync(ct);
+
+        if (transaction is null)
+        {
+            _logger.EntityNotFound("WalletTransaction", request.TransactionId);
+            return Result.NotFound("Transaction not found");
+        }
+
+        if (transaction.Description?.StartsWith("Reversal of") == true)
+        {
+            return Result.Failure("Transaction has already been reversed", 400);
+        }
+
+        if (transaction.Held)
+        {
+            return Result.Failure("Cannot reverse a held transaction. Release it first.", 400);
+        }
+
+        var wallet = await _dataContext.Query<Wallet>()
+            .Where(w => w.Id == transaction.WalletId)
+            .FirstOrDefaultAsync(ct);
+
+        if (wallet is null)
+        {
+            _logger.EntityNotFound("Wallet", transaction.WalletId);
+            return Result.NotFound("Wallet not found");
+        }
+
+        var statusCheck = CheckWalletStatus(wallet, "ReverseTransaction");
+        if (statusCheck is not null) return statusCheck;
+
+        // Create inverse transaction
+        var reversalType = transaction.TransactionType == TransactionType.Credit
+            ? TransactionType.Debit
+            : TransactionType.Credit;
+
+        var absAmount = Math.Abs(transaction.Amount);
+
+        // Snapshot previous balances
+        var previousBalance = wallet.Balance;
+        var previousTotalBalance = wallet.TotalBalance!.Value;
+        var previousDebitOnHold = wallet.DebitOnHoldBalance;
+        var previousCreditOnHold = wallet.CreditOnHoldBalance;
+
+        // Update wallet balance inversely
+        if (transaction.TransactionType == TransactionType.Credit)
+        {
+            wallet.Balance -= absAmount;
+            wallet.TransferableBalance -= absAmount;
+        }
+        else
+        {
+            wallet.Balance += absAmount;
+            wallet.TransferableBalance += absAmount;
+        }
+
+        var reversalTransaction = new WalletTransaction
+        {
+            TenantId = tenantId,
+            CredentialId = transaction.CredentialId,
+            WalletId = transaction.WalletId,
+            Amount = absAmount,
+            TransactionType = reversalType,
+            TransactionFee = 0,
+            ReferenceNumber = transaction.ReferenceNumber,
+            Description = $"Reversal of {transaction.Id}: {request.Reason}",
+            Remarks = request.Reason,
+            PreviousBalance = previousBalance,
+            PreviousTotalBalance = previousTotalBalance,
+            PreviousDebitOnHoldBalance = previousDebitOnHold,
+            PreviousCreditOnHoldBalance = previousCreditOnHold,
+            RunningBalance = wallet.Balance,
+            RunningTotalBalance = wallet.TotalBalance,
+            RunningAvailableBalance = wallet.AvailableBalance,
+            RunningDebitOnHoldBalance = wallet.DebitOnHoldBalance,
+            RunningCreditOnHoldBalance = wallet.CreditOnHoldBalance
+        };
+
+        _dataContext.Add(reversalTransaction);
+        _dataContext.Update(wallet);
+        await _dataContext.SaveChangesAsync(ct);
+
+        _logger.EntityCreated("ReversalTransaction", reversalTransaction.Id);
+        return Result.Success("Transaction reversed successfully");
+    }
+
+    private async Task<Result> ReversePairedTransfer(
+        Guid tenantId, ReverseTransactionRequest request, CancellationToken ct)
+    {
+        var transfer = await _dataContext.Query<WalletTransfer>()
+            .Where(t => t.Id == request.WalletTransferId && t.TenantId == tenantId)
+            .FirstOrDefaultAsync(ct);
+
+        if (transfer is null)
+        {
+            _logger.EntityNotFound("WalletTransfer", request.WalletTransferId);
+            return Result.NotFound("Transfer not found");
+        }
+
+        if (transfer.TransactionPurpose == TransactionPurpose.Reversal)
+        {
+            return Result.Failure("This transfer is already a reversal", 400);
+        }
+
+        var senderTx = await _dataContext.Query<WalletTransaction>()
+            .Where(t => t.Id == transfer.SenderTransactionId)
+            .FirstOrDefaultAsync(ct);
+
+        var recipientTx = await _dataContext.Query<WalletTransaction>()
+            .Where(t => t.Id == transfer.RecipientTransactionId)
+            .FirstOrDefaultAsync(ct);
+
+        if (senderTx is null || recipientTx is null)
+        {
+            return Result.Failure("Transfer transactions not found", 404);
+        }
+
+        var senderWallet = await _dataContext.Query<Wallet>()
+            .Where(w => w.Id == senderTx.WalletId)
+            .FirstOrDefaultAsync(ct);
+
+        var recipientWallet = await _dataContext.Query<Wallet>()
+            .Where(w => w.Id == recipientTx.WalletId)
+            .FirstOrDefaultAsync(ct);
+
+        if (senderWallet is null || recipientWallet is null)
+        {
+            return Result.Failure("Wallets not found", 404);
+        }
+
+        var senderCheck = CheckWalletStatus(senderWallet, "ReverseTransfer");
+        if (senderCheck is not null) return senderCheck;
+
+        var recipientCheck = CheckWalletStatus(recipientWallet, "ReverseTransfer");
+        if (recipientCheck is not null) return recipientCheck;
+
+        var absAmount = Math.Abs(senderTx.Amount);
+
+        // Reverse sender: was Debit → now Credit (money back)
+        var senderPrevBalance = senderWallet.Balance;
+        var senderPrevTotal = senderWallet.TotalBalance!.Value;
+        var senderPrevDebitOnHold = senderWallet.DebitOnHoldBalance;
+        var senderPrevCreditOnHold = senderWallet.CreditOnHoldBalance;
+
+        senderWallet.Balance += absAmount;
+        senderWallet.TransferableBalance += absAmount;
+
+        var senderReversalTx = new WalletTransaction
+        {
+            TenantId = tenantId,
+            CredentialId = senderTx.CredentialId,
+            WalletId = senderTx.WalletId,
+            Amount = absAmount,
+            TransactionType = TransactionType.Credit,
+            TransactionFee = 0,
+            ReferenceNumber = senderTx.ReferenceNumber,
+            Description = $"Reversal of transfer {transfer.Id}: {request.Reason}",
+            Remarks = request.Reason,
+            PreviousBalance = senderPrevBalance,
+            PreviousTotalBalance = senderPrevTotal,
+            PreviousDebitOnHoldBalance = senderPrevDebitOnHold,
+            PreviousCreditOnHoldBalance = senderPrevCreditOnHold,
+            RunningBalance = senderWallet.Balance,
+            RunningTotalBalance = senderWallet.TotalBalance,
+            RunningAvailableBalance = senderWallet.AvailableBalance,
+            RunningDebitOnHoldBalance = senderWallet.DebitOnHoldBalance,
+            RunningCreditOnHoldBalance = senderWallet.CreditOnHoldBalance
+        };
+
+        // Reverse recipient: was Credit → now Debit (money taken back)
+        var recipientPrevBalance = recipientWallet.Balance;
+        var recipientPrevTotal = recipientWallet.TotalBalance!.Value;
+        var recipientPrevDebitOnHold = recipientWallet.DebitOnHoldBalance;
+        var recipientPrevCreditOnHold = recipientWallet.CreditOnHoldBalance;
+
+        recipientWallet.Balance -= absAmount;
+        recipientWallet.TransferableBalance -= absAmount;
+
+        var recipientReversalTx = new WalletTransaction
+        {
+            TenantId = tenantId,
+            CredentialId = recipientTx.CredentialId,
+            WalletId = recipientTx.WalletId,
+            Amount = absAmount,
+            TransactionType = TransactionType.Debit,
+            TransactionFee = 0,
+            ReferenceNumber = recipientTx.ReferenceNumber,
+            Description = $"Reversal of transfer {transfer.Id}: {request.Reason}",
+            Remarks = request.Reason,
+            PreviousBalance = recipientPrevBalance,
+            PreviousTotalBalance = recipientPrevTotal,
+            PreviousDebitOnHoldBalance = recipientPrevDebitOnHold,
+            PreviousCreditOnHoldBalance = recipientPrevCreditOnHold,
+            RunningBalance = recipientWallet.Balance,
+            RunningTotalBalance = recipientWallet.TotalBalance,
+            RunningAvailableBalance = recipientWallet.AvailableBalance,
+            RunningDebitOnHoldBalance = recipientWallet.DebitOnHoldBalance,
+            RunningCreditOnHoldBalance = recipientWallet.CreditOnHoldBalance
+        };
+
+        _dataContext.Add(senderReversalTx);
+        _dataContext.Add(recipientReversalTx);
+
+        // Create reversal WalletTransfer linking the reversal transactions
+        var reversalTransfer = new WalletTransfer
+        {
+            TenantId = tenantId,
+            TransactionPurpose = TransactionPurpose.Reversal,
+            SenderTransactionId = senderReversalTx.Id,
+            RecipientTransactionId = recipientReversalTx.Id,
+            TransactionFee = 0
+        };
+
+        _dataContext.Add(reversalTransfer);
+        _dataContext.Update(senderWallet);
+        _dataContext.Update(recipientWallet);
+        await _dataContext.SaveChangesAsync(ct);
+
+        _logger.EntityCreated("ReversalTransfer", reversalTransfer.Id);
+        return Result.Success("Transfer reversed successfully");
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> FreezeWalletAsync(
+        FreezeWalletRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+
+            var wallet = await _dataContext.Query<Wallet>()
+                .Where(w => w.Id == request.WalletId && w.TenantId == tenant.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (wallet is null)
+            {
+                _logger.EntityNotFound("Wallet", request.WalletId);
+                return Result.NotFound("Wallet not found");
+            }
+
+            if (wallet.Status == WalletStatus.Frozen)
+                return Result.Failure("Wallet is already frozen", 400);
+
+            if (wallet.Status == WalletStatus.Closed)
+                return Result.Failure("Cannot freeze a closed wallet", 400);
+
+            wallet.Status = WalletStatus.Frozen;
+            wallet.ModifiedAt = DateTime.UtcNow;
+            _dataContext.Update(wallet);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            _logger.EntityUpdated("Wallet", wallet.Id);
+            return Result.Success("Wallet frozen successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("FreezeWallet", "Wallet", request.WalletId, ex.Message, ex);
+            return Result.Failure("An error occurred while freezing the wallet", 500);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> UnfreezeWalletAsync(
+        UnfreezeWalletRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+
+            var wallet = await _dataContext.Query<Wallet>()
+                .Where(w => w.Id == request.WalletId && w.TenantId == tenant.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (wallet is null)
+            {
+                _logger.EntityNotFound("Wallet", request.WalletId);
+                return Result.NotFound("Wallet not found");
+            }
+
+            if (wallet.Status != WalletStatus.Frozen)
+                return Result.Failure("Wallet is not frozen", 400);
+
+            wallet.Status = WalletStatus.Active;
+            wallet.ModifiedAt = DateTime.UtcNow;
+            _dataContext.Update(wallet);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            _logger.EntityUpdated("Wallet", wallet.Id);
+            return Result.Success("Wallet unfrozen successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("UnfreezeWallet", "Wallet", request.WalletId, ex.Message, ex);
+            return Result.Failure("An error occurred while unfreezing the wallet", 500);
+        }
     }
 }

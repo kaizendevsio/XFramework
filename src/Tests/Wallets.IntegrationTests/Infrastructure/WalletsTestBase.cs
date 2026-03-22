@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 
 namespace Wallets.IntegrationTests;
 

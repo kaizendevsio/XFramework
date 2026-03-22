@@ -26,7 +26,7 @@ public class FilesState
                     Value = action.Identifier
                 }
             };
-            
+
             var response = await identityServerServiceWrapper.StorageFile.GetList(
                 pageSize: 100,
                 pageNumber: 1,

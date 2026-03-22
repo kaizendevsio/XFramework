@@ -12,5 +12,8 @@ global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;
 global using Wallets.Api.Endpoints;
 global using Wallets.Api.Extensions;
+global using IdentityServer.Domain.Shared.Contracts;
+global using Wallets.Domain.Shared.Contracts;
 global using Wallets.Domain.Shared.Contracts.Requests;
+global using Wallets.Domain.Shared.Enums;
 global using XFramework.Extensions;

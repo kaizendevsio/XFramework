@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Azure.Storage.Blobs;
@@ -19,7 +20,7 @@ using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Services;
-using Session = XFramework.Domain.Shared.Contracts.Session;
+using Session = IdentityServer.Domain.Shared.Contracts.Session;
 
 namespace IdentityServer.Api.Services;
 
@@ -699,7 +700,7 @@ public sealed class AuthService : IAuthService
     /// </summary>
     private async Task<IdentityCredential?> ValidateAuthorization(
         AuthenticateIdentityRequest request,
-        XFramework.Domain.Shared.Contracts.Tenant tenant,
+        IdentityServer.Domain.Shared.Contracts.Tenant tenant,
         AuthorizationType authorizationType,
         CancellationToken ct)
     {
@@ -913,7 +914,8 @@ public sealed class AuthService : IAuthService
             TenantId = tenantId,
             SessionTypeId = sessionTypeId,
             CredentialId = credentialId,
-            SessionData = JsonSerializer.Serialize(token)
+            SessionData = JsonSerializer.Serialize(token),
+            Status = CurrentSessionState.Active
         };
 
         _dataContext.Add(session);
@@ -966,6 +968,124 @@ public sealed class AuthService : IAuthService
         }
 
         return sessionTypeId;
+    }
+
+    #endregion
+
+    #region Logout & Refresh Token
+
+    public async Task<Result> LogoutAsync(LogoutRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var session = await _dataContext.Query<Session>()
+                .Where(s => s.Id == request.SessionId)
+                .Where(s => s.CredentialId == request.CredentialId)
+                .FirstOrDefaultAsync(ct);
+
+            if (session is null)
+            {
+                _logger.EntityNotFound("Session", request.SessionId);
+                return Result.NotFound("Session not found");
+            }
+
+            if (session.Status == CurrentSessionState.Inactive)
+            {
+                return Result.Failure("Session is already inactive", 400);
+            }
+
+            session.Status = CurrentSessionState.Inactive;
+            session.ModifiedAt = DateTime.UtcNow;
+            _dataContext.Update(session);
+
+            await CreateAuthorizationLog(
+                session.TenantId,
+                request.CredentialId,
+                request.Metadata?.IpAddress ?? string.Empty,
+                request.Metadata?.Name ?? string.Empty,
+                request.Metadata?.DeviceName ?? string.Empty,
+                request.Metadata?.DeviceAgent ?? string.Empty,
+                AuthenticationState.NotAuthenticated,
+                session.Id);
+
+            await _dataContext.SaveChangesAsync(ct);
+
+            _logger.UserLoggedOut(request.CredentialId);
+
+            return Result.Success("Logged out successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("Logout", "Session", request.SessionId, ex.Message, ex);
+            return Result.Failure("An error occurred during logout", 500);
+        }
+    }
+
+    public async Task<Result<RefreshTokenResponse>> RefreshTokenAsync(
+        RefreshTokenRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var session = await _dataContext.Query<Session>()
+                .Where(s => s.Id == request.SessionId)
+                .Where(s => s.Status == CurrentSessionState.Active)
+                .FirstOrDefaultAsync(ct);
+
+            if (session is null)
+            {
+                _logger.EntityNotFound("Session", request.SessionId);
+                return Result<RefreshTokenResponse>.NotFound("Session not found or inactive");
+            }
+
+            // Validate refresh token against stored session data
+            var storedToken = JsonSerializer.Deserialize<JwtToken>(session.SessionData ?? "{}");
+            if (storedToken is null || storedToken.RefreshToken != request.RefreshToken)
+            {
+                _logger.TokenValidationFailed(session.CredentialId, "Invalid refresh token");
+                return Result<RefreshTokenResponse>.Failure("Invalid refresh token", 401);
+            }
+
+            // Decode expired access token to extract claims
+            ClaimsPrincipal principal;
+            try
+            {
+                var (claims, _) = await _jwtService.DecodeExpiredToken(request.AccessToken!);
+                principal = claims;
+            }
+            catch
+            {
+                _logger.TokenValidationFailed(session.CredentialId, "Invalid access token");
+                return Result<RefreshTokenResponse>.Failure("Invalid access token", 401);
+            }
+
+            // Generate new token pair from existing claims
+            var newToken = await _jwtService.GenerateToken(principal.Claims.ToList());
+            newToken.SessionId = session.Id;
+
+            // Update session with new tokens
+            session.SessionData = JsonSerializer.Serialize(newToken);
+            session.ModifiedAt = DateTime.UtcNow;
+            _dataContext.Update(session);
+            await _dataContext.SaveChangesAsync(ct);
+
+            // Extract expiration from the newly generated token
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwt = handler.ReadJwtToken(newToken.AccessToken);
+            var expiresIn = (int)(jwt.ValidTo - DateTime.UtcNow).TotalSeconds;
+
+            return Result<RefreshTokenResponse>.Success(new RefreshTokenResponse
+            {
+                AccessToken = newToken.AccessToken,
+                RefreshToken = newToken.RefreshToken,
+                SessionId = newToken.SessionId,
+                ExpiresIn = expiresIn
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("RefreshToken", "Session", request.SessionId, ex.Message, ex);
+            return Result<RefreshTokenResponse>.Failure("An error occurred while refreshing the token", 500);
+        }
     }
 
     #endregion

@@ -10,4 +10,5 @@ public interface IJwtService : IXFrameworkService
     public Task<JwtToken> GenerateToken(List<Claim> claims);
     public Task<JwtToken> Refresh(string refreshToken, string accessToken, DateTime now);
     public Task<(ClaimsPrincipal, JwtSecurityToken)> DecodeJwtToken(string token);
+    public Task<(ClaimsPrincipal, JwtSecurityToken)> DecodeExpiredToken(string token);
 }

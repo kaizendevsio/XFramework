@@ -25,7 +25,7 @@ public partial class WalletState
                 [
                     new()
                     {
-                        PropertyName = nameof(Domain.Shared.Contracts.Wallet.CredentialId),
+                        PropertyName = nameof(Wallets.Domain.Shared.Contracts.Wallet.CredentialId),
                         Operation = QueryFilterOperation.Equal,
                         Value = SessionState.Credential.Id
                     }
@@ -33,7 +33,7 @@ public partial class WalletState
                 includeNavigations: true,
                 includes:
                 [
-                    $"{nameof(Domain.Shared.Contracts.Wallet.WalletType)}"
+                    $"{nameof(Wallets.Domain.Shared.Contracts.Wallet.WalletType)}"
                 ]);
 
             // Handle if the response is invalid or error

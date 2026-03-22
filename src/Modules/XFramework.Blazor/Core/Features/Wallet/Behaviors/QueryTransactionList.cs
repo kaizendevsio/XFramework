@@ -29,7 +29,7 @@ public partial class WalletState
                 ],
                 includeNavigations: true,
                 includes:[
-                    $"{nameof(WalletTransaction.Wallet)}.{nameof(Domain.Shared.Contracts.Wallet.WalletType)}",
+                    $"{nameof(WalletTransaction.Wallet)}.{nameof(Wallets.Domain.Shared.Contracts.Wallet.WalletType)}",
                 ]
             );
             

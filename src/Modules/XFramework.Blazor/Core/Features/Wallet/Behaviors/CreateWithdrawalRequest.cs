@@ -52,13 +52,13 @@ public partial class WalletState
                 [
                     new()
                     {
-                        PropertyName = nameof(Domain.Shared.Contracts.Wallet.WalletTypeId),
+                        PropertyName = nameof(Wallets.Domain.Shared.Contracts.Wallet.WalletTypeId),
                         Operation = QueryFilterOperation.Equal,
                         Value = action.WalletTypeId,
                     },
                     new()
                     {
-                        PropertyName = nameof(Domain.Shared.Contracts.Wallet.CredentialId),
+                        PropertyName = nameof(Wallets.Domain.Shared.Contracts.Wallet.CredentialId),
                         Operation = QueryFilterOperation.Equal,
                         Value = credentialId
                     }

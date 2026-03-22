@@ -4,7 +4,7 @@ using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Attributes;
-using CreateVerificationRequest = XFramework.Domain.Shared.Contracts.Requests.Create<XFramework.Domain.Shared.Contracts.IdentityVerification>;
+using CreateVerificationRequest = XFramework.Domain.Shared.Contracts.Requests.Create<IdentityServer.Domain.Shared.Contracts.IdentityVerification>;
 
 namespace IdentityServer.Api.Features.Verification.Create;
 

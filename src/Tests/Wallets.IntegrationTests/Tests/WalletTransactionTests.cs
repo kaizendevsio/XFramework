@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 
 namespace Wallets.IntegrationTests.Tests;
 
@@ -275,9 +277,9 @@ public class WalletTransactionTests : WalletsTestBase
         var secondTypeId = Guid.NewGuid();
         await using (var db = CreateDbContext())
         {
-            if (!await db.Set<XFramework.Domain.Shared.Contracts.WalletType>().AnyAsync(w => w.Id == secondTypeId))
+            if (!await db.Set<Wallets.Domain.Shared.Contracts.WalletType>().AnyAsync(w => w.Id == secondTypeId))
             {
-                db.Set<XFramework.Domain.Shared.Contracts.WalletType>().Add(new XFramework.Domain.Shared.Contracts.WalletType
+                db.Set<Wallets.Domain.Shared.Contracts.WalletType>().Add(new Wallets.Domain.Shared.Contracts.WalletType
                 {
                     Id = secondTypeId,
                     Code = "TST2",

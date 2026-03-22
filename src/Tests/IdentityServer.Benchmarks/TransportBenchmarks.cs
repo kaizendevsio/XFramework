@@ -23,11 +23,12 @@ using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Interfaces;
+using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
-using Contracts = XFramework.Domain.Shared.Contracts;
+using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.Benchmarks;
 

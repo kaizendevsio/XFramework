@@ -1,4 +1,5 @@
 ﻿using XFramework.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Responses;
 
 namespace XFramework.Blazor.Core.Features.Identity;
@@ -12,7 +13,7 @@ public partial class IdentityState
         public List<IdentityAddress>? Addresses { get; set; }
         public List<IdentityRole>? Roles { get; set; }
         public List<IdentityContact>? Contacts { get; set; }
-        public List<Domain.Shared.Contracts.Wallet>? Wallets { get; set; }
+        public List<Wallets.Domain.Shared.Contracts.Wallet>? Wallets { get; set; }
         public IdentityContact? SelectedContact { get; set; }
         public PaginatedResult<IdentityCredential>? CredentialList { get; set; }
     }

@@ -106,4 +106,21 @@ public interface IAuthService
     Task<Result<StorageFile>> CreateFileAsync(
         Create<StorageFile> request,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Logs out a user by marking their session as Inactive.
+    /// Creates an authorization log entry for audit trail.
+    /// </summary>
+    Task<Result> LogoutAsync(
+        LogoutRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Refreshes an expired access token using a valid refresh token.
+    /// Validates the refresh token against stored session data,
+    /// generates a new token pair, and updates the session.
+    /// </summary>
+    Task<Result<RefreshTokenResponse>> RefreshTokenAsync(
+        RefreshTokenRequest request,
+        CancellationToken ct = default);
 }

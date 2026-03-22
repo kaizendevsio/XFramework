@@ -38,7 +38,7 @@ public partial class WalletState
             }
             
             // Map view model to request object
-            var request = action.Adapt<Domain.Shared.Contracts.Wallet>();
+            var request = action.Adapt<Wallets.Domain.Shared.Contracts.Wallet>();
             request.CredentialId = action.CredentialId;
             
             // Send the request

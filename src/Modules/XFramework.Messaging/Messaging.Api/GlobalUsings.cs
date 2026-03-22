@@ -6,6 +6,8 @@ global using XFramework.Domain.Shared.Contracts.Responses;
 global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.EntityFrameworkCore;
 global using Messaging.Api.Services;
+global using IdentityServer.Domain.Shared.Contracts;
+global using Messaging.Domain.Shared.Contracts;
 global using Messaging.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Integration.Abstractions;

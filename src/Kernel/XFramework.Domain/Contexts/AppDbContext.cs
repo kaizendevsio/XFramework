@@ -1,8 +1,14 @@
+using Community.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared;
+using IdentityServer.Domain.Shared.Contracts;
+using Messaging.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Wallets.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Enums;
 using XFramework.Domain.Shared.Contracts;
+using CurrencyType = Wallets.Domain.Shared.Contracts.CurrencyType;
 
 namespace XFramework.Domain.Contexts;
 
@@ -250,7 +256,8 @@ public partial class AppDbContext : XDbContext
             entity.Property(e => e.Name).HasMaxLength(50);
             entity.Property(e => e.PhoneCountryCode).HasMaxLength(9);
 
-            entity.HasOne(d => d.Currency).WithMany(p => p.AddressCountries)
+            entity.HasOne<CurrencyType>()
+                .WithMany()
                 .HasForeignKey(d => d.CurrencyId)
                 .HasConstraintName("CurrencyID");
         });
@@ -463,12 +470,12 @@ public partial class AppDbContext : XDbContext
                 .HasDefaultValueSql("true");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
-            entity.HasOne(d => d.Content).WithMany(p => p.CommunityContentFiles)
+            entity.HasOne(d => d.Content).WithMany()
                 .HasForeignKey(d => d.ContentId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("socialmediacontentfiles_socialmediacontent_id_fk");
 
-            entity.HasOne(d => d.Storage).WithMany(p => p.CommunityContentFiles)
+            entity.HasOne(d => d.Storage).WithMany()
                 .HasForeignKey(d => d.StorageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("socialmediacontentfiles_storagefile_id_fk");
@@ -545,12 +552,12 @@ public partial class AppDbContext : XDbContext
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
             entity.Property(e => e.Tagline).HasColumnType("character varying");
 
-            entity.HasOne(d => d.Type).WithMany(p => p.CommunityIdentities)
+            entity.HasOne(d => d.Type).WithMany()
                 .HasForeignKey(d => d.TypeId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("communityidentity_communityidentityentity_id_fk");
 
-            entity.HasOne(d => d.Credential).WithMany(p => p.CommunityIdentities)
+            entity.HasOne(d => d.Credential).WithMany()
                 .HasForeignKey(d => d.CredentialId)
                 .HasConstraintName("socialidentity_identitycredential_id_fk");
         });
@@ -590,17 +597,17 @@ public partial class AppDbContext : XDbContext
                 .HasDefaultValueSql("true");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
-            entity.HasOne(d => d.Type).WithMany(p => p.CommunityIdentityFiles)
+            entity.HasOne(d => d.Type).WithMany()
                 .HasForeignKey(d => d.TypeId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("communityidentityfile_communityidentityfileentity_id_fk");
 
-            entity.HasOne(d => d.Identity).WithMany(p => p.CommunityIdentityFiles)
+            entity.HasOne(d => d.Identity).WithMany()
                 .HasForeignKey(d => d.IdentityId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("communityidentityfiles_communityidentity_id_fk");
 
-            entity.HasOne(d => d.Storage).WithMany(p => p.CommunityIdentityFiles)
+            entity.HasOne(d => d.Storage).WithMany()
                 .HasForeignKey(d => d.StorageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("communityidentityfiles_storagefile_id_fk");
@@ -665,19 +672,19 @@ public partial class AppDbContext : XDbContext
             entity.Property(e => e.Remarks).HasMaxLength(10000);
             entity.Property(e => e.SystemFee).HasPrecision(18, 10);
 
-            entity.HasOne(d => d.PaymentGateway).WithMany(p => p.DepositRequests)
+            entity.HasOne(d => d.PaymentGateway).WithMany()
                 .HasForeignKey(d => d.GatewayId)
                 .HasConstraintName("DepositRequest_Gateway_ID_fk");
 
-            entity.HasOne(d => d.Credential).WithMany(p => p.DepositRequests)
+            entity.HasOne(d => d.Credential).WithMany()
                 .HasForeignKey(d => d.CredentialId)
                 .HasConstraintName("DepositRequest_CredentialId");
 
-            entity.HasOne(d => d.SourceCurrency).WithMany(p => p.DepositRequests)
+            entity.HasOne(d => d.SourceCurrency).WithMany()
                 .HasForeignKey(d => d.SourceCurrencyId)
                 .HasConstraintName("SourceCurrencyId");
 
-            entity.HasOne(d => d.WalletType).WithMany(p => p.DepositRequests)
+            entity.HasOne(d => d.WalletType).WithMany()
                 .HasForeignKey(d => d.WalletTypeId)
                 .HasConstraintName("DepositRequest_WalletTypeId");
         });
@@ -1322,11 +1329,11 @@ public partial class AppDbContext : XDbContext
                 .HasForeignKey(d => d.ParentMessageId)
                 .HasConstraintName("messagedirect_messagedirect_id_fk");
 
-            entity.HasOne(d => d.Recipient).WithMany(p => p.MessageDirectRecipientNavigations)
+            entity.HasOne(d => d.Recipient).WithMany()
                 .HasForeignKey(d => d.RecipientId)
                 .HasConstraintName("messagedirect_identitycredential_2_id_fk");
 
-            entity.HasOne(d => d.Sender).WithMany(p => p.MessageDirectSenderNavigations)
+            entity.HasOne(d => d.Sender).WithMany()
                 .HasForeignKey(d => d.SenderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagedirect_identitycredential_id_fk");
@@ -1354,12 +1361,12 @@ public partial class AppDbContext : XDbContext
                 .HasDefaultValueSql("true");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
-            entity.HasOne(d => d.Message).WithMany(p => p.MessageFiles)
+            entity.HasOne(d => d.Message).WithMany()
                 .HasForeignKey(d => d.MessageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagefiles_message_id_fk");
 
-            entity.HasOne(d => d.Storage).WithMany(p => p.MessageFiles)
+            entity.HasOne(d => d.Storage).WithMany()
                 .HasForeignKey(d => d.StorageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagefiles_storagefile_id_fk");
@@ -1475,17 +1482,17 @@ public partial class AppDbContext : XDbContext
                 .HasDefaultValueSql("true");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
-            entity.HasOne(d => d.Group).WithMany(p => p.MessageThreadMembers)
+            entity.HasOne(d => d.Group).WithMany()
                 .HasForeignKey(d => d.GroupId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagethreadmember_messagethreadmembergroup_id_fk");
 
-            entity.HasOne(d => d.Credential).WithMany(p => p.MessageThreadMembers)
+            entity.HasOne(d => d.Credential).WithMany()
                 .HasForeignKey(d => d.CredentialId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagethreadmember_identitycredential_id_fk");
 
-            entity.HasOne(d => d.MessageThread).WithMany(p => p.MessageThreadMembers)
+            entity.HasOne(d => d.MessageThread).WithMany()
                 .HasForeignKey(d => d.MessageThreadId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagethreadmember_messagethread_id_fk");
@@ -1532,12 +1539,12 @@ public partial class AppDbContext : XDbContext
                 .HasDefaultValueSql("true");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
-            entity.HasOne(d => d.MessageThreadMember).WithMany(p => p.MessageThreadMemberRoles)
+            entity.HasOne(d => d.MessageThreadMember).WithMany()
                 .HasForeignKey(d => d.MessageThreadMemberId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagethreadmemberrole_messagethreadmember_id_fk");
 
-            entity.HasOne(d => d.Role).WithMany(p => p.MessageThreadMemberRoles)
+            entity.HasOne(d => d.Role).WithMany()
                 .HasForeignKey(d => d.RoleId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("messagethreadmemberrole_identityrole_id_fk");
@@ -1697,6 +1704,7 @@ public partial class AppDbContext : XDbContext
                 .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
 
             entity.Property(e => e.SessionData).HasMaxLength(2000);
+            entity.Property(e => e.Status).HasDefaultValue(XFramework.Domain.Shared.Enums.CurrentSessionState.Active);
             entity.Property(e => e.SessionTypeId).HasColumnName("SessionTypeID");
             entity.Property(e => e.CredentialId).HasColumnName("CredentialID");
 
@@ -1882,13 +1890,14 @@ public partial class AppDbContext : XDbContext
 
             entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
             entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+            entity.Property(e => e.Status).HasDefaultValue(global::Wallets.Domain.Shared.Enums.WalletStatus.Active);
 
-            entity.HasOne(d => d.Credential).WithMany(p => p.Wallets)
+            entity.HasOne(d => d.Credential).WithMany()
                 .HasForeignKey(d => d.CredentialId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbl_Wallets_CredentialId_fkey");
 
-            entity.HasOne(d => d.WalletType).WithMany(p => p.Wallets)
+            entity.HasOne(d => d.WalletType).WithMany()
                 .HasForeignKey(d => d.WalletTypeId)
                 .HasConstraintName("tbl_Wallets_WalletTypeId_fkey");
         });
@@ -1932,12 +1941,12 @@ public partial class AppDbContext : XDbContext
 
             entity.Property(e => e.Name).HasMaxLength(20);
 
-            entity.HasOne(d => d.Tenant).WithMany(p => p.WalletTypes)
+            entity.HasOne(d => d.Tenant).WithMany()
                 .HasForeignKey(d => d.TenantId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("tbl_walletTypes_tbl_applications_id_fk");
 
-            entity.HasOne(d => d.CurrencyType).WithMany(p => p.WalletTypes)
+            entity.HasOne(d => d.CurrencyType).WithMany()
                 .HasForeignKey(d => d.CurrencyTypeId)
                 .HasConstraintName("CurrencyID");
         });
@@ -1961,12 +1970,12 @@ public partial class AppDbContext : XDbContext
             entity.Property(e => e.Remarks).HasMaxLength(10000);
             entity.Property(e => e.RunningTotalBalance).HasPrecision(24, 8);
 
-            entity.HasOne(d => d.Credential).WithMany(p => p.WalletTransactions)
+            entity.HasOne(d => d.Credential).WithMany()
                 .HasForeignKey(d => d.CredentialId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("UserAuthID");
 
-            entity.HasOne(d => d.Wallet).WithMany(p => p.WalletTransactions)
+            entity.HasOne(d => d.Wallet).WithMany()
                 .HasForeignKey(d => d.WalletId)
                 .HasConstraintName("SourceUserWalletId");
         });
@@ -1987,12 +1996,12 @@ public partial class AppDbContext : XDbContext
             entity.Property(e => e.Remarks).HasColumnType("character varying");
             entity.Property(e => e.Amount).HasPrecision(18, 10);
 
-            entity.HasOne(d => d.Credential).WithMany(p => p.WithdrawalRequests)
+            entity.HasOne(d => d.Credential).WithMany()
                 .HasForeignKey(d => d.CredentialId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("WithdrawalRequest_CredentialId");
 
-            entity.HasOne(d => d.Wallet).WithMany(p => p.WithdrawalRequests)
+            entity.HasOne(d => d.Wallet).WithMany()
                 .HasForeignKey(d => d.WalletId)
                 .HasConstraintName("WithdrawalRequest_WalletId");
             

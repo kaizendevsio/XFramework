@@ -91,17 +91,100 @@ public class EntityEndpointGenerator : IIncrementalGenerator
 
     private static void Execute(Compilation compilation, ImmutableArray<EndpointInfo> entities, SourceProductionContext context)
     {
-        if (entities.IsDefaultOrEmpty)
-            return;
+        var allEntities = new List<EndpointInfo>();
 
-        foreach (var entity in entities)
+        if (!entities.IsDefaultOrEmpty)
         {
-            if (entity == null)
+            allEntities.AddRange(entities.Where(e => e != null));
+        }
+
+        // Discover entities from referenced assemblies
+        var referencedEntities = DiscoverFromReferencedAssemblies(compilation);
+        allEntities.AddRange(referencedEntities);
+
+        var seen = new HashSet<string>();
+        foreach (var entity in allEntities)
+        {
+            if (!seen.Add(entity.ClassName))
                 continue;
 
-            // Generate the endpoint class
             var source = GenerateEndpointSource(entity);
             context.AddSource($"{entity.ClassName}Endpoints.g.cs", SourceText.From(source, Encoding.UTF8));
+        }
+    }
+
+    private static List<EndpointInfo> DiscoverFromReferencedAssemblies(Compilation compilation)
+    {
+        var results = new List<EndpointInfo>();
+        var coreAttr = "XFramework.Core.Attributes.GenerateEndpointsAttribute";
+        var sharedAttr = "XFramework.Domain.Shared.Attributes.GenerateEndpointsAttribute";
+
+        // Only discover from referenced assemblies in Api projects
+        var assemblyName = compilation.AssemblyName ?? "";
+        if (!assemblyName.EndsWith(".Api"))
+            return results;
+        var modulePrefix = assemblyName.Contains('.') ? assemblyName.Split('.')[0] : assemblyName;
+
+        foreach (var reference in compilation.References)
+        {
+            var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
+            if (symbol is not IAssemblySymbol assembly)
+                continue;
+
+            // Only discover from this module's own Domain.Shared assembly
+            if (!assembly.Name.StartsWith(modulePrefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            foreach (var type in GetAllTypes(assembly.GlobalNamespace))
+            {
+                if (type.IsAbstract || type.TypeKind != TypeKind.Class)
+                    continue;
+
+                foreach (var attr in type.GetAttributes())
+                {
+                    if (attr.AttributeClass?.ToDisplayString() != coreAttr && attr.AttributeClass?.ToDisplayString() != sharedAttr)
+                        continue;
+
+                    var attrType = GetEnumValue<int>(attr, "Type", 3);
+                    var actions = GetEnumValue<int>(attr, "Actions", 31);
+                    var routePrefix = GetStringValue(attr, "RoutePrefix");
+                    var requireAuth = GetBoolValue(attr, "RequireAuthorization", true);
+                    var cacheDuration = GetIntValue(attr, "CacheDurationSeconds", 300);
+                    var roles = GetStringArrayValue(attr, "Roles");
+
+                    if (attrType != 2 && attrType != 3) // Rest or Both
+                        continue;
+
+                    var defaultRoute = $"api/{ToPlural(type.Name.ToLowerInvariant())}";
+
+                    results.Add(new EndpointInfo
+                    {
+                        ClassName = type.Name,
+                        Namespace = type.ContainingNamespace.ToDisplayString(),
+                        RoutePrefix = routePrefix ?? defaultRoute,
+                        Actions = actions,
+                        RequireAuthorization = requireAuth,
+                        Roles = roles,
+                        CacheDurationSeconds = cacheDuration
+                    });
+
+                    break;
+                }
+            }
+        }
+
+        return results;
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetAllTypes(INamespaceSymbol ns)
+    {
+        foreach (var type in ns.GetTypeMembers())
+            yield return type;
+
+        foreach (var childNs in ns.GetNamespaceMembers())
+        {
+            foreach (var type in GetAllTypes(childNs))
+                yield return type;
         }
     }
 

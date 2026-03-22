@@ -31,9 +31,6 @@ public partial class PaymentGateway : BaseModel
     public decimal ConvenienceFee { get; set; }
 
 
-    [MemoryPackOrder(8)]
-    public virtual ICollection<DepositRequest> DepositRequests { get; set; } = new List<DepositRequest>();
-
     [MemoryPackOrder(9)]
     public virtual PaymentGatewayCategory PaymentGatewayCategory { get; set; } = null!;
 

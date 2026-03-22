@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Contexts;
-using Contracts = XFramework.Domain.Shared.Contracts;
+using IdentityContracts = IdentityServer.Domain.Shared.Contracts;
+using WalletContracts = Wallets.Domain.Shared.Contracts;
 
 namespace XFramework.TestInfrastructure;
 
@@ -23,9 +24,9 @@ public static class TestSeedData
 
     private static async Task SeedTenant(AppDbContext db)
     {
-        if (!await db.Set<Contracts.Tenant>().AnyAsync(t => t.Id == TestConstants.TenantId))
+        if (!await db.Set<IdentityContracts.Tenant>().AnyAsync(t => t.Id == TestConstants.TenantId))
         {
-            db.Set<Contracts.Tenant>().Add(new Contracts.Tenant
+            db.Set<IdentityContracts.Tenant>().Add(new IdentityContracts.Tenant
             {
                 Id = TestConstants.TenantId,
                 TenantId = TestConstants.TenantId,
@@ -37,9 +38,9 @@ public static class TestSeedData
 
     private static async Task SeedIdentityRoles(AppDbContext db)
     {
-        if (!await db.Set<Contracts.IdentityRoleTypeGroup>().AnyAsync(g => g.Id == TestConstants.RoleGroupId))
+        if (!await db.Set<IdentityContracts.IdentityRoleTypeGroup>().AnyAsync(g => g.Id == TestConstants.RoleGroupId))
         {
-            db.Set<Contracts.IdentityRoleTypeGroup>().Add(new Contracts.IdentityRoleTypeGroup
+            db.Set<IdentityContracts.IdentityRoleTypeGroup>().Add(new IdentityContracts.IdentityRoleTypeGroup
             {
                 Id = TestConstants.RoleGroupId,
                 Name = "Default",
@@ -48,9 +49,9 @@ public static class TestSeedData
             });
         }
 
-        if (!await db.Set<Contracts.IdentityRoleType>().AnyAsync(r => r.Id == TestConstants.RoleTypeId))
+        if (!await db.Set<IdentityContracts.IdentityRoleType>().AnyAsync(r => r.Id == TestConstants.RoleTypeId))
         {
-            db.Set<Contracts.IdentityRoleType>().Add(new Contracts.IdentityRoleType
+            db.Set<IdentityContracts.IdentityRoleType>().Add(new IdentityContracts.IdentityRoleType
             {
                 Id = TestConstants.RoleTypeId,
                 Name = "User",
@@ -62,9 +63,9 @@ public static class TestSeedData
 
     private static async Task SeedRegistryConfig(AppDbContext db)
     {
-        if (!await db.Set<Contracts.RegistryConfigurationGroup>().AnyAsync(g => g.Id == TestConstants.RegistryGroupId))
+        if (!await db.Set<IdentityContracts.RegistryConfigurationGroup>().AnyAsync(g => g.Id == TestConstants.RegistryGroupId))
         {
-            db.Set<Contracts.RegistryConfigurationGroup>().Add(new Contracts.RegistryConfigurationGroup
+            db.Set<IdentityContracts.RegistryConfigurationGroup>().Add(new IdentityContracts.RegistryConfigurationGroup
             {
                 Id = TestConstants.RegistryGroupId,
                 Name = "Config",
@@ -82,9 +83,9 @@ public static class TestSeedData
 
     private static async Task SeedRegistryEntry(AppDbContext db, string key, string value)
     {
-        if (!await db.Set<Contracts.RegistryConfiguration>().AnyAsync(r => r.Key == key && r.TenantId == TestConstants.TenantId))
+        if (!await db.Set<IdentityContracts.RegistryConfiguration>().AnyAsync(r => r.Key == key && r.TenantId == TestConstants.TenantId))
         {
-            db.Set<Contracts.RegistryConfiguration>().Add(new Contracts.RegistryConfiguration
+            db.Set<IdentityContracts.RegistryConfiguration>().Add(new IdentityContracts.RegistryConfiguration
             {
                 Id = Guid.NewGuid(),
                 Key = key,
@@ -97,9 +98,9 @@ public static class TestSeedData
 
     private static async Task SeedVerificationTypes(AppDbContext db)
     {
-        if (!await db.Set<Contracts.IdentityVerificationType>().AnyAsync(v => v.Name == "Sms"))
+        if (!await db.Set<IdentityContracts.IdentityVerificationType>().AnyAsync(v => v.Name == "Sms"))
         {
-            db.Set<Contracts.IdentityVerificationType>().Add(new Contracts.IdentityVerificationType
+            db.Set<IdentityContracts.IdentityVerificationType>().Add(new IdentityContracts.IdentityVerificationType
             {
                 Id = Guid.NewGuid(),
                 Name = "Sms",
@@ -119,9 +120,9 @@ public static class TestSeedData
 
         foreach (var (name, sysRefId) in sessionTypes)
         {
-            if (!await db.Set<Contracts.SessionType>().AnyAsync(s => s.Name == name && s.TenantId == TestConstants.TenantId))
+            if (!await db.Set<IdentityContracts.SessionType>().AnyAsync(s => s.Name == name && s.TenantId == TestConstants.TenantId))
             {
-                db.Set<Contracts.SessionType>().Add(new Contracts.SessionType
+                db.Set<IdentityContracts.SessionType>().Add(new IdentityContracts.SessionType
                 {
                     Id = Guid.NewGuid(),
                     Name = name,
@@ -134,9 +135,9 @@ public static class TestSeedData
 
     private static async Task SeedWalletTypes(AppDbContext db)
     {
-        if (!await db.Set<Contracts.WalletType>().AnyAsync(w => w.Id == TestConstants.WalletTypeId))
+        if (!await db.Set<WalletContracts.WalletType>().AnyAsync(w => w.Id == TestConstants.WalletTypeId))
         {
-            db.Set<Contracts.WalletType>().Add(new Contracts.WalletType
+            db.Set<WalletContracts.WalletType>().Add(new WalletContracts.WalletType
             {
                 Id = TestConstants.WalletTypeId,
                 Code = "TST",
@@ -147,9 +148,9 @@ public static class TestSeedData
             });
         }
 
-        if (!await db.Set<Contracts.WalletType>().AnyAsync(w => w.Id == TestConstants.WalletType2Id))
+        if (!await db.Set<WalletContracts.WalletType>().AnyAsync(w => w.Id == TestConstants.WalletType2Id))
         {
-            db.Set<Contracts.WalletType>().Add(new Contracts.WalletType
+            db.Set<WalletContracts.WalletType>().Add(new WalletContracts.WalletType
             {
                 Id = TestConstants.WalletType2Id,
                 Code = "TST2",

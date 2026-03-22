@@ -86,17 +86,95 @@ public class EntityServiceGenerator : IIncrementalGenerator
 
     private static void Execute(Compilation compilation, ImmutableArray<ServiceInfo> entities, SourceProductionContext context)
     {
-        if (entities.IsDefaultOrEmpty)
-            return;
+        // Combine local syntax-discovered entities with referenced assembly entities
+        var allEntities = new List<ServiceInfo>();
 
-        foreach (var entity in entities)
+        if (!entities.IsDefaultOrEmpty)
         {
-            if (entity == null)
+            allEntities.AddRange(entities.Where(e => e != null));
+        }
+
+        // Discover entities from referenced assemblies
+        var referencedEntities = DiscoverFromReferencedAssemblies(compilation);
+        allEntities.AddRange(referencedEntities);
+
+        // Deduplicate by class name
+        var seen = new HashSet<string>();
+        foreach (var entity in allEntities)
+        {
+            if (!seen.Add(entity.ClassName))
                 continue;
 
-            // Generate the service class
             var source = GenerateServiceCode(entity);
             context.AddSource($"{entity.ClassName}Service.g.cs", SourceText.From(source, Encoding.UTF8));
+        }
+    }
+
+    private static List<ServiceInfo> DiscoverFromReferencedAssemblies(Compilation compilation)
+    {
+        var results = new List<ServiceInfo>();
+        var coreAttr = "XFramework.Core.Attributes.GenerateEndpointsAttribute";
+        var sharedAttr = "XFramework.Domain.Shared.Attributes.GenerateEndpointsAttribute";
+
+        // Only discover from referenced assemblies in Api projects
+        var assemblyName = compilation.AssemblyName ?? "";
+        if (!assemblyName.EndsWith(".Api"))
+            return results;
+        var modulePrefix = assemblyName.Contains('.') ? assemblyName.Split('.')[0] : assemblyName;
+
+        foreach (var reference in compilation.References)
+        {
+            var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
+            if (symbol is not IAssemblySymbol assembly)
+                continue;
+
+            // Only discover from this module's own Domain.Shared assembly
+            if (!assembly.Name.StartsWith(modulePrefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            foreach (var type in GetAllTypes(assembly.GlobalNamespace))
+            {
+                if (type.IsAbstract || type.TypeKind != TypeKind.Class)
+                    continue;
+
+                foreach (var attr in type.GetAttributes())
+                {
+                    if (attr.AttributeClass?.ToDisplayString() != coreAttr && attr.AttributeClass?.ToDisplayString() != sharedAttr)
+                        continue;
+
+                    var attrType = GetEnumValue<int>(attr, "Type", 3);
+                    var actions = GetEnumValue<int>(attr, "Actions", 31);
+
+                    if (attrType != 1 && attrType != 3) // Service or Both
+                        continue;
+
+                    // Skip tenant filtering for referenced assembly entities
+                    // — tenant isolation is handled by middleware/DataContext layer
+                    results.Add(new ServiceInfo
+                    {
+                        ClassName = type.Name,
+                        Namespace = type.ContainingNamespace.ToDisplayString(),
+                        Actions = actions,
+                        HasTenantId = false
+                    });
+
+                    break;
+                }
+            }
+        }
+
+        return results;
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetAllTypes(INamespaceSymbol ns)
+    {
+        foreach (var type in ns.GetTypeMembers())
+            yield return type;
+
+        foreach (var childNs in ns.GetNamespaceMembers())
+        {
+            foreach (var type in GetAllTypes(childNs))
+                yield return type;
         }
     }
 

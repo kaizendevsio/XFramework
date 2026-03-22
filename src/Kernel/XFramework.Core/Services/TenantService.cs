@@ -1,5 +1,5 @@
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.Extensions.Caching.Memory;
-using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Core.Services;
 

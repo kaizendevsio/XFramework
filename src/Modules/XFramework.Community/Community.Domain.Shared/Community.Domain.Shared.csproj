@@ -14,6 +14,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
+      <ProjectReference Include="..\..\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
     </ItemGroup>
 
 </Project>

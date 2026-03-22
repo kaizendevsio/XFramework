@@ -4123,7 +4123,7 @@ namespace XFramework.Domain.Migrations
                     b.ToTable("SubscriptionType", "Affiliate");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.Tenant", b =>
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5052,7 +5052,7 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("tbl_identitycredentials_fk");
 
-                    b.HasOne("XFramework.Domain.Shared.Contracts.Tenant", "Tenant")
+                    b.HasOne("IdentityServer.Domain.Shared.Contracts.Tenant", "Tenant")
                         .WithMany("IdentityCredentials")
                         .HasForeignKey("TenantId")
                         .IsRequired()
@@ -5084,7 +5084,7 @@ namespace XFramework.Domain.Migrations
 
             modelBuilder.Entity("XFramework.Domain.Shared.Contracts.IdentityInformation", b =>
                 {
-                    b.HasOne("XFramework.Domain.Shared.Contracts.Tenant", "Tenant")
+                    b.HasOne("IdentityServer.Domain.Shared.Contracts.Tenant", "Tenant")
                         .WithMany("IdentityInformations")
                         .HasForeignKey("TenantId")
                         .IsRequired()
@@ -5122,7 +5122,7 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("identityroleentity_identityroleentitygroup_id_fk");
 
-                    b.HasOne("XFramework.Domain.Shared.Contracts.Tenant", "Tenant")
+                    b.HasOne("IdentityServer.Domain.Shared.Contracts.Tenant", "Tenant")
                         .WithMany("IdentityRoleTypes")
                         .HasForeignKey("TenantId")
                         .IsRequired()
@@ -5446,7 +5446,7 @@ namespace XFramework.Domain.Migrations
                         .IsRequired()
                         .HasConstraintName("tbl_configurations_tbl_configurationgroup_id_fk");
 
-                    b.HasOne("XFramework.Domain.Shared.Contracts.Tenant", "Tenant")
+                    b.HasOne("IdentityServer.Domain.Shared.Contracts.Tenant", "Tenant")
                         .WithMany("RegistryConfigurations")
                         .HasForeignKey("TenantId")
                         .IsRequired()
@@ -5618,7 +5618,7 @@ namespace XFramework.Domain.Migrations
                         .HasForeignKey("CurrencyTypeId")
                         .HasConstraintName("CurrencyID");
 
-                    b.HasOne("XFramework.Domain.Shared.Contracts.Tenant", "Tenant")
+                    b.HasOne("IdentityServer.Domain.Shared.Contracts.Tenant", "Tenant")
                         .WithMany("WalletTypes")
                         .HasForeignKey("TenantId")
                         .IsRequired()
@@ -5970,7 +5970,7 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("Subscriptions");
                 });
 
-            modelBuilder.Entity("XFramework.Domain.Shared.Contracts.Tenant", b =>
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.Tenant", b =>
                 {
                     b.Navigation("IdentityCredentials");
 

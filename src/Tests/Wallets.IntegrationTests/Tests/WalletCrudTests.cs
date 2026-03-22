@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using Wallets.Api.Features.Wallets.Create;
 using Wallets.Api.Features.Wallets.Shared;
 using XFramework.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 
 namespace Wallets.IntegrationTests.Tests;
 

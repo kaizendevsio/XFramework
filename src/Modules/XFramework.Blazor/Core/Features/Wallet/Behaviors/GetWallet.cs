@@ -5,17 +5,17 @@ namespace XFramework.Blazor.Core.Features.Wallet;
 
 public partial class WalletState
 {
-    public record GetWallet(Guid Id) : NavigableRequest<Domain.Shared.Contracts.Wallet?>;
+    public record GetWallet(Guid Id) : NavigableRequest<Wallets.Domain.Shared.Contracts.Wallet?>;
     
     protected class GetWalletHandler(
         IWalletsServiceWrapper walletsServiceWrapper,
         HandlerServices handlerServices,
         IStore store)
-        : StateActionHandler<GetWallet, Domain.Shared.Contracts.Wallet?>(handlerServices, store)
+        : StateActionHandler<GetWallet, Wallets.Domain.Shared.Contracts.Wallet?>(handlerServices, store)
     {
 
         private WalletState CurrentState => Store.GetState<WalletState>();
-        public override async Task<Domain.Shared.Contracts.Wallet?> Handle(GetWallet action, CancellationToken aCancellationToken)
+        public override async Task<Wallets.Domain.Shared.Contracts.Wallet?> Handle(GetWallet action, CancellationToken aCancellationToken)
         {
             if (SessionState.State is not CurrentSessionState.Active) return null;
             var response = await walletsServiceWrapper.Wallet.Get(action.Id);

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
@@ -27,7 +28,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         var compilationAndClasses = context.CompilationProvider.Combine(classDeclarations.Collect());
 
         context.RegisterSourceOutput(compilationAndClasses,
-            static (spc, source) => Execute(source.Right!, spc));
+            static (spc, source) => Execute(source.Left, source.Right!, spc));
     }
 
     private static EntityRegistrationInfo? GetEntityInfo(GeneratorSyntaxContext context)
@@ -58,9 +59,41 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         return null;
     }
 
-    private static void Execute(ImmutableArray<EntityRegistrationInfo?> entities, SourceProductionContext context)
+    private static void Execute(Compilation compilation, ImmutableArray<EntityRegistrationInfo?> entities, SourceProductionContext context)
     {
-        var validEntities = entities
+        var allEntities = new List<EntityRegistrationInfo>();
+
+        if (!entities.IsDefaultOrEmpty)
+        {
+            allEntities.AddRange(entities.Where(e => e is not null).Select(e => e!));
+        }
+
+        // Discover from referenced assemblies
+        var coreAttr = "XFramework.Core.Attributes.GenerateEndpointsAttribute";
+        var sharedAttr = "XFramework.Domain.Shared.Attributes.GenerateEndpointsAttribute";
+        foreach (var reference in compilation.References)
+        {
+            var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
+            if (symbol is not IAssemblySymbol assembly)
+                continue;
+
+            foreach (var type in GetAllTypes(assembly.GlobalNamespace))
+            {
+                if (type.IsAbstract || type.TypeKind != TypeKind.Class)
+                    continue;
+
+                if (type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == coreAttr || a.AttributeClass?.ToDisplayString() == sharedAttr))
+                {
+                    allEntities.Add(new EntityRegistrationInfo
+                    {
+                        ClassName = type.Name,
+                        FullyQualifiedName = type.ToDisplayString()
+                    });
+                }
+            }
+        }
+
+        var validEntities = allEntities
             .Where(e => e is not null)
             .Select(e => e!)
             .GroupBy(e => e.FullyQualifiedName)
@@ -89,13 +122,25 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
 
         foreach (var entity in validEntities)
         {
-            sb.AppendLine($"        [\"{entity.ClassName}\"] = typeof({entity.FullyQualifiedName}),");
+            sb.AppendLine($"        [\"{entity.ClassName}\"] = typeof(global::{entity.FullyQualifiedName}),");
         }
 
         sb.AppendLine("    };");
         sb.AppendLine("}");
 
         context.AddSource("DataContextEntityRegistrations.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetAllTypes(INamespaceSymbol ns)
+    {
+        foreach (var type in ns.GetTypeMembers())
+            yield return type;
+
+        foreach (var childNs in ns.GetNamespaceMembers())
+        {
+            foreach (var type in GetAllTypes(childNs))
+                yield return type;
+        }
     }
 
     private class EntityRegistrationInfo

@@ -79,7 +79,7 @@ public interface IBatchWalletService
     /// Uses AddRangeAsync for optimal bulk insert performance.
     /// </remarks>
     Task<Result<BatchOperationResult>> ProcessTransactionsAsync(
-        List<XFramework.Domain.Shared.Contracts.WalletTransaction> transactions,
+        List<WalletTransaction> transactions,
         Guid tenantId,
         CancellationToken cancellationToken = default);
 }

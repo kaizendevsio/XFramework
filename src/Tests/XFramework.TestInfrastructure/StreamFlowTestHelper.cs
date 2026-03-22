@@ -14,7 +14,7 @@ using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
-using Contracts = XFramework.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts;
 
 namespace XFramework.TestInfrastructure;
 
@@ -85,7 +85,7 @@ public static class StreamFlowTestHelper
     public static void SeedTenantCache(WebApplication app)
     {
         var cache = app.Services.GetRequiredService<IMemoryCache>();
-        cache.Set($"GetTenant-{TestConstants.TenantId}", new Contracts.Tenant
+        cache.Set($"GetTenant-{TestConstants.TenantId}", new Tenant
         {
             Id = TestConstants.TenantId,
             TenantId = TestConstants.TenantId,

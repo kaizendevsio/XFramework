@@ -84,8 +84,8 @@ public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
 
     public async Task<JwtToken> Refresh(string refreshToken, string accessToken, DateTime now)
     {
-        var (principal, jwtToken) = await DecodeJwtToken(accessToken);
-        if (jwtToken == null || !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256Signature))
+        var (principal, jwtToken) = await DecodeExpiredToken(accessToken);
+        if (jwtToken == null)
         {
             throw new SecurityTokenException("Invalid token");
         }
@@ -112,6 +112,31 @@ public sealed class JwtService(JwtOptions jwtOptions) : IJwtService
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtOptions.Secret)),
                     RequireExpirationTime = false,
                     ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromMinutes(1)
+                },
+                out var validatedToken);
+        return (principal, validatedToken as JwtSecurityToken);
+    }
+
+    public async Task<(ClaimsPrincipal, JwtSecurityToken)> DecodeExpiredToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new SecurityTokenException("Invalid token");
+        }
+
+        var principal = new JwtSecurityTokenHandler()
+            .ValidateToken(token,
+                new()
+                {
+                    ValidateIssuerSigningKey = true,
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidAudience = jwtOptions.ValidAudience,
+                    ValidIssuer = jwtOptions.ValidIssuer,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtOptions.Secret)),
+                    RequireExpirationTime = false,
+                    ValidateLifetime = false,
                     ClockSkew = TimeSpan.FromMinutes(1)
                 },
                 out var validatedToken);

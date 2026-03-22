@@ -4,7 +4,7 @@ using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Attributes;
-using PatchRequest = XFramework.Domain.Shared.Contracts.Requests.Patch<XFramework.Domain.Shared.Contracts.IdentityCredential>;
+using PatchRequest = XFramework.Domain.Shared.Contracts.Requests.Patch<IdentityServer.Domain.Shared.Contracts.IdentityCredential>;
 
 namespace IdentityServer.Api.Features.Credentials.Update;
 

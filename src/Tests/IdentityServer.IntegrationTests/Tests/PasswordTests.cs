@@ -4,6 +4,8 @@ using System.Text;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Shared.Contracts;
+using IdentityServer.Domain.Shared.Contracts;
+using Wallets.Domain.Shared.Contracts;
 
 namespace IdentityServer.IntegrationTests.Tests;
 

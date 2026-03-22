@@ -18,7 +18,7 @@ using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
-using Contracts = XFramework.Domain.Shared.Contracts;
+using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.IntegrationTests;
 
