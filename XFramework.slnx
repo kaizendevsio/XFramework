@@ -63,10 +63,14 @@
   <Folder Name="/src/" />
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/XFramework.IdentityServer/" />
+  <Folder Name="/src/Modules/XFramework.Inventario/" />
+  <Folder Name="/src/Modules/XFramework.SmsGateway/" />
   <Folder Name="/src/Modules/XFramework.StreamFlow/" />
   <Folder Name="/src/Modules/XFramework.Wallets/" />
   <Folder Name="/src/Tests/">
     <Project Path="src/Tests/IdentityServer.Benchmarks/IdentityServer.Benchmarks.csproj" />
+    <Project Path="src/Tests/Inventario.IntegrationTests/Inventario.IntegrationTests.csproj" />
+    <Project Path="src/Tests/SmsGateway.IntegrationTests/SmsGateway.IntegrationTests.csproj" />
     <Project Path="src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Tests/">
