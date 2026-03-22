@@ -64,8 +64,10 @@
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/XFramework.IdentityServer/" />
   <Folder Name="/src/Modules/XFramework.StreamFlow/" />
+  <Folder Name="/src/Modules/XFramework.Wallets/" />
   <Folder Name="/src/Tests/">
     <Project Path="src/Tests/IdentityServer.Benchmarks/IdentityServer.Benchmarks.csproj" />
+    <Project Path="src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
