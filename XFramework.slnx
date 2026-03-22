@@ -63,7 +63,6 @@
   <Folder Name="/src/" />
   <Folder Name="/src/Tests/">
     <Project Path="src/Tests/IdentityServer.Benchmarks/IdentityServer.Benchmarks.csproj" />
-    <Project Path="src/Tests/Inventario.IntegrationTests/Inventario.IntegrationTests.csproj" />
     <Project Path="src/Tests/Wallets.IntegrationTests/Wallets.IntegrationTests.csproj" />
     <Project Path="src/Tests/XFramework.TestInfrastructure/XFramework.TestInfrastructure.csproj" />
   </Folder>
