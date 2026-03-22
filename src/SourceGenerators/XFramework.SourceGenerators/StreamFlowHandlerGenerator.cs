@@ -429,8 +429,10 @@ public sealed class {h.ClassName}_{h.MethodName}_StreamFlowHandler : BaseSignalR
         var restParams = new StringBuilder();
         var callArgs = new StringBuilder("request");
 
-        // Request parameter
-        restParams.Append($"{h.RequestTypeFullName} request");
+        // Request parameter — GET/DELETE use [AsParameters] for query binding, POST/PUT/PATCH use body
+        var isBodylessMethod = httpMapMethod is "MapGet" or "MapDelete";
+        var paramAttribute = isBodylessMethod ? "[AsParameters] " : "";
+        restParams.Append($"{paramAttribute}{h.RequestTypeFullName} request");
 
         // DI service parameters
         foreach (var (typeFullName, name, _) in h.DiParameters)

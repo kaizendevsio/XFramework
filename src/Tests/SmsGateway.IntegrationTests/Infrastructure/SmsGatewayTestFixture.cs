@@ -65,7 +65,7 @@ public class SmsGatewayTestFixture
 
     private static WebApplication StartApp()
     {
-        var builder = XApplication.Configure<SmsService>();
+        var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls(AppUrl);
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -75,6 +75,7 @@ public class SmsGatewayTestFixture
             ["Serilog:MinimumLevel:Default"] = "Warning"
         });
 
+        // Register services directly — SmsGateway is simple (in-memory cache, no StreamFlow)
         builder.Services.AddSingleton<ICachingService, CachingService>();
         builder.Services.AddScoped<ISmsService, SmsService>();
         builder.Services.AddValidatorsFromAssemblyContaining<SmsService>();

@@ -43,27 +43,6 @@ public class InventarioTestFixture
 
         _app = StartApp();
         await WaitForHealth($"{AppUrl}/health/live", _appTask);
-
-        // Seed category using the app's DbContext (has entity mappings)
-        await SeedCategory();
-    }
-
-    private static async Task SeedCategory()
-    {
-        using var scope = _app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        if (!await db.Set<XFramework.Inventario.Domain.Shared.Contracts.ProductCategory>().AnyAsync(c => c.Id == TestCategoryId))
-        {
-            db.Set<XFramework.Inventario.Domain.Shared.Contracts.ProductCategory>().Add(
-                new XFramework.Inventario.Domain.Shared.Contracts.ProductCategory
-                {
-                    Id = TestCategoryId,
-                    Name = "Test Category",
-                    TenantId = TestTenantId
-                });
-            await db.SaveChangesAsync();
-        }
     }
 
     [OneTimeTearDown]
@@ -95,25 +74,8 @@ public class InventarioTestFixture
         app.UseCorrelationId();
         app.EnsureDatabase<AppDbContext>();
 
-        // Map only POST/PUT/DELETE endpoints manually (GET endpoints have body-inference issues in source generator)
-        app.MapPost("/api/products", Inventario.Api.Features.Products.Create.CreateProductEndpoint.Handle);
-        app.MapPut("/api/products/{id:guid}", Inventario.Api.Features.Products.Update.UpdateProductEndpoint.Handle);
-        app.MapDelete("/api/products/{id:guid}", Inventario.Api.Features.Products.Delete.DeleteProductEndpoint.Handle);
-
-        // GET endpoints with simple parameter binding
-        app.MapGet("/api/products/{id:guid}", async (Guid id, XFramework.Inventario.Api.Services.ProductService svc, CancellationToken ct) =>
-        {
-            var result = await svc.GetByIdAsync(id, ct);
-            if (!result.IsSuccess) return result.StatusCode == 404 ? Results.NotFound() : Results.Problem(result.Message);
-            return Results.Ok(Inventario.Api.Features.Products.ProductResponse.FromProduct(result.Data!));
-        });
-        app.MapGet("/api/products", async ([AsParameters] XFramework.Inventario.Api.Services.GetProductsRequest req, XFramework.Inventario.Api.Services.ProductService svc, CancellationToken ct) =>
-        {
-            var normalized = req with { Page = req.Page <= 0 ? 1 : req.Page, PageSize = req.PageSize <= 0 ? 10 : Math.Min(req.PageSize, 100) };
-            var result = await svc.GetListAsync(normalized, ct);
-            if (!result.IsSuccess) return Results.Problem(result.Message);
-            return Results.Ok(new { items = result.Data!.Items.Select(Inventario.Api.Features.Products.ProductResponse.FromProduct).ToList(), result.Data.Page, result.Data.PageSize, result.Data.TotalCount, result.Data.TotalPages });
-        });
+        // Map feature endpoints (source-generated with [AsParameters] for GET binding)
+        Inventario.Api.Generated.GeneratedEndpointRoutes.MapGeneratedEndpoints(app);
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
         _appTask = Task.Run(() => app.RunAsync());

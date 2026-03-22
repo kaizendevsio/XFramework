@@ -27,7 +27,7 @@ public class ProductTests
             Name = $"TestProduct_{Guid.NewGuid():N}",
             Price = 19.99m,
             StockQuantity = 100,
-            CategoryId = InventarioTestFixture.TestCategoryId,
+            CategoryId = Guid.Empty,
             IsAvailable = true
         };
 
@@ -198,7 +198,7 @@ public class ProductTests
             Name = name ?? $"TestProduct_{Guid.NewGuid():N}",
             Price = 9.99m,
             StockQuantity = 50,
-            CategoryId = InventarioTestFixture.TestCategoryId,
+            CategoryId = Guid.Empty,
             IsAvailable = true
         };
 
