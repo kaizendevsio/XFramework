@@ -36,6 +36,14 @@ public class ServiceWrapperGenerator : ISourceGenerator
         var codeBuilder = new StringBuilder();
         var serviceName = classDeclarationSyntax.Identifier.Text.Replace("ServiceWrapper", string.Empty);
 
+        // Also discover entities from [GenerateEndpoints] in referenced assemblies
+        var (generatedModels, generatedNamespaces) = DiscoverGenerateEndpointEntities(context, serviceName);
+        foreach (var model in generatedModels)
+        {
+            if (!models.Contains(model))
+                models.Add(model);
+        }
+
         if (models.Count == 0)
         {
             return;
@@ -67,6 +75,15 @@ public class ServiceWrapperGenerator : ISourceGenerator
             {
             using {{namespaceName}};
             """);
+
+        // Add usings for namespaces of [GenerateEndpoints] entities
+        foreach (var ns in generatedNamespaces)
+        {
+            if (ns != namespaceName)
+            {
+                codeBuilder.AppendLine($"using {ns};");
+            }
+        }
 
         // ── Interface: CRUD properties + custom StreamFlow methods ──
         codeBuilder.AppendLine(
@@ -393,6 +410,53 @@ public class ServiceWrapperGenerator : ISourceGenerator
         {
             CollectTypes(childNs, types);
         }
+    }
+
+    /// <summary>
+    /// Discovers entities with [GenerateEndpoints] attribute from referenced assemblies
+    /// that belong to this module (filtered by service name prefix).
+    /// Returns entity names and their namespaces.
+    /// </summary>
+    private static (List<string> Models, HashSet<string> Namespaces) DiscoverGenerateEndpointEntities(
+        GeneratorExecutionContext context, string serviceName)
+    {
+        var models = new List<string>();
+        var namespaces = new HashSet<string>();
+        var coreAttr = "XFramework.Core.Attributes.GenerateEndpointsAttribute";
+        var sharedAttr = "XFramework.Domain.Shared.Attributes.GenerateEndpointsAttribute";
+
+        foreach (var reference in context.Compilation.References)
+        {
+            var symbol = context.Compilation.GetAssemblyOrModuleSymbol(reference);
+            if (symbol is not IAssemblySymbol assembly)
+                continue;
+
+            // Only scan assemblies belonging to this module
+            if (!assembly.Name.StartsWith(serviceName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var allTypes = new List<INamedTypeSymbol>();
+            CollectTypes(assembly.GlobalNamespace, allTypes);
+
+            foreach (var type in allTypes)
+            {
+                if (type.IsAbstract || type.TypeKind != TypeKind.Class)
+                    continue;
+
+                foreach (var attr in type.GetAttributes())
+                {
+                    var attrName = attr.AttributeClass?.ToDisplayString();
+                    if (attrName != coreAttr && attrName != sharedAttr)
+                        continue;
+
+                    models.Add(type.Name);
+                    namespaces.Add(type.ContainingNamespace.ToDisplayString());
+                    break;
+                }
+            }
+        }
+
+        return (models, namespaces);
     }
 
     private class CustomRequestInfo
