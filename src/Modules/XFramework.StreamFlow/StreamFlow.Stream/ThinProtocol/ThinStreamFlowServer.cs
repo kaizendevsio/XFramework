@@ -83,8 +83,12 @@ public sealed class ThinStreamFlowServer
                 await HandleRegisterAsync(connection, buffer, length, ct);
                 break;
             case FrameType.Request:
-                await HandleRequestAsync(connection, buffer, length, ct);
+            {
+                // Dispatch off the receive loop — don't block reading next frame
+                var data = buffer.AsSpan(0, length).ToArray();
+                _ = HandleRequestAsync(connection, data, data.Length, ct);
                 break;
+            }
             case FrameType.Response:
                 await HandleResponseAsync(connection, buffer, length, ct);
                 break;

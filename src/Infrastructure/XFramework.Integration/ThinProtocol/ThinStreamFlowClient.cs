@@ -28,13 +28,13 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
     private readonly StreamFlowConfiguration _config;
     private readonly ILogger _logger;
 
-    private ClientWebSocket? _webSocket;
-    private CancellationTokenSource? _receiveCts;
-    private Task? _receiveLoop;
+    // Connection pool — multiple WebSocket connections for throughput
+    private readonly List<BoltConnection> _connections = [];
+    private int _roundRobin;
     private volatile bool _isRegistered;
     private volatile bool _disposed;
 
-    // Pending RPC calls — response frames resolve these
+    // Pending RPC calls — shared across all connections, response frames resolve these
     private readonly ConcurrentDictionary<Guid, PooledRpcCallThin> _pendingCalls = new();
 
     // Handler registry — maps command hash to handler delegate
@@ -46,13 +46,10 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
     // Offline queue
     private readonly ConcurrentQueue<byte[]> _offlineQueue = new();
 
-    // Send lock — WebSocket only supports one concurrent send
-    private readonly SemaphoreSlim _sendLock = new(1, 1);
-
-    // Cached timeout for RPC calls — avoids CancellationTokenSource.CreateLinkedTokenSource per call
+    // Cached timeout for RPC calls
     private TimeSpan _rpcTimeout;
 
-    public bool IsConnected => _webSocket?.State == WebSocketState.Open && _isRegistered;
+    public bool IsConnected => _connections.Count > 0 && _isRegistered;
 
     public ThinStreamFlowClient(Uri serverUri, string clientId, string clientName, StreamFlowConfiguration config, ILogger logger)
     {
@@ -66,36 +63,66 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
 
     /// <summary>
     /// Connect to the thin StreamFlow server and register.
+    /// Creates MinConnections connections (default 1, scales up dynamically).
     /// </summary>
     public async Task ConnectAsync(CancellationToken ct = default)
     {
-        _webSocket = new ClientWebSocket();
-        await _webSocket.ConnectAsync(_serverUri, ct);
+        var minConns = Math.Max(1, _config.MinConnections);
+        for (int i = 0; i < minConns; i++)
+        {
+            var conn = await CreateConnectionAsync(ct);
+            _connections.Add(conn);
+        }
 
-        // Send registration frame
+        _isRegistered = true;
+        _logger.LogInformation("Bolt client connected: {ClientId} ({ClientName}), {Count} connection(s)",
+            _clientId, _clientName, _connections.Count);
+
+        await DrainOfflineQueueAsync(ct);
+    }
+
+    private async Task<BoltConnection> CreateConnectionAsync(CancellationToken ct)
+    {
+        var ws = new ClientWebSocket();
+        await ws.ConnectAsync(_serverUri, ct);
+
+        // Register this connection
         var writer = new ArrayBufferWriter<byte>(128);
         StreamFlowCodec.WriteRegister(writer, _clientId, _clientName);
-        await SendRawAsync(writer.WrittenMemory, ct);
+        await ws.SendAsync(writer.WrittenMemory, WebSocketMessageType.Binary, true, ct);
 
-        // Wait for ack
         var ackBuffer = new byte[2];
-        var result = await _webSocket.ReceiveAsync(ackBuffer, ct);
-        if (result.Count >= 2 && (FrameType)ackBuffer[0] == FrameType.RegisterAck && ackBuffer[1] == 1)
-        {
-            _isRegistered = true;
-            _logger.LogInformation("Thin client registered: {ClientId} ({ClientName})", _clientId, _clientName);
-        }
-        else
-        {
+        var result = await ws.ReceiveAsync(ackBuffer, ct);
+        if (result.Count < 2 || (FrameType)ackBuffer[0] != FrameType.RegisterAck || ackBuffer[1] != 1)
             throw new InvalidOperationException("Server rejected registration");
+
+        var conn = new BoltConnection(ws);
+
+        // Start receive loop for this connection
+        var receiveCts = new CancellationTokenSource();
+        conn.ReceiveCts = receiveCts;
+        conn.ReceiveLoop = Task.Run(() => ReceiveLoopAsync(conn, receiveCts.Token));
+
+        return conn;
+    }
+
+    /// <summary>
+    /// Scale up: add a new connection when under load.
+    /// </summary>
+    private async Task ScaleUpAsync()
+    {
+        if (_connections.Count >= _config.MaxConnections) return;
+
+        try
+        {
+            var conn = await CreateConnectionAsync(CancellationToken.None);
+            _connections.Add(conn);
+            _logger.LogInformation("Bolt connection pool scaled to {Count}", _connections.Count);
         }
-
-        // Start receive loop
-        _receiveCts = new CancellationTokenSource();
-        _receiveLoop = Task.Run(() => ReceiveLoopAsync(_receiveCts.Token));
-
-        // Drain offline queue
-        await DrainOfflineQueueAsync(ct);
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to scale up Bolt connection pool");
+        }
     }
 
     /// <summary>
@@ -125,9 +152,10 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
                 var jitter = TimeSpan.FromMilliseconds(random.Next(0, (int)(delay.TotalMilliseconds * 0.3)));
                 await Task.Delay(delay + jitter, ct);
 
-                // Reset socket for retry
-                _webSocket?.Dispose();
-                _webSocket = null;
+                // Reset connections for retry
+                foreach (var c in _connections)
+                    c.WebSocket.Dispose();
+                _connections.Clear();
             }
         }
 
@@ -143,7 +171,6 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
     {
         var requestId = Guid.NewGuid();
 
-        // Cached hash lookups — computed once per unique string, O(1) thereafter
         var recipientHash = _hashCache.GetOrAdd(recipientId, StreamFlowCodec.Fnv1aHash);
         var commandHash = _hashCache.GetOrAdd(commandName, StreamFlowCodec.Fnv1aHash);
 
@@ -162,10 +189,15 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
             }
             else
             {
-                await SendRawAsync(writer.WrittenMemory, ct);
+                // Round-robin across connections for load distribution
+                var conn = GetConnection();
+                await conn.SendAsync(writer.WrittenMemory, ct);
+
+                // Auto-scale: if this connection is backed up, add another
+                if (conn.PendingSends > _config.ScaleUpThreshold && _connections.Count < _config.MaxConnections)
+                    _ = ScaleUpAsync();
             }
 
-            // Simple CTS timeout — avoids CreateLinkedTokenSource allocation
             using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
             rpcCall.RegisterTimeout(timeoutCts.Token);
 
@@ -178,6 +210,14 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         }
     }
 
+    private BoltConnection GetConnection()
+    {
+        var count = _connections.Count;
+        if (count == 1) return _connections[0];
+        var idx = (uint)Interlocked.Increment(ref _roundRobin) % count;
+        return _connections[(int)idx];
+    }
+
     /// <summary>
     /// Register a handler for incoming request frames (this client is the recipient).
     /// </summary>
@@ -188,17 +228,14 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         _logger.LogDebug("Registered thin handler for {CommandName} [hash={Hash}]", commandName, hash);
     }
 
-    /// <summary>
-    /// Background receive loop — reads frames from the WebSocket and dispatches them.
-    /// </summary>
-    private async Task ReceiveLoopAsync(CancellationToken ct)
+    private async Task ReceiveLoopAsync(BoltConnection conn, CancellationToken ct)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
         try
         {
-            while (!ct.IsCancellationRequested && _webSocket?.State == WebSocketState.Open)
+            while (!ct.IsCancellationRequested && conn.WebSocket.State == WebSocketState.Open)
             {
-                var result = await _webSocket.ReceiveAsync(buffer.AsMemory(), ct);
+                var result = await conn.WebSocket.ReceiveAsync(buffer.AsMemory(), ct);
 
                 if (result.MessageType == WebSocketMessageType.Close)
                     break;
@@ -216,19 +253,14 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
                         break;
 
                     case FrameType.Request:
-                        await HandleIncomingRequestAsync(buffer, result.Count, ct);
-                        break;
-
-                    default:
-                        _logger.LogDebug("Received unexpected frame type {FrameType}", frameType);
+                        // Dispatch off the receive loop — don't block reading next frame
+                        var reqData = buffer.AsSpan(0, result.Count).ToArray();
+                        _ = HandleIncomingRequestAsync(conn, reqData, reqData.Length, ct);
                         break;
                 }
             }
         }
-        catch (OperationCanceledException)
-        {
-            // Expected on shutdown
-        }
+        catch (OperationCanceledException) { }
         catch (WebSocketException ex)
         {
             _logger.LogWarning("WebSocket receive error: {Error}", ex.Message);
@@ -236,18 +268,20 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
-            _isRegistered = false;
 
-            // Cancel all pending RPCs
-            foreach (var (id, rpc) in _pendingCalls)
-            {
-                if (_pendingCalls.TryRemove(id, out var call))
-                    call.SetException(new InvalidOperationException("Connection lost"));
-            }
-
-            // Attempt reconnection if not disposed
             if (!_disposed)
-                _ = Task.Run(() => ReconnectAsync());
+            {
+                // Remove dead connection, cancel pending RPCs only if ALL connections dead
+                _connections.Remove(conn);
+                if (_connections.Count == 0)
+                {
+                    _isRegistered = false;
+                    foreach (var (id, _) in _pendingCalls)
+                        if (_pendingCalls.TryRemove(id, out var call))
+                            call.SetException(new InvalidOperationException("Connection lost"));
+                    _ = Task.Run(() => ReconnectAsync());
+                }
+            }
         }
     }
 
@@ -266,7 +300,7 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         }
     }
 
-    private async Task HandleIncomingRequestAsync(byte[] data, int length, CancellationToken ct)
+    private async Task HandleIncomingRequestAsync(BoltConnection conn, byte[] data, int length, CancellationToken ct)
     {
         var span = data.AsSpan(0, length);
         if (!StreamFlowCodec.TryReadRequest(span, out var frame, out _))
@@ -276,62 +310,26 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         {
             try
             {
-                // Zero-copy: pass payload slice from the original buffer
                 var payload = frame.GetPayload(data.AsMemory(0, length));
                 var (statusCode, responsePayload) = await handler(payload, frame.RequestId);
 
                 var writer = RentedBufferWriter.GetThreadLocal();
                 StreamFlowCodec.WriteResponse(writer, frame.RequestId, statusCode, responsePayload.Span);
-                await SendRawAsync(writer.WrittenMemory, ct);
+                await conn.SendAsync(writer.WrittenMemory, ct);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Handler error for command hash {CommandHash}", frame.CommandHash);
                 var errWriter = RentedBufferWriter.GetThreadLocal();
                 StreamFlowCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.InternalServerError, ReadOnlySpan<byte>.Empty);
-                await SendRawAsync(errWriter.WrittenMemory, ct);
+                await conn.SendAsync(errWriter.WrittenMemory, ct);
             }
         }
         else
         {
             var writer = RentedBufferWriter.GetThreadLocal();
             StreamFlowCodec.WriteResponse(writer, frame.RequestId, HttpStatusCode.NotImplemented, ReadOnlySpan<byte>.Empty);
-            await SendRawAsync(writer.WrittenMemory, ct);
-        }
-    }
-
-    private ValueTask SendRawAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
-    {
-        // Fast path: if lock is available, send synchronously
-        if (_sendLock.Wait(0))
-        {
-            try
-            {
-                if (_webSocket?.State == WebSocketState.Open)
-                    return _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
-                return ValueTask.CompletedTask;
-            }
-            finally
-            {
-                _sendLock.Release();
-            }
-        }
-
-        // Slow path: contention — await the lock
-        return SendRawSlowAsync(data, ct);
-    }
-
-    private async ValueTask SendRawSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
-    {
-        await _sendLock.WaitAsync(ct);
-        try
-        {
-            if (_webSocket?.State == WebSocketState.Open)
-                await _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
-        }
-        finally
-        {
-            _sendLock.Release();
+            await conn.SendAsync(writer.WrittenMemory, ct);
         }
     }
 
@@ -340,7 +338,7 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         var drained = 0;
         while (_offlineQueue.TryDequeue(out var frame))
         {
-            await SendRawAsync(frame, ct);
+            await GetConnection().SendAsync(frame, ct);
             drained++;
         }
         if (drained > 0)
@@ -363,26 +361,92 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
-        _receiveCts?.Cancel();
 
-        if (_receiveLoop is not null)
+        foreach (var conn in _connections)
         {
-            try { await _receiveLoop; } catch { }
+            conn.ReceiveCts?.Cancel();
+            if (conn.ReceiveLoop is not null)
+                try { await conn.ReceiveLoop; } catch { }
+
+            try
+            {
+                if (conn.WebSocket.State == WebSocketState.Open)
+                    await conn.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+            }
+            catch { }
+            conn.WebSocket.Dispose();
+            conn.ReceiveCts?.Dispose();
         }
 
-        if (_webSocket is not null)
+        _connections.Clear();
+    }
+}
+
+/// <summary>
+/// A single WebSocket connection in the Bolt client pool.
+/// Each has its own send lock (WebSocket only supports one concurrent send).
+/// </summary>
+public sealed class BoltConnection
+{
+    public ClientWebSocket WebSocket { get; }
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private int _pendingSends;
+
+    public CancellationTokenSource? ReceiveCts { get; set; }
+    public Task? ReceiveLoop { get; set; }
+    public int PendingSends => _pendingSends;
+
+    public BoltConnection(ClientWebSocket webSocket) => WebSocket = webSocket;
+
+    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        Interlocked.Increment(ref _pendingSends);
+
+        if (_sendLock.Wait(0))
         {
             try
             {
-                if (_webSocket.State == WebSocketState.Open)
-                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+                if (WebSocket.State == WebSocketState.Open)
+                {
+                    var task = WebSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+                    if (task.IsCompleted)
+                    {
+                        Interlocked.Decrement(ref _pendingSends);
+                        return task;
+                    }
+                    return AwaitAndDecrement(task);
+                }
+                Interlocked.Decrement(ref _pendingSends);
+                return ValueTask.CompletedTask;
             }
-            catch { }
-            _webSocket.Dispose();
+            finally
+            {
+                _sendLock.Release();
+            }
         }
 
-        _receiveCts?.Dispose();
-        _sendLock.Dispose();
+        return SendSlowAsync(data, ct);
+    }
+
+    private async ValueTask AwaitAndDecrement(ValueTask task)
+    {
+        try { await task; }
+        finally { Interlocked.Decrement(ref _pendingSends); }
+    }
+
+    private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        await _sendLock.WaitAsync(ct);
+        try
+        {
+            if (WebSocket.State == WebSocketState.Open)
+                await WebSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+        }
+        finally
+        {
+            _sendLock.Release();
+            Interlocked.Decrement(ref _pendingSends);
+        }
     }
 }
 
