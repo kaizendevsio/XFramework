@@ -19,12 +19,12 @@ namespace XFramework.Integration.ThinProtocol;
 /// Drop-in replacement for StreamFlowDriverSignalR using the thin binary protocol.
 /// Implements IMessageBusWrapper so all service wrappers work unchanged.
 /// </summary>
-public class ThinStreamFlowDriver : IMessageBusWrapper
+public class BoltDriver : IMessageBusWrapper
 {
-    private readonly ThinStreamFlowClient _client;
+    private readonly BoltClient _client;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _hostEnvironment;
-    private readonly ILogger<ThinStreamFlowDriver> _logger;
+    private readonly ILogger<BoltDriver> _logger;
     private readonly DeviceAgentProvider _deviceAgentProvider;
 
     private string? _clientIpAddress;
@@ -36,11 +36,11 @@ public class ThinStreamFlowDriver : IMessageBusWrapper
     public Action OnReconnecting { get; set; }
     public Action OnDisconnected { get; set; }
 
-    public ThinStreamFlowDriver(
-        ThinStreamFlowClient client,
+    public BoltDriver(
+        BoltClient client,
         IConfiguration configuration,
         IHostEnvironment hostEnvironment,
-        ILogger<ThinStreamFlowDriver> logger,
+        ILogger<BoltDriver> logger,
         DeviceAgentProvider deviceAgentProvider)
     {
         _client = client;

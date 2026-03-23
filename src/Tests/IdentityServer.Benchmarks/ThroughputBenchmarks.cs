@@ -60,8 +60,8 @@ public class ThroughputBenchmarks
     private HttpClient _httpClient = null!;
 
     // Bolt
-    private ThinStreamFlowClient _thinServiceClient = null!;
-    private ThinStreamFlowClient _thinCallerClient = null!;
+    private BoltClient _thinServiceClient = null!;
+    private BoltClient _thinCallerClient = null!;
 
     // gRPC (with hub)
     private WebApplication _grpcBackendApp = null!;
@@ -152,14 +152,14 @@ public class ThroughputBenchmarks
         var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
         var serviceId = "3902761a822d4c6b8e2d323fd501bcd6";
 
-        _thinServiceClient = new ThinStreamFlowClient(thinServerUri, serviceId, "IdentityServer.TpBench",
-            config, lf.CreateLogger<ThinStreamFlowClient>());
+        _thinServiceClient = new BoltClient(thinServerUri, serviceId, "IdentityServer.TpBench",
+            config, lf.CreateLogger<BoltClient>());
         _thinServiceClient.RegisterHandler(typeof(HealthCheckRequest).GetTypeFullName(), HealthCheckHandler);
         await _thinServiceClient.ConnectAsync();
 
         // Caller: multiple connections for throughput
-        _thinCallerClient = new ThinStreamFlowClient(thinServerUri, "tp_bench_caller", "TpBenchClient.Bolt",
-            config, lf.CreateLogger<ThinStreamFlowClient>());
+        _thinCallerClient = new BoltClient(thinServerUri, "tp_bench_caller", "TpBenchClient.Bolt",
+            config, lf.CreateLogger<BoltClient>());
         await _thinCallerClient.ConnectAsync();
     }
 

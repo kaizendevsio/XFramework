@@ -11,7 +11,7 @@ public static class ApplicationBuilderExtension
 
         // Thin binary WebSocket protocol — replaces SignalR
         app.UseWebSockets();
-        app.MapThinStreamFlow("/streamflow/ws");
+        app.MapBolt("/streamflow/ws");
 
         // Legacy SignalR hub — kept temporarily for existing tests/benchmarks during migration
         app.MapHub<MessageQueueHub>("/stream-flow/queue");

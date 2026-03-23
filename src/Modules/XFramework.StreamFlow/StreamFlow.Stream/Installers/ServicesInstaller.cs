@@ -29,6 +29,6 @@ public sealed class ServicesInstaller : IInstaller
         services.AddSingleton<IStreamFlowService, StreamFlowService>();
 
         // Thin binary WebSocket server (Phase 3 — runs alongside SignalR)
-        services.AddSingleton<ThinStreamFlowServer>();
+        services.AddSingleton<BoltServer>();
     }
 }

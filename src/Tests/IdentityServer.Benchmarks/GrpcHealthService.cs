@@ -23,7 +23,7 @@ public class GrpcHealthBackend : HealthService.HealthServiceBase
 }
 
 /// <summary>
-/// gRPC hub — proxies requests to the backend, like Bolt's ThinStreamFlowServer.
+/// gRPC hub — proxies requests to the backend, like Bolt's BoltServer.
 /// Client → Hub → Backend → Hub → Client (same hop count as Bolt).
 /// </summary>
 public class GrpcHealthHub : HealthService.HealthServiceBase

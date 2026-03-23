@@ -57,8 +57,8 @@ public class ConcurrentBenchmarks
     private IIdentityServerServiceWrapper _serviceWrapper = null!;
 
     // Thin protocol
-    private ThinStreamFlowClient _thinServiceClient = null!;
-    private ThinStreamFlowClient _thinCallerClient = null!;
+    private BoltClient _thinServiceClient = null!;
+    private BoltClient _thinCallerClient = null!;
 
     // gRPC (with hub)
     private WebApplication _grpcBackendApp = null!;
@@ -198,13 +198,13 @@ public class ConcurrentBenchmarks
         var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
         var serviceId = "3902761a822d4c6b8e2d323fd501bcd6";
 
-        _thinServiceClient = new ThinStreamFlowClient(thinServerUri, serviceId, "IdentityServer.ConcBench",
-            config, lf.CreateLogger<ThinStreamFlowClient>());
+        _thinServiceClient = new BoltClient(thinServerUri, serviceId, "IdentityServer.ConcBench",
+            config, lf.CreateLogger<BoltClient>());
         _thinServiceClient.RegisterHandler(typeof(HealthCheckRequest).GetTypeFullName(), HealthCheckHandler);
         await _thinServiceClient.ConnectAsync();
 
-        _thinCallerClient = new ThinStreamFlowClient(thinServerUri, "conc_bench_caller", "ConcBenchClient.Thin",
-            config, lf.CreateLogger<ThinStreamFlowClient>());
+        _thinCallerClient = new BoltClient(thinServerUri, "conc_bench_caller", "ConcBenchClient.Thin",
+            config, lf.CreateLogger<BoltClient>());
         await _thinCallerClient.ConnectAsync();
     }
 

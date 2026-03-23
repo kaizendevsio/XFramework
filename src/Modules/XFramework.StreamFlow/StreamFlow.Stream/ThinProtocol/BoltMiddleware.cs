@@ -5,13 +5,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace StreamFlow.Stream.ThinProtocol;
 
-public static class ThinStreamFlowMiddleware
+public static class BoltMiddleware
 {
     /// <summary>
     /// Map the thin StreamFlow WebSocket endpoint.
     /// Runs alongside the existing SignalR hub for migration.
     /// </summary>
-    public static IEndpointRouteBuilder MapThinStreamFlow(this IEndpointRouteBuilder endpoints, string path = "/streamflow/ws")
+    public static IEndpointRouteBuilder MapBolt(this IEndpointRouteBuilder endpoints, string path = "/streamflow/ws")
     {
         endpoints.Map(path, async (HttpContext context) =>
         {
@@ -22,7 +22,7 @@ public static class ThinStreamFlowMiddleware
                 return;
             }
 
-            var server = context.RequestServices.GetRequiredService<ThinStreamFlowServer>();
+            var server = context.RequestServices.GetRequiredService<BoltServer>();
             var webSocket = await context.WebSockets.AcceptWebSocketAsync();
             await server.HandleConnectionAsync(webSocket, context.RequestAborted);
         });

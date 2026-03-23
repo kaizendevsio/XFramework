@@ -58,8 +58,8 @@ public class TransportBenchmarks
     private IIdentityServerServiceWrapper _serviceWrapper = null!;
 
     // Thin protocol
-    private ThinStreamFlowClient _thinServiceClient = null!;
-    private ThinStreamFlowClient _thinCallerClient = null!;
+    private BoltClient _thinServiceClient = null!;
+    private BoltClient _thinCallerClient = null!;
     private int _identityServerServiceHash;
     private int _healthCheckCommandHash;
 
@@ -232,7 +232,7 @@ public class TransportBenchmarks
         _ = Task.Run(() => _grpcBackendApp.RunAsync());
         await WaitForHealth("http://localhost:19264/health/live");
 
-        // 2. gRPC Hub (proxies to backend — same role as ThinStreamFlowServer in Bolt)
+        // 2. gRPC Hub (proxies to backend — same role as BoltServer in Bolt)
         var backendChannel = GrpcChannel.ForAddress("http://localhost:19263");
         var backendClient = new HealthService.HealthServiceClient(backendChannel);
 
@@ -281,9 +281,9 @@ public class TransportBenchmarks
         _healthCheckCommandHash = StreamFlowCodec.Fnv1aHash(typeof(HealthCheckRequest).GetTypeFullName());
 
         // Start "IdentityServer" thin client — handles incoming requests
-        _thinServiceClient = new ThinStreamFlowClient(
+        _thinServiceClient = new BoltClient(
             thinServerUri, identityServerServiceId, "IdentityServer.Bench",
-            config, loggerFactory.CreateLogger<ThinStreamFlowClient>());
+            config, loggerFactory.CreateLogger<BoltClient>());
 
         // Register the HealthCheck handler on the service client
         _thinServiceClient.RegisterHandler(typeof(HealthCheckRequest).GetTypeFullName(),
@@ -307,9 +307,9 @@ public class TransportBenchmarks
         await _thinServiceClient.ConnectAsync();
 
         // Start "BenchClient" thin client — sends requests
-        _thinCallerClient = new ThinStreamFlowClient(
+        _thinCallerClient = new BoltClient(
             thinServerUri, "bench_caller", "BenchClient.Thin",
-            config, loggerFactory.CreateLogger<ThinStreamFlowClient>());
+            config, loggerFactory.CreateLogger<BoltClient>());
         await _thinCallerClient.ConnectAsync();
 
         // Warmup thin path

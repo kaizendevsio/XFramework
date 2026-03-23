@@ -14,7 +14,7 @@ namespace XFramework.Integration.ThinProtocol;
 /// QUIC-based StreamFlow client. Each RPC opens its own bidirectional QUIC stream,
 /// providing native multiplexing with zero head-of-line blocking.
 ///
-/// Same wire protocol as ThinStreamFlowClient, but over QUIC instead of WebSocket.
+/// Same wire protocol as BoltClient, but over QUIC instead of WebSocket.
 /// Benefits: 0-RTT reconnection, per-stream flow control, built-in TLS 1.3.
 /// </summary>
 public sealed class QuicStreamFlowClient : IAsyncDisposable

@@ -20,7 +20,7 @@ namespace XFramework.Integration.ThinProtocol;
 /// - Offline message queue
 /// - Handler routing by FNV-1a command hash
 /// </summary>
-public sealed class ThinStreamFlowClient : IAsyncDisposable
+public sealed class BoltClient : IAsyncDisposable
 {
     private readonly Uri _serverUri;
     private readonly string _clientId;
@@ -57,7 +57,7 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
 
     public bool IsConnected => _connections.Count > 0 && _isRegistered;
 
-    public ThinStreamFlowClient(Uri serverUri, string clientId, string clientName, StreamFlowConfiguration config, ILogger logger)
+    public BoltClient(Uri serverUri, string clientId, string clientName, StreamFlowConfiguration config, ILogger logger)
     {
         _serverUri = serverUri;
         _clientId = clientId;
