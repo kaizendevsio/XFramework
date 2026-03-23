@@ -247,7 +247,7 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
 
     /// <summary>
     /// Open a bidirectional stream to a remote service.
-    /// Returns a BoltStream for sending/receiving chunks.
+    /// Returns a BoltStream for sending/receiving raw bytes or typed objects.
     /// </summary>
     public async Task<BoltStream> OpenStreamAsync(string recipientId, string commandName, CancellationToken ct = default)
     {
@@ -261,12 +261,35 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         var stream = new BoltStream(streamId, conn);
         _activeStreams[streamId] = stream;
 
-        // Send StreamOpen frame
         var writer = RentedBufferWriter.GetThreadLocal();
         StreamFlowCodec.WriteStreamOpen(writer, streamId, recipientHash, commandHash);
         await conn.SendAsync(writer.WrittenMemory, ct);
 
         return stream;
+    }
+
+    /// <summary>
+    /// Stream an IAsyncEnumerable to a remote service.
+    /// Each item is serialized with MemoryPack and sent as a StreamData frame.
+    /// Stream is automatically closed when the enumerable completes.
+    /// </summary>
+    public async Task StreamAsync<T>(string recipientId, string commandName, IAsyncEnumerable<T> items, CancellationToken ct = default)
+    {
+        await using var stream = await OpenStreamAsync(recipientId, commandName, ct);
+        await stream.SendAllAsync(items, ct);
+    }
+
+    /// <summary>
+    /// Register a typed stream handler. When a remote client opens a stream with the
+    /// given command name, the handler receives an IAsyncEnumerable of deserialized items.
+    /// </summary>
+    public void RegisterStreamHandler<T>(string commandName, Func<IAsyncEnumerable<T>, BoltStream, Task> handler)
+    {
+        RegisterStreamHandler(commandName, async (stream) =>
+        {
+            var items = stream.ReadAllAsync<T>();
+            await handler(items, stream);
+        });
     }
 
     private async Task ReceiveLoopAsync(BoltConnection conn, CancellationToken ct)
