@@ -1,8 +1,69 @@
 # XFramework
 
-A modular .NET 10 enterprise framework with **Bolt** — a custom binary RPC protocol that's **47% faster than gRPC** with **90% less memory** and **40,000+ ops/sec peak throughput**.
+A modular .NET 10 enterprise framework with **Bolt** — a custom binary RPC and streaming protocol that's **47% faster than gRPC** with **90% less memory** and **40,000+ ops/sec peak throughput**.
 
-## Bolt Protocol Performance
+## Bolt Protocol
+
+Bolt is a lightweight binary protocol for .NET-to-.NET and server-to-client communication. It supports RPC (request-response), fire-and-forget push, and bidirectional byte streaming — all through a single WebSocket connection with zero-copy hub routing.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **RPC** | Request-response with pooled completion sources, sub-3KB per call |
+| **Streaming** | Bidirectional `IAsyncEnumerable<T>` streaming for video, audio, files, any bytes |
+| **Hub Routing** | Zero-copy frame forwarding — hub reads 29-byte header, forwards raw bytes |
+| **Connection Pooling** | Auto-scales WebSocket connections under load, round-robin dispatch |
+| **Typed Serialization** | MemoryPack auto-serialization for both RPC and stream payloads |
+| **Resilience** | Exponential backoff reconnection, offline queue, dead letter queue |
+| **Zero GC** | No Gen0 collections under any load level |
+
+### Wire Protocol
+
+```
+RPC Request:   [1:type] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]  = 29B header
+RPC Response:  [1:type] [16:requestId] [2:statusCode] [4:payloadLen] [payload]                      = 23B header
+Stream Open:   [1:type] [16:streamId]  [4:recipientHash] [4:commandHash]                            = 25B header
+Stream Data:   [1:type] [16:streamId]  [4:payloadLen] [payload]                                     = 21B header
+Stream Close:  [1:type] [16:streamId]  [2:statusCode]                                               = 19B header
+```
+
+### Streaming API
+
+Bolt supports three streaming patterns:
+
+**Raw bytes** — stream any binary data:
+```csharp
+var stream = await client.OpenStreamAsync("video-service", "upload");
+await stream.SendAsync(jpegBytes);
+await stream.SendAsync(moreBytes);
+await stream.CloseAsync();
+```
+
+**Typed objects** — auto-serialized with MemoryPack:
+```csharp
+await stream.SendAsync<VideoFrame>(frame);
+
+await foreach (var frame in stream.ReadAllAsync<VideoFrame>())
+    ProcessFrame(frame);
+```
+
+**IAsyncEnumerable pipe** — plug any async producer directly into a stream:
+```csharp
+// Sender: pipe a producer into the stream
+await client.StreamAsync("video-service", "process",
+    GetVideoFramesAsync(), ct);  // IAsyncEnumerable<VideoFrame>
+
+// Receiver: typed handler with IAsyncEnumerable
+client.RegisterStreamHandler<VideoFrame>("process",
+    async (frames, stream) =>
+    {
+        await foreach (var frame in frames)
+            await ProcessFrameAsync(frame);
+    });
+```
+
+## Performance
 
 Benchmarked on .NET 10, Windows 11, Hyper-V. All transports routed through a hub for fair comparison (Client -> Hub -> Service -> Hub -> Client).
 
@@ -72,7 +133,7 @@ src/Modules/XFramework.{Module}/
 ### Key Technologies
 
 - **.NET 10 / C# 14** with Vertical Slice Architecture (VSA)
-- **Bolt Protocol** — custom binary RPC over WebSocket (replaces SignalR)
+- **Bolt Protocol** — custom binary RPC + streaming over WebSocket
 - **MemoryPack** — zero-allocation binary serialization for payloads
 - **Source Generators** — compile-time code generation for endpoints, handlers, and service wrappers
 - **Entity Framework Core** with PostgreSQL
