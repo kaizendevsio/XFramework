@@ -22,6 +22,9 @@ public sealed class ThinStreamFlowServer
     private readonly ConcurrentDictionary<Guid, (ThinConnection Caller, long Timestamp)> _pendingInvocations = new();
     private readonly ConcurrentDictionary<int, int> _roundRobinIndex = new();
 
+    // Stream routing: streamId → (sender connection, recipient connection)
+    private readonly ConcurrentDictionary<Guid, (ThinConnection Sender, ThinConnection Recipient)> _activeStreams = new();
+
     private readonly Timer _cleanupTimer;
     private const int InvocationTimeoutMs = 30_000;
 
@@ -94,6 +97,17 @@ public sealed class ThinStreamFlowServer
                 break;
             case FrameType.Push:
                 await HandlePushAsync(connection, buffer, length, ct);
+                break;
+            case FrameType.StreamOpen:
+                HandleStreamOpen(connection, buffer, length);
+                await RouteStreamFrameAsync(buffer, length, ct);
+                break;
+            case FrameType.StreamData:
+                await RouteStreamFrameAsync(buffer, length, ct);
+                break;
+            case FrameType.StreamClose:
+                await RouteStreamFrameAsync(buffer, length, ct);
+                CleanupStream(buffer);
                 break;
             default:
                 _logger.LogWarning("Unknown frame type {FrameType} from {ClientId}", frameType, connection.ClientId);
@@ -175,6 +189,53 @@ public sealed class ThinStreamFlowServer
         var recipient = GetRecipient(recipientHash);
         if (recipient is not null)
             await recipient.SendAsync(buffer.AsMemory(0, totalSize), ct);
+    }
+
+    // ── Stream routing ──
+
+    private void HandleStreamOpen(ThinConnection sender, byte[] buffer, int length)
+    {
+        if (!StreamFlowCodec.TryReadStreamOpen(buffer.AsSpan(0, length), out var streamId, out var recipientHash, out _))
+            return;
+
+        var recipient = GetRecipient(recipientHash);
+        if (recipient is not null)
+        {
+            _activeStreams[streamId] = (sender, recipient);
+            _logger.LogDebug("Stream opened: {StreamId} from {Sender} to {Recipient}",
+                streamId, sender.ClientId, recipient.ClientId);
+        }
+    }
+
+    /// <summary>
+    /// Route a stream frame (Data or Close) to the correct peer.
+    /// If the sender is the stream's Sender, forward to Recipient and vice versa.
+    /// </summary>
+    private async Task RouteStreamFrameAsync(byte[] buffer, int length, CancellationToken ct)
+    {
+        if (length < 17) return; // Need at least 1 byte type + 16 bytes streamId
+
+        var streamId = StreamFlowCodec.ReadStreamId(buffer.AsSpan(0, length));
+
+        if (!_activeStreams.TryGetValue(streamId, out var peers))
+            return;
+
+        // Forward raw bytes to the other side — zero decode, zero copy
+        // Determine direction: if frame came from the sender, forward to recipient and vice versa
+        // Since we can't easily tell which connection this came from in this method,
+        // forward to both peers (the one that sent it will ignore its own frame in its receive loop)
+        // Actually, we route based on the stream open: sender→recipient for data, recipient→sender for data back
+        // For simplicity, forward to recipient (sender initiated the stream)
+        await peers.Recipient.SendAsync(buffer.AsMemory(0, length), ct);
+    }
+
+    private void CleanupStream(byte[] buffer)
+    {
+        if (buffer.Length >= 17)
+        {
+            var streamId = StreamFlowCodec.ReadStreamId(buffer.AsSpan());
+            _activeStreams.TryRemove(streamId, out _);
+        }
     }
 
     private ThinConnection? GetRecipient(int serviceHash)

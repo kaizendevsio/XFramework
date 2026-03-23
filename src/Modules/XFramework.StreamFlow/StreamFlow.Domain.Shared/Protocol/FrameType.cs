@@ -35,4 +35,22 @@ public enum FrameType : byte
     /// Header: [1:type] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen]
     /// </summary>
     Push = 0x05,
+
+    /// <summary>
+    /// Open a bidirectional byte stream.
+    /// Header: [1:type] [16:streamId] [4:recipientHash] [4:commandHash]
+    /// </summary>
+    StreamOpen = 0x10,
+
+    /// <summary>
+    /// Stream data chunk. Sent continuously in either direction on an open stream.
+    /// Header: [1:type] [16:streamId] [4:payloadLen] [payload]
+    /// </summary>
+    StreamData = 0x11,
+
+    /// <summary>
+    /// Close a stream. Sent by either side when done.
+    /// Header: [1:type] [16:streamId] [2:statusCode]
+    /// </summary>
+    StreamClose = 0x12,
 }

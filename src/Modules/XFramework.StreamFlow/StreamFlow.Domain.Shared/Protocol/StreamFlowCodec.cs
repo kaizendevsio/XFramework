@@ -98,6 +98,57 @@ public static class StreamFlowCodec
         return 2;
     }
 
+    // ── Streaming ──
+
+    public const int StreamOpenHeaderSize = 1 + 16 + 4 + 4;  // 25 bytes
+    public const int StreamDataHeaderSize = 1 + 16 + 4;       // 21 bytes
+    public const int StreamCloseSize = 1 + 16 + 2;            // 19 bytes
+
+    /// <summary>
+    /// Open a bidirectional stream to a recipient.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteStreamOpen(IBufferWriter<byte> writer, Guid streamId, int recipientHash, int commandHash)
+    {
+        var span = writer.GetSpan(StreamOpenHeaderSize);
+        span[0] = (byte)FrameType.StreamOpen;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(17), recipientHash);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(21), commandHash);
+        writer.Advance(StreamOpenHeaderSize);
+        return StreamOpenHeaderSize;
+    }
+
+    /// <summary>
+    /// Write a stream data chunk.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteStreamData(IBufferWriter<byte> writer, Guid streamId, ReadOnlySpan<byte> payload)
+    {
+        var totalSize = StreamDataHeaderSize + payload.Length;
+        var span = writer.GetSpan(totalSize);
+        span[0] = (byte)FrameType.StreamData;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(17), payload.Length);
+        payload.CopyTo(span.Slice(21));
+        writer.Advance(totalSize);
+        return totalSize;
+    }
+
+    /// <summary>
+    /// Close a stream.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteStreamClose(IBufferWriter<byte> writer, Guid streamId, HttpStatusCode statusCode = HttpStatusCode.OK)
+    {
+        var span = writer.GetSpan(StreamCloseSize);
+        span[0] = (byte)FrameType.StreamClose;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteInt16LittleEndian(span.Slice(17), (short)statusCode);
+        writer.Advance(StreamCloseSize);
+        return StreamCloseSize;
+    }
+
     #endregion
 
     #region Decoding
@@ -224,6 +275,66 @@ public static class StreamFlowCodec
         bytesConsumed = totalSize;
         return true;
     }
+
+    // ── Stream frame decoding ──
+
+    /// <summary>
+    /// Read a StreamOpen frame.
+    /// </summary>
+    public static bool TryReadStreamOpen(ReadOnlySpan<byte> buffer, out Guid streamId, out int recipientHash, out int commandHash)
+    {
+        streamId = default;
+        recipientHash = 0;
+        commandHash = 0;
+        if (buffer.Length < StreamOpenHeaderSize) return false;
+
+        streamId = ReadGuid(buffer.Slice(1));
+        recipientHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(17));
+        commandHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(21));
+        return true;
+    }
+
+    /// <summary>
+    /// Read a StreamData frame header. Payload is at offset 21.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadStreamData(ReadOnlySpan<byte> buffer, out Guid streamId, out int payloadOffset, out int payloadLength, out int totalSize)
+    {
+        streamId = default;
+        payloadOffset = 0;
+        payloadLength = 0;
+        totalSize = 0;
+
+        if (buffer.Length < StreamDataHeaderSize) return false;
+
+        streamId = ReadGuid(buffer.Slice(1));
+        payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(17));
+        payloadOffset = StreamDataHeaderSize;
+        totalSize = StreamDataHeaderSize + payloadLength;
+        return buffer.Length >= totalSize;
+    }
+
+    /// <summary>
+    /// Read a StreamClose frame.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadStreamClose(ReadOnlySpan<byte> buffer, out Guid streamId, out HttpStatusCode statusCode)
+    {
+        streamId = default;
+        statusCode = default;
+        if (buffer.Length < StreamCloseSize) return false;
+
+        streamId = ReadGuid(buffer.Slice(1));
+        statusCode = (HttpStatusCode)BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(17));
+        return true;
+    }
+
+    /// <summary>
+    /// Read just the streamId from any stream frame (bytes 1-16).
+    /// Used by hub for routing without full decode.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Guid ReadStreamId(ReadOnlySpan<byte> buffer) => ReadGuid(buffer.Slice(1));
 
     #endregion
 

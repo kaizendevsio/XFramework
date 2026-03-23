@@ -46,6 +46,12 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
     // Offline queue
     private readonly ConcurrentQueue<byte[]> _offlineQueue = new();
 
+    // Streaming — active streams by streamId
+    private readonly ConcurrentDictionary<Guid, BoltStream> _activeStreams = new();
+
+    // Stream handler registry — maps command hash to stream handler
+    private readonly ConcurrentDictionary<int, Func<BoltStream, Task>> _streamHandlers = new();
+
     // Cached timeout for RPC calls
     private TimeSpan _rpcTimeout;
 
@@ -225,7 +231,42 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
     {
         var hash = StreamFlowCodec.Fnv1aHash(commandName);
         _handlers[hash] = handler;
-        _logger.LogDebug("Registered thin handler for {CommandName} [hash={Hash}]", commandName, hash);
+        _logger.LogDebug("Registered Bolt handler for {CommandName} [hash={Hash}]", commandName, hash);
+    }
+
+    /// <summary>
+    /// Register a handler for incoming streams.
+    /// Called when a remote client opens a stream to this client.
+    /// </summary>
+    public void RegisterStreamHandler(string commandName, Func<BoltStream, Task> handler)
+    {
+        var hash = StreamFlowCodec.Fnv1aHash(commandName);
+        _streamHandlers[hash] = handler;
+        _logger.LogDebug("Registered Bolt stream handler for {CommandName} [hash={Hash}]", commandName, hash);
+    }
+
+    /// <summary>
+    /// Open a bidirectional stream to a remote service.
+    /// Returns a BoltStream for sending/receiving chunks.
+    /// </summary>
+    public async Task<BoltStream> OpenStreamAsync(string recipientId, string commandName, CancellationToken ct = default)
+    {
+        if (!IsConnected) throw new InvalidOperationException("Not connected");
+
+        var streamId = Guid.NewGuid();
+        var recipientHash = _hashCache.GetOrAdd(recipientId, StreamFlowCodec.Fnv1aHash);
+        var commandHash = _hashCache.GetOrAdd(commandName, StreamFlowCodec.Fnv1aHash);
+
+        var conn = GetConnection();
+        var stream = new BoltStream(streamId, conn);
+        _activeStreams[streamId] = stream;
+
+        // Send StreamOpen frame
+        var writer = RentedBufferWriter.GetThreadLocal();
+        StreamFlowCodec.WriteStreamOpen(writer, streamId, recipientHash, commandHash);
+        await conn.SendAsync(writer.WrittenMemory, ct);
+
+        return stream;
     }
 
     private async Task ReceiveLoopAsync(BoltConnection conn, CancellationToken ct)
@@ -253,9 +294,20 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
                         break;
 
                     case FrameType.Request:
-                        // Dispatch off the receive loop — don't block reading next frame
                         var reqData = buffer.AsSpan(0, result.Count).ToArray();
                         _ = HandleIncomingRequestAsync(conn, reqData, reqData.Length, ct);
+                        break;
+
+                    case FrameType.StreamOpen:
+                        HandleStreamOpen(conn, data, ct);
+                        break;
+
+                    case FrameType.StreamData:
+                        HandleStreamData(data);
+                        break;
+
+                    case FrameType.StreamClose:
+                        HandleStreamClose(data);
                         break;
                 }
             }
@@ -292,12 +344,53 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
 
         if (_pendingCalls.TryRemove(frame.RequestId, out var rpcCall))
         {
-            // Copy payload here since the receive buffer will be reused
             var payload = frame.PayloadLength > 0
                 ? frame.GetPayload(data).ToArray()
                 : Array.Empty<byte>();
             rpcCall.SetResult(new ThinRpcResponse { StatusCode = frame.StatusCode, Data = payload });
         }
+    }
+
+    private void HandleStreamOpen(BoltConnection conn, ReadOnlySpan<byte> data, CancellationToken ct)
+    {
+        if (!StreamFlowCodec.TryReadStreamOpen(data, out var streamId, out _, out var commandHash))
+            return;
+
+        var stream = new BoltStream(streamId, conn);
+        _activeStreams[streamId] = stream;
+
+        if (_streamHandlers.TryGetValue(commandHash, out var handler))
+        {
+            // Dispatch stream handler off the receive loop
+            _ = Task.Run(async () =>
+            {
+                try { await handler(stream); }
+                catch (Exception ex) { _logger.LogError(ex, "Stream handler error for streamId={StreamId}", streamId); }
+                finally { _activeStreams.TryRemove(streamId, out _); }
+            }, ct);
+        }
+    }
+
+    private void HandleStreamData(ReadOnlySpan<byte> data)
+    {
+        if (!StreamFlowCodec.TryReadStreamData(data, out var streamId, out var payloadOffset, out var payloadLength, out _))
+            return;
+
+        if (_activeStreams.TryGetValue(streamId, out var stream))
+        {
+            // Copy payload since buffer will be reused
+            var chunk = data.Slice(payloadOffset, payloadLength).ToArray();
+            stream.EnqueueInbound(chunk);
+        }
+    }
+
+    private void HandleStreamClose(ReadOnlySpan<byte> data)
+    {
+        if (!StreamFlowCodec.TryReadStreamClose(data, out var streamId, out var statusCode))
+            return;
+
+        if (_activeStreams.TryRemove(streamId, out var stream))
+            stream.MarkClosed(statusCode);
     }
 
     private async Task HandleIncomingRequestAsync(BoltConnection conn, byte[] data, int length, CancellationToken ct)
