@@ -40,11 +40,17 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
     // Handler registry — maps command hash to handler delegate
     private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _handlers = new();
 
+    // Hash cache — computed once per unique string, reused every call
+    private readonly ConcurrentDictionary<string, int> _hashCache = new();
+
     // Offline queue
     private readonly ConcurrentQueue<byte[]> _offlineQueue = new();
 
     // Send lock — WebSocket only supports one concurrent send
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+
+    // Cached timeout for RPC calls — avoids CancellationTokenSource.CreateLinkedTokenSource per call
+    private TimeSpan _rpcTimeout;
 
     public bool IsConnected => _webSocket?.State == WebSocketState.Open && _isRegistered;
 
@@ -55,6 +61,7 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         _clientName = clientName;
         _config = config;
         _logger = logger;
+        _rpcTimeout = TimeSpan.FromSeconds(config.RpcTimeoutSeconds > 0 ? config.RpcTimeoutSeconds : 30);
     }
 
     /// <summary>
@@ -135,34 +142,31 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
         string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
         var requestId = Guid.NewGuid();
-        var recipientHash = StreamFlowCodec.Fnv1aHash(recipientId);
-        var commandHash = StreamFlowCodec.Fnv1aHash(commandName);
 
-        // Rent a pooled RPC completion source
+        // Cached hash lookups — computed once per unique string, O(1) thereafter
+        var recipientHash = _hashCache.GetOrAdd(recipientId, StreamFlowCodec.Fnv1aHash);
+        var commandHash = _hashCache.GetOrAdd(commandName, StreamFlowCodec.Fnv1aHash);
+
         var rpcCall = PooledRpcCallThin.Rent();
         _pendingCalls[requestId] = rpcCall;
 
         try
         {
-            // Encode request frame
             var writer = RentedBufferWriter.GetThreadLocal();
             StreamFlowCodec.WriteRequest(writer, requestId, recipientHash, commandHash, payload.Span);
 
             if (!IsConnected)
             {
-                // Queue for offline delivery
                 _offlineQueue.Enqueue(writer.WrittenSpan.ToArray());
                 rpcCall.SetException(new InvalidOperationException("Not connected"));
             }
             else
             {
-                // Send request
                 await SendRawAsync(writer.WrittenMemory, ct);
             }
 
-            // Wait for response with timeout
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(_config.RpcTimeoutSeconds > 0 ? _config.RpcTimeoutSeconds : 30));
+            // Simple CTS timeout — avoids CreateLinkedTokenSource allocation
+            using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
             rpcCall.RegisterTimeout(timeoutCts.Token);
 
             var response = await rpcCall.GetTask();
@@ -254,22 +258,28 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
 
         if (_pendingCalls.TryRemove(frame.RequestId, out var rpcCall))
         {
-            rpcCall.SetResult(new ThinRpcResponse { StatusCode = frame.StatusCode, Data = frame.Payload });
+            // Copy payload here since the receive buffer will be reused
+            var payload = frame.PayloadLength > 0
+                ? frame.GetPayload(data).ToArray()
+                : Array.Empty<byte>();
+            rpcCall.SetResult(new ThinRpcResponse { StatusCode = frame.StatusCode, Data = payload });
         }
     }
 
     private async Task HandleIncomingRequestAsync(byte[] data, int length, CancellationToken ct)
     {
-        if (!StreamFlowCodec.TryReadRequest(data.AsSpan(0, length), out var frame, out _))
+        var span = data.AsSpan(0, length);
+        if (!StreamFlowCodec.TryReadRequest(span, out var frame, out _))
             return;
 
         if (_handlers.TryGetValue(frame.CommandHash, out var handler))
         {
             try
             {
-                var (statusCode, responsePayload) = await handler(frame.Payload, frame.RequestId);
+                // Zero-copy: pass payload slice from the original buffer
+                var payload = frame.GetPayload(data.AsMemory(0, length));
+                var (statusCode, responsePayload) = await handler(payload, frame.RequestId);
 
-                // Send response frame back
                 var writer = RentedBufferWriter.GetThreadLocal();
                 StreamFlowCodec.WriteResponse(writer, frame.RequestId, statusCode, responsePayload.Span);
                 await SendRawAsync(writer.WrittenMemory, ct);
@@ -277,23 +287,41 @@ public sealed class ThinStreamFlowClient : IAsyncDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Handler error for command hash {CommandHash}", frame.CommandHash);
-
-                // Send error response
-                var errWriter = new ArrayBufferWriter<byte>(StreamFlowCodec.ResponseHeaderSize);
+                var errWriter = RentedBufferWriter.GetThreadLocal();
                 StreamFlowCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.InternalServerError, ReadOnlySpan<byte>.Empty);
                 await SendRawAsync(errWriter.WrittenMemory, ct);
             }
         }
         else
         {
-            _logger.LogWarning("No handler registered for command hash {CommandHash}", frame.CommandHash);
-            var writer = new ArrayBufferWriter<byte>(StreamFlowCodec.ResponseHeaderSize);
+            var writer = RentedBufferWriter.GetThreadLocal();
             StreamFlowCodec.WriteResponse(writer, frame.RequestId, HttpStatusCode.NotImplemented, ReadOnlySpan<byte>.Empty);
             await SendRawAsync(writer.WrittenMemory, ct);
         }
     }
 
-    private async Task SendRawAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    private ValueTask SendRawAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        // Fast path: if lock is available, send synchronously
+        if (_sendLock.Wait(0))
+        {
+            try
+            {
+                if (_webSocket?.State == WebSocketState.Open)
+                    return _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+                return ValueTask.CompletedTask;
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
+        }
+
+        // Slow path: contention — await the lock
+        return SendRawSlowAsync(data, ct);
+    }
+
+    private async ValueTask SendRawSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
         await _sendLock.WaitAsync(ct);
         try

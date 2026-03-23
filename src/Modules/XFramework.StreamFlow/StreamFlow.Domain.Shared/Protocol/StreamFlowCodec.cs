@@ -109,7 +109,8 @@ public static class StreamFlowCodec
     public static FrameType PeekFrameType(ReadOnlySpan<byte> buffer) => (FrameType)buffer[0];
 
     /// <summary>
-    /// Try to read a complete request frame. Returns false if buffer is incomplete.
+    /// Try to read a complete request frame. Zero-copy: Payload references the source buffer.
+    /// Caller must consume the payload before the buffer is reused.
     /// </summary>
     public static bool TryReadRequest(ReadOnlySpan<byte> buffer, out RequestFrame frame, out int bytesConsumed)
     {
@@ -127,14 +128,56 @@ public static class StreamFlowCodec
             RequestId = ReadGuid(buffer.Slice(1)),
             RecipientHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(17)),
             CommandHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(21)),
-            Payload = buffer.Slice(29, payloadLen).ToArray()
+            PayloadOffset = RequestHeaderSize,
+            PayloadLength = payloadLen
         };
         bytesConsumed = totalSize;
         return true;
     }
 
     /// <summary>
-    /// Try to read a complete response frame.
+    /// Read only the request header (29 bytes) for routing without touching payload.
+    /// Used by the server to extract RequestId + RecipientHash for forwarding.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadRequestHeader(ReadOnlySpan<byte> buffer, out Guid requestId, out int recipientHash, out int totalSize)
+    {
+        requestId = default;
+        recipientHash = 0;
+        totalSize = 0;
+
+        if (buffer.Length < RequestHeaderSize) return false;
+
+        var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(25));
+        totalSize = RequestHeaderSize + payloadLen;
+        if (buffer.Length < totalSize) return false;
+
+        requestId = ReadGuid(buffer.Slice(1));
+        recipientHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(17));
+        return true;
+    }
+
+    /// <summary>
+    /// Read only the response header to extract RequestId for routing.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadResponseHeader(ReadOnlySpan<byte> buffer, out Guid requestId, out int totalSize)
+    {
+        requestId = default;
+        totalSize = 0;
+
+        if (buffer.Length < ResponseHeaderSize) return false;
+
+        var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(19));
+        totalSize = ResponseHeaderSize + payloadLen;
+        if (buffer.Length < totalSize) return false;
+
+        requestId = ReadGuid(buffer.Slice(1));
+        return true;
+    }
+
+    /// <summary>
+    /// Try to read a complete response frame. Zero-copy: Payload references the source buffer.
     /// </summary>
     public static bool TryReadResponse(ReadOnlySpan<byte> buffer, out ResponseFrame frame, out int bytesConsumed)
     {
@@ -151,7 +194,8 @@ public static class StreamFlowCodec
         {
             RequestId = ReadGuid(buffer.Slice(1)),
             StatusCode = (HttpStatusCode)BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(17)),
-            Payload = buffer.Slice(23, payloadLen).ToArray()
+            PayloadOffset = ResponseHeaderSize,
+            PayloadLength = payloadLen
         };
         bytesConsumed = totalSize;
         return true;
@@ -224,22 +268,44 @@ public static class StreamFlowCodec
 }
 
 /// <summary>
-/// Decoded request frame.
+/// Decoded request frame. Zero-copy: payload is an offset+length into the source buffer.
+/// Use GetPayload(sourceBuffer) to read the payload.
 /// </summary>
 public struct RequestFrame
 {
     public Guid RequestId;
     public int RecipientHash;
     public int CommandHash;
-    public ReadOnlyMemory<byte> Payload;
+    public int PayloadOffset;
+    public int PayloadLength;
+
+    /// <summary>
+    /// Get the payload slice from the original buffer. Zero-copy.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<byte> GetPayload(ReadOnlySpan<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlyMemory<byte> GetPayload(ReadOnlyMemory<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
 }
 
 /// <summary>
-/// Decoded response frame.
+/// Decoded response frame. Zero-copy: payload is an offset+length into the source buffer.
 /// </summary>
 public struct ResponseFrame
 {
     public Guid RequestId;
     public HttpStatusCode StatusCode;
-    public ReadOnlyMemory<byte> Payload;
+    public int PayloadOffset;
+    public int PayloadLength;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<byte> GetPayload(ReadOnlySpan<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlyMemory<byte> GetPayload(ReadOnlyMemory<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
 }

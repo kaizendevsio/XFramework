@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.WebSockets;
+using StreamFlow.Domain.Shared.Buffers;
 using StreamFlow.Domain.Shared.Protocol;
 
 namespace StreamFlow.Stream.ThinProtocol;
@@ -124,63 +125,52 @@ public sealed class ThinStreamFlowServer
 
     private async Task HandleRequestAsync(ThinConnection caller, byte[] buffer, int length, CancellationToken ct)
     {
-        if (!StreamFlowCodec.TryReadRequest(buffer.AsSpan(0, length), out var frame, out var consumed))
+        // Header-only read — no payload decode, no allocation
+        if (!StreamFlowCodec.TryReadRequestHeader(buffer.AsSpan(0, length), out var requestId, out var recipientHash, out var totalSize))
         {
             _logger.LogWarning("Invalid request frame from {ClientId}", caller.ClientId);
             return;
         }
 
-        _pendingInvocations[frame.RequestId] = (caller, Environment.TickCount64);
+        _pendingInvocations[requestId] = (caller, Environment.TickCount64);
 
-        var recipient = GetRecipient(frame.RecipientHash);
+        var recipient = GetRecipient(recipientHash);
         if (recipient is null)
         {
-            _logger.LogWarning("No recipient for hash {RecipientHash}, requestId={RequestId}", frame.RecipientHash, frame.RequestId);
-            var errWriter = new ArrayBufferWriter<byte>(StreamFlowCodec.ResponseHeaderSize);
-            StreamFlowCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.NotFound, ReadOnlySpan<byte>.Empty);
+            var errWriter = RentedBufferWriter.GetThreadLocal();
+            StreamFlowCodec.WriteResponse(errWriter, requestId, HttpStatusCode.NotFound, ReadOnlySpan<byte>.Empty);
             await caller.SendAsync(errWriter.WrittenMemory, ct);
-            _pendingInvocations.TryRemove(frame.RequestId, out _);
+            _pendingInvocations.TryRemove(requestId, out _);
             return;
         }
 
-        // Forward the raw frame bytes to recipient — zero intermediate processing
-        await recipient.SendAsync(buffer.AsMemory(0, consumed), ct);
+        // Forward raw bytes — zero decode, zero copy
+        await recipient.SendAsync(buffer.AsMemory(0, totalSize), ct);
     }
 
     private async Task HandleResponseAsync(ThinConnection responder, byte[] buffer, int length, CancellationToken ct)
     {
-        if (!StreamFlowCodec.TryReadResponse(buffer.AsSpan(0, length), out var frame, out var consumed))
+        // Header-only read — extract RequestId for routing without touching payload
+        if (!StreamFlowCodec.TryReadResponseHeader(buffer.AsSpan(0, length), out var requestId, out var totalSize))
         {
             _logger.LogWarning("Invalid response frame from {ClientId}", responder.ClientId);
             return;
         }
 
-        if (_pendingInvocations.TryRemove(frame.RequestId, out var pending))
+        if (_pendingInvocations.TryRemove(requestId, out var pending))
         {
-            await pending.Caller.SendAsync(buffer.AsMemory(0, consumed), ct);
-        }
-        else
-        {
-            _logger.LogWarning("No pending invocation for response requestId={RequestId}", frame.RequestId);
+            await pending.Caller.SendAsync(buffer.AsMemory(0, totalSize), ct);
         }
     }
 
     private async Task HandlePushAsync(ThinConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
-        if (!StreamFlowCodec.TryReadRequest(buffer.AsSpan(0, length), out var frame, out var consumed))
-        {
-            _logger.LogWarning("Invalid push frame from {ClientId}", sender.ClientId);
+        if (!StreamFlowCodec.TryReadRequestHeader(buffer.AsSpan(0, length), out _, out var recipientHash, out var totalSize))
             return;
-        }
 
-        var recipient = GetRecipient(frame.RecipientHash);
-        if (recipient is null)
-        {
-            _logger.LogWarning("No recipient for push, hash={RecipientHash}", frame.RecipientHash);
-            return;
-        }
-
-        await recipient.SendAsync(buffer.AsMemory(0, consumed), ct);
+        var recipient = GetRecipient(recipientHash);
+        if (recipient is not null)
+            await recipient.SendAsync(buffer.AsMemory(0, totalSize), ct);
     }
 
     private ThinConnection? GetRecipient(int serviceHash)
@@ -188,12 +178,35 @@ public sealed class ThinStreamFlowServer
         if (!_connectionsByServiceHash.TryGetValue(serviceHash, out var bag))
             return null;
 
-        var clients = bag.Where(c => c.IsAlive).ToList();
-        if (clients.Count == 0) return null;
-        if (clients.Count == 1) return clients[0];
+        // Direct iteration — no LINQ, no List allocation
+        ThinConnection? firstAlive = null;
+        int aliveCount = 0;
 
+        foreach (var client in bag)
+        {
+            if (client.IsAlive)
+            {
+                firstAlive ??= client;
+                aliveCount++;
+            }
+        }
+
+        if (aliveCount <= 1) return firstAlive;
+
+        // Round-robin for multiple clients
         var idx = _roundRobinIndex.AddOrUpdate(serviceHash, 0, (_, prev) => prev + 1);
-        return clients[(int)((uint)idx % clients.Count)];
+        var targetIdx = (int)((uint)idx % aliveCount);
+        var current = 0;
+        foreach (var client in bag)
+        {
+            if (client.IsAlive)
+            {
+                if (current == targetIdx) return client;
+                current++;
+            }
+        }
+
+        return firstAlive;
     }
 
     private void RemoveConnection(ThinConnection connection)

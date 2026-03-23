@@ -96,9 +96,10 @@ public sealed class QuicDirectServer : IAsyncDisposable
             {
                 if (_handlers.TryGetValue(frame.CommandHash, out var handler))
                 {
-                    var (status, payload) = await handler(frame.Payload, frame.RequestId);
+                    var requestPayload = frame.GetPayload(buffer.AsMemory(0, read));
+                    var (status, respData) = await handler(requestPayload, frame.RequestId);
                     var writer = RentedBufferWriter.GetThreadLocal();
-                    StreamFlowCodec.WriteResponse(writer, frame.RequestId, status, payload.Span);
+                    StreamFlowCodec.WriteResponse(writer, frame.RequestId, status, respData.Span);
                     await stream.WriteAsync(writer.WrittenMemory, ct);
                 }
                 else
@@ -186,7 +187,12 @@ public sealed class QuicDirectClient : IAsyncDisposable
             {
                 var read = await stream.ReadAsync(buffer, ct);
                 if (read > 0 && StreamFlowCodec.TryReadResponse(buffer.AsSpan(0, read), out var frame, out _))
-                    return (frame.StatusCode, frame.Payload);
+                {
+                    var respBytes = frame.PayloadLength > 0
+                        ? frame.GetPayload(buffer.AsSpan(0, read)).ToArray()
+                        : Array.Empty<byte>();
+                    return (frame.StatusCode, (ReadOnlyMemory<byte>)respBytes);
+                }
 
                 return (HttpStatusCode.InternalServerError, ReadOnlyMemory<byte>.Empty);
             }

@@ -168,7 +168,10 @@ public sealed class QuicStreamFlowClient : IAsyncDisposable
                 {
                     if (_pendingCalls.TryRemove(frame.RequestId, out var rpcCall))
                     {
-                        rpcCall.SetResult(new ThinRpcResponse { StatusCode = frame.StatusCode, Data = frame.Payload });
+                        var respPayload = frame.PayloadLength > 0
+                            ? frame.GetPayload(buffer.AsSpan(0, read)).ToArray()
+                            : Array.Empty<byte>();
+                        rpcCall.SetResult(new ThinRpcResponse { StatusCode = frame.StatusCode, Data = respPayload });
                     }
                 }
             }
@@ -223,7 +226,8 @@ public sealed class QuicStreamFlowClient : IAsyncDisposable
             {
                 if (_handlers.TryGetValue(frame.CommandHash, out var handler))
                 {
-                    var (statusCode, responsePayload) = await handler(frame.Payload, frame.RequestId);
+                    var reqPayload = frame.GetPayload(buffer.AsMemory(0, read));
+                    var (statusCode, responsePayload) = await handler(reqPayload, frame.RequestId);
 
                     // Write response back on the same stream
                     var writer = RentedBufferWriter.GetThreadLocal();
