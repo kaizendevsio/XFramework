@@ -63,11 +63,11 @@ public class TransportBenchmarks
     private int _identityServerServiceHash;
     private int _healthCheckCommandHash;
 
-    // gRPC
-    private WebApplication _grpcApp = null!;
+    // gRPC (with hub — fair comparison: Client → Hub → Backend → Hub → Client)
+    private WebApplication _grpcBackendApp = null!;
+    private WebApplication _grpcHubApp = null!;
     private GrpcChannel _grpcChannel = null!;
     private HealthService.HealthServiceClient _grpcClient = null!;
-    private const string GrpcUrl = "http://localhost:19263";
 
     // QUIC (direct — no hub, server-to-server)
     private QuicDirectServer _quicServer = null!;
@@ -216,25 +216,44 @@ public class TransportBenchmarks
 
     private async Task SetupGrpc()
     {
-        var grpcBuilder = WebApplication.CreateBuilder();
-        grpcBuilder.WebHost.ConfigureKestrel(options =>
+        // 1. gRPC Backend (handles actual requests — same role as IdentityServer in Bolt)
+        var backendBuilder = WebApplication.CreateBuilder();
+        backendBuilder.WebHost.ConfigureKestrel(o =>
         {
-            // HTTP/2 only for gRPC on main port
-            options.ListenLocalhost(19263, o => o.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
-            // HTTP/1.1 for health check probe
-            options.ListenLocalhost(19264, o => o.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+            o.ListenLocalhost(19263, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(19264, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
         });
-        grpcBuilder.Services.AddGrpc();
-        grpcBuilder.Logging.SetMinimumLevel(LogLevel.Error);
+        backendBuilder.Services.AddGrpc();
+        backendBuilder.Logging.SetMinimumLevel(LogLevel.Error);
 
-        _grpcApp = grpcBuilder.Build();
-        _grpcApp.MapGrpcService<GrpcHealthServiceImpl>();
-        _grpcApp.MapGet("/health/live", () => Results.Ok("healthy"));
-
-        _ = Task.Run(() => _grpcApp.RunAsync());
+        _grpcBackendApp = backendBuilder.Build();
+        _grpcBackendApp.MapGrpcService<GrpcHealthBackend>();
+        _grpcBackendApp.MapGet("/health/live", () => Results.Ok("healthy"));
+        _ = Task.Run(() => _grpcBackendApp.RunAsync());
         await WaitForHealth("http://localhost:19264/health/live");
 
-        _grpcChannel = GrpcChannel.ForAddress(GrpcUrl);
+        // 2. gRPC Hub (proxies to backend — same role as ThinStreamFlowServer in Bolt)
+        var backendChannel = GrpcChannel.ForAddress("http://localhost:19263");
+        var backendClient = new HealthService.HealthServiceClient(backendChannel);
+
+        var hubBuilder = WebApplication.CreateBuilder();
+        hubBuilder.WebHost.ConfigureKestrel(o =>
+        {
+            o.ListenLocalhost(19266, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(19267, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        hubBuilder.Services.AddGrpc();
+        hubBuilder.Services.AddSingleton(backendClient);
+        hubBuilder.Logging.SetMinimumLevel(LogLevel.Error);
+
+        _grpcHubApp = hubBuilder.Build();
+        _grpcHubApp.MapGrpcService<GrpcHealthHub>();
+        _grpcHubApp.MapGet("/health/live", () => Results.Ok("healthy"));
+        _ = Task.Run(() => _grpcHubApp.RunAsync());
+        await WaitForHealth("http://localhost:19267/health/live");
+
+        // 3. Client connects to the Hub (not the backend) — same as Bolt client → hub
+        _grpcChannel = GrpcChannel.ForAddress("http://localhost:19266");
         _grpcClient = new HealthService.HealthServiceClient(_grpcChannel);
 
         // Warmup
@@ -311,7 +330,8 @@ public class TransportBenchmarks
         _grpcChannel?.Dispose();
         try { await _quicClient.DisposeAsync(); } catch { }
         try { await _quicServer.DisposeAsync(); } catch { }
-        try { await _grpcApp.StopAsync(); } catch { }
+        try { await _grpcHubApp.StopAsync(); } catch { }
+        try { await _grpcBackendApp.StopAsync(); } catch { }
         try { await _thinCallerClient.DisposeAsync(); } catch { }
         try { await _thinServiceClient.DisposeAsync(); } catch { }
         try { await _testClientApp.StopAsync(); } catch { }

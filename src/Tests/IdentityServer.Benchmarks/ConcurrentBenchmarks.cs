@@ -60,8 +60,9 @@ public class ConcurrentBenchmarks
     private ThinStreamFlowClient _thinServiceClient = null!;
     private ThinStreamFlowClient _thinCallerClient = null!;
 
-    // gRPC
-    private WebApplication _grpcApp = null!;
+    // gRPC (with hub)
+    private WebApplication _grpcBackendApp = null!;
+    private WebApplication _grpcHubApp = null!;
     private GrpcChannel _grpcChannel = null!;
     private HealthService.HealthServiceClient _grpcClient = null!;
 
@@ -209,20 +210,41 @@ public class ConcurrentBenchmarks
 
     private async Task SetupGrpc()
     {
-        var grpcBuilder = WebApplication.CreateBuilder();
-        grpcBuilder.WebHost.ConfigureKestrel(o =>
+        // Backend
+        var backendBuilder = WebApplication.CreateBuilder();
+        backendBuilder.WebHost.ConfigureKestrel(o =>
         {
             o.ListenLocalhost(19363, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
             o.ListenLocalhost(19364, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
         });
-        grpcBuilder.Services.AddGrpc();
-        grpcBuilder.Logging.SetMinimumLevel(LogLevel.Error);
-        _grpcApp = grpcBuilder.Build();
-        _grpcApp.MapGrpcService<GrpcHealthServiceImpl>();
-        _grpcApp.MapGet("/health/live", () => Results.Ok("healthy"));
-        _ = Task.Run(() => _grpcApp.RunAsync());
+        backendBuilder.Services.AddGrpc();
+        backendBuilder.Logging.SetMinimumLevel(LogLevel.Error);
+        _grpcBackendApp = backendBuilder.Build();
+        _grpcBackendApp.MapGrpcService<GrpcHealthBackend>();
+        _grpcBackendApp.MapGet("/health/live", () => Results.Ok("healthy"));
+        _ = Task.Run(() => _grpcBackendApp.RunAsync());
         await WaitForHealth("http://localhost:19364/health/live");
-        _grpcChannel = GrpcChannel.ForAddress(GrpcUrl);
+
+        // Hub
+        var backendChannel = GrpcChannel.ForAddress("http://localhost:19363");
+        var backendClient = new HealthService.HealthServiceClient(backendChannel);
+        var hubBuilder = WebApplication.CreateBuilder();
+        hubBuilder.WebHost.ConfigureKestrel(o =>
+        {
+            o.ListenLocalhost(19366, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(19367, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        hubBuilder.Services.AddGrpc();
+        hubBuilder.Services.AddSingleton(backendClient);
+        hubBuilder.Logging.SetMinimumLevel(LogLevel.Error);
+        _grpcHubApp = hubBuilder.Build();
+        _grpcHubApp.MapGrpcService<GrpcHealthHub>();
+        _grpcHubApp.MapGet("/health/live", () => Results.Ok("healthy"));
+        _ = Task.Run(() => _grpcHubApp.RunAsync());
+        await WaitForHealth("http://localhost:19367/health/live");
+
+        // Client → Hub
+        _grpcChannel = GrpcChannel.ForAddress("http://localhost:19366");
         _grpcClient = new HealthService.HealthServiceClient(_grpcChannel);
     }
 
@@ -325,7 +347,8 @@ public class ConcurrentBenchmarks
         _grpcChannel?.Dispose();
         try { await _quicClient.DisposeAsync(); } catch { }
         try { await _quicServer.DisposeAsync(); } catch { }
-        try { await _grpcApp.StopAsync(); } catch { }
+        try { await _grpcHubApp.StopAsync(); } catch { }
+        try { await _grpcBackendApp.StopAsync(); } catch { }
         try { await _thinCallerClient.DisposeAsync(); } catch { }
         try { await _thinServiceClient.DisposeAsync(); } catch { }
         try { await _testClientApp.StopAsync(); } catch { }
