@@ -549,7 +549,7 @@ file class BenchmarkConfig : ManualConfig
     }
 }
 
-file class OpsPerSecColumn : IColumn
+internal class OpsPerSecColumn : IColumn
 {
     public string Id => "OpsPerSec";
     public string ColumnName => "Op/s";
