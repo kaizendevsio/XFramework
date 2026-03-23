@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
@@ -326,49 +327,35 @@ public static class HelperExtensions
 
     // Usage of FilterExpressionVisitor within SerializeFilter
     
+    private static readonly ConcurrentDictionary<Type, string> TypeFullNameCache = new();
+
     public static string GetTypeFullName(this Type type)
     {
-        if (type.IsGenericParameter)
+        return TypeFullNameCache.GetOrAdd(type, static t =>
         {
-            return type.Name;
-        }
+            if (t.IsGenericParameter)
+                return t.Name;
 
-        if (!type.IsGenericType)
-        {
-            return type.FullName ?? type.Name;
-        }
+            if (!t.IsGenericType)
+                return t.FullName ?? t.Name;
 
-        var nameSpan = type.Name.AsSpan();
-        var index = nameSpan.IndexOf('`');
-        var prefix = index == -1 ? nameSpan : nameSpan.Slice(0, index);
+            var nameSpan = t.Name.AsSpan();
+            var index = nameSpan.IndexOf('`');
+            var prefix = index == -1 ? nameSpan : nameSpan.Slice(0, index);
 
-        var builder = new StringBuilder();
-        builder.Append(prefix).Append('<');
-        var first = true;
-        foreach (var arg in type.GetGenericArguments())
-        {
-            if (!first)
+            var builder = new StringBuilder();
+            builder.Append(prefix).Append('<');
+            var first = true;
+            foreach (var arg in t.GetGenericArguments())
             {
-                builder.Append(',');
+                if (!first)
+                    builder.Append(',');
+
+                builder.Append(arg.FullName != null && arg.FullName.Contains('.') ? arg.Name : GetTypeFullName(arg));
+                first = false;
             }
-
-            var argName = arg.Name;  // Start with simple name
-
-            // Check if arg's FullName contains namespaces, and if so, just use the simple name.
-            if (arg.FullName != null && arg.FullName.Contains('.'))
-            {
-                builder.Append(argName);
-            }
-            else
-            {
-                builder.Append(GetTypeFullName(arg));
-            }
-
-            first = false;
-        }
-        builder.Append('>');
-
-        var friendlyName = builder.ToString();
-        return friendlyName;
+            builder.Append('>');
+            return builder.ToString();
+        });
     }
 }

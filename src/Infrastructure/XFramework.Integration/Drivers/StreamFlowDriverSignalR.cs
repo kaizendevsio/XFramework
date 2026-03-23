@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using System.Collections.Concurrent;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using MemoryPack;
@@ -33,9 +34,9 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     private string? ClientName { get; set; }
     private Guid? TenantId { get; set; }
     public List<string> TopicList { get; init; }
-    public static Dictionary<Type, string> TypeFriendlyNameCache = new();
+    public static ConcurrentDictionary<Type, string> TypeFriendlyNameCache = new();
 
-    public HubConnectionState ConnectionState => SignalRService.Connection?.State ?? HubConnectionState.Disconnected;
+    public bool IsConnected => SignalRService.Connection?.State == HubConnectionState.Connected;
 
     public Action OnReconnected { get; set; }
     public Action OnReconnecting { get; set; }
@@ -100,54 +101,32 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
     
     private static string GetRequestFriendlyName(Type type)
     {
-        if (TypeFriendlyNameCache.TryGetValue(type, out var cachedName))
+        return TypeFriendlyNameCache.GetOrAdd(type, static t =>
         {
-            return cachedName;
-        }
+            if (t.IsGenericParameter)
+                return t.Name;
 
-        if (type.IsGenericParameter)
-        {
-            return type.Name;
-        }
+            if (!t.IsGenericType)
+                return t.FullName ?? t.Name;
 
-        if (!type.IsGenericType)
-        {
-            return type.FullName ?? type.Name;
-        }
+            var nameSpan = t.Name.AsSpan();
+            var index = nameSpan.IndexOf('`');
+            var prefix = index == -1 ? nameSpan : nameSpan.Slice(0, index);
 
-        var nameSpan = type.Name.AsSpan();
-        var index = nameSpan.IndexOf('`');
-        var prefix = index == -1 ? nameSpan : nameSpan.Slice(0, index);
-
-        var builder = new StringBuilder();
-        builder.Append(prefix).Append('<');
-        var first = true;
-        foreach (var arg in type.GetGenericArguments())
-        {
-            if (!first)
+            var builder = new StringBuilder();
+            builder.Append(prefix).Append('<');
+            var first = true;
+            foreach (var arg in t.GetGenericArguments())
             {
-                builder.Append(',');
+                if (!first)
+                    builder.Append(',');
+
+                builder.Append(arg.FullName != null && arg.FullName.Contains('.') ? arg.Name : GetRequestFriendlyName(arg));
+                first = false;
             }
-
-            var argName = arg.Name;  // Start with simple name
-
-            // Check if arg's FullName contains namespaces, and if so, just use the simple name.
-            if (arg.FullName != null && arg.FullName.Contains('.'))
-            {
-                builder.Append(argName);
-            }
-            else
-            {
-                builder.Append(GetRequestFriendlyName(arg));
-            }
-
-            first = false;
-        }
-        builder.Append('>');
-
-        var friendlyName = builder.ToString();
-        TypeFriendlyNameCache[type] = friendlyName;
-        return friendlyName;
+            builder.Append('>');
+            return builder.ToString();
+        });
     }
     
     public async Task<bool> Connect()
@@ -303,15 +282,15 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
         return result.Response;
     }
 
-    public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TModel, TResponse>(StreamFlowMessage<TModel> request) 
+    public async Task<StreamFlowInvokeResult<TResponse>> InvokeAsync<TModel, TResponse>(StreamFlowMessage<TModel> request)
         where TModel : class, IHasRequestServer
         where TResponse : class, IBaseResponse
     {
         Logger.LogDebug("Sending request {Request}...", request.CommandName);
 
-        var signalRResponse = await SignalRService.InvokeAsync(request);
+        var rpcResult = await SignalRService.InvokeAsync(request);
 
-        switch (signalRResponse.ResponseStatusCode)
+        switch (rpcResult.StatusCode)
         {
             case HttpStatusCode.Processing:
             {
@@ -331,19 +310,19 @@ public class StreamFlowDriverSignalR : IMessageBusWrapper
             }
             case HttpStatusCode.InternalServerError:
             {
-                Logger.LogError("Sending request: {Request}... Failed in {ResponseTime}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, signalRResponse.ResponseStatusCode);
+                Logger.LogError("Sending request: {Request}... Failed in {ResponseTime}ms => {StatusCode}", request.CommandName, rpcResult.Duration.TotalMilliseconds, rpcResult.StatusCode);
                 request.Dispose();
-                
+
                 return new()
                 {
-                    HttpStatusCode = signalRResponse.ResponseStatusCode,
-                    Message = signalRResponse.Message,
-                    Response = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data.Span)
+                    HttpStatusCode = rpcResult.StatusCode,
+                    Message = rpcResult.Message,
+                    Response = MemoryPackSerializer.Deserialize<TResponse>(rpcResult.Data.Span)
                 };
             }
             default:
-                var t = MemoryPackSerializer.Deserialize<TResponse>(signalRResponse.Data.Span);
-                Logger.LogDebug("Request {Request} completed in {ResponseTime}ms => {StatusCode}", request.CommandName, signalRResponse.Duration.TotalMilliseconds, t.HttpStatusCode);
+                var t = MemoryPackSerializer.Deserialize<TResponse>(rpcResult.Data.Span);
+                Logger.LogDebug("Request {Request} completed in {ResponseTime}ms => {StatusCode}", request.CommandName, rpcResult.Duration.TotalMilliseconds, t.HttpStatusCode);
                 request.Dispose();
 
                 return new()

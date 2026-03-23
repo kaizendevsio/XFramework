@@ -1,5 +1,6 @@
 using StreamFlow.Stream.Interfaces;
 using StreamFlow.Stream.Services;
+using StreamFlow.Stream.ThinProtocol;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Interfaces;
 
@@ -22,9 +23,12 @@ public sealed class ServicesInstaller : IInstaller
 
         // Register CachingService as singleton (requires StreamFlowMessageQueue)
         services.AddSingleton<ICachingService, CachingService>();
-        
+
         // Register StreamFlowService as singleton — _pendingInvocations must be shared
         // across hub connections for the Invoke/InvokeResponse pattern to work
         services.AddSingleton<IStreamFlowService, StreamFlowService>();
+
+        // Thin binary WebSocket server (Phase 3 — runs alongside SignalR)
+        services.AddSingleton<ThinStreamFlowServer>();
     }
 }

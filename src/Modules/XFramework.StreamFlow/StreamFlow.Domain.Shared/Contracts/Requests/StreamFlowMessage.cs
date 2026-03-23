@@ -3,6 +3,7 @@ using System.Net;
 using MemoryPack;
 using XFramework.Domain.Shared.Enums;
 using MessagePack;
+using StreamFlow.Domain.Shared.Buffers;
 using StreamFlow.Domain.Shared.Enums;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.Extensions;
@@ -29,13 +30,15 @@ public class StreamFlowMessage<T> : StreamFlowMessage
         CommandName ??= typeof(T).GetTypeFullName();
         if (request is null) { Data = ReadOnlyMemory<byte>.Empty; return; }
 
-        var writer = new ArrayBufferWriter<byte>(256);
+        // Zero-copy: serialize directly into a rented ArrayPool buffer.
+        // RentedBufferWriter implements IBufferWriter<byte> backed by ArrayPool.
+        // Detach() transfers ownership of the rented array to us — no copy needed.
+        var writer = RentedBufferWriter.GetThreadLocal();
         MemoryPackSerializer.Serialize(writer, request);
 
-        var rented = ArrayPool<byte>.Shared.Rent(writer.WrittenCount);
-        writer.WrittenSpan.CopyTo(rented);
-        Data = rented.AsMemory(0, writer.WrittenCount);
-        _rentedArray = rented;
+        var (buffer, written) = writer.Detach();
+        Data = buffer.AsMemory(0, written);
+        _rentedArray = buffer;
     }
 }
 

@@ -188,26 +188,28 @@ public sealed class StreamFlowService : IStreamFlowService
             await _hubContext.Clients.Client(recipient.StreamId)
                 .SendAsync(message.CommandName, message, cancellationToken);
 
-            // Wait for response with timeout
-            var timeout = TimeSpan.FromSeconds(30);
-            var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(timeout, cancellationToken));
+            // Wait for response with CancellationToken-based timeout (cheaper than Task.Delay allocation)
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(_configuration.RpcTimeoutSeconds > 0 ? _configuration.RpcTimeoutSeconds : 30));
 
-            if (completedTask != tcs.Task)
+            try
+            {
+                var responseMessage = await tcs.Task.WaitAsync(timeoutCts.Token);
+
+                var response = new StreamFlowInvokeResponse
+                {
+                    HttpStatusCode = responseMessage.ResponseStatusCode,
+                    Message = responseMessage.Message,
+                    Response = responseMessage.Data
+                };
+
+                return Result<StreamFlowInvokeResponse>.Success(response);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 _logger.StreamFlowMethodInvocationTimeout(message.RequestId.ToString());
                 return Result<StreamFlowInvokeResponse>.Failure("Method invocation timed out", 408);
             }
-
-            var responseMessage = await tcs.Task;
-
-            var response = new StreamFlowInvokeResponse
-            {
-                HttpStatusCode = responseMessage.ResponseStatusCode,
-                Message = responseMessage.Message,
-                Response = responseMessage.Data
-            };
-
-            return Result<StreamFlowInvokeResponse>.Success(response);
         }
         catch (Exception ex)
         {

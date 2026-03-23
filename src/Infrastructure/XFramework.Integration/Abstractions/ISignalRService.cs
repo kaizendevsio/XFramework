@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
 using StreamFlow.Domain.Shared.Contracts.Requests;
+using StreamFlow.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.Configurations;
 
 namespace XFramework.Integration.Abstractions;
@@ -15,5 +16,5 @@ public interface ISignalRService : IXFrameworkService
 
     Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage);
 
-    Task<StreamFlowMessage> InvokeAsync(StreamFlowMessage sfMessage);
+    Task<StreamFlowRpcResult> InvokeAsync(StreamFlowMessage sfMessage);
 }

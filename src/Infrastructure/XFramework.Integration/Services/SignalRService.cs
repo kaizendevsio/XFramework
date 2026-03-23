@@ -12,6 +12,7 @@ using StreamFlow.Domain.Shared.Abstractions;
 using StreamFlow.Domain.Shared.BusinessObjects;
 using StreamFlow.Domain.Shared.Contracts.Requests;
 using StreamFlow.Domain.Shared.Contracts.Responses;
+using StreamFlow.Domain.Shared.Enums;
 using TypeSupport.Extensions;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Contracts.Base;
@@ -35,10 +36,17 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
     private readonly ConcurrentQueue<(string MethodName, StreamFlowMessage StreamFlowMessage)> _offlineQueue = new();
     protected TaskCompletionSource TaskCompletionSource { get; set; } = new();
+
+    // Connection pool — replaces the single Connection property
+    private ConnectionPool? _connectionPool;
+
+    // Primary connection (backward compat for event handlers, handler registration)
     public HubConnection? Connection { get; set; }
-    
-    public StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
+
+    // Legacy single-connection pending calls (for InvokeResponseHandler pattern)
     public ConcurrentDictionary<Guid, PooledRpcCall> PendingMethodCalls { get; set; } = new();
+
+    public StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
 
     public SignalRService(IHostEnvironment hostEnvironment, IConfiguration configuration, ILogger<SignalRService> logger, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
     {
@@ -48,36 +56,35 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         _scopeFactory = scopeFactory;
         _logger = logger;
         configuration.Bind(nameof(StreamFlowConfiguration), StreamFlowConfiguration);
-        
+
         InitializeService();
     }
 
-    private void InitializeService()
+    private Uri? ResolveServerUrl()
     {
         var envConfig = _configuration["STREAMFLOW_SERVER_URLS"];
-        
-        if ((StreamFlowConfiguration.ServerUrls is null || !StreamFlowConfiguration.ServerUrls.Any()) && string.IsNullOrEmpty(envConfig))
-        {
-            _logger.LogWarning("StreamFlow configuration is not set, therefore SignalR client service is disabled");
-            return;
-        }
 
-        // Environment variable takes precedence (Docker override), then appsettings config
-        var serverUrl = !string.IsNullOrEmpty(envConfig)
+        if ((StreamFlowConfiguration.ServerUrls is null || !StreamFlowConfiguration.ServerUrls.Any()) && string.IsNullOrEmpty(envConfig))
+            return null;
+
+        return !string.IsNullOrEmpty(envConfig)
             ? new Uri(envConfig)
             : StreamFlowConfiguration?.ServerUrls?.FirstOrDefault();
-        Connection = new HubConnectionBuilder()
+    }
+
+    private HubConnection BuildConnection(Uri serverUrl)
+    {
+        return new HubConnectionBuilder()
             .WithUrl(serverUrl, (opts) =>
             {
                 if (OperatingSystem.IsBrowser()) return;
-                
+
                 if (serverUrl.AbsoluteUri.StartsWith("https://localhost", StringComparison.OrdinalIgnoreCase)
                     || serverUrl.AbsoluteUri.StartsWith("https://127.0.0.1", StringComparison.OrdinalIgnoreCase))
                 {
                     opts.HttpMessageHandlerFactory = (message) =>
                     {
                         if (message is HttpClientHandler clientHandler)
-                            // always verify the SSL certificate
                             clientHandler.ServerCertificateCustomValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;
                         return message;
                     };
@@ -92,9 +99,107 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                     .WithResolver(MessagePack.Resolvers.ContractlessStandardResolver.Instance);
             })
             .Build();
-        
+    }
+
+    private void InitializeService()
+    {
+        var serverUrl = ResolveServerUrl();
+        if (serverUrl is null)
+        {
+            _logger.LogWarning("StreamFlow configuration is not set, therefore SignalR client service is disabled");
+            return;
+        }
+
+        // Build primary connection
+        Connection = BuildConnection(serverUrl);
+
+        // Initialize connection pool
+        _connectionPool = new ConnectionPool(
+            connectionFactory: () => BuildConnection(serverUrl),
+            onConnectionReady: RegisterPooledConnectionAsync,
+            StreamFlowConfiguration,
+            _logger);
+        _connectionPool.AddPrimary(Connection);
+
         HandleEvents();
         Task.Run(async () => await EnsureConnection());
+    }
+
+    /// <summary>
+    /// Register a newly scaled-up connection with the StreamFlow hub.
+    /// </summary>
+    private async Task RegisterPooledConnectionAsync(HubConnection connection)
+    {
+        var serviceName = !string.IsNullOrEmpty(StreamFlowConfiguration.ClientName)
+            ? StreamFlowConfiguration.ClientName.Split(".").First()
+            : Assembly.GetEntryAssembly()!.GetName().Name!.Split(".").First()
+              ?? throw new ArgumentException("Assembly name is not set");
+        var serviceId = serviceName.ToSha256();
+        var clientId = StreamFlowConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Streamflow client Id is not set");
+
+        var request = new StreamFlowClient()
+        {
+            Id = clientId,
+            Name = StreamFlowConfiguration.ClientName,
+            Queue = new StreamFlowQueue()
+        };
+        await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
+
+        // Register handlers on the new connection
+        RegisterHandlersOnConnection(connection);
+        RegisterInvokeResponseOnConnection(connection);
+
+        _logger.LogInformation("Pooled connection registered with StreamFlow hub");
+    }
+
+    /// <summary>
+    /// Register the InvokeResponse handler on a specific connection.
+    /// </summary>
+    private void RegisterInvokeResponseOnConnection(HubConnection connection)
+    {
+        connection.On<StreamFlowMessage>(nameof(IStreamFlow.InvokeResponseHandler),
+            (response) =>
+            {
+                try
+                {
+                    // Check all pooled connections' pending calls
+                    if (_connectionPool is not null)
+                    {
+                        foreach (var pooledConn in _connectionPool.GetAll())
+                        {
+                            if (pooledConn.PendingCalls.TryRemove(response.RequestId, out var pooledRpc))
+                            {
+                                pooledRpc.SetResult(response);
+                                return;
+                            }
+                        }
+                    }
+
+                    // Fallback: check legacy pending calls
+                    if (PendingMethodCalls.TryRemove(response.RequestId, out var rpcCall))
+                    {
+                        rpcCall.SetResult(response);
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.LogInformation("[{Caller}] Processing response for '{Request}' resulted in exception: {Error}", nameof(HandleInvokeResponseEvent), response.CommandName, e.Message);
+                }
+            });
+    }
+
+    /// <summary>
+    /// Register generated ISignalREventHandler instances on a specific connection.
+    /// </summary>
+    private void RegisterHandlersOnConnection(HubConnection connection)
+    {
+        var handlers = Assembly.GetEntryAssembly()?.ExportedTypes
+            .Where(x => typeof(ISignalREventHandler).IsAssignableFrom(x) && x is { IsInterface: false, IsAbstract: false })
+            .Select(Activator.CreateInstance)
+            .Cast<ISignalREventHandler>()
+            .ToList();
+
+        handlers?.ForEach(handler => handler.Handle(connection, _baseLogger, _scopeFactory));
     }
 
     private void HandleEvents()
@@ -121,35 +226,28 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         {
             var genericArguments = type.Interface.GetGenericArguments();
 
-            // Ensure there are exactly two generic arguments (TRequest, TResponse)
             if (genericArguments.Length == 2)
             {
                 Type tRequest = genericArguments[0];
                 Type tResponse = genericArguments[1];
 
-                // Now you have TRequest and TResponse for each type that implements IStreamflowRequest<TRequest, TResponse>
-                // You can process them as needed, for example:
                 Console.WriteLine($"Type: {type.Type.Name}, TRequest: {tRequest.Name}, TResponse: {tResponse.Name}");
-        
-                // If you need to invoke HandleRequestCmd or other methods dynamically, you can do so here.
 
                 if (tResponse.IsAssignableTo(typeof(ICmdWithResultResponse)))
                 {
-                    // Use reflection to call HandleRequestCmd with the correct type arguments
                     var methodInfo = GetType()
                         .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
                         .First(m => m.Name == nameof(HandleRequestCmd) && m.GetGenericArguments().Length == 2);
-                    
+
                     var genericMethod = methodInfo.MakeGenericMethod(tRequest, tResponse.GetGenericArguments().First());
                     genericMethod.Invoke(this, [Connection, _baseLogger, _scopeFactory]);
                 }
                 else if (tResponse.IsAssignableTo(typeof(ICmdResponse)))
                 {
-                    // Use reflection to call HandleRequestCmd with the correct type arguments
                     var methodInfo = GetType()
                         .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
                         .First(m => m.Name == nameof(HandleRequestCmd) && m.GetGenericArguments().Length == 1);
-                    
+
                     var genericMethod = methodInfo.MakeGenericMethod(tRequest);
                     genericMethod.Invoke(this, [Connection, _baseLogger, _scopeFactory]);
                 }
@@ -166,13 +264,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
     private void ScanAndRegisterHandlers()
     {
-        var installers = Assembly.GetEntryAssembly().ExportedTypes
-            .Where(x => typeof(ISignalREventHandler).IsAssignableFrom(x) && x is { IsInterface: false, IsAbstract: false })
-            .Select(Activator.CreateInstance)
-            .Cast<ISignalREventHandler>()
-            .ToList();
-        
-        installers.ForEach(installer => installer.Handle(Connection, _baseLogger, _scopeFactory));
+        RegisterHandlersOnConnection(Connection!);
     }
 
     public async Task StartEventListener(string topic)
@@ -199,31 +291,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
     private void HandleInvokeResponseEvent()
     {
-        //_logger.LogInformation($"InvokeResponseHandler Initialized");
-        Connection?.On<StreamFlowMessage>(nameof(IStreamFlow.InvokeResponseHandler),
-            async (response) =>
-            {
-                try
-                {
-                    if (PendingMethodCalls.TryRemove(response.RequestId, out var rpcCall))
-                    {
-                        var result = new StreamFlowMessage()
-                        {
-                            ConsumerId = response.ConsumerId,
-                            RequestId = response.RequestId,
-                            Data = response.Data,
-                            Message = response.Message,
-                            ResponseStatusCode = response.ResponseStatusCode
-                        };
-                        rpcCall.SetResult(result);
-                    }
-                    //StopWatch.Stop("Response for Invoked Method Received"); 
-                }
-                catch (Exception e)
-                {
-                    _logger.LogInformation("[{Caller}] Processing response for '{Request}' resulted in exception: {Error}", nameof(HandleInvokeResponseEvent), response.CommandName, e.Message);
-                }
-            });
+        RegisterInvokeResponseOnConnection(Connection!);
     }
 
     private void HandleClosedEvent()
@@ -232,7 +300,20 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         {
             _logger.LogInformation("Connection to StreamFlow server closed, connectionId: {ConnectionId}", connectionId);
 
-            // Cancel all pending RPCs to prevent orphaned calls
+            // Cancel all pending RPCs across all pool connections
+            if (_connectionPool is not null)
+            {
+                foreach (var pooledConn in _connectionPool.GetAll())
+                {
+                    foreach (var (id, _) in pooledConn.PendingCalls)
+                    {
+                        if (pooledConn.PendingCalls.TryRemove(id, out var rpcCall))
+                            rpcCall.SetException(new InvalidOperationException("Connection lost"));
+                    }
+                }
+            }
+
+            // Cancel legacy pending RPCs
             foreach (var (id, _) in PendingMethodCalls)
             {
                 if (PendingMethodCalls.TryRemove(id, out var rpcCall))
@@ -256,16 +337,11 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             _logger.LogInformation("Cannot handle reconnected event, connection is null");
             return;
         }
-        
+
         Connection.Reconnected += async connectionId =>
         {
             Debug.Assert(Connection?.State == HubConnectionState.Connected);
-
-            // Notify users the connection was reestablished.
-            // Start dequeuing messages queued while reconnecting if any.
-
             _logger.LogInformation("Connection to StreamFlow server restored");
-
             await RegisterConnection();
         };
     }
@@ -277,22 +353,19 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             _logger.LogInformation("Cannot handle reconnecting event, connection is null");
             return;
         }
-        
+
         Connection.Reconnecting += error =>
         {
-            // Notify users the connection was lost and the client is reconnecting.
-            // Start queuing or dropping messages.
             Debug.Assert(Connection?.State == HubConnectionState.Reconnecting);
             _isRegistered = false;
             _isRegistering = false;
-            
+
             _logger.LogInformation("Connection to StreamFlow server lost, trying to reconnect..");
-            //EnsureConnection();
-            
+
             return Task.CompletedTask;
         };
     }
-    
+
     public async Task<bool> EnsureConnection()
     {
         const int maxRetries = 5;
@@ -301,27 +374,21 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         {
             try
             {
-                // Check if connection is already established and registered.
                 if (Connection?.State is not HubConnectionState.Disconnected && _isRegistered)
-                {
                     return true;
-                }
 
-                // If connection is in a reconnecting state, wait for it.
                 if (Connection?.State == HubConnectionState.Reconnecting)
                 {
                     _logger.LogInformation("Connection is in the process of reconnecting, waiting...");
                     return true;
                 }
 
-                // If we're in the process of registering, then wait for it.
                 if (_isRegistering)
                 {
                     _logger.LogInformation("Request Postponed, Awaiting Registration..");
                     return true;
                 }
 
-                // If connection is disconnected, then start it.
                 if (Connection?.State == HubConnectionState.Disconnected)
                 {
                     var startTimer = Stopwatch.StartNew();
@@ -332,7 +399,6 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                     _logger.LogInformation("Connecting to StreamFlow server.. Done in {ResponseTime}ms", startTimer.ElapsedMilliseconds);
                 }
 
-                // If we're connected, proceed with registration.
                 if (Connection?.State == HubConnectionState.Connected)
                 {
                     await RegisterConnection();
@@ -354,20 +420,20 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     private async Task RegisterConnection()
     {
         if(_isRegistered) return;
-        
+
         _isRegistering = true;
         var startTimer = Stopwatch.StartNew();
         _logger.LogInformation("Registering Connection..");
-        
+
         var serviceName = !string.IsNullOrEmpty(StreamFlowConfiguration.ClientName)
             ? StreamFlowConfiguration.ClientName.Split(".").First()
             : Assembly.GetEntryAssembly()!.GetName().Name!.Split(".").First()
               ?? throw new ArgumentException("Assembly name is not set");
         var serviceId = serviceName.ToSha256();
-        
+
         _clientId = StreamFlowConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Streamflow client Id is not set");
         _logger.LogInformation("Registering streamflow client with id {ClientId}", _clientId);
-        
+
         var request = new StreamFlowClient()
         {
             Id = _clientId,
@@ -375,13 +441,17 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             Queue = new StreamFlowQueue()
         };
         await Connection!.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
-    
+
         startTimer.Stop();
         _logger.LogInformation("Registering Connection.. Done in {ResponseTime}ms", startTimer.ElapsedMilliseconds);
-        
+
+        // Mark primary pooled connection as registered
+        var primaryPooled = _connectionPool?.GetAll().FirstOrDefault();
+        if (primaryPooled is not null) primaryPooled.IsRegistered = true;
+
         _isRegistered = true;
         _isRegistering = false;
-        
+
         if (_offlineQueue.IsEmpty) return;
 
         _logger.LogInformation("Dequeuing items from cache..");
@@ -414,7 +484,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         _logger.LogInformation("Dequeued {DequeueCount} item(s) from cache", dequeued);
     }
 
-    public async Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage) 
+    public async Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage)
     {
         try
         {
@@ -422,7 +492,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             {
                 return await Connection?.InvokeAsync<HttpStatusCode>(methodName, sfMessage);
             }
-            
+
             var maxQueue = StreamFlowConfiguration.QueueDepth > 0 ? StreamFlowConfiguration.QueueDepth : 10_000;
             if (_offlineQueue.Count >= maxQueue)
             {
@@ -443,7 +513,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         return HttpStatusCode.InternalServerError;
     }
 
-    public async Task<StreamFlowMessage> InvokeAsync(StreamFlowMessage sfMessage)
+    public async Task<StreamFlowRpcResult> InvokeAsync(StreamFlowMessage sfMessage)
     {
         var startTimer = Stopwatch.StartNew();
         sfMessage.ClientId = _clientId;
@@ -452,29 +522,34 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
         try
         {
-            if (Connection?.State is not HubConnectionState.Connected || !_isRegistered || _isRegistering)
+            // Get the best connection from the pool
+            var pooledConn = _connectionPool?.GetConnection();
+            var connection = pooledConn?.Connection ?? Connection;
+
+            if (connection?.State is not HubConnectionState.Connected || !_isRegistered || _isRegistering)
             {
-                // Queue for offline delivery
                 var maxQueue = StreamFlowConfiguration.QueueDepth > 0 ? StreamFlowConfiguration.QueueDepth : 10_000;
                 if (_offlineQueue.Count >= maxQueue)
                 {
-                    return CreateErrorResponse(sfMessage, HttpStatusCode.ServiceUnavailable, "Offline queue full");
+                    return new() { StatusCode = HttpStatusCode.ServiceUnavailable, Message = "Offline queue full" };
                 }
                 _offlineQueue.Enqueue(new(nameof(IStreamFlow.Push), sfMessage));
-                return new() { ResponseStatusCode = HttpStatusCode.Processing };
+                return new() { StatusCode = HttpStatusCode.Processing };
             }
 
-            // Use hub's Invoke — hub routes to recipient, waits for response, returns directly
+            pooledConn?.Touch();
+
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(StreamFlowConfiguration.RpcTimeoutSeconds));
-            var invokeResponse = await Connection.InvokeAsync<StreamFlowInvokeResponse>(
+            var invokeResponse = await connection.InvokeAsync<StreamFlowInvokeResponse>(
                 "Invoke", sfMessage, cts.Token);
 
             startTimer.Stop();
             _logger.LogDebug("Invoked Method \'{SfMessageCommandName}\' completed in {ResponseTime}ms", sfMessage.CommandName, startTimer.ElapsedMilliseconds);
 
+            // Return stack-allocated struct — no heap allocation for the response wrapper
             return new()
             {
-                ResponseStatusCode = invokeResponse.HttpStatusCode,
+                StatusCode = invokeResponse.HttpStatusCode,
                 Data = invokeResponse.Response,
                 Message = invokeResponse.Message,
                 Duration = startTimer.Elapsed
@@ -483,24 +558,21 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         catch (OperationCanceledException)
         {
             _logger.LogError("RPC timeout for method '{SfMessageCommandName}' after {Timeout}s", sfMessage.CommandName, StreamFlowConfiguration.RpcTimeoutSeconds);
-            return CreateErrorResponse(sfMessage, HttpStatusCode.RequestTimeout,
-                $"RPC timeout for method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
+            return new()
+            {
+                StatusCode = HttpStatusCode.RequestTimeout,
+                Message = $"RPC timeout for method '{sfMessage.CommandName}' on {sfMessage.RecipientId}"
+            };
         }
         catch (Exception e)
         {
             _logger.LogError("Invoke '{SfMessageCommandName}' failed: {EMessage}", sfMessage.CommandName, e.Message);
-            return CreateErrorResponse(sfMessage, HttpStatusCode.InternalServerError,
-                $"Error invoking method '{sfMessage.CommandName}' on {sfMessage.RecipientId}");
+            return new()
+            {
+                StatusCode = HttpStatusCode.InternalServerError,
+                Message = $"Error invoking method '{sfMessage.CommandName}' on {sfMessage.RecipientId}"
+            };
         }
-    }
-
-    private StreamFlowMessage CreateErrorResponse(StreamFlowMessage sfMessage, HttpStatusCode code, string message) 
-    {
-        return new()
-        {
-            ResponseStatusCode = code,
-            Message = message
-        };
     }
 
 }

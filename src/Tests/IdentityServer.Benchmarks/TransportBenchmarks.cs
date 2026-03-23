@@ -10,24 +10,35 @@ using FluentValidation;
 using IdentityServer.Api.Generated;
 using IdentityServer.Api.Services;
 using IdentityServer.Domain.Shared.Contracts.Requests;
+using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Drivers;
+using MemoryPack;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using StreamFlow.Domain.Shared.Protocol;
 using StreamFlow.Stream.Extensions;
+using StreamFlow.Stream.ThinProtocol;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.Configurations;
+using XFramework.Domain.Shared.Extensions;
 using XFramework.Domain.Shared.Interfaces;
 using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
+using XFramework.Integration.ThinProtocol;
+using System.Net.Quic;
+using Grpc.Net.Client;
+using IdentityServer.Benchmarks.Grpc;
+using StreamFlow.Stream.ThinProtocol;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.Benchmarks;
@@ -45,6 +56,22 @@ public class TransportBenchmarks
     private Task? _testClientTask;
     private HttpClient _httpClient = null!;
     private IIdentityServerServiceWrapper _serviceWrapper = null!;
+
+    // Thin protocol
+    private ThinStreamFlowClient _thinServiceClient = null!;
+    private ThinStreamFlowClient _thinCallerClient = null!;
+    private int _identityServerServiceHash;
+    private int _healthCheckCommandHash;
+
+    // gRPC
+    private WebApplication _grpcApp = null!;
+    private GrpcChannel _grpcChannel = null!;
+    private HealthService.HealthServiceClient _grpcClient = null!;
+    private const string GrpcUrl = "http://localhost:19263";
+
+    // QUIC (direct — no hub, server-to-server)
+    private QuicDirectServer _quicServer = null!;
+    private QuicDirectClient _quicClient = null!;
 
     private const string StreamFlowUrl = "http://localhost:19000";
     private const string IdentityServerUrl = "http://localhost:19261";
@@ -136,12 +163,157 @@ public class TransportBenchmarks
                 }
             });
         }
+
+        // 10. Setup thin protocol clients
+        await SetupThinProtocol();
+
+        // 11. Setup gRPC (benchmark-only)
+        await SetupGrpc();
+
+        // 12. Setup QUIC
+        await SetupQuic();
+    }
+
+    private async Task SetupQuic()
+    {
+        if (!QuicListener.IsSupported)
+        {
+            Console.WriteLine("QUIC not supported on this platform, skipping QUIC benchmark");
+            return;
+        }
+
+        var quicEndPoint = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 19265);
+        var loggerFactory = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
+
+        // Direct QUIC server — handles requests directly (no hub routing)
+        _quicServer = new QuicDirectServer(loggerFactory.CreateLogger<QuicDirectServer>());
+        _quicServer.RegisterHandler(typeof(HealthCheckRequest).GetTypeFullName(),
+            async (payload, requestId) =>
+            {
+                var request = MemoryPackSerializer.Deserialize<HealthCheckRequest>(payload.Span)!;
+                var result = await IdentityServer.Api.Features.Health.Check.HealthCheckEndpoint.Handle(request, CancellationToken.None);
+                var response = new QueryResponse<HealthCheckResponse>
+                {
+                    HttpStatusCode = (System.Net.HttpStatusCode)result.StatusCode,
+                    Response = result.Data,
+                    Message = result.Message
+                };
+                return ((System.Net.HttpStatusCode)result.StatusCode, (ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(response));
+            });
+        await _quicServer.StartAsync(quicEndPoint);
+
+        // Direct QUIC client
+        _quicClient = new QuicDirectClient(quicEndPoint);
+        await _quicClient.ConnectAsync();
+
+        // Warmup
+        for (var i = 0; i < 5; i++)
+        {
+            var warmupPayload = MemoryPackSerializer.Serialize(_request);
+            await _quicClient.InvokeAsync(typeof(HealthCheckRequest).GetTypeFullName(), warmupPayload);
+        }
+    }
+
+    private async Task SetupGrpc()
+    {
+        var grpcBuilder = WebApplication.CreateBuilder();
+        grpcBuilder.WebHost.ConfigureKestrel(options =>
+        {
+            // HTTP/2 only for gRPC on main port
+            options.ListenLocalhost(19263, o => o.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            // HTTP/1.1 for health check probe
+            options.ListenLocalhost(19264, o => o.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        grpcBuilder.Services.AddGrpc();
+        grpcBuilder.Logging.SetMinimumLevel(LogLevel.Error);
+
+        _grpcApp = grpcBuilder.Build();
+        _grpcApp.MapGrpcService<GrpcHealthServiceImpl>();
+        _grpcApp.MapGet("/health/live", () => Results.Ok("healthy"));
+
+        _ = Task.Run(() => _grpcApp.RunAsync());
+        await WaitForHealth("http://localhost:19264/health/live");
+
+        _grpcChannel = GrpcChannel.ForAddress(GrpcUrl);
+        _grpcClient = new HealthService.HealthServiceClient(_grpcChannel);
+
+        // Warmup
+        for (var i = 0; i < 5; i++)
+        {
+            await _grpcClient.CheckAsync(new HealthCheckReq
+            {
+                TenantId = TestTenantId.ToString(),
+                RequestId = Guid.NewGuid().ToString(),
+                IpAddress = "127.0.0.1",
+                Name = "Benchmark"
+            });
+        }
+    }
+
+    private async Task SetupThinProtocol()
+    {
+        var thinServerUri = new Uri($"ws://localhost:19000/streamflow/ws");
+        var config = new StreamFlowConfiguration { RpcTimeoutSeconds = 30 };
+        var loggerFactory = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
+
+        // Compute hashes for routing
+        var identityServerServiceId = "3902761a822d4c6b8e2d323fd501bcd6"; // SHA256 of "IdentityServer" — same as SignalR registration
+        _identityServerServiceHash = StreamFlowCodec.Fnv1aHash(identityServerServiceId);
+        _healthCheckCommandHash = StreamFlowCodec.Fnv1aHash(typeof(HealthCheckRequest).GetTypeFullName());
+
+        // Start "IdentityServer" thin client — handles incoming requests
+        _thinServiceClient = new ThinStreamFlowClient(
+            thinServerUri, identityServerServiceId, "IdentityServer.Bench",
+            config, loggerFactory.CreateLogger<ThinStreamFlowClient>());
+
+        // Register the HealthCheck handler on the service client
+        _thinServiceClient.RegisterHandler(typeof(HealthCheckRequest).GetTypeFullName(),
+            async (payload, requestId) =>
+            {
+                var request = MemoryPackSerializer.Deserialize<HealthCheckRequest>(payload.Span)!;
+
+                // Call the endpoint directly (same as what the generated StreamFlow handler does)
+                var result = await IdentityServer.Api.Features.Health.Check.HealthCheckEndpoint.Handle(request, CancellationToken.None);
+
+                var response = new QueryResponse<HealthCheckResponse>
+                {
+                    HttpStatusCode = (System.Net.HttpStatusCode)result.StatusCode,
+                    Response = result.Data,
+                    Message = result.Message
+                };
+                var responseBytes = MemoryPackSerializer.Serialize(response);
+                return ((System.Net.HttpStatusCode)result.StatusCode, (ReadOnlyMemory<byte>)responseBytes);
+            });
+
+        await _thinServiceClient.ConnectAsync();
+
+        // Start "BenchClient" thin client — sends requests
+        _thinCallerClient = new ThinStreamFlowClient(
+            thinServerUri, "bench_caller", "BenchClient.Thin",
+            config, loggerFactory.CreateLogger<ThinStreamFlowClient>());
+        await _thinCallerClient.ConnectAsync();
+
+        // Warmup thin path
+        for (var i = 0; i < 5; i++)
+        {
+            var warmupPayload = MemoryPackSerializer.Serialize(_request);
+            await _thinCallerClient.InvokeAsync(
+                identityServerServiceId,
+                typeof(HealthCheckRequest).GetTypeFullName(),
+                warmupPayload);
+        }
     }
 
     [GlobalCleanup]
     public async Task Cleanup()
     {
         _httpClient?.Dispose();
+        _grpcChannel?.Dispose();
+        try { await _quicClient.DisposeAsync(); } catch { }
+        try { await _quicServer.DisposeAsync(); } catch { }
+        try { await _grpcApp.StopAsync(); } catch { }
+        try { await _thinCallerClient.DisposeAsync(); } catch { }
+        try { await _thinServiceClient.DisposeAsync(); } catch { }
         try { await _testClientApp.StopAsync(); } catch { }
         try { await _identityServerApp.StopAsync(); } catch { }
         try { await _streamFlowApp.StopAsync(); } catch { }
@@ -155,9 +327,8 @@ public class TransportBenchmarks
     }
 
     [Benchmark]
-    public async Task<QueryResponse<IdentityServer.Domain.Shared.Contracts.Responses.HealthCheckResponse>?> StreamFlow_HealthCheck()
+    public async Task<QueryResponse<HealthCheckResponse>?> StreamFlow_HealthCheck()
     {
-        // Each call needs a unique RequestId to avoid idempotency guard
         var req = new HealthCheckRequest
         {
             Metadata = new RequestMetadata
@@ -171,6 +342,66 @@ public class TransportBenchmarks
             }
         };
         return await _serviceWrapper.HealthCheck(req);
+    }
+
+    [Benchmark]
+    public async Task<HealthCheckResp> Grpc_HealthCheck()
+    {
+        return await _grpcClient.CheckAsync(new HealthCheckReq
+        {
+            TenantId = TestTenantId.ToString(),
+            RequestId = Guid.NewGuid().ToString(),
+            IpAddress = "127.0.0.1",
+            Name = "Benchmark"
+        });
+    }
+
+    [Benchmark]
+    public async Task<QueryResponse<HealthCheckResponse>?> Quic_HealthCheck()
+    {
+        var req = new HealthCheckRequest
+        {
+            Metadata = new RequestMetadata
+            {
+                TenantId = TestTenantId,
+                RequestId = Guid.NewGuid(),
+                IpAddress = "127.0.0.1",
+                Name = "Benchmark",
+                DeviceName = "BenchDevice",
+                DeviceAgent = "BenchAgent"
+            }
+        };
+
+        var payload = MemoryPackSerializer.Serialize(req);
+        var (statusCode, data) = await _quicClient.InvokeAsync(
+            typeof(HealthCheckRequest).GetTypeFullName(), payload);
+
+        return MemoryPackSerializer.Deserialize<QueryResponse<HealthCheckResponse>>(data.Span);
+    }
+
+    [Benchmark]
+    public async Task<QueryResponse<HealthCheckResponse>?> ThinProtocol_HealthCheck()
+    {
+        var req = new HealthCheckRequest
+        {
+            Metadata = new RequestMetadata
+            {
+                TenantId = TestTenantId,
+                RequestId = Guid.NewGuid(),
+                IpAddress = "127.0.0.1",
+                Name = "Benchmark",
+                DeviceName = "BenchDevice",
+                DeviceAgent = "BenchAgent"
+            }
+        };
+
+        var payload = MemoryPackSerializer.Serialize(req);
+        var (statusCode, data) = await _thinCallerClient.InvokeAsync(
+            "3902761a822d4c6b8e2d323fd501bcd6",
+            typeof(HealthCheckRequest).GetTypeFullName(),
+            payload);
+
+        return MemoryPackSerializer.Deserialize<QueryResponse<HealthCheckResponse>>(data.Span);
     }
 
     #region Infrastructure

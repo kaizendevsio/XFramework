@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option csharp_namespace = "IdentityServer.Benchmarks.Grpc";
+
+package health;
+
+service HealthService {
+  rpc Check (HealthCheckReq) returns (HealthCheckResp);
+}
+
+message HealthCheckReq {
+  string tenant_id = 1;
+  string request_id = 2;
+  string ip_address = 3;
+  string name = 4;
+}
+
+message HealthCheckResp {
+  string status = 1;
+  string start_time = 2;
+}

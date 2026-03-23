@@ -16,4 +16,10 @@ public class StreamFlowConfiguration
     public int MaxPendingRpcCalls { get; set; } = 1000;
     public int DeadLetterQueueCapacity { get; set; } = 100_000;
     public int MaxParallelInvocationsPerClient { get; set; } = 64;
+
+    // Connection pooling
+    public int MinConnections { get; set; } = 1;
+    public int MaxConnections { get; set; } = Environment.ProcessorCount;
+    public int ScaleUpThreshold { get; set; } = 48;
+    public int IdleTimeoutSeconds { get; set; } = 30;
 }

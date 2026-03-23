@@ -12,6 +12,14 @@
     <ItemGroup>
         <PackageReference Include="BenchmarkDotNet" />
         <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="Grpc.AspNetCore" />
+        <PackageReference Include="Grpc.Net.Client" />
+        <PackageReference Include="Google.Protobuf" />
+        <PackageReference Include="Grpc.Tools" PrivateAssets="All" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Protobuf Include="Protos\health.proto" GrpcServices="Both" />
     </ItemGroup>
 
     <ItemGroup>
