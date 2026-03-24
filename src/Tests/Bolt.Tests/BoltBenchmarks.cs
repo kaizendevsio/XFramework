@@ -38,11 +38,16 @@ public class BoltBenchmarks
     private WebApplication _boltDirectApp = null!;
     private BoltClient _boltDirectClient = null!;
 
-    // gRPC (with hub: client → hub → backend → hub → client)
+    // gRPC Hub (client → hub → backend → hub → client)
     private WebApplication _grpcBackendApp = null!;
     private WebApplication _grpcHubApp = null!;
     private GrpcChannel _grpcChannel = null!;
     private HelloService.HelloServiceClient _grpcClient = null!;
+
+    // gRPC Direct (client → server, no hub)
+    private WebApplication _grpcDirectApp = null!;
+    private GrpcChannel _grpcDirectChannel = null!;
+    private HelloService.HelloServiceClient _grpcDirectClient = null!;
 
     // SignalR (with hub routing: client → hub → backend → hub → client)
     private WebApplication _signalRBackendApp = null!;
@@ -58,6 +63,7 @@ public class BoltBenchmarks
         await SetupBoltHub();
         await SetupBoltDirect();
         await SetupGrpc();
+        await SetupGrpcDirect();
         await SetupSignalR();
 
         // Warmup all paths
@@ -66,6 +72,7 @@ public class BoltBenchmarks
             await BoltHubCall();
             await BoltDirectCall();
             await GrpcCall();
+            await GrpcDirectCall();
             await SignalRCall();
         }
     }
@@ -159,6 +166,27 @@ public class BoltBenchmarks
         _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
     }
 
+    private async Task SetupGrpcDirect()
+    {
+        // Single gRPC server — client connects directly (no hub routing)
+        var db = WebApplication.CreateBuilder();
+        db.WebHost.ConfigureKestrel(o =>
+        {
+            o.ListenLocalhost(18305, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(18306, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        db.Services.AddGrpc();
+        db.Logging.SetMinimumLevel(LogLevel.Error);
+        _grpcDirectApp = db.Build();
+        _grpcDirectApp.MapGrpcService<GrpcHelloBackend>();
+        _grpcDirectApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _grpcDirectApp.RunAsync());
+        await WaitForHealth("http://localhost:18306/health");
+
+        _grpcDirectChannel = GrpcChannel.ForAddress("http://localhost:18305");
+        _grpcDirectClient = new HelloService.HelloServiceClient(_grpcDirectChannel);
+    }
+
     private async Task SetupSignalR()
     {
         // Backend — handles actual Hello logic
@@ -230,6 +258,11 @@ public class BoltBenchmarks
         await _grpcClient.SayHelloAsync(new HelloRequest { Name = "World" });
     }
 
+    private async Task GrpcDirectCall()
+    {
+        await _grpcDirectClient.SayHelloAsync(new HelloRequest { Name = "World" });
+    }
+
     private async Task SignalRCall()
     {
         await _signalRCaller.InvokeAsync<string>("SayHello", "World");
@@ -263,6 +296,14 @@ public class BoltBenchmarks
         await Task.WhenAll(tasks);
     }
 
+    [Benchmark]
+    public async Task GRPC_Direct()
+    {
+        var tasks = new Task[Concurrency];
+        for (int i = 0; i < Concurrency; i++) tasks[i] = GrpcDirectCall();
+        await Task.WhenAll(tasks);
+    }
+
     [Benchmark(Baseline = true)]
     public async Task SignalR_Hub()
     {
@@ -281,8 +322,10 @@ public class BoltBenchmarks
         try { await _boltDirectClient.DisposeAsync(); } catch { }
         try { await _signalRCaller.DisposeAsync(); } catch { }
         _grpcChannel?.Dispose();
+        _grpcDirectChannel?.Dispose();
         try { await _grpcHubApp.StopAsync(); } catch { }
         try { await _grpcBackendApp.StopAsync(); } catch { }
+        try { await _grpcDirectApp.StopAsync(); } catch { }
         try { await _signalRHubApp.StopAsync(); } catch { }
         try { await _signalRBackendApp.StopAsync(); } catch { }
         try { await _boltHubApp.StopAsync(); } catch { }
@@ -362,6 +405,9 @@ public class BoltThroughputBenchmarks
     private WebApplication _grpcHubApp = null!;
     private GrpcChannel _grpcChannel = null!;
     private HelloService.HelloServiceClient _grpcClient = null!;
+    private WebApplication _grpcDirectApp = null!;
+    private GrpcChannel _grpcDirectChannel = null!;
+    private HelloService.HelloServiceClient _grpcDirectClient = null!;
     private WebApplication _signalRBackendApp = null!;
     private WebApplication _signalRHubApp = null!;
     private HubConnection _signalRCaller = null!;
@@ -441,6 +487,22 @@ public class BoltThroughputBenchmarks
         _grpcChannel = GrpcChannel.ForAddress("http://localhost:18703");
         _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
 
+        // ── gRPC Direct ──
+        var gd = WebApplication.CreateBuilder();
+        gd.WebHost.ConfigureKestrel(o => {
+            o.ListenLocalhost(18705, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(18706, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        gd.Services.AddGrpc();
+        gd.Logging.SetMinimumLevel(LogLevel.Error);
+        _grpcDirectApp = gd.Build();
+        _grpcDirectApp.MapGrpcService<GrpcHelloBackend>();
+        _grpcDirectApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _grpcDirectApp.RunAsync());
+        await WaitForHealth("http://localhost:18706/health");
+        _grpcDirectChannel = GrpcChannel.ForAddress("http://localhost:18705");
+        _grpcDirectClient = new HelloService.HelloServiceClient(_grpcDirectChannel);
+
         // ── SignalR Hub ──
         var sb = WebApplication.CreateBuilder();
         sb.WebHost.UseUrls("http://localhost:18800");
@@ -476,6 +538,7 @@ public class BoltThroughputBenchmarks
             await _boltHubCaller.InvokeAsync("tp_service", "hello", p);
             await _boltDirectClient.InvokeAsync("_", "hello", p);
             await _grpcClient.SayHelloAsync(new HelloRequest { Name = "W" });
+            await _grpcDirectClient.SayHelloAsync(new HelloRequest { Name = "W" });
             await _signalRCaller.InvokeAsync<string>("SayHello", "W");
         }
     }
@@ -520,6 +583,15 @@ public class BoltThroughputBenchmarks
         await Task.WhenAll(tasks);
     }
 
+    [Benchmark(OperationsPerInvoke = Batch)]
+    public async Task GRPC_Direct_Throughput()
+    {
+        var tasks = new Task[Batch];
+        for (int i = 0; i < Batch; i++)
+            tasks[i] = _grpcDirectClient.SayHelloAsync(new HelloRequest { Name = "World" }).ResponseAsync;
+        await Task.WhenAll(tasks);
+    }
+
     [Benchmark(Baseline = true, OperationsPerInvoke = Batch)]
     public async Task SignalR_Hub_Throughput()
     {
@@ -537,8 +609,10 @@ public class BoltThroughputBenchmarks
         try { await _boltDirectClient.DisposeAsync(); } catch { }
         try { await _signalRCaller.DisposeAsync(); } catch { }
         _grpcChannel?.Dispose();
+        _grpcDirectChannel?.Dispose();
         try { await _grpcHubApp.StopAsync(); } catch { }
         try { await _grpcBackendApp.StopAsync(); } catch { }
+        try { await _grpcDirectApp.StopAsync(); } catch { }
         try { await _signalRHubApp.StopAsync(); } catch { }
         try { await _signalRBackendApp.StopAsync(); } catch { }
         try { await _boltHubApp.StopAsync(); } catch { }
