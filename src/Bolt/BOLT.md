@@ -140,7 +140,16 @@ SignalR also collapses under high concurrent load (5,129 us at 64 concurrent vs 
 ### RPC (Request-Response)
 
 ```csharp
-var (status, data) = await client.InvokeAsync("target-service", "command", payload);
+// Typed — auto-serializes request and deserializes response with MemoryPack
+var response = await client.SendAsync<GreetRequest, GreetResponse>("greeting-service", "greet",
+    new GreetRequest { Name = "World" });
+
+// Command (no response body)
+var status = await client.SendAsync("service", "delete-item",
+    new DeleteRequest { Id = itemId });
+
+// Raw bytes (when you need full control)
+var (statusCode, data) = await client.InvokeAsync("service", "command", rawBytes);
 ```
 
 ### Bidirectional Streaming
@@ -270,11 +279,10 @@ The client auto-connects on app startup via `IHostedService` and disconnects on 
 ```csharp
 public class GreetingService(BoltClient bolt)
 {
-    public async Task<string> Greet(string name)
+    public async Task<HelloMsg> Greet(string name)
     {
-        var payload = MemoryPackSerializer.Serialize(new HelloMsg { Text = name });
-        var (status, data) = await bolt.InvokeAsync("greeting-service", "greet", payload);
-        return MemoryPackSerializer.Deserialize<HelloMsg>(data.Span)!.Text;
+        return await bolt.SendAsync<HelloMsg, HelloMsg>("greeting-service", "greet",
+            new HelloMsg { Text = name });
     }
 }
 ```
@@ -319,6 +327,9 @@ builder.Services.AddBoltClient(bolt => bolt
     .WithServer("ws://server:5000/bolt")
     .WithClientId("caller")
 );
+
+// Usage — typed, clean
+var response = await bolt.SendAsync<HelloMsg, HelloMsg>("_", "hello", new HelloMsg { Text = "World" });
 ```
 
 ### Blazor Server / WASM
@@ -349,8 +360,13 @@ builder.Services.AddBoltClient(bolt => bolt
 @code {
     private async Task SendMessage(string text)
     {
-        var payload = MemoryPackSerializer.Serialize(new ChatMessage { Text = text });
-        await Bolt.InvokeAsync("chat-service", "send", payload);
+        await Bolt.SendAsync("chat-service", "send", new ChatMessage { Text = text });
+    }
+
+    private async Task<UserProfile> GetProfile(Guid userId)
+    {
+        return await Bolt.SendAsync<GetProfileRequest, UserProfile>("user-service", "get-profile",
+            new GetProfileRequest { UserId = userId });
     }
 }
 ```

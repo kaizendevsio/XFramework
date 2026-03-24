@@ -2,9 +2,10 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.WebSockets;
-using Microsoft.Extensions.Logging;
-using Bolt.Protocol.Buffers;
 using Bolt.Protocol;
+using Bolt.Protocol.Buffers;
+using MemoryPack;
+using Microsoft.Extensions.Logging;
 
 
 namespace Bolt.Client;
@@ -213,6 +214,30 @@ public sealed class BoltClient : IAsyncDisposable
         {
             _pendingCalls.TryRemove(requestId, out _);
         }
+    }
+
+    /// <summary>
+    /// Invoke with typed request and response. Auto-serializes with MemoryPack.
+    ///
+    /// Usage: var response = await client.SendAsync&lt;MyRequest, MyResponse&gt;("service", "command", request);
+    /// </summary>
+    public async Task<TResponse?> SendAsync<TRequest, TResponse>(string recipientId, string commandName, TRequest request, CancellationToken ct = default)
+    {
+        var payload = MemoryPackSerializer.Serialize(request);
+        var result = await InvokeAsync(recipientId, commandName, payload, ct);
+        return result.Data.Length > 0 ? MemoryPackSerializer.Deserialize<TResponse>(result.Data.Span) : default;
+    }
+
+    /// <summary>
+    /// Invoke with typed request, no response data expected (command pattern).
+    ///
+    /// Usage: var status = await client.SendAsync("service", "command", request);
+    /// </summary>
+    public async Task<HttpStatusCode> SendAsync<TRequest>(string recipientId, string commandName, TRequest request, CancellationToken ct = default)
+    {
+        var payload = MemoryPackSerializer.Serialize(request);
+        var result = await InvokeAsync(recipientId, commandName, payload, ct);
+        return result.StatusCode;
     }
 
     private BoltConnection GetConnection()
