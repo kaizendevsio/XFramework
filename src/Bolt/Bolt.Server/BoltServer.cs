@@ -26,6 +26,9 @@ public sealed class BoltServer
     // Stream routing: streamId → (sender connection, recipient connection)
     private readonly ConcurrentDictionary<Guid, (BoltHubConnection Sender, BoltHubConnection Recipient)> _activeStreams = new();
 
+    // Direct handlers — when registered, server handles requests locally instead of routing
+    private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _localHandlers = new();
+
     private readonly Timer _cleanupTimer;
     private const int InvocationTimeoutMs = 30_000;
 
@@ -33,6 +36,17 @@ public sealed class BoltServer
     {
         _logger = logger;
         _cleanupTimer = new Timer(CleanupStaleInvocations, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    /// <summary>
+    /// Register a local handler. When a request arrives with this command hash,
+    /// the server handles it directly instead of routing to another client.
+    /// Enables direct client-to-server mode (no hub routing needed).
+    /// </summary>
+    public void RegisterHandler(string commandName, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
+    {
+        var hash = BoltCodec.Fnv1aHash(commandName);
+        _localHandlers[hash] = handler;
     }
 
     public async Task HandleConnectionAsync(WebSocket webSocket, CancellationToken ct)
@@ -144,8 +158,35 @@ public sealed class BoltServer
 
     private async Task HandleRequestAsync(BoltHubConnection caller, byte[] buffer, int length, CancellationToken ct)
     {
-        // Header-only read — no payload decode, no allocation
-        if (!BoltCodec.TryReadRequestHeader(buffer.AsSpan(0, length), out var requestId, out var recipientHash, out var totalSize))
+        var span = buffer.AsSpan(0, length);
+
+        // Check for local handler first (direct mode — server handles request itself)
+        if (_localHandlers.Count > 0 && BoltCodec.TryReadRequest(span, out var frame, out var consumed))
+        {
+            if (_localHandlers.TryGetValue(frame.CommandHash, out var handler))
+            {
+                try
+                {
+                    var payload = frame.GetPayload(buffer.AsMemory(0, length));
+                    var (statusCode, responsePayload) = await handler(payload, frame.RequestId);
+
+                    var writer = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteResponse(writer, frame.RequestId, statusCode, responsePayload.Span);
+                    await caller.SendAsync(writer.WrittenMemory, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Local handler error for command hash {Hash}", frame.CommandHash);
+                    var errWriter = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.InternalServerError, ReadOnlySpan<byte>.Empty);
+                    await caller.SendAsync(errWriter.WrittenMemory, ct);
+                }
+                return;
+            }
+        }
+
+        // Hub mode — route to recipient
+        if (!BoltCodec.TryReadRequestHeader(span, out var requestId, out var recipientHash, out var totalSize))
         {
             _logger.LogWarning("Invalid request frame from {ClientId}", caller.ClientId);
             return;
