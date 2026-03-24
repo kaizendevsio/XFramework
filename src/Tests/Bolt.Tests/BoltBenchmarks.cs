@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Net;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
@@ -8,8 +7,13 @@ using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 using Bolt.Client;
 using Bolt.Server;
+using Bolt.Tests.Grpc;
+using Grpc.Core;
+using Grpc.Net.Client;
 using MemoryPack;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Perfolizer.Horology;
@@ -17,24 +21,32 @@ using Perfolizer.Horology;
 namespace Bolt.Tests;
 
 /// <summary>
-/// Standalone Bolt benchmarks — no XFramework dependencies.
-/// Tests hub mode, direct mode, and concurrent load.
+/// Standalone transport comparison: Bolt Hub, Bolt Direct, gRPC (with hub), SignalR (with hub).
+/// All transports return a simple "Hello {name}" string.
+/// No XFramework dependencies — pure protocol benchmark.
 /// </summary>
 [Config(typeof(BoltBenchConfig))]
 [MemoryDiagnoser]
 public class BoltBenchmarks
 {
-    // Hub mode
-    private WebApplication _hubApp = null!;
-    private BoltClient _hubServiceClient = null!;
-    private BoltClient _hubCallerClient = null!;
+    // Bolt Hub
+    private WebApplication _boltHubApp = null!;
+    private BoltClient _boltHubService = null!;
+    private BoltClient _boltHubCaller = null!;
 
-    // Direct mode (client → server, no hub routing)
-    private WebApplication _directApp = null!;
-    private BoltClient _directClient = null!;
+    // Bolt Direct
+    private WebApplication _boltDirectApp = null!;
+    private BoltClient _boltDirectClient = null!;
 
-    private const string HubUrl = "http://localhost:18100";
-    private const string DirectUrl = "http://localhost:18200";
+    // gRPC (with hub: client → hub → backend → hub → client)
+    private WebApplication _grpcBackendApp = null!;
+    private WebApplication _grpcHubApp = null!;
+    private GrpcChannel _grpcChannel = null!;
+    private HelloService.HelloServiceClient _grpcClient = null!;
+
+    // SignalR (with hub)
+    private WebApplication _signalRApp = null!;
+    private HubConnection _signalRCaller = null!;
 
     [Params(1, 64)]
     public int Concurrency { get; set; }
@@ -42,125 +54,217 @@ public class BoltBenchmarks
     [GlobalSetup]
     public async Task Setup()
     {
-        await SetupHub();
-        await SetupDirect();
+        await SetupBoltHub();
+        await SetupBoltDirect();
+        await SetupGrpc();
+        await SetupSignalR();
 
-        // Warmup both paths
+        // Warmup all paths
         for (int i = 0; i < 10; i++)
         {
-            await InvokePing(_hubCallerClient, "hub_service");
-            await InvokePingDirect(_directClient);
+            await BoltHubCall();
+            await BoltDirectCall();
+            await GrpcCall();
+            await SignalRCall();
         }
     }
 
-    private async Task SetupHub()
+    #region Setup
+
+    private async Task SetupBoltHub()
     {
         var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls(HubUrl);
+        builder.WebHost.UseUrls("http://localhost:18100");
         builder.Services.AddSingleton<BoltServer>();
         builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _hubApp = builder.Build();
-        _hubApp.UseWebSockets();
-        _hubApp.MapBolt("/bolt");
-        _hubApp.MapGet("/health", () => Results.Ok("ok"));
-        _ = Task.Run(() => _hubApp.RunAsync());
-        await WaitForHealth($"{HubUrl}/health");
+        _boltHubApp = builder.Build();
+        _boltHubApp.UseWebSockets();
+        _boltHubApp.MapBolt("/bolt");
+        _boltHubApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _boltHubApp.RunAsync());
+        await WaitForHealth("http://localhost:18100/health");
 
-        var lf = _hubApp.Services.GetRequiredService<ILoggerFactory>();
+        var lf = _boltHubApp.Services.GetRequiredService<ILoggerFactory>();
         var opts = new BoltClientOptions { RpcTimeoutSeconds = 30 };
 
-        // Service client — handles pings
-        _hubServiceClient = new BoltClient(
-            new Uri($"ws://localhost:18100/bolt"), "hub_service", "HubService",
-            opts, lf.CreateLogger<BoltClient>());
-        _hubServiceClient.RegisterHandler("ping", PingHandler);
-        await _hubServiceClient.ConnectAsync();
+        _boltHubService = new BoltClient(new Uri("ws://localhost:18100/bolt"),
+            "bolt_service", "BoltService", opts, lf.CreateLogger<BoltClient>());
+        _boltHubService.RegisterHandler("hello", HelloHandler);
+        await _boltHubService.ConnectAsync();
 
-        // Caller client — sends pings
-        _hubCallerClient = new BoltClient(
-            new Uri($"ws://localhost:18100/bolt"), "hub_caller", "HubCaller",
-            opts, lf.CreateLogger<BoltClient>());
-        await _hubCallerClient.ConnectAsync();
+        _boltHubCaller = new BoltClient(new Uri("ws://localhost:18100/bolt"),
+            "bolt_caller", "BoltCaller", opts, lf.CreateLogger<BoltClient>());
+        await _boltHubCaller.ConnectAsync();
     }
 
-    private async Task SetupDirect()
+    private async Task SetupBoltDirect()
     {
-        // Direct server — handles requests locally, no routing
         var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls(DirectUrl);
+        builder.WebHost.UseUrls("http://localhost:18200");
         builder.Services.AddSingleton<BoltServer>();
         builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _directApp = builder.Build();
+        _boltDirectApp = builder.Build();
+        _boltDirectApp.Services.GetRequiredService<BoltServer>().RegisterHandler("hello", HelloHandler);
+        _boltDirectApp.UseWebSockets();
+        _boltDirectApp.MapBolt("/bolt");
+        _boltDirectApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _boltDirectApp.RunAsync());
+        await WaitForHealth("http://localhost:18200/health");
 
-        // Register handler directly on the server (direct mode)
-        var server = _directApp.Services.GetRequiredService<BoltServer>();
-        server.RegisterHandler("ping", PingHandler);
-
-        _directApp.UseWebSockets();
-        _directApp.MapBolt("/bolt");
-        _directApp.MapGet("/health", () => Results.Ok("ok"));
-        _ = Task.Run(() => _directApp.RunAsync());
-        await WaitForHealth($"{DirectUrl}/health");
-
-        var lf = _directApp.Services.GetRequiredService<ILoggerFactory>();
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 30 };
-
-        // Client connects directly to the server (which handles requests itself)
-        _directClient = new BoltClient(
-            new Uri($"ws://localhost:18200/bolt"), "direct_caller", "DirectCaller",
-            opts, lf.CreateLogger<BoltClient>());
-        await _directClient.ConnectAsync();
+        var lf = _boltDirectApp.Services.GetRequiredService<ILoggerFactory>();
+        _boltDirectClient = new BoltClient(new Uri("ws://localhost:18200/bolt"),
+            "direct_caller", "DirectCaller", new BoltClientOptions { RpcTimeoutSeconds = 30 },
+            lf.CreateLogger<BoltClient>());
+        await _boltDirectClient.ConnectAsync();
     }
 
-    // Simple ping handler — returns a small response
-    private static Task<(HttpStatusCode, ReadOnlyMemory<byte>)> PingHandler(ReadOnlyMemory<byte> payload, Guid requestId)
+    private async Task SetupGrpc()
     {
-        var response = new PingResponse { Message = "pong", Timestamp = DateTime.UtcNow.Ticks };
-        var bytes = MemoryPackSerializer.Serialize(response);
-        return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)bytes));
+        // Backend
+        var bb = WebApplication.CreateBuilder();
+        bb.WebHost.ConfigureKestrel(o =>
+        {
+            o.ListenLocalhost(18301, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(18302, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        bb.Services.AddGrpc();
+        bb.Logging.SetMinimumLevel(LogLevel.Error);
+        _grpcBackendApp = bb.Build();
+        _grpcBackendApp.MapGrpcService<GrpcHelloBackend>();
+        _grpcBackendApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _grpcBackendApp.RunAsync());
+        await WaitForHealth("http://localhost:18302/health");
+
+        // Hub
+        var backendChannel = GrpcChannel.ForAddress("http://localhost:18301");
+        var backendClient = new HelloService.HelloServiceClient(backendChannel);
+        var hb = WebApplication.CreateBuilder();
+        hb.WebHost.ConfigureKestrel(o =>
+        {
+            o.ListenLocalhost(18303, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(18304, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        hb.Services.AddGrpc();
+        hb.Services.AddSingleton(backendClient);
+        hb.Logging.SetMinimumLevel(LogLevel.Error);
+        _grpcHubApp = hb.Build();
+        _grpcHubApp.MapGrpcService<GrpcHelloHub>();
+        _grpcHubApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _grpcHubApp.RunAsync());
+        await WaitForHealth("http://localhost:18304/health");
+
+        // Client → Hub
+        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18303");
+        _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
     }
 
-    private static async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> InvokePing(BoltClient client, string recipient)
+    private async Task SetupSignalR()
     {
-        var request = new PingRequest { Message = "ping" };
-        var payload = MemoryPackSerializer.Serialize(request);
-        return await client.InvokeAsync(recipient, "ping", payload);
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://localhost:18400");
+        builder.Services.AddSignalR().AddMessagePackProtocol();
+        builder.Logging.SetMinimumLevel(LogLevel.Error);
+        _signalRApp = builder.Build();
+        _signalRApp.MapHub<HelloHub>("/hello-hub");
+        _signalRApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _signalRApp.RunAsync());
+        await WaitForHealth("http://localhost:18400/health");
+
+        _signalRCaller = new HubConnectionBuilder()
+            .WithUrl("http://localhost:18400/hello-hub")
+            .AddMessagePackProtocol()
+            .Build();
+        await _signalRCaller.StartAsync();
     }
 
-    private static async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> InvokePingDirect(BoltClient client)
+    #endregion
+
+    #region Handlers
+
+    private static Task<(HttpStatusCode, ReadOnlyMemory<byte>)> HelloHandler(ReadOnlyMemory<byte> payload, Guid requestId)
     {
-        var request = new PingRequest { Message = "ping" };
-        var payload = MemoryPackSerializer.Serialize(request);
-        // recipientId doesn't matter in direct mode — server handles locally
-        return await client.InvokeAsync("_", "ping", payload);
+        var req = MemoryPackSerializer.Deserialize<HelloMsg>(payload.Span)!;
+        var resp = new HelloMsg { Text = $"Hello {req.Text}" };
+        return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(resp)));
     }
 
-    [Benchmark(Baseline = true)]
-    public async Task Hub_Mode()
+    #endregion
+
+    #region Call helpers
+
+    private async Task BoltHubCall()
+    {
+        var payload = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
+        await _boltHubCaller.InvokeAsync("bolt_service", "hello", payload);
+    }
+
+    private async Task BoltDirectCall()
+    {
+        var payload = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
+        await _boltDirectClient.InvokeAsync("_", "hello", payload);
+    }
+
+    private async Task GrpcCall()
+    {
+        await _grpcClient.SayHelloAsync(new HelloRequest { Name = "World" });
+    }
+
+    private async Task SignalRCall()
+    {
+        await _signalRCaller.InvokeAsync<string>("SayHello", "World");
+    }
+
+    #endregion
+
+    #region Benchmarks
+
+    [Benchmark]
+    public async Task Bolt_Hub()
     {
         var tasks = new Task[Concurrency];
-        for (int i = 0; i < Concurrency; i++)
-            tasks[i] = InvokePing(_hubCallerClient, "hub_service");
+        for (int i = 0; i < Concurrency; i++) tasks[i] = BoltHubCall();
         await Task.WhenAll(tasks);
     }
 
     [Benchmark]
-    public async Task Direct_Mode()
+    public async Task Bolt_Direct()
     {
         var tasks = new Task[Concurrency];
-        for (int i = 0; i < Concurrency; i++)
-            tasks[i] = InvokePingDirect(_directClient);
+        for (int i = 0; i < Concurrency; i++) tasks[i] = BoltDirectCall();
         await Task.WhenAll(tasks);
     }
+
+    [Benchmark]
+    public async Task GRPC_Hub()
+    {
+        var tasks = new Task[Concurrency];
+        for (int i = 0; i < Concurrency; i++) tasks[i] = GrpcCall();
+        await Task.WhenAll(tasks);
+    }
+
+    [Benchmark(Baseline = true)]
+    public async Task SignalR_Hub()
+    {
+        var tasks = new Task[Concurrency];
+        for (int i = 0; i < Concurrency; i++) tasks[i] = SignalRCall();
+        await Task.WhenAll(tasks);
+    }
+
+    #endregion
 
     [GlobalCleanup]
     public async Task Cleanup()
     {
-        try { await _hubCallerClient.DisposeAsync(); } catch { }
-        try { await _hubServiceClient.DisposeAsync(); } catch { }
-        try { await _directClient.DisposeAsync(); } catch { }
-        try { await _hubApp.StopAsync(); } catch { }
-        try { await _directApp.StopAsync(); } catch { }
+        try { await _boltHubCaller.DisposeAsync(); } catch { }
+        try { await _boltHubService.DisposeAsync(); } catch { }
+        try { await _boltDirectClient.DisposeAsync(); } catch { }
+        try { await _signalRCaller.DisposeAsync(); } catch { }
+        _grpcChannel?.Dispose();
+        try { await _grpcHubApp.StopAsync(); } catch { }
+        try { await _grpcBackendApp.StopAsync(); } catch { }
+        try { await _signalRApp.StopAsync(); } catch { }
+        try { await _boltHubApp.StopAsync(); } catch { }
+        try { await _boltDirectApp.StopAsync(); } catch { }
     }
 
     private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
@@ -176,18 +280,38 @@ public class BoltBenchmarks
     }
 }
 
-[MemoryPackable]
-public partial record PingRequest
-{
-    public string Message { get; init; } = "";
-}
+// ── Shared types ──
 
 [MemoryPackable]
-public partial record PingResponse
+public partial record HelloMsg
 {
-    public string Message { get; init; } = "";
-    public long Timestamp { get; init; }
+    public string Text { get; init; } = "";
 }
+
+// ── gRPC services ──
+
+public class GrpcHelloBackend : HelloService.HelloServiceBase
+{
+    public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
+        => Task.FromResult(new HelloReply { Message = $"Hello {request.Name}" });
+}
+
+public class GrpcHelloHub : HelloService.HelloServiceBase
+{
+    private readonly HelloService.HelloServiceClient _backend;
+    public GrpcHelloHub(HelloService.HelloServiceClient backend) => _backend = backend;
+    public override async Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
+        => await _backend.SayHelloAsync(request);
+}
+
+// ── SignalR hub ──
+
+public class HelloHub : Hub
+{
+    public string SayHello(string name) => $"Hello {name}";
+}
+
+// ── Config ──
 
 file class BoltBenchConfig : ManualConfig
 {
@@ -208,7 +332,7 @@ file class BoltOpsPerSecColumn : IColumn
     public int PriorityInCategory => 0;
     public bool IsNumeric => true;
     public UnitType UnitType => UnitType.Dimensionless;
-    public string Legend => "Operations per second (1 / Mean)";
+    public string Legend => "Operations per second";
 
     public string GetValue(Summary summary, BenchmarkCase benchmarkCase)
         => GetValue(summary, benchmarkCase, SummaryStyle.Default);
@@ -217,9 +341,7 @@ file class BoltOpsPerSecColumn : IColumn
     {
         var report = summary[benchmarkCase];
         if (report?.ResultStatistics == null) return "N/A";
-        var meanNs = report.ResultStatistics.Mean;
-        var opsPerSec = 1_000_000_000.0 / meanNs;
-        return opsPerSec.ToString("N0");
+        return (1_000_000_000.0 / report.ResultStatistics.Mean).ToString("N0");
     }
 
     public bool IsDefault(Summary summary, BenchmarkCase benchmarkCase) => false;

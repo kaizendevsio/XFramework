@@ -11,6 +11,16 @@
     <ItemGroup>
         <PackageReference Include="BenchmarkDotNet" />
         <PackageReference Include="MemoryPack" />
+        <PackageReference Include="Grpc.AspNetCore" />
+        <PackageReference Include="Grpc.Net.Client" />
+        <PackageReference Include="Google.Protobuf" />
+        <PackageReference Include="Grpc.Tools" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Protobuf Include="Protos\hello.proto" GrpcServices="Both" />
     </ItemGroup>
 
     <ItemGroup>
