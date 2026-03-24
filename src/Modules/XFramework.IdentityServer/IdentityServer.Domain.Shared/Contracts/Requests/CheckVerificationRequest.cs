@@ -8,7 +8,7 @@ using TResponse = QueryResponse<CheckVerificationResponse>;
 [MemoryPackable]
 public partial record CheckVerificationRequest : RequestBase,
     IQuery<TResponse>,
-    IStreamflowRequest<TRequest, TResponse>
+    IBoltRequest<TRequest, TResponse>
 {
     public Guid CredentialId { get; init; }
     public Guid VerificationTypeId { get; init; }

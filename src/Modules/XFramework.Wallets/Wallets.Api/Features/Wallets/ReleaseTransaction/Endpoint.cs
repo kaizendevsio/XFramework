@@ -11,7 +11,7 @@ namespace Wallets.Api.Features.Wallets.ReleaseTransaction;
 /// </summary>
 public static class ReleaseTransactionEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/wallets/release-transaction", Tags = ["Wallets"],
         Summary = "Release a held transaction",
         Description = "Releases a transaction that was previously placed on hold. Moves the amount from on-hold balances to available balances.",

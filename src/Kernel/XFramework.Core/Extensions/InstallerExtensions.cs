@@ -47,7 +47,7 @@ public static class InstallerExtensions
         _logger.LogInformation("Runtime Version: {RuntimeVersion}", Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName);
     }
 
-    public static void InstallStreamflowRequestHandlers()
+    public static void InstallBoltRequestHandlers()
     {
         
     }

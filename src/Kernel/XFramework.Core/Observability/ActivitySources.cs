@@ -36,9 +36,9 @@ public static class ActivitySources
     public static readonly ActivitySource Auth = new($"{ServiceName}.Auth", Version);
     
     /// <summary>
-    /// ActivitySource for StreamFlow messaging operations
+    /// ActivitySource for Bolt messaging operations
     /// </summary>
-    public static readonly ActivitySource StreamFlow = new($"{ServiceName}.StreamFlow", Version);
+    public static readonly ActivitySource Bolt = new($"{ServiceName}.Bolt", Version);
     
     /// <summary>
     /// ActivitySource for SMS gateway operations

@@ -8,7 +8,7 @@ namespace Wallets.Api.Features.Wallets.Unfreeze;
 
 public static class UnfreezeWalletEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/wallets/unfreeze", Tags = ["Wallets"],
         Summary = "Unfreeze a wallet",
         Description = "Unfreezes a wallet, restoring it to Active status and allowing financial operations.",

@@ -144,10 +144,10 @@ public class PasswordTests : IntegrationTestBase
 
     #endregion
 
-    #region StreamFlow — VerifyPassword
+    #region Bolt — VerifyPassword
 
     [Test]
-    public async Task StreamFlow_VerifyPassword_WithCorrectPassword_ReturnsOk()
+    public async Task Bolt_VerifyPassword_WithCorrectPassword_ReturnsOk()
     {
         var password = "CorrectPassword123!";
         var credential = await SeedCredential(password: password);
@@ -159,7 +159,7 @@ public class PasswordTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task StreamFlow_VerifyPassword_WithWrongPassword_Returns400()
+    public async Task Bolt_VerifyPassword_WithWrongPassword_Returns400()
     {
         var credential = await SeedCredential(password: "CorrectPassword123!");
 
@@ -170,7 +170,7 @@ public class PasswordTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task StreamFlow_VerifyPassword_WithEmptyPassword_Returns400()
+    public async Task Bolt_VerifyPassword_WithEmptyPassword_Returns400()
     {
         var credential = await SeedCredential();
 
@@ -181,7 +181,7 @@ public class PasswordTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task StreamFlow_VerifyPassword_WithEmptyCredentialId_Returns400()
+    public async Task Bolt_VerifyPassword_WithEmptyCredentialId_Returns400()
     {
         var result = await IntegrationTestFixture.ServiceWrapper.VerifyPassword(
             new VerifyPasswordRequest { CredentialId = Guid.Empty, Password = "SomePassword!" });
@@ -190,7 +190,7 @@ public class PasswordTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task StreamFlow_VerifyPassword_WithNonExistentCredential_Returns404()
+    public async Task Bolt_VerifyPassword_WithNonExistentCredential_Returns404()
     {
         var result = await IntegrationTestFixture.ServiceWrapper.VerifyPassword(
             new VerifyPasswordRequest { CredentialId = Guid.NewGuid(), Password = "SomePassword!" });
@@ -200,10 +200,10 @@ public class PasswordTests : IntegrationTestBase
 
     #endregion
 
-    #region StreamFlow — ChangePassword
+    #region Bolt — ChangePassword
 
     [Test]
-    public async Task StreamFlow_ChangePassword_WithValidData_ChangesPassword()
+    public async Task Bolt_ChangePassword_WithValidData_ChangesPassword()
     {
         var oldPassword = "OldPassword123!";
         var newPassword = "NewPassword456!";
@@ -219,19 +219,19 @@ public class PasswordTests : IntegrationTestBase
 
         result.HttpStatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Verify via StreamFlow: old password fails
+        // Verify via Bolt: old password fails
         var verifyOld = await IntegrationTestFixture.ServiceWrapper.VerifyPassword(
             new VerifyPasswordRequest { CredentialId = credential.Id, Password = oldPassword });
         verifyOld.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        // Verify via StreamFlow: new password works
+        // Verify via Bolt: new password works
         var verifyNew = await IntegrationTestFixture.ServiceWrapper.VerifyPassword(
             new VerifyPasswordRequest { CredentialId = credential.Id, Password = newPassword });
         verifyNew.HttpStatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Test]
-    public async Task StreamFlow_ChangePassword_WithEmptyCredentialId_Returns400()
+    public async Task Bolt_ChangePassword_WithEmptyCredentialId_Returns400()
     {
         var result = await IntegrationTestFixture.ServiceWrapper.ChangePassword(
             new ChangePasswordRequest
@@ -245,7 +245,7 @@ public class PasswordTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task StreamFlow_ChangePassword_WithEmptyNewPassword_Returns400()
+    public async Task Bolt_ChangePassword_WithEmptyNewPassword_Returns400()
     {
         var credential = await SeedCredential();
 
@@ -261,7 +261,7 @@ public class PasswordTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task StreamFlow_ChangePassword_WithNonExistentCredential_Returns404()
+    public async Task Bolt_ChangePassword_WithNonExistentCredential_Returns404()
     {
         var result = await IntegrationTestFixture.ServiceWrapper.ChangePassword(
             new ChangePasswordRequest

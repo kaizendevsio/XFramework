@@ -1,4 +1,4 @@
-// Custom StreamFlow wrapper methods are now source-generated from IStreamflowRequest types
+// Custom Bolt wrapper methods are now source-generated from IBoltRequest types
 // in the IdentityServer.Domain.Shared assembly. See ServiceWrapperGenerator.
 //
 // Generated methods: AuthenticateIdentity, CheckVerification, VerifyPassword, ChangePassword

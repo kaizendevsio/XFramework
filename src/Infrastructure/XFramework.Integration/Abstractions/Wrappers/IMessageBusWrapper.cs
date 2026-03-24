@@ -1,4 +1,4 @@
-using StreamFlow.Domain.Shared.Contracts.Requests;
+using Bolt.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Integration.Entity.Contracts.Responses;
 
@@ -22,7 +22,7 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task PublishAsync<TModel>(string eventName, string topic, TModel? data)
         where TModel : class, IHasRequestServer;
     public Task PublishAsync(string eventName, string topic);
-    public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request)
+    public Task Subscribe<TResponse>(BoltSubscriptionRequest<TResponse> request)
         where TResponse : class;
-    public Task Unsubscribe(StreamFlowSubscriptionRequest request);
+    public Task Unsubscribe(BoltSubscriptionRequest request);
 }

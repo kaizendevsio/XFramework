@@ -8,7 +8,7 @@ namespace IdentityServer.Api.Features.Auth.Logout;
 
 public static class LogoutEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/auth/logout", Tags = ["Auth"],
         Summary = "Logout a user",
         Description = "Marks the user's session as Inactive. Creates an authorization log entry for audit trail.",

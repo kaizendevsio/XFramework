@@ -8,11 +8,11 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using StreamFlow.Domain.Shared.Abstractions;
-using StreamFlow.Domain.Shared.BusinessObjects;
-using StreamFlow.Domain.Shared.Contracts.Requests;
-using StreamFlow.Domain.Shared.Contracts.Responses;
-using StreamFlow.Domain.Shared.Enums;
+using Bolt.Domain.Shared.Abstractions;
+using Bolt.Domain.Shared.BusinessObjects;
+using Bolt.Domain.Shared.Contracts.Requests;
+using Bolt.Domain.Shared.Contracts.Responses;
+using Bolt.Domain.Shared.Enums;
 using TypeSupport.Extensions;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Contracts.Base;
@@ -34,7 +34,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     private bool _isRegistering;
     private bool _subscriptionsEventHandle;
 
-    private readonly ConcurrentQueue<(string MethodName, StreamFlowMessage StreamFlowMessage)> _offlineQueue = new();
+    private readonly ConcurrentQueue<(string MethodName, BoltMessage BoltMessage)> _offlineQueue = new();
     protected TaskCompletionSource TaskCompletionSource { get; set; } = new();
 
     // Connection pool — replaces the single Connection property
@@ -46,7 +46,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     // Legacy single-connection pending calls (for InvokeResponseHandler pattern)
     public ConcurrentDictionary<Guid, PooledRpcCall> PendingMethodCalls { get; set; } = new();
 
-    public StreamFlowConfiguration StreamFlowConfiguration { get; set; } = new();
+    public BoltConfiguration BoltConfiguration { get; set; } = new();
 
     public SignalRService(IHostEnvironment hostEnvironment, IConfiguration configuration, ILogger<SignalRService> logger, ILogger<BaseSignalRHandler> baseLogger, IServiceScopeFactory scopeFactory)
     {
@@ -55,21 +55,21 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         _baseLogger = baseLogger;
         _scopeFactory = scopeFactory;
         _logger = logger;
-        configuration.Bind(nameof(StreamFlowConfiguration), StreamFlowConfiguration);
+        configuration.Bind(nameof(BoltConfiguration), BoltConfiguration);
 
         InitializeService();
     }
 
     private Uri? ResolveServerUrl()
     {
-        var envConfig = _configuration["STREAMFLOW_SERVER_URLS"];
+        var envConfig = _configuration["BOLT_SERVER_URLS"];
 
-        if ((StreamFlowConfiguration.ServerUrls is null || !StreamFlowConfiguration.ServerUrls.Any()) && string.IsNullOrEmpty(envConfig))
+        if ((BoltConfiguration.ServerUrls is null || !BoltConfiguration.ServerUrls.Any()) && string.IsNullOrEmpty(envConfig))
             return null;
 
         return !string.IsNullOrEmpty(envConfig)
             ? new Uri(envConfig)
-            : StreamFlowConfiguration?.ServerUrls?.FirstOrDefault();
+            : BoltConfiguration?.ServerUrls?.FirstOrDefault();
     }
 
     private HubConnection BuildConnection(Uri serverUrl)
@@ -106,7 +106,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         var serverUrl = ResolveServerUrl();
         if (serverUrl is null)
         {
-            _logger.LogWarning("StreamFlow configuration is not set, therefore SignalR client service is disabled");
+            _logger.LogWarning("Bolt configuration is not set, therefore SignalR client service is disabled");
             return;
         }
 
@@ -117,7 +117,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         _connectionPool = new ConnectionPool(
             connectionFactory: () => BuildConnection(serverUrl),
             onConnectionReady: RegisterPooledConnectionAsync,
-            StreamFlowConfiguration,
+            BoltConfiguration,
             _logger);
         _connectionPool.AddPrimary(Connection);
 
@@ -126,30 +126,30 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     }
 
     /// <summary>
-    /// Register a newly scaled-up connection with the StreamFlow hub.
+    /// Register a newly scaled-up connection with the Bolt hub.
     /// </summary>
     private async Task RegisterPooledConnectionAsync(HubConnection connection)
     {
-        var serviceName = !string.IsNullOrEmpty(StreamFlowConfiguration.ClientName)
-            ? StreamFlowConfiguration.ClientName.Split(".").First()
+        var serviceName = !string.IsNullOrEmpty(BoltConfiguration.ClientName)
+            ? BoltConfiguration.ClientName.Split(".").First()
             : Assembly.GetEntryAssembly()!.GetName().Name!.Split(".").First()
               ?? throw new ArgumentException("Assembly name is not set");
         var serviceId = serviceName.ToSha256();
-        var clientId = StreamFlowConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Streamflow client Id is not set");
+        var clientId = BoltConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Bolt client Id is not set");
 
-        var request = new StreamFlowClient()
+        var request = new BoltHubClient()
         {
             Id = clientId,
-            Name = StreamFlowConfiguration.ClientName,
-            Queue = new StreamFlowQueue()
+            Name = BoltConfiguration.ClientName,
+            Queue = new BoltQueue()
         };
-        await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
+        await connection.InvokeAsync<HttpStatusCode>(nameof(IBoltTransport.Register), request);
 
         // Register handlers on the new connection
         RegisterHandlersOnConnection(connection);
         RegisterInvokeResponseOnConnection(connection);
 
-        _logger.LogInformation("Pooled connection registered with StreamFlow hub");
+        _logger.LogInformation("Pooled connection registered with Bolt hub");
     }
 
     /// <summary>
@@ -157,7 +157,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     /// </summary>
     private void RegisterInvokeResponseOnConnection(HubConnection connection)
     {
-        connection.On<StreamFlowMessage>(nameof(IStreamFlow.InvokeResponseHandler),
+        connection.On<BoltMessage>(nameof(IBoltTransport.InvokeResponseHandler),
             (response) =>
             {
                 try
@@ -216,13 +216,13 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
     public Task AddHandlersFromAssembly<T>()
     {
-        var typesImplementingStreamflowRequest = Assembly.GetAssembly(typeof(T)).GetTypes()
+        var typesImplementingBoltRequest = Assembly.GetAssembly(typeof(T)).GetTypes()
             .Where(x => !x.IsInterface && !x.IsAbstract)
             .SelectMany(x => x.GetInterfaces(), (x, i) => new { Type = x, Interface = i })
-            .Where(x => x.Interface.IsGenericType && x.Interface.GetGenericTypeDefinition() == typeof(IStreamflowRequest<,>))
+            .Where(x => x.Interface.IsGenericType && x.Interface.GetGenericTypeDefinition() == typeof(IBoltRequest<,>))
             .ToList();
 
-        foreach (var type in typesImplementingStreamflowRequest)
+        foreach (var type in typesImplementingBoltRequest)
         {
             var genericArguments = type.Interface.GetGenericArguments();
 
@@ -270,14 +270,14 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     public async Task StartEventListener(string topic)
     {
         if (string.IsNullOrEmpty(topic)) return;
-        var client = new StreamFlowClient
+        var client = new BoltHubClient
         {
             Queue = new()
             {
                 Name = topic
             },
         };
-        var r = await Connection?.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Subscribe), client);
+        var r = await Connection?.InvokeAsync<HttpStatusCode>(nameof(IBoltTransport.Subscribe), client);
         if (r is not HttpStatusCode.Accepted)
         {
             throw new ArgumentException("Handle subscriptions event error: Failed to subscribe for notifications");
@@ -298,7 +298,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
     {
         Connection!.Closed += async connectionId =>
         {
-            _logger.LogInformation("Connection to StreamFlow server closed, connectionId: {ConnectionId}", connectionId);
+            _logger.LogInformation("Connection to Bolt server closed, connectionId: {ConnectionId}", connectionId);
 
             // Cancel all pending RPCs across all pool connections
             if (_connectionPool is not null)
@@ -327,7 +327,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
     private void HandleTelemetryCallEvent()
     {
-        Connection?.On<string, string>(nameof(IStreamFlow.TelemetryCall), (data, message) => { _logger.LogInformation("Telemetry Call ({Now}): {Message}", DateTime.Now, message); });
+        Connection?.On<string, string>(nameof(IBoltTransport.TelemetryCall), (data, message) => { _logger.LogInformation("Telemetry Call ({Now}): {Message}", DateTime.Now, message); });
     }
 
     private void HandleReconnectedEvent()
@@ -341,7 +341,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         Connection.Reconnected += async connectionId =>
         {
             Debug.Assert(Connection?.State == HubConnectionState.Connected);
-            _logger.LogInformation("Connection to StreamFlow server restored");
+            _logger.LogInformation("Connection to Bolt server restored");
             await RegisterConnection();
         };
     }
@@ -360,7 +360,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             _isRegistered = false;
             _isRegistering = false;
 
-            _logger.LogInformation("Connection to StreamFlow server lost, trying to reconnect..");
+            _logger.LogInformation("Connection to Bolt server lost, trying to reconnect..");
 
             return Task.CompletedTask;
         };
@@ -392,11 +392,11 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                 if (Connection?.State == HubConnectionState.Disconnected)
                 {
                     var startTimer = Stopwatch.StartNew();
-                    _logger.LogInformation("Connecting to StreamFlow server..");
+                    _logger.LogInformation("Connecting to Bolt server..");
 
                     await Connection.StartAsync();
                     startTimer.Stop();
-                    _logger.LogInformation("Connecting to StreamFlow server.. Done in {ResponseTime}ms", startTimer.ElapsedMilliseconds);
+                    _logger.LogInformation("Connecting to Bolt server.. Done in {ResponseTime}ms", startTimer.ElapsedMilliseconds);
                 }
 
                 if (Connection?.State == HubConnectionState.Connected)
@@ -408,9 +408,9 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to connect to StreamFlow server: {EMessage} : {InnerExceptionMessage}", e.Message, e.InnerException?.Message);
-                _logger.LogInformation("Retrying in {ReconnectDelay}ms", StreamFlowConfiguration.ReconnectDelay);
-                await Task.Delay(StreamFlowConfiguration.ReconnectDelay);
+                _logger.LogError(e, "Failed to connect to Bolt server: {EMessage} : {InnerExceptionMessage}", e.Message, e.InnerException?.Message);
+                _logger.LogInformation("Retrying in {ReconnectDelay}ms", BoltConfiguration.ReconnectDelay);
+                await Task.Delay(BoltConfiguration.ReconnectDelay);
             }
         }
 
@@ -425,22 +425,22 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         var startTimer = Stopwatch.StartNew();
         _logger.LogInformation("Registering Connection..");
 
-        var serviceName = !string.IsNullOrEmpty(StreamFlowConfiguration.ClientName)
-            ? StreamFlowConfiguration.ClientName.Split(".").First()
+        var serviceName = !string.IsNullOrEmpty(BoltConfiguration.ClientName)
+            ? BoltConfiguration.ClientName.Split(".").First()
             : Assembly.GetEntryAssembly()!.GetName().Name!.Split(".").First()
               ?? throw new ArgumentException("Assembly name is not set");
         var serviceId = serviceName.ToSha256();
 
-        _clientId = StreamFlowConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Streamflow client Id is not set");
-        _logger.LogInformation("Registering streamflow client with id {ClientId}", _clientId);
+        _clientId = BoltConfiguration.Anonymous ? $"sfc_{Guid.NewGuid()}" : serviceId ?? throw new ArgumentException("Bolt client Id is not set");
+        _logger.LogInformation("Registering bolt client with id {ClientId}", _clientId);
 
-        var request = new StreamFlowClient()
+        var request = new BoltHubClient()
         {
             Id = _clientId,
-            Name = StreamFlowConfiguration.ClientName,
-            Queue = new StreamFlowQueue()
+            Name = BoltConfiguration.ClientName,
+            Queue = new BoltQueue()
         };
-        await Connection!.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.Register), request);
+        await Connection!.InvokeAsync<HttpStatusCode>(nameof(IBoltTransport.Register), request);
 
         startTimer.Stop();
         _logger.LogInformation("Registering Connection.. Done in {ResponseTime}ms", startTimer.ElapsedMilliseconds);
@@ -464,7 +464,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
             {
                 try
                 {
-                    await Connection.InvokeAsync<HttpStatusCode>(item.MethodName, item.StreamFlowMessage);
+                    await Connection.InvokeAsync<HttpStatusCode>(item.MethodName, item.BoltMessage);
                     sent = true;
                 }
                 catch (Exception ex) when (attempt < 2)
@@ -484,7 +484,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         _logger.LogInformation("Dequeued {DequeueCount} item(s) from cache", dequeued);
     }
 
-    public async Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage)
+    public async Task<HttpStatusCode> InvokeVoidAsync(string methodName, BoltMessage sfMessage)
     {
         try
         {
@@ -493,7 +493,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
                 return await Connection?.InvokeAsync<HttpStatusCode>(methodName, sfMessage);
             }
 
-            var maxQueue = StreamFlowConfiguration.QueueDepth > 0 ? StreamFlowConfiguration.QueueDepth : 10_000;
+            var maxQueue = BoltConfiguration.QueueDepth > 0 ? BoltConfiguration.QueueDepth : 10_000;
             if (_offlineQueue.Count >= maxQueue)
             {
                 _logger.LogError("Offline queue full ({Count}), dropping message '{CommandName}'",
@@ -513,7 +513,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         return HttpStatusCode.InternalServerError;
     }
 
-    public async Task<StreamFlowRpcResult> InvokeAsync(StreamFlowMessage sfMessage)
+    public async Task<BoltRpcResult> InvokeAsync(BoltMessage sfMessage)
     {
         var startTimer = Stopwatch.StartNew();
         sfMessage.ClientId = _clientId;
@@ -528,19 +528,19 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
 
             if (connection?.State is not HubConnectionState.Connected || !_isRegistered || _isRegistering)
             {
-                var maxQueue = StreamFlowConfiguration.QueueDepth > 0 ? StreamFlowConfiguration.QueueDepth : 10_000;
+                var maxQueue = BoltConfiguration.QueueDepth > 0 ? BoltConfiguration.QueueDepth : 10_000;
                 if (_offlineQueue.Count >= maxQueue)
                 {
                     return new() { StatusCode = HttpStatusCode.ServiceUnavailable, Message = "Offline queue full" };
                 }
-                _offlineQueue.Enqueue(new(nameof(IStreamFlow.Push), sfMessage));
+                _offlineQueue.Enqueue(new(nameof(IBoltTransport.Push), sfMessage));
                 return new() { StatusCode = HttpStatusCode.Processing };
             }
 
             pooledConn?.Touch();
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(StreamFlowConfiguration.RpcTimeoutSeconds));
-            var invokeResponse = await connection.InvokeAsync<StreamFlowInvokeResponse>(
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(BoltConfiguration.RpcTimeoutSeconds));
+            var invokeResponse = await connection.InvokeAsync<BoltInvokeResponse>(
                 "Invoke", sfMessage, cts.Token);
 
             startTimer.Stop();
@@ -557,7 +557,7 @@ public class SignalRService : BaseSignalRHandler, ISignalRService
         }
         catch (OperationCanceledException)
         {
-            _logger.LogError("RPC timeout for method '{SfMessageCommandName}' after {Timeout}s", sfMessage.CommandName, StreamFlowConfiguration.RpcTimeoutSeconds);
+            _logger.LogError("RPC timeout for method '{SfMessageCommandName}' after {Timeout}s", sfMessage.CommandName, BoltConfiguration.RpcTimeoutSeconds);
             return new()
             {
                 StatusCode = HttpStatusCode.RequestTimeout,

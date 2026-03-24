@@ -6,7 +6,7 @@ using TResponse = CmdResponse;
 [MemoryPackable]
 public partial record CreateCashoutRequest : TransactionRequestBase,
     ICommand<CmdResponse>,
-    IStreamflowRequest<TRequest, TResponse>
+    IBoltRequest<TRequest, TResponse>
 {
     public PaymentGateway? PaymentGateway { get; set; }
 }

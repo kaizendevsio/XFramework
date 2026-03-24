@@ -8,7 +8,7 @@ namespace Messaging.Api.Features.Messages.CreateDirect;
 
 public static class CreateDirectMessageEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/messages/direct", Tags = ["Messages"],
         Summary = "Create and send a direct message",
         ExcludeFromOpenApi = true)]

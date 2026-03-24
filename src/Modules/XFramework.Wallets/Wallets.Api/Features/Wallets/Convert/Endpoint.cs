@@ -10,7 +10,7 @@ namespace Wallets.Api.Features.Wallets.Convert;
 /// </summary>
 public static class ConvertEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/wallets/convert", Tags = ["Wallets"],
         Summary = "Convert funds between wallet types",
         Description = "Converts funds from one wallet type to another for the same credential. Handles fee deduction based on TransferDeductionType. Automatically creates target wallet if it doesn't exist.",

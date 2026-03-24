@@ -6,8 +6,8 @@ using System.Net.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging;
-using StreamFlow.Domain.Shared.Buffers;
-using StreamFlow.Domain.Shared.Protocol;
+using Bolt.Domain.Shared.Buffers;
+using Bolt.Domain.Shared.Protocol;
 
 namespace XFramework.Integration.ThinProtocol;
 
@@ -27,7 +27,7 @@ public sealed class QuicDirectServer : IAsyncDisposable
 
     public void RegisterHandler(string commandName, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
     {
-        _handlers[StreamFlowCodec.Fnv1aHash(commandName)] = handler;
+        _handlers[BoltHubCodec.Fnv1aHash(commandName)] = handler;
     }
 
     public async Task StartAsync(IPEndPoint endpoint, CancellationToken ct = default)
@@ -92,20 +92,20 @@ public sealed class QuicDirectServer : IAsyncDisposable
         try
         {
             var read = await stream.ReadAsync(buffer, ct);
-            if (read > 0 && StreamFlowCodec.TryReadRequest(buffer.AsSpan(0, read), out var frame, out _))
+            if (read > 0 && BoltHubCodec.TryReadRequest(buffer.AsSpan(0, read), out var frame, out _))
             {
                 if (_handlers.TryGetValue(frame.CommandHash, out var handler))
                 {
                     var requestPayload = frame.GetPayload(buffer.AsMemory(0, read));
                     var (status, respData) = await handler(requestPayload, frame.RequestId);
                     var writer = RentedBufferWriter.GetThreadLocal();
-                    StreamFlowCodec.WriteResponse(writer, frame.RequestId, status, respData.Span);
+                    BoltHubCodec.WriteResponse(writer, frame.RequestId, status, respData.Span);
                     await stream.WriteAsync(writer.WrittenMemory, ct);
                 }
                 else
                 {
-                    var writer = new ArrayBufferWriter<byte>(StreamFlowCodec.ResponseHeaderSize);
-                    StreamFlowCodec.WriteResponse(writer, frame.RequestId, HttpStatusCode.NotImplemented, []);
+                    var writer = new ArrayBufferWriter<byte>(BoltHubCodec.ResponseHeaderSize);
+                    BoltHubCodec.WriteResponse(writer, frame.RequestId, HttpStatusCode.NotImplemented, []);
                     await stream.WriteAsync(writer.WrittenMemory, ct);
                 }
             }
@@ -170,14 +170,14 @@ public sealed class QuicDirectClient : IAsyncDisposable
         string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
         var requestId = Guid.NewGuid();
-        var commandHash = StreamFlowCodec.Fnv1aHash(commandName);
+        var commandHash = BoltHubCodec.Fnv1aHash(commandName);
 
         var stream = await _connection!.OpenOutboundStreamAsync(QuicStreamType.Bidirectional, ct);
         try
         {
             // Write request
             var writer = RentedBufferWriter.GetThreadLocal();
-            StreamFlowCodec.WriteRequest(writer, requestId, 0, commandHash, payload.Span);
+            BoltHubCodec.WriteRequest(writer, requestId, 0, commandHash, payload.Span);
             await stream.WriteAsync(writer.WrittenMemory, ct);
             stream.CompleteWrites(); // Signal end of request
 
@@ -186,7 +186,7 @@ public sealed class QuicDirectClient : IAsyncDisposable
             try
             {
                 var read = await stream.ReadAsync(buffer, ct);
-                if (read > 0 && StreamFlowCodec.TryReadResponse(buffer.AsSpan(0, read), out var frame, out _))
+                if (read > 0 && BoltHubCodec.TryReadResponse(buffer.AsSpan(0, read), out var frame, out _))
                 {
                     var respBytes = frame.PayloadLength > 0
                         ? frame.GetPayload(buffer.AsSpan(0, read)).ToArray()

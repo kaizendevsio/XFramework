@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using StreamFlow.Stream.Extensions;
+using Bolt.Hub.Extensions;
 using Testcontainers.PostgreSql;
 using Wallets.Integration.Drivers;
 using XFramework.Core.Extensions;
@@ -32,7 +32,7 @@ public class WalletsTestFixture
     private static Task? _testClientTask;
 
     public static string ConnectionString { get; private set; } = null!;
-    public static string StreamFlowUrl => "http://localhost:17100";
+    public static string BoltUrl => "http://localhost:17100";
     public static string WalletsUrl => "http://localhost:18361";
     public static string TestClientUrl => "http://localhost:18362";
 
@@ -57,8 +57,8 @@ public class WalletsTestFixture
 
         await MigrateAndSeed();
 
-        _streamFlowApp = StartStreamFlow();
-        await WaitForHealth($"{StreamFlowUrl}/health/live");
+        _streamFlowApp = StartBolt();
+        await WaitForHealth($"{BoltUrl}/health/live");
 
         _walletsApp = StartWallets();
         await WaitForHealth($"{WalletsUrl}/health/live");
@@ -73,8 +73,8 @@ public class WalletsTestFixture
         _testClientApp = StartTestClient();
         await WaitForHealth($"{TestClientUrl}/health/live");
 
-        await WaitForStreamFlowClients();
-        RegisterStreamFlowHandlers();
+        await WaitForBoltClients();
+        RegisterBoltHandlers();
     }
 
     [OneTimeTearDown]
@@ -86,11 +86,11 @@ public class WalletsTestFixture
         if (_postgres != null) await _postgres.DisposeAsync();
     }
 
-    private static WebApplication StartStreamFlow()
+    private static WebApplication StartBolt()
     {
-        var builder = XApplication.Configure<StreamFlow.Stream.Installers.StreamInstaller>();
-        builder.WebHost.UseUrls(StreamFlowUrl);
-        OverrideConfig(builder, "StreamFlow.WalletTest", "00000000-0000-0000-0000-000000000010");
+        var builder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
+        builder.WebHost.UseUrls(BoltUrl);
+        OverrideConfig(builder, "Bolt.WalletTest", "00000000-0000-0000-0000-000000000010");
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
@@ -106,7 +106,7 @@ public class WalletsTestFixture
         var builder = XApplication.Configure<Wallets.Api.Services.WalletOperationsService>();
         builder.WebHost.UseUrls(WalletsUrl);
         OverrideConfig(builder, "Wallets.Test", "4902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue";
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
 
         builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletOperationsService>();
 
@@ -133,15 +133,15 @@ public class WalletsTestFixture
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["StreamFlowConfiguration:ClientName"] = "WalletTestClient",
-            ["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientName"] = "WalletTestClient",
+            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Warning",
         });
 
         builder.Services.InstallStandardServices<WalletsTestFixture>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("WalletTest"));
-        builder.Services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
+        builder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
         builder.Services.AddWalletsWrapperServices();
 
         var app = builder.Build();
@@ -151,7 +151,7 @@ public class WalletsTestFixture
         return app;
     }
 
-    private static async Task WaitForStreamFlowClients()
+    private static async Task WaitForBoltClients()
     {
         var walletsSignalR = _walletsApp.Services.GetRequiredService<ISignalRService>();
         var testClientSignalR = _testClientApp.Services.GetRequiredService<ISignalRService>();
@@ -167,10 +167,10 @@ public class WalletsTestFixture
             }
             await Task.Delay(250);
         }
-        throw new TimeoutException("StreamFlow clients failed to connect within 15s");
+        throw new TimeoutException("Bolt clients failed to connect within 15s");
     }
 
-    private static void RegisterStreamFlowHandlers()
+    private static void RegisterBoltHandlers()
     {
         var signalRService = _walletsApp.Services.GetRequiredService<ISignalRService>();
         var logger = _walletsApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
@@ -190,8 +190,8 @@ public class WalletsTestFixture
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = ConnectionString,
-            ["StreamFlowConfiguration:ClientGuid"] = clientGuid,
-            ["StreamFlowConfiguration:ClientName"] = clientName,
+            ["BoltConfiguration:ClientGuid"] = clientGuid,
+            ["BoltConfiguration:ClientName"] = clientName,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Warning"
         });

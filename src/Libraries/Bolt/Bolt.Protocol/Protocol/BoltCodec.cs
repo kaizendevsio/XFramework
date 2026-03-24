@@ -7,7 +7,7 @@ using System.Text;
 namespace Bolt.Protocol;
 
 /// <summary>
-/// Zero-allocation binary codec for the thin StreamFlow protocol.
+/// Zero-allocation binary codec for the thin Bolt protocol.
 ///
 /// Request frame:  [1:type] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]
 ///                 = 29 bytes header + N payload

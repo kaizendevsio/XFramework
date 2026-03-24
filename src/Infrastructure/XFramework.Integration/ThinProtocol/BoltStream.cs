@@ -2,8 +2,8 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using MemoryPack;
-using StreamFlow.Domain.Shared.Buffers;
-using StreamFlow.Domain.Shared.Protocol;
+using Bolt.Domain.Shared.Buffers;
+using Bolt.Domain.Shared.Protocol;
 
 namespace XFramework.Integration.ThinProtocol;
 
@@ -55,7 +55,7 @@ public sealed class BoltStream : IAsyncDisposable
         if (_closed) throw new InvalidOperationException("Stream is closed");
 
         var writer = RentedBufferWriter.GetThreadLocal();
-        StreamFlowCodec.WriteStreamData(writer, _streamId, data.Span);
+        BoltHubCodec.WriteStreamData(writer, _streamId, data.Span);
         await _connection.SendAsync(writer.WrittenMemory, ct);
     }
 
@@ -131,7 +131,7 @@ public sealed class BoltStream : IAsyncDisposable
         _closed = true;
 
         var writer = RentedBufferWriter.GetThreadLocal();
-        StreamFlowCodec.WriteStreamClose(writer, _streamId, statusCode);
+        BoltHubCodec.WriteStreamClose(writer, _streamId, statusCode);
         await _connection.SendAsync(writer.WrittenMemory, ct);
 
         _inboundChannel.Writer.TryComplete();

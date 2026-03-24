@@ -8,7 +8,7 @@ namespace Wallets.Api.Features.Wallets.ReverseTransaction;
 
 public static class ReverseTransactionEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/wallets/reverse-transaction", Tags = ["Wallets"],
         Summary = "Reverse a transaction",
         Description = "Reverses a single transaction or a full transfer (paired). Creates inverse transactions and updates balances.",

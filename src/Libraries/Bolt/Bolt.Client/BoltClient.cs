@@ -68,7 +68,7 @@ public sealed class BoltClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// Connect to the thin StreamFlow server and register.
+    /// Connect to the thin Bolt server and register.
     /// Creates MinConnections connections (default 1, scales up dynamically).
     /// </summary>
     public async Task ConnectAsync(CancellationToken ct = default)

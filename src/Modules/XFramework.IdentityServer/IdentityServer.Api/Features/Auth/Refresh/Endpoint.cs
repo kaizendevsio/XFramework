@@ -9,7 +9,7 @@ namespace IdentityServer.Api.Features.Auth.Refresh;
 
 public static class RefreshTokenEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/auth/refresh", Tags = ["Auth"],
         Summary = "Refresh an access token",
         Description = "Validates the refresh token against stored session data, generates a new token pair, and updates the session.",

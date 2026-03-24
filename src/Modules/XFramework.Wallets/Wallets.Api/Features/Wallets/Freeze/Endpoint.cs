@@ -8,7 +8,7 @@ namespace Wallets.Api.Features.Wallets.Freeze;
 
 public static class FreezeWalletEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/wallets/freeze", Tags = ["Wallets"],
         Summary = "Freeze a wallet",
         Description = "Freezes a wallet, preventing all financial operations (transfer, increment, decrement, convert).",

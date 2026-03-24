@@ -465,34 +465,34 @@ public static partial class LogMessages
 
     #endregion
 
-    #region StreamFlow Operations (9000-9999)
+    #region Bolt Operations (9000-9999)
 
     [LoggerMessage(
         EventId = 9001,
         Level = LogLevel.Warning,
         Message = "Unknown or unauthorized client detected. ConnectionId: {ConnectionId}")]
-    public static partial void StreamFlowClientUnauthorized(
+    public static partial void BoltClientUnauthorized(
         this Microsoft.Extensions.Logging.ILogger logger, string connectionId);
 
     [LoggerMessage(
         EventId = 9002,
         Level = LogLevel.Information,
         Message = "FanOut message sent. RequestId: {RequestId}, Sender: {SenderName}")]
-    public static partial void StreamFlowFanOutSent(
+    public static partial void BoltFanOutSent(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, string senderName);
 
     [LoggerMessage(
         EventId = 9003,
         Level = LogLevel.Information,
         Message = "Topic message sent. RequestId: {RequestId}, Topic: {Topic}, Sender: {SenderName}")]
-    public static partial void StreamFlowTopicSent(
+    public static partial void BoltTopicSent(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, string topic, string senderName);
 
     [LoggerMessage(
         EventId = 9004,
         Level = LogLevel.Information,
         Message = "Direct message sent. ExchangeType: {ExchangeType}, RequestId: {RequestId}, Sender: {SenderName} -> Recipient: {RecipientName}, Status: {StatusCode}")]
-    public static partial void StreamFlowDirectSent(
+    public static partial void BoltDirectSent(
         this Microsoft.Extensions.Logging.ILogger logger, string exchangeType, string requestId,
         string senderName, string recipientName, int statusCode);
 
@@ -500,21 +500,21 @@ public static partial class LogMessages
         EventId = 9005,
         Level = LogLevel.Error,
         Message = "Error pushing message. RequestId: {RequestId}")]
-    public static partial void StreamFlowPushError(
+    public static partial void BoltPushError(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, Exception exception);
 
     [LoggerMessage(
         EventId = 9006,
         Level = LogLevel.Error,
         Message = "Failed to register client after {MaxAttempts} attempts. ConnectionId: {ConnectionId}, ClientId: {ClientId}")]
-    public static partial void StreamFlowClientRegistrationFailed(
+    public static partial void BoltClientRegistrationFailed(
         this Microsoft.Extensions.Logging.ILogger logger, int maxAttempts, string connectionId, string clientId);
 
     [LoggerMessage(
         EventId = 9007,
         Level = LogLevel.Information,
         Message = "Client registered. ConnectionId: {ConnectionId}, ClientId: {ClientId}, Transport: {TransportType}, Name: {ClientName}")]
-    public static partial void StreamFlowClientRegistered(
+    public static partial void BoltClientRegistered(
         this Microsoft.Extensions.Logging.ILogger logger, string connectionId, string clientId,
         string transportType, string clientName);
 
@@ -522,112 +522,112 @@ public static partial class LogMessages
         EventId = 9008,
         Level = LogLevel.Warning,
         Message = "Failed to queue method call. RequestId: {RequestId}")]
-    public static partial void StreamFlowMethodCallQueueFailed(
+    public static partial void BoltMethodCallQueueFailed(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId);
 
     [LoggerMessage(
         EventId = 9009,
         Level = LogLevel.Warning,
         Message = "Method invocation timed out. RequestId: {RequestId}")]
-    public static partial void StreamFlowMethodInvocationTimeout(
+    public static partial void BoltMethodInvocationTimeout(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId);
 
     [LoggerMessage(
         EventId = 9010,
         Level = LogLevel.Error,
         Message = "Error invoking method. RequestId: {RequestId}")]
-    public static partial void StreamFlowMethodInvocationError(
+    public static partial void BoltMethodInvocationError(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, Exception exception);
 
     [LoggerMessage(
         EventId = 9011,
         Level = LogLevel.Information,
         Message = "Method response received. RequestId: {RequestId}")]
-    public static partial void StreamFlowMethodResponseReceived(
+    public static partial void BoltMethodResponseReceived(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId);
 
     [LoggerMessage(
         EventId = 9012,
         Level = LogLevel.Error,
         Message = "Error processing method response. RequestId: {RequestId}")]
-    public static partial void StreamFlowMethodResponseError(
+    public static partial void BoltMethodResponseError(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, Exception exception);
 
     [LoggerMessage(
         EventId = 9013,
         Level = LogLevel.Debug,
         Message = "Dequeue request for client. ClientId: {ClientId}")]
-    public static partial void StreamFlowDequeueRequest(
+    public static partial void BoltDequeueRequest(
         this Microsoft.Extensions.Logging.ILogger logger, string clientId);
 
     [LoggerMessage(
         EventId = 9014,
         Level = LogLevel.Warning,
         Message = "Invalid recipient for message. RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}")]
-    public static partial void StreamFlowInvalidRecipient(
+    public static partial void BoltInvalidRecipient(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, string senderName, string recipientId);
 
     [LoggerMessage(
         EventId = 9015,
         Level = LogLevel.Information,
         Message = "Message queueing disabled. Message dropped. RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}")]
-    public static partial void StreamFlowMessageQueuingDisabled(
+    public static partial void BoltMessageQueuingDisabled(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, string senderName, string recipientId);
 
     [LoggerMessage(
         EventId = 9016,
         Level = LogLevel.Information,
         Message = "Message queued for offline recipient. RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}")]
-    public static partial void StreamFlowMessageQueued(
+    public static partial void BoltMessageQueued(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, string senderName, string recipientId);
 
     [LoggerMessage(
         EventId = 9017,
         Level = LogLevel.Warning,
         Message = "Failed to queue message (channel closed). RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}")]
-    public static partial void StreamFlowMessageQueueFailed(
+    public static partial void BoltMessageQueueFailed(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, string senderName, string recipientId);
 
     [LoggerMessage(
         EventId = 9018,
         Level = LogLevel.Information,
         Message = "Message queueing cancelled. RequestId: {RequestId}, Sender: {SenderName}, RecipientId: {RecipientId}")]
-    public static partial void StreamFlowMessageQueueCancelled(
+    public static partial void BoltMessageQueueCancelled(
         this Microsoft.Extensions.Logging.ILogger logger, string requestId, string senderName, string recipientId);
 
     [LoggerMessage(
         EventId = 9019,
         Level = LogLevel.Warning,
         Message = "Failed to cache latest client after {MaxAttempts} attempts. ClientId: {ClientId}")]
-    public static partial void StreamFlowClientCacheFailed(
+    public static partial void BoltClientCacheFailed(
         this Microsoft.Extensions.Logging.ILogger logger, int maxAttempts, string clientId);
 
     [LoggerMessage(
         EventId = 9020,
         Level = LogLevel.Warning,
         Message = "Failed to update latest client cache after {MaxAttempts} attempts. ClientId: {ClientId}")]
-    public static partial void StreamFlowClientCacheUpdateFailed(
+    public static partial void BoltClientCacheUpdateFailed(
         this Microsoft.Extensions.Logging.ILogger logger, int maxAttempts, string clientId);
 
     [LoggerMessage(
         EventId = 9021,
         Level = LogLevel.Debug,
         Message = "Client added to absolute clients. ClientId: {ClientId}")]
-    public static partial void StreamFlowClientAddedToAbsolute(
+    public static partial void BoltClientAddedToAbsolute(
         this Microsoft.Extensions.Logging.ILogger logger, string clientId);
 
     [LoggerMessage(
         EventId = 9022,
         Level = LogLevel.Warning,
         Message = "Failed to add client to absolute clients after {MaxAttempts} attempts. ClientId: {ClientId}")]
-    public static partial void StreamFlowAbsoluteClientAddFailed(
+    public static partial void BoltAbsoluteClientAddFailed(
         this Microsoft.Extensions.Logging.ILogger logger, int maxAttempts, string clientId);
 
     [LoggerMessage(
         EventId = 9023,
         Level = LogLevel.Debug,
         Message = "Updated connection ID for existing client. ClientId: {ClientId}")]
-    public static partial void StreamFlowClientConnectionUpdated(
+    public static partial void BoltClientConnectionUpdated(
         this Microsoft.Extensions.Logging.ILogger logger, string clientId);
 
     #endregion

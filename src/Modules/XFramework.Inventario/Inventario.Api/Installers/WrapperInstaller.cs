@@ -9,7 +9,7 @@ public class WrapperInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
+        services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
         services.AddSingleton<IMessagingServiceWrapper, MessagingServiceWrapper>();
     }
 }

@@ -22,9 +22,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Perfolizer.Horology;
-using StreamFlow.Domain.Shared.Protocol;
-using StreamFlow.Stream.Extensions;
-using StreamFlow.Stream.ThinProtocol;
+using Bolt.Domain.Shared.Protocol;
+using Bolt.Hub.Extensions;
+using Bolt.Hub.ThinProtocol;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
@@ -69,7 +69,7 @@ public class ThroughputBenchmarks
     private GrpcChannel _grpcChannel = null!;
     private HealthService.HealthServiceClient _grpcClient = null!;
 
-    private const string StreamFlowUrl = "http://localhost:19400";
+    private const string BoltUrl = "http://localhost:19400";
     private const string IdentityServerUrl = "http://localhost:19461";
     private const string TestClientUrl = "http://localhost:19462";
     private static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
@@ -101,22 +101,22 @@ public class ThroughputBenchmarks
             await db.SaveChangesAsync();
         }
 
-        // StreamFlow hub
-        var sfBuilder = XApplication.Configure<StreamFlow.Stream.Installers.StreamInstaller>();
-        sfBuilder.WebHost.UseUrls(StreamFlowUrl);
-        OverrideConfig(sfBuilder, "StreamFlow.TpBench", "00000000-0000-0000-0000-000000000097");
+        // Bolt hub
+        var sfBuilder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
+        sfBuilder.WebHost.UseUrls(BoltUrl);
+        OverrideConfig(sfBuilder, "Bolt.TpBench", "00000000-0000-0000-0000-000000000097");
         _streamFlowApp = (WebApplication)sfBuilder.Build();
         _streamFlowApp.UseCorrelationId();
         _streamFlowApp.UseAppServices();
         _streamFlowApp.MapGet("/health/live", () => Results.Ok("healthy"));
         _ = Task.Run(() => _streamFlowApp.RunAsync());
-        await WaitForHealth($"{StreamFlowUrl}/health/live");
+        await WaitForHealth($"{BoltUrl}/health/live");
 
         // IdentityServer
         var idBuilder = XApplication.Configure<AuthService>();
         idBuilder.WebHost.UseUrls(IdentityServerUrl);
         OverrideConfig(idBuilder, "IdentityServer.TpBench", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        idBuilder.Configuration["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue";
+        idBuilder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
         idBuilder.Services.AddScoped<IAuthService, AuthService>();
         idBuilder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
         _identityServerApp = (WebApplication)idBuilder.Build();
@@ -147,8 +147,8 @@ public class ThroughputBenchmarks
 
     private async Task SetupBolt()
     {
-        var thinServerUri = new Uri($"ws://localhost:19400/streamflow/ws");
-        var config = new StreamFlowConfiguration { RpcTimeoutSeconds = 60 };
+        var thinServerUri = new Uri($"ws://localhost:19400/bolt/ws");
+        var config = new BoltConfiguration { RpcTimeoutSeconds = 60 };
         var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
         var serviceId = "3902761a822d4c6b8e2d323fd501bcd6";
 
@@ -297,8 +297,8 @@ public class ThroughputBenchmarks
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = _postgres.GetConnectionString(),
-            ["StreamFlowConfiguration:ClientGuid"] = clientGuid,
-            ["StreamFlowConfiguration:ClientName"] = clientName,
+            ["BoltConfiguration:ClientGuid"] = clientGuid,
+            ["BoltConfiguration:ClientName"] = clientName,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["JwtOptions:ValidAudience"] = IdentityServerUrl,
             ["JwtOptions:ValidIssuer"] = IdentityServerUrl,

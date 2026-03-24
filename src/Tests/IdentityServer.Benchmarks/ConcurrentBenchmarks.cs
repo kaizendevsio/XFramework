@@ -21,9 +21,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Perfolizer.Horology;
-using StreamFlow.Domain.Shared.Protocol;
-using StreamFlow.Stream.Extensions;
-using StreamFlow.Stream.ThinProtocol;
+using Bolt.Domain.Shared.Protocol;
+using Bolt.Hub.Extensions;
+using Bolt.Hub.ThinProtocol;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
@@ -70,7 +70,7 @@ public class ConcurrentBenchmarks
     private QuicDirectServer _quicServer = null!;
     private QuicDirectClient _quicClient = null!;
 
-    private const string StreamFlowUrl = "http://localhost:19300";
+    private const string BoltUrl = "http://localhost:19300";
     private const string IdentityServerUrl = "http://localhost:19361";
     private const string TestClientUrl = "http://localhost:19362";
     private const string GrpcUrl = "http://localhost:19363";
@@ -106,22 +106,22 @@ public class ConcurrentBenchmarks
             await db.SaveChangesAsync();
         }
 
-        // 3. StreamFlow hub
-        var sfBuilder = XApplication.Configure<StreamFlow.Stream.Installers.StreamInstaller>();
-        sfBuilder.WebHost.UseUrls(StreamFlowUrl);
-        OverrideConfig(sfBuilder, "StreamFlow.ConcBench", "00000000-0000-0000-0000-000000000098");
+        // 3. Bolt hub
+        var sfBuilder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
+        sfBuilder.WebHost.UseUrls(BoltUrl);
+        OverrideConfig(sfBuilder, "Bolt.ConcBench", "00000000-0000-0000-0000-000000000098");
         _streamFlowApp = (WebApplication)sfBuilder.Build();
         _streamFlowApp.UseCorrelationId();
         _streamFlowApp.UseAppServices();
         _streamFlowApp.MapGet("/health/live", () => Results.Ok("healthy"));
         _ = Task.Run(() => _streamFlowApp.RunAsync());
-        await WaitForHealth($"{StreamFlowUrl}/health/live");
+        await WaitForHealth($"{BoltUrl}/health/live");
 
         // 4. IdentityServer
         var idBuilder = XApplication.Configure<AuthService>();
         idBuilder.WebHost.UseUrls(IdentityServerUrl);
         OverrideConfig(idBuilder, "IdentityServer.ConcBench", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        idBuilder.Configuration["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue";
+        idBuilder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
         idBuilder.Services.AddScoped<IAuthService, AuthService>();
         idBuilder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
         _identityServerApp = (WebApplication)idBuilder.Build();
@@ -144,21 +144,21 @@ public class ConcurrentBenchmarks
         tcBuilder.WebHost.UseUrls(TestClientUrl);
         tcBuilder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["StreamFlowConfiguration:ClientName"] = "ConcBenchClient",
-            ["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientName"] = "ConcBenchClient",
+            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Error",
         });
         tcBuilder.Services.InstallStandardServices<ConcurrentBenchmarks>(tcBuilder.Configuration);
         tcBuilder.Services.AddSingleton(new DeviceAgentProvider("Benchmark"));
-        tcBuilder.Services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
+        tcBuilder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
         tcBuilder.Services.AddIdentityServerWrapperServices();
         _testClientApp = tcBuilder.Build();
         _testClientApp.MapGet("/health/live", () => Results.Ok("healthy"));
         _ = Task.Run(() => _testClientApp.RunAsync());
         await WaitForHealth($"{TestClientUrl}/health/live");
 
-        // 7. Wait for StreamFlow clients
+        // 7. Wait for Bolt clients
         var idSignalR = _identityServerApp.Services.GetRequiredService<ISignalRService>();
         var tcSignalR = _testClientApp.Services.GetRequiredService<ISignalRService>();
         var deadline = DateTime.UtcNow.AddSeconds(15);
@@ -170,7 +170,7 @@ public class ConcurrentBenchmarks
             await Task.Delay(250);
         }
 
-        // 8. Register StreamFlow handlers
+        // 8. Register Bolt handlers
         var logger = _identityServerApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
         var scopeFactory = _identityServerApp.Services.GetRequiredService<IServiceScopeFactory>();
         foreach (var handler in typeof(AuthService).Assembly.GetExportedTypes()
@@ -193,8 +193,8 @@ public class ConcurrentBenchmarks
 
     private async Task SetupThinProtocol()
     {
-        var thinServerUri = new Uri($"ws://localhost:19300/streamflow/ws");
-        var config = new StreamFlowConfiguration { RpcTimeoutSeconds = 30 };
+        var thinServerUri = new Uri($"ws://localhost:19300/bolt/ws");
+        var config = new BoltConfiguration { RpcTimeoutSeconds = 30 };
         var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
         var serviceId = "3902761a822d4c6b8e2d323fd501bcd6";
 
@@ -293,7 +293,7 @@ public class ConcurrentBenchmarks
     }
 
     [Benchmark]
-    public async Task StreamFlow_Concurrent()
+    public async Task Bolt_Concurrent()
     {
         var tasks = new Task[Concurrency];
         for (int i = 0; i < Concurrency; i++)
@@ -362,8 +362,8 @@ public class ConcurrentBenchmarks
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = _postgres.GetConnectionString(),
-            ["StreamFlowConfiguration:ClientGuid"] = clientGuid,
-            ["StreamFlowConfiguration:ClientName"] = clientName,
+            ["BoltConfiguration:ClientGuid"] = clientGuid,
+            ["BoltConfiguration:ClientName"] = clientName,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["JwtOptions:ValidAudience"] = IdentityServerUrl,
             ["JwtOptions:ValidIssuer"] = IdentityServerUrl,

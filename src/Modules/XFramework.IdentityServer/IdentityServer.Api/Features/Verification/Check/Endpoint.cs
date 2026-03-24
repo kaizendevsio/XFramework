@@ -8,7 +8,7 @@ namespace IdentityServer.Api.Features.Verification.Check;
 
 public static class CheckVerificationEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/verifications/check", Tags = ["Verification"],
         Summary = "Check verification status",
         Description = "Checks if a valid (non-expired) verification exists for a credential. Verifications expire after 10 minutes.",

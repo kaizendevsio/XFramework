@@ -53,10 +53,10 @@ public class HealthCheckTests : IntegrationTestBase
 
     #endregion
 
-    #region StreamFlow Tests
+    #region Bolt Tests
 
     [Test]
-    public async Task StreamFlow_HealthCheck_ReturnsOkWithStatus()
+    public async Task Bolt_HealthCheck_ReturnsOkWithStatus()
     {
         var request = new HealthCheckRequest { Metadata = CreateMetadata() };
 
@@ -70,7 +70,7 @@ public class HealthCheckTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task StreamFlow_HealthCheck_RespondsUnder50ms()
+    public async Task Bolt_HealthCheck_RespondsUnder50ms()
     {
         // Warmup
         await IntegrationTestFixture.ServiceWrapper.HealthCheck(
@@ -86,7 +86,7 @@ public class HealthCheckTests : IntegrationTestBase
         sw.ElapsedMilliseconds.Should().BeLessThan(50,
             "Health check should be lightweight with no DB or BCrypt operations");
 
-        TestContext.Out.WriteLine($"[StreamFlow] HealthCheck — {sw.Elapsed.TotalMilliseconds:F1}ms");
+        TestContext.Out.WriteLine($"[Bolt] HealthCheck — {sw.Elapsed.TotalMilliseconds:F1}ms");
     }
 
     #endregion

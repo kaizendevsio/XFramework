@@ -36,7 +36,7 @@ public class AuthenticationTests : IntegrationTestBase
             using var warmupClient = new HttpClient { BaseAddress = new Uri(IntegrationTestFixture.IdentityServerUrl) };
             await warmupClient.PostAsJsonAsync("/api/auth/authenticate", request);
 
-            // Warmup StreamFlow transport path (service wrapper → SignalR hub → handler → response)
+            // Warmup Bolt transport path (service wrapper → SignalR hub → handler → response)
             try
             {
                 await IntegrationTestFixture.ServiceWrapper.AuthenticateIdentity(
@@ -44,7 +44,7 @@ public class AuthenticationTests : IntegrationTestBase
             }
             catch (Exception ex)
             {
-                TestContext.Out.WriteLine($"[Warmup] StreamFlow warmup {i} failed: {ex.GetType().Name}: {ex.Message}");
+                TestContext.Out.WriteLine($"[Warmup] Bolt warmup {i} failed: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -173,16 +173,16 @@ public class AuthenticationTests : IntegrationTestBase
 
     #endregion
 
-    #region StreamFlow Transport Tests (service wrapper → SignalR hub → handler → response)
+    #region Bolt Transport Tests (service wrapper → SignalR hub → handler → response)
 
     [Test]
-    public async Task StreamFlow_Authenticate_WithValidCredentials_ReturnsTokenAndSession()
+    public async Task Bolt_Authenticate_WithValidCredentials_ReturnsTokenAndSession()
     {
         var username = UniqueUsername();
         var password = "ValidPassword123!";
         var credential = await SeedCredentialWithRole(username, password);
 
-        var (result, elapsed) = await TimedStreamFlowCall(CreateAuthRequest(username, password));
+        var (result, elapsed) = await TimedBoltCall(CreateAuthRequest(username, password));
 
         result.Should().NotBeNull();
         result!.HttpStatusCode.Should().Be(HttpStatusCode.OK);
@@ -193,55 +193,55 @@ public class AuthenticationTests : IntegrationTestBase
         result.Response.Credential.Should().NotBeNull();
         result.Response.Credential!.Id.Should().Be(credential.Id);
 
-        LogTiming("StreamFlow", elapsed);
+        LogTiming("Bolt", elapsed);
     }
 
     [Test]
-    public async Task StreamFlow_Authenticate_WithWrongPassword_Returns400()
+    public async Task Bolt_Authenticate_WithWrongPassword_Returns400()
     {
         var username = UniqueUsername();
         await SeedCredentialWithRole(username, "CorrectPassword123!");
 
-        var (result, elapsed) = await TimedStreamFlowCall(CreateAuthRequest(username, "WrongPassword!"));
+        var (result, elapsed) = await TimedBoltCall(CreateAuthRequest(username, "WrongPassword!"));
 
         result.Should().NotBeNull();
         result!.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
-        LogTiming("StreamFlow", elapsed);
+        LogTiming("Bolt", elapsed);
     }
 
     [Test]
-    public async Task StreamFlow_Authenticate_WithNonExistentUser_Returns404()
+    public async Task Bolt_Authenticate_WithNonExistentUser_Returns404()
     {
-        var (result, elapsed) = await TimedStreamFlowCall(
+        var (result, elapsed) = await TimedBoltCall(
             CreateAuthRequest("nonexistent_" + Guid.NewGuid().ToString("N"), "SomePassword!"));
 
         result.Should().NotBeNull();
         result!.HttpStatusCode.Should().Be(HttpStatusCode.NotFound);
-        LogTiming("StreamFlow", elapsed);
+        LogTiming("Bolt", elapsed);
     }
 
     [Test]
-    public async Task StreamFlow_Authenticate_WithEmptyUsername_Returns400()
+    public async Task Bolt_Authenticate_WithEmptyUsername_Returns400()
     {
-        var (result, elapsed) = await TimedStreamFlowCall(CreateAuthRequest("", "SomePassword!"));
+        var (result, elapsed) = await TimedBoltCall(CreateAuthRequest("", "SomePassword!"));
 
         result.Should().NotBeNull();
         result!.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
-        LogTiming("StreamFlow", elapsed);
+        LogTiming("Bolt", elapsed);
     }
 
     [Test]
-    public async Task StreamFlow_Authenticate_WithEmptyPassword_Returns400()
+    public async Task Bolt_Authenticate_WithEmptyPassword_Returns400()
     {
-        var (result, elapsed) = await TimedStreamFlowCall(CreateAuthRequest(UniqueUsername(), ""));
+        var (result, elapsed) = await TimedBoltCall(CreateAuthRequest(UniqueUsername(), ""));
 
         result.Should().NotBeNull();
         result!.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
-        LogTiming("StreamFlow", elapsed);
+        LogTiming("Bolt", elapsed);
     }
 
     [Test]
-    public async Task StreamFlow_Authenticate_WithEmptyRoleId_Returns400()
+    public async Task Bolt_Authenticate_WithEmptyRoleId_Returns400()
     {
         var username = UniqueUsername();
         await SeedCredentialWithRole(username, "ValidPassword123!");
@@ -249,21 +249,21 @@ public class AuthenticationTests : IntegrationTestBase
         var request = CreateAuthRequest(username, "ValidPassword123!");
         request.RoleId = Guid.Empty;
 
-        var (result, elapsed) = await TimedStreamFlowCall(request);
+        var (result, elapsed) = await TimedBoltCall(request);
 
         result.Should().NotBeNull();
         result!.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
-        LogTiming("StreamFlow", elapsed);
+        LogTiming("Bolt", elapsed);
     }
 
     [Test]
-    public async Task StreamFlow_Authenticate_CreatesSessionInDatabase()
+    public async Task Bolt_Authenticate_CreatesSessionInDatabase()
     {
         var username = UniqueUsername();
         var password = "ValidPassword123!";
         var credential = await SeedCredentialWithRole(username, password);
 
-        var (_, elapsed) = await TimedStreamFlowCall(CreateAuthRequest(username, password));
+        var (_, elapsed) = await TimedBoltCall(CreateAuthRequest(username, password));
 
         await using var db = CreateDbContext();
         var session = await db.Set<Session>()
@@ -271,17 +271,17 @@ public class AuthenticationTests : IntegrationTestBase
             .FirstOrDefaultAsync();
 
         session.Should().NotBeNull();
-        LogTiming("StreamFlow", elapsed);
+        LogTiming("Bolt", elapsed);
     }
 
     [Test]
-    public async Task StreamFlow_Authenticate_LogsAuthorizationAttempt()
+    public async Task Bolt_Authenticate_LogsAuthorizationAttempt()
     {
         var username = UniqueUsername();
         var password = "ValidPassword123!";
         var credential = await SeedCredentialWithRole(username, password);
 
-        var (_, elapsed) = await TimedStreamFlowCall(CreateAuthRequest(username, password));
+        var (_, elapsed) = await TimedBoltCall(CreateAuthRequest(username, password));
 
         await using var db = CreateDbContext();
         var log = await db.Set<AuthorizationLog>()
@@ -289,7 +289,7 @@ public class AuthenticationTests : IntegrationTestBase
             .FirstOrDefaultAsync();
 
         log.Should().NotBeNull();
-        LogTiming("StreamFlow", elapsed);
+        LogTiming("Bolt", elapsed);
     }
 
     #endregion
@@ -305,10 +305,10 @@ public class AuthenticationTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Calls IdentityServer via the generated service wrapper through the full StreamFlow transport.
-    /// Test client → SignalR → StreamFlow hub → IdentityServer handler → response back through SignalR.
+    /// Calls IdentityServer via the generated service wrapper through the full Bolt transport.
+    /// Test client → SignalR → Bolt hub → IdentityServer handler → response back through SignalR.
     /// </summary>
-    private static async Task<(QueryResponse<AuthenticateIdentityResponse>? Result, TimeSpan Elapsed)> TimedStreamFlowCall(
+    private static async Task<(QueryResponse<AuthenticateIdentityResponse>? Result, TimeSpan Elapsed)> TimedBoltCall(
         AuthenticateIdentityRequest request)
     {
         var sw = Stopwatch.StartNew();

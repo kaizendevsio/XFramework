@@ -8,7 +8,7 @@ namespace Messaging.Api.Features.Messages.UpdateDirect;
 
 public static class UpdateDirectMessageEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPatch("/api/messages/direct", Tags = ["Messages"],
         Summary = "Update a direct message",
         ExcludeFromOpenApi = true)]

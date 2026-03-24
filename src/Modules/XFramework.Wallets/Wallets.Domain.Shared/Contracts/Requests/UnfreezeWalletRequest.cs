@@ -6,7 +6,7 @@ using TResponse = CmdResponse;
 [MemoryPackable]
 public partial record UnfreezeWalletRequest : RequestBase,
     ICommand<TResponse>,
-    IStreamflowRequest<TRequest, TResponse>
+    IBoltRequest<TRequest, TResponse>
 {
     public Guid WalletId { get; set; }
     public string? Reason { get; set; }

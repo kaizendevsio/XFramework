@@ -8,7 +8,7 @@ namespace IdentityServer.Api.Features.Auth.ChangePassword;
 
 public static class ChangePasswordEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/auth/change-password", Tags = ["Auth"],
         Summary = "Change user password",
         Description = "Changes a user's password with optional verification requirement. Uses BCrypt hashing.",

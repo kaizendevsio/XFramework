@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using StreamFlow.Stream.Extensions;
+using Bolt.Hub.Extensions;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
@@ -34,14 +34,14 @@ public class IntegrationTestFixture
     private static Task? _testClientTask;
 
     public static string ConnectionString { get; private set; } = null!;
-    public static string StreamFlowUrl => "http://localhost:17000";
+    public static string BoltUrl => "http://localhost:17000";
     public static string IdentityServerUrl => "http://localhost:18261";
     public static string TestClientUrl => "http://localhost:18262";
 
     public static IServiceProvider Services => _identityServerApp.Services;
 
     /// <summary>
-    /// Service wrapper that calls IdentityServer through the actual StreamFlow transport.
+    /// Service wrapper that calls IdentityServer through the actual Bolt transport.
     /// </summary>
     public static IIdentityServerServiceWrapper ServiceWrapper =>
         _testClientApp.Services.GetRequiredService<IIdentityServerServiceWrapper>();
@@ -64,11 +64,11 @@ public class IntegrationTestFixture
         // 2. Run migrations and seed data
         await MigrateAndSeed();
 
-        // 3. Start StreamFlow hub
-        _streamFlowApp = StartStreamFlow();
-        await WaitForHealth($"{StreamFlowUrl}/health/live", _streamFlowTask);
+        // 3. Start Bolt hub
+        _streamFlowApp = StartBolt();
+        await WaitForHealth($"{BoltUrl}/health/live", _streamFlowTask);
 
-        // 4. Start IdentityServer (connects to StreamFlow as "IdentityServer" client)
+        // 4. Start IdentityServer (connects to Bolt as "IdentityServer" client)
         _identityServerApp = StartIdentityServer();
         await WaitForHealth($"{IdentityServerUrl}/health/live", _identityServerTask);
 
@@ -82,17 +82,17 @@ public class IntegrationTestFixture
             Description = "Integration test tenant"
         });
 
-        // 6. Start test client app (connects to StreamFlow, has IIdentityServerServiceWrapper)
+        // 6. Start test client app (connects to Bolt, has IIdentityServerServiceWrapper)
         _testClientApp = StartTestClient();
         await WaitForHealth($"{TestClientUrl}/health/live", _testClientTask);
 
-        // 7. Wait for both StreamFlow clients to connect and register
-        await WaitForStreamFlowClients();
+        // 7. Wait for both Bolt clients to connect and register
+        await WaitForBoltClients();
 
-        // 8. Register IdentityServer's generated StreamFlow handlers on its SignalR connection.
+        // 8. Register IdentityServer's generated Bolt handlers on its SignalR connection.
         //    ScanAndRegisterHandlers() only scans the entry assembly (testhost in tests),
         //    so we manually scan the IdentityServer assembly for ISignalREventHandler implementations.
-        RegisterStreamFlowHandlers();
+        RegisterBoltHandlers();
     }
 
     [OneTimeTearDown]
@@ -104,11 +104,11 @@ public class IntegrationTestFixture
         if (_postgres != null) await _postgres.DisposeAsync();
     }
 
-    private static WebApplication StartStreamFlow()
+    private static WebApplication StartBolt()
     {
-        var builder = XApplication.Configure<StreamFlow.Stream.Installers.StreamInstaller>();
-        builder.WebHost.UseUrls(StreamFlowUrl);
-        OverrideConfiguration(builder, "StreamFlow.Test", "00000000-0000-0000-0000-000000000001");
+        var builder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
+        builder.WebHost.UseUrls(BoltUrl);
+        OverrideConfiguration(builder, "Bolt.Test", "00000000-0000-0000-0000-000000000001");
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
@@ -126,7 +126,7 @@ public class IntegrationTestFixture
         // ClientName = "IdentityServer.Test" → SignalRService registers as SHA256("IdentityServer")
         // This matches the generated wrapper's TargetClient
         OverrideConfiguration(builder, "IdentityServer.Test", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue";
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
 
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
@@ -141,8 +141,8 @@ public class IntegrationTestFixture
     }
 
     /// <summary>
-    /// Minimal app that acts as a StreamFlow client with IIdentityServerServiceWrapper.
-    /// This is how any real service (Blazor, Wallets, etc.) would call IdentityServer via StreamFlow.
+    /// Minimal app that acts as a Bolt client with IIdentityServerServiceWrapper.
+    /// This is how any real service (Blazor, Wallets, etc.) would call IdentityServer via Bolt.
     /// </summary>
     private static WebApplication StartTestClient()
     {
@@ -151,8 +151,8 @@ public class IntegrationTestFixture
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["StreamFlowConfiguration:ClientName"] = "TestClient",
-            ["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientName"] = "TestClient",
+            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Warning",
         });
@@ -160,9 +160,9 @@ public class IntegrationTestFixture
         // Core services needed by SignalRService and service wrappers
         builder.Services.InstallStandardServices<IntegrationTestFixture>(builder.Configuration);
         builder.Services.AddSingleton(new XFramework.Domain.Shared.BusinessObjects.DeviceAgentProvider("IntegrationTest"));
-        builder.Services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
+        builder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
 
-        // Register the IdentityServer service wrapper (generated — uses StreamFlow transport)
+        // Register the IdentityServer service wrapper (generated — uses Bolt transport)
         builder.Services.AddIdentityServerWrapperServices();
 
         var app = builder.Build();
@@ -172,7 +172,7 @@ public class IntegrationTestFixture
         return app;
     }
 
-    private static async Task WaitForStreamFlowClients()
+    private static async Task WaitForBoltClients()
     {
         var idServerSignalR = _identityServerApp.Services.GetRequiredService<ISignalRService>();
         var testClientSignalR = _testClientApp.Services.GetRequiredService<ISignalRService>();
@@ -190,10 +190,10 @@ public class IntegrationTestFixture
             await Task.Delay(250);
         }
 
-        throw new TimeoutException("StreamFlow clients failed to connect within 15s");
+        throw new TimeoutException("Bolt clients failed to connect within 15s");
     }
 
-    private static void RegisterStreamFlowHandlers()
+    private static void RegisterBoltHandlers()
     {
         var signalRService = _identityServerApp.Services.GetRequiredService<ISignalRService>();
         var logger = _identityServerApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
@@ -213,8 +213,8 @@ public class IntegrationTestFixture
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = ConnectionString,
-            ["StreamFlowConfiguration:ClientGuid"] = clientGuid,
-            ["StreamFlowConfiguration:ClientName"] = clientName,
+            ["BoltConfiguration:ClientGuid"] = clientGuid,
+            ["BoltConfiguration:ClientName"] = clientName,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["JwtOptions:ValidAudience"] = "http://localhost:18261",
             ["JwtOptions:ValidIssuer"] = "http://localhost:18261",

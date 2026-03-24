@@ -3,10 +3,10 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using StreamFlow.Domain.Shared.Abstractions;
-using StreamFlow.Domain.Shared.BusinessObjects;
-using StreamFlow.Domain.Shared.Contracts.Requests;
-using StreamFlow.Domain.Shared.Contracts.Responses;
+using Bolt.Domain.Shared.Abstractions;
+using Bolt.Domain.Shared.BusinessObjects;
+using Bolt.Domain.Shared.Contracts.Requests;
+using Bolt.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.Configurations;
 
 namespace XFramework.Integration.Services;
@@ -21,7 +21,7 @@ public sealed class ConnectionPool : IAsyncDisposable
     private readonly Lock _scaleLock = new();
     private readonly Func<HubConnection> _connectionFactory;
     private readonly Func<HubConnection, Task> _onConnectionReady;
-    private readonly StreamFlowConfiguration _config;
+    private readonly BoltConfiguration _config;
     private readonly ILogger _logger;
     private readonly Timer _scaleTimer;
     private int _roundRobinCounter;
@@ -30,7 +30,7 @@ public sealed class ConnectionPool : IAsyncDisposable
     public ConnectionPool(
         Func<HubConnection> connectionFactory,
         Func<HubConnection, Task> onConnectionReady,
-        StreamFlowConfiguration config,
+        BoltConfiguration config,
         ILogger logger)
     {
         _connectionFactory = connectionFactory;

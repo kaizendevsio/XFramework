@@ -5,7 +5,7 @@ using TResponse = CmdResponse;
 [MemoryPackable]
 public partial record ChangePasswordRequest : RequestBase,
     ICommand<TResponse>,
-    IStreamflowRequest<ChangePasswordRequest, TResponse>
+    IBoltRequest<ChangePasswordRequest, TResponse>
 {
     public Guid CreadentialId { get; set; }
     public string? NewPassword { get; set; }

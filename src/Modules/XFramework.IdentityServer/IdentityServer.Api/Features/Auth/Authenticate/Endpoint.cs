@@ -8,7 +8,7 @@ namespace IdentityServer.Api.Features.Auth.Authenticate;
 
 public static class AuthenticateEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/auth/authenticate", Tags = ["Auth"],
         Summary = "Authenticate a user",
         Description = "Authenticates a user with multi-type support (Username, Email, Phone, Token). Generates JWT tokens and creates session.",

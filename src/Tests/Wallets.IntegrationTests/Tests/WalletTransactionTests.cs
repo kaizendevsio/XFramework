@@ -164,10 +164,10 @@ public class WalletTransactionTests : WalletsTestBase
 
     #endregion
 
-    #region StreamFlow — AddFunds
+    #region Bolt — AddFunds
 
     [Test]
-    public async Task StreamFlow_AddFunds_WithValidData_IncrementsBalance()
+    public async Task Bolt_AddFunds_WithValidData_IncrementsBalance()
     {
         var credential = await SeedCredential();
         var wallet = await SeedWallet(credential.Id, 1000m);
@@ -190,10 +190,10 @@ public class WalletTransactionTests : WalletsTestBase
 
     #endregion
 
-    #region StreamFlow — WithdrawFunds
+    #region Bolt — WithdrawFunds
 
     [Test]
-    public async Task StreamFlow_WithdrawFunds_WithSufficientBalance_DecrementsBalance()
+    public async Task Bolt_WithdrawFunds_WithSufficientBalance_DecrementsBalance()
     {
         var credential = await SeedCredential();
         var wallet = await SeedWallet(credential.Id, 1000m);
@@ -215,7 +215,7 @@ public class WalletTransactionTests : WalletsTestBase
     }
 
     [Test]
-    public async Task StreamFlow_WithdrawFunds_InsufficientBalance_Returns400()
+    public async Task Bolt_WithdrawFunds_InsufficientBalance_Returns400()
     {
         var credential = await SeedCredential();
         var wallet = await SeedWallet(credential.Id, 100m);
@@ -234,10 +234,10 @@ public class WalletTransactionTests : WalletsTestBase
 
     #endregion
 
-    #region StreamFlow — Transfer
+    #region Bolt — Transfer
 
     [Test]
-    public async Task StreamFlow_Transfer_WithValidData_MovesBalance()
+    public async Task Bolt_Transfer_WithValidData_MovesBalance()
     {
         var sender = await SeedCredential();
         var senderWallet = await SeedWallet(sender.Id, 1000m);
@@ -268,10 +268,10 @@ public class WalletTransactionTests : WalletsTestBase
 
     #endregion
 
-    #region StreamFlow — Convert
+    #region Bolt — Convert
 
     [Test]
-    public async Task StreamFlow_Convert_WithValidData_ReturnsOk()
+    public async Task Bolt_Convert_WithValidData_ReturnsOk()
     {
         // Convert requires two different wallet types — seed a second type
         var secondTypeId = Guid.NewGuid();

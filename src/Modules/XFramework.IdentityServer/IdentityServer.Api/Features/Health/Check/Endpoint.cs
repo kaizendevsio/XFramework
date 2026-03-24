@@ -6,7 +6,7 @@ namespace IdentityServer.Api.Features.Health.Check;
 
 public static class HealthCheckEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/health/check", Tags = ["Health"],
         Summary = "Health check",
         Description = "Lightweight health check for transport throughput benchmarking.")]

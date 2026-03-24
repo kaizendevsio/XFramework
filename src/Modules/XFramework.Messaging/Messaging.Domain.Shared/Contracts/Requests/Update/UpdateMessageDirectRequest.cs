@@ -5,7 +5,7 @@ using TResponse = CmdResponse;
 [MemoryPackable]
 public partial record UpdateMessageDirectRequest : RequestBase,
     ICommand<CmdResponse>,
-    IStreamflowRequest<UpdateMessageDirectRequest, TResponse>
+    IBoltRequest<UpdateMessageDirectRequest, TResponse>
 {
     public Guid? Id { get; set; }
     public Guid AgentClusterId { get; set; }

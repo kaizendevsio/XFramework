@@ -31,12 +31,12 @@ public class TestConstants
     public static class Ports
     {
         // IdentityServer
-        public const string IdentityStreamFlow = "http://localhost:17000";
+        public const string IdentityBolt = "http://localhost:17000";
         public const string IdentityServer = "http://localhost:18261";
         public const string IdentityTestClient = "http://localhost:18262";
 
         // Wallets
-        public const string WalletsStreamFlow = "http://localhost:17100";
+        public const string WalletsBolt = "http://localhost:17100";
         public const string WalletsServer = "http://localhost:18361";
         public const string WalletsTestClient = "http://localhost:18362";
 

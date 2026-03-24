@@ -44,9 +44,9 @@
     <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj" />
     <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
   </Folder>
-  <Folder Name="/Services/StreamFlow/">
-    <Project Path="src\Modules\XFramework.StreamFlow\StreamFlow.Domain.Shared\StreamFlow.Domain.Shared.csproj" />
-    <Project Path="src\Modules\XFramework.StreamFlow\StreamFlow.Stream\StreamFlow.Stream.csproj" />
+  <Folder Name="/Services/Bolt/">
+    <Project Path="src\Modules\XFramework.Bolt\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />
+    <Project Path="src\Modules\XFramework.Bolt\Bolt.Hub\Bolt.Hub.csproj" />
   </Folder>
   <Folder Name="/Services/Wallets/">
     <Project Path="src\Modules\XFramework.Wallets\Wallets.Api\Wallets.Api.csproj" />
@@ -63,6 +63,7 @@
     <Project Path="src\Libraries\Bolt\Bolt.Protocol\Bolt.Protocol.csproj" />
     <Project Path="src\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
     <Project Path="src\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
+    <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
@@ -71,7 +72,6 @@
     <Project Path="src\Tests\IdentityServer.Benchmarks\IdentityServer.Benchmarks.csproj" />
     <Project Path="src\Tests\Wallets.IntegrationTests\Wallets.IntegrationTests.csproj" />
     <Project Path="src\Tests\SerializerPerfTest\SerializerPerfTest.csproj" />
-    <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
   </Folder>
   <Folder Name="/Tools/">
     <Project Path="src\Tools\XFramework.MigrationRunner\XFramework.MigrationRunner.csproj" />

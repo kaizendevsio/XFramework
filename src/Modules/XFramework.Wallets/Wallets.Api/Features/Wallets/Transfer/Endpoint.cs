@@ -10,7 +10,7 @@ namespace Wallets.Api.Features.Wallets.Transfer;
 /// </summary>
 public static class TransferEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/wallets/transfer", Tags = ["Wallets"],
         Summary = "Transfer funds between wallets",
         Description = "Transfers funds from one wallet to another. Handles fee deduction based on TransferDeductionType. Automatically creates recipient wallet if it doesn't exist.",

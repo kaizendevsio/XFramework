@@ -18,9 +18,9 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using StreamFlow.Domain.Shared.Protocol;
-using StreamFlow.Stream.Extensions;
-using StreamFlow.Stream.ThinProtocol;
+using Bolt.Domain.Shared.Protocol;
+using Bolt.Hub.Extensions;
+using Bolt.Hub.ThinProtocol;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
@@ -38,7 +38,7 @@ using XFramework.Integration.ThinProtocol;
 using System.Net.Quic;
 using Grpc.Net.Client;
 using IdentityServer.Benchmarks.Grpc;
-using StreamFlow.Stream.ThinProtocol;
+using Bolt.Hub.ThinProtocol;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.Benchmarks;
@@ -73,7 +73,7 @@ public class TransportBenchmarks
     private QuicDirectServer _quicServer = null!;
     private QuicDirectClient _quicClient = null!;
 
-    private const string StreamFlowUrl = "http://localhost:19000";
+    private const string BoltUrl = "http://localhost:19000";
     private const string IdentityServerUrl = "http://localhost:19261";
     private const string TestClientUrl = "http://localhost:19262";
     private static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
@@ -107,9 +107,9 @@ public class TransportBenchmarks
             await db.SaveChangesAsync();
         }
 
-        // 3. Start StreamFlow hub
-        _streamFlowApp = StartStreamFlow();
-        await WaitForHealth($"{StreamFlowUrl}/health/live");
+        // 3. Start Bolt hub
+        _streamFlowApp = StartBolt();
+        await WaitForHealth($"{BoltUrl}/health/live");
 
         // 4. Start IdentityServer
         _identityServerApp = StartIdentityServer();
@@ -123,15 +123,15 @@ public class TransportBenchmarks
             Name = "Bench Tenant", Description = "Benchmark tenant"
         });
 
-        // 6. Start test client (StreamFlow consumer)
+        // 6. Start test client (Bolt consumer)
         _testClientApp = StartTestClient();
         await WaitForHealth($"{TestClientUrl}/health/live");
 
-        // 7. Wait for StreamFlow clients to connect
-        await WaitForStreamFlowClients();
+        // 7. Wait for Bolt clients to connect
+        await WaitForBoltClients();
 
-        // 8. Register StreamFlow handlers
-        RegisterStreamFlowHandlers();
+        // 8. Register Bolt handlers
+        RegisterBoltHandlers();
 
         // 9. Create reusable objects
         _httpClient = new HttpClient { BaseAddress = new Uri(IdentityServerUrl) };
@@ -271,14 +271,14 @@ public class TransportBenchmarks
 
     private async Task SetupThinProtocol()
     {
-        var thinServerUri = new Uri($"ws://localhost:19000/streamflow/ws");
-        var config = new StreamFlowConfiguration { RpcTimeoutSeconds = 30 };
+        var thinServerUri = new Uri($"ws://localhost:19000/bolt/ws");
+        var config = new BoltConfiguration { RpcTimeoutSeconds = 30 };
         var loggerFactory = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
 
         // Compute hashes for routing
         var identityServerServiceId = "3902761a822d4c6b8e2d323fd501bcd6"; // SHA256 of "IdentityServer" — same as SignalR registration
-        _identityServerServiceHash = StreamFlowCodec.Fnv1aHash(identityServerServiceId);
-        _healthCheckCommandHash = StreamFlowCodec.Fnv1aHash(typeof(HealthCheckRequest).GetTypeFullName());
+        _identityServerServiceHash = BoltHubCodec.Fnv1aHash(identityServerServiceId);
+        _healthCheckCommandHash = BoltHubCodec.Fnv1aHash(typeof(HealthCheckRequest).GetTypeFullName());
 
         // Start "IdentityServer" thin client — handles incoming requests
         _thinServiceClient = new BoltClient(
@@ -291,7 +291,7 @@ public class TransportBenchmarks
             {
                 var request = MemoryPackSerializer.Deserialize<HealthCheckRequest>(payload.Span)!;
 
-                // Call the endpoint directly (same as what the generated StreamFlow handler does)
+                // Call the endpoint directly (same as what the generated Bolt handler does)
                 var result = await IdentityServer.Api.Features.Health.Check.HealthCheckEndpoint.Handle(request, CancellationToken.None);
 
                 var response = new QueryResponse<HealthCheckResponse>
@@ -347,7 +347,7 @@ public class TransportBenchmarks
     }
 
     [Benchmark]
-    public async Task<QueryResponse<HealthCheckResponse>?> StreamFlow_HealthCheck()
+    public async Task<QueryResponse<HealthCheckResponse>?> Bolt_HealthCheck()
     {
         var req = new HealthCheckRequest
         {
@@ -426,11 +426,11 @@ public class TransportBenchmarks
 
     #region Infrastructure
 
-    private WebApplication StartStreamFlow()
+    private WebApplication StartBolt()
     {
-        var builder = XApplication.Configure<StreamFlow.Stream.Installers.StreamInstaller>();
-        builder.WebHost.UseUrls(StreamFlowUrl);
-        OverrideConfig(builder, "StreamFlow.Bench", "00000000-0000-0000-0000-000000000099");
+        var builder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
+        builder.WebHost.UseUrls(BoltUrl);
+        OverrideConfig(builder, "Bolt.Bench", "00000000-0000-0000-0000-000000000099");
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
@@ -446,7 +446,7 @@ public class TransportBenchmarks
         var builder = XApplication.Configure<AuthService>();
         builder.WebHost.UseUrls(IdentityServerUrl);
         OverrideConfig(builder, "IdentityServer.Bench", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue";
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
 
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
@@ -467,15 +467,15 @@ public class TransportBenchmarks
 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["StreamFlowConfiguration:ClientName"] = "BenchClient",
-            ["StreamFlowConfiguration:ServerUrls:0"] = $"{StreamFlowUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientName"] = "BenchClient",
+            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Error",
         });
 
         builder.Services.InstallStandardServices<TransportBenchmarks>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("Benchmark"));
-        builder.Services.AddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
+        builder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
         builder.Services.AddIdentityServerWrapperServices();
 
         var app = builder.Build();
@@ -485,7 +485,7 @@ public class TransportBenchmarks
         return app;
     }
 
-    private async Task WaitForStreamFlowClients()
+    private async Task WaitForBoltClients()
     {
         var idServerSignalR = _identityServerApp.Services.GetRequiredService<ISignalRService>();
         var testClientSignalR = _testClientApp.Services.GetRequiredService<ISignalRService>();
@@ -502,10 +502,10 @@ public class TransportBenchmarks
             }
             await Task.Delay(250);
         }
-        throw new TimeoutException("StreamFlow clients failed to connect within 15s");
+        throw new TimeoutException("Bolt clients failed to connect within 15s");
     }
 
-    private void RegisterStreamFlowHandlers()
+    private void RegisterBoltHandlers()
     {
         var signalRService = _identityServerApp.Services.GetRequiredService<ISignalRService>();
         var logger = _identityServerApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
@@ -525,8 +525,8 @@ public class TransportBenchmarks
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultDatabaseConnection"] = _postgres.GetConnectionString(),
-            ["StreamFlowConfiguration:ClientGuid"] = clientGuid,
-            ["StreamFlowConfiguration:ClientName"] = clientName,
+            ["BoltConfiguration:ClientGuid"] = clientGuid,
+            ["BoltConfiguration:ClientName"] = clientName,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["JwtOptions:ValidAudience"] = IdentityServerUrl,
             ["JwtOptions:ValidIssuer"] = IdentityServerUrl,

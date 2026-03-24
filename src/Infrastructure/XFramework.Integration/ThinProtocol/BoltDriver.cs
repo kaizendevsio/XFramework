@@ -3,7 +3,7 @@ using Bolt.Client;
 using MemoryPack;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using StreamFlow.Domain.Shared.Contracts.Requests;
+using Bolt.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Contracts.Base;
@@ -15,7 +15,7 @@ using XFramework.Integration.Services;
 namespace XFramework.Integration.ThinProtocol;
 
 /// <summary>
-/// Drop-in replacement for StreamFlowDriverSignalR using the thin binary protocol.
+/// Drop-in replacement for BoltDriverSignalR using the thin binary protocol.
 /// Implements IMessageBusWrapper so all service wrappers work unchanged.
 /// </summary>
 public class BoltDriver : IMessageBusWrapper
@@ -146,13 +146,13 @@ public class BoltDriver : IMessageBusWrapper
         return Task.CompletedTask;
     }
 
-    public Task Subscribe<TResponse>(StreamFlowSubscriptionRequest<TResponse> request) where TResponse : class
+    public Task Subscribe<TResponse>(BoltSubscriptionRequest<TResponse> request) where TResponse : class
     {
         _logger.LogWarning("Subscribe not yet implemented in thin protocol");
         return Task.CompletedTask;
     }
 
-    public Task Unsubscribe(StreamFlowSubscriptionRequest request)
+    public Task Unsubscribe(BoltSubscriptionRequest request)
     {
         _logger.LogWarning("Unsubscribe not yet implemented in thin protocol");
         return Task.CompletedTask;
@@ -165,8 +165,8 @@ public class BoltDriver : IMessageBusWrapper
             ? appId
             : throw new ArgumentNullException("Tenant:DefaultId is not set");
 
-        _clientName ??= _configuration.GetValue<string>("StreamFlowConfiguration:ClientName")
-                        ?? throw new ArgumentNullException("StreamFlowConfiguration:ClientName is not set");
+        _clientName ??= _configuration.GetValue<string>("BoltConfiguration:ClientName")
+                        ?? throw new ArgumentNullException("BoltConfiguration:ClientName is not set");
 
         var existing = request.Metadata;
         request.Metadata = new RequestMetadata

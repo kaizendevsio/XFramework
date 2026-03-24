@@ -95,10 +95,10 @@ public class VerificationTests : IntegrationTestBase
 
     #endregion
 
-    #region StreamFlow Tests
+    #region Bolt Tests
 
     [Test]
-    public async Task StreamFlow_CheckVerification_WithPendingVerification_ReturnsStatus()
+    public async Task Bolt_CheckVerification_WithPendingVerification_ReturnsStatus()
     {
         var credential = await SeedCredentialWithContact();
         var verificationType = await GetSmsVerificationType();
@@ -116,7 +116,7 @@ public class VerificationTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task StreamFlow_CheckVerification_WithNoVerification_ReturnsNotFound()
+    public async Task Bolt_CheckVerification_WithNoVerification_ReturnsNotFound()
     {
         var credential = await SeedCredentialWithContact();
         var verificationType = await GetSmsVerificationType();

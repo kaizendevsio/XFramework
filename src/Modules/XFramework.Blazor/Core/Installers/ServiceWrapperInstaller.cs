@@ -9,7 +9,7 @@ public class ServiceWrapperInstaller : IInstaller
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         services.TryAddSingleton<ISignalRService, SignalRService>();
-        services.TryAddSingleton<IMessageBusWrapper, StreamFlowDriverSignalR>();
+        services.TryAddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
 
         // Service wrappers are auto-generated from [GenerateEndpoints] entities
         services.AddIdentityServerWrapperServices();

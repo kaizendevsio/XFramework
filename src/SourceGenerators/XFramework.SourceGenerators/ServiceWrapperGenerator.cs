@@ -8,9 +8,9 @@ namespace XFramework.SourceGenerators;
 
 /// <summary>
 /// Source generator that creates client-side service wrapper interfaces and implementations
-/// for cross-module StreamFlow calls. Auto-discovers entities from [GenerateEndpoints] attribute
-/// in referenced assemblies and custom StreamFlow methods from IStreamflowRequest types.
-/// No [StreamFlowWrapper] attribute needed — derives everything from assembly name convention.
+/// for cross-module Bolt calls. Auto-discovers entities from [GenerateEndpoints] attribute
+/// in referenced assemblies and custom Bolt methods from IBoltRequest types.
+/// No [BoltWrapper] attribute needed — derives everything from assembly name convention.
 /// </summary>
 [Generator]
 public class ServiceWrapperGenerator : IIncrementalGenerator
@@ -18,7 +18,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Pure auto-discovery: use CompilationProvider to scan referenced assemblies
-        // for [GenerateEndpoints] entities and IStreamflowRequest types.
+        // for [GenerateEndpoints] entities and IBoltRequest types.
         // Triggers only in *.Integration projects (by assembly name convention).
         context.RegisterSourceOutput(context.CompilationProvider,
             static (spc, compilation) => Execute(compilation, spc));
@@ -38,8 +38,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         // Discover entities from [GenerateEndpoints] in referenced assemblies
         var (models, namespaces) = DiscoverGenerateEndpointEntities(compilation, moduleName);
 
-        // Also check for [StreamFlowWrapper] for backward compatibility (entities not yet migrated)
-        var (legacyModels, legacyNamespace) = DiscoverStreamFlowWrapperEntities(compilation);
+        // Also check for [BoltWrapper] for backward compatibility (entities not yet migrated)
+        var (legacyModels, legacyNamespace) = DiscoverBoltWrapperEntities(compilation);
         foreach (var model in legacyModels)
         {
             if (!models.Contains(model))
@@ -51,8 +51,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         if (models.Count == 0)
             return; // No entities discovered — skip (manual wrappers handle custom-only cases)
 
-        // Discover custom StreamFlow request types (IStreamflowRequest implementations)
-        var customRequests = DiscoverStreamFlowRequests(compilation, moduleName);
+        // Discover custom Bolt request types (IBoltRequest implementations)
+        var customRequests = DiscoverBoltRequests(compilation, moduleName);
 
         // Generate the wrapper
         var source = GenerateWrapper(moduleName, serviceId, models, namespaces, customRequests);
@@ -240,9 +240,9 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Backward compatibility: discover entities from [StreamFlowWrapper] if still present.
+    /// Backward compatibility: discover entities from [BoltWrapper] if still present.
     /// </summary>
-    private static (List<string> Models, string Namespace) DiscoverStreamFlowWrapperEntities(
+    private static (List<string> Models, string Namespace) DiscoverBoltWrapperEntities(
         Compilation compilation)
     {
         var models = new List<string>();
@@ -260,7 +260,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
                 foreach (var attr in classSymbol.GetAttributes())
                 {
-                    if (attr.AttributeClass?.Name != "StreamFlowWrapperAttribute")
+                    if (attr.AttributeClass?.Name != "BoltWrapperAttribute")
                         continue;
 
                     if (attr.ConstructorArguments.Length > 0)
@@ -281,14 +281,14 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         return (models, ns);
     }
 
-    private static List<CustomRequestInfo> DiscoverStreamFlowRequests(
+    private static List<CustomRequestInfo> DiscoverBoltRequests(
         Compilation compilation, string serviceName)
     {
         var results = new List<CustomRequestInfo>();
-        var streamflowInterface = compilation.GetTypeByMetadataName(
-            "StreamFlow.Domain.Shared.Contracts.Requests.IStreamflowRequest`2");
+        var boltInterface = compilation.GetTypeByMetadataName(
+            "Bolt.Domain.Shared.Contracts.Requests.IBoltRequest`2");
 
-        if (streamflowInterface == null)
+        if (boltInterface == null)
             return results;
 
         var allTypes = GetAllTypes(compilation);
@@ -310,7 +310,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                 if (!iface.IsGenericType || iface.OriginalDefinition == null)
                     continue;
 
-                if (!SymbolEqualityComparer.Default.Equals(iface.OriginalDefinition, streamflowInterface))
+                if (!SymbolEqualityComparer.Default.Equals(iface.OriginalDefinition, boltInterface))
                     continue;
 
                 var tRequest = iface.TypeArguments[0];

@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>        
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
+      <ProjectReference Include="..\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />
+      <ProjectReference Include="..\..\..\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
+    </ItemGroup>
+
+
+    <ItemGroup>
+      <Folder Include="HostedService\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- OpenTelemetry Core -->
+        <PackageReference Include="OpenTelemetry" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+        
+        <!-- OpenTelemetry Instrumentation -->
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.StackExchangeRedis" />
+        
+        <!-- OpenTelemetry Exporters -->
+        <PackageReference Include="OpenTelemetry.Exporter.Console" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    </ItemGroup>
+
+</Project>
+

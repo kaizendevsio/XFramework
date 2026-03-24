@@ -1,6 +1,6 @@
 using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.ObjectPool;
-using StreamFlow.Domain.Shared.Contracts.Requests;
+using Bolt.Domain.Shared.Contracts.Requests;
 
 namespace XFramework.Integration.Services;
 
@@ -9,9 +9,9 @@ namespace XFramework.Integration.Services;
 /// Implements IValueTaskSource so callers get a ValueTask (no Task allocation).
 /// The instance is automatically returned to the pool when GetResult is called.
 /// </summary>
-public sealed class PooledRpcCall : IValueTaskSource<StreamFlowMessage>
+public sealed class PooledRpcCall : IValueTaskSource<BoltMessage>
 {
-    private ManualResetValueTaskSourceCore<StreamFlowMessage> _core;
+    private ManualResetValueTaskSourceCore<BoltMessage> _core;
     private CancellationTokenRegistration _ctr;
 
     private static readonly ObjectPool<PooledRpcCall> Pool =
@@ -21,7 +21,7 @@ public sealed class PooledRpcCall : IValueTaskSource<StreamFlowMessage>
 
     public static PooledRpcCall Rent() => Pool.Get();
 
-    public ValueTask<StreamFlowMessage> GetTask()
+    public ValueTask<BoltMessage> GetTask()
         => new(this, _core.Version);
 
     public void RegisterTimeout(CancellationToken ct)
@@ -36,13 +36,13 @@ public sealed class PooledRpcCall : IValueTaskSource<StreamFlowMessage>
         }
     }
 
-    public void SetResult(StreamFlowMessage result)
+    public void SetResult(BoltMessage result)
         => _core.SetResult(result);
 
     public void SetException(Exception ex)
         => _core.SetException(ex);
 
-    StreamFlowMessage IValueTaskSource<StreamFlowMessage>.GetResult(short token)
+    BoltMessage IValueTaskSource<BoltMessage>.GetResult(short token)
     {
         try
         {
@@ -54,10 +54,10 @@ public sealed class PooledRpcCall : IValueTaskSource<StreamFlowMessage>
         }
     }
 
-    ValueTaskSourceStatus IValueTaskSource<StreamFlowMessage>.GetStatus(short token)
+    ValueTaskSourceStatus IValueTaskSource<BoltMessage>.GetStatus(short token)
         => _core.GetStatus(token);
 
-    void IValueTaskSource<StreamFlowMessage>.OnCompleted(
+    void IValueTaskSource<BoltMessage>.OnCompleted(
         Action<object?> continuation, object? state,
         short token, ValueTaskSourceOnCompletedFlags flags)
         => _core.OnCompleted(continuation, state, token, flags);

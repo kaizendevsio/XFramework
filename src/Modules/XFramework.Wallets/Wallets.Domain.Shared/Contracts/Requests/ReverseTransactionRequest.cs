@@ -6,7 +6,7 @@ using TResponse = CmdResponse;
 [MemoryPackable]
 public partial record ReverseTransactionRequest : RequestBase,
     ICommand<TResponse>,
-    IStreamflowRequest<TRequest, TResponse>
+    IBoltRequest<TRequest, TResponse>
 {
     public Guid TransactionId { get; set; }
     public Guid WalletTransferId { get; set; }

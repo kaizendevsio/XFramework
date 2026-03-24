@@ -1,0 +1,16 @@
+global using System;
+global using System.Net;
+global using System.Threading.Tasks;
+global using Mapster;
+global using Microsoft.Extensions.Configuration;
+global using XFramework.Domain.Shared.BusinessObjects;
+global using Microsoft.EntityFrameworkCore;
+global using Bolt.Domain.Shared.Contracts.Requests;
+global using Bolt.Domain.Shared.Contracts.Responses;
+global using Bolt.Hub.Extensions;
+global using XFramework.Core.Services;
+global using XFramework.Core.Patterns;
+global using XFramework.Domain.Contexts;
+global using XFramework.Integration.Abstractions;
+global using XFramework.Integration.Services;
+global using XFramework.Extensions;

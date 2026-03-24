@@ -17,7 +17,7 @@ public class RemoteDataContext : IDataContext
     public IRemoteQuery<T> Query<T>() where T : class
     {
         var connection = _signalRService.Connection
-            ?? throw new InvalidOperationException("StreamFlow connection is not established.");
+            ?? throw new InvalidOperationException("Bolt connection is not established.");
         return new RemoteQuery<T>(connection);
     }
 
@@ -57,7 +57,7 @@ public class RemoteDataContext : IDataContext
             return DataContextResult.Success("No changes to save.");
 
         var connection = _signalRService.Connection
-            ?? throw new InvalidOperationException("StreamFlow connection is not established.");
+            ?? throw new InvalidOperationException("Bolt connection is not established.");
 
         var request = new SaveChangesRequest { Changes = [.._pendingChanges] };
         var requestBytes = MemoryPack.MemoryPackSerializer.Serialize(request);

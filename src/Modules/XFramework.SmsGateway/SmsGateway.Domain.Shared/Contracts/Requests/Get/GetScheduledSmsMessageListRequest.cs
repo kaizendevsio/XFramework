@@ -8,7 +8,7 @@ using TResponse = QueryResponse<List<SmsNodeJob>>;
 [MemoryPackable]
 public partial record GetScheduledSmsMessageListRequest : RequestBase,
     IQuery<TResponse>,
-    IStreamflowRequest<TRequest, TResponse>
+    IBoltRequest<TRequest, TResponse>
 {
     public Guid AgentClusterId { get; set; }
 }

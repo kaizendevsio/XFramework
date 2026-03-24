@@ -11,7 +11,7 @@ namespace XFramework.SourceGenerators;
 /// <summary>
 /// Source generator that collects entity types marked with [GenerateEndpoints] and generates
 /// a static registry for DataContext entity allowlisting. The generated code has no external
-/// dependencies — it returns a dictionary of (name → Type) that the StreamFlow server-side
+/// dependencies — it returns a dictionary of (name → Type) that the Bolt server-side
 /// QueryExecutionService consumes at startup.
 /// </summary>
 [Generator]

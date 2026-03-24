@@ -3,8 +3,8 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.WebSockets;
 using Microsoft.Extensions.Logging;
-using StreamFlow.Domain.Shared.Buffers;
-using StreamFlow.Domain.Shared.Protocol;
+using Bolt.Domain.Shared.Buffers;
+using Bolt.Domain.Shared.Protocol;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Integration.Services;
 
@@ -25,7 +25,7 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly Uri _serverUri;
     private readonly string _clientId;
     private readonly string _clientName;
-    private readonly StreamFlowConfiguration _config;
+    private readonly BoltConfiguration _config;
     private readonly ILogger _logger;
 
     // Connection pool — multiple WebSocket connections for throughput
@@ -57,7 +57,7 @@ public sealed class BoltClient : IAsyncDisposable
 
     public bool IsConnected => _connections.Count > 0 && _isRegistered;
 
-    public BoltClient(Uri serverUri, string clientId, string clientName, StreamFlowConfiguration config, ILogger logger)
+    public BoltClient(Uri serverUri, string clientId, string clientName, BoltConfiguration config, ILogger logger)
     {
         _serverUri = serverUri;
         _clientId = clientId;
@@ -68,7 +68,7 @@ public sealed class BoltClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// Connect to the thin StreamFlow server and register.
+    /// Connect to the thin Bolt server and register.
     /// Creates MinConnections connections (default 1, scales up dynamically).
     /// </summary>
     public async Task ConnectAsync(CancellationToken ct = default)
@@ -94,7 +94,7 @@ public sealed class BoltClient : IAsyncDisposable
 
         // Register this connection
         var writer = new ArrayBufferWriter<byte>(128);
-        StreamFlowCodec.WriteRegister(writer, _clientId, _clientName);
+        BoltHubCodec.WriteRegister(writer, _clientId, _clientName);
         await ws.SendAsync(writer.WrittenMemory, WebSocketMessageType.Binary, true, ct);
 
         var ackBuffer = new byte[2];
@@ -177,8 +177,8 @@ public sealed class BoltClient : IAsyncDisposable
     {
         var requestId = Guid.NewGuid();
 
-        var recipientHash = _hashCache.GetOrAdd(recipientId, StreamFlowCodec.Fnv1aHash);
-        var commandHash = _hashCache.GetOrAdd(commandName, StreamFlowCodec.Fnv1aHash);
+        var recipientHash = _hashCache.GetOrAdd(recipientId, BoltHubCodec.Fnv1aHash);
+        var commandHash = _hashCache.GetOrAdd(commandName, BoltHubCodec.Fnv1aHash);
 
         var rpcCall = PooledRpcCallThin.Rent();
         _pendingCalls[requestId] = rpcCall;
@@ -186,7 +186,7 @@ public sealed class BoltClient : IAsyncDisposable
         try
         {
             var writer = RentedBufferWriter.GetThreadLocal();
-            StreamFlowCodec.WriteRequest(writer, requestId, recipientHash, commandHash, payload.Span);
+            BoltHubCodec.WriteRequest(writer, requestId, recipientHash, commandHash, payload.Span);
 
             if (!IsConnected)
             {
@@ -229,7 +229,7 @@ public sealed class BoltClient : IAsyncDisposable
     /// </summary>
     public void RegisterHandler(string commandName, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
     {
-        var hash = StreamFlowCodec.Fnv1aHash(commandName);
+        var hash = BoltHubCodec.Fnv1aHash(commandName);
         _handlers[hash] = handler;
         _logger.LogDebug("Registered Bolt handler for {CommandName} [hash={Hash}]", commandName, hash);
     }
@@ -240,7 +240,7 @@ public sealed class BoltClient : IAsyncDisposable
     /// </summary>
     public void RegisterStreamHandler(string commandName, Func<BoltStream, Task> handler)
     {
-        var hash = StreamFlowCodec.Fnv1aHash(commandName);
+        var hash = BoltHubCodec.Fnv1aHash(commandName);
         _streamHandlers[hash] = handler;
         _logger.LogDebug("Registered Bolt stream handler for {CommandName} [hash={Hash}]", commandName, hash);
     }
@@ -254,15 +254,15 @@ public sealed class BoltClient : IAsyncDisposable
         if (!IsConnected) throw new InvalidOperationException("Not connected");
 
         var streamId = Guid.NewGuid();
-        var recipientHash = _hashCache.GetOrAdd(recipientId, StreamFlowCodec.Fnv1aHash);
-        var commandHash = _hashCache.GetOrAdd(commandName, StreamFlowCodec.Fnv1aHash);
+        var recipientHash = _hashCache.GetOrAdd(recipientId, BoltHubCodec.Fnv1aHash);
+        var commandHash = _hashCache.GetOrAdd(commandName, BoltHubCodec.Fnv1aHash);
 
         var conn = GetConnection();
         var stream = new BoltStream(streamId, conn);
         _activeStreams[streamId] = stream;
 
         var writer = RentedBufferWriter.GetThreadLocal();
-        StreamFlowCodec.WriteStreamOpen(writer, streamId, recipientHash, commandHash);
+        BoltHubCodec.WriteStreamOpen(writer, streamId, recipientHash, commandHash);
         await conn.SendAsync(writer.WrittenMemory, ct);
 
         return stream;
@@ -308,7 +308,7 @@ public sealed class BoltClient : IAsyncDisposable
                     continue;
 
                 var data = buffer.AsSpan(0, result.Count);
-                var frameType = StreamFlowCodec.PeekFrameType(data);
+                var frameType = BoltHubCodec.PeekFrameType(data);
 
                 switch (frameType)
                 {
@@ -362,7 +362,7 @@ public sealed class BoltClient : IAsyncDisposable
 
     private void HandleIncomingResponse(ReadOnlySpan<byte> data)
     {
-        if (!StreamFlowCodec.TryReadResponse(data, out var frame, out _))
+        if (!BoltHubCodec.TryReadResponse(data, out var frame, out _))
             return;
 
         if (_pendingCalls.TryRemove(frame.RequestId, out var rpcCall))
@@ -376,7 +376,7 @@ public sealed class BoltClient : IAsyncDisposable
 
     private void HandleStreamOpen(BoltConnection conn, ReadOnlySpan<byte> data, CancellationToken ct)
     {
-        if (!StreamFlowCodec.TryReadStreamOpen(data, out var streamId, out _, out var commandHash))
+        if (!BoltHubCodec.TryReadStreamOpen(data, out var streamId, out _, out var commandHash))
             return;
 
         var stream = new BoltStream(streamId, conn);
@@ -396,7 +396,7 @@ public sealed class BoltClient : IAsyncDisposable
 
     private void HandleStreamData(ReadOnlySpan<byte> data)
     {
-        if (!StreamFlowCodec.TryReadStreamData(data, out var streamId, out var payloadOffset, out var payloadLength, out _))
+        if (!BoltHubCodec.TryReadStreamData(data, out var streamId, out var payloadOffset, out var payloadLength, out _))
             return;
 
         if (_activeStreams.TryGetValue(streamId, out var stream))
@@ -409,7 +409,7 @@ public sealed class BoltClient : IAsyncDisposable
 
     private void HandleStreamClose(ReadOnlySpan<byte> data)
     {
-        if (!StreamFlowCodec.TryReadStreamClose(data, out var streamId, out var statusCode))
+        if (!BoltHubCodec.TryReadStreamClose(data, out var streamId, out var statusCode))
             return;
 
         if (_activeStreams.TryRemove(streamId, out var stream))
@@ -419,7 +419,7 @@ public sealed class BoltClient : IAsyncDisposable
     private async Task HandleIncomingRequestAsync(BoltConnection conn, byte[] data, int length, CancellationToken ct)
     {
         var span = data.AsSpan(0, length);
-        if (!StreamFlowCodec.TryReadRequest(span, out var frame, out _))
+        if (!BoltHubCodec.TryReadRequest(span, out var frame, out _))
             return;
 
         if (_handlers.TryGetValue(frame.CommandHash, out var handler))
@@ -430,21 +430,21 @@ public sealed class BoltClient : IAsyncDisposable
                 var (statusCode, responsePayload) = await handler(payload, frame.RequestId);
 
                 var writer = RentedBufferWriter.GetThreadLocal();
-                StreamFlowCodec.WriteResponse(writer, frame.RequestId, statusCode, responsePayload.Span);
+                BoltHubCodec.WriteResponse(writer, frame.RequestId, statusCode, responsePayload.Span);
                 await conn.SendAsync(writer.WrittenMemory, ct);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Handler error for command hash {CommandHash}", frame.CommandHash);
                 var errWriter = RentedBufferWriter.GetThreadLocal();
-                StreamFlowCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.InternalServerError, ReadOnlySpan<byte>.Empty);
+                BoltHubCodec.WriteResponse(errWriter, frame.RequestId, HttpStatusCode.InternalServerError, ReadOnlySpan<byte>.Empty);
                 await conn.SendAsync(errWriter.WrittenMemory, ct);
             }
         }
         else
         {
             var writer = RentedBufferWriter.GetThreadLocal();
-            StreamFlowCodec.WriteResponse(writer, frame.RequestId, HttpStatusCode.NotImplemented, ReadOnlySpan<byte>.Empty);
+            BoltHubCodec.WriteResponse(writer, frame.RequestId, HttpStatusCode.NotImplemented, ReadOnlySpan<byte>.Empty);
             await conn.SendAsync(writer.WrittenMemory, ct);
         }
     }

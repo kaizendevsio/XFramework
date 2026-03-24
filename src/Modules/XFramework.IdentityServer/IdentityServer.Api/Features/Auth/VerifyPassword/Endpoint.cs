@@ -8,7 +8,7 @@ namespace IdentityServer.Api.Features.Auth.VerifyPassword;
 
 public static class VerifyPasswordEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/auth/verify-password", Tags = ["Auth"],
         Summary = "Verify user password",
         Description = "Verifies a password against stored credential using BCrypt.",

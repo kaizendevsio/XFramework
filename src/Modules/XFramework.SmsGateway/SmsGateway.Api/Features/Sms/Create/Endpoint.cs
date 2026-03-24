@@ -7,7 +7,7 @@ namespace SmsGateway.Api.Features.Sms.Create;
 
 public static class CreateSmsMessageEndpoint
 {
-    [StreamFlowHandler]
+    [BoltHandler]
     [MapPost("/api/sms/messages", Tags = ["SMS"],
         Summary = "Create a new SMS message",
         Description = "Creates a new SMS message to be sent via the SMS gateway",

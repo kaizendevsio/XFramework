@@ -30,7 +30,7 @@ var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
 app.EnsureDatabase<DbContext>();
-// StreamFlow handlers are now source-generated from [StreamFlowHandler] on endpoint methods.
+// Bolt handlers are now source-generated from [BoltHandler] on endpoint methods.
 // UseCustomRequestsInAssembly is no longer needed — the generated ISignalREventHandler
 // implementations are auto-discovered by ScanAndRegisterHandlers() at startup.
 app.MapXFrameworkHealthChecks("IdentityServer");

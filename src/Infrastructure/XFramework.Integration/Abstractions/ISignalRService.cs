@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
-using StreamFlow.Domain.Shared.Contracts.Requests;
-using StreamFlow.Domain.Shared.Contracts.Responses;
+using Bolt.Domain.Shared.Contracts.Requests;
+using Bolt.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.Configurations;
 
 namespace XFramework.Integration.Abstractions;
@@ -8,13 +8,13 @@ namespace XFramework.Integration.Abstractions;
 public interface ISignalRService : IXFrameworkService
 {
     HubConnection? Connection { get; set; }
-    StreamFlowConfiguration StreamFlowConfiguration { get; set; }
+    BoltConfiguration BoltConfiguration { get; set; }
 
     Task<bool> EnsureConnection();
     Task StartEventListener(string topic);
     Task AddHandlersFromAssembly<T>();
 
-    Task<HttpStatusCode> InvokeVoidAsync(string methodName, StreamFlowMessage sfMessage);
+    Task<HttpStatusCode> InvokeVoidAsync(string methodName, BoltMessage sfMessage);
 
-    Task<StreamFlowRpcResult> InvokeAsync(StreamFlowMessage sfMessage);
+    Task<BoltRpcResult> InvokeAsync(BoltMessage sfMessage);
 }

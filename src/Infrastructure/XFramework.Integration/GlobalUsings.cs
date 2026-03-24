@@ -4,7 +4,7 @@ global using System.Net;
 global using System.Threading.Tasks;
 global using Mapster;
 global using Microsoft.Extensions.Configuration;
-global using StreamFlow.Domain.Shared.Enums;
+global using Bolt.Domain.Shared.Enums;
 global using XFramework.Domain.Shared.BusinessObjects;
 global using XFramework.Domain.Shared.Contracts.Responses;
 global using XFramework.Domain.Shared.Interfaces;

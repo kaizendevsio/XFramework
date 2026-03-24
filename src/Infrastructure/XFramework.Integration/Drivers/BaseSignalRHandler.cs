@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog.Context;
-using StreamFlow.Domain.Shared.Abstractions;
-using StreamFlow.Domain.Shared.Contracts.Requests;
+using Bolt.Domain.Shared.Abstractions;
+using Bolt.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.Contracts.Requests;
@@ -21,41 +21,41 @@ public abstract class BaseSignalRHandler
     public async Task<HttpStatusCode> RespondToInvoke<TResult>(HubConnection connection, Guid requestId, string clientId, TResult data) 
         where TResult : class, IBaseResponse, IHasRequestServer
     {
-        var request = new StreamFlowMessage<TResult>(data)
+        var request = new BoltMessage<TResult>(data)
         {
             RequestId = requestId,
             RecipientId = clientId,
             ExchangeType = MessageExchangeType.Direct,
             ResponseStatusCode = data.HttpStatusCode,
-            CommandName = nameof(IStreamFlow.InvokeResponseHandler)
+            CommandName = nameof(IBoltTransport.InvokeResponseHandler)
         };
         
-        return await connection.InvokeAsync<HttpStatusCode>(nameof(IStreamFlow.InvokeResponse), request);
+        return await connection.InvokeAsync<HttpStatusCode>(nameof(IBoltTransport.InvokeResponse), request);
     }
 
     protected virtual void HandleRequestQuery<TQuery, TResponse>(HubConnection connection, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
         where TResponse : class
         where TQuery : class, IQuery<QueryResponse<TResponse>>, IHasRequestServer
     {
-        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TQuery).GetTypeFullName());
-        connection.On(typeof(TQuery).GetTypeFullName(), (StreamFlowMessage<TQuery> response) => StreamflowRequestHandler<TQuery, QueryResponse<TResponse>>(response, connection, logger, scopeFactory).ConfigureAwait(false));
+        logger.LogInformation("Registering bolt handler for {HandlerName}", typeof(TQuery).GetTypeFullName());
+        connection.On(typeof(TQuery).GetTypeFullName(), (BoltMessage<TQuery> response) => BoltRequestHandler<TQuery, QueryResponse<TResponse>>(response, connection, logger, scopeFactory).ConfigureAwait(false));
     }
    
     protected virtual void HandleRequestCmd<TCmd>(HubConnection connection, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
         where TCmd : class, ICommand<CmdResponse>, IHasRequestServer
     {
-        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
-        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse>(response, connection, logger, scopeFactory).ConfigureAwait(false));
+        logger.LogInformation("Registering bolt handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
+        connection.On(typeof(TCmd).GetTypeFullName(), (BoltMessage<TCmd> response) => BoltRequestHandler<TCmd, CmdResponse>(response, connection, logger, scopeFactory).ConfigureAwait(false));
     }
     
     protected virtual void HandleRequestCmd<TCmd, TResponse>(HubConnection connection, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
         where TCmd : class, ICommand<CmdResponse<TResponse>>, IHasRequestServer
     {
-        logger.LogInformation("Registering streamflow handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
-        connection.On(typeof(TCmd).GetTypeFullName(), (StreamFlowMessage<TCmd> response) => StreamflowRequestHandler<TCmd, CmdResponse<TResponse>>(response, connection, logger, scopeFactory).ConfigureAwait(false));
+        logger.LogInformation("Registering bolt handler for {HandlerName}", typeof(TCmd).GetTypeFullName());
+        connection.On(typeof(TCmd).GetTypeFullName(), (BoltMessage<TCmd> response) => BoltRequestHandler<TCmd, CmdResponse<TResponse>>(response, connection, logger, scopeFactory).ConfigureAwait(false));
     }
 
-    private async Task StreamflowRequestHandler<TRequest, TResponse>(StreamFlowMessage<TRequest> response, HubConnection connection, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
+    private async Task BoltRequestHandler<TRequest, TResponse>(BoltMessage<TRequest> response, HubConnection connection, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
         where TRequest : class, IHasRequestServer
         where TResponse : class, IBaseResponse, IHasRequestServer
     {
@@ -73,7 +73,7 @@ public abstract class BaseSignalRHandler
                     using (LogContext.PushProperty(nameof(RequestMetadata.RequestId), r.Metadata?.RequestId))
                     {
                         logger.LogWarning("[{Caller}] CQRS dispatcher removed - handler is deprecated. Request type: {RequestType}",
-                            nameof(StreamflowRequestHandler), typeof(TRequest).Name);
+                            nameof(BoltRequestHandler), typeof(TRequest).Name);
                         
                         // Return not implemented response
                         var result = Activator.CreateInstance<TResponse>();
@@ -92,7 +92,7 @@ public abstract class BaseSignalRHandler
         catch (Exception e)
         {
             logger.LogInformation("[{Caller}] Invoking {Request}' resulted in exception: {Message}; {StackTrace}",
-                nameof(StreamflowRequestHandler), GetType().Name, e.Message, e.StackTrace);
+                nameof(BoltRequestHandler), GetType().Name, e.Message, e.StackTrace);
         }
     }
 }

@@ -8,7 +8,7 @@ using TResponse = CmdResponse;
 [MemoryPackable]
 public partial record TransferWalletRequest : TransactionRequestBase,
     ICommand<TResponse>,
-    IStreamflowRequest<TRequest, TResponse>
+    IBoltRequest<TRequest, TResponse>
 {
     public TransferDeductionType TransferDeductionType { get; set; } = TransferDeductionType.Default;
     public TransactionPurpose TransactionPurpose { get; set; } = TransactionPurpose.Transfer;
