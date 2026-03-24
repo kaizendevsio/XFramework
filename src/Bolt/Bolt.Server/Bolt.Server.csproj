@@ -5,8 +5,16 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageId>Bolt.Server</PackageId>
-        <Description>Bolt RPC + streaming hub server. WebSocket middleware for ASP.NET Core.</Description>
+
+        <PackageId>Bolt.Net.Server</PackageId>
+        <Version>1.0.0-preview.1</Version>
+        <Authors>KaizenDevs</Authors>
+        <Description>Bolt — high-performance binary RPC + streaming hub server for ASP.NET Core. WebSocket middleware with zero-copy routing, connection pooling, and direct handler support. 47% faster than gRPC.</Description>
+        <PackageTags>rpc;binary;server;hub;websocket;bolt;aspnetcore;high-performance</PackageTags>
+        <RepositoryUrl>https://github.com/kaizendevsio/XFramework</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/kaizendevsio/XFramework</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>BOLT.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,6 +23,10 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Bolt.Protocol\Bolt.Protocol.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\BOLT.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
 </Project>

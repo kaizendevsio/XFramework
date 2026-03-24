@@ -5,8 +5,20 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageId>Bolt.Protocol</PackageId>
-        <Description>Bolt binary RPC + streaming wire protocol. Shared between Bolt.Server and Bolt.Client.</Description>
+
+        <PackageId>Bolt.Net.Protocol</PackageId>
+        <Version>1.0.0-preview.1</Version>
+        <Authors>KaizenDevs</Authors>
+        <Description>Bolt — high-performance binary RPC + streaming wire protocol for .NET. 47% faster than gRPC with 94% less memory. This package contains the shared wire format, codec, and buffers.</Description>
+        <PackageTags>rpc;binary;protocol;streaming;websocket;bolt;high-performance</PackageTags>
+        <RepositoryUrl>https://github.com/kaizendevsio/XFramework</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/kaizendevsio/XFramework</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>BOLT.md</PackageReadmeFile>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\BOLT.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
 
 </Project>

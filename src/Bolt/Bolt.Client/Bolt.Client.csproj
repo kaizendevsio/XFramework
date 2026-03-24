@@ -5,8 +5,16 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageId>Bolt.Client</PackageId>
-        <Description>Bolt RPC + streaming client. Connects to a Bolt hub or directly to another Bolt client.</Description>
+
+        <PackageId>Bolt.Net.Client</PackageId>
+        <Version>1.0.0-preview.1</Version>
+        <Authors>KaizenDevs</Authors>
+        <Description>Bolt — high-performance binary RPC + streaming client for .NET. Connection pooling, typed SendAsync, bidirectional IAsyncEnumerable streaming, DI support for Blazor/ASP.NET. 47% faster than gRPC with 94% less memory.</Description>
+        <PackageTags>rpc;binary;client;streaming;websocket;bolt;blazor;high-performance</PackageTags>
+        <RepositoryUrl>https://github.com/kaizendevsio/XFramework</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/kaizendevsio/XFramework</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>BOLT.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -19,6 +27,10 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Bolt.Protocol\Bolt.Protocol.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\BOLT.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
 </Project>
