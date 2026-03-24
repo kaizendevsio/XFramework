@@ -7,7 +7,7 @@
         <Nullable>enable</Nullable>
 
         <PackageId>Bolt.Net.Protocol</PackageId>
-        <Version>1.0.0-preview.1</Version>
+        <Version>1.0.0</Version>
         <Authors>KaizenDevs</Authors>
         <Description>Bolt — high-performance binary RPC + streaming wire protocol for .NET. 47% faster than gRPC with 94% less memory. This package contains the shared wire format, codec, and buffers.</Description>
         <PackageTags>rpc;binary;protocol;streaming;websocket;bolt;high-performance</PackageTags>
