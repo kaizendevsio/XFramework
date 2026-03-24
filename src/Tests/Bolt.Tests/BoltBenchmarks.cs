@@ -342,6 +342,222 @@ public class HelloRouterHub : Hub
     public async Task<string> SayHello(string name) => await _backend.InvokeAsync<string>("SayHello", name);
 }
 
+// ── Max Throughput Benchmark ──
+
+/// <summary>
+/// Fires a batch of 100 requests at max parallelism via Task.WhenAll.
+/// OperationsPerInvoke=100 gives BenchmarkDotNet the per-op latency.
+/// Tests peak ops/sec each transport can sustain.
+/// </summary>
+[Config(typeof(BoltBenchConfig))]
+[MemoryDiagnoser]
+public class BoltThroughputBenchmarks
+{
+    private WebApplication _boltHubApp = null!;
+    private BoltClient _boltHubService = null!;
+    private BoltClient _boltHubCaller = null!;
+    private WebApplication _boltDirectApp = null!;
+    private BoltClient _boltDirectClient = null!;
+    private WebApplication _grpcBackendApp = null!;
+    private WebApplication _grpcHubApp = null!;
+    private GrpcChannel _grpcChannel = null!;
+    private HelloService.HelloServiceClient _grpcClient = null!;
+    private WebApplication _signalRBackendApp = null!;
+    private WebApplication _signalRHubApp = null!;
+    private HubConnection _signalRCaller = null!;
+
+    private const int Batch = 100;
+
+    [GlobalSetup]
+    public async Task Setup()
+    {
+        // ── Bolt Hub ──
+        var b1 = WebApplication.CreateBuilder();
+        b1.WebHost.UseUrls("http://localhost:18500");
+        b1.Services.AddSingleton<BoltServer>();
+        b1.Logging.SetMinimumLevel(LogLevel.Error);
+        _boltHubApp = b1.Build();
+        _boltHubApp.UseWebSockets();
+        _boltHubApp.MapBolt("/bolt");
+        _boltHubApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _boltHubApp.RunAsync());
+        await WaitForHealth("http://localhost:18500/health");
+
+        var lf = _boltHubApp.Services.GetRequiredService<ILoggerFactory>();
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60 };
+        _boltHubService = new BoltClient(new Uri("ws://localhost:18500/bolt"),
+            "tp_service", "TpService", opts, lf.CreateLogger<BoltClient>());
+        _boltHubService.RegisterHandler("hello", HelloHandler);
+        await _boltHubService.ConnectAsync();
+        _boltHubCaller = new BoltClient(new Uri("ws://localhost:18500/bolt"),
+            "tp_caller", "TpCaller", opts, lf.CreateLogger<BoltClient>());
+        await _boltHubCaller.ConnectAsync();
+
+        // ── Bolt Direct ──
+        var b2 = WebApplication.CreateBuilder();
+        b2.WebHost.UseUrls("http://localhost:18600");
+        b2.Services.AddSingleton<BoltServer>();
+        b2.Logging.SetMinimumLevel(LogLevel.Error);
+        _boltDirectApp = b2.Build();
+        _boltDirectApp.Services.GetRequiredService<BoltServer>().RegisterHandler("hello", HelloHandler);
+        _boltDirectApp.UseWebSockets();
+        _boltDirectApp.MapBolt("/bolt");
+        _boltDirectApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _boltDirectApp.RunAsync());
+        await WaitForHealth("http://localhost:18600/health");
+        _boltDirectClient = new BoltClient(new Uri("ws://localhost:18600/bolt"),
+            "tp_direct", "TpDirect", opts, lf.CreateLogger<BoltClient>());
+        await _boltDirectClient.ConnectAsync();
+
+        // ── gRPC Hub ──
+        var gb = WebApplication.CreateBuilder();
+        gb.WebHost.ConfigureKestrel(o => {
+            o.ListenLocalhost(18701, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(18702, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        gb.Services.AddGrpc();
+        gb.Logging.SetMinimumLevel(LogLevel.Error);
+        _grpcBackendApp = gb.Build();
+        _grpcBackendApp.MapGrpcService<GrpcHelloBackend>();
+        _grpcBackendApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _grpcBackendApp.RunAsync());
+        await WaitForHealth("http://localhost:18702/health");
+
+        var backendCh = GrpcChannel.ForAddress("http://localhost:18701");
+        var backendCl = new HelloService.HelloServiceClient(backendCh);
+        var gh = WebApplication.CreateBuilder();
+        gh.WebHost.ConfigureKestrel(o => {
+            o.ListenLocalhost(18703, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(18704, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+        });
+        gh.Services.AddGrpc();
+        gh.Services.AddSingleton(backendCl);
+        gh.Logging.SetMinimumLevel(LogLevel.Error);
+        _grpcHubApp = gh.Build();
+        _grpcHubApp.MapGrpcService<GrpcHelloHub>();
+        _grpcHubApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _grpcHubApp.RunAsync());
+        await WaitForHealth("http://localhost:18704/health");
+        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18703");
+        _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
+
+        // ── SignalR Hub ──
+        var sb = WebApplication.CreateBuilder();
+        sb.WebHost.UseUrls("http://localhost:18800");
+        sb.Services.AddSignalR().AddMessagePackProtocol();
+        sb.Logging.SetMinimumLevel(LogLevel.Error);
+        _signalRBackendApp = sb.Build();
+        _signalRBackendApp.MapHub<HelloBackendHub>("/hello-backend");
+        _signalRBackendApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _signalRBackendApp.RunAsync());
+        await WaitForHealth("http://localhost:18800/health");
+
+        var backendConn = new HubConnectionBuilder()
+            .WithUrl("http://localhost:18800/hello-backend").AddMessagePackProtocol().Build();
+        await backendConn.StartAsync();
+        var sh = WebApplication.CreateBuilder();
+        sh.WebHost.UseUrls("http://localhost:18801");
+        sh.Services.AddSignalR().AddMessagePackProtocol();
+        sh.Services.AddSingleton(backendConn);
+        sh.Logging.SetMinimumLevel(LogLevel.Error);
+        _signalRHubApp = sh.Build();
+        _signalRHubApp.MapHub<HelloRouterHub>("/hello-hub");
+        _signalRHubApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _signalRHubApp.RunAsync());
+        await WaitForHealth("http://localhost:18801/health");
+        _signalRCaller = new HubConnectionBuilder()
+            .WithUrl("http://localhost:18801/hello-hub").AddMessagePackProtocol().Build();
+        await _signalRCaller.StartAsync();
+
+        // Warmup
+        for (int i = 0; i < 10; i++)
+        {
+            var p = MemoryPackSerializer.Serialize(new HelloMsg { Text = "W" });
+            await _boltHubCaller.InvokeAsync("tp_service", "hello", p);
+            await _boltDirectClient.InvokeAsync("_", "hello", p);
+            await _grpcClient.SayHelloAsync(new HelloRequest { Name = "W" });
+            await _signalRCaller.InvokeAsync<string>("SayHello", "W");
+        }
+    }
+
+    private static Task<(HttpStatusCode, ReadOnlyMemory<byte>)> HelloHandler(ReadOnlyMemory<byte> payload, Guid requestId)
+    {
+        var req = MemoryPackSerializer.Deserialize<HelloMsg>(payload.Span)!;
+        var resp = new HelloMsg { Text = $"Hello {req.Text}" };
+        return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(resp)));
+    }
+
+    [Benchmark(OperationsPerInvoke = Batch)]
+    public async Task Bolt_Hub_Throughput()
+    {
+        var tasks = new Task[Batch];
+        for (int i = 0; i < Batch; i++)
+        {
+            var p = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
+            tasks[i] = _boltHubCaller.InvokeAsync("tp_service", "hello", p);
+        }
+        await Task.WhenAll(tasks);
+    }
+
+    [Benchmark(OperationsPerInvoke = Batch)]
+    public async Task Bolt_Direct_Throughput()
+    {
+        var tasks = new Task[Batch];
+        for (int i = 0; i < Batch; i++)
+        {
+            var p = MemoryPackSerializer.Serialize(new HelloMsg { Text = "World" });
+            tasks[i] = _boltDirectClient.InvokeAsync("_", "hello", p);
+        }
+        await Task.WhenAll(tasks);
+    }
+
+    [Benchmark(OperationsPerInvoke = Batch)]
+    public async Task GRPC_Hub_Throughput()
+    {
+        var tasks = new Task[Batch];
+        for (int i = 0; i < Batch; i++)
+            tasks[i] = _grpcClient.SayHelloAsync(new HelloRequest { Name = "World" }).ResponseAsync;
+        await Task.WhenAll(tasks);
+    }
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = Batch)]
+    public async Task SignalR_Hub_Throughput()
+    {
+        var tasks = new Task[Batch];
+        for (int i = 0; i < Batch; i++)
+            tasks[i] = _signalRCaller.InvokeAsync<string>("SayHello", "World");
+        await Task.WhenAll(tasks);
+    }
+
+    [GlobalCleanup]
+    public async Task Cleanup()
+    {
+        try { await _boltHubCaller.DisposeAsync(); } catch { }
+        try { await _boltHubService.DisposeAsync(); } catch { }
+        try { await _boltDirectClient.DisposeAsync(); } catch { }
+        try { await _signalRCaller.DisposeAsync(); } catch { }
+        _grpcChannel?.Dispose();
+        try { await _grpcHubApp.StopAsync(); } catch { }
+        try { await _grpcBackendApp.StopAsync(); } catch { }
+        try { await _signalRHubApp.StopAsync(); } catch { }
+        try { await _signalRBackendApp.StopAsync(); } catch { }
+        try { await _boltHubApp.StopAsync(); } catch { }
+        try { await _boltDirectApp.StopAsync(); } catch { }
+    }
+
+    private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
+    {
+        using var client = new HttpClient();
+        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+        while (DateTime.UtcNow < deadline)
+        {
+            try { if ((await client.GetAsync(url)).IsSuccessStatusCode) return; } catch { }
+            await Task.Delay(200);
+        }
+        throw new TimeoutException($"Service at {url} not healthy within {timeoutSeconds}s");
+    }
+}
+
 // ── Config ──
 
 file class BoltBenchConfig : ManualConfig
