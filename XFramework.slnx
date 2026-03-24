@@ -59,14 +59,10 @@
     <Project Path="src\Presentation\Fluid\Fluid.csproj" />
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
   </Folder>
-  <Folder Name="/src/" />
-  <Folder Name="/src/Bolt/">
-    <Project Path="src/Bolt/Bolt.Client/Bolt.Client.csproj" />
-    <Project Path="src/Bolt/Bolt.Protocol/Bolt.Protocol.csproj" />
-    <Project Path="src/Bolt/Bolt.Server/Bolt.Server.csproj" />
-  </Folder>
-  <Folder Name="/src/Tests/">
-    <Project Path="src/Tests/Bolt.Tests/Bolt.Tests.csproj" />
+  <Folder Name="/Libraries/Bolt/">
+    <Project Path="src\Libraries\Bolt\Bolt.Protocol\Bolt.Protocol.csproj" />
+    <Project Path="src\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
+    <Project Path="src\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
@@ -75,6 +71,7 @@
     <Project Path="src\Tests\IdentityServer.Benchmarks\IdentityServer.Benchmarks.csproj" />
     <Project Path="src\Tests\Wallets.IntegrationTests\Wallets.IntegrationTests.csproj" />
     <Project Path="src\Tests\SerializerPerfTest\SerializerPerfTest.csproj" />
+    <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
   </Folder>
   <Folder Name="/Tools/">
     <Project Path="src\Tools\XFramework.MigrationRunner\XFramework.MigrationRunner.csproj" />

@@ -24,8 +24,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\Bolt\Bolt.Server\Bolt.Server.csproj" />
-        <ProjectReference Include="..\..\Bolt\Bolt.Client\Bolt.Client.csproj" />
+        <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
+        <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
     </ItemGroup>
 
 </Project>
