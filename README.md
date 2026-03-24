@@ -194,8 +194,42 @@ dotnet run --project src/Tests/IdentityServer.Benchmarks/ -c Release
 
 ## Running Benchmarks
 
+### Standalone Bolt Benchmarks (no database required)
+
+Pure protocol benchmark — Bolt vs gRPC vs SignalR, all returning a simple "Hello" string.
+
 ```bash
-# Sequential (all transports)
+cd src/Tests/Bolt.Tests
+
+# All benchmarks (interactive menu)
+dotnet run -c Release
+
+# Sequential + concurrent (1 and 64 parallel)
+dotnet run -c Release -- --filter "*BoltBenchmarks*"
+
+# Max throughput (100 concurrent batch, peak ops/sec)
+dotnet run -c Release -- --filter "*Throughput*"
+
+# Single transport only
+dotnet run -c Release -- --filter "*Bolt_Direct*"
+dotnet run -c Release -- --filter "*Bolt_Hub*"
+dotnet run -c Release -- --filter "*GRPC_Direct*"
+dotnet run -c Release -- --filter "*GRPC_Hub*"
+dotnet run -c Release -- --filter "*SignalR*"
+```
+
+### XFramework Integrated Benchmarks (requires Docker for PostgreSQL)
+
+Tests with a real HealthCheck endpoint through the full XFramework stack.
+
+```bash
+cd src/Tests/IdentityServer.Benchmarks
+
+# Set Docker host for Testcontainers
+export DOCKER_HOST=tcp://your-docker-host:2375
+export TESTCONTAINERS_HOST_OVERRIDE=your-docker-host
+
+# Sequential (all 5 transports)
 dotnet run -c Release -- --filter "*TransportBenchmarks*"
 
 # Concurrent load (1, 16, 64 parallel)
@@ -204,6 +238,8 @@ dotnet run -c Release -- --filter "*Concurrent*"
 # Max throughput
 dotnet run -c Release -- --filter "*Throughput*"
 ```
+
+Results are saved to `BenchmarkDotNet.Artifacts/` as markdown, HTML, and CSV.
 
 ## License
 
