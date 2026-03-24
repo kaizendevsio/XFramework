@@ -222,7 +222,7 @@ var (status, data) = await client.InvokeAsync("_", "hello", payload);
 |---------|-------------|-------------|
 | `Bolt.Protocol` | Wire format, codec, buffers | None |
 | `Bolt.Server` | Hub server middleware for ASP.NET Core | Bolt.Protocol |
-| `Bolt.Client` | RPC + streaming client | Bolt.Protocol, MemoryPack |
+| `Bolt.Client` | RPC + streaming client with DI support | Bolt.Protocol, MemoryPack |
 
 ## Quick Start
 
@@ -230,7 +230,10 @@ var (status, data) = await client.InvokeAsync("_", "hello", payload);
 
 ```csharp
 var builder = WebApplication.CreateBuilder();
-builder.Services.AddSingleton<BoltServer>();
+
+builder.Services.AddBoltServer();
+// Or with options:
+// builder.Services.AddBoltServer(o => o.InvocationTimeoutMs = 60000);
 
 var app = builder.Build();
 app.UseWebSockets();
@@ -238,13 +241,51 @@ app.MapBolt("/bolt");
 app.Run();
 ```
 
-### Client
+### Client (via DI — recommended for Blazor, ASP.NET, hosted apps)
+
+```csharp
+builder.Services.AddBoltClient(bolt => bolt
+    .WithServer("ws://localhost:5000/bolt")
+    .WithClientId("my-service")
+    .WithClientName("MyService")
+    .WithMinConnections(2)
+    .WithMaxConnections(8)
+    .WithTimeout(30)
+    .HandleRpc("greet", async (payload, id) =>
+    {
+        var name = MemoryPackSerializer.Deserialize<string>(payload.Span);
+        var reply = MemoryPackSerializer.Serialize($"Hello {name}");
+        return (HttpStatusCode.OK, (ReadOnlyMemory<byte>)reply);
+    })
+    .HandleStream("live-data", async (stream) =>
+    {
+        await foreach (var chunk in stream.ReadAllAsync())
+            ProcessUpdate(chunk);
+    })
+);
+```
+
+The client auto-connects on app startup via `IHostedService` and disconnects on shutdown. Then inject it anywhere:
+
+```csharp
+public class GreetingService(BoltClient bolt)
+{
+    public async Task<string> Greet(string name)
+    {
+        var payload = MemoryPackSerializer.Serialize(new HelloMsg { Text = name });
+        var (status, data) = await bolt.InvokeAsync("greeting-service", "greet", payload);
+        return MemoryPackSerializer.Deserialize<HelloMsg>(data.Span)!.Text;
+    }
+}
+```
+
+### Client (manual — for console apps or when you need full control)
 
 ```csharp
 var client = new BoltClient(
     new Uri("ws://localhost:5000/bolt"),
     "my-service", "MyService",
-    new BoltClientOptions(), logger);
+    new BoltClientOptions { MinConnections = 2 }, logger);
 
 client.RegisterHandler("greet", async (payload, id) =>
 {
@@ -253,5 +294,63 @@ client.RegisterHandler("greet", async (payload, id) =>
     return (HttpStatusCode.OK, (ReadOnlyMemory<byte>)reply);
 });
 
-await client.ConnectAsync();
+await client.ConnectWithRetryAsync();
+```
+
+### Direct Mode (server handles requests locally, no hub routing)
+
+```csharp
+// Server
+builder.Services.AddBoltServer();
+var app = builder.Build();
+
+app.Services.GetRequiredService<BoltServer>().RegisterHandler("hello", async (payload, id) =>
+{
+    var msg = MemoryPackSerializer.Deserialize<HelloMsg>(payload.Span)!;
+    var reply = MemoryPackSerializer.Serialize(new HelloMsg { Text = $"Hello {msg.Text}" });
+    return (HttpStatusCode.OK, (ReadOnlyMemory<byte>)reply);
+});
+
+app.UseWebSockets();
+app.MapBolt("/bolt");
+
+// Client connects directly — no hub needed
+builder.Services.AddBoltClient(bolt => bolt
+    .WithServer("ws://server:5000/bolt")
+    .WithClientId("caller")
+);
+```
+
+### Blazor Server / WASM
+
+```csharp
+// In Program.cs
+builder.Services.AddBoltClient(bolt => bolt
+    .WithServer("ws://api.myapp.com/bolt")
+    .WithClientId($"blazor_{Guid.NewGuid():N}")
+    .WithClientName("BlazorApp")
+    .HandleRpc("notification", async (payload, id) =>
+    {
+        // Handle server-push notifications
+        var notification = MemoryPackSerializer.Deserialize<Notification>(payload.Span);
+        NotificationStore.Add(notification);
+        return (HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty);
+    })
+    .HandleStream("live-feed", async (stream) =>
+    {
+        await foreach (var update in stream.ReadAllAsync<LiveUpdate>())
+            StateContainer.ApplyUpdate(update);
+    })
+);
+
+// In any component or service — inject and use
+@inject BoltClient Bolt
+
+@code {
+    private async Task SendMessage(string text)
+    {
+        var payload = MemoryPackSerializer.Serialize(new ChatMessage { Text = text });
+        await Bolt.InvokeAsync("chat-service", "send", payload);
+    }
+}
 ```
