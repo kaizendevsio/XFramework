@@ -101,12 +101,9 @@ public sealed class BoltServer
                 await HandleRegisterAsync(connection, buffer, length, ct);
                 break;
             case FrameType.Request:
-            {
-                // Dispatch off the receive loop — don't block reading next frame
-                var data = buffer.AsSpan(0, length).ToArray();
-                _ = HandleRequestAsync(connection, data, data.Length, ct);
+                // Process inline — hub work is just header parse + queue to writer channel (non-blocking)
+                await HandleRequestAsync(connection, buffer, length, ct);
                 break;
-            }
             case FrameType.Response:
                 await HandleResponseAsync(connection, buffer, length, ct);
                 break;
@@ -370,7 +367,30 @@ public sealed class BoltHubConnection
 
     public BoltHubConnection(WebSocket webSocket) => _webSocket = webSocket;
 
-    public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    /// <summary>
+    /// Send data with fast-path for uncontended lock.
+    /// </summary>
+    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        // Fast path: no contention — send synchronously, zero overhead
+        if (_sendLock.Wait(0))
+        {
+            try
+            {
+                if (_webSocket.State == WebSocketState.Open)
+                    return _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+                return ValueTask.CompletedTask;
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
+        }
+        // Slow path: contention — await lock
+        return SendSlowAsync(data, ct);
+    }
+
+    private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
         await _sendLock.WaitAsync(ct);
         try
