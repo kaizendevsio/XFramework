@@ -93,7 +93,8 @@ public class BoltBenchmarks
         await WaitForHealth("http://localhost:18100/health");
 
         var lf = _boltHubApp.Services.GetRequiredService<ILoggerFactory>();
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 30 };
+        // Multiple connections for both caller and service — hub round-robins across them
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 30, MinConnections = 4, MaxConnections = 8, ScaleUpThreshold = 16 };
 
         _boltHubService = new BoltClient(new Uri("ws://localhost:18100/bolt"),
             "bolt_service", "BoltService", opts, lf.CreateLogger<BoltClient>());
@@ -430,7 +431,7 @@ public class BoltThroughputBenchmarks
         await WaitForHealth("http://localhost:18500/health");
 
         var lf = _boltHubApp.Services.GetRequiredService<ILoggerFactory>();
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60 };
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60, MinConnections = 4, MaxConnections = 8, ScaleUpThreshold = 16 };
         _boltHubService = new BoltClient(new Uri("ws://localhost:18500/bolt"),
             "tp_service", "TpService", opts, lf.CreateLogger<BoltClient>());
         _boltHubService.RegisterHandler("hello", HelloHandler);
