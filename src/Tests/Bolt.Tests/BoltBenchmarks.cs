@@ -44,8 +44,9 @@ public class BoltBenchmarks
     private GrpcChannel _grpcChannel = null!;
     private HelloService.HelloServiceClient _grpcClient = null!;
 
-    // SignalR (with hub)
-    private WebApplication _signalRApp = null!;
+    // SignalR (with hub routing: client → hub → backend → hub → client)
+    private WebApplication _signalRBackendApp = null!;
+    private WebApplication _signalRHubApp = null!;
     private HubConnection _signalRCaller = null!;
 
     [Params(1, 64)]
@@ -160,18 +161,38 @@ public class BoltBenchmarks
 
     private async Task SetupSignalR()
     {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls("http://localhost:18400");
-        builder.Services.AddSignalR().AddMessagePackProtocol();
-        builder.Logging.SetMinimumLevel(LogLevel.Error);
-        _signalRApp = builder.Build();
-        _signalRApp.MapHub<HelloHub>("/hello-hub");
-        _signalRApp.MapGet("/health", () => "ok");
-        _ = Task.Run(() => _signalRApp.RunAsync());
+        // Backend — handles actual Hello logic
+        var bb = WebApplication.CreateBuilder();
+        bb.WebHost.UseUrls("http://localhost:18400");
+        bb.Services.AddSignalR().AddMessagePackProtocol();
+        bb.Logging.SetMinimumLevel(LogLevel.Error);
+        _signalRBackendApp = bb.Build();
+        _signalRBackendApp.MapHub<HelloBackendHub>("/hello-backend");
+        _signalRBackendApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _signalRBackendApp.RunAsync());
         await WaitForHealth("http://localhost:18400/health");
 
+        // Hub — proxies to backend (same routing as Bolt Hub and gRPC Hub)
+        var backendConn = new HubConnectionBuilder()
+            .WithUrl("http://localhost:18400/hello-backend")
+            .AddMessagePackProtocol()
+            .Build();
+        await backendConn.StartAsync();
+
+        var hb = WebApplication.CreateBuilder();
+        hb.WebHost.UseUrls("http://localhost:18401");
+        hb.Services.AddSignalR().AddMessagePackProtocol();
+        hb.Services.AddSingleton(backendConn);
+        hb.Logging.SetMinimumLevel(LogLevel.Error);
+        _signalRHubApp = hb.Build();
+        _signalRHubApp.MapHub<HelloRouterHub>("/hello-hub");
+        _signalRHubApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _signalRHubApp.RunAsync());
+        await WaitForHealth("http://localhost:18401/health");
+
+        // Client → Hub (not backend)
         _signalRCaller = new HubConnectionBuilder()
-            .WithUrl("http://localhost:18400/hello-hub")
+            .WithUrl("http://localhost:18401/hello-hub")
             .AddMessagePackProtocol()
             .Build();
         await _signalRCaller.StartAsync();
@@ -262,7 +283,8 @@ public class BoltBenchmarks
         _grpcChannel?.Dispose();
         try { await _grpcHubApp.StopAsync(); } catch { }
         try { await _grpcBackendApp.StopAsync(); } catch { }
-        try { await _signalRApp.StopAsync(); } catch { }
+        try { await _signalRHubApp.StopAsync(); } catch { }
+        try { await _signalRBackendApp.StopAsync(); } catch { }
         try { await _boltHubApp.StopAsync(); } catch { }
         try { await _boltDirectApp.StopAsync(); } catch { }
     }
@@ -304,11 +326,20 @@ public class GrpcHelloHub : HelloService.HelloServiceBase
         => await _backend.SayHelloAsync(request);
 }
 
-// ── SignalR hub ──
+// ── SignalR hubs (backend + router — same hop count as Bolt Hub and gRPC Hub) ──
 
-public class HelloHub : Hub
+/// <summary>Backend — handles actual logic (like IdentityServer in Bolt)</summary>
+public class HelloBackendHub : Hub
 {
     public string SayHello(string name) => $"Hello {name}";
+}
+
+/// <summary>Router — proxies to backend (like BoltServer hub routing)</summary>
+public class HelloRouterHub : Hub
+{
+    private readonly HubConnection _backend;
+    public HelloRouterHub(HubConnection backend) => _backend = backend;
+    public async Task<string> SayHello(string name) => await _backend.InvokeAsync<string>("SayHello", name);
 }
 
 // ── Config ──
