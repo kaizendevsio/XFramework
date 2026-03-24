@@ -11,7 +11,6 @@ using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Extensions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Services;
-using BoltRpcClient = Bolt.Client.BoltClient;
 
 namespace XFramework.Integration.ThinProtocol;
 
@@ -21,7 +20,7 @@ namespace XFramework.Integration.ThinProtocol;
 /// </summary>
 public class BoltDriver : IMessageBusWrapper
 {
-    private readonly BoltRpcClient _client;
+    private readonly Bolt.Client.BoltClient _client;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<BoltDriver> _logger;
@@ -37,7 +36,7 @@ public class BoltDriver : IMessageBusWrapper
     public Action OnDisconnected { get; set; }
 
     public BoltDriver(
-        BoltRpcClient client,
+        Bolt.Client.BoltClient client,
         IConfiguration configuration,
         IHostEnvironment hostEnvironment,
         ILogger<BoltDriver> logger,
