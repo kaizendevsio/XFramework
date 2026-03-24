@@ -1,5 +1,5 @@
-﻿using StreamFlow.Stream.Hubs;
-using StreamFlow.Stream.ThinProtocol;
+﻿using Bolt.Server;
+using StreamFlow.Stream.Hubs;
 
 namespace StreamFlow.Stream.Extensions;
 
@@ -9,7 +9,7 @@ public static class ApplicationBuilderExtension
     {
         var app = appBuilder as WebApplication;
 
-        // Thin binary WebSocket protocol — replaces SignalR
+        // Bolt protocol endpoint
         app.UseWebSockets();
         app.MapBolt("/streamflow/ws");
 

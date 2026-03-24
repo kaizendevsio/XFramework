@@ -59,6 +59,12 @@
     <Project Path="src\Presentation\Fluid\Fluid.csproj" />
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
   </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Bolt/">
+    <Project Path="src/Bolt/Bolt.Client/Bolt.Client.csproj" />
+    <Project Path="src/Bolt/Bolt.Protocol/Bolt.Protocol.csproj" />
+    <Project Path="src/Bolt/Bolt.Server/Bolt.Server.csproj" />
+  </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
     <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />

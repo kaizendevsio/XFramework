@@ -1,10 +1,9 @@
 using System.Net;
-using System.Reflection;
+using Bolt.Client;
 using MemoryPack;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StreamFlow.Domain.Shared.Contracts.Requests;
-using StreamFlow.Domain.Shared.Protocol;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Contracts.Base;
@@ -12,6 +11,7 @@ using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Extensions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Services;
+using BoltRpcClient = Bolt.Client.BoltClient;
 
 namespace XFramework.Integration.ThinProtocol;
 
@@ -21,7 +21,7 @@ namespace XFramework.Integration.ThinProtocol;
 /// </summary>
 public class BoltDriver : IMessageBusWrapper
 {
-    private readonly BoltClient _client;
+    private readonly BoltRpcClient _client;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<BoltDriver> _logger;
@@ -37,7 +37,7 @@ public class BoltDriver : IMessageBusWrapper
     public Action OnDisconnected { get; set; }
 
     public BoltDriver(
-        BoltClient client,
+        BoltRpcClient client,
         IConfiguration configuration,
         IHostEnvironment hostEnvironment,
         ILogger<BoltDriver> logger,

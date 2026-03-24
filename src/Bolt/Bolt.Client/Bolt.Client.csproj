@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>Bolt.Client</PackageId>
+        <Description>Bolt RPC + streaming client. Connects to a Bolt hub or directly to another Bolt client.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MemoryPack" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+        <PackageReference Include="Microsoft.Extensions.ObjectPool" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Bolt.Protocol\Bolt.Protocol.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,6 +1,6 @@
+using Bolt.Server;
 using StreamFlow.Stream.Interfaces;
 using StreamFlow.Stream.Services;
-using StreamFlow.Stream.ThinProtocol;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Interfaces;
 
