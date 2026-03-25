@@ -5,6 +5,9 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <PackageId>XFramework.Integration</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework integration layer — Bolt drivers, JWT, SignalR, DataContext, and service abstractions.</Description>
     </PropertyGroup>
 
     <ItemGroup>

@@ -8,6 +8,9 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>false</EnforceExtendedAnalyzerRules>
     <IsPackable>false</IsPackable>
+        <PackageId>XFramework.SourceGenerators</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Roslyn source generators — BoltHandlerGenerator, EndpointGenerator, ServiceWrapperGenerator.</Description>
   </PropertyGroup>
 
   <ItemGroup>

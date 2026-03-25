@@ -6,6 +6,9 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         
+        <PackageId>Community.Domain.Shared</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Community domain contracts — community identity, content, connections.</Description>
     </PropertyGroup>
 
     <ItemGroup>

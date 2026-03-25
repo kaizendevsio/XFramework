@@ -5,6 +5,9 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <PackageId>IdentityServer.Integration</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework IdentityServer service wrapper for cross-module Bolt RPC calls.</Description>
     </PropertyGroup>
 
     <ItemGroup>

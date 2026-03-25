@@ -5,6 +5,9 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <PackageId>Messaging.Domain.Shared</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Messaging domain contracts — message entities, thread types, delivery types.</Description>
     </PropertyGroup>
 
     <ItemGroup>

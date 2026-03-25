@@ -6,6 +6,9 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         
+        <PackageId>SmsGateway.Domain.Shared</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework SmsGateway domain contracts — SMS message types and delivery.</Description>
     </PropertyGroup>
 
     <ItemGroup>

@@ -6,10 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <PackageId>XFramework.Core</PackageId>
+    <Version>$(XFrameworkVersion)</Version>
+    <Description>XFramework core — ASP.NET bootstrap, middleware, health checks, and hosting utilities.</Description>
     <!-- Enable XML documentation generation for Swagger -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Suppress missing XML comment warnings, CPM multiple source warning, and transitive vulnerability warnings -->
-    <NoWarn>$(NoWarn);1591;NU1507;NU1902</NoWarn>
+    <NoWarn>$(NoWarn);1591;NU1507;NU1902;NU5104</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

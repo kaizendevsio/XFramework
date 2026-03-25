@@ -5,6 +5,9 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <PackageId>XFramework.Domain.Shared</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework shared domain contracts, base entities, enums, and request/response types.</Description>
     </PropertyGroup>
 
     <ItemGroup>

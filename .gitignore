@@ -353,3 +353,6 @@ MigrationBackup/
 .env
 .env.*
 !.env.example
+
+# NuGet pack output
+nupkgs/

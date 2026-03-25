@@ -1,0 +1,14 @@
+<Project>
+  <Import Project="Version.props" />
+
+  <PropertyGroup>
+    <!-- Shared NuGet packaging metadata -->
+    <Authors>KaizenDevs</Authors>
+    <Company>KaizenDevs</Company>
+    <RepositoryUrl>https://github.com/kaizendevsio/XFramework</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/kaizendevsio/XFramework</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>xframework;dotnet;enterprise;microservices</PackageTags>
+  </PropertyGroup>
+</Project>

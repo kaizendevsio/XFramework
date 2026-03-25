@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <XFrameworkVersion>1.0.0</XFrameworkVersion>
+    <BoltVersion>1.0.0</BoltVersion>
+  </PropertyGroup>
+</Project>

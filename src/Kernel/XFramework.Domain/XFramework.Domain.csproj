@@ -6,6 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     
+    <PackageId>XFramework.Domain</PackageId>
+    <Version>$(XFrameworkVersion)</Version>
+    <Description>XFramework domain layer — XDbContext base with multi-tenancy, soft delete, and audit support.</Description>
   </PropertyGroup>
 
   <ItemGroup>

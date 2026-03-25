@@ -4,6 +4,9 @@
         <TargetFramework>net10.0</TargetFramework>
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
+        <PackageId>XFramework.Bolt.Domain.Shared</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Bolt domain types — BoltMessage, IBoltRequest, and RPC contracts.</Description>
     </PropertyGroup>
 
     <ItemGroup>

@@ -5,6 +5,9 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <PackageId>Inventario.Domain.Shared</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Inventario domain contracts — product and inventory entities.</Description>
     </PropertyGroup>
 
     <ItemGroup>
