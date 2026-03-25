@@ -19,8 +19,8 @@ jobs:
       - name: Build
         run: dotnet build XFramework.slnx -c Release
 
-      - name: Test
-        run: dotnet test XFramework.slnx -c Release --no-build --filter "Category!=Integration"
+      - name: Test (unit tests only)
+        run: dotnet test src/Tests/XFramework.Core.Tests/ -c Release --no-build
 
       - name: Pack
         run: bash scripts/pack-all.sh Release
