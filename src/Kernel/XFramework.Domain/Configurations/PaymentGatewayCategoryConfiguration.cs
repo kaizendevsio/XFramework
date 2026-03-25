@@ -1,0 +1,28 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using XFramework.Domain.Shared.Contracts;
+
+namespace XFramework.Domain.Configurations;
+
+public class PaymentGatewayCategoryConfiguration : IEntityTypeConfiguration<PaymentGatewayCategory>
+{
+    public void Configure(EntityTypeBuilder<PaymentGatewayCategory> entity)
+    {
+        entity.HasKey(e => e.Id).HasName("tbl_gatewaycategories_pk");
+
+        entity.ToTable("GatewayCategory", "Integration.PaymentGateway");
+
+        entity.Property(e => e.Id)
+            .HasColumnName("ID")
+            .HasDefaultValueSql("(uuid_generate_v4())"); // Generate new UUID on insert
+        entity.Property(e => e.Description).HasColumnType("character varying");
+
+        entity.Property(e => e.IsDeleted)
+            .HasDefaultValueSql("false")
+            .HasColumnName("isDeleted");
+        entity.Property(e => e.IsEnabled)
+            .HasDefaultValueSql("true")
+            .HasColumnName("isEnabled");
+        entity.Property(e => e.Name).HasColumnType("character varying");
+    }
+}

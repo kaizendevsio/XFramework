@@ -21,10 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
-    <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
-    <ProjectReference Include="..\..\Modules\XFramework.Messaging\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />
-    <ProjectReference Include="..\..\Modules\XFramework.Community\Community.Domain.Shared\Community.Domain.Shared.csproj" />
     <ProjectReference Include="..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
   </ItemGroup>
 
