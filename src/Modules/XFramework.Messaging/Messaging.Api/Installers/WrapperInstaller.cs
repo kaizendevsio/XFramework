@@ -1,4 +1,4 @@
-using SmsGateway.Domain.Shared.Drivers;
+using SmsGateway.Integration.Drivers;
 using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;

@@ -2,7 +2,7 @@ using System.Net;
 using Messaging.Domain.Shared.Contracts.Requests.Create;
 using Messaging.Domain.Shared.Contracts.Requests.Update;
 using Microsoft.Extensions.Logging;
-using SmsGateway.Domain.Shared.Drivers;
+using SmsGateway.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.BusinessObjects;

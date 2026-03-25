@@ -49,7 +49,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\Modules\XFramework.Bolt\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />
       <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
       <ProjectReference Include="..\..\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />

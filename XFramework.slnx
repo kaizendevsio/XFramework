@@ -1,7 +1,6 @@
 <Solution>
   <Folder Name="/Shared/">
     <Project Path="src\Shared\XFramework.Domain.Shared\XFramework.Domain.Shared.csproj" />
-    <Project Path="src\Shared\XFramework.Utilities\XFramework.Utilities.csproj" />
   </Folder>
   <Folder Name="/Kernel/">
     <Project Path="src\Kernel\XFramework.Core\XFramework.Core.csproj" />
@@ -43,6 +42,7 @@
   <Folder Name="/Services/SmsGateway/">
     <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Api\SmsGateway.Api.csproj" />
     <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Domain.Shared\SmsGateway.Domain.Shared.csproj" />
+    <Project Path="src\Modules\XFramework.SmsGateway\SmsGateway.Integration\SmsGateway.Integration.csproj" />
   </Folder>
   <Folder Name="/Services/Bolt/">
     <Project Path="src\Modules\XFramework.Bolt\Bolt.Domain.Shared\Bolt.Domain.Shared.csproj" />

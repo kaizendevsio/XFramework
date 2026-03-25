@@ -4,7 +4,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using IdentityServer.Domain.Shared.Enums;
 using Microsoft.IdentityModel.Tokens;
 using XFramework.Integration.Abstractions;
 

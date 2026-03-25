@@ -7,7 +7,7 @@ using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Security;
 
-namespace SmsGateway.Domain.Shared.Drivers;
+namespace SmsGateway.Integration.Drivers;
 
 public partial interface ISmsGatewayServiceWrapper : IServiceWrapper
 {

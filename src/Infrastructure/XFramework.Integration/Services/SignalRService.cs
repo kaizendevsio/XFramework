@@ -2,8 +2,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using HashidsNet;
-using IdentityServer.Domain.Shared.Contracts.Requests;
-using IdentityServer.Domain.Shared.Contracts.Responses;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
