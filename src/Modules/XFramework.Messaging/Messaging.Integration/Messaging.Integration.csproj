@@ -5,7 +5,7 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageId>Messaging.Integration</PackageId>
+        <PackageId>XFramework.Messaging.Integration</PackageId>
         <Version>$(XFrameworkVersion)</Version>
         <Description>XFramework Messaging service wrapper for cross-module Bolt RPC calls.</Description>
     </PropertyGroup>

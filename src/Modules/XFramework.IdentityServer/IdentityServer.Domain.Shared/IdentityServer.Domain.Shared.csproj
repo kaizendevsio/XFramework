@@ -5,7 +5,7 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageId>IdentityServer.Domain.Shared</PackageId>
+        <PackageId>XFramework.IdentityServer.Domain.Shared</PackageId>
         <Version>$(XFrameworkVersion)</Version>
         <Description>XFramework IdentityServer domain contracts — identity entities, auth requests/responses.</Description>
     </PropertyGroup>
