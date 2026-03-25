@@ -5,7 +5,7 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageId>Payments.Domain.Shared</PackageId>
+        <PackageId>XFramework.Payments.Domain.Shared</PackageId>
         <Version>$(XFrameworkVersion)</Version>
         <Description>XFramework Payments domain contracts — payment gateway types.</Description>
     </PropertyGroup>

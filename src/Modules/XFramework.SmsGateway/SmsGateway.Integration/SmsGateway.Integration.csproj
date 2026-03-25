@@ -5,7 +5,7 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageId>SmsGateway.Integration</PackageId>
+        <PackageId>XFramework.SmsGateway.Integration</PackageId>
         <Version>$(XFrameworkVersion)</Version>
         <Description>XFramework SmsGateway service wrapper for cross-module Bolt RPC calls.</Description>
     </PropertyGroup>

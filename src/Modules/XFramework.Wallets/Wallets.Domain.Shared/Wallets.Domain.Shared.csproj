@@ -5,7 +5,7 @@
         <LangVersion>14</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageId>Wallets.Domain.Shared</PackageId>
+        <PackageId>XFramework.Wallets.Domain.Shared</PackageId>
         <Version>$(XFrameworkVersion)</Version>
         <Description>XFramework Wallets domain contracts — wallet entities, transaction types, currency types.</Description>
     </PropertyGroup>
