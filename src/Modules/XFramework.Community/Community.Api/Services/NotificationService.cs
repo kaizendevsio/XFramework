@@ -120,7 +120,6 @@ public sealed class NotificationService : INotificationService
                 ActorIdentityId = n.ActorIdentityId,
                 ActorHandleName = n.ActorIdentity?.HandleName,
                 Type = n.Type,
-                ReferenceId = n.ReferenceId,
                 Message = n.Message,
                 IsRead = n.IsRead,
                 CreatedAt = n.CreatedAt
@@ -158,8 +157,7 @@ public sealed class NotificationService : INotificationService
             {
                 RecipientIdentityId = recipientIdentityId,
                 ActorIdentityId = actorIdentityId,
-                Type = type,
-                ReferenceId = referenceId,
+                Type = type.ToString(),
                 Message = message,
                 IsRead = false,
                 IsEnabled = true,
