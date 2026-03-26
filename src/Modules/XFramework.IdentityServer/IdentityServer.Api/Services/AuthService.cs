@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -25,11 +26,30 @@ using Session = IdentityServer.Domain.Shared.Contracts.Session;
 namespace IdentityServer.Api.Services;
 
 /// <summary>
+/// In-memory account lockout tracking.
+/// Tracks failed login attempts and lockout expiration per credential.
+/// </summary>
+internal sealed class LockoutInfo
+{
+    public int FailedAttempts { get; set; }
+    public DateTime? LockoutEnd { get; set; }
+}
+
+
+/// <summary>
 /// Unified authentication service implementing all IdentityServer operations.
 /// Consolidates credential management, authentication, verification, and session management.
 /// </summary>
 public sealed class AuthService : IAuthService
 {
+    private const int MaxFailedLoginAttempts = 5;
+    private const int LockoutDurationMinutes = 15;
+    private const int DefaultSessionExpirationHours = 24;
+    private const int RememberMeSessionExpirationDays = 30;
+    private const int PasswordResetTokenExpirationMinutes = 30;
+
+    private static readonly ConcurrentDictionary<Guid, LockoutInfo> LockoutCache = new();
+
     private readonly IDataContext _dataContext;
     private readonly ITenantResolver _tenantService;
     private readonly IJwtService _jwtService;
@@ -277,12 +297,54 @@ public sealed class AuthService : IAuthService
                     "User or identity does not exist");
             }
 
+            // Check account lockout - SECURITY CRITICAL
+            if (LockoutCache.TryGetValue(originalCredential.Id, out var lockoutInfo)
+                && lockoutInfo.LockoutEnd.HasValue
+                && lockoutInfo.LockoutEnd.Value > DateTime.UtcNow)
+            {
+                await CreateAuthorizationLog(
+                    tenant.Id,
+                    originalCredential.Id,
+                    request.Metadata.IpAddress,
+                    request.Metadata.Name,
+                    request.Metadata.DeviceName,
+                    request.Metadata.DeviceAgent,
+                    AuthenticationState.Locked,
+                    null);
+
+                await _dataContext.SaveChangesAsync(CancellationToken.None);
+
+                var remainingMinutes = (int)Math.Ceiling(
+                    (lockoutInfo.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes);
+
+                _logger.MultipleFailedLogins(
+                    request.UserName ?? string.Empty,
+                    request.Metadata.IpAddress,
+                    lockoutInfo.FailedAttempts);
+
+                return Result<AuthenticateIdentityResponse>.Failure(
+                    $"Account is locked due to multiple failed login attempts. Try again in {remainingMinutes} minute(s).", 423);
+            }
+
             // Validate password - SECURITY CRITICAL
             var credential = await ValidatePassword(
                 request, request.AuthorizationType, originalCredential, ct);
 
             if (credential == null)
             {
+                // Track failed login attempt for lockout - SECURITY CRITICAL
+                var info = LockoutCache.GetOrAdd(originalCredential.Id, _ => new LockoutInfo());
+                info.FailedAttempts++;
+
+                if (info.FailedAttempts >= MaxFailedLoginAttempts)
+                {
+                    info.LockoutEnd = DateTime.UtcNow.AddMinutes(LockoutDurationMinutes);
+                    _logger.MultipleFailedLogins(
+                        request.UserName ?? string.Empty,
+                        request.Metadata.IpAddress,
+                        info.FailedAttempts);
+                }
+
                 // Log failed authentication attempt - SECURITY CRITICAL
                 await CreateAuthorizationLog(
                     tenant.Id,
@@ -298,6 +360,9 @@ public sealed class AuthService : IAuthService
 
                 return Result<AuthenticateIdentityResponse>.Failure("Wrong password", 400);
             }
+
+            // Reset lockout on successful password validation - SECURITY CRITICAL
+            LockoutCache.TryRemove(originalCredential.Id, out _);
 
             // Check roles - SECURITY CRITICAL
             var roleList = await GetRoleList(credential, ct);
@@ -333,12 +398,17 @@ public sealed class AuthService : IAuthService
             // Determine session type based on authorization type
             var sessionTypeId = await GetSessionTypeId(tenant.Id, request.AuthorizationType);
 
-            // Create session - SECURITY CRITICAL
+            // Create session with expiration - SECURITY CRITICAL
+            var sessionExpiresAt = request.RememberMe
+                ? DateTime.UtcNow.AddDays(RememberMeSessionExpirationDays)
+                : DateTime.UtcNow.AddHours(DefaultSessionExpirationHours);
+
             var session = await CreateSession(
                 tenant.Id,
                 credential.Id,
                 sessionTypeId,
-                token);
+                token,
+                sessionExpiresAt);
 
             // Log successful authentication - SECURITY CRITICAL
             await CreateAuthorizationLog(
@@ -478,6 +548,70 @@ public sealed class AuthService : IAuthService
                         verification.Id, identityCredential.Id);
 
                     return Result<IdentityVerification>.Success(verification);
+
+                case nameof(IdentityConstants.VerificationType.Email):
+                    var emailMessageTemplate = await _dataContext.Query<RegistryConfiguration>()
+                        .Where(i => i.TenantId == tenant.Id)
+                        .Where(i => i.Group.Name == "MessagingService_Otp")
+                        .FirstOrDefaultAsync(ct);
+
+                    if (emailMessageTemplate is null)
+                    {
+                        return Result<IdentityVerification>.Failure(
+                            "Unable to send message: OTP message template could not be found", 409);
+                    }
+
+                    // Generate OTP code for email
+                    var emailOtp = _helperService.GenerateRandomNumber(111111, 999999);
+                    var emailMessage = emailMessageTemplate.Value.Replace("|Value|", $"{emailOtp}");
+
+                    // Get email contact via separate query
+                    var emailContact = await _dataContext.Query<IdentityContact>()
+                        .Include(c => c.Type)
+                        .Where(c => c.CredentialId == identityCredential.Id)
+                        .Where(c => c.Type.Name == "Email")
+                        .FirstOrDefaultAsync(ct);
+
+                    var emailAddress = emailContact?.Value;
+
+                    if (string.IsNullOrEmpty(emailAddress))
+                    {
+                        return Result<IdentityVerification>.Failure(
+                            $"Credential with id {request.Model.CredentialId} does not have an email address", 502);
+                    }
+
+                    // Create verification entity for email
+                    var emailVerification = new IdentityVerification
+                    {
+                        Status = (short?)GenericStatusType.Pending,
+                        StatusUpdatedOn = DateTime.UtcNow,
+                        Token = $"{emailOtp}",
+                        Expiry = DateTime.UtcNow.AddMinutes((double)verificationType.DefaultExpiry),
+                        CredentialId = identityCredential.Id,
+                        VerificationTypeId = verificationType.Id
+                    };
+
+                    _dataContext.Add(emailVerification);
+                    await _dataContext.SaveChangesAsync(ct);
+
+                    // Send Email with OTP
+                    await _messagingServiceWrapper.CreateDirectMessage(new()
+                    {
+                        MessageTransportType = MessageTransportType.Email,
+                        Sender = GenericSender.System,
+                        Recipient = emailAddress,
+                        Subject = "Verification Code",
+                        Intent = "OTP",
+                        Message = emailMessage,
+                        IsScheduled = false,
+                        Metadata = request.Metadata
+                    });
+
+                    _logger.LogInformation(
+                        "Verification created and email sent. VerificationId: {VerificationId}, CredentialId: {CredentialId}",
+                        emailVerification.Id, identityCredential.Id);
+
+                    return Result<IdentityVerification>.Success(emailVerification);
             }
 
             return Result<IdentityVerification>.Failure(
@@ -900,13 +1034,14 @@ public sealed class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Creates a session entity for tracking user sessions.
+    /// Creates a session entity for tracking user sessions with expiration.
     /// </summary>
     private async Task<Session> CreateSession(
         Guid tenantId,
         Guid credentialId,
         Guid? sessionTypeId,
-        JwtToken token)
+        JwtToken token,
+        DateTime? expiresAt = null)
     {
         var session = new Session
         {
@@ -915,7 +1050,8 @@ public sealed class AuthService : IAuthService
             SessionTypeId = sessionTypeId,
             CredentialId = credentialId,
             SessionData = JsonSerializer.Serialize(token),
-            Status = CurrentSessionState.Active
+            Status = CurrentSessionState.Active,
+            ExpiresAt = expiresAt ?? DateTime.UtcNow.AddHours(DefaultSessionExpirationHours)
         };
 
         _dataContext.Add(session);
@@ -1037,6 +1173,18 @@ public sealed class AuthService : IAuthService
                 return Result<RefreshTokenResponse>.NotFound("Session not found or inactive");
             }
 
+            // Check session expiration - SECURITY CRITICAL
+            if (session.ExpiresAt.HasValue && session.ExpiresAt.Value <= DateTime.UtcNow)
+            {
+                session.Status = CurrentSessionState.Expired;
+                session.ModifiedAt = DateTime.UtcNow;
+                _dataContext.Update(session);
+                await _dataContext.SaveChangesAsync(ct);
+
+                _logger.TokenValidationFailed(session.CredentialId, "Session has expired");
+                return Result<RefreshTokenResponse>.Failure("Session has expired. Please log in again.", 401);
+            }
+
             // Validate refresh token against stored session data
             var storedToken = JsonSerializer.Deserialize<JwtToken>(session.SessionData ?? "{}");
             if (storedToken is null || storedToken.RefreshToken != request.RefreshToken)
@@ -1085,6 +1233,191 @@ public sealed class AuthService : IAuthService
         {
             _logger.OperationFailed("RefreshToken", "Session", request.SessionId, ex.Message, ex);
             return Result<RefreshTokenResponse>.Failure("An error occurred while refreshing the token", 500);
+        }
+    }
+
+    #endregion
+
+    #region Password Reset
+
+    /// <inheritdoc />
+    public async Task<Result> ForgotPasswordAsync(
+        ForgotPasswordRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+
+            // Determine lookup method based on input
+            IdentityCredential? credential = null;
+            string? recipientAddress = null;
+            MessageTransportType transportType;
+
+            if (!string.IsNullOrEmpty(request.Email))
+            {
+                // Lookup credential by email contact
+                var emailContact = await _dataContext.Query<IdentityContact>()
+                    .Include(c => c.Type)
+                    .Where(c => c.Credential.TenantId == tenant.Id)
+                    .Where(c => c.Value == request.Email)
+                    .Where(c => c.Type.Name == nameof(GenericContactType.Email))
+                    .FirstOrDefaultAsync(ct);
+
+                if (emailContact != null)
+                {
+                    credential = await _dataContext.Query<IdentityCredential>()
+                        .Where(c => c.Id == emailContact.CredentialId)
+                        .FirstOrDefaultAsync(ct);
+                    recipientAddress = emailContact.Value;
+                }
+
+                transportType = MessageTransportType.Email;
+            }
+            else if (!string.IsNullOrEmpty(request.Phone))
+            {
+                // Lookup credential by phone contact
+                var phoneContact = await _dataContext.Query<IdentityContact>()
+                    .Include(c => c.Type)
+                    .Where(c => c.Credential.TenantId == tenant.Id)
+                    .Where(c => c.Value == request.Phone)
+                    .Where(c => c.Type.Name == nameof(GenericContactType.Phone))
+                    .FirstOrDefaultAsync(ct);
+
+                if (phoneContact != null)
+                {
+                    credential = await _dataContext.Query<IdentityCredential>()
+                        .Where(c => c.Id == phoneContact.CredentialId)
+                        .FirstOrDefaultAsync(ct);
+                    recipientAddress = phoneContact.Value;
+                }
+
+                transportType = MessageTransportType.Sms;
+            }
+            else
+            {
+                // Don't reveal whether the account exists — always return success
+                return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
+            }
+
+            // If no account found, still return success (don't reveal account existence)
+            if (credential is null || string.IsNullOrEmpty(recipientAddress))
+            {
+                return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
+            }
+
+            // Generate reset token (GUID for URL-safe token)
+            var resetToken = Guid.NewGuid().ToString("N");
+
+            // Get or create the PasswordReset verification type
+            var verificationTypeId = IdentityConstants.VerificationType.Email;
+            if (transportType == MessageTransportType.Sms)
+            {
+                verificationTypeId = IdentityConstants.VerificationType.Sms;
+            }
+
+            // Create verification entity with the reset token
+            var verification = new IdentityVerification
+            {
+                Status = (short?)GenericStatusType.Pending,
+                StatusUpdatedOn = DateTime.UtcNow,
+                Token = resetToken,
+                Expiry = DateTime.UtcNow.AddMinutes(PasswordResetTokenExpirationMinutes),
+                CredentialId = credential.Id,
+                VerificationTypeId = verificationTypeId
+            };
+
+            _dataContext.Add(verification);
+            await _dataContext.SaveChangesAsync(ct);
+
+            // Get message template for password reset
+            var messageTemplate = await _dataContext.Query<RegistryConfiguration>()
+                .Where(i => i.TenantId == tenant.Id)
+                .Where(i => i.Group.Name == "MessagingService_PasswordReset")
+                .FirstOrDefaultAsync(ct);
+
+            var message = messageTemplate?.Value?.Replace("|Token|", resetToken)
+                ?? $"Your password reset token is: {resetToken}. This token expires in {PasswordResetTokenExpirationMinutes} minutes.";
+
+            // Send reset token via appropriate transport
+            await _messagingServiceWrapper.CreateDirectMessage(new()
+            {
+                MessageTransportType = transportType,
+                Sender = GenericSender.System,
+                Recipient = recipientAddress,
+                Subject = "Password Reset Request",
+                Intent = "PasswordReset",
+                Message = message,
+                IsScheduled = false,
+                Metadata = request.Metadata
+            });
+
+            _logger.LogInformation(
+                "Password reset token generated and sent. CredentialId: {CredentialId}, Transport: {Transport}",
+                credential.Id, transportType);
+
+            return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("ForgotPassword", "IdentityCredential", Guid.Empty, ex.Message, ex);
+            // Still return success to not reveal internal errors
+            return Result.Success("If an account exists with that contact information, a password reset link has been sent.");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> ResetPasswordAsync(
+        ResetPasswordRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            // Look up verification by token, must be pending and not expired
+            var verification = await _dataContext.Query<IdentityVerification>()
+                .Where(i => i.Token == request.Token)
+                .Where(i => i.Status == (short?)GenericStatusType.Pending)
+                .Where(i => i.Expiry > DateTime.UtcNow)
+                .FirstOrDefaultAsync(ct);
+
+            if (verification is null)
+            {
+                return Result.Failure("Invalid or expired reset token", 400);
+            }
+
+            // Look up the credential
+            var credential = await _dataContext.Query<IdentityCredential>()
+                .Where(c => c.Id == verification.CredentialId)
+                .FirstOrDefaultAsync(ct);
+
+            if (credential is null)
+            {
+                return Result.NotFound("Associated account not found");
+            }
+
+            // Hash new password with BCrypt (workFactor 11) - SECURITY CRITICAL
+            var hashPasswordByte = Encoding.ASCII.GetBytes(
+                BCrypt.Net.BCrypt.HashPassword(inputKey: request.NewPassword, workFactor: 11));
+            credential.PasswordByte = hashPasswordByte;
+
+            _dataContext.Update(credential);
+
+            // Invalidate the token (mark verification as used)
+            verification.Status = (short?)GenericStatusType.Approved;
+            verification.StatusUpdatedOn = DateTime.UtcNow;
+            _dataContext.Update(verification);
+
+            await _dataContext.SaveChangesAsync(ct);
+
+            // Clear any lockout on successful password reset
+            LockoutCache.TryRemove(credential.Id, out _);
+
+            _logger.PasswordChanged(credential.Id);
+
+            return Result.Success("Password has been reset successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("ResetPassword", "IdentityCredential", Guid.Empty, ex.Message, ex);
+            return Result.Failure("An error occurred while resetting the password", 500);
         }
     }
 

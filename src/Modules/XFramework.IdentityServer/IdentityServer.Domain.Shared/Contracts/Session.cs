@@ -28,6 +28,9 @@ public partial class Session : BaseModel
     [MemoryPackOrder(5)]
     public CurrentSessionState Status { get; set; } = CurrentSessionState.Active;
 
+    [MemoryPackOrder(6)]
+    public DateTime? ExpiresAt { get; set; }
+
     [MemoryPackOrder(3)]
     public virtual SessionType? SessionType { get; set; }
 
