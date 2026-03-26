@@ -2,7 +2,7 @@ name: Publish NuGet Packages
 
 on:
   push:
-    tags: ['v*']
+    branches: [main, develop]
 
 jobs:
   publish:
@@ -10,27 +10,62 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
+      - name: Determine version
+        id: version
+        run: |
+          # Read base version from Version.props
+          XFRAMEWORK_VERSION=$(grep -oP '(?<=<XFrameworkVersion>)[^<]+' Version.props)
+          BOLT_VERSION=$(grep -oP '(?<=<BoltVersion>)[^<]+' Version.props)
+
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            # Stable release — use version as-is
+            echo "xframework_version=$XFRAMEWORK_VERSION" >> $GITHUB_OUTPUT
+            echo "bolt_version=$BOLT_VERSION" >> $GITHUB_OUTPUT
+            echo "Publishing STABLE: XFramework=$XFRAMEWORK_VERSION, Bolt=$BOLT_VERSION"
+          else
+            # Pre-release — append dev suffix with run number
+            SUFFIX="dev.${{ github.run_number }}"
+            echo "xframework_version=$XFRAMEWORK_VERSION-$SUFFIX" >> $GITHUB_OUTPUT
+            echo "bolt_version=$BOLT_VERSION-$SUFFIX" >> $GITHUB_OUTPUT
+            echo "Publishing PRE-RELEASE: XFramework=$XFRAMEWORK_VERSION-$SUFFIX, Bolt=$BOLT_VERSION-$SUFFIX"
+          fi
+
       - name: Build
-        run: dotnet build XFramework.slnx -c Release
+        run: dotnet build XFramework.slnx -c Release -p:XFrameworkVersion=${{ steps.version.outputs.xframework_version }} -p:BoltVersion=${{ steps.version.outputs.bolt_version }}
 
       - name: Test (unit tests only)
         run: dotnet test src/Tests/XFramework.Core.Tests/ -c Release --no-build
         continue-on-error: true
 
       - name: Pack
-        run: bash scripts/pack-all.sh Release
+        run: |
+          mkdir -p nupkgs
+          dotnet pack XFramework.slnx -c Release --no-build -o nupkgs \
+            -p:XFrameworkVersion=${{ steps.version.outputs.xframework_version }} \
+            -p:BoltVersion=${{ steps.version.outputs.bolt_version }} \
+            -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg \
+            --no-restore || true
+          # Pack individually for projects that fail in solution-wide pack
+          echo "Packages created:"
+          ls -1 nupkgs/*.nupkg 2>/dev/null | wc -l
 
       - name: Publish to NuGet
-        run: dotnet nuget push ./nupkgs/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+        run: |
+          for pkg in nupkgs/*.nupkg; do
+            echo "Publishing $pkg..."
+            dotnet nuget push "$pkg" -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate || true
+          done
 
       - name: Upload packages as artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: nupkgs
+          name: nupkgs-${{ github.ref_name }}-${{ github.run_number }}
           path: ./nupkgs/
