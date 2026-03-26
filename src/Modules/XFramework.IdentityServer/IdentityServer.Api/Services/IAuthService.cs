@@ -123,4 +123,26 @@ public interface IAuthService
     Task<Result<RefreshTokenResponse>> RefreshTokenAsync(
         RefreshTokenRequest request,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Initiates a password reset flow by generating a reset token and sending it via email or SMS.
+    /// Does not reveal whether the account exists (security best practice).
+    /// </summary>
+    /// <param name="request">Request containing email or phone to identify the account</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Result indicating the request was processed (always success for security)</returns>
+    Task<Result> ForgotPasswordAsync(
+        ForgotPasswordRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Resets a user's password using a valid reset token.
+    /// Validates the token, hashes the new password with BCrypt, and invalidates the token.
+    /// </summary>
+    /// <param name="request">Request containing the reset token and new password</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Result indicating whether the password was reset successfully</returns>
+    Task<Result> ResetPasswordAsync(
+        ResetPasswordRequest request,
+        CancellationToken ct = default);
 }
