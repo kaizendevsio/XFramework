@@ -4,6 +4,7 @@ using IdentityServer.Api.Services;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
+using XFramework.Core.RateLimiting;
 
 var builder = XApplication.Configure<Program>();
 
@@ -12,6 +13,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Rate limiting — global 100/min per IP + stricter "auth" and "password-reset" policies
+builder.Services.AddXFrameworkRateLimiting();
 
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.IdentityServer.Api");
 builder.Services.AddXFrameworkHealthChecks<DbContext>(
@@ -29,6 +33,7 @@ builder.Services.AddOpenApi("v1", options =>
 var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
+app.UseXFrameworkRateLimiting();
 app.EnsureDatabase<DbContext>();
 // Bolt handlers are now source-generated from [BoltHandler] on endpoint methods.
 // UseCustomRequestsInAssembly is no longer needed — the generated ISignalREventHandler
