@@ -11,6 +11,13 @@ public record TransactionRequestBase : RequestBase
     public bool OnHold { get; set; }
     public string? ReferenceNumber { get; set; }
     public Guid CurrencyId { get; set; }
-    
+
+    /// <summary>
+    /// Optional idempotency key to prevent duplicate financial transactions.
+    /// When provided, the system checks if a transaction with this key already exists
+    /// and returns the existing result instead of creating a duplicate.
+    /// </summary>
+    public string? IdempotencyKey { get; set; }
+
     public List<WalletTransactionLineItem> LineItems { get; set; } = [];
 }
