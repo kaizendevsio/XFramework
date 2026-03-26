@@ -356,3 +356,4 @@ MigrationBackup/
 
 # NuGet pack output
 nupkgs/
+.claude/worktrees/
