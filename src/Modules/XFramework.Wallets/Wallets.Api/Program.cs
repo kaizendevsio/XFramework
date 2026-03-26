@@ -8,6 +8,7 @@ using Wallets.Api.Generated;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
+using XFramework.Core.RateLimiting;
 
 var builder = XApplication.Configure<Program>();
 
@@ -27,9 +28,13 @@ builder.Services.AddOpenApi("v1", options =>
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
+// Rate limiting — global 100/min per IP
+builder.Services.AddXFrameworkRateLimiting();
+
 var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
+app.UseXFrameworkRateLimiting();
 app.EnsureDatabase<AppDbContext>();
 // Bolt handlers are now source-generated from [BoltHandler] on endpoint methods.
 // UseCustomRequestsInAssembly is no longer needed — the generated ISignalREventHandler
