@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Wallets.Api.Events;
 using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Loggers;
 using XFramework.Core.Observability;
@@ -24,17 +25,20 @@ public sealed class WalletOperationsService : IWalletOperationsService
     private readonly ITenantResolver _tenantService;
     private readonly IHelperService _helperService;
     private readonly ILogger<WalletOperationsService> _logger;
+    private readonly IWalletEventPublisher _eventPublisher;
 
     public WalletOperationsService(
         IDataContext dataContext,
         ITenantResolver tenantService,
         IHelperService helperService,
-        ILogger<WalletOperationsService> logger)
+        ILogger<WalletOperationsService> logger,
+        IWalletEventPublisher eventPublisher)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _tenantService = tenantService ?? throw new ArgumentNullException(nameof(tenantService));
         _helperService = helperService ?? throw new ArgumentNullException(nameof(helperService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     }
 
     /// <inheritdoc />
@@ -298,6 +302,19 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             _logger.WalletIncremented(wallet.Id, request.TotalAmount, "Primary", wallet.Balance);
             _logger.TransactionCreated(transaction.Id, wallet.Id, "Credit", request.TotalAmount);
+
+            await _eventPublisher.PublishAsync(new TransactionCompletedEvent
+            {
+                EventType = nameof(TransactionCompletedEvent),
+                WalletId = wallet.Id,
+                CredentialId = request.CredentialId,
+                TenantId = tenant.Id,
+                Amount = request.TotalAmount,
+                TransactionType = "Credit",
+                ReferenceNumber = transaction.ReferenceNumber,
+                RunningBalance = wallet.Balance
+            });
+
             return Result.Success();
         }
         catch (Exception ex)
@@ -412,6 +429,19 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             _logger.WalletDecremented(wallet.Id, request.TotalAmount, "Primary", wallet.Balance);
             _logger.TransactionCreated(transaction.Id, wallet.Id, "Debit", request.TotalAmount);
+
+            await _eventPublisher.PublishAsync(new TransactionCompletedEvent
+            {
+                EventType = nameof(TransactionCompletedEvent),
+                WalletId = wallet.Id,
+                CredentialId = request.CredentialId,
+                TenantId = tenant.Id,
+                Amount = request.TotalAmount,
+                TransactionType = "Debit",
+                ReferenceNumber = transaction.ReferenceNumber,
+                RunningBalance = wallet.Balance
+            });
+
             return Result.Success();
         }
         catch (Exception ex)
@@ -721,6 +751,31 @@ public sealed class WalletOperationsService : IWalletOperationsService
             await _dataContext.SaveChangesAsync(cancellationToken);
 
             _logger.WalletTransfer(senderWallet.Id, recipientWallet.Id, request.TotalAmount, "Primary");
+
+            await _eventPublisher.PublishAsync(new TransactionCompletedEvent
+            {
+                EventType = nameof(TransactionCompletedEvent),
+                WalletId = senderWallet.Id,
+                CredentialId = request.CredentialId,
+                TenantId = tenant.Id,
+                Amount = request.TotalAmount,
+                TransactionType = "Debit",
+                ReferenceNumber = senderTransaction.ReferenceNumber,
+                RunningBalance = senderWallet.Balance
+            });
+
+            await _eventPublisher.PublishAsync(new TransactionCompletedEvent
+            {
+                EventType = nameof(TransactionCompletedEvent),
+                WalletId = recipientWallet.Id,
+                CredentialId = request.RecipientCredentialId,
+                TenantId = tenant.Id,
+                Amount = request.TotalAmount,
+                TransactionType = "Credit",
+                ReferenceNumber = recipientTransaction.ReferenceNumber,
+                RunningBalance = recipientWallet.Balance
+            });
+
             return Result.Success();
         }
         catch (Exception ex)
@@ -927,6 +982,31 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             stopwatch.Stop();
             _logger.OperationCompleted("ConvertWallet", stopwatch.ElapsedMilliseconds);
+
+            await _eventPublisher.PublishAsync(new TransactionCompletedEvent
+            {
+                EventType = nameof(TransactionCompletedEvent),
+                WalletId = sourceWallet.Id,
+                CredentialId = request.CredentialId,
+                TenantId = tenant.Id,
+                Amount = totalDecrement,
+                TransactionType = "Debit",
+                ReferenceNumber = sourceTransaction.ReferenceNumber,
+                RunningBalance = sourceWallet.Balance
+            });
+
+            await _eventPublisher.PublishAsync(new TransactionCompletedEvent
+            {
+                EventType = nameof(TransactionCompletedEvent),
+                WalletId = targetWallet.Id,
+                CredentialId = request.CredentialId,
+                TenantId = tenant.Id,
+                Amount = totalIncrement,
+                TransactionType = "Credit",
+                ReferenceNumber = targetTransaction.ReferenceNumber,
+                RunningBalance = targetWallet.Balance
+            });
+
             return Result.Success();
         }
         catch (Exception ex)
@@ -1174,6 +1254,18 @@ public sealed class WalletOperationsService : IWalletOperationsService
         await _dataContext.SaveChangesAsync(ct);
 
         _logger.EntityCreated("ReversalTransaction", reversalTransaction.Id);
+
+        await _eventPublisher.PublishAsync(new TransactionReversedEvent
+        {
+            EventType = nameof(TransactionReversedEvent),
+            WalletId = wallet.Id,
+            CredentialId = transaction.CredentialId,
+            TenantId = tenantId,
+            OriginalTransactionId = transaction.Id,
+            ReversalTransactionId = reversalTransaction.Id,
+            Amount = absAmount
+        });
+
         return Result.Success("Transaction reversed successfully");
     }
 
@@ -1310,6 +1402,29 @@ public sealed class WalletOperationsService : IWalletOperationsService
         await _dataContext.SaveChangesAsync(ct);
 
         _logger.EntityCreated("ReversalTransfer", reversalTransfer.Id);
+
+        await _eventPublisher.PublishAsync(new TransactionReversedEvent
+        {
+            EventType = nameof(TransactionReversedEvent),
+            WalletId = senderWallet.Id,
+            CredentialId = senderTx.CredentialId,
+            TenantId = tenantId,
+            OriginalTransactionId = senderTx.Id,
+            ReversalTransactionId = senderReversalTx.Id,
+            Amount = absAmount
+        });
+
+        await _eventPublisher.PublishAsync(new TransactionReversedEvent
+        {
+            EventType = nameof(TransactionReversedEvent),
+            WalletId = recipientWallet.Id,
+            CredentialId = recipientTx.CredentialId,
+            TenantId = tenantId,
+            OriginalTransactionId = recipientTx.Id,
+            ReversalTransactionId = recipientReversalTx.Id,
+            Amount = absAmount
+        });
+
         return Result.Success("Transfer reversed successfully");
     }
 
@@ -1344,6 +1459,16 @@ public sealed class WalletOperationsService : IWalletOperationsService
             await _dataContext.SaveChangesAsync(cancellationToken);
 
             _logger.EntityUpdated("Wallet", wallet.Id);
+
+            await _eventPublisher.PublishAsync(new WalletFrozenEvent
+            {
+                EventType = nameof(WalletFrozenEvent),
+                WalletId = wallet.Id,
+                CredentialId = wallet.CredentialId,
+                TenantId = tenant.Id,
+                Reason = request.Reason
+            });
+
             return Result.Success("Wallet frozen successfully");
         }
         catch (Exception ex)
@@ -1381,6 +1506,15 @@ public sealed class WalletOperationsService : IWalletOperationsService
             await _dataContext.SaveChangesAsync(cancellationToken);
 
             _logger.EntityUpdated("Wallet", wallet.Id);
+
+            await _eventPublisher.PublishAsync(new WalletUnfrozenEvent
+            {
+                EventType = nameof(WalletUnfrozenEvent),
+                WalletId = wallet.Id,
+                CredentialId = wallet.CredentialId,
+                TenantId = tenant.Id
+            });
+
             return Result.Success("Wallet unfrozen successfully");
         }
         catch (Exception ex)
