@@ -1,4 +1,7 @@
-using Messaging.Domain.Shared.Contracts.Requests.Threads;
+using Messaging.Domain.Shared.Contracts.Requests.Attachments;
+using Messaging.Domain.Shared.Contracts.Requests.Delete;
+using Messaging.Domain.Shared.Contracts.Requests.Edit;
+using Messaging.Domain.Shared.Contracts.Requests.Reactions;
 using Messaging.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.Contracts;
@@ -8,37 +11,32 @@ namespace Messaging.Api.Services;
 public interface IThreadService
 {
     /// <summary>
-    /// Creates a new message thread with initial members
+    /// Soft-deletes a message in a thread after verifying membership and ownership.
     /// </summary>
-    Task<Result<CreateThreadResponse>> CreateThreadAsync(CreateThreadRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> DeleteThreadMessageAsync(DeleteThreadMessageRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// Gets a paginated list of threads where the credential is a member
+    /// Edits the text of a message in a thread after verifying membership and ownership.
     /// </summary>
-    Task<Result<GetThreadListResponse>> GetThreadListAsync(GetThreadListRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> EditThreadMessageAsync(EditThreadMessageRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// Gets a thread by ID with its members
+    /// Creates a file attachment linking a message to a storage file.
     /// </summary>
-    Task<Result<GetThreadResponse>> GetThreadAsync(GetThreadRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> CreateMessageFileAsync(CreateMessageFileRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// Adds a member to a thread
+    /// Retrieves all file attachments for a given message.
     /// </summary>
-    Task<Result<CmdResponse>> AddThreadMemberAsync(AddThreadMemberRequest request, CancellationToken ct = default);
+    Task<Result<List<MessageFileResponse>>> GetMessageFilesAsync(GetMessageFilesRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// Removes a member from a thread
+    /// Creates a reaction on a message, preventing duplicates of the same type per member.
     /// </summary>
-    Task<Result<CmdResponse>> RemoveThreadMemberAsync(RemoveThreadMemberRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> CreateMessageReactionAsync(CreateMessageReactionRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// Creates a new message in a thread
+    /// Soft-deletes a reaction after verifying the requester is a member of the thread.
     /// </summary>
-    Task<Result<CreateThreadMessageResponse>> CreateThreadMessageAsync(CreateThreadMessageRequest request, CancellationToken ct = default);
-
-    /// <summary>
-    /// Gets paginated messages for a thread
-    /// </summary>
-    Task<Result<GetThreadMessagesResponse>> GetThreadMessagesAsync(GetThreadMessagesRequest request, CancellationToken ct = default);
+    Task<Result<CmdResponse>> DeleteMessageReactionAsync(DeleteMessageReactionRequest request, CancellationToken ct = default);
 }
