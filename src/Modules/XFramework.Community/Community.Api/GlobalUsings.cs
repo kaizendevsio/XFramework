@@ -7,6 +7,7 @@ global using Community.Api.Extensions;
 global using Community.Api.Services;
 global using Community.Domain.Shared.Contracts;
 global using Community.Domain.Shared.Contracts.Requests;
+global using Community.Domain.Shared.Contracts.Responses;
 global using Community.Domain.Shared.Enums;
 global using IdentityServer.Domain.Shared.Contracts;
 global using FluentValidation;
