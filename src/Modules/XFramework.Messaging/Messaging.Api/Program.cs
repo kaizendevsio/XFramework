@@ -15,6 +15,7 @@ builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
 
 // Register services
 builder.Services.AddScoped<IMessagingService, MessagingService>();
+builder.Services.AddScoped<IThreadService, ThreadService>();
 
 // Register validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();

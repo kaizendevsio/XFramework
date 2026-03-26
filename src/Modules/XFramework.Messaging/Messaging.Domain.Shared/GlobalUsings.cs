@@ -2,6 +2,7 @@
 
 global using MemoryPack;
 global using Bolt.Domain.Shared.Contracts.Requests;
+global using Messaging.Domain.Shared.Contracts.Responses;
 global using XFramework.Domain.Shared.BusinessObjects;
 global using XFramework.Domain.Shared.Contracts;
 global using XFramework.Domain.Shared.Contracts.Base;
