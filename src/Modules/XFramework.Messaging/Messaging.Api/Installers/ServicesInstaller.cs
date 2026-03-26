@@ -17,5 +17,8 @@ public sealed class ServicesInstaller : IInstaller
 
         // Register MessagingService
         services.AddScoped<IMessagingService, MessagingService>();
+
+        // Register ThreadService
+        services.AddScoped<IThreadService, ThreadService>();
     }
 }
