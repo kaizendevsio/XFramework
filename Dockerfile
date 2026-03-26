@@ -3,7 +3,7 @@ ARG PROJECT_PATH
 WORKDIR /src
 
 # Copy solution and Directory.* files first for layer caching
-COPY Directory.Packages.props Directory.Build.props* ./
+COPY Directory.Packages.props Directory.Build.props* Version.props ./
 COPY XFramework.slnx ./
 
 # Copy all project files for restore

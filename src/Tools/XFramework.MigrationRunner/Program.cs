@@ -14,6 +14,8 @@ var options = new DbContextOptionsBuilder<AppDbContext>()
             maxRetryCount: 10,
             maxRetryDelay: TimeSpan.FromSeconds(30),
             errorCodesToAdd: null))
+    .ConfigureWarnings(w => w.Ignore(
+        Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
     .Options;
 
 try

@@ -44,17 +44,17 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # ── StreamFlow Server (must be healthy before services start) ─
-  streamflow:
+  # ── Bolt Hub (must be healthy before services start) ─────────
+  bolt-hub:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        PROJECT_PATH: src/Modules/XFramework.StreamFlow/StreamFlow.Stream/StreamFlow.Stream.csproj
+        PROJECT_PATH: src/Modules/XFramework.Bolt/Bolt.Hub/Bolt.Hub.csproj
     environment:
       <<: *common-env
     ports:
-      - "${STREAMFLOW_EXPOSE_PORT:-7000}:8080"
+      - "${BOLT_HUB_EXPOSE_PORT:-7000}:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -80,7 +80,7 @@ services:
     ports:
       - "${IDENTITY_EXPOSE_PORT:-8261}:8080"
     depends_on:
-      streamflow:
+      bolt-hub:
         condition: service_healthy
 
   # ── Messaging Server ────────────────────────────────────────
@@ -95,7 +95,7 @@ services:
     ports:
       - "${MESSAGING_EXPOSE_PORT:-5148}:8080"
     depends_on:
-      streamflow:
+      bolt-hub:
         condition: service_healthy
 
   # ── SMS Gateway ─────────────────────────────────────────────
@@ -110,7 +110,7 @@ services:
     ports:
       - "${SMSGATEWAY_EXPOSE_PORT:-5274}:8080"
     depends_on:
-      streamflow:
+      bolt-hub:
         condition: service_healthy
 
   # ── Wallets Server ──────────────────────────────────────────
@@ -125,7 +125,7 @@ services:
     ports:
       - "${WALLETS_EXPOSE_PORT:-9696}:8080"
     depends_on:
-      streamflow:
+      bolt-hub:
         condition: service_healthy
 
 volumes:
