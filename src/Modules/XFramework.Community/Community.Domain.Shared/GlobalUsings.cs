@@ -1,5 +1,6 @@
 // Global using directives
 
+global using Bolt.Domain.Shared.Contracts.Requests;
 global using MemoryPack;
 global using XFramework.Domain.Shared.BusinessObjects;
 global using XFramework.Domain.Shared.Contracts;

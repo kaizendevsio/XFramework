@@ -838,5 +838,89 @@ public static partial class LogMessages
     public static partial void CommunityConnectionsError(
         this Microsoft.Extensions.Logging.ILogger logger, Guid identityId, Exception exception);
 
+    [LoggerMessage(
+        EventId = 12012,
+        Level = LogLevel.Information,
+        Message = "Connection {ConnectionId} created between source {SourceId} and target {TargetId}")]
+    public static partial void CommunityConnectionCreated(
+        this Microsoft.Extensions.Logging.ILogger logger, Guid connectionId, Guid sourceId, Guid targetId);
+
+    [LoggerMessage(
+        EventId = 12013,
+        Level = LogLevel.Error,
+        Message = "Error creating connection between source {SourceId} and target {TargetId}")]
+    public static partial void CommunityConnectionCreateError(
+        this Microsoft.Extensions.Logging.ILogger logger, Guid sourceId, Guid targetId, Exception exception);
+
+    [LoggerMessage(
+        EventId = 12014,
+        Level = LogLevel.Information,
+        Message = "Connection {ConnectionId} deleted successfully")]
+    public static partial void CommunityConnectionDeleted(
+        this Microsoft.Extensions.Logging.ILogger logger, Guid connectionId);
+
+    [LoggerMessage(
+        EventId = 12015,
+        Level = LogLevel.Error,
+        Message = "Error deleting connection {ConnectionId}")]
+    public static partial void CommunityConnectionDeleteError(
+        this Microsoft.Extensions.Logging.ILogger logger, Guid connectionId, Exception exception);
+
+    [LoggerMessage(
+        EventId = 12016,
+        Level = LogLevel.Information,
+        Message = "Retrieved {Count} feed items for identity {IdentityId}")]
+    public static partial void CommunityFeedRetrieved(
+        this Microsoft.Extensions.Logging.ILogger logger, int count, Guid identityId);
+
+    [LoggerMessage(
+        EventId = 12017,
+        Level = LogLevel.Error,
+        Message = "Error generating feed for identity {IdentityId}")]
+    public static partial void CommunityFeedError(
+        this Microsoft.Extensions.Logging.ILogger logger, Guid identityId, Exception exception);
+
+    [LoggerMessage(
+        EventId = 12018,
+        Level = LogLevel.Information,
+        Message = "Notification {NotificationId} created for recipient {RecipientId}")]
+    public static partial void CommunityNotificationCreated(
+        this Microsoft.Extensions.Logging.ILogger logger, Guid notificationId, Guid recipientId);
+
+    [LoggerMessage(
+        EventId = 12019,
+        Level = LogLevel.Error,
+        Message = "Error creating notification for recipient {RecipientId}")]
+    public static partial void CommunityNotificationCreateError(
+        this Microsoft.Extensions.Logging.ILogger logger, Guid recipientId, Exception exception);
+
+    [LoggerMessage(
+        EventId = 12020,
+        Level = LogLevel.Information,
+        Message = "{Count} notifications marked as read")]
+    public static partial void CommunityNotificationsMarkedRead(
+        this Microsoft.Extensions.Logging.ILogger logger, int count);
+
+    [LoggerMessage(
+        EventId = 12021,
+        Level = LogLevel.Error,
+        Message = "Error marking notifications as read")]
+    public static partial void CommunityNotificationsMarkReadError(
+        this Microsoft.Extensions.Logging.ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        EventId = 12022,
+        Level = LogLevel.Information,
+        Message = "Retrieved {Count} notifications for identity {IdentityId}")]
+    public static partial void CommunityNotificationsRetrieved(
+        this Microsoft.Extensions.Logging.ILogger logger, int count, Guid identityId);
+
+    [LoggerMessage(
+        EventId = 12023,
+        Level = LogLevel.Error,
+        Message = "Error retrieving notifications for identity {IdentityId}")]
+    public static partial void CommunityNotificationsError(
+        this Microsoft.Extensions.Logging.ILogger logger, Guid identityId, Exception exception);
+
     #endregion
 }
