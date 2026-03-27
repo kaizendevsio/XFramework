@@ -53,4 +53,19 @@ public enum FrameType : byte
     /// Header: [1:type] [16:streamId] [2:statusCode]
     /// </summary>
     StreamClose = 0x12,
+
+    // -- Media --
+
+    /// <summary>Media config/negotiation.</summary>
+    MediaConfig = 0x20,
+    /// <summary>Encoded media frame (audio/video).</summary>
+    MediaFrame = 0x21,
+    /// <summary>Receiver feedback for adaptive bitrate.</summary>
+    MediaFeedback = 0x22,
+    /// <summary>Keyframe request.</summary>
+    MediaKeyRequest = 0x23,
+    /// <summary>Call signaling (initiate, answer, reject, end, hold).</summary>
+    CallSignal = 0x24,
+    /// <summary>FEC parity frame.</summary>
+    FecFrame = 0x25,
 }

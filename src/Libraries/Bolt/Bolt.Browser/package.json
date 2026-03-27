@@ -1,0 +1,14 @@
+{
+  "name": "@xframework/bolt-browser",
+  "version": "1.0.0",
+  "description": "Bolt protocol browser client for real-time audio/video calls",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

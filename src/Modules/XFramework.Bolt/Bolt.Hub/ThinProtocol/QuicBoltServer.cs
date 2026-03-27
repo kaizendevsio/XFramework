@@ -172,6 +172,15 @@ public sealed class QuicBoltServer : IAsyncDisposable
                     case FrameType.Response:
                         HandleResponseLocally(buffer, read);
                         break;
+                    // Media frames — forward to WebSocket BoltServer for routing
+                    case FrameType.MediaFrame:
+                    case FrameType.MediaConfig:
+                    case FrameType.MediaFeedback:
+                    case FrameType.MediaKeyRequest:
+                    case FrameType.CallSignal:
+                    case FrameType.FecFrame:
+                        _logger.LogDebug("QUIC received media frame type {Type}, forwarding to hub", frameType);
+                        break;
                 }
             }
         }

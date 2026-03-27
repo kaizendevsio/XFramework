@@ -156,7 +156,7 @@ public sealed class QuicBoltHubClient : IAsyncDisposable
 
     private async Task ReadRpcResponsesAsync(QuicStream stream, CancellationToken ct)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+        var buffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
         try
         {
             while (!ct.IsCancellationRequested)
@@ -215,7 +215,7 @@ public sealed class QuicBoltHubClient : IAsyncDisposable
 
     private async Task HandleInboundStreamAsync(QuicStream stream, CancellationToken ct)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+        var buffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
         try
         {
             var read = await stream.ReadAsync(buffer, ct);
