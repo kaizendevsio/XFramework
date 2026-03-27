@@ -1,18 +1,17 @@
 @inherits LayoutComponentBase
 
-<BbPortalHost />
-<BbToastProvider Position="ToastPosition.BottomRight" />
-<BbDialogProvider />
-
-<BbSidebarProvider>
+<BbSidebarProvider DefaultOpen="true" Variant="SidebarVariant.Sidebar">
     <BbSidebar>
         <BbSidebarHeader>
-            <div class="flex items-center gap-2 px-2">
-                <BbTypography Variant="TypographyVariant.H6">Control Panel</BbTypography>
-            </div>
-            <BbTypography Variant="TypographyVariant.Muted" Class="px-2 text-xs">
-                XFramework Admin
-            </BbTypography>
+            <BbSidebarHeaderContent>
+                <div class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                    <LucideIcon Name="shield" Size="16" />
+                </div>
+                <BbSidebarHeaderInfo>
+                    <span class="truncate font-semibold">Control Panel</span>
+                    <span class="truncate text-xs text-muted-foreground">XFramework Admin</span>
+                </BbSidebarHeaderInfo>
+            </BbSidebarHeaderContent>
         </BbSidebarHeader>
 
         <BbSidebarContent>
@@ -20,10 +19,16 @@
         </BbSidebarContent>
 
         <BbSidebarFooter>
-            <div class="flex items-center gap-2 px-2 py-1">
-                <BbThemeSwitcher />
-            </div>
+            <BbSidebarMenu>
+                <BbSidebarMenuItem>
+                    <BbSidebarMenuButton OnClick="@(() => {})">
+                        <LucideIcon Name="sun" Size="16" />
+                        <span>Toggle Theme</span>
+                    </BbSidebarMenuButton>
+                </BbSidebarMenuItem>
+            </BbSidebarMenu>
         </BbSidebarFooter>
+        <BbSidebarRail />
     </BbSidebar>
 
     <BbSidebarInset>
@@ -44,3 +49,7 @@
         </main>
     </BbSidebarInset>
 </BbSidebarProvider>
+
+<BbToastProvider Position="ToastPosition.BottomRight" />
+<BbDialogProvider />
+<BbPortalHost />
