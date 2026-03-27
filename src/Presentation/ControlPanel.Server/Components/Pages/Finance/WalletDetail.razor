@@ -3,117 +3,443 @@
 
 <PageTitle>Wallet Detail - Control Panel</PageTitle>
 
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <BbTypography Variant="TypographyVariant.H3">Wallet Detail</BbTypography>
-        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => NavigationManager.NavigateTo("/finance/wallets"))">
-            Back to Wallets
-        </BbButton>
-    </div>
+@if (_wallet is null)
+{
+    <BbTypography Variant="TypographyVariant.Muted">Loading wallet details...</BbTypography>
+}
+else
+{
+    <div class="space-y-6">
+        @* Header *@
+        <div class="flex items-center gap-4">
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                      OnClick="@(() => NavigationManager.NavigateTo("/finance/wallets"))">
+                <LucideArrowLeft class="h-4 w-4" />
+            </BbButton>
+            <div class="flex-1">
+                <BbTypography Variant="TypographyVariant.H3">
+                    Wallet: @(_wallet.AccountNumber ?? _wallet.Id.ToString()[..8] + "...")
+                </BbTypography>
+                <BbTypography Variant="TypographyVariant.Muted">
+                    ID: @_wallet.Id &mdash; Type: @(_wallet.WalletType?.Name ?? "N/A")
+                </BbTypography>
+            </div>
+            <div class="flex items-center gap-2">
+                @if (_wallet.Status == WalletStatus.Active)
+                {
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@FreezeWallet">
+                        <LucideLock class="mr-2 h-4 w-4" />
+                        Freeze Wallet
+                    </BbButton>
+                }
+                else if (_wallet.Status == WalletStatus.Frozen)
+                {
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@UnfreezeWallet">
+                        <LucideLockOpen class="mr-2 h-4 w-4" />
+                        Unfreeze Wallet
+                    </BbButton>
+                }
+                @if (_wallet.Status != WalletStatus.Closed)
+                {
+                    <BbButton Variant="ButtonVariant.Destructive" OnClick="@(() => _showCloseDialog = true)">
+                        <LucideXCircle class="mr-2 h-4 w-4" />
+                        Close Wallet
+                    </BbButton>
+                }
+            </div>
+        </div>
 
-    @if (_wallet is not null)
-    {
+        @* Wallet Summary Card *@
         <BbCard>
             <BbCardHeader>
-                <BbCardTitle>@_wallet.AccountNumber</BbCardTitle>
-                <BbCardDescription>Wallet ID: @_wallet.Id</BbCardDescription>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <BbCardTitle>Wallet Summary</BbCardTitle>
+                        <BbCardDescription>
+                            Credential: <span class="font-mono">@_wallet.CredentialId</span>
+                        </BbCardDescription>
+                    </div>
+                    <StatusBadge Text="@_wallet.Status.ToString()" Status="@GetStatusKey(_wallet.Status)" />
+                </div>
             </BbCardHeader>
             <BbCardContent>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <BbCard>
+                        <BbCardContent>
+                            <div class="space-y-1 pt-4">
+                                <BbTypography Variant="TypographyVariant.Muted">Balance</BbTypography>
+                                <BbTypography Variant="TypographyVariant.H3">@_wallet.Balance.ToString("N2")</BbTypography>
+                            </div>
+                        </BbCardContent>
+                    </BbCard>
+                    <BbCard>
+                        <BbCardContent>
+                            <div class="space-y-1 pt-4">
+                                <BbTypography Variant="TypographyVariant.Muted">Available Balance</BbTypography>
+                                <BbTypography Variant="TypographyVariant.H3" class="@(_wallet.AvailableBalance < 0 ? "text-red-500" : "")">
+                                    @_wallet.AvailableBalance.ToString("N2")
+                                </BbTypography>
+                            </div>
+                        </BbCardContent>
+                    </BbCard>
+                    <BbCard>
+                        <BbCardContent>
+                            <div class="space-y-1 pt-4">
+                                <BbTypography Variant="TypographyVariant.Muted">Debit On Hold</BbTypography>
+                                <BbTypography Variant="TypographyVariant.H3" class="@(_wallet.DebitOnHoldBalance > 0 ? "text-yellow-600" : "")">
+                                    @_wallet.DebitOnHoldBalance.ToString("N2")
+                                </BbTypography>
+                            </div>
+                        </BbCardContent>
+                    </BbCard>
+                    <BbCard>
+                        <BbCardContent>
+                            <div class="space-y-1 pt-4">
+                                <BbTypography Variant="TypographyVariant.Muted">Credit On Hold</BbTypography>
+                                <BbTypography Variant="TypographyVariant.H3" class="@(_wallet.CreditOnHoldBalance > 0 ? "text-yellow-600" : "")">
+                                    @_wallet.CreditOnHoldBalance.ToString("N2")
+                                </BbTypography>
+                            </div>
+                        </BbCardContent>
+                    </BbCard>
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Balance</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">@_wallet.Balance.ToString("N2")</BbTypography>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Available Balance</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">@_wallet.AvailableBalance.ToString("N2")</BbTypography>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Debit On Hold</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">@_wallet.DebitOnHoldBalance.ToString("N2")</BbTypography>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Credit On Hold</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">@_wallet.CreditOnHoldBalance.ToString("N2")</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Muted">Total Balance</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">@(_wallet.TotalBalance?.ToString("N2") ?? "N/A")</BbTypography>
                     </div>
                     <div class="space-y-1">
                         <BbTypography Variant="TypographyVariant.Muted">Transferable Balance</BbTypography>
                         <BbTypography Variant="TypographyVariant.Large">@_wallet.TransferableBalance.ToString("N2")</BbTypography>
                     </div>
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Status</BbTypography>
-                        <StatusBadge Text="@_wallet.Status.ToString()" Status="@GetStatusText(_wallet.Status)" />
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Credential ID</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Small">@_wallet.CredentialId</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Muted">Account Number</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">@(_wallet.AccountNumber ?? "N/A")</BbTypography>
                     </div>
                     <div class="space-y-1">
                         <BbTypography Variant="TypographyVariant.Muted">Created</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Small">@_wallet.CreatedAt.ToString("g")</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">@_wallet.CreatedAt.ToString("g")</BbTypography>
                     </div>
                 </div>
             </BbCardContent>
         </BbCard>
 
-        <BbTypography Variant="TypographyVariant.H4">Transactions</BbTypography>
+        @* Admin Operations *@
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Admin Operations</BbCardTitle>
+                <BbCardDescription>Directly manage wallet funds. All operations are logged as transactions.</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTabs DefaultValue="add-funds">
+                    <BbTabsList>
+                        <BbTabsTrigger Value="add-funds">Add Funds</BbTabsTrigger>
+                        <BbTabsTrigger Value="withdraw-funds">Withdraw Funds</BbTabsTrigger>
+                        <BbTabsTrigger Value="adjust-balance">Adjust Balance</BbTabsTrigger>
+                    </BbTabsList>
 
-        <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
-            <Columns>
-                <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-                <BbDataGridTemplateColumn Title="Type">
-                    <ChildContent Context="item">
-                        <BbBadge Variant="@(item.TransactionType == TransactionType.Credit ? BadgeVariant.Default : BadgeVariant.Destructive)">
-                            @item.TransactionType
-                        </BbBadge>
-                    </ChildContent>
-                </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-                <BbDataGridTemplateColumn Title="Held">
-                    <ChildContent Context="item">
-                        <BbBadge Variant="@(item.Held ? BadgeVariant.Outline : BadgeVariant.Secondary)">
-                            @(item.Held ? "Yes" : "No")
-                        </BbBadge>
-                    </ChildContent>
-                </BbDataGridTemplateColumn>
-                <BbDataGridTemplateColumn Title="Released">
-                    <ChildContent Context="item">
-                        <BbBadge Variant="@(item.Released ? BadgeVariant.Default : BadgeVariant.Secondary)">
-                            @(item.Released ? "Yes" : "No")
-                        </BbBadge>
-                    </ChildContent>
-                </BbDataGridTemplateColumn>
-                <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
-                <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running Balance" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-            </Columns>
-        </BbDataGrid>
-    }
-    else
-    {
-        <BbTypography Variant="TypographyVariant.Muted">Loading wallet details...</BbTypography>
-    }
-</div>
+                    <BbTabsContent Value="add-funds">
+                        <div class="grid gap-4 py-4 md:grid-cols-3">
+                            <div class="grid gap-2">
+                                <BbLabel>Amount</BbLabel>
+                                <BbInput Value="@_addFundsAmount"
+                                         ValueChanged="@((string v) => _addFundsAmount = v)"
+                                         Placeholder="0.00" />
+                            </div>
+                            <div class="grid gap-2">
+                                <BbLabel>Reference Number</BbLabel>
+                                <BbInput Value="@_addFundsRef"
+                                         ValueChanged="@((string v) => _addFundsRef = v)"
+                                         Placeholder="REF-001" />
+                            </div>
+                            <div class="grid gap-2">
+                                <BbLabel>Remarks</BbLabel>
+                                <BbInput Value="@_addFundsRemarks"
+                                         ValueChanged="@((string v) => _addFundsRemarks = v)"
+                                         Placeholder="Admin credit" />
+                            </div>
+                        </div>
+                        <BbButton OnClick="@AddFunds" Disabled="@_isProcessing">
+                            @if (_isProcessing)
+                            {
+                                <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                            }
+                            <LucidePlus class="mr-2 h-4 w-4" />
+                            Add Funds
+                        </BbButton>
+                    </BbTabsContent>
+
+                    <BbTabsContent Value="withdraw-funds">
+                        <div class="grid gap-4 py-4 md:grid-cols-3">
+                            <div class="grid gap-2">
+                                <BbLabel>Amount</BbLabel>
+                                <BbInput Value="@_withdrawAmount"
+                                         ValueChanged="@((string v) => _withdrawAmount = v)"
+                                         Placeholder="0.00" />
+                            </div>
+                            <div class="grid gap-2">
+                                <BbLabel>Reference Number</BbLabel>
+                                <BbInput Value="@_withdrawRef"
+                                         ValueChanged="@((string v) => _withdrawRef = v)"
+                                         Placeholder="REF-001" />
+                            </div>
+                            <div class="grid gap-2">
+                                <BbLabel>Remarks</BbLabel>
+                                <BbInput Value="@_withdrawRemarks"
+                                         ValueChanged="@((string v) => _withdrawRemarks = v)"
+                                         Placeholder="Admin debit" />
+                            </div>
+                        </div>
+                        <BbButton Variant="ButtonVariant.Destructive" OnClick="@WithdrawFunds" Disabled="@_isProcessing">
+                            @if (_isProcessing)
+                            {
+                                <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                            }
+                            <LucideMinus class="mr-2 h-4 w-4" />
+                            Withdraw Funds
+                        </BbButton>
+                    </BbTabsContent>
+
+                    <BbTabsContent Value="adjust-balance">
+                        <BbAlert Variant="AlertVariant.Warning" class="mb-4">
+                            <BbAlertTitle>Warning</BbAlertTitle>
+                            <BbAlertDescription>
+                                Balance adjustment directly overwrites the wallet balance without creating a standard transaction. Use with caution.
+                            </BbAlertDescription>
+                        </BbAlert>
+                        <div class="grid gap-4 py-4 md:grid-cols-2">
+                            <div class="grid gap-2">
+                                <BbLabel>New Balance</BbLabel>
+                                <BbInput Value="@_adjustBalance"
+                                         ValueChanged="@((string v) => _adjustBalance = v)"
+                                         Placeholder="0.00" />
+                            </div>
+                            <div class="grid gap-2">
+                                <BbLabel>Remarks</BbLabel>
+                                <BbInput Value="@_adjustRemarks"
+                                         ValueChanged="@((string v) => _adjustRemarks = v)"
+                                         Placeholder="Admin balance adjustment" />
+                            </div>
+                        </div>
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@AdjustBalance" Disabled="@_isProcessing">
+                            @if (_isProcessing)
+                            {
+                                <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                            }
+                            <LucideSettings class="mr-2 h-4 w-4" />
+                            Apply Adjustment
+                        </BbButton>
+                    </BbTabsContent>
+                </BbTabs>
+            </BbCardContent>
+        </BbCard>
+
+        @* Transaction History *@
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Transaction History</BbCardTitle>
+                <BbCardDescription>@_transactions.Count transaction(s) recorded for this wallet</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
+                    <Columns>
+                        <BbDataGridTemplateColumn Title="Amount" Sortable="true">
+                            <ChildContent Context="item">
+                                <span class="font-semibold @(item.TransactionType == TransactionType.Credit ? "text-green-600" : "text-red-600")">
+                                    @(item.TransactionType == TransactionType.Credit ? "+" : "")@item.Amount.ToString("N2")
+                                </span>
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Type">
+                            <ChildContent Context="item">
+                                @if (item.TransactionType == TransactionType.Credit)
+                                {
+                                    <BbBadge Variant="BadgeVariant.Default">Credit</BbBadge>
+                                }
+                                else if (item.TransactionType == TransactionType.Debit)
+                                {
+                                    <BbBadge Variant="BadgeVariant.Destructive">Debit</BbBadge>
+                                }
+                                else
+                                {
+                                    <BbBadge Variant="BadgeVariant.Secondary">Unknown</BbBadge>
+                                }
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Fee" Sortable="true">
+                            <ChildContent Context="item">
+                                @if (item.TransactionFee > 0)
+                                {
+                                    <span class="text-yellow-600">@item.TransactionFee.ToString("N2")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted-foreground">0.00</span>
+                                }
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Held">
+                            <ChildContent Context="item">
+                                <BbBadge Variant="@(item.Held ? BadgeVariant.Outline : BadgeVariant.Secondary)">
+                                    @(item.Held ? "Held" : "No")
+                                </BbBadge>
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Released">
+                            <ChildContent Context="item">
+                                <BbBadge Variant="@(item.Released ? BadgeVariant.Default : BadgeVariant.Secondary)">
+                                    @(item.Released ? "Released" : "No")
+                                </BbBadge>
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Reference">
+                            <ChildContent Context="item">
+                                <span class="font-mono text-xs">@(item.ReferenceNumber ?? "N/A")</span>
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Remarks">
+                            <ChildContent Context="item">
+                                @if (!string.IsNullOrEmpty(item.Remarks))
+                                {
+                                    <span title="@item.Remarks">
+                                        @(item.Remarks.Length > 30 ? item.Remarks[..30] + "..." : item.Remarks)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted-foreground">--</span>
+                                }
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridTemplateColumn Title="Running Balance" Sortable="true">
+                            <ChildContent Context="item">
+                                @(item.RunningBalance?.ToString("N2") ?? "N/A")
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
+                </BbDataGrid>
+            </BbCardContent>
+        </BbCard>
+
+        @* Wallet Rules *@
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Wallet Rules</BbCardTitle>
+                <BbCardDescription>Transfer and balance rules configured for this wallet</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Min Transfer Rule</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">
+                            @(_wallet.MinTransferRule?.ToString("N2") ?? "Not set")
+                        </BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Max Transfer Rule</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">
+                            @(_wallet.MaxTransferRule?.ToString("N2") ?? "Not set")
+                        </BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Bond Balance Rule</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">
+                            @(_wallet.BondBalanceRule?.ToString("N2") ?? "Not set")
+                        </BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Maintaining Balance Rule</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">
+                            @(_wallet.MaintainingBalanceRule?.ToString("N2") ?? "Not set")
+                        </BbTypography>
+                    </div>
+                </div>
+            </BbCardContent>
+        </BbCard>
+    </div>
+}
+
+@* Close Wallet Confirmation Dialog *@
+<BbDialog Open="@_showCloseDialog" OpenChanged="@(v => _showCloseDialog = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Close Wallet</BbDialogTitle>
+            <BbDialogDescription>
+                Are you sure you want to close this wallet? This action cannot be easily undone.
+                @if (_wallet?.Balance > 0)
+                {
+                    <span class="mt-2 block font-semibold text-red-500">
+                        Warning: This wallet still has a balance of @_wallet.Balance.ToString("N2").
+                    </span>
+                }
+            </BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showCloseDialog = false)">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="@CloseWallet">
+                Confirm Close
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
 
 @code {
     [Parameter] public Guid Id { get; set; }
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
 
     private Wallet? _wallet;
     private List<WalletTransaction> _transactions = [];
+    private bool _isProcessing;
+    private bool _showCloseDialog;
+
+    // Add Funds form
+    private string _addFundsAmount = "";
+    private string _addFundsRef = "";
+    private string _addFundsRemarks = "";
+
+    // Withdraw Funds form
+    private string _withdrawAmount = "";
+    private string _withdrawRef = "";
+    private string _withdrawRemarks = "";
+
+    // Adjust Balance form
+    private string _adjustBalance = "";
+    private string _adjustRemarks = "";
 
     protected override async Task OnInitializedAsync()
     {
-        _wallet = await DataContext.Query<Wallet>().Where(x => x.Id == Id).FirstOrDefaultAsync();
+        try
+        {
+            await LoadWallet();
+            await LoadTransactions();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load wallet: {ex.Message}");
+        }
+    }
+
+    private async Task LoadWallet()
+    {
+        _wallet = await DataContext.Query<Wallet>()
+            .Include(x => x.WalletType)
+            .Where(x => x.Id == Id)
+            .FirstOrDefaultAsync();
+    }
+
+    private async Task LoadTransactions()
+    {
         _transactions = await DataContext.Query<WalletTransaction>()
             .Where(x => x.WalletId == Id)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
     }
 
-    private string GetStatusText(WalletStatus status) => status switch
+    private string GetStatusKey(WalletStatus status) => status switch
     {
         WalletStatus.Active => "active",
         WalletStatus.Frozen => "frozen",
@@ -121,4 +447,358 @@
         WalletStatus.Closed => "closed",
         _ => "inactive"
     };
+
+    private async Task AddFunds()
+    {
+        if (!decimal.TryParse(_addFundsAmount, out var amount) || amount <= 0)
+        {
+            ToastService.Show("Please enter a valid positive amount.");
+            return;
+        }
+
+        _isProcessing = true;
+        try
+        {
+            var fresh = await DataContext.Query<Wallet>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Wallet not found.");
+                return;
+            }
+
+            var oldBalance = fresh.Balance;
+            var newBalance = oldBalance + amount;
+
+            // Create transaction record
+            var transaction = new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                WalletId = Id,
+                CredentialId = fresh.CredentialId,
+                Amount = amount,
+                TransactionType = TransactionType.Credit,
+                TransactionFee = 0,
+                ReferenceNumber = string.IsNullOrWhiteSpace(_addFundsRef) ? null : _addFundsRef.Trim(),
+                Remarks = string.IsNullOrWhiteSpace(_addFundsRemarks) ? "Admin credit" : _addFundsRemarks.Trim(),
+                Held = false,
+                Released = true,
+                RunningBalance = newBalance,
+                PreviousBalance = oldBalance,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            DataContext.Add(transaction);
+
+            // Update wallet balance
+            fresh.Balance = newBalance;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show($"Added {amount:N2} to wallet. New balance: {newBalance:N2}");
+                _addFundsAmount = "";
+                _addFundsRef = "";
+                _addFundsRemarks = "";
+                await LoadWallet();
+                await LoadTransactions();
+            }
+            else
+            {
+                ToastService.Show($"Failed to add funds: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error adding funds: {ex.Message}");
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task WithdrawFunds()
+    {
+        if (!decimal.TryParse(_withdrawAmount, out var amount) || amount <= 0)
+        {
+            ToastService.Show("Please enter a valid positive amount.");
+            return;
+        }
+
+        _isProcessing = true;
+        try
+        {
+            var fresh = await DataContext.Query<Wallet>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Wallet not found.");
+                return;
+            }
+
+            if (fresh.Balance < amount)
+            {
+                ToastService.Show($"Insufficient balance. Current balance: {fresh.Balance:N2}, requested: {amount:N2}");
+                return;
+            }
+
+            var oldBalance = fresh.Balance;
+            var newBalance = oldBalance - amount;
+
+            // Create transaction record
+            var transaction = new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                WalletId = Id,
+                CredentialId = fresh.CredentialId,
+                Amount = amount,
+                TransactionType = TransactionType.Debit,
+                TransactionFee = 0,
+                ReferenceNumber = string.IsNullOrWhiteSpace(_withdrawRef) ? null : _withdrawRef.Trim(),
+                Remarks = string.IsNullOrWhiteSpace(_withdrawRemarks) ? "Admin debit" : _withdrawRemarks.Trim(),
+                Held = false,
+                Released = true,
+                RunningBalance = newBalance,
+                PreviousBalance = oldBalance,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            DataContext.Add(transaction);
+
+            // Update wallet balance
+            fresh.Balance = newBalance;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show($"Withdrew {amount:N2} from wallet. New balance: {newBalance:N2}");
+                _withdrawAmount = "";
+                _withdrawRef = "";
+                _withdrawRemarks = "";
+                await LoadWallet();
+                await LoadTransactions();
+            }
+            else
+            {
+                ToastService.Show($"Failed to withdraw funds: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error withdrawing funds: {ex.Message}");
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task AdjustBalance()
+    {
+        if (!decimal.TryParse(_adjustBalance, out var newBalance))
+        {
+            ToastService.Show("Please enter a valid balance amount.");
+            return;
+        }
+
+        _isProcessing = true;
+        try
+        {
+            var fresh = await DataContext.Query<Wallet>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Wallet not found.");
+                return;
+            }
+
+            var oldBalance = fresh.Balance;
+            var difference = newBalance - oldBalance;
+
+            // Create an adjustment transaction record
+            var transaction = new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                WalletId = Id,
+                CredentialId = fresh.CredentialId,
+                Amount = Math.Abs(difference),
+                TransactionType = difference >= 0 ? TransactionType.Credit : TransactionType.Debit,
+                TransactionFee = 0,
+                ReferenceNumber = $"ADJ-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                Remarks = string.IsNullOrWhiteSpace(_adjustRemarks)
+                    ? $"Admin balance adjustment: {oldBalance:N2} -> {newBalance:N2}"
+                    : _adjustRemarks.Trim(),
+                Held = false,
+                Released = true,
+                RunningBalance = newBalance,
+                PreviousBalance = oldBalance,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+            DataContext.Add(transaction);
+
+            // Update wallet balance directly
+            fresh.Balance = newBalance;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show($"Balance adjusted from {oldBalance:N2} to {newBalance:N2}.");
+                _adjustBalance = "";
+                _adjustRemarks = "";
+                await LoadWallet();
+                await LoadTransactions();
+            }
+            else
+            {
+                ToastService.Show($"Failed to adjust balance: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error adjusting balance: {ex.Message}");
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task FreezeWallet()
+    {
+        try
+        {
+            var fresh = await DataContext.Query<Wallet>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Wallet not found.");
+                return;
+            }
+
+            if (fresh.Status != WalletStatus.Active)
+            {
+                ToastService.Show($"Cannot freeze. Wallet status is {fresh.Status}.");
+                return;
+            }
+
+            fresh.Status = WalletStatus.Frozen;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Wallet frozen successfully.");
+                await LoadWallet();
+            }
+            else
+            {
+                ToastService.Show($"Failed to freeze wallet: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error freezing wallet: {ex.Message}");
+        }
+    }
+
+    private async Task UnfreezeWallet()
+    {
+        try
+        {
+            var fresh = await DataContext.Query<Wallet>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Wallet not found.");
+                return;
+            }
+
+            if (fresh.Status != WalletStatus.Frozen)
+            {
+                ToastService.Show($"Cannot unfreeze. Wallet status is {fresh.Status}.");
+                return;
+            }
+
+            fresh.Status = WalletStatus.Active;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Wallet unfrozen successfully.");
+                await LoadWallet();
+            }
+            else
+            {
+                ToastService.Show($"Failed to unfreeze wallet: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error unfreezing wallet: {ex.Message}");
+        }
+    }
+
+    private async Task CloseWallet()
+    {
+        try
+        {
+            var fresh = await DataContext.Query<Wallet>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Wallet not found.");
+                return;
+            }
+
+            if (fresh.Status == WalletStatus.Closed)
+            {
+                ToastService.Show("Wallet is already closed.");
+                _showCloseDialog = false;
+                return;
+            }
+
+            fresh.Status = WalletStatus.Closed;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Wallet closed successfully.");
+                _showCloseDialog = false;
+                await LoadWallet();
+            }
+            else
+            {
+                ToastService.Show($"Failed to close wallet: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error closing wallet: {ex.Message}");
+        }
+    }
 }

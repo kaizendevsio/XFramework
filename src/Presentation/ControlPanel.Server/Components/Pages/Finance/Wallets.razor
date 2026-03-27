@@ -1,75 +1,193 @@
 @page "/finance/wallets"
 @using global::Wallets.Domain.Shared.Enums
 
-<PageTitle>Wallets - Control Panel</PageTitle>
+<PageTitle>Wallet Management - Control Panel</PageTitle>
 
-<div class="space-y-4">
+<div class="space-y-6">
     <div class="flex items-center justify-between">
-        <BbTypography Variant="TypographyVariant.H3">Wallets</BbTypography>
-        <BbButton OnClick="@(() => _showCreateDialog = true)">Create Wallet</BbButton>
+        <div>
+            <BbTypography Variant="TypographyVariant.H3">Wallet Management</BbTypography>
+            <BbTypography Variant="TypographyVariant.Muted">Manage user wallets, balances, and account statuses</BbTypography>
+        </div>
+        <BbButton OnClick="@OpenCreateDialog">
+            <LucidePlus class="mr-2 h-4 w-4" />
+            Create Wallet
+        </BbButton>
     </div>
 
-    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <Columns>
-            <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account Number" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available Balance" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.DebitOnHoldBalance)" Title="Debit On Hold" Sortable="true" />
-            <BbDataGridPropertyColumn Property="@(x => x.CreditOnHoldBalance)" Title="Credit On Hold" Sortable="true" />
-            <BbDataGridTemplateColumn Title="Status">
-                <ChildContent Context="item">
-                    <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusText(item.Status)" />
-                </ChildContent>
-            </BbDataGridTemplateColumn>
-            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-            <BbDataGridTemplateColumn Title="Actions">
-                <ChildContent Context="item">
-                    <div class="flex items-center gap-2">
-                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                                  OnClick="@(() => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))">
-                            View
-                        </BbButton>
-                        @if (item.Status == WalletStatus.Active)
-                        {
-                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                                      OnClick="@(() => ToggleFreeze(item))">
-                                Freeze
-                            </BbButton>
-                        }
-                        else if (item.Status == WalletStatus.Frozen)
-                        {
-                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                                      OnClick="@(() => ToggleFreeze(item))">
-                                Unfreeze
-                            </BbButton>
-                        }
-                    </div>
-                </ChildContent>
-            </BbDataGridTemplateColumn>
-        </Columns>
-    </BbDataGrid>
+    @* Summary Statistics *@
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Total Wallets</BbCardTitle>
+                <BbCardDescription>All wallet accounts</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypography Variant="TypographyVariant.H2">@_totalWallets</BbTypography>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Total Balance</BbCardTitle>
+                <BbCardDescription>Sum of all wallet balances</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypography Variant="TypographyVariant.H2">@_totalBalance.ToString("N2")</BbTypography>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Active Wallets</BbCardTitle>
+                <BbCardDescription>Currently active accounts</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypography Variant="TypographyVariant.H2">@_activeWallets</BbTypography>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Frozen Wallets</BbCardTitle>
+                <BbCardDescription>Temporarily frozen accounts</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypography Variant="TypographyVariant.H2">@_frozenWallets</BbTypography>
+            </BbCardContent>
+        </BbCard>
+    </div>
+
+    @* Wallet List *@
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>All Wallets</BbCardTitle>
+            <BbCardDescription>@_items.Count wallet(s) loaded</BbCardDescription>
+        </BbCardHeader>
+        <BbCardContent>
+            <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridTemplateColumn Title="Account Number" Sortable="true">
+                        <ChildContent Context="item">
+                            @(item.AccountNumber ?? "N/A")
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Credential ID" Sortable="true">
+                        <ChildContent Context="item">
+                            <span class="font-mono text-xs">@item.CredentialId.ToString()[..8]...</span>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Wallet Type">
+                        <ChildContent Context="item">
+                            @(item.WalletType?.Name ?? "N/A")
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Balance" Sortable="true">
+                        <ChildContent Context="item">
+                            <span class="font-semibold">@item.Balance.ToString("N2")</span>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Available Balance" Sortable="true">
+                        <ChildContent Context="item">
+                            <span class="@(item.AvailableBalance < 0 ? "text-red-500 font-semibold" : "")">
+                                @item.AvailableBalance.ToString("N2")
+                            </span>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Debit On Hold" Sortable="true">
+                        <ChildContent Context="item">
+                            @if (item.DebitOnHoldBalance > 0)
+                            {
+                                <span class="text-yellow-600">@item.DebitOnHoldBalance.ToString("N2")</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted-foreground">0.00</span>
+                            }
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Status">
+                        <ChildContent Context="item">
+                            <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusKey(item.Status)" />
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-1">
+                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                          OnClick="@(() => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))">
+                                    <LucideEye class="h-4 w-4" />
+                                </BbButton>
+                                @if (item.Status == WalletStatus.Active)
+                                {
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              OnClick="@(() => ToggleFreeze(item))">
+                                        <LucideLock class="h-4 w-4" />
+                                    </BbButton>
+                                }
+                                else if (item.Status == WalletStatus.Frozen)
+                                {
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              OnClick="@(() => ToggleFreeze(item))">
+                                        <LucideLockOpen class="h-4 w-4" />
+                                    </BbButton>
+                                }
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbCardContent>
+    </BbCard>
 </div>
 
+@* Create Wallet Dialog *@
 <BbDialog Open="@_showCreateDialog" OpenChanged="@(v => _showCreateDialog = v)">
     <BbDialogContent>
         <BbDialogHeader>
             <BbDialogTitle>Create Wallet</BbDialogTitle>
-            <BbDialogDescription>Create a new wallet for a credential.</BbDialogDescription>
+            <BbDialogDescription>Create a new wallet account for a user credential.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="space-y-4 py-4">
-            <div class="space-y-2">
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-2">
                 <BbLabel>Credential ID</BbLabel>
-                <BbInput Value="@_newCredentialId" ValueChanged="@(v => _newCredentialId = v)" Placeholder="Enter credential ID" />
+                <BbInput Value="@_newCredentialId"
+                         ValueChanged="@((string v) => _newCredentialId = v)"
+                         Placeholder="Enter credential GUID" />
             </div>
-            <div class="space-y-2">
-                <BbLabel>Wallet Type ID</BbLabel>
-                <BbInput Value="@_newWalletTypeId" ValueChanged="@(v => _newWalletTypeId = v)" Placeholder="Enter wallet type ID" />
+            <div class="grid gap-2">
+                <BbLabel>Wallet Type</BbLabel>
+                <BbSelect Value="@_newWalletTypeId" ValueChanged="@((string v) => _newWalletTypeId = v)">
+                    <BbSelectItem Value="@("none")">None</BbSelectItem>
+                    @foreach (var wt in _walletTypes)
+                    {
+                        <BbSelectItem Value="@wt.Id.ToString()">@(wt.Name) (@(wt.Code))</BbSelectItem>
+                    }
+                </BbSelect>
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Account Number (optional)</BbLabel>
+                <BbInput Value="@_newAccountNumber"
+                         ValueChanged="@((string v) => _newAccountNumber = v)"
+                         Placeholder="Leave blank for auto-generation" />
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Initial Balance</BbLabel>
+                <BbInput Value="@_newInitialBalance"
+                         ValueChanged="@((string v) => _newInitialBalance = v)"
+                         Placeholder="0.00" />
             </div>
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showCreateDialog = false)">Cancel</BbButton>
-            <BbButton OnClick="@CreateWallet">Create</BbButton>
+            <BbButton OnClick="@CreateWallet" Disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                }
+                Create Wallet
+            </BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
@@ -80,16 +198,51 @@
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<Wallet> _items = [];
+    private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
     private bool _showCreateDialog;
+    private bool _isSaving;
+
+    // Stats
+    private int _totalWallets;
+    private decimal _totalBalance;
+    private int _activeWallets;
+    private int _frozenWallets;
+
+    // Create form
     private string _newCredentialId = "";
     private string _newWalletTypeId = "";
+    private string _newAccountNumber = "";
+    private string _newInitialBalance = "0";
 
     protected override async Task OnInitializedAsync()
     {
-        _items = await DataContext.Query<Wallet>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        try
+        {
+            await LoadData();
+            _walletTypes = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
+                .OrderBy(x => x.Name)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load wallets: {ex.Message}");
+        }
     }
 
-    private string GetStatusText(WalletStatus status) => status switch
+    private async Task LoadData()
+    {
+        _items = await DataContext.Query<Wallet>()
+            .Include(x => x.WalletType)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+
+        _totalWallets = _items.Count;
+        _totalBalance = _items.Sum(x => x.Balance);
+        _activeWallets = _items.Count(x => x.Status == WalletStatus.Active);
+        _frozenWallets = _items.Count(x => x.Status == WalletStatus.Frozen);
+    }
+
+    private string GetStatusKey(WalletStatus status) => status switch
     {
         WalletStatus.Active => "active",
         WalletStatus.Frozen => "frozen",
@@ -98,44 +251,109 @@
         _ => "inactive"
     };
 
-    private async Task ToggleFreeze(Wallet wallet)
+    private void OpenCreateDialog()
     {
-        if (wallet.Status is not (WalletStatus.Active or WalletStatus.Frozen)) return;
-
-        var fresh = await DataContext.Query<Wallet>().Where(x => x.Id == wallet.Id).FirstOrDefaultAsync();
-        if (fresh is null) return;
-
-        fresh.Status = fresh.Status == WalletStatus.Active ? WalletStatus.Frozen : WalletStatus.Active;
-        DataContext.Update(fresh);
-        var result = await DataContext.SaveChangesAsync();
-        ToastService.Show(result.IsSuccess ? "Wallet status updated." : $"Error: {result.Message}");
-        _items = await DataContext.Query<Wallet>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _newCredentialId = "";
+        _newWalletTypeId = "";
+        _newAccountNumber = "";
+        _newInitialBalance = "0";
+        _showCreateDialog = true;
     }
 
     private async Task CreateWallet()
     {
-        if (!Guid.TryParse(_newCredentialId, out var credentialId)) return;
-
-        var wallet = new Wallet
+        if (!Guid.TryParse(_newCredentialId, out var credentialId))
         {
-            Id = Guid.NewGuid(),
-            CredentialId = credentialId,
-            WalletTypeId = Guid.TryParse(_newWalletTypeId, out var walletTypeId) ? walletTypeId : null,
-            Status = WalletStatus.Active,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        DataContext.Add(wallet);
-        var result = await DataContext.SaveChangesAsync();
-        if (!result.IsSuccess)
-        {
-            ToastService.Show($"Error: {result.Message}");
+            ToastService.Show("Invalid Credential ID. Please enter a valid GUID.");
             return;
         }
 
-        _showCreateDialog = false;
-        _newCredentialId = "";
-        _newWalletTypeId = "";
-        _items = await DataContext.Query<Wallet>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        if (!decimal.TryParse(_newInitialBalance, out var initialBalance))
+        {
+            initialBalance = 0;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var wallet = new Wallet
+            {
+                Id = Guid.NewGuid(),
+                CredentialId = credentialId,
+                WalletTypeId = _newWalletTypeId != "none" && Guid.TryParse(_newWalletTypeId, out var walletTypeId) ? walletTypeId : null,
+                AccountNumber = string.IsNullOrWhiteSpace(_newAccountNumber) ? null : _newAccountNumber.Trim(),
+                Balance = initialBalance,
+                Status = WalletStatus.Active,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+
+            DataContext.Add(wallet);
+            var result = await DataContext.SaveChangesAsync();
+
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Wallet created successfully.");
+                _showCreateDialog = false;
+                await LoadData();
+            }
+            else
+            {
+                ToastService.Show($"Failed to create wallet: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error creating wallet: {ex.Message}");
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task ToggleFreeze(Wallet wallet)
+    {
+        if (wallet.Status is not (WalletStatus.Active or WalletStatus.Frozen)) return;
+
+        try
+        {
+            var fresh = await DataContext.Query<Wallet>()
+                .Where(x => x.Id == wallet.Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Wallet not found. It may have been deleted.");
+                return;
+            }
+
+            if (fresh.Status is not (WalletStatus.Active or WalletStatus.Frozen))
+            {
+                ToastService.Show($"Cannot toggle freeze. Wallet status is {fresh.Status}.");
+                return;
+            }
+
+            var newStatus = fresh.Status == WalletStatus.Active ? WalletStatus.Frozen : WalletStatus.Active;
+            fresh.Status = newStatus;
+            fresh.ModifiedAt = DateTime.UtcNow;
+
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
+
+            if (result.IsSuccess)
+            {
+                ToastService.Show($"Wallet {(newStatus == WalletStatus.Frozen ? "frozen" : "unfrozen")} successfully.");
+                await LoadData();
+            }
+            else
+            {
+                ToastService.Show($"Failed to update wallet: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error updating wallet: {ex.Message}");
+        }
     }
 }
