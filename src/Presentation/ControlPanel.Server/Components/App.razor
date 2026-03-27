@@ -7,17 +7,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <!-- BlazorBlueprint: themes (sidebar, color variables, all component theming) -->
-    <link href="_content/BlazorBlueprint.Components/css/themes.css" rel="stylesheet" />
-    <!-- BlazorBlueprint: Tailwind utilities for components -->
+    <!-- Theme CSS variables - must load first -->
+    <link href="styles/themes/default.css" rel="stylesheet" />
+    <!-- BlazorBlueprint component styles -->
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
-    <!-- BlazorBlueprint: animations -->
-    <link href="_content/BlazorBlueprint.Components/css/tw-animate.css" rel="stylesheet" />
-    <!-- BlazorBlueprint: input component styles -->
-    <link href="_content/BlazorBlueprint.Components/css/blazorblueprint-input.css" rel="stylesheet" />
-    <!-- BlazorBlueprint: primitives base styles -->
-    <link href="_content/BlazorBlueprint.Primitives/css/primitives.css" rel="stylesheet" />
-    <!-- App styles (Tailwind utilities for our pages) -->
+    <!-- App styles (Tailwind utilities) -->
     <link href="css/app.css" rel="stylesheet" />
     <HeadOutlet />
 </head>
