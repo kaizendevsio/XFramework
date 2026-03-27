@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.WebSockets;
@@ -25,6 +26,12 @@ public sealed class BoltServer
 
     // Stream routing: streamId → (sender connection, recipient connection)
     private readonly ConcurrentDictionary<Guid, (BoltHubConnection Sender, BoltHubConnection Recipient)> _activeStreams = new();
+
+    // Media routing: streamId → route (sender + recipients for multicast)
+    private readonly ConcurrentDictionary<Guid, MediaStreamRoute> _activeMediaStreams = new();
+
+    // Call state management: callId → state
+    private readonly ConcurrentDictionary<Guid, ServerCallState> _activeCalls = new();
 
     // Direct handlers — when registered, server handles requests locally instead of routing
     private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _localHandlers = new();
@@ -121,6 +128,23 @@ public sealed class BoltServer
                 await RouteStreamFrameAsync(buffer, length, ct);
                 CleanupStream(buffer);
                 break;
+
+            // ── Media frame routing ──
+            case FrameType.MediaFrame:
+            case FrameType.FecFrame:
+                await RouteMediaFrameAsync(connection, buffer, length, ct);
+                break;
+            case FrameType.MediaConfig:
+                await HandleMediaConfigAsync(connection, buffer, length, ct);
+                break;
+            case FrameType.MediaFeedback:
+            case FrameType.MediaKeyRequest:
+                await RouteMediaFeedbackAsync(connection, buffer, length, ct);
+                break;
+            case FrameType.CallSignal:
+                await HandleCallSignalAsync(connection, buffer, length, ct);
+                break;
+
             default:
                 _logger.LogWarning("Unknown frame type {FrameType} from {ClientId}", frameType, connection.ClientId);
                 break;
@@ -277,6 +301,297 @@ public sealed class BoltServer
         }
     }
 
+    // ── Media frame routing ──
+
+    /// <summary>
+    /// Hot path for MediaFrame and FecFrame: header-only decode (streamId from bytes 1-16),
+    /// look up route, forward raw bytes to all recipients. Skip sender.
+    /// </summary>
+    private async Task RouteMediaFrameAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
+    {
+        if (!BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var streamId))
+            return;
+
+        if (!_activeMediaStreams.TryGetValue(streamId, out var route))
+            return;
+
+        var data = buffer.AsMemory(0, length);
+        foreach (var recipient in route.Recipients)
+        {
+            if (recipient.StreamId != sender.StreamId && recipient.IsAlive)
+                await recipient.SendAsync(data, ct);
+        }
+    }
+
+    /// <summary>
+    /// Handle MediaConfig: register the media stream in the routing table and forward to recipients.
+    /// </summary>
+    private async Task HandleMediaConfigAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
+    {
+        if (!BoltCodec.TryReadMediaConfig(buffer.AsSpan(0, length), out var config))
+        {
+            _logger.LogWarning("Invalid MediaConfig frame from {ClientId}", sender.ClientId);
+            return;
+        }
+
+        // Register or update the media stream route
+        var route = _activeMediaStreams.GetOrAdd(config.StreamId, _ => new MediaStreamRoute
+        {
+            Sender = sender,
+            CallId = config.CallId,
+        });
+
+        // If the call exists, add stream to its tracking list
+        if (_activeCalls.TryGetValue(config.CallId, out var callState))
+        {
+            lock (callState.MediaStreamIds)
+            {
+                if (!callState.MediaStreamIds.Contains(config.StreamId))
+                    callState.MediaStreamIds.Add(config.StreamId);
+            }
+
+            // Add all call participants (except sender) as recipients
+            lock (callState.Participants)
+            {
+                foreach (var participant in callState.Participants)
+                {
+                    if (participant.StreamId != sender.StreamId && !route.Recipients.Any(r => r.StreamId == participant.StreamId))
+                        route.Recipients.Add(participant);
+                }
+            }
+        }
+
+        // Forward config to all recipients
+        var data = buffer.AsMemory(0, length);
+        foreach (var recipient in route.Recipients)
+        {
+            if (recipient.IsAlive)
+                await recipient.SendAsync(data, ct);
+        }
+
+        _logger.LogDebug("Media stream registered: {StreamId} (call={CallId}, type={MediaType}, codec={CodecId}) from {ClientId}",
+            config.StreamId, config.CallId, config.MediaType, config.CodecId, sender.ClientId);
+    }
+
+    /// <summary>
+    /// Route MediaFeedback and MediaKeyRequest back to the stream sender (reverse direction).
+    /// </summary>
+    private async Task RouteMediaFeedbackAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
+    {
+        if (!BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var streamId))
+            return;
+
+        if (!_activeMediaStreams.TryGetValue(streamId, out var route))
+            return;
+
+        // Feedback goes back to the stream's sender
+        if (route.Sender.IsAlive)
+            await route.Sender.SendAsync(buffer.AsMemory(0, length), ct);
+    }
+
+    // ── Call signaling ──
+
+    /// <summary>
+    /// Handle call signaling frames. Manages call lifecycle and routes signals between parties.
+    /// </summary>
+    private async Task HandleCallSignalAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
+    {
+        var span = buffer.AsSpan(0, length);
+        if (!BoltCodec.TryReadCallSignal(span, out var header))
+        {
+            _logger.LogWarning("Invalid CallSignal frame from {ClientId}", sender.ClientId);
+            return;
+        }
+
+        switch (header.SignalType)
+        {
+            case SignalType.Initiate:
+                await HandleCallInitiateAsync(sender, buffer, length, header, ct);
+                break;
+            case SignalType.Answer:
+                await HandleCallAnswerAsync(sender, buffer, length, header, ct);
+                break;
+            case SignalType.Reject:
+                await HandleCallRejectAsync(sender, buffer, length, header, ct);
+                break;
+            case SignalType.End:
+                await HandleCallEndAsync(sender, buffer, length, header, ct);
+                break;
+            case SignalType.Hold:
+            case SignalType.Unhold:
+                await HandleCallHoldAsync(sender, buffer, length, header, ct);
+                break;
+            case SignalType.DirectOffer:
+            case SignalType.DirectAnswer:
+                await RelayCallSignalAsync(sender, buffer, length, header, ct);
+                break;
+            default:
+                _logger.LogWarning("Unhandled call signal type {SignalType} from {ClientId}", header.SignalType, sender.ClientId);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Handle Initiate: create call state, look up callee from payload (first 4 bytes = recipientHash),
+    /// send Ring back to caller, forward Initiate to callee.
+    /// </summary>
+    private async Task HandleCallInitiateAsync(BoltHubConnection caller, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
+    {
+        // Payload starts with recipientHash (4 bytes, little-endian)
+        if (header.PayloadLength < 4)
+        {
+            _logger.LogWarning("CallSignal Initiate from {ClientId} has no recipient hash in payload", caller.ClientId);
+            return;
+        }
+
+        var recipientHash = BinaryPrimitives.ReadInt32LittleEndian(
+            buffer.AsSpan(header.PayloadOffset, 4));
+
+        var callee = GetRecipient(recipientHash);
+        if (callee is null)
+        {
+            // No recipient found — send End back to caller
+            _logger.LogDebug("Call {CallId} initiate failed: no recipient for hash {RecipientHash}", header.CallId, recipientHash);
+            var writer = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteCallSignal(writer, header.CallId, SignalType.End, ReadOnlySpan<byte>.Empty);
+            await caller.SendAsync(writer.WrittenMemory, ct);
+            return;
+        }
+
+        var callState = new ServerCallState
+        {
+            CallId = header.CallId,
+            Status = ServerCallStatus.Ringing,
+            CallerConnection = caller,
+            CalleeConnection = callee,
+        };
+        callState.Participants.Add(caller);
+        callState.Participants.Add(callee);
+
+        _activeCalls[header.CallId] = callState;
+
+        // Send Ring back to caller
+        var ringWriter = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteCallSignal(ringWriter, header.CallId, SignalType.Ring, ReadOnlySpan<byte>.Empty);
+        await caller.SendAsync(ringWriter.WrittenMemory, ct);
+
+        // Forward the full Initiate frame to the callee
+        await callee.SendAsync(buffer.AsMemory(0, length), ct);
+
+        _logger.LogDebug("Call {CallId} initiated: {Caller} → {Callee}",
+            header.CallId, caller.ClientId, callee.ClientId);
+    }
+
+    /// <summary>
+    /// Handle Answer: transition to Active, forward to caller.
+    /// </summary>
+    private async Task HandleCallAnswerAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(header.CallId, out var callState))
+        {
+            _logger.LogDebug("Call {CallId} Answer from {ClientId} but call not found", header.CallId, sender.ClientId);
+            return;
+        }
+
+        callState.Status = ServerCallStatus.Active;
+
+        // Forward Answer to the caller
+        await callState.CallerConnection.SendAsync(buffer.AsMemory(0, length), ct);
+
+        _logger.LogDebug("Call {CallId} answered by {ClientId}", header.CallId, sender.ClientId);
+    }
+
+    /// <summary>
+    /// Handle Reject: transition to Rejected, forward to caller, cleanup.
+    /// </summary>
+    private async Task HandleCallRejectAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(header.CallId, out var callState))
+            return;
+
+        callState.Status = ServerCallStatus.Rejected;
+
+        // Forward Reject to the caller
+        await callState.CallerConnection.SendAsync(buffer.AsMemory(0, length), ct);
+
+        CleanupCall(header.CallId);
+
+        _logger.LogDebug("Call {CallId} rejected by {ClientId}", header.CallId, sender.ClientId);
+    }
+
+    /// <summary>
+    /// Handle End: transition to Ended, forward to the other party, cleanup media streams.
+    /// </summary>
+    private async Task HandleCallEndAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(header.CallId, out var callState))
+            return;
+
+        callState.Status = ServerCallStatus.Ended;
+
+        // Forward End to the other party
+        var otherParty = callState.CallerConnection.StreamId == sender.StreamId
+            ? callState.CalleeConnection
+            : callState.CallerConnection;
+
+        if (otherParty is { IsAlive: true })
+            await otherParty.SendAsync(buffer.AsMemory(0, length), ct);
+
+        CleanupCall(header.CallId);
+
+        _logger.LogDebug("Call {CallId} ended by {ClientId}", header.CallId, sender.ClientId);
+    }
+
+    /// <summary>
+    /// Handle Hold/Unhold: update state, forward to the other party.
+    /// </summary>
+    private async Task HandleCallHoldAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(header.CallId, out var callState))
+            return;
+
+        callState.Status = header.SignalType == SignalType.Hold ? ServerCallStatus.Held : ServerCallStatus.Active;
+
+        // Forward to the other party
+        var otherParty = callState.CallerConnection.StreamId == sender.StreamId
+            ? callState.CalleeConnection
+            : callState.CallerConnection;
+
+        if (otherParty is { IsAlive: true })
+            await otherParty.SendAsync(buffer.AsMemory(0, length), ct);
+    }
+
+    /// <summary>
+    /// Pure relay for DirectOffer/DirectAnswer: forward to the other party without state changes.
+    /// </summary>
+    private async Task RelayCallSignalAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(header.CallId, out var callState))
+            return;
+
+        var otherParty = callState.CallerConnection.StreamId == sender.StreamId
+            ? callState.CalleeConnection
+            : callState.CallerConnection;
+
+        if (otherParty is { IsAlive: true })
+            await otherParty.SendAsync(buffer.AsMemory(0, length), ct);
+    }
+
+    /// <summary>
+    /// Remove all media streams and call state for a given call.
+    /// </summary>
+    private void CleanupCall(Guid callId)
+    {
+        if (_activeCalls.TryRemove(callId, out var callState))
+        {
+            lock (callState.MediaStreamIds)
+            {
+                foreach (var streamId in callState.MediaStreamIds)
+                    _activeMediaStreams.TryRemove(streamId, out _);
+            }
+        }
+    }
+
     private BoltHubConnection? GetRecipient(int serviceHash)
     {
         if (!_connectionsByServiceHash.TryGetValue(serviceHash, out var bag))
@@ -336,6 +651,49 @@ public sealed class BoltServer
             if (pending.Caller.StreamId == connection.StreamId)
                 _pendingInvocations.TryRemove(requestId, out _);
         }
+
+        // End any active calls this connection is part of
+        foreach (var (callId, callState) in _activeCalls)
+        {
+            var isParticipant = callState.CallerConnection.StreamId == connection.StreamId
+                || (callState.CalleeConnection is not null && callState.CalleeConnection.StreamId == connection.StreamId);
+
+            if (!isParticipant) continue;
+
+            callState.Status = ServerCallStatus.Ended;
+
+            // Notify the other party
+            var otherParty = callState.CallerConnection.StreamId == connection.StreamId
+                ? callState.CalleeConnection
+                : callState.CallerConnection;
+
+            if (otherParty is { IsAlive: true })
+            {
+                try
+                {
+                    var writer = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteCallSignal(writer, callId, SignalType.End, ReadOnlySpan<byte>.Empty);
+                    // Fire-and-forget: we're in cleanup, can't await reliably
+                    _ = otherParty.SendAsync(writer.WrittenMemory, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to send End signal for call {CallId} during disconnect cleanup", callId);
+                }
+            }
+
+            CleanupCall(callId);
+        }
+
+        // Remove connection from any media stream recipient lists
+        foreach (var (streamId, route) in _activeMediaStreams)
+        {
+            route.Recipients.RemoveAll(r => r.StreamId == connection.StreamId);
+
+            // If sender disconnected, remove the whole route
+            if (route.Sender.StreamId == connection.StreamId)
+                _activeMediaStreams.TryRemove(streamId, out _);
+        }
     }
 
     private void CleanupStaleInvocations(object? state)
@@ -348,6 +706,49 @@ public sealed class BoltServer
                 if (_pendingInvocations.TryRemove(requestId, out _))
                     _logger.LogDebug("Cleaned up stale invocation {RequestId}", requestId);
             }
+        }
+
+        // Cleanup stale Ringing calls (unanswered for > 30 seconds)
+        var utcNow = DateTime.UtcNow;
+        foreach (var (callId, callState) in _activeCalls)
+        {
+            if (callState.Status != ServerCallStatus.Ringing) continue;
+            if ((utcNow - callState.CreatedAt).TotalSeconds <= 30) continue;
+
+            callState.Status = ServerCallStatus.Missed;
+
+            // Send End to the caller
+            if (callState.CallerConnection.IsAlive)
+            {
+                try
+                {
+                    var writer = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteCallSignal(writer, callId, SignalType.End, ReadOnlySpan<byte>.Empty);
+                    _ = callState.CallerConnection.SendAsync(writer.WrittenMemory, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to send End for missed call {CallId}", callId);
+                }
+            }
+
+            // Send End to the callee too
+            if (callState.CalleeConnection is { IsAlive: true })
+            {
+                try
+                {
+                    var writer = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteCallSignal(writer, callId, SignalType.End, ReadOnlySpan<byte>.Empty);
+                    _ = callState.CalleeConnection.SendAsync(writer.WrittenMemory, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to send End for missed call {CallId}", callId);
+                }
+            }
+
+            CleanupCall(callId);
+            _logger.LogDebug("Call {CallId} timed out (missed) after 30s ringing", callId);
         }
     }
 
@@ -403,4 +804,32 @@ public sealed class BoltHubConnection
             _sendLock.Release();
         }
     }
+}
+
+/// <summary>
+/// Routing entry for an active media stream.
+/// Sender produces frames; Recipients receive them (multicast).
+/// </summary>
+internal sealed class MediaStreamRoute
+{
+    public BoltHubConnection Sender { get; init; } = null!;
+    public List<BoltHubConnection> Recipients { get; } = new();
+    public Guid CallId { get; init; }
+}
+
+/// <summary>Server-side call status.</summary>
+internal enum ServerCallStatus { Ringing, Active, Held, Ended, Rejected, Missed }
+
+/// <summary>
+/// Server-side call state tracking. Manages participants, associated media streams, and lifecycle.
+/// </summary>
+internal sealed class ServerCallState
+{
+    public Guid CallId { get; init; }
+    public ServerCallStatus Status { get; set; }
+    public BoltHubConnection CallerConnection { get; init; } = null!;
+    public BoltHubConnection? CalleeConnection { get; set; }
+    public List<BoltHubConnection> Participants { get; } = new();
+    public List<Guid> MediaStreamIds { get; } = new();
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 }

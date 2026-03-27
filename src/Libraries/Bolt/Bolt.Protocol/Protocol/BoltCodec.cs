@@ -24,6 +24,14 @@ public static class BoltCodec
     public const int RequestHeaderSize = 1 + 16 + 4 + 4 + 4;   // 29 bytes
     public const int ResponseHeaderSize = 1 + 16 + 2 + 4;       // 23 bytes
 
+    // Media frame header sizes
+    public const int MediaFrameHeaderSize = 1 + 16 + 4 + 4 + 1 + 4;     // 30 bytes
+    public const int MediaConfigHeaderSize = 1 + 16 + 16 + 1 + 1 + 4 + 4 + 4 + 1 + 4; // 52 bytes
+    public const int MediaFeedbackSize = 1 + 16 + 4 + 4 + 4 + 2 + 1;    // 32 bytes
+    public const int MediaKeyRequestSize = 1 + 16;                        // 17 bytes
+    public const int CallSignalHeaderSize = 1 + 16 + 1 + 4;              // 22 bytes
+    public const int FecFrameHeaderSize = 1 + 16 + 4 + 1 + 4;            // 26 bytes
+
     #region Encoding
 
     /// <summary>
@@ -147,6 +155,98 @@ public static class BoltCodec
         BinaryPrimitives.WriteInt16LittleEndian(span.Slice(17), (short)statusCode);
         writer.Advance(StreamCloseSize);
         return StreamCloseSize;
+    }
+
+    // -- Media encoding --
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteMediaFrame(IBufferWriter<byte> writer, Guid streamId, uint sequenceNumber, uint timestamp, byte flags, ReadOnlySpan<byte> payload)
+    {
+        var totalSize = MediaFrameHeaderSize + payload.Length;
+        var span = writer.GetSpan(totalSize);
+        span[0] = (byte)FrameType.MediaFrame;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(17), sequenceNumber);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(21), timestamp);
+        span[25] = flags;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(26), payload.Length);
+        payload.CopyTo(span.Slice(30));
+        writer.Advance(totalSize);
+        return totalSize;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteMediaConfig(IBufferWriter<byte> writer, Guid streamId, Guid callId, MediaType mediaType, CodecId codecId, int param1, int param2, int bitrateKbps, byte flags, ReadOnlySpan<byte> extension)
+    {
+        var totalSize = MediaConfigHeaderSize + extension.Length;
+        var span = writer.GetSpan(totalSize);
+        span[0] = (byte)FrameType.MediaConfig;
+        WriteGuid(span.Slice(1), streamId);
+        WriteGuid(span.Slice(17), callId);
+        span[33] = (byte)mediaType;
+        span[34] = (byte)codecId;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(35), param1);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(39), param2);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(43), bitrateKbps);
+        span[47] = flags;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(48), extension.Length);
+        extension.CopyTo(span.Slice(52));
+        writer.Advance(totalSize);
+        return totalSize;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteMediaFeedback(IBufferWriter<byte> writer, Guid streamId, uint highestSeqReceived, uint cumulativeLost, uint jitterX100, ushort rttMs, QualityHint qualityHint)
+    {
+        var span = writer.GetSpan(MediaFeedbackSize);
+        span[0] = (byte)FrameType.MediaFeedback;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(17), highestSeqReceived);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(21), cumulativeLost);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(25), jitterX100);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(29), rttMs);
+        span[31] = (byte)qualityHint;
+        writer.Advance(MediaFeedbackSize);
+        return MediaFeedbackSize;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteMediaKeyRequest(IBufferWriter<byte> writer, Guid streamId)
+    {
+        var span = writer.GetSpan(MediaKeyRequestSize);
+        span[0] = (byte)FrameType.MediaKeyRequest;
+        WriteGuid(span.Slice(1), streamId);
+        writer.Advance(MediaKeyRequestSize);
+        return MediaKeyRequestSize;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteCallSignal(IBufferWriter<byte> writer, Guid callId, SignalType signalType, ReadOnlySpan<byte> payload)
+    {
+        var totalSize = CallSignalHeaderSize + payload.Length;
+        var span = writer.GetSpan(totalSize);
+        span[0] = (byte)FrameType.CallSignal;
+        WriteGuid(span.Slice(1), callId);
+        span[17] = (byte)signalType;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(18), payload.Length);
+        payload.CopyTo(span.Slice(22));
+        writer.Advance(totalSize);
+        return totalSize;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteFecFrame(IBufferWriter<byte> writer, Guid streamId, uint fecGroupStart, byte fecGroupSize, ReadOnlySpan<byte> payload)
+    {
+        var totalSize = FecFrameHeaderSize + payload.Length;
+        var span = writer.GetSpan(totalSize);
+        span[0] = (byte)FrameType.FecFrame;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(17), fecGroupStart);
+        span[21] = fecGroupSize;
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(22), payload.Length);
+        payload.CopyTo(span.Slice(26));
+        writer.Advance(totalSize);
+        return totalSize;
     }
 
     #endregion
@@ -336,6 +436,130 @@ public static class BoltCodec
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Guid ReadStreamId(ReadOnlySpan<byte> buffer) => ReadGuid(buffer.Slice(1));
 
+    // -- Media decoding --
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadMediaFrame(ReadOnlySpan<byte> buffer, out MediaFrameHeader header)
+    {
+        header = default;
+        if (buffer.Length < MediaFrameHeaderSize) return false;
+
+        var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(26));
+        if (buffer.Length < MediaFrameHeaderSize + payloadLength) return false;
+
+        header = new MediaFrameHeader
+        {
+            StreamId = ReadGuid(buffer.Slice(1)),
+            SequenceNumber = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(17)),
+            Timestamp = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(21)),
+            Flags = buffer[25],
+            PayloadOffset = MediaFrameHeaderSize,
+            PayloadLength = payloadLength,
+        };
+        return true;
+    }
+
+    /// <summary>Header-only read for hub routing — only extracts streamId.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadMediaFrameHeader(ReadOnlySpan<byte> buffer, out Guid streamId)
+    {
+        streamId = default;
+        if (buffer.Length < 17) return false;
+        streamId = ReadGuid(buffer.Slice(1));
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadMediaConfig(ReadOnlySpan<byte> buffer, out MediaConfigData config)
+    {
+        config = default;
+        if (buffer.Length < MediaConfigHeaderSize) return false;
+
+        var extensionLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(48));
+        if (buffer.Length < MediaConfigHeaderSize + extensionLength) return false;
+
+        config = new MediaConfigData
+        {
+            StreamId = ReadGuid(buffer.Slice(1)),
+            CallId = ReadGuid(buffer.Slice(17)),
+            MediaType = (MediaType)buffer[33],
+            CodecId = (CodecId)buffer[34],
+            Param1 = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(35)),
+            Param2 = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(39)),
+            BitrateKbps = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(43)),
+            Flags = buffer[47],
+            ExtensionOffset = MediaConfigHeaderSize,
+            ExtensionLength = extensionLength,
+        };
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadMediaFeedback(ReadOnlySpan<byte> buffer, out MediaFeedbackData feedback)
+    {
+        feedback = default;
+        if (buffer.Length < MediaFeedbackSize) return false;
+
+        feedback = new MediaFeedbackData
+        {
+            StreamId = ReadGuid(buffer.Slice(1)),
+            HighestSeqReceived = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(17)),
+            CumulativeLost = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(21)),
+            JitterX100 = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(25)),
+            RttMs = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(29)),
+            QualityHint = (QualityHint)buffer[31],
+        };
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadMediaKeyRequest(ReadOnlySpan<byte> buffer, out Guid streamId)
+    {
+        streamId = default;
+        if (buffer.Length < MediaKeyRequestSize) return false;
+        streamId = ReadGuid(buffer.Slice(1));
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadCallSignal(ReadOnlySpan<byte> buffer, out CallSignalHeader header)
+    {
+        header = default;
+        if (buffer.Length < CallSignalHeaderSize) return false;
+
+        var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(18));
+        if (buffer.Length < CallSignalHeaderSize + payloadLength) return false;
+
+        header = new CallSignalHeader
+        {
+            CallId = ReadGuid(buffer.Slice(1)),
+            SignalType = (SignalType)buffer[17],
+            PayloadOffset = CallSignalHeaderSize,
+            PayloadLength = payloadLength,
+        };
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadFecFrame(ReadOnlySpan<byte> buffer, out FecFrameHeader header)
+    {
+        header = default;
+        if (buffer.Length < FecFrameHeaderSize) return false;
+
+        var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(22));
+        if (buffer.Length < FecFrameHeaderSize + payloadLength) return false;
+
+        header = new FecFrameHeader
+        {
+            StreamId = ReadGuid(buffer.Slice(1)),
+            FecGroupStart = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(17)),
+            FecGroupSize = buffer[21],
+            PayloadOffset = FecFrameHeaderSize,
+            PayloadLength = payloadLength,
+        };
+        return true;
+    }
+
     #endregion
 
     #region Hashing
@@ -409,6 +633,96 @@ public struct ResponseFrame
 {
     public Guid RequestId;
     public HttpStatusCode StatusCode;
+    public int PayloadOffset;
+    public int PayloadLength;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<byte> GetPayload(ReadOnlySpan<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlyMemory<byte> GetPayload(ReadOnlyMemory<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+}
+
+// -- Media frame structs --
+
+/// <summary>Decoded media frame header. Zero-copy payload.</summary>
+public struct MediaFrameHeader
+{
+    public Guid StreamId;
+    public uint SequenceNumber;
+    public uint Timestamp;
+    public byte Flags;
+    public int PayloadOffset;
+    public int PayloadLength;
+
+    public bool IsKeyframe => (Flags & 0x01) != 0;
+    public bool IsDropEligible => (Flags & 0x40) != 0;
+    public bool IsCompressed => (Flags & 0x80) != 0;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<byte> GetPayload(ReadOnlySpan<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlyMemory<byte> GetPayload(ReadOnlyMemory<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+}
+
+/// <summary>Decoded media config data.</summary>
+public struct MediaConfigData
+{
+    public Guid StreamId;
+    public Guid CallId;
+    public MediaType MediaType;
+    public CodecId CodecId;
+    public int Param1;          // SampleRate (audio) or Width (video)
+    public int Param2;          // ChannelCount (audio) or Height (video)
+    public int BitrateKbps;
+    public byte Flags;
+    public int ExtensionOffset;
+    public int ExtensionLength;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<byte> GetExtension(ReadOnlySpan<byte> sourceBuffer)
+        => sourceBuffer.Slice(ExtensionOffset, ExtensionLength);
+}
+
+/// <summary>Decoded media feedback (fixed size, no payload).</summary>
+public struct MediaFeedbackData
+{
+    public Guid StreamId;
+    public uint HighestSeqReceived;
+    public uint CumulativeLost;
+    public uint JitterX100;
+    public ushort RttMs;
+    public QualityHint QualityHint;
+}
+
+/// <summary>Decoded call signal header. Zero-copy payload.</summary>
+public struct CallSignalHeader
+{
+    public Guid CallId;
+    public SignalType SignalType;
+    public int PayloadOffset;
+    public int PayloadLength;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<byte> GetPayload(ReadOnlySpan<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlyMemory<byte> GetPayload(ReadOnlyMemory<byte> sourceBuffer)
+        => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+}
+
+/// <summary>Decoded FEC frame header. Zero-copy payload.</summary>
+public struct FecFrameHeader
+{
+    public Guid StreamId;
+    public uint FecGroupStart;
+    public byte FecGroupSize;
     public int PayloadOffset;
     public int PayloadLength;
 

@@ -55,6 +55,17 @@ public sealed class BoltClient : IAsyncDisposable
     // Cached timeout for RPC calls
     private TimeSpan _rpcTimeout;
 
+    // Call management
+    private readonly ConcurrentDictionary<Guid, ClientCallInfo> _activeCalls = new();
+    private readonly ConcurrentDictionary<Guid, BoltMediaStream> _mediaStreams = new();
+
+    // Call events
+    public event Func<IncomingCallInfo, Task>? OnIncomingCall;
+    public event Func<Guid, Task>? OnCallAnswered;
+    public event Func<Guid, string?, Task>? OnCallRejected;
+    public event Func<Guid, Task>? OnCallEnded;
+    public event Action<Guid>? OnKeyframeRequested;
+
     public bool IsConnected => _connections.Count > 0 && _isRegistered;
 
     public BoltClient(Uri serverUri, string clientId, string clientName, BoltClientOptions config, ILogger logger)
@@ -356,6 +367,27 @@ public sealed class BoltClient : IAsyncDisposable
                     case FrameType.StreamClose:
                         HandleStreamClose(data);
                         break;
+
+                    case FrameType.MediaFrame:
+                        HandleMediaFrame(data);
+                        break;
+
+                    case FrameType.MediaConfig:
+                        HandleMediaConfig(conn, data);
+                        break;
+
+                    case FrameType.MediaFeedback:
+                        HandleMediaFeedback(data);
+                        break;
+
+                    case FrameType.MediaKeyRequest:
+                        HandleMediaKeyRequest(data);
+                        break;
+
+                    case FrameType.CallSignal:
+                        var csData = data.ToArray();
+                        _ = HandleCallSignalAsync(csData, result.Count);
+                        break;
                 }
             }
         }
@@ -470,6 +502,159 @@ public sealed class BoltClient : IAsyncDisposable
             var writer = RentedBufferWriter.GetThreadLocal();
             BoltCodec.WriteResponse(writer, frame.RequestId, HttpStatusCode.NotImplemented, ReadOnlySpan<byte>.Empty);
             await conn.SendAsync(writer.WrittenMemory, ct);
+        }
+    }
+
+    // ── Call API ─────────────────────────────────────────────
+
+    public async Task<Guid> StartCallAsync(string recipientId, bool video = false)
+    {
+        var callId = Guid.NewGuid();
+        _activeCalls[callId] = new ClientCallInfo { CallId = callId, IsOutgoing = true, RemoteClientId = recipientId };
+
+        var recipientHash = _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
+        var payload = new byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(payload, recipientHash);
+
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteCallSignal(writer, callId, SignalType.Initiate, payload);
+        await GetConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+        writer.Reset();
+
+        return callId;
+    }
+
+    public async Task AnswerCallAsync(Guid callId)
+    {
+        if (_activeCalls.TryGetValue(callId, out var call))
+            call.Status = ClientCallStatus.Active;
+
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteCallSignal(writer, callId, SignalType.Answer, ReadOnlySpan<byte>.Empty);
+        await GetConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+        writer.Reset();
+    }
+
+    public async Task RejectCallAsync(Guid callId, string? reason = null)
+    {
+        _activeCalls.TryRemove(callId, out _);
+
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteCallSignal(writer, callId, SignalType.Reject, ReadOnlySpan<byte>.Empty);
+        await GetConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+        writer.Reset();
+    }
+
+    public async Task EndCallAsync(Guid callId)
+    {
+        _activeCalls.TryRemove(callId, out _);
+
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteCallSignal(writer, callId, SignalType.End, ReadOnlySpan<byte>.Empty);
+        await GetConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
+        writer.Reset();
+
+        // Clean up media streams for this call
+        foreach (var (streamId, stream) in _mediaStreams)
+        {
+            if (stream.CallId == callId)
+            {
+                _mediaStreams.TryRemove(streamId, out _);
+                await stream.DisposeAsync();
+            }
+        }
+    }
+
+    public BoltMediaStream? GetMediaStream(Guid streamId)
+        => _mediaStreams.TryGetValue(streamId, out var stream) ? stream : null;
+
+    // ── Media frame handlers ────────────────────────────────
+
+    private void HandleMediaFrame(ReadOnlySpan<byte> data)
+    {
+        if (!BoltCodec.TryReadMediaFrame(data, out var header)) return;
+        if (_mediaStreams.TryGetValue(header.StreamId, out var stream))
+        {
+            var payload = header.GetPayload(data).ToArray();
+            stream.EnqueueFrame(header.SequenceNumber, header.Timestamp, payload, header.Flags);
+        }
+    }
+
+    private void HandleMediaConfig(BoltConnection conn, ReadOnlySpan<byte> data)
+    {
+        if (!BoltCodec.TryReadMediaConfig(data, out var config)) return;
+
+        var isAudio = config.MediaType == MediaType.Audio;
+        var stream = new BoltMediaStream(conn, config.StreamId, config.CallId, isAudio);
+        _mediaStreams[config.StreamId] = stream;
+
+        if (_activeCalls.TryGetValue(config.CallId, out var call))
+        {
+            if (isAudio) call.AudioStreamId = config.StreamId;
+            else call.VideoStreamId = config.StreamId;
+        }
+    }
+
+    private void HandleMediaFeedback(ReadOnlySpan<byte> data)
+    {
+        // Feedback from receiver — used for adaptive bitrate (handled by caller)
+        // Future: route to BandwidthEstimator
+    }
+
+    private void HandleMediaKeyRequest(ReadOnlySpan<byte> data)
+    {
+        if (!BoltCodec.TryReadMediaKeyRequest(data, out var streamId)) return;
+        OnKeyframeRequested?.Invoke(streamId);
+    }
+
+    private async Task HandleCallSignalAsync(byte[] data, int length)
+    {
+        if (!BoltCodec.TryReadCallSignal(data.AsSpan(0, length), out var header)) return;
+
+        switch (header.SignalType)
+        {
+            case SignalType.Initiate:
+                var incomingCall = new ClientCallInfo
+                {
+                    CallId = header.CallId, IsOutgoing = false, Status = ClientCallStatus.Ringing
+                };
+                _activeCalls[header.CallId] = incomingCall;
+                if (OnIncomingCall != null)
+                    await OnIncomingCall(new IncomingCallInfo(header.CallId, "", false));
+                break;
+
+            case SignalType.Ring:
+                if (_activeCalls.TryGetValue(header.CallId, out var ringing))
+                    ringing.Status = ClientCallStatus.Ringing;
+                break;
+
+            case SignalType.Answer:
+                if (_activeCalls.TryGetValue(header.CallId, out var answered))
+                    answered.Status = ClientCallStatus.Active;
+                if (OnCallAnswered != null)
+                    await OnCallAnswered(header.CallId);
+                break;
+
+            case SignalType.Reject:
+                _activeCalls.TryRemove(header.CallId, out _);
+                if (OnCallRejected != null)
+                    await OnCallRejected(header.CallId, null);
+                break;
+
+            case SignalType.End:
+                _activeCalls.TryRemove(header.CallId, out _);
+                // Clean up media streams
+                foreach (var (streamId, stream) in _mediaStreams)
+                {
+                    if (stream.CallId == header.CallId)
+                    {
+                        _mediaStreams.TryRemove(streamId, out _);
+                        await stream.DisposeAsync();
+                    }
+                }
+                if (OnCallEnded != null)
+                    await OnCallEnded(header.CallId);
+                break;
         }
     }
 
@@ -597,4 +782,19 @@ public struct BoltRpcResponse
 {
     public HttpStatusCode StatusCode;
     public ReadOnlyMemory<byte> Data;
+}
+
+/// <summary>Information about an incoming call.</summary>
+public record IncomingCallInfo(Guid CallId, string CallerClientId, bool VideoRequested);
+
+internal enum ClientCallStatus { Initiating, Ringing, Active, Held, Ended }
+
+internal sealed class ClientCallInfo
+{
+    public Guid CallId { get; init; }
+    public bool IsOutgoing { get; init; }
+    public string RemoteClientId { get; set; } = "";
+    public ClientCallStatus Status { get; set; } = ClientCallStatus.Initiating;
+    public Guid? AudioStreamId { get; set; }
+    public Guid? VideoStreamId { get; set; }
 }
