@@ -3,8 +3,10 @@ using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.WebSockets;
+using System.Threading.Channels;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
+using Bolt.Server.Media;
 using Microsoft.Extensions.Logging;
 
 namespace Bolt.Server;
@@ -36,6 +38,11 @@ public sealed class BoltServer
     // Direct handlers — when registered, server handles requests locally instead of routing
     private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _localHandlers = new();
 
+    // Media processor tap: registered processors receive copies of media frames on a background thread
+    private readonly List<IMediaProcessor> _mediaProcessors = new();
+    private readonly Channel<(Guid CallId, Guid StreamId, byte[] Data, uint Timestamp, uint Seq)> _mediaTapChannel;
+    private readonly CancellationTokenSource _mediaTapCts = new();
+
     private readonly Timer _cleanupTimer;
     private const int InvocationTimeoutMs = 30_000;
 
@@ -43,7 +50,20 @@ public sealed class BoltServer
     {
         _logger = logger;
         _cleanupTimer = new Timer(CleanupStaleInvocations, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        _mediaTapChannel = Channel.CreateBounded<(Guid, Guid, byte[], uint, uint)>(
+            new BoundedChannelOptions(10_000)
+            {
+                FullMode = BoundedChannelFullMode.DropWrite,
+                SingleReader = true,
+            });
+        _ = Task.Run(() => MediaTapLoopAsync(_mediaTapCts.Token));
     }
+
+    /// <summary>
+    /// Register a media processor that will receive copies of media frames for server-side processing.
+    /// Call before accepting connections.
+    /// </summary>
+    public void RegisterMediaProcessor(IMediaProcessor processor) => _mediaProcessors.Add(processor);
 
     /// <summary>
     /// Register a local handler. When a request arrives with this command hash,
@@ -306,6 +326,7 @@ public sealed class BoltServer
     /// <summary>
     /// Hot path for MediaFrame and FecFrame: header-only decode (streamId from bytes 1-16),
     /// look up route, forward raw bytes to all recipients. Skip sender.
+    /// If media processors are registered, write a copy to the tap channel.
     /// </summary>
     private async Task RouteMediaFrameAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
@@ -320,6 +341,16 @@ public sealed class BoltServer
         {
             if (recipient.StreamId != sender.StreamId && recipient.IsAlive)
                 await recipient.SendAsync(data, ct);
+        }
+
+        // Tap: send a copy to media processors (non-blocking, drops if full)
+        if (_mediaProcessors.Count > 0)
+        {
+            if (BoltCodec.TryReadMediaFrame(buffer.AsSpan(0, length), out var mfHeader))
+            {
+                var dataCopy = buffer.AsSpan(0, length).ToArray();
+                _mediaTapChannel.Writer.TryWrite((route.CallId, mfHeader.StreamId, dataCopy, mfHeader.Timestamp, mfHeader.SequenceNumber));
+            }
         }
     }
 
@@ -421,6 +452,12 @@ public sealed class BoltServer
             case SignalType.Unhold:
                 await HandleCallHoldAsync(sender, buffer, length, header, ct);
                 break;
+            case SignalType.AddParticipant:
+                await HandleAddParticipantAsync(sender, buffer, length, header, ct);
+                break;
+            case SignalType.RemoveParticipant:
+                await HandleRemoveParticipantAsync(sender, buffer, length, header, ct);
+                break;
             case SignalType.DirectOffer:
             case SignalType.DirectAnswer:
                 await RelayCallSignalAsync(sender, buffer, length, header, ct);
@@ -483,7 +520,7 @@ public sealed class BoltServer
     }
 
     /// <summary>
-    /// Handle Answer: transition to Active, forward to caller.
+    /// Handle Answer: transition to Active, forward to caller, notify media processors.
     /// </summary>
     private async Task HandleCallAnswerAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
     {
@@ -498,11 +535,14 @@ public sealed class BoltServer
         // Forward Answer to the caller
         await callState.CallerConnection.SendAsync(buffer.AsMemory(0, length), ct);
 
+        // Notify media processors that the call is now active
+        await NotifyProcessorsCallStartedAsync(header.CallId);
+
         _logger.LogDebug("Call {CallId} answered by {ClientId}", header.CallId, sender.ClientId);
     }
 
     /// <summary>
-    /// Handle Reject: transition to Rejected, forward to caller, cleanup.
+    /// Handle Reject: transition to Rejected, forward to caller, cleanup, notify media processors.
     /// </summary>
     private async Task HandleCallRejectAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
     {
@@ -516,11 +556,14 @@ public sealed class BoltServer
 
         CleanupCall(header.CallId);
 
+        // Notify media processors that the call ended
+        await NotifyProcessorsCallEndedAsync(header.CallId);
+
         _logger.LogDebug("Call {CallId} rejected by {ClientId}", header.CallId, sender.ClientId);
     }
 
     /// <summary>
-    /// Handle End: transition to Ended, forward to the other party, cleanup media streams.
+    /// Handle End: transition to Ended, forward to all other participants, cleanup media streams, notify processors.
     /// </summary>
     private async Task HandleCallEndAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
     {
@@ -529,15 +572,21 @@ public sealed class BoltServer
 
         callState.Status = ServerCallStatus.Ended;
 
-        // Forward End to the other party
-        var otherParty = callState.CallerConnection.StreamId == sender.StreamId
-            ? callState.CalleeConnection
-            : callState.CallerConnection;
-
-        if (otherParty is { IsAlive: true })
-            await otherParty.SendAsync(buffer.AsMemory(0, length), ct);
+        // Forward End to all other participants (supports group calls)
+        var data = buffer.AsMemory(0, length);
+        lock (callState.Participants)
+        {
+            foreach (var participant in callState.Participants)
+            {
+                if (participant.StreamId != sender.StreamId && participant.IsAlive)
+                    _ = participant.SendAsync(data, ct);
+            }
+        }
 
         CleanupCall(header.CallId);
+
+        // Notify media processors that the call ended
+        await NotifyProcessorsCallEndedAsync(header.CallId);
 
         _logger.LogDebug("Call {CallId} ended by {ClientId}", header.CallId, sender.ClientId);
     }
@@ -575,6 +624,212 @@ public sealed class BoltServer
 
         if (otherParty is { IsAlive: true })
             await otherParty.SendAsync(buffer.AsMemory(0, length), ct);
+    }
+
+    // ── Group call: Add/Remove participant ──
+
+    /// <summary>
+    /// Handle AddParticipant: look up the new participant by recipientHash from payload,
+    /// add to call state, add to all existing media stream routes, request keyframes from all senders,
+    /// and forward the signal to all existing participants.
+    /// </summary>
+    private async Task HandleAddParticipantAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(header.CallId, out var callState))
+        {
+            _logger.LogDebug("Call {CallId} AddParticipant from {ClientId} but call not found", header.CallId, sender.ClientId);
+            return;
+        }
+
+        if (header.PayloadLength < 4)
+        {
+            _logger.LogWarning("CallSignal AddParticipant from {ClientId} has no recipient hash in payload", sender.ClientId);
+            return;
+        }
+
+        var recipientHash = BinaryPrimitives.ReadInt32LittleEndian(
+            buffer.AsSpan(header.PayloadOffset, 4));
+
+        var newParticipant = GetRecipient(recipientHash);
+        if (newParticipant is null)
+        {
+            _logger.LogDebug("Call {CallId} AddParticipant failed: no recipient for hash {RecipientHash}", header.CallId, recipientHash);
+            return;
+        }
+
+        // Add to participants list
+        lock (callState.Participants)
+        {
+            if (!callState.Participants.Any(p => p.StreamId == newParticipant.StreamId))
+                callState.Participants.Add(newParticipant);
+        }
+
+        // Add to all existing media stream routes as a recipient + request keyframes from senders
+        List<Guid> streamIds;
+        lock (callState.MediaStreamIds)
+        {
+            streamIds = new List<Guid>(callState.MediaStreamIds);
+        }
+
+        foreach (var streamId in streamIds)
+        {
+            if (!_activeMediaStreams.TryGetValue(streamId, out var route))
+                continue;
+
+            // Add new participant as recipient (if not already present and not the sender)
+            if (route.Sender.StreamId != newParticipant.StreamId &&
+                !route.Recipients.Any(r => r.StreamId == newParticipant.StreamId))
+            {
+                route.Recipients.Add(newParticipant);
+            }
+
+            // Send MediaKeyRequest to the stream's sender so the new participant gets a keyframe
+            if (route.Sender.IsAlive)
+            {
+                var keyReqWriter = RentedBufferWriter.GetThreadLocal();
+                BoltCodec.WriteMediaKeyRequest(keyReqWriter, streamId);
+                await route.Sender.SendAsync(keyReqWriter.WrittenMemory, ct);
+            }
+        }
+
+        // Forward the AddParticipant signal to all existing participants
+        var data = buffer.AsMemory(0, length);
+        lock (callState.Participants)
+        {
+            foreach (var participant in callState.Participants)
+            {
+                if (participant.StreamId != sender.StreamId && participant.StreamId != newParticipant.StreamId && participant.IsAlive)
+                    _ = participant.SendAsync(data, ct);
+            }
+        }
+
+        // Also send the signal to the new participant
+        if (newParticipant.IsAlive)
+            await newParticipant.SendAsync(data, ct);
+
+        _logger.LogDebug("Call {CallId} participant added: {NewParticipant} (by {Sender})",
+            header.CallId, newParticipant.ClientId, sender.ClientId);
+    }
+
+    /// <summary>
+    /// Handle RemoveParticipant: remove from call state and all media stream routes,
+    /// forward the signal to remaining participants.
+    /// </summary>
+    private async Task HandleRemoveParticipantAsync(BoltHubConnection sender, byte[] buffer, int length, CallSignalHeader header, CancellationToken ct)
+    {
+        if (!_activeCalls.TryGetValue(header.CallId, out var callState))
+        {
+            _logger.LogDebug("Call {CallId} RemoveParticipant from {ClientId} but call not found", header.CallId, sender.ClientId);
+            return;
+        }
+
+        if (header.PayloadLength < 4)
+        {
+            _logger.LogWarning("CallSignal RemoveParticipant from {ClientId} has no recipient hash in payload", sender.ClientId);
+            return;
+        }
+
+        var recipientHash = BinaryPrimitives.ReadInt32LittleEndian(
+            buffer.AsSpan(header.PayloadOffset, 4));
+
+        // Remove from participants list
+        string? removedClientId = null;
+        lock (callState.Participants)
+        {
+            var idx = callState.Participants.FindIndex(p => p.ServiceHash == recipientHash);
+            if (idx >= 0)
+            {
+                removedClientId = callState.Participants[idx].ClientId;
+                callState.Participants.RemoveAt(idx);
+            }
+        }
+
+        // Remove from all media stream recipient lists
+        List<Guid> streamIds;
+        lock (callState.MediaStreamIds)
+        {
+            streamIds = new List<Guid>(callState.MediaStreamIds);
+        }
+
+        foreach (var streamId in streamIds)
+        {
+            if (_activeMediaStreams.TryGetValue(streamId, out var route))
+                route.Recipients.RemoveAll(r => r.ServiceHash == recipientHash);
+        }
+
+        // Forward the RemoveParticipant signal to remaining participants
+        var data = buffer.AsMemory(0, length);
+        lock (callState.Participants)
+        {
+            foreach (var participant in callState.Participants)
+            {
+                if (participant.StreamId != sender.StreamId && participant.IsAlive)
+                    _ = participant.SendAsync(data, ct);
+            }
+        }
+
+        _logger.LogDebug("Call {CallId} participant removed: {Removed} (by {Sender})",
+            header.CallId, removedClientId ?? $"hash={recipientHash}", sender.ClientId);
+    }
+
+    // ── Media processor tap ──
+
+    /// <summary>
+    /// Background loop that reads media frame copies from the tap channel
+    /// and dispatches them to all registered media processors.
+    /// </summary>
+    private async Task MediaTapLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            await foreach (var (callId, streamId, data, ts, seq) in _mediaTapChannel.Reader.ReadAllAsync(ct))
+            {
+                foreach (var processor in _mediaProcessors)
+                {
+                    try
+                    {
+                        await processor.ProcessFrameAsync(callId, streamId, data, ts, seq);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Media processor error for call {CallId}", callId);
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>Notify all media processors that a call has started.</summary>
+    private async Task NotifyProcessorsCallStartedAsync(Guid callId)
+    {
+        foreach (var processor in _mediaProcessors)
+        {
+            try
+            {
+                await processor.OnCallStartedAsync(callId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Media processor OnCallStarted error for call {CallId}", callId);
+            }
+        }
+    }
+
+    /// <summary>Notify all media processors that a call has ended.</summary>
+    private async Task NotifyProcessorsCallEndedAsync(Guid callId)
+    {
+        foreach (var processor in _mediaProcessors)
+        {
+            try
+            {
+                await processor.OnCallEndedAsync(callId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Media processor OnCallEnded error for call {CallId}", callId);
+            }
+        }
     }
 
     /// <summary>
@@ -748,6 +1003,10 @@ public sealed class BoltServer
             }
 
             CleanupCall(callId);
+
+            // Notify media processors (fire-and-forget in timer callback)
+            _ = NotifyProcessorsCallEndedAsync(callId);
+
             _logger.LogDebug("Call {CallId} timed out (missed) after 30s ringing", callId);
         }
     }

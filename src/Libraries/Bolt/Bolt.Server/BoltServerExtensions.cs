@@ -1,3 +1,4 @@
+using Bolt.Server.Media;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -12,6 +13,12 @@ public class BoltServerOptions
 
     /// <summary>RPC invocation timeout in milliseconds. Default: 30000.</summary>
     public int InvocationTimeoutMs { get; set; } = 30_000;
+
+    /// <summary>
+    /// Media processors that receive copies of media frames for server-side processing
+    /// (recording, transcription, AI analysis, etc.).
+    /// </summary>
+    public List<IMediaProcessor> MediaProcessors { get; } = new();
 }
 
 public static class BoltServerExtensions
@@ -22,13 +29,21 @@ public static class BoltServerExtensions
     /// Usage:
     ///   builder.Services.AddBoltServer();
     ///   builder.Services.AddBoltServer(options => options.InvocationTimeoutMs = 60000);
+    ///   builder.Services.AddBoltServer(options => options.MediaProcessors.Add(new MyRecorder()));
     /// </summary>
     public static IServiceCollection AddBoltServer(this IServiceCollection services, Action<BoltServerOptions>? configure = null)
     {
         var options = new BoltServerOptions();
         configure?.Invoke(options);
         services.AddSingleton(options);
-        services.AddSingleton<BoltServer>();
+        services.AddSingleton<BoltServer>(sp =>
+        {
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<BoltServer>>();
+            var server = new BoltServer(logger);
+            foreach (var processor in options.MediaProcessors)
+                server.RegisterMediaProcessor(processor);
+            return server;
+        });
         return services;
     }
 
