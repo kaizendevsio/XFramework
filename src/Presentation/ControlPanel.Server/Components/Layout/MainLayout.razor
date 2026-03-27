@@ -1,26 +1,35 @@
 @inherits LayoutComponentBase
 
-<BbSidebarProvider DefaultOpen="true" CookieKey="@null">
+<BbSidebarProvider DefaultOpen="true" Variant="SidebarVariant.Sidebar">
     <BbSidebar>
         <BbSidebarHeader>
-            <div class="flex items-center gap-2 px-2 h-10">
-                <div class="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                    <LucideIcon Name="shield" class="h-4 w-4" />
+            <BbSidebarHeaderContent>
+                <div class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                    X
                 </div>
-                <span class="text-sm font-semibold">Control Panel</span>
-            </div>
+                <BbSidebarHeaderInfo>
+                    <span class="truncate font-semibold">Control Panel</span>
+                    <span class="truncate text-xs text-muted-foreground">XFramework Admin</span>
+                </BbSidebarHeaderInfo>
+            </BbSidebarHeaderContent>
         </BbSidebarHeader>
         <BbSidebarContent>
             <NavMenu />
         </BbSidebarContent>
         <BbSidebarFooter>
-            <div class="flex items-center gap-2 px-2 py-2">
-                <span class="text-xs text-muted-foreground">XFramework Admin</span>
-            </div>
+            <BbSidebarMenu>
+                <BbSidebarMenuItem>
+                    <BbSidebarMenuButton>
+                        <LucideIcon Name="settings" class="h-4 w-4" />
+                        <span>Settings</span>
+                    </BbSidebarMenuButton>
+                </BbSidebarMenuItem>
+            </BbSidebarMenu>
         </BbSidebarFooter>
+        <BbSidebarRail />
     </BbSidebar>
     <BbSidebarInset>
-        <header class="flex items-center gap-2 px-4 py-3 border-b">
+        <header class="flex h-16 items-center gap-2 border-b px-4">
             <BbSidebarTrigger />
             <BbSeparator Orientation="SeparatorOrientation.Vertical" Class="h-4" />
             <BbBreadcrumb>
@@ -31,9 +40,9 @@
                 </BbBreadcrumbList>
             </BbBreadcrumb>
         </header>
-        <div class="flex-1 p-4">
+        <main class="flex-1 p-4">
             @Body
-        </div>
+        </main>
     </BbSidebarInset>
 </BbSidebarProvider>
 
