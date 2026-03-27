@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Bolt.Client.Media;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
 
@@ -23,6 +24,8 @@ public sealed class BoltMediaStream : IAsyncDisposable
     private uint _timestampCounter;
     private readonly uint _timestampIncrement; // 960 for Opus 48kHz/20ms, 3000 for 30fps video at 90kHz
     private bool _closed;
+    private FecEncoder? _fecEncoder;
+    private FecDecoder? _fecDecoder;
 
     /// <summary>Unique identifier for this media stream.</summary>
     public Guid StreamId { get; }
@@ -47,8 +50,27 @@ public sealed class BoltMediaStream : IAsyncDisposable
     }
 
     /// <summary>
+    /// Enable Forward Error Correction for this stream.
+    /// FEC encodes parity across groups of frames to recover single-frame losses.
+    /// </summary>
+    public void EnableFec(int groupSize = 4)
+    {
+        _fecEncoder = new FecEncoder(groupSize);
+        _fecDecoder = new FecDecoder();
+    }
+
+    /// <summary>
+    /// Called internally by the receive loop when an FEC parity frame arrives.
+    /// </summary>
+    internal void EnqueueFecFrame(uint groupStart, byte groupSize, ReadOnlyMemory<byte> parityData)
+    {
+        _fecDecoder?.AddFecFrame(groupStart, groupSize, parityData, Array.Empty<int>());
+    }
+
+    /// <summary>
     /// Send an encoded media frame (audio or video) to the remote peer.
     /// Sequence numbers and timestamps are auto-incremented.
+    /// If FEC is enabled, parity frames are sent after each group completes.
     /// </summary>
     public async ValueTask SendFrameAsync(ReadOnlyMemory<byte> encodedData, bool isKeyframe = false, CancellationToken ct = default)
     {
@@ -65,6 +87,18 @@ public sealed class BoltMediaStream : IAsyncDisposable
         BoltCodec.WriteMediaFrame(writer, StreamId, seq, ts, flags, encodedData.Span);
         await _connection.SendAsync(writer.WrittenMemory, ct);
         writer.Reset();
+
+        if (_fecEncoder != null)
+        {
+            var fecResult = _fecEncoder.AddFrame(seq, encodedData);
+            if (fecResult != null)
+            {
+                var fecWriter = RentedBufferWriter.GetThreadLocal();
+                BoltCodec.WriteFecFrame(fecWriter, StreamId, fecResult.GroupStartSequence, fecResult.GroupSize, fecResult.ParityData);
+                await _connection.SendAsync(fecWriter.WrittenMemory, ct);
+                fecWriter.Reset();
+            }
+        }
     }
 
     /// <summary>

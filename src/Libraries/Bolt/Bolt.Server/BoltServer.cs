@@ -59,7 +59,7 @@ public sealed class BoltServer
     public async Task HandleConnectionAsync(WebSocket webSocket, CancellationToken ct)
     {
         var connection = new BoltHubConnection(webSocket);
-        var receiveBuffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+        var receiveBuffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
 
         try
         {

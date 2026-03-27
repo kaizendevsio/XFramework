@@ -58,6 +58,7 @@ public sealed class BoltClient : IAsyncDisposable
     // Call management
     private readonly ConcurrentDictionary<Guid, ClientCallInfo> _activeCalls = new();
     private readonly ConcurrentDictionary<Guid, BoltMediaStream> _mediaStreams = new();
+    private readonly ConcurrentDictionary<Guid, Media.AdaptiveBitrateController> _bitrateControllers = new();
 
     // Call events
     public event Func<IncomingCallInfo, Task>? OnIncomingCall;
@@ -329,7 +330,7 @@ public sealed class BoltClient : IAsyncDisposable
 
     private async Task ReceiveLoopAsync(BoltConnection conn, CancellationToken ct)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+        var buffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
         try
         {
             while (!ct.IsCancellationRequested && conn.WebSocket.State == WebSocketState.Open)
@@ -382,6 +383,10 @@ public sealed class BoltClient : IAsyncDisposable
 
                     case FrameType.MediaKeyRequest:
                         HandleMediaKeyRequest(data);
+                        break;
+
+                    case FrameType.FecFrame:
+                        HandleFecFrame(data);
                         break;
 
                     case FrameType.CallSignal:
@@ -577,6 +582,9 @@ public sealed class BoltClient : IAsyncDisposable
         {
             var payload = header.GetPayload(data).ToArray();
             stream.EnqueueFrame(header.SequenceNumber, header.Timestamp, payload, header.Flags);
+
+            if (_bitrateControllers.TryGetValue(header.StreamId, out var controller))
+                controller.RecordFrameReceived(header.SequenceNumber);
         }
     }
 
@@ -597,14 +605,25 @@ public sealed class BoltClient : IAsyncDisposable
 
     private void HandleMediaFeedback(ReadOnlySpan<byte> data)
     {
-        // Feedback from receiver — used for adaptive bitrate (handled by caller)
-        // Future: route to BandwidthEstimator
+        if (!BoltCodec.TryReadMediaFeedback(data, out var feedback)) return;
+        if (_bitrateControllers.TryGetValue(feedback.StreamId, out var controller))
+            controller.ProcessFeedback(feedback);
     }
 
     private void HandleMediaKeyRequest(ReadOnlySpan<byte> data)
     {
         if (!BoltCodec.TryReadMediaKeyRequest(data, out var streamId)) return;
         OnKeyframeRequested?.Invoke(streamId);
+    }
+
+    private void HandleFecFrame(ReadOnlySpan<byte> data)
+    {
+        if (!BoltCodec.TryReadFecFrame(data, out var header)) return;
+        if (_mediaStreams.TryGetValue(header.StreamId, out var stream))
+        {
+            var payload = header.GetPayload(data).ToArray();
+            stream.EnqueueFecFrame(header.FecGroupStart, header.FecGroupSize, payload);
+        }
     }
 
     private async Task HandleCallSignalAsync(byte[] data, int length)
