@@ -28,12 +28,10 @@ builder.Services.AddServerDataContext<AppDbContext>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-var app = builder.Build();
+// Enable static web assets (serves _content/ and _framework/ from NuGet/build locations)
+builder.WebHost.UseStaticWebAssets();
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
-}
+var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseAntiforgery();

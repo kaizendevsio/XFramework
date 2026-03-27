@@ -8,6 +8,14 @@
         XFramework Control Panel — Identity Server &amp; Wallets Administration
     </BbTypography>
 
+    @if (_error is not null)
+    {
+        <BbAlert Variant="AlertVariant.Danger">
+            <BbAlertTitle>Database Error</BbAlertTitle>
+            <BbAlertDescription>@_error</BbAlertDescription>
+        </BbAlert>
+    }
+
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <BbCard>
             <BbCardHeader>
@@ -53,19 +61,29 @@
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
 
     private int _userCount;
     private int _sessionCount;
     private int _walletCount;
     private int _tenantCount;
+    private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
-        _userCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().CountAsync();
-        _sessionCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Session>()
-            .Where(s => s.Status == XFramework.Domain.Shared.Enums.CurrentSessionState.Active)
-            .CountAsync();
-        _walletCount = await DataContext.Query<Wallets.Domain.Shared.Contracts.Wallet>().CountAsync();
-        _tenantCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>().CountAsync();
+        try
+        {
+            _userCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().CountAsync();
+            _sessionCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Session>()
+                .Where(s => s.Status == XFramework.Domain.Shared.Enums.CurrentSessionState.Active)
+                .CountAsync();
+            _walletCount = await DataContext.Query<Wallets.Domain.Shared.Contracts.Wallet>().CountAsync();
+            _tenantCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>().CountAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load dashboard stats");
+            _error = $"Failed to load stats: {ex.Message}";
+        }
     }
 }
