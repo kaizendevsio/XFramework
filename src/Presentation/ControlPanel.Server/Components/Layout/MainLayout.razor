@@ -1,40 +1,28 @@
 @inherits LayoutComponentBase
 
-<BbSidebarProvider DefaultOpen="true" Variant="SidebarVariant.Sidebar">
+<BbSidebarProvider>
     <BbSidebar>
         <BbSidebarHeader>
-            <BbSidebarHeaderContent>
-                <div class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <LucideIcon Name="shield" Size="16" />
+            <div class="flex items-center gap-2 px-2 h-10">
+                <div class="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                    <LucideIcon Name="shield" class="h-4 w-4" />
                 </div>
-                <BbSidebarHeaderInfo>
-                    <span class="truncate font-semibold">Control Panel</span>
-                    <span class="truncate text-xs text-muted-foreground">XFramework Admin</span>
-                </BbSidebarHeaderInfo>
-            </BbSidebarHeaderContent>
+                <span class="text-sm font-semibold">Control Panel</span>
+            </div>
         </BbSidebarHeader>
-
         <BbSidebarContent>
             <NavMenu />
         </BbSidebarContent>
-
         <BbSidebarFooter>
-            <BbSidebarMenu>
-                <BbSidebarMenuItem>
-                    <BbSidebarMenuButton OnClick="@(() => {})">
-                        <LucideIcon Name="sun" Size="16" />
-                        <span>Toggle Theme</span>
-                    </BbSidebarMenuButton>
-                </BbSidebarMenuItem>
-            </BbSidebarMenu>
+            <div class="flex items-center gap-2 px-2 py-2">
+                <span class="text-xs text-muted-foreground">XFramework Admin</span>
+            </div>
         </BbSidebarFooter>
-        <BbSidebarRail />
     </BbSidebar>
-
     <BbSidebarInset>
-        <header class="flex h-12 items-center gap-2 border-b px-4">
+        <header class="flex items-center gap-2 px-4 py-3 border-b">
             <BbSidebarTrigger />
-            <BbSeparator Orientation="SeparatorOrientation.Vertical" Class="mx-2 h-4" />
+            <BbSeparator Orientation="SeparatorOrientation.Vertical" Class="h-4" />
             <BbBreadcrumb>
                 <BbBreadcrumbList>
                     <BbBreadcrumbItem>
@@ -43,10 +31,9 @@
                 </BbBreadcrumbList>
             </BbBreadcrumb>
         </header>
-
-        <main class="flex-1 p-4">
+        <div class="flex-1 p-4">
             @Body
-        </main>
+        </div>
     </BbSidebarInset>
 </BbSidebarProvider>
 
