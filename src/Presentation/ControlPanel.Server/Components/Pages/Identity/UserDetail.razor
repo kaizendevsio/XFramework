@@ -1,0 +1,184 @@
+@page "/identity/users/{Id:guid}"
+
+<PageTitle>User Detail - Control Panel</PageTitle>
+
+@if (_user is null)
+{
+    <BbTypography Variant="TypographyVariant.Muted">Loading...</BbTypography>
+}
+else
+{
+    <div class="space-y-6">
+        <div class="flex items-center gap-4">
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                      OnClick="@(() => Navigation.NavigateTo("/identity/users"))">
+                <LucideArrowLeft class="h-4 w-4" />
+            </BbButton>
+            <div>
+                <BbTypography Variant="TypographyVariant.H3">@_user.FullName</BbTypography>
+                <BbTypography Variant="TypographyVariant.Muted">@_user.IdentityName</BbTypography>
+            </div>
+        </div>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>User Information</BbCardTitle>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">First Name</BbTypography>
+                        <BbTypography>@(_user.FirstName ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Middle Name</BbTypography>
+                        <BbTypography>@(_user.MiddleName ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Last Name</BbTypography>
+                        <BbTypography>@(_user.LastName ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Suffix</BbTypography>
+                        <BbTypography>@(_user.Suffix ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Birth Date</BbTypography>
+                        <BbTypography>@(_user.BirthDate?.ToString("yyyy-MM-dd") ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Gender</BbTypography>
+                        <BbTypography>@(_user.Gender?.ToString() ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Civil Status</BbTypography>
+                        <BbTypography>@(_user.CivilStatus?.ToString() ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Verified</BbTypography>
+                        <StatusBadge Text="@(_user.IsVerified ? "Verified" : "Unverified")"
+                                     Status="@(_user.IsVerified ? "active" : "inactive")" />
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Created</BbTypography>
+                        <BbTypography>@_user.CreatedAt.ToString("g")</BbTypography>
+                    </div>
+                </div>
+            </BbCardContent>
+        </BbCard>
+
+        <BbTabs DefaultValue="credentials">
+            <BbTabsList>
+                <BbTabsTrigger Value="credentials">Credentials</BbTabsTrigger>
+                <BbTabsTrigger Value="contacts">Contacts</BbTabsTrigger>
+                <BbTabsTrigger Value="addresses">Addresses</BbTabsTrigger>
+                <BbTabsTrigger Value="roles">Roles</BbTabsTrigger>
+            </BbTabsList>
+
+            <BbTabsContent Value="credentials">
+                <BbDataGrid Items="@_credentials">
+                    <BbDataGridPropertyColumn Property="@(x => x.UserName)" Title="Username" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.UserAlias)" Title="Alias" Sortable="true" />
+                    <BbDataGridTemplateColumn Title="Online">
+                        <ChildContent Context="cred">
+                            <StatusBadge Text="@(cred.IsOnline ? "Online" : "Offline")"
+                                         Status="@(cred.IsOnline ? "online" : "inactive")" />
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.LastSeen)" Title="Last Seen" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Device)" Title="Device" />
+                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                </BbDataGrid>
+            </BbTabsContent>
+
+            <BbTabsContent Value="contacts">
+                <BbDataGrid Items="@_contacts">
+                    <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
+                    <BbDataGridTemplateColumn Title="Type">
+                        <ChildContent Context="contact">
+                            @(contact.Type?.Name ?? contact.TypeId?.ToString() ?? "N/A")
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                </BbDataGrid>
+            </BbTabsContent>
+
+            <BbTabsContent Value="addresses">
+                <BbDataGrid Items="@_addresses">
+                    <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" />
+                    <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" />
+                    <BbDataGridTemplateColumn Title="Default">
+                        <ChildContent Context="addr">
+                            <StatusBadge Text="@(addr.DefaultAddress == true ? "Default" : "No")"
+                                         Status="@(addr.DefaultAddress == true ? "active" : "inactive")" />
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                </BbDataGrid>
+            </BbTabsContent>
+
+            <BbTabsContent Value="roles">
+                <BbDataGrid Items="@_roles">
+                    <BbDataGridTemplateColumn Title="Role Type">
+                        <ChildContent Context="role">
+                            @(role.Type?.Name ?? role.TypeId?.ToString() ?? "N/A")
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.RoleExpiration)" Title="Expiration" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                </BbDataGrid>
+            </BbTabsContent>
+        </BbTabs>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private IdentityInformation? _user;
+    private List<IdentityCredential> _credentials = [];
+    private List<IdentityContact> _contacts = [];
+    private List<IdentityAddress> _addresses = [];
+    private List<IdentityRole> _roles = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await DataContext.Query<IdentityInformation>()
+            .Where(x => x.Id == Id)
+            .FirstOrDefaultAsync();
+
+        if (_user is null) return;
+
+        _credentials = await DataContext.Query<IdentityCredential>()
+            .Where(x => x.IdentityInfoId == Id)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+
+        // Load contacts and roles per credential (List.Contains not supported by expression visitor)
+        var contactTasks = _credentials.Select(c =>
+            DataContext.Query<IdentityContact>()
+                .Include(x => x.Type)
+                .Where(x => x.CredentialId == c.Id)
+                .ToListAsync());
+        var contactResults = await Task.WhenAll(contactTasks);
+        _contacts = contactResults.SelectMany(x => x).OrderByDescending(x => x.CreatedAt).ToList();
+
+        _addresses = await DataContext.Query<IdentityAddress>()
+            .Where(x => x.IdentityInfoId == Id)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+
+        var roleTasks = _credentials.Select(c =>
+            DataContext.Query<IdentityRole>()
+                .Include(x => x.Type)
+                .Where(x => x.CredentialId == c.Id)
+                .ToListAsync());
+        var roleResults = await Task.WhenAll(roleTasks);
+        _roles = roleResults.SelectMany(x => x).OrderByDescending(x => x.CreatedAt).ToList();
+    }
+}

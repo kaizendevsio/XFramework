@@ -1,0 +1,63 @@
+@page "/identity/sessions"
+
+<PageTitle>Sessions - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Sessions</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_sessions">
+        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Status">
+            <ChildContent Context="session">
+                <StatusBadge Text="@GetStatusText(session.Status)"
+                             Status="@GetStatusKey(session.Status)" />
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridTemplateColumn Title="Session Data">
+            <ChildContent Context="session">
+                @(Truncate(session.SessionData, 50))
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires At" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<Session> _sessions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _sessions = await DataContext.Query<Session>()
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+    }
+
+    private static string GetStatusText(CurrentSessionState status) => status switch
+    {
+        CurrentSessionState.Active => "Active",
+        CurrentSessionState.Inactive => "Inactive",
+        CurrentSessionState.Expired => "Expired",
+        CurrentSessionState.Suspended => "Suspended",
+        _ => "Unknown"
+    };
+
+    private static string GetStatusKey(CurrentSessionState status) => status switch
+    {
+        CurrentSessionState.Active => "active",
+        CurrentSessionState.Inactive => "inactive",
+        CurrentSessionState.Expired => "expired",
+        CurrentSessionState.Suspended => "suspended",
+        _ => "inactive"
+    };
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value)) return "N/A";
+        return value.Length <= maxLength ? value : value[..maxLength] + "...";
+    }
+}

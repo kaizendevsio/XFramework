@@ -1,0 +1,36 @@
+@page "/identity/auth-logs"
+
+<PageTitle>Auth Logs - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Authorization Logs</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_logs">
+        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Ipaddress)" Title="IP Address" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Success">
+            <ChildContent Context="log">
+                <StatusBadge Text="@(log.IsSuccess == true ? "Success" : "Failed")"
+                             Status="@(log.IsSuccess == true ? "success" : "failed")" />
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.LoginSource)" Title="Login Source" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.DeviceName)" Title="Device" />
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<AuthorizationLog> _logs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _logs = await DataContext.Query<AuthorizationLog>()
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+    }
+}

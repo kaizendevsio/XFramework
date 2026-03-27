@@ -1,0 +1,66 @@
+@page "/identity/verifications"
+
+<PageTitle>Verifications - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Verifications</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_verifications">
+        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Verification Type">
+            <ChildContent Context="v">
+                @(v.VerificationType?.Name ?? v.VerificationTypeId?.ToString() ?? "N/A")
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridTemplateColumn Title="Status">
+            <ChildContent Context="v">
+                @{
+                    var statusText = v.Status switch
+                    {
+                        0 => "Pending",
+                        1 => "Verified",
+                        2 => "Rejected",
+                        _ => "Unknown"
+                    };
+                    var statusKey = v.Status switch
+                    {
+                        0 => "pending",
+                        1 => "active",
+                        2 => "failed",
+                        _ => "inactive"
+                    };
+                }
+                <StatusBadge Text="@statusText" Status="@statusKey" />
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridTemplateColumn Title="Token">
+            <ChildContent Context="v">
+                @(Truncate(v.Token, 20))
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.Expiry)" Title="Expiry" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<IdentityVerification> _verifications = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _verifications = await DataContext.Query<IdentityVerification>()
+            .Include(x => x.VerificationType)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+    }
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value)) return "N/A";
+        return value.Length <= maxLength ? value : value[..maxLength] + "...";
+    }
+}

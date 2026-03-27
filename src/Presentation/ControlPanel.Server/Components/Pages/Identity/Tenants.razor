@@ -1,0 +1,52 @@
+@page "/identity/tenants"
+
+<PageTitle>Tenants - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Tenants</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_tenants">
+        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+        <BbDataGridTemplateColumn Title="Status">
+            <ChildContent Context="tenant">
+                @{
+                    var statusText = tenant.Status switch
+                    {
+                        0 => "Inactive",
+                        1 => "Active",
+                        2 => "Suspended",
+                        _ => "Unknown"
+                    };
+                    var statusKey = tenant.Status switch
+                    {
+                        0 => "inactive",
+                        1 => "active",
+                        2 => "suspended",
+                        _ => "inactive"
+                    };
+                }
+                <StatusBadge Text="@statusText" Status="@statusKey" />
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.Version)" Title="Version" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Expiration)" Title="Expiration" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.AvailabilityDate)" Title="Availability" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<Tenant> _tenants = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tenants = await DataContext.Query<Tenant>()
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+    }
+}

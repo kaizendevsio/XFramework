@@ -1,0 +1,27 @@
+@page "/lookups/verification-types"
+
+<PageTitle>Verification Types - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Verification Types</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.DefaultExpiry)" Title="Default Expiry" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Priority)" Title="Priority" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<IdentityVerificationType> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await DataContext.Query<IdentityVerificationType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+}

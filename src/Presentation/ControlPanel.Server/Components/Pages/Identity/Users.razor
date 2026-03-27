@@ -1,0 +1,218 @@
+@page "/identity/users"
+
+<PageTitle>Users - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Users</BbTypography>
+        <BbButton OnClick="@OpenAddDialog">
+            <LucidePlus class="mr-2 h-4 w-4" />
+            Add User
+        </BbButton>
+    </div>
+
+    <BbDataGrid Items="@_users">
+        <BbDataGridPropertyColumn Property="@(x => x.FirstName)" Title="First Name" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.LastName)" Title="Last Name" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.IdentityName)" Title="Identity Name" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.BirthDate)" Title="Birth Date" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Gender">
+            <ChildContent Context="user">
+                @(user.Gender?.ToString() ?? "N/A")
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridTemplateColumn Title="Verified">
+            <ChildContent Context="user">
+                <StatusBadge Text="@(user.IsVerified ? "Verified" : "Unverified")"
+                             Status="@(user.IsVerified ? "active" : "inactive")" />
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Actions">
+            <ChildContent Context="user">
+                <div class="flex items-center gap-2">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                              OnClick="@(() => NavigateToDetail(user.Id))">
+                        <LucideEye class="h-4 w-4" />
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                              OnClick="@(() => OpenEditDialog(user))">
+                        <LucidePencil class="h-4 w-4" />
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                              OnClick="@(() => OpenDeleteDialog(user))">
+                        <LucideTrash2 class="h-4 w-4" />
+                    </BbButton>
+                </div>
+            </ChildContent>
+        </BbDataGridTemplateColumn>
+    </BbDataGrid>
+</div>
+
+<BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(_isEditing ? "Edit User" : "Add User")</BbDialogTitle>
+            <BbDialogDescription>
+                @(_isEditing ? "Update user information." : "Create a new user record.")
+            </BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-2">
+                <BbLabel>First Name</BbLabel>
+                <BbInput Value="@_formModel.FirstName"
+                         ValueChanged="@((string v) => _formModel.FirstName = v)" />
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Middle Name</BbLabel>
+                <BbInput Value="@_formModel.MiddleName"
+                         ValueChanged="@((string v) => _formModel.MiddleName = v)" />
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Last Name</BbLabel>
+                <BbInput Value="@_formModel.LastName"
+                         ValueChanged="@((string v) => _formModel.LastName = v)" />
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Identity Name</BbLabel>
+                <BbInput Value="@_formModel.IdentityName"
+                         ValueChanged="@((string v) => _formModel.IdentityName = v)" />
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Birth Date</BbLabel>
+                <BbInput Value="@_formModel.BirthDateString"
+                         ValueChanged="@((string v) => _formModel.BirthDateString = v)" Placeholder="YYYY-MM-DD" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveUser">@(_isEditing ? "Update" : "Create")</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<ConfirmDeleteDialog Open="@_deleteDialogOpen"
+                     OpenChanged="@(v => _deleteDialogOpen = v)"
+                     OnConfirm="@ConfirmDelete" />
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private List<IdentityInformation> _users = [];
+    private bool _dialogOpen;
+    private bool _deleteDialogOpen;
+    private bool _isEditing;
+    private Guid _editingId;
+    private IdentityInformation? _deletingUser;
+    private UserFormModel _formModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _users = await DataContext.Query<IdentityInformation>()
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+    }
+
+    private void NavigateToDetail(Guid id)
+    {
+        Navigation.NavigateTo($"/identity/users/{id}");
+    }
+
+    private void OpenAddDialog()
+    {
+        _isEditing = false;
+        _formModel = new UserFormModel();
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(IdentityInformation user)
+    {
+        _isEditing = true;
+        _editingId = user.Id;
+        _formModel = new UserFormModel
+        {
+            FirstName = user.FirstName,
+            MiddleName = user.MiddleName,
+            LastName = user.LastName,
+            IdentityName = user.IdentityName,
+            BirthDateString = user.BirthDate?.ToString("yyyy-MM-dd") ?? ""
+        };
+        _dialogOpen = true;
+    }
+
+    private void OpenDeleteDialog(IdentityInformation user)
+    {
+        _deletingUser = user;
+        _deleteDialogOpen = true;
+    }
+
+    private async Task SaveUser()
+    {
+        if (_isEditing)
+        {
+            var user = await DataContext.Query<IdentityInformation>()
+                .Where(x => x.Id == _editingId)
+                .FirstOrDefaultAsync();
+
+            if (user is not null)
+            {
+                user.FirstName = _formModel.FirstName;
+                user.MiddleName = _formModel.MiddleName;
+                user.LastName = _formModel.LastName;
+                user.IdentityName = _formModel.IdentityName;
+                user.BirthDate = DateOnly.TryParse(_formModel.BirthDateString, out var d) ? d : null;
+                DataContext.Update(user);
+                var result = await DataContext.SaveChangesAsync();
+                ToastService.Show(result.IsSuccess ? "User updated." : $"Error: {result.Message}");
+            }
+        }
+        else
+        {
+            var user = new IdentityInformation
+            {
+                Id = Guid.NewGuid(),
+                FirstName = _formModel.FirstName,
+                MiddleName = _formModel.MiddleName,
+                LastName = _formModel.LastName,
+                IdentityName = _formModel.IdentityName,
+                BirthDate = DateOnly.TryParse(_formModel.BirthDateString, out var d) ? d : null,
+                CreatedAt = DateTime.UtcNow
+            };
+            DataContext.Add(user);
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess ? "User created." : $"Error: {result.Message}");
+        }
+
+        _dialogOpen = false;
+        await LoadData();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingUser is not null)
+        {
+            DataContext.Remove(_deletingUser);
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess ? "User deleted." : $"Error: {result.Message}");
+            _deleteDialogOpen = false;
+            _deletingUser = null;
+            await LoadData();
+        }
+    }
+
+    private class UserFormModel
+    {
+        public string? FirstName { get; set; }
+        public string? MiddleName { get; set; }
+        public string? LastName { get; set; }
+        public string? IdentityName { get; set; }
+        public string BirthDateString { get; set; } = "";
+    }
+}

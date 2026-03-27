@@ -1,0 +1,28 @@
+@page "/lookups/currency-types"
+
+<PageTitle>Currency Types - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Currency Types</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.CurrencyIsoCode3)" Title="ISO Code" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+        <BbDataGridPropertyColumn Property="@(x => x.Type)" Title="Type" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+}

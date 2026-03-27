@@ -1,0 +1,46 @@
+@inherits LayoutComponentBase
+
+<BbPortalHost />
+<BbToastProvider Position="ToastPosition.BottomRight" />
+<BbDialogProvider />
+
+<BbSidebarProvider>
+    <BbSidebar>
+        <BbSidebarHeader>
+            <div class="flex items-center gap-2 px-2">
+                <BbTypography Variant="TypographyVariant.H6">Control Panel</BbTypography>
+            </div>
+            <BbTypography Variant="TypographyVariant.Muted" Class="px-2 text-xs">
+                XFramework Admin
+            </BbTypography>
+        </BbSidebarHeader>
+
+        <BbSidebarContent>
+            <NavMenu />
+        </BbSidebarContent>
+
+        <BbSidebarFooter>
+            <div class="flex items-center gap-2 px-2 py-1">
+                <BbThemeSwitcher />
+            </div>
+        </BbSidebarFooter>
+    </BbSidebar>
+
+    <BbSidebarInset>
+        <header class="flex h-12 items-center gap-2 border-b px-4">
+            <BbSidebarTrigger />
+            <BbSeparator Orientation="SeparatorOrientation.Vertical" Class="mx-2 h-4" />
+            <BbBreadcrumb>
+                <BbBreadcrumbList>
+                    <BbBreadcrumbItem>
+                        <BbBreadcrumbLink Href="/">Dashboard</BbBreadcrumbLink>
+                    </BbBreadcrumbItem>
+                </BbBreadcrumbList>
+            </BbBreadcrumb>
+        </header>
+
+        <main class="flex-1 p-4">
+            @Body
+        </main>
+    </BbSidebarInset>
+</BbSidebarProvider>

@@ -1,0 +1,27 @@
+@page "/lookups/role-types"
+
+<PageTitle>Role Types - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Role Types</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.RoleLevel)" Title="Role Level" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.GroupId)" Title="Group ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<IdentityRoleType> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await DataContext.Query<IdentityRoleType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+}

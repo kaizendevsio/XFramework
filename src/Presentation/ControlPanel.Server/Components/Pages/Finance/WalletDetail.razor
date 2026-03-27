@@ -1,0 +1,116 @@
+@page "/finance/wallets/{Id:guid}"
+@using global::Wallets.Domain.Shared.Enums
+
+<PageTitle>Wallet Detail - Control Panel</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Wallet Detail</BbTypography>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => NavigationManager.NavigateTo("/finance/wallets"))">
+            Back to Wallets
+        </BbButton>
+    </div>
+
+    @if (_wallet is not null)
+    {
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>@_wallet.AccountNumber</BbCardTitle>
+                <BbCardDescription>Wallet ID: @_wallet.Id</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Balance</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">@_wallet.Balance.ToString("N2")</BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Available Balance</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">@_wallet.AvailableBalance.ToString("N2")</BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Debit On Hold</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">@_wallet.DebitOnHoldBalance.ToString("N2")</BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Credit On Hold</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">@_wallet.CreditOnHoldBalance.ToString("N2")</BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Transferable Balance</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Large">@_wallet.TransferableBalance.ToString("N2")</BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Status</BbTypography>
+                        <StatusBadge Text="@_wallet.Status.ToString()" Status="@GetStatusText(_wallet.Status)" />
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Credential ID</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Small">@_wallet.CredentialId</BbTypography>
+                    </div>
+                    <div class="space-y-1">
+                        <BbTypography Variant="TypographyVariant.Muted">Created</BbTypography>
+                        <BbTypography Variant="TypographyVariant.Small">@_wallet.CreatedAt.ToString("g")</BbTypography>
+                    </div>
+                </div>
+            </BbCardContent>
+        </BbCard>
+
+        <BbTypography Variant="TypographyVariant.H4">Transactions</BbTypography>
+
+        <BbDataGrid Items="@_transactions" ShowPagination="true" InitialPageSize="20">
+            <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Type">
+                <BbBadge Variant="@(context.TransactionType == TransactionType.Credit ? BadgeVariant.Default : BadgeVariant.Destructive)">
+                    @context.TransactionType
+                </BbBadge>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Held">
+                <BbBadge Variant="@(context.Held ? BadgeVariant.Outline : BadgeVariant.Secondary)">
+                    @(context.Held ? "Yes" : "No")
+                </BbBadge>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Released">
+                <BbBadge Variant="@(context.Released ? BadgeVariant.Default : BadgeVariant.Secondary)">
+                    @(context.Released ? "Yes" : "No")
+                </BbBadge>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
+            <BbDataGridPropertyColumn Property="@(x => x.RunningBalance)" Title="Running Balance" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </BbDataGrid>
+    }
+    else
+    {
+        <BbTypography Variant="TypographyVariant.Muted">Loading wallet details...</BbTypography>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    private Wallet? _wallet;
+    private List<WalletTransaction> _transactions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _wallet = await DataContext.Query<Wallet>().Where(x => x.Id == Id).FirstOrDefaultAsync();
+        _transactions = await DataContext.Query<WalletTransaction>()
+            .Where(x => x.WalletId == Id)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+    }
+
+    private string GetStatusText(WalletStatus status) => status switch
+    {
+        WalletStatus.Active => "active",
+        WalletStatus.Frozen => "frozen",
+        WalletStatus.Suspended => "suspended",
+        WalletStatus.Closed => "closed",
+        _ => "inactive"
+    };
+}

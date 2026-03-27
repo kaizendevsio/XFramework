@@ -1,0 +1,61 @@
+@page "/finance/batch-operations"
+
+<PageTitle>Batch Operations - Control Panel</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Batch Operations</BbTypography>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Batch Increment</BbCardTitle>
+                <BbCardDescription>
+                    Credit multiple wallets in a single operation. Useful for bulk payouts, rewards distribution, or promotional credits.
+                </BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbButton Disabled="true" class="w-full">
+                    Batch Increment (Requires Bolt)
+                </BbButton>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Batch Decrement</BbCardTitle>
+                <BbCardDescription>
+                    Debit multiple wallets in a single operation. Useful for bulk fee collection, subscription charges, or balance adjustments.
+                </BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbButton Disabled="true" class="w-full">
+                    Batch Decrement (Requires Bolt)
+                </BbButton>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Batch Transfer</BbCardTitle>
+                <BbCardDescription>
+                    Execute multiple wallet-to-wallet transfers in a single operation. Useful for settlement, fund redistribution, or payroll.
+                </BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbButton Disabled="true" class="w-full">
+                    Batch Transfer (Requires Bolt)
+                </BbButton>
+            </BbCardContent>
+        </BbCard>
+    </div>
+
+    <BbCard>
+        <BbCardContent>
+            <BbTypography Variant="TypographyVariant.Muted">
+                Batch operations require Bolt service wrappers to execute. These will be enabled once the Bolt integration is configured for this control panel.
+            </BbTypography>
+        </BbCardContent>
+    </BbCard>
+</div>

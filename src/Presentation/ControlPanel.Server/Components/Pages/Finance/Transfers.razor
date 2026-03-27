@@ -1,0 +1,30 @@
+@page "/finance/transfers"
+
+<PageTitle>Transfers - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Transfers</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <BbDataGridPropertyColumn Property="@(x => x.SenderTransactionId)" Title="Sender Transaction ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.RecipientTransactionId)" Title="Recipient Transaction ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Purpose">
+            <BbBadge Variant="BadgeVariant.Outline">@context.TransactionPurpose</BbBadge>
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<WalletTransfer> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await DataContext.Query<WalletTransfer>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+}

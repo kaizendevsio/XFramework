@@ -1,0 +1,44 @@
+@page "/finance/transactions"
+
+<PageTitle>Transactions - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Transactions</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Type">
+            <BbBadge Variant="@(context.TransactionType == TransactionType.Credit ? BadgeVariant.Default : BadgeVariant.Destructive)">
+                @context.TransactionType
+            </BbBadge>
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Held">
+            <BbBadge Variant="@(context.Held ? BadgeVariant.Outline : BadgeVariant.Secondary)">
+                @(context.Held ? "Yes" : "No")
+            </BbBadge>
+        </BbDataGridTemplateColumn>
+        <BbDataGridTemplateColumn Title="Released">
+            <BbBadge Variant="@(context.Released ? BadgeVariant.Default : BadgeVariant.Secondary)">
+                @(context.Released ? "Yes" : "No")
+            </BbBadge>
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<WalletTransaction> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await DataContext.Query<WalletTransaction>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+}

@@ -1,0 +1,78 @@
+@page "/"
+
+<PageTitle>Dashboard - Control Panel</PageTitle>
+
+<div class="space-y-6">
+    <BbTypography Variant="TypographyVariant.H3">Dashboard</BbTypography>
+    <BbTypography Variant="TypographyVariant.Muted">
+        XFramework Control Panel — Identity Server &amp; Wallets Administration
+    </BbTypography>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Users</BbCardTitle>
+                <BbCardDescription>Total registered users</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypography Variant="TypographyVariant.H2">@_userCount</BbTypography>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Active Sessions</BbCardTitle>
+                <BbCardDescription>Currently active sessions</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypography Variant="TypographyVariant.H2">@_sessionCount</BbTypography>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Wallets</BbCardTitle>
+                <BbCardDescription>Total wallets created</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypography Variant="TypographyVariant.H2">@_walletCount</BbTypography>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Tenants</BbCardTitle>
+                <BbCardDescription>Total tenants</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypography Variant="TypographyVariant.H2">@_tenantCount</BbTypography>
+            </BbCardContent>
+        </BbCard>
+    </div>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private int _userCount;
+    private int _sessionCount;
+    private int _walletCount;
+    private int _tenantCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var usersTask = DataContext.Query<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().CountAsync();
+        var sessionsTask = DataContext.Query<IdentityServer.Domain.Shared.Contracts.Session>()
+            .Where(s => s.Status == XFramework.Domain.Shared.Enums.CurrentSessionState.Active)
+            .CountAsync();
+        var walletsTask = DataContext.Query<Wallets.Domain.Shared.Contracts.Wallet>().CountAsync();
+        var tenantsTask = DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>().CountAsync();
+
+        await Task.WhenAll(usersTask, sessionsTask, walletsTask, tenantsTask);
+
+        _userCount = usersTask.Result;
+        _sessionCount = sessionsTask.Result;
+        _walletCount = walletsTask.Result;
+        _tenantCount = tenantsTask.Result;
+    }
+}

@@ -1,0 +1,23 @@
+@if (!string.IsNullOrEmpty(Text))
+{
+    <BbBadge Variant="@_variant">@Text</BbBadge>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Status { get; set; }
+
+    private BadgeVariant _variant = BadgeVariant.Secondary;
+
+    protected override void OnParametersSet()
+    {
+        _variant = (Status?.ToLowerInvariant()) switch
+        {
+            "active" or "approved" or "success" or "online" or "true" => BadgeVariant.Default,
+            "inactive" or "expired" or "closed" or "false" => BadgeVariant.Secondary,
+            "pending" or "suspended" or "frozen" => BadgeVariant.Outline,
+            "failed" or "error" or "cancelled" => BadgeVariant.Destructive,
+            _ => BadgeVariant.Secondary
+        };
+    }
+}

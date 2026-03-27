@@ -1,0 +1,107 @@
+@page "/lookups/address-hierarchy"
+
+<PageTitle>Address Hierarchy - Control Panel</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Address Hierarchy</BbTypography>
+    </div>
+
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>Countries</BbCardTitle>
+            <BbCardDescription>Registered countries in the system.</BbCardDescription>
+        </BbCardHeader>
+        <BbCardContent>
+            <BbDataGrid Items="@_countries" ShowPagination="true" InitialPageSize="10">
+                <BbDataGridPropertyColumn Property="@(x => x.IsoCode2)" Title="ISO Code 2" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.IsoCode3)" Title="ISO Code 3" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Language)" Title="Language" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.PhoneCountryCode)" Title="Phone Code" Sortable="true" />
+            </BbDataGrid>
+        </BbCardContent>
+    </BbCard>
+
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>Regions</BbCardTitle>
+            <BbCardDescription>Administrative regions.</BbCardDescription>
+        </BbCardHeader>
+        <BbCardContent>
+            <BbDataGrid Items="@_regions" ShowPagination="true" InitialPageSize="10">
+                <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+            </BbDataGrid>
+        </BbCardContent>
+    </BbCard>
+
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>Provinces</BbCardTitle>
+            <BbCardDescription>Provinces within regions.</BbCardDescription>
+        </BbCardHeader>
+        <BbCardContent>
+            <BbDataGrid Items="@_provinces" ShowPagination="true" InitialPageSize="10">
+                <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+            </BbDataGrid>
+        </BbCardContent>
+    </BbCard>
+
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>Cities</BbCardTitle>
+            <BbCardDescription>Cities and municipalities within provinces.</BbCardDescription>
+        </BbCardHeader>
+        <BbCardContent>
+            <BbDataGrid Items="@_cities" ShowPagination="true" InitialPageSize="10">
+                <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+            </BbDataGrid>
+        </BbCardContent>
+    </BbCard>
+
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>Barangays</BbCardTitle>
+            <BbCardDescription>Barangays within cities and municipalities.</BbCardDescription>
+        </BbCardHeader>
+        <BbCardContent>
+            <BbDataGrid Items="@_barangays" ShowPagination="true" InitialPageSize="10">
+                <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+            </BbDataGrid>
+        </BbCardContent>
+    </BbCard>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<AddressCountry> _countries = [];
+    private List<AddressRegion> _regions = [];
+    private List<AddressProvince> _provinces = [];
+    private List<AddressCity> _cities = [];
+    private List<AddressBarangay> _barangays = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var countriesTask = DataContext.Query<AddressCountry>().OrderBy(x => x.Name).ToListAsync();
+        var regionsTask = DataContext.Query<AddressRegion>().OrderBy(x => x.Description).Take(100).ToListAsync();
+        var provincesTask = DataContext.Query<AddressProvince>().OrderBy(x => x.Description).Take(200).ToListAsync();
+        var citiesTask = DataContext.Query<AddressCity>().OrderBy(x => x.Description).Take(500).ToListAsync();
+        var barangaysTask = DataContext.Query<AddressBarangay>().OrderBy(x => x.Description).Take(500).ToListAsync();
+
+        await Task.WhenAll(countriesTask, regionsTask, provincesTask, citiesTask, barangaysTask);
+
+        _countries = countriesTask.Result;
+        _regions = regionsTask.Result;
+        _provinces = provincesTask.Result;
+        _cities = citiesTask.Result;
+        _barangays = barangaysTask.Result;
+    }
+}

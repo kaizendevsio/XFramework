@@ -1,0 +1,43 @@
+@page "/finance/withdrawal-requests"
+
+<PageTitle>Withdrawal Requests - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Withdrawal Requests</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Fee)" Title="Fee" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Status">
+            <StatusBadge Text="@context.WithdrawalStatus.ToString()" Status="@GetWithdrawalStatusCategory(context.WithdrawalStatus)" />
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<WithdrawalRequest> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await DataContext.Query<WithdrawalRequest>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+
+    private string GetWithdrawalStatusCategory(TransactionStatus status) => status switch
+    {
+        TransactionStatus.Pending or TransactionStatus.OnHold or TransactionStatus.Scheduled => "pending",
+        TransactionStatus.Ok or TransactionStatus.Completed => "active",
+        TransactionStatus.Accepted or TransactionStatus.OnGoing or TransactionStatus.ForDelivery => "approved",
+        TransactionStatus.Failed or TransactionStatus.Cancelled or TransactionStatus.Rejected => "failed",
+        TransactionStatus.Expired or TransactionStatus.Reversed or TransactionStatus.Refunded => "error",
+        _ => "inactive"
+    };
+}

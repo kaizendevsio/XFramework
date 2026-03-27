@@ -1,0 +1,169 @@
+@page "/lookups/configurations"
+
+<PageTitle>Configurations - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Configurations</BbTypography>
+        <BbButton OnClick="@OpenCreateDialog">Add Configuration</BbButton>
+    </div>
+
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <BbDataGridPropertyColumn Property="@(x => x.Key)" Title="Key" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Unit)" Title="Unit" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.GroupId)" Title="Group ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Actions">
+            <div class="flex items-center gap-2">
+                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                          OnClick="@(() => OpenEditDialog(context))">
+                    Edit
+                </BbButton>
+                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                          OnClick="@(() => OpenDeleteDialog(context))">
+                    Delete
+                </BbButton>
+            </div>
+        </BbDataGridTemplateColumn>
+    </BbDataGrid>
+</div>
+
+<BbDialog Open="@_showFormDialog" OpenChanged="@(v => _showFormDialog = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(_isEditing ? "Edit Configuration" : "Add Configuration")</BbDialogTitle>
+            <BbDialogDescription>@(_isEditing ? "Update the configuration entry." : "Create a new configuration entry.")</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="space-y-4 py-4">
+            <div class="space-y-2">
+                <BbLabel>Key</BbLabel>
+                <BbInput Value="@_formKey" ValueChanged="@(v => _formKey = v)" Placeholder="Configuration key" />
+            </div>
+            <div class="space-y-2">
+                <BbLabel>Value</BbLabel>
+                <BbInput Value="@_formValue" ValueChanged="@(v => _formValue = v)" Placeholder="Configuration value" />
+            </div>
+            <div class="space-y-2">
+                <BbLabel>Unit</BbLabel>
+                <BbInput Value="@_formUnit" ValueChanged="@(v => _formUnit = v)" Placeholder="Unit (optional)" />
+            </div>
+            <div class="space-y-2">
+                <BbLabel>Group ID</BbLabel>
+                <BbInput Value="@_formGroupId" ValueChanged="@(v => _formGroupId = v)" Placeholder="Group ID" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showFormDialog = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveConfiguration">@(_isEditing ? "Update" : "Create")</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<ConfirmDeleteDialog Open="@_showDeleteDialog" OpenChanged="@(v => _showDeleteDialog = v)"
+                     Message="@($"This will permanently delete the configuration \"{_deleteTarget?.Key}\".")"
+                     OnConfirm="@DeleteConfiguration" />
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private List<RegistryConfiguration> _items = [];
+    private bool _showFormDialog;
+    private bool _showDeleteDialog;
+    private bool _isEditing;
+    private RegistryConfiguration? _editTarget;
+    private RegistryConfiguration? _deleteTarget;
+
+    private string _formKey = "";
+    private string _formValue = "";
+    private string _formUnit = "";
+    private string _formGroupId = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await DataContext.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+
+    private void OpenCreateDialog()
+    {
+        _isEditing = false;
+        _editTarget = null;
+        _formKey = "";
+        _formValue = "";
+        _formUnit = "";
+        _formGroupId = "";
+        _showFormDialog = true;
+    }
+
+    private void OpenEditDialog(RegistryConfiguration config)
+    {
+        _isEditing = true;
+        _editTarget = config;
+        _formKey = config.Key;
+        _formValue = config.Value ?? "";
+        _formUnit = config.Unit ?? "";
+        _formGroupId = config.GroupId.ToString();
+        _showFormDialog = true;
+    }
+
+    private void OpenDeleteDialog(RegistryConfiguration config)
+    {
+        _deleteTarget = config;
+        _showDeleteDialog = true;
+    }
+
+    private async Task SaveConfiguration()
+    {
+        if (string.IsNullOrWhiteSpace(_formKey)) return;
+
+        if (_isEditing && _editTarget is not null)
+        {
+            var fresh = await DataContext.Query<RegistryConfiguration>()
+                .Where(x => x.Id == _editTarget.Id).FirstOrDefaultAsync();
+            if (fresh is null) return;
+
+            fresh.Key = _formKey;
+            fresh.Value = _formValue;
+            fresh.Unit = string.IsNullOrWhiteSpace(_formUnit) ? null : _formUnit;
+            fresh.GroupId = Guid.TryParse(_formGroupId, out var gid) ? gid : fresh.GroupId;
+            DataContext.Update(fresh);
+        }
+        else
+        {
+            var config = new RegistryConfiguration
+            {
+                Id = Guid.NewGuid(),
+                Key = _formKey,
+                Value = _formValue,
+                Unit = string.IsNullOrWhiteSpace(_formUnit) ? null : _formUnit,
+                GroupId = Guid.TryParse(_formGroupId, out var gid) ? gid : Guid.Empty,
+                CreatedAt = DateTime.UtcNow
+            };
+            DataContext.Add(config);
+        }
+
+        var result = await DataContext.SaveChangesAsync();
+        if (!result.IsSuccess)
+        {
+            ToastService.Show($"Error: {result.Message}");
+            return;
+        }
+
+        _showFormDialog = false;
+        _items = await DataContext.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+
+    private async Task DeleteConfiguration()
+    {
+        if (_deleteTarget is not null)
+        {
+            DataContext.Remove(_deleteTarget);
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess ? "Configuration deleted." : $"Error: {result.Message}");
+            _showDeleteDialog = false;
+            _deleteTarget = null;
+            _items = await DataContext.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        }
+    }
+}

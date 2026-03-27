@@ -1,0 +1,51 @@
+@page "/finance/deposit-requests"
+
+<PageTitle>Deposit Requests - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypography Variant="TypographyVariant.H3">Deposit Requests</BbTypography>
+    </div>
+
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+        <BbDataGridTemplateColumn Title="Status">
+            <StatusBadge Text="@GetDepositStatusText(context.DepositStatus)" Status="@GetDepositStatusCategory(context.DepositStatus)" />
+        </BbDataGridTemplateColumn>
+        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNo)" Title="Reference No" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.Address)" Title="Address" />
+        <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
+        <BbDataGridPropertyColumn Property="@(x => x.ExpiryDate)" Title="Expiry Date" Sortable="true" />
+        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+    </BbDataGrid>
+</div>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+
+    private List<DepositRequest> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await DataContext.Query<DepositRequest>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+
+    private string GetDepositStatusText(short? status) => status switch
+    {
+        0 => "Pending",
+        1 => "Approved",
+        2 => "Rejected",
+        3 => "Expired",
+        _ => "Unknown"
+    };
+
+    private string GetDepositStatusCategory(short? status) => status switch
+    {
+        0 => "pending",
+        1 => "approved",
+        2 => "failed",
+        3 => "expired",
+        _ => "inactive"
+    };
+}
