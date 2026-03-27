@@ -548,6 +548,16 @@ public sealed class BoltClient : IAsyncDisposable
         BoltCodec.WriteCallSignal(writer, callId, SignalType.Reject, ReadOnlySpan<byte>.Empty);
         await GetConnection().SendAsync(writer.WrittenMemory, CancellationToken.None);
         writer.Reset();
+
+        // Clean up media streams for this call
+        foreach (var (streamId, stream) in _mediaStreams)
+        {
+            if (stream.CallId == callId)
+            {
+                _mediaStreams.TryRemove(streamId, out _);
+                await stream.DisposeAsync();
+            }
+        }
     }
 
     public async Task EndCallAsync(Guid callId)
@@ -595,6 +605,11 @@ public sealed class BoltClient : IAsyncDisposable
         var isAudio = config.MediaType == MediaType.Audio;
         var stream = new BoltMediaStream(conn, config.StreamId, config.CallId, isAudio);
         _mediaStreams[config.StreamId] = stream;
+
+        // Create and start an ABR controller so receiver feedback drives encoder bitrate
+        var controller = new Media.AdaptiveBitrateController(conn, config.StreamId, config.BitrateKbps, isAudio);
+        _bitrateControllers[config.StreamId] = controller;
+        controller.Start();
 
         if (_activeCalls.TryGetValue(config.CallId, out var call))
         {
@@ -705,6 +720,16 @@ public sealed class BoltClient : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+
+        // Dispose all media streams
+        foreach (var (_, stream) in _mediaStreams)
+            await stream.DisposeAsync();
+        _mediaStreams.Clear();
+
+        // Dispose all ABR controllers
+        foreach (var (_, controller) in _bitrateControllers)
+            await controller.DisposeAsync();
+        _bitrateControllers.Clear();
 
         foreach (var conn in _connections)
         {

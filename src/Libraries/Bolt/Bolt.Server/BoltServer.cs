@@ -18,7 +18,7 @@ namespace Bolt.Server;
 ///
 /// Zero SignalR overhead — frames go directly: binary WebSocket ↔ MemoryPack.
 /// </summary>
-public sealed class BoltServer
+public sealed class BoltServer : IDisposable
 {
     private readonly ILogger<BoltServer> _logger;
     private readonly ConcurrentDictionary<string, BoltHubConnection> _connectionsByStreamId = new();
@@ -1012,6 +1012,14 @@ public sealed class BoltServer
     }
 
     public int ConnectedClients => _connectionsByStreamId.Count;
+
+    public void Dispose()
+    {
+        _mediaTapCts.Cancel();
+        _mediaTapChannel.Writer.TryComplete();
+        _cleanupTimer.Dispose();
+        _mediaTapCts.Dispose();
+    }
 }
 
 public sealed class BoltHubConnection

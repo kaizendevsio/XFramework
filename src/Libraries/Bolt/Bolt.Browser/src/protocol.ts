@@ -592,3 +592,8 @@ export function readFecFrame(data: Uint8Array): FecFrameData | null {
         payload: data.slice(26, 26 + payloadLen),
     };
 }
+
+// ─── Convenience aliases ────────────────────────────────────────────────────
+
+export const FRAME = FrameType;
+export const SIGNAL = SignalType;

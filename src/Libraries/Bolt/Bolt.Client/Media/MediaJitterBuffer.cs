@@ -16,7 +16,7 @@ public sealed class MediaJitterBuffer : IAsyncDisposable
     private int _targetDelayMs;
     private double _jitterEma;
     private long _lastArrivalTicks;
-    private uint _nextExpectedSeq;
+    private uint _nextExpectedSeq = uint.MaxValue;
     private bool _started;
     private readonly PeriodicTimer _playbackTimer;
     private readonly CancellationTokenSource _cts = new();
@@ -80,7 +80,7 @@ public sealed class MediaJitterBuffer : IAsyncDisposable
                 if (_buffer.Count > 0)
                 {
                     var first = _buffer.GetValueAtIndex(0);
-                    if (_nextExpectedSeq == 0) _nextExpectedSeq = first.SequenceNumber;
+                    if (_nextExpectedSeq == uint.MaxValue) _nextExpectedSeq = first.SequenceNumber;
 
                     if (_buffer.TryGetValue(_nextExpectedSeq, out var expected))
                     {

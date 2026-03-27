@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Threading.Channels;
 using Bolt.Client.Media;
 using Bolt.Protocol;
@@ -26,6 +27,7 @@ public sealed class BoltMediaStream : IAsyncDisposable
     private bool _closed;
     private FecEncoder? _fecEncoder;
     private FecDecoder? _fecDecoder;
+    private uint _lastReceivedSeq;
 
     /// <summary>Unique identifier for this media stream.</summary>
     public Guid StreamId { get; }
@@ -61,10 +63,18 @@ public sealed class BoltMediaStream : IAsyncDisposable
 
     /// <summary>
     /// Called internally by the receive loop when an FEC parity frame arrives.
+    /// The payload starts with groupSize * 4 bytes of original frame lengths (int32 LE),
+    /// followed by the XOR parity data.
     /// </summary>
-    internal void EnqueueFecFrame(uint groupStart, byte groupSize, ReadOnlyMemory<byte> parityData)
+    internal void EnqueueFecFrame(uint groupStart, byte groupSize, ReadOnlyMemory<byte> payload)
     {
-        _fecDecoder?.AddFecFrame(groupStart, groupSize, parityData, Array.Empty<int>());
+        if (_fecDecoder == null) return;
+        var span = payload.Span;
+        var lengths = new int[groupSize];
+        for (int i = 0; i < groupSize; i++)
+            lengths[i] = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(i * 4));
+        var parityData = payload.Slice(groupSize * 4);
+        _fecDecoder.AddFecFrame(groupStart, groupSize, parityData, lengths);
     }
 
     /// <summary>
@@ -93,8 +103,17 @@ public sealed class BoltMediaStream : IAsyncDisposable
             var fecResult = _fecEncoder.AddFrame(seq, encodedData);
             if (fecResult != null)
             {
+                // Serialize original frame lengths before parity data so the decoder
+                // can truncate recovered frames to the correct size.
+                var lengthBytes = new byte[fecResult.OriginalLengths.Length * 4];
+                for (int i = 0; i < fecResult.OriginalLengths.Length; i++)
+                    BinaryPrimitives.WriteInt32LittleEndian(lengthBytes.AsSpan(i * 4), fecResult.OriginalLengths[i]);
+                var fecPayload = new byte[lengthBytes.Length + fecResult.ParityData.Length];
+                lengthBytes.CopyTo(fecPayload, 0);
+                fecResult.ParityData.CopyTo(fecPayload, lengthBytes.Length);
+
                 var fecWriter = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WriteFecFrame(fecWriter, StreamId, fecResult.GroupStartSequence, fecResult.GroupSize, fecResult.ParityData);
+                BoltCodec.WriteFecFrame(fecWriter, StreamId, fecResult.GroupStartSequence, fecResult.GroupSize, fecPayload);
                 await _connection.SendAsync(fecWriter.WrittenMemory, ct);
                 fecWriter.Reset();
             }
@@ -112,6 +131,22 @@ public sealed class BoltMediaStream : IAsyncDisposable
         var copy = new byte[data.Length];
         data.CopyTo(copy);
         _inbound.Writer.TryWrite(new MediaFrameData(seq, timestamp, copy, isKeyframe));
+
+        // Register frame with FEC decoder for potential recovery
+        _fecDecoder?.AddFrame(seq, seq, data);
+
+        // Check for gaps and attempt FEC recovery for missing frames
+        if (_fecDecoder != null && _lastReceivedSeq > 0)
+        {
+            for (uint missing = _lastReceivedSeq + 1; missing < seq; missing++)
+            {
+                if (_fecDecoder.TryRecover(missing, missing, out var recovered))
+                {
+                    _inbound.Writer.TryWrite(new MediaFrameData(missing, 0, recovered, false));
+                }
+            }
+        }
+        _lastReceivedSeq = seq;
     }
 
     /// <summary>
