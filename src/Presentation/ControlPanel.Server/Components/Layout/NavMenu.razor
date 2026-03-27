@@ -1,228 +1,124 @@
-<BbSidebarGroup>
+@* Dashboard *@
+<div class="space-y-1">
+    <NavLink href="/" Match="NavLinkMatch.All"
+             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+             ActiveClass="bg-accent text-accent-foreground">
+        <LucideIcon Name="layout-dashboard" class="h-4 w-4" />
+        Dashboard
+    </NavLink>
+</div>
 
-        <BbSidebarGroupContent>
-            <BbSidebarMenu>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/" Match="NavLinkMatch.All" Tooltip="Dashboard">
-                    <LucideIcon Name="layout-dashboard" class="h-4 w-4" />
-                    <span>Dashboard</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            </BbSidebarMenu>
-        </BbSidebarGroupContent>
+@* Identity *@
+<div class="mt-4">
+    <p class="px-3 mb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">Identity</p>
+    <div class="space-y-0.5">
+        <NavLink href="/identity/users" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="users" class="h-4 w-4" /> Users
+        </NavLink>
+        <NavLink href="/identity/credentials" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="key-round" class="h-4 w-4" /> Credentials
+        </NavLink>
+        <NavLink href="/identity/roles" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="shield" class="h-4 w-4" /> Roles
+        </NavLink>
+        <NavLink href="/identity/sessions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="monitor" class="h-4 w-4" /> Sessions
+        </NavLink>
+        <NavLink href="/identity/auth-logs" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="scroll-text" class="h-4 w-4" /> Auth Logs
+        </NavLink>
+        <NavLink href="/identity/verifications" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="shield-check" class="h-4 w-4" /> Verifications
+        </NavLink>
+        <NavLink href="/identity/contacts" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="contact" class="h-4 w-4" /> Contacts
+        </NavLink>
+        <NavLink href="/identity/addresses" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="map-pin" class="h-4 w-4" /> Addresses
+        </NavLink>
+        <NavLink href="/identity/tenants" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="building-2" class="h-4 w-4" /> Tenants
+        </NavLink>
+    </div>
+</div>
 
-</BbSidebarGroup>
+@* Finance *@
+<div class="mt-4">
+    <p class="px-3 mb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">Finance</p>
+    <div class="space-y-0.5">
+        <NavLink href="/finance/wallets" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="wallet" class="h-4 w-4" /> Wallets
+        </NavLink>
+        <NavLink href="/finance/transactions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="arrow-left-right" class="h-4 w-4" /> Transactions
+        </NavLink>
+        <NavLink href="/finance/transfers" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="send" class="h-4 w-4" /> Transfers
+        </NavLink>
+        <NavLink href="/finance/batch-operations" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="layers" class="h-4 w-4" /> Batch Operations
+        </NavLink>
+        <NavLink href="/finance/deposit-requests" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="arrow-down-to-line" class="h-4 w-4" /> Deposits
+        </NavLink>
+        <NavLink href="/finance/withdrawal-requests" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="arrow-up-from-line" class="h-4 w-4" /> Withdrawals
+        </NavLink>
+    </div>
+</div>
 
-<BbSidebarGroup>
-    <BbSidebarGroupLabel>Identity</BbSidebarGroupLabel>
+@* Lookups *@
+<div class="mt-4">
+    <p class="px-3 mb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">Lookups</p>
+    <div class="space-y-0.5">
+        <NavLink href="/lookups/role-types" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Role Types
+        </NavLink>
+        <NavLink href="/lookups/role-type-groups" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Role Type Groups
+        </NavLink>
+        <NavLink href="/lookups/contact-types" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Contact Types
+        </NavLink>
+        <NavLink href="/lookups/contact-groups" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Contact Groups
+        </NavLink>
+        <NavLink href="/lookups/address-types" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Address Types
+        </NavLink>
+        <NavLink href="/lookups/address-hierarchy" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="globe" class="h-4 w-4" /> Address Hierarchy
+        </NavLink>
+        <NavLink href="/lookups/verification-types" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Verification Types
+        </NavLink>
+        <NavLink href="/lookups/session-types" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Session Types
+        </NavLink>
+        <NavLink href="/lookups/wallet-types" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Wallet Types
+        </NavLink>
+        <NavLink href="/lookups/currency-types" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="coins" class="h-4 w-4" /> Currency Types
+        </NavLink>
+        <NavLink href="/lookups/exchange-rates" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="arrow-right-left" class="h-4 w-4" /> Exchange Rates
+        </NavLink>
+        <NavLink href="/lookups/configurations" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="settings" class="h-4 w-4" /> Configurations
+        </NavLink>
+        <NavLink href="/lookups/configuration-groups" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="tag" class="h-4 w-4" /> Config Groups
+        </NavLink>
+    </div>
+</div>
 
-        <BbSidebarGroupContent>
-            <BbSidebarMenu>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/users" Tooltip="Users">
-                    <LucideIcon Name="users" class="h-4 w-4" />
-                    <span>Users</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/credentials" Tooltip="Credentials">
-                    <LucideIcon Name="key-round" class="h-4 w-4" />
-                    <span>Credentials</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/roles" Tooltip="Roles">
-                    <LucideIcon Name="shield" class="h-4 w-4" />
-                    <span>Roles</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/sessions" Tooltip="Sessions">
-                    <LucideIcon Name="monitor" class="h-4 w-4" />
-                    <span>Sessions</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/auth-logs" Tooltip="Auth Logs">
-                    <LucideIcon Name="scroll-text" class="h-4 w-4" />
-                    <span>Auth Logs</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/verifications" Tooltip="Verifications">
-                    <LucideIcon Name="shield-check" class="h-4 w-4" />
-                    <span>Verifications</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/contacts" Tooltip="Contacts">
-                    <LucideIcon Name="contact" class="h-4 w-4" />
-                    <span>Contacts</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/addresses" Tooltip="Addresses">
-                    <LucideIcon Name="map-pin" class="h-4 w-4" />
-                    <span>Addresses</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/identity/tenants" Tooltip="Tenants">
-                    <LucideIcon Name="building-2" class="h-4 w-4" />
-                    <span>Tenants</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            </BbSidebarMenu>
-        </BbSidebarGroupContent>
-
-</BbSidebarGroup>
-
-<BbSidebarGroup>
-    <BbSidebarGroupLabel>Finance</BbSidebarGroupLabel>
-
-        <BbSidebarGroupContent>
-            <BbSidebarMenu>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/finance/wallets" Tooltip="Wallets">
-                    <LucideIcon Name="wallet" class="h-4 w-4" />
-                    <span>Wallets</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/finance/transactions" Tooltip="Transactions">
-                    <LucideIcon Name="arrow-left-right" class="h-4 w-4" />
-                    <span>Transactions</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/finance/transfers" Tooltip="Transfers">
-                    <LucideIcon Name="send" class="h-4 w-4" />
-                    <span>Transfers</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/finance/batch-operations" Tooltip="Batch Operations">
-                    <LucideIcon Name="layers" class="h-4 w-4" />
-                    <span>Batch Operations</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/finance/deposit-requests" Tooltip="Deposit Requests">
-                    <LucideIcon Name="arrow-down-to-line" class="h-4 w-4" />
-                    <span>Deposit Requests</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/finance/withdrawal-requests" Tooltip="Withdrawal Requests">
-                    <LucideIcon Name="arrow-up-from-line" class="h-4 w-4" />
-                    <span>Withdrawal Requests</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            </BbSidebarMenu>
-        </BbSidebarGroupContent>
-
-</BbSidebarGroup>
-
-<BbSidebarGroup>
-    <BbSidebarGroupLabel>Lookups</BbSidebarGroupLabel>
-
-        <BbSidebarGroupContent>
-            <BbSidebarMenu>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/role-types" Tooltip="Role Types">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Role Types</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/role-type-groups" Tooltip="Role Type Groups">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Role Type Groups</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/contact-types" Tooltip="Contact Types">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Contact Types</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/contact-groups" Tooltip="Contact Groups">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Contact Groups</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/address-types" Tooltip="Address Types">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Address Types</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/address-hierarchy" Tooltip="Address Hierarchy">
-                    <LucideIcon Name="globe" class="h-4 w-4" />
-                    <span>Address Hierarchy</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/verification-types" Tooltip="Verification Types">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Verification Types</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/session-types" Tooltip="Session Types">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Session Types</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/wallet-types" Tooltip="Wallet Types">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Wallet Types</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/currency-types" Tooltip="Currency Types">
-                    <LucideIcon Name="coins" class="h-4 w-4" />
-                    <span>Currency Types</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/exchange-rates" Tooltip="Exchange Rates">
-                    <LucideIcon Name="arrow-right-left" class="h-4 w-4" />
-                    <span>Exchange Rates</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/configurations" Tooltip="Configurations">
-                    <LucideIcon Name="settings" class="h-4 w-4" />
-                    <span>Configurations</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/lookups/configuration-groups" Tooltip="Configuration Groups">
-                    <LucideIcon Name="tag" class="h-4 w-4" />
-                    <span>Configuration Groups</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            </BbSidebarMenu>
-        </BbSidebarGroupContent>
-
-</BbSidebarGroup>
-
-<BbSidebarGroup>
-    <BbSidebarGroupLabel>Storage</BbSidebarGroupLabel>
-
-        <BbSidebarGroupContent>
-            <BbSidebarMenu>
-            <BbSidebarMenuItem>
-                <BbSidebarMenuButton Href="/storage/files" Tooltip="Files">
-                    <LucideIcon Name="file" class="h-4 w-4" />
-                    <span>Files</span>
-                </BbSidebarMenuButton>
-            </BbSidebarMenuItem>
-            </BbSidebarMenu>
-        </BbSidebarGroupContent>
-
-</BbSidebarGroup>
+@* Storage *@
+<div class="mt-4">
+    <p class="px-3 mb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">Storage</p>
+    <div class="space-y-0.5">
+        <NavLink href="/storage/files" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent" ActiveClass="bg-accent text-accent-foreground">
+            <LucideIcon Name="file" class="h-4 w-4" /> Files
+        </NavLink>
+    </div>
+</div>

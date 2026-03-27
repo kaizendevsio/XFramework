@@ -1,37 +1,35 @@
 @inherits LayoutComponentBase
 
-<BbSidebarProvider DefaultOpen="true" Variant="SidebarVariant.Sidebar">
-    <BbSidebar>
-        <BbSidebarHeader>
-            <BbSidebarHeaderContent>
-                <div class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+<div class="flex min-h-screen">
+    @* Fixed left sidebar — always visible, no toggle *@
+    <aside class="w-64 shrink-0 border-r bg-card">
+        <div class="flex flex-col h-full">
+            @* Header *@
+            <div class="flex items-center gap-2 px-4 h-14 border-b">
+                <div class="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
                     X
                 </div>
-                <BbSidebarHeaderInfo>
-                    <span class="truncate font-semibold">Control Panel</span>
-                    <span class="truncate text-xs text-muted-foreground">XFramework Admin</span>
-                </BbSidebarHeaderInfo>
-            </BbSidebarHeaderContent>
-        </BbSidebarHeader>
-        <BbSidebarContent>
-            <NavMenu />
-        </BbSidebarContent>
-        <BbSidebarFooter>
-            <BbSidebarMenu>
-                <BbSidebarMenuItem>
-                    <BbSidebarMenuButton>
-                        <LucideIcon Name="settings" class="h-4 w-4" />
-                        <span>Settings</span>
-                    </BbSidebarMenuButton>
-                </BbSidebarMenuItem>
-            </BbSidebarMenu>
-        </BbSidebarFooter>
-        <BbSidebarRail />
-    </BbSidebar>
-    <BbSidebarInset>
-        <header class="flex h-16 items-center gap-2 border-b px-4">
-            <BbSidebarTrigger />
-            <BbSeparator Orientation="SeparatorOrientation.Vertical" Class="h-4" />
+                <div>
+                    <span class="text-sm font-semibold">Control Panel</span>
+                    <p class="text-[10px] text-muted-foreground leading-none">XFramework Admin</p>
+                </div>
+            </div>
+
+            @* Scrollable nav *@
+            <nav class="flex-1 overflow-y-auto p-3">
+                <NavMenu />
+            </nav>
+
+            @* Footer *@
+            <div class="border-t px-4 py-3">
+                <span class="text-xs text-muted-foreground">XFramework Admin</span>
+            </div>
+        </div>
+    </aside>
+
+    @* Main content *@
+    <div class="flex-1 flex flex-col min-w-0">
+        <header class="flex items-center gap-2 px-6 h-14 border-b shrink-0">
             <BbBreadcrumb>
                 <BbBreadcrumbList>
                     <BbBreadcrumbItem>
@@ -40,11 +38,11 @@
                 </BbBreadcrumbList>
             </BbBreadcrumb>
         </header>
-        <main class="flex-1 p-4">
+        <main class="flex-1 p-6 overflow-y-auto">
             @Body
         </main>
-    </BbSidebarInset>
-</BbSidebarProvider>
+    </div>
+</div>
 
 <BbToastProvider Position="ToastPosition.BottomRight" />
 <BbDialogProvider />
