@@ -4,11 +4,11 @@ using XFramework.Core.DataContext;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Blazor Server
+// Add services to the container
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// BlueprintUI
+// Add BlazorBlueprint services
 builder.Services.AddBlazorBlueprintComponents();
 
 // Database + IDataContext (ServerDataContext = direct EF Core)
@@ -25,13 +25,14 @@ builder.Services.AddServerDataContext<AppDbContext>();
 
 var app = builder.Build();
 
+// Configure the HTTP request pipeline
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
 
-app.UseStaticFiles();
+app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
