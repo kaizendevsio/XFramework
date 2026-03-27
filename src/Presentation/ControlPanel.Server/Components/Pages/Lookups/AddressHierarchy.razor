@@ -90,18 +90,10 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var countriesTask = DataContext.Query<AddressCountry>().OrderBy(x => x.Name).ToListAsync();
-        var regionsTask = DataContext.Query<AddressRegion>().OrderBy(x => x.Description).Take(100).ToListAsync();
-        var provincesTask = DataContext.Query<AddressProvince>().OrderBy(x => x.Description).Take(200).ToListAsync();
-        var citiesTask = DataContext.Query<AddressCity>().OrderBy(x => x.Description).Take(500).ToListAsync();
-        var barangaysTask = DataContext.Query<AddressBarangay>().OrderBy(x => x.Description).Take(500).ToListAsync();
-
-        await Task.WhenAll(countriesTask, regionsTask, provincesTask, citiesTask, barangaysTask);
-
-        _countries = countriesTask.Result;
-        _regions = regionsTask.Result;
-        _provinces = provincesTask.Result;
-        _cities = citiesTask.Result;
-        _barangays = barangaysTask.Result;
+        _countries = await DataContext.Query<AddressCountry>().OrderBy(x => x.Name).ToListAsync();
+        _regions = await DataContext.Query<AddressRegion>().OrderBy(x => x.Description).Take(100).ToListAsync();
+        _provinces = await DataContext.Query<AddressProvince>().OrderBy(x => x.Description).Take(200).ToListAsync();
+        _cities = await DataContext.Query<AddressCity>().OrderBy(x => x.Description).Take(500).ToListAsync();
+        _barangays = await DataContext.Query<AddressBarangay>().OrderBy(x => x.Description).Take(500).ToListAsync();
     }
 }

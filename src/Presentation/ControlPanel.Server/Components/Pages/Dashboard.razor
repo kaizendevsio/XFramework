@@ -61,18 +61,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var usersTask = DataContext.Query<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().CountAsync();
-        var sessionsTask = DataContext.Query<IdentityServer.Domain.Shared.Contracts.Session>()
+        _userCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().CountAsync();
+        _sessionCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Session>()
             .Where(s => s.Status == XFramework.Domain.Shared.Enums.CurrentSessionState.Active)
             .CountAsync();
-        var walletsTask = DataContext.Query<Wallets.Domain.Shared.Contracts.Wallet>().CountAsync();
-        var tenantsTask = DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>().CountAsync();
-
-        await Task.WhenAll(usersTask, sessionsTask, walletsTask, tenantsTask);
-
-        _userCount = usersTask.Result;
-        _sessionCount = sessionsTask.Result;
-        _walletCount = walletsTask.Result;
-        _tenantCount = tenantsTask.Result;
+        _walletCount = await DataContext.Query<Wallets.Domain.Shared.Contracts.Wallet>().CountAsync();
+        _tenantCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>().CountAsync();
     }
 }

@@ -159,26 +159,30 @@ else
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
 
-        // Load contacts and roles per credential (List.Contains not supported by expression visitor)
-        var contactTasks = _credentials.Select(c =>
-            DataContext.Query<IdentityContact>()
+        // Load contacts and roles per credential sequentially (DbContext is not thread-safe)
+        foreach (var cred in _credentials)
+        {
+            var contacts = await DataContext.Query<IdentityContact>()
                 .Include(x => x.Type)
-                .Where(x => x.CredentialId == c.Id)
-                .ToListAsync());
-        var contactResults = await Task.WhenAll(contactTasks);
-        _contacts = contactResults.SelectMany(x => x).OrderByDescending(x => x.CreatedAt).ToList();
+                .Where(x => x.CredentialId == cred.Id)
+                .ToListAsync();
+            _contacts.AddRange(contacts);
+        }
+        _contacts = _contacts.OrderByDescending(x => x.CreatedAt).ToList();
 
         _addresses = await DataContext.Query<IdentityAddress>()
             .Where(x => x.IdentityInfoId == Id)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
 
-        var roleTasks = _credentials.Select(c =>
-            DataContext.Query<IdentityRole>()
+        foreach (var cred in _credentials)
+        {
+            var roles = await DataContext.Query<IdentityRole>()
                 .Include(x => x.Type)
-                .Where(x => x.CredentialId == c.Id)
-                .ToListAsync());
-        var roleResults = await Task.WhenAll(roleTasks);
-        _roles = roleResults.SelectMany(x => x).OrderByDescending(x => x.CreatedAt).ToList();
+                .Where(x => x.CredentialId == cred.Id)
+                .ToListAsync();
+            _roles.AddRange(roles);
+        }
+        _roles = _roles.OrderByDescending(x => x.CreatedAt).ToList();
     }
 }
