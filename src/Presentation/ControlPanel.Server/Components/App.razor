@@ -13,10 +13,10 @@
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
     <!-- App styles (Tailwind utilities) -->
     <link href="css/app.css" rel="stylesheet" />
-    <HeadOutlet @rendermode="new InteractiveServerRenderMode(prerender: false)" />
+    <HeadOutlet />
 </head>
 <body class="font-sans antialiased">
-    <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
+    <Routes @rendermode="InteractiveServer" />
 
     <div id="blazor-error-ui" class="hidden fixed bottom-0 left-0 right-0 z-50 p-4 bg-destructive text-destructive-foreground">
         An error has occurred. This application may no longer respond until reloaded.
