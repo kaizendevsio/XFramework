@@ -91,6 +91,7 @@
 
     <!-- Blazor & UI Components -->
     <PackageVersion Include="BlazorBlueprint.Components" Version="3.9.2" />
+    <PackageVersion Include="BlazorBlueprint.Primitives" Version="3.9.2" />
     <PackageVersion Include="BlazorBlueprint.Icons.Lucide" Version="2.0.0" />
     <PackageVersion Include="Blazored.LocalStorage" Version="4.5.0" />
     <PackageVersion Include="Blazored.SessionStorage" Version="2.4.0" />
