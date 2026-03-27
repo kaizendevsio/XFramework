@@ -8,10 +8,12 @@
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.DefaultExpiry)" Title="Default Expiry" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Priority)" Title="Priority" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.DefaultExpiry)" Title="Default Expiry" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Priority)" Title="Priority" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        </Columns>
     </BbDataGrid>
 </div>
 

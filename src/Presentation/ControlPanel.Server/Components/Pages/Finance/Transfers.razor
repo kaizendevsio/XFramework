@@ -8,13 +8,17 @@
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <BbDataGridPropertyColumn Property="@(x => x.SenderTransactionId)" Title="Sender Transaction ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.RecipientTransactionId)" Title="Recipient Transaction ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Purpose">
-            <BbBadge Variant="BadgeVariant.Outline">@context.TransactionPurpose</BbBadge>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.SenderTransactionId)" Title="Sender Transaction ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.RecipientTransactionId)" Title="Recipient Transaction ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Purpose">
+                <ChildContent Context="item">
+                    <BbBadge Variant="BadgeVariant.Outline">@item.TransactionPurpose</BbBadge>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
     </BbDataGrid>
 </div>
 

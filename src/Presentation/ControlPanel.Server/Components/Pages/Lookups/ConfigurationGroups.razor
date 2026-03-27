@@ -8,9 +8,11 @@
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
-        <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+            <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        </Columns>
     </BbDataGrid>
 </div>
 

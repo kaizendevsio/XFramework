@@ -8,33 +8,35 @@
     </div>
 
     <BbDataGrid Items="@_tenants">
-        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
-        <BbDataGridTemplateColumn Title="Status">
-            <ChildContent Context="tenant">
-                @{
-                    var statusText = tenant.Status switch
-                    {
-                        0 => "Inactive",
-                        1 => "Active",
-                        2 => "Suspended",
-                        _ => "Unknown"
-                    };
-                    var statusKey = tenant.Status switch
-                    {
-                        0 => "inactive",
-                        1 => "active",
-                        2 => "suspended",
-                        _ => "inactive"
-                    };
-                }
-                <StatusBadge Text="@statusText" Status="@statusKey" />
-            </ChildContent>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.Version)" Title="Version" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Expiration)" Title="Expiration" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.AvailabilityDate)" Title="Availability" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+            <BbDataGridTemplateColumn Title="Status">
+                <ChildContent Context="item">
+                    @{
+                        var statusText = item.Status switch
+                        {
+                            0 => "Inactive",
+                            1 => "Active",
+                            2 => "Suspended",
+                            _ => "Unknown"
+                        };
+                        var statusKey = item.Status switch
+                        {
+                            0 => "inactive",
+                            1 => "active",
+                            2 => "suspended",
+                            _ => "inactive"
+                        };
+                    }
+                    <StatusBadge Text="@statusText" Status="@statusKey" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.Version)" Title="Version" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Expiration)" Title="Expiration" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.AvailabilityDate)" Title="Availability" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
     </BbDataGrid>
 </div>
 

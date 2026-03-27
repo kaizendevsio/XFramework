@@ -8,27 +8,35 @@
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Type">
-            <BbBadge Variant="@(context.TransactionType == TransactionType.Credit ? BadgeVariant.Default : BadgeVariant.Destructive)">
-                @context.TransactionType
-            </BbBadge>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Held">
-            <BbBadge Variant="@(context.Held ? BadgeVariant.Outline : BadgeVariant.Secondary)">
-                @(context.Held ? "Yes" : "No")
-            </BbBadge>
-        </BbDataGridTemplateColumn>
-        <BbDataGridTemplateColumn Title="Released">
-            <BbBadge Variant="@(context.Released ? BadgeVariant.Default : BadgeVariant.Secondary)">
-                @(context.Released ? "Yes" : "No")
-            </BbBadge>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Type">
+                <ChildContent Context="item">
+                    <BbBadge Variant="@(item.TransactionType == TransactionType.Credit ? BadgeVariant.Default : BadgeVariant.Destructive)">
+                        @item.TransactionType
+                    </BbBadge>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Held">
+                <ChildContent Context="item">
+                    <BbBadge Variant="@(item.Held ? BadgeVariant.Outline : BadgeVariant.Secondary)">
+                        @(item.Held ? "Yes" : "No")
+                    </BbBadge>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Released">
+                <ChildContent Context="item">
+                    <BbBadge Variant="@(item.Released ? BadgeVariant.Default : BadgeVariant.Secondary)">
+                        @(item.Released ? "Yes" : "No")
+                    </BbBadge>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
     </BbDataGrid>
 </div>
 

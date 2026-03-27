@@ -10,38 +10,44 @@
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account Number" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available Balance" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.DebitOnHoldBalance)" Title="Debit On Hold" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CreditOnHoldBalance)" Title="Credit On Hold" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Status">
-            <StatusBadge Text="@context.Status.ToString()" Status="@GetStatusText(context.Status)" />
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Actions">
-            <div class="flex items-center gap-2">
-                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                          OnClick="@(() => NavigationManager.NavigateTo($"/finance/wallets/{context.Id}"))">
-                    View
-                </BbButton>
-                @if (context.Status == WalletStatus.Active)
-                {
-                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                              OnClick="@(() => ToggleFreeze(context))">
-                        Freeze
-                    </BbButton>
-                }
-                else if (context.Status == WalletStatus.Frozen)
-                {
-                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                              OnClick="@(() => ToggleFreeze(context))">
-                        Unfreeze
-                    </BbButton>
-                }
-            </div>
-        </BbDataGridTemplateColumn>
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.AccountNumber)" Title="Account Number" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Balance)" Title="Balance" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.AvailableBalance)" Title="Available Balance" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.DebitOnHoldBalance)" Title="Debit On Hold" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreditOnHoldBalance)" Title="Credit On Hold" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Status">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusText(item.Status)" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Actions">
+                <ChildContent Context="item">
+                    <div class="flex items-center gap-2">
+                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                  OnClick="@(() => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))">
+                            View
+                        </BbButton>
+                        @if (item.Status == WalletStatus.Active)
+                        {
+                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                      OnClick="@(() => ToggleFreeze(item))">
+                                Freeze
+                            </BbButton>
+                        }
+                        else if (item.Status == WalletStatus.Frozen)
+                        {
+                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                      OnClick="@(() => ToggleFreeze(item))">
+                                Unfreeze
+                            </BbButton>
+                        }
+                    </div>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+        </Columns>
     </BbDataGrid>
 </div>
 

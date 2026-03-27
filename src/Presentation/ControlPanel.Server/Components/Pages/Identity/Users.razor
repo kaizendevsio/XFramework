@@ -12,40 +12,42 @@
     </div>
 
     <BbDataGrid Items="@_users">
-        <BbDataGridPropertyColumn Property="@(x => x.FirstName)" Title="First Name" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.LastName)" Title="Last Name" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.IdentityName)" Title="Identity Name" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.BirthDate)" Title="Birth Date" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Gender">
-            <ChildContent Context="user">
-                @(user.Gender?.ToString() ?? "N/A")
-            </ChildContent>
-        </BbDataGridTemplateColumn>
-        <BbDataGridTemplateColumn Title="Verified">
-            <ChildContent Context="user">
-                <StatusBadge Text="@(user.IsVerified ? "Verified" : "Unverified")"
-                             Status="@(user.IsVerified ? "active" : "inactive")" />
-            </ChildContent>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Actions">
-            <ChildContent Context="user">
-                <div class="flex items-center gap-2">
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                              OnClick="@(() => NavigateToDetail(user.Id))">
-                        <LucideEye class="h-4 w-4" />
-                    </BbButton>
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                              OnClick="@(() => OpenEditDialog(user))">
-                        <LucidePencil class="h-4 w-4" />
-                    </BbButton>
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                              OnClick="@(() => OpenDeleteDialog(user))">
-                        <LucideTrash2 class="h-4 w-4" />
-                    </BbButton>
-                </div>
-            </ChildContent>
-        </BbDataGridTemplateColumn>
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.FirstName)" Title="First Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.LastName)" Title="Last Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.IdentityName)" Title="Identity Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.BirthDate)" Title="Birth Date" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Gender">
+                <ChildContent Context="item">
+                    @(item.Gender?.ToString() ?? "N/A")
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Verified">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@(item.IsVerified ? "Verified" : "Unverified")"
+                                 Status="@(item.IsVerified ? "active" : "inactive")" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Actions">
+                <ChildContent Context="item">
+                    <div class="flex items-center gap-2">
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => NavigateToDetail(item.Id))">
+                            <LucideEye class="h-4 w-4" />
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => OpenEditDialog(item))">
+                            <LucidePencil class="h-4 w-4" />
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => OpenDeleteDialog(item))">
+                            <LucideTrash2 class="h-4 w-4" />
+                        </BbButton>
+                    </div>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+        </Columns>
     </BbDataGrid>
 </div>
 

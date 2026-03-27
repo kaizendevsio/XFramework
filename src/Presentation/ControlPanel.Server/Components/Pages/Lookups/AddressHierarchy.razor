@@ -14,11 +14,13 @@
         </BbCardHeader>
         <BbCardContent>
             <BbDataGrid Items="@_countries" ShowPagination="true" InitialPageSize="10">
-                <BbDataGridPropertyColumn Property="@(x => x.IsoCode2)" Title="ISO Code 2" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.IsoCode3)" Title="ISO Code 3" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Language)" Title="Language" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.PhoneCountryCode)" Title="Phone Code" Sortable="true" />
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.IsoCode2)" Title="ISO Code 2" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.IsoCode3)" Title="ISO Code 3" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Language)" Title="Language" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.PhoneCountryCode)" Title="Phone Code" Sortable="true" />
+                </Columns>
             </BbDataGrid>
         </BbCardContent>
     </BbCard>
@@ -30,9 +32,11 @@
         </BbCardHeader>
         <BbCardContent>
             <BbDataGrid Items="@_regions" ShowPagination="true" InitialPageSize="10">
-                <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                </Columns>
             </BbDataGrid>
         </BbCardContent>
     </BbCard>
@@ -44,9 +48,11 @@
         </BbCardHeader>
         <BbCardContent>
             <BbDataGrid Items="@_provinces" ShowPagination="true" InitialPageSize="10">
-                <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                </Columns>
             </BbDataGrid>
         </BbCardContent>
     </BbCard>
@@ -58,9 +64,11 @@
         </BbCardHeader>
         <BbCardContent>
             <BbDataGrid Items="@_cities" ShowPagination="true" InitialPageSize="10">
-                <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.PsgcCode)" Title="PSGC Code" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                </Columns>
             </BbDataGrid>
         </BbCardContent>
     </BbCard>
@@ -72,8 +80,10 @@
         </BbCardHeader>
         <BbCardContent>
             <BbDataGrid Items="@_barangays" ShowPagination="true" InitialPageSize="10">
-                <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
-                <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" Sortable="true" />
+                </Columns>
             </BbDataGrid>
         </BbCardContent>
     </BbCard>

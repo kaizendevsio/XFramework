@@ -12,32 +12,34 @@
     </div>
 
     <BbDataGrid Items="@_addresses">
-        <BbDataGridPropertyColumn Property="@(x => x.IdentityInfoId)" Title="User ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" />
-        <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" />
-        <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Default">
-            <ChildContent Context="addr">
-                <StatusBadge Text="@(addr.DefaultAddress == true ? "Default" : "No")"
-                             Status="@(addr.DefaultAddress == true ? "active" : "inactive")" />
-            </ChildContent>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Actions">
-            <ChildContent Context="addr">
-                <div class="flex items-center gap-2">
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                              OnClick="@(() => OpenEditDialog(addr))">
-                        <LucidePencil class="h-4 w-4" />
-                    </BbButton>
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                              OnClick="@(() => OpenDeleteDialog(addr))">
-                        <LucideTrash2 class="h-4 w-4" />
-                    </BbButton>
-                </div>
-            </ChildContent>
-        </BbDataGridTemplateColumn>
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.IdentityInfoId)" Title="User ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" />
+            <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" />
+            <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Default">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@(item.DefaultAddress == true ? "Default" : "No")"
+                                 Status="@(item.DefaultAddress == true ? "active" : "inactive")" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Actions">
+                <ChildContent Context="item">
+                    <div class="flex items-center gap-2">
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => OpenEditDialog(item))">
+                            <LucidePencil class="h-4 w-4" />
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => OpenDeleteDialog(item))">
+                            <LucideTrash2 class="h-4 w-4" />
+                        </BbButton>
+                    </div>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+        </Columns>
     </BbDataGrid>
 </div>
 

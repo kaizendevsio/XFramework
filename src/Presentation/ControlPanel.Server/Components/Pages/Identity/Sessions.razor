@@ -8,20 +8,22 @@
     </div>
 
     <BbDataGrid Items="@_sessions">
-        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Status">
-            <ChildContent Context="session">
-                <StatusBadge Text="@GetStatusText(session.Status)"
-                             Status="@GetStatusKey(session.Status)" />
-            </ChildContent>
-        </BbDataGridTemplateColumn>
-        <BbDataGridTemplateColumn Title="Session Data">
-            <ChildContent Context="session">
-                @(Truncate(session.SessionData, 50))
-            </ChildContent>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires At" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Status">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@GetStatusText(item.Status)"
+                                 Status="@GetStatusKey(item.Status)" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Session Data">
+                <ChildContent Context="item">
+                    @(Truncate(item.SessionData, 50))
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires At" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
     </BbDataGrid>
 </div>
 

@@ -77,57 +77,65 @@ else
 
             <BbTabsContent Value="credentials">
                 <BbDataGrid Items="@_credentials">
-                    <BbDataGridPropertyColumn Property="@(x => x.UserName)" Title="Username" Sortable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.UserAlias)" Title="Alias" Sortable="true" />
-                    <BbDataGridTemplateColumn Title="Online">
-                        <ChildContent Context="cred">
-                            <StatusBadge Text="@(cred.IsOnline ? "Online" : "Offline")"
-                                         Status="@(cred.IsOnline ? "online" : "inactive")" />
-                        </ChildContent>
-                    </BbDataGridTemplateColumn>
-                    <BbDataGridPropertyColumn Property="@(x => x.LastSeen)" Title="Last Seen" Sortable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.Device)" Title="Device" />
-                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.UserName)" Title="Username" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.UserAlias)" Title="Alias" Sortable="true" />
+                        <BbDataGridTemplateColumn Title="Online">
+                            <ChildContent Context="item">
+                                <StatusBadge Text="@(item.IsOnline ? "Online" : "Offline")"
+                                             Status="@(item.IsOnline ? "online" : "inactive")" />
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.LastSeen)" Title="Last Seen" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Device)" Title="Device" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
                 </BbDataGrid>
             </BbTabsContent>
 
             <BbTabsContent Value="contacts">
                 <BbDataGrid Items="@_contacts">
-                    <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
-                    <BbDataGridTemplateColumn Title="Type">
-                        <ChildContent Context="contact">
-                            @(contact.Type?.Name ?? contact.TypeId?.ToString() ?? "N/A")
-                        </ChildContent>
-                    </BbDataGridTemplateColumn>
-                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
+                        <BbDataGridTemplateColumn Title="Type">
+                            <ChildContent Context="item">
+                                @(item.Type?.Name ?? item.TypeId?.ToString() ?? "N/A")
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
                 </BbDataGrid>
             </BbTabsContent>
 
             <BbTabsContent Value="addresses">
                 <BbDataGrid Items="@_addresses">
-                    <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" />
-                    <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" />
-                    <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" />
-                    <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" />
-                    <BbDataGridTemplateColumn Title="Default">
-                        <ChildContent Context="addr">
-                            <StatusBadge Text="@(addr.DefaultAddress == true ? "Default" : "No")"
-                                         Status="@(addr.DefaultAddress == true ? "active" : "inactive")" />
-                        </ChildContent>
-                    </BbDataGridTemplateColumn>
-                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    <Columns>
+                        <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" />
+                        <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" />
+                        <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" />
+                        <BbDataGridTemplateColumn Title="Default">
+                            <ChildContent Context="item">
+                                <StatusBadge Text="@(item.DefaultAddress == true ? "Default" : "No")"
+                                             Status="@(item.DefaultAddress == true ? "active" : "inactive")" />
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
                 </BbDataGrid>
             </BbTabsContent>
 
             <BbTabsContent Value="roles">
                 <BbDataGrid Items="@_roles">
-                    <BbDataGridTemplateColumn Title="Role Type">
-                        <ChildContent Context="role">
-                            @(role.Type?.Name ?? role.TypeId?.ToString() ?? "N/A")
-                        </ChildContent>
-                    </BbDataGridTemplateColumn>
-                    <BbDataGridPropertyColumn Property="@(x => x.RoleExpiration)" Title="Expiration" Sortable="true" />
-                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    <Columns>
+                        <BbDataGridTemplateColumn Title="Role Type">
+                            <ChildContent Context="item">
+                                @(item.Type?.Name ?? item.TypeId?.ToString() ?? "N/A")
+                            </ChildContent>
+                        </BbDataGridTemplateColumn>
+                        <BbDataGridPropertyColumn Property="@(x => x.RoleExpiration)" Title="Expiration" Sortable="true" />
+                        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    </Columns>
                 </BbDataGrid>
             </BbTabsContent>
         </BbTabs>

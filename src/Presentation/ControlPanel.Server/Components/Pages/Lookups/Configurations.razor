@@ -9,23 +9,27 @@
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <BbDataGridPropertyColumn Property="@(x => x.Key)" Title="Key" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Unit)" Title="Unit" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.GroupId)" Title="Group ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Actions">
-            <div class="flex items-center gap-2">
-                <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                          OnClick="@(() => OpenEditDialog(context))">
-                    Edit
-                </BbButton>
-                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
-                          OnClick="@(() => OpenDeleteDialog(context))">
-                    Delete
-                </BbButton>
-            </div>
-        </BbDataGridTemplateColumn>
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.Key)" Title="Key" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Unit)" Title="Unit" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.GroupId)" Title="Group ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Actions">
+                <ChildContent Context="item">
+                    <div class="flex items-center gap-2">
+                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                  OnClick="@(() => OpenEditDialog(item))">
+                            Edit
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                  OnClick="@(() => OpenDeleteDialog(item))">
+                            Delete
+                        </BbButton>
+                    </div>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+        </Columns>
     </BbDataGrid>
 </div>
 

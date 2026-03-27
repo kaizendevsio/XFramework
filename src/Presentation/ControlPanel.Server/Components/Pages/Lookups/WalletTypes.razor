@@ -8,13 +8,15 @@
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
-        <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Desc)" Title="Description" />
-        <BbDataGridPropertyColumn Property="@(x => x.Type)" Title="Type" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.MinTransferRule)" Title="Min Transfer" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.MaxTransferRule)" Title="Max Transfer" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Desc)" Title="Description" />
+            <BbDataGridPropertyColumn Property="@(x => x.Type)" Title="Type" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.MinTransferRule)" Title="Min Transfer" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.MaxTransferRule)" Title="Max Transfer" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        </Columns>
     </BbDataGrid>
 </div>
 

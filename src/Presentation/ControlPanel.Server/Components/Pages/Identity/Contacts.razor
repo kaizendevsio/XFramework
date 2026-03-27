@@ -12,29 +12,31 @@
     </div>
 
     <BbDataGrid Items="@_contacts">
-        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Type">
-            <ChildContent Context="contact">
-                @(contact.Type?.Name ?? contact.TypeId?.ToString() ?? "N/A")
-            </ChildContent>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.GroupId)" Title="Group ID" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Actions">
-            <ChildContent Context="contact">
-                <div class="flex items-center gap-2">
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                              OnClick="@(() => OpenEditDialog(contact))">
-                        <LucidePencil class="h-4 w-4" />
-                    </BbButton>
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                              OnClick="@(() => OpenDeleteDialog(contact))">
-                        <LucideTrash2 class="h-4 w-4" />
-                    </BbButton>
-                </div>
-            </ChildContent>
-        </BbDataGridTemplateColumn>
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Type">
+                <ChildContent Context="item">
+                    @(item.Type?.Name ?? item.TypeId?.ToString() ?? "N/A")
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.GroupId)" Title="Group ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Actions">
+                <ChildContent Context="item">
+                    <div class="flex items-center gap-2">
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => OpenEditDialog(item))">
+                            <LucidePencil class="h-4 w-4" />
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => OpenDeleteDialog(item))">
+                            <LucideTrash2 class="h-4 w-4" />
+                        </BbButton>
+                    </div>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+        </Columns>
     </BbDataGrid>
 </div>
 

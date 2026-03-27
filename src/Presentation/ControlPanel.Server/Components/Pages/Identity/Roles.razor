@@ -12,22 +12,24 @@
     </div>
 
     <BbDataGrid Items="@_roles">
-        <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Role Type">
-            <ChildContent Context="role">
-                @(role.Type?.Name ?? role.TypeId?.ToString() ?? "N/A")
-            </ChildContent>
-        </BbDataGridTemplateColumn>
-        <BbDataGridPropertyColumn Property="@(x => x.RoleExpiration)" Title="Expiration" Sortable="true" />
-        <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
-        <BbDataGridTemplateColumn Title="Actions">
-            <ChildContent Context="role">
-                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                          OnClick="@(() => OpenDeleteDialog(role))">
-                    <LucideTrash2 class="h-4 w-4" />
-                </BbButton>
-            </ChildContent>
-        </BbDataGridTemplateColumn>
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Role Type">
+                <ChildContent Context="item">
+                    @(item.Type?.Name ?? item.TypeId?.ToString() ?? "N/A")
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.RoleExpiration)" Title="Expiration" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Actions">
+                <ChildContent Context="item">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                              OnClick="@(() => OpenDeleteDialog(item))">
+                        <LucideTrash2 class="h-4 w-4" />
+                    </BbButton>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+        </Columns>
     </BbDataGrid>
 </div>
 
