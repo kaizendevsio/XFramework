@@ -72,7 +72,7 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<IdentityRole> _roles = [];
@@ -87,14 +87,14 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
-        _roleTypes = await DataContext.Query<IdentityRoleType>()
+        _roleTypes = await Db.Query<IdentityRoleType>()
             .OrderBy(x => x.Name)
             .ToListAsync();
     }
 
     private async Task LoadData()
     {
-        _roles = await DataContext.Query<IdentityRole>()
+        _roles = await Db.Query<IdentityRole>()
             .Include(x => x.Type)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
@@ -131,9 +131,9 @@
             CreatedAt = DateTime.UtcNow
         };
 
-        DataContext.Add(role);
-        var result = await DataContext.SaveChangesAsync();
-        ToastService.Show(result.IsSuccess ? "Role created." : $"Error: {result.Message}");
+        Db.Add(role);
+        var result = await Db.SaveAsync();
+        ToastService.Show(result.Success ? "Role created." : $"Error: {result.Error}");
         _dialogOpen = false;
         await LoadData();
     }
@@ -142,9 +142,9 @@
     {
         if (_deletingRole is not null)
         {
-            DataContext.Remove(_deletingRole);
-            var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Role deleted." : $"Error: {result.Message}");
+            Db.Remove(_deletingRole);
+            var result = await Db.SaveAsync();
+            ToastService.Show(result.Success ? "Role deleted." : $"Error: {result.Error}");
             _deleteDialogOpen = false;
             _deletingRole = null;
             await LoadData();

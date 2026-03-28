@@ -90,7 +90,7 @@
 </div>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<AddressCountry> _countries = [];
     private List<AddressRegion> _regions = [];
@@ -100,10 +100,10 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _countries = await DataContext.Query<AddressCountry>().OrderBy(x => x.Name).ToListAsync();
-        _regions = await DataContext.Query<AddressRegion>().OrderBy(x => x.Description).Take(100).ToListAsync();
-        _provinces = await DataContext.Query<AddressProvince>().OrderBy(x => x.Description).Take(200).ToListAsync();
-        _cities = await DataContext.Query<AddressCity>().OrderBy(x => x.Description).Take(500).ToListAsync();
-        _barangays = await DataContext.Query<AddressBarangay>().OrderBy(x => x.Description).Take(500).ToListAsync();
+        _countries = await Db.Query<AddressCountry>().OrderBy(x => x.Name).ToListAsync();
+        _regions = await Db.Query<AddressRegion>().OrderBy(x => x.Description).Take(100).ToListAsync();
+        _provinces = await Db.Query<AddressProvince>().OrderBy(x => x.Description).Take(200).ToListAsync();
+        _cities = await Db.Query<AddressCity>().OrderBy(x => x.Description).Take(500).ToListAsync();
+        _barangays = await Db.Query<AddressBarangay>().OrderBy(x => x.Description).Take(500).ToListAsync();
     }
 }

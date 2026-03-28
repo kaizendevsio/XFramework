@@ -193,7 +193,7 @@
 </BbDialog>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
@@ -219,7 +219,7 @@
         try
         {
             await LoadData();
-            _walletTypes = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
+            _walletTypes = await Db.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
                 .OrderBy(x => x.Name)
                 .ToListAsync();
         }
@@ -231,7 +231,7 @@
 
     private async Task LoadData()
     {
-        _items = await DataContext.Query<Wallet>()
+        _items = await Db.Query<Wallet>()
             .Include(x => x.WalletType)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
@@ -277,7 +277,7 @@
         try
         {
             // Get credential's TenantId
-            var cred = await DataContext.Query<IdentityCredential>().Where(x => x.Id == credentialId).FirstOrDefaultAsync();
+            var cred = await Db.Query<IdentityCredential>().Where(x => x.Id == credentialId).FirstOrDefaultAsync();
             var walletTenantId = cred?.TenantId ?? Guid.Empty;
 
             var wallet = new Wallet
@@ -293,10 +293,10 @@
                 IsEnabled = true
             };
 
-            DataContext.Add(wallet);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Add(wallet);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show("Wallet created successfully.");
                 _showCreateDialog = false;
@@ -304,7 +304,7 @@
             }
             else
             {
-                ToastService.Show($"Failed to create wallet: {result.Message}");
+                ToastService.Show($"Failed to create wallet: {result.Error}");
             }
         }
         catch (Exception ex)
@@ -323,7 +323,7 @@
 
         try
         {
-            var fresh = await DataContext.Query<Wallet>()
+            var fresh = await Db.Query<Wallet>()
                 .Where(x => x.Id == wallet.Id)
                 .FirstOrDefaultAsync();
 
@@ -343,17 +343,17 @@
             fresh.Status = newStatus;
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Update(fresh);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show($"Wallet {(newStatus == WalletStatus.Frozen ? "frozen" : "unfrozen")} successfully.");
                 await LoadData();
             }
             else
             {
-                ToastService.Show($"Failed to update wallet: {result.Message}");
+                ToastService.Show($"Failed to update wallet: {result.Error}");
             }
         }
         catch (Exception ex)

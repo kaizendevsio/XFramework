@@ -28,13 +28,13 @@
 </div>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<Session> _sessions = [];
 
     protected override async Task OnInitializedAsync()
     {
-        _sessions = await DataContext.Query<Session>()
+        _sessions = await Db.Query<Session>()
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
     }

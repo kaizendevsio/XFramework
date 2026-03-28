@@ -25,13 +25,13 @@
 </div>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<AuthorizationLog> _logs = [];
 
     protected override async Task OnInitializedAsync()
     {
-        _logs = await DataContext.Query<AuthorizationLog>()
+        _logs = await Db.Query<AuthorizationLog>()
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
     }

@@ -60,7 +60,7 @@
 </div>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
 
     private int _userCount;
@@ -73,12 +73,12 @@
     {
         try
         {
-            _userCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().CountAsync();
-            _sessionCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Session>()
+            _userCount = await Db.Query<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().CountAsync();
+            _sessionCount = await Db.Query<IdentityServer.Domain.Shared.Contracts.Session>()
                 .Where(s => s.Status == XFramework.Domain.Shared.Enums.CurrentSessionState.Active)
                 .CountAsync();
-            _walletCount = await DataContext.Query<Wallets.Domain.Shared.Contracts.Wallet>().CountAsync();
-            _tenantCount = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>().CountAsync();
+            _walletCount = await Db.Query<Wallets.Domain.Shared.Contracts.Wallet>().CountAsync();
+            _tenantCount = await Db.Query<IdentityServer.Domain.Shared.Contracts.Tenant>().CountAsync();
         }
         catch (Exception ex)
         {

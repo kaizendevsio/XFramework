@@ -18,12 +18,12 @@
 </div>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<IdentityVerificationType> _items = [];
 
     protected override async Task OnInitializedAsync()
     {
-        _items = await DataContext.Query<IdentityVerificationType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _items = await Db.Query<IdentityVerificationType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 }

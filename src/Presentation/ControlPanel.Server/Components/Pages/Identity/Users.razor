@@ -198,7 +198,7 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
@@ -225,7 +225,7 @@
         _loading = true;
         try
         {
-            _users = await DataContext.Query<IdentityInformation>()
+            _users = await Db.Query<IdentityInformation>()
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
 
@@ -233,7 +233,7 @@
             _credentialUsernames.Clear();
             foreach (var user in _users)
             {
-                var cred = await DataContext.Query<IdentityCredential>()
+                var cred = await Db.Query<IdentityCredential>()
                     .Where(x => x.IdentityInfoId == user.Id)
                     .FirstOrDefaultAsync();
                 _credentialUsernames[user.Id] = cred?.UserName;
@@ -271,7 +271,7 @@
         try
         {
             // Get the first available tenant for the new user
-            var tenant = await DataContext.Query<Tenant>().FirstOrDefaultAsync();
+            var tenant = await Db.Query<Tenant>().FirstOrDefaultAsync();
             if (tenant is null)
             {
                 ToastService.Show("No tenants exist. Create a tenant first.");
@@ -295,10 +295,10 @@
                 CreatedAt = DateTime.UtcNow
             };
 
-            DataContext.Add(user);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Add(user);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show("User created successfully.");
                 _createDialogOpen = false;
@@ -306,7 +306,7 @@
             }
             else
             {
-                ToastService.Show($"Error creating user: {result.Message}");
+                ToastService.Show($"Error creating user: {result.Error}");
             }
         }
         catch (Exception ex)
@@ -323,7 +323,7 @@
     {
         try
         {
-            var fresh = await DataContext.Query<IdentityInformation>()
+            var fresh = await Db.Query<IdentityInformation>()
                 .Where(x => x.Id == user.Id)
                 .FirstOrDefaultAsync();
 
@@ -335,17 +335,17 @@
 
             fresh.IsEnabled = !fresh.IsEnabled;
             fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Update(fresh);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show(fresh.IsEnabled ? "User enabled." : "User disabled.");
                 await LoadData();
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Show($"Error: {result.Error}");
             }
         }
         catch (Exception ex)
@@ -366,7 +366,7 @@
 
         try
         {
-            var fresh = await DataContext.Query<IdentityInformation>()
+            var fresh = await Db.Query<IdentityInformation>()
                 .Where(x => x.Id == _deletingUser.Id)
                 .FirstOrDefaultAsync();
 
@@ -380,16 +380,16 @@
             fresh.IsEnabled = false;
             fresh.DeletedAt = DateTime.UtcNow;
             fresh.ModifiedAt = DateTime.UtcNow;
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Update(fresh);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show("User deleted.");
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Show($"Error: {result.Error}");
             }
         }
         catch (Exception ex)

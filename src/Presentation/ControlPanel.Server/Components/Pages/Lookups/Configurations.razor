@@ -69,7 +69,7 @@
                      OnConfirm="@DeleteConfiguration" />
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<RegistryConfiguration> _items = [];
@@ -86,7 +86,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _items = await DataContext.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _items = await Db.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 
     private void OpenCreateDialog()
@@ -123,7 +123,7 @@
 
         if (_isEditing && _editTarget is not null)
         {
-            var fresh = await DataContext.Query<RegistryConfiguration>()
+            var fresh = await Db.Query<RegistryConfiguration>()
                 .Where(x => x.Id == _editTarget.Id).FirstOrDefaultAsync();
             if (fresh is null) return;
 
@@ -131,7 +131,7 @@
             fresh.Value = _formValue;
             fresh.Unit = string.IsNullOrWhiteSpace(_formUnit) ? null : _formUnit;
             fresh.GroupId = Guid.TryParse(_formGroupId, out var gid) ? gid : fresh.GroupId;
-            DataContext.Update(fresh);
+            Db.Update(fresh);
         }
         else
         {
@@ -144,30 +144,30 @@
                 GroupId = Guid.TryParse(_formGroupId, out var gid) ? gid : Guid.Empty,
                 CreatedAt = DateTime.UtcNow
             };
-            DataContext.Add(config);
+            Db.Add(config);
         }
 
-        var result = await DataContext.SaveChangesAsync();
-        if (!result.IsSuccess)
+        var result = await Db.SaveAsync();
+        if (!result.Success)
         {
-            ToastService.Show($"Error: {result.Message}");
+            ToastService.Show($"Error: {result.Error}");
             return;
         }
 
         _showFormDialog = false;
-        _items = await DataContext.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _items = await Db.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 
     private async Task DeleteConfiguration()
     {
         if (_deleteTarget is not null)
         {
-            DataContext.Remove(_deleteTarget);
-            var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Configuration deleted." : $"Error: {result.Message}");
+            Db.Remove(_deleteTarget);
+            var result = await Db.SaveAsync();
+            ToastService.Show(result.Success ? "Configuration deleted." : $"Error: {result.Error}");
             _showDeleteDialog = false;
             _deleteTarget = null;
-            _items = await DataContext.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+            _items = await Db.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
         }
     }
 }

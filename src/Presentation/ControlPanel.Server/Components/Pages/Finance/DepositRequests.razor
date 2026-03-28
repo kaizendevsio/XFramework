@@ -26,13 +26,13 @@
 </div>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<DepositRequest> _items = [];
 
     protected override async Task OnInitializedAsync()
     {
-        _items = await DataContext.Query<DepositRequest>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _items = await Db.Query<DepositRequest>().OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 
     private string GetDepositStatusText(short? status) => status switch

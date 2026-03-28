@@ -99,7 +99,7 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<IdentityAddress> _addresses = [];
@@ -123,7 +123,7 @@
 
     private async Task LoadData()
     {
-        _addresses = await DataContext.Query<IdentityAddress>()
+        _addresses = await Db.Query<IdentityAddress>()
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
     }
@@ -169,7 +169,7 @@
 
         if (_isEditing)
         {
-            var addr = await DataContext.Query<IdentityAddress>()
+            var addr = await Db.Query<IdentityAddress>()
                 .Where(x => x.Id == _editingId)
                 .FirstOrDefaultAsync();
 
@@ -181,9 +181,9 @@
                 addr.Building = _formBuilding;
                 addr.Subdivision = _formSubdivision;
                 addr.ConsolidatedName = _formConsolidatedName;
-                DataContext.Update(addr);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Address updated." : $"Error: {result.Message}");
+                Db.Update(addr);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Address updated." : $"Error: {result.Error}");
             }
         }
         else
@@ -199,9 +199,9 @@
                 ConsolidatedName = _formConsolidatedName,
                 CreatedAt = DateTime.UtcNow
             };
-            DataContext.Add(addr);
-            var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Address created." : $"Error: {result.Message}");
+            Db.Add(addr);
+            var result = await Db.SaveAsync();
+            ToastService.Show(result.Success ? "Address created." : $"Error: {result.Error}");
         }
 
         _dialogOpen = false;
@@ -212,9 +212,9 @@
     {
         if (_deletingAddress is not null)
         {
-            DataContext.Remove(_deletingAddress);
-            var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Address deleted." : $"Error: {result.Message}");
+            Db.Remove(_deletingAddress);
+            var result = await Db.SaveAsync();
+            ToastService.Show(result.Success ? "Address deleted." : $"Error: {result.Error}");
             _deleteDialogOpen = false;
             _deletingAddress = null;
             await LoadData();

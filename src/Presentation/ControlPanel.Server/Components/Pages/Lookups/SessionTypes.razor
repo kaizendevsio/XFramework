@@ -16,12 +16,12 @@
 </div>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<SessionType> _items = [];
 
     protected override async Task OnInitializedAsync()
     {
-        _items = await DataContext.Query<SessionType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _items = await Db.Query<SessionType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 }

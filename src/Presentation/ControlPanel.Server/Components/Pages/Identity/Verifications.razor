@@ -48,13 +48,13 @@
 </div>
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<IdentityVerification> _verifications = [];
 
     protected override async Task OnInitializedAsync()
     {
-        _verifications = await DataContext.Query<IdentityVerification>()
+        _verifications = await Db.Query<IdentityVerification>()
             .Include(x => x.VerificationType)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();

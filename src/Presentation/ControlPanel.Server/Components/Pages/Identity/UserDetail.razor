@@ -786,7 +786,7 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
@@ -844,7 +844,7 @@ else
         _loading = true;
         try
         {
-            _user = await DataContext.Query<IdentityInformation>()
+            _user = await Db.Query<IdentityInformation>()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -871,7 +871,7 @@ else
 
     private async Task LoadCredentials()
     {
-        _credentials = await DataContext.Query<IdentityCredential>()
+        _credentials = await Db.Query<IdentityCredential>()
             .Where(x => x.IdentityInfoId == Id)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
@@ -882,7 +882,7 @@ else
         _roles = [];
         foreach (var cred in _credentials)
         {
-            var roles = await DataContext.Query<IdentityRole>()
+            var roles = await Db.Query<IdentityRole>()
                 .Include(x => x.Type)
                 .Where(x => x.CredentialId == cred.Id)
                 .ToListAsync();
@@ -896,7 +896,7 @@ else
         _contacts = [];
         foreach (var cred in _credentials)
         {
-            var contacts = await DataContext.Query<IdentityContact>()
+            var contacts = await Db.Query<IdentityContact>()
                 .Include(x => x.Type)
                 .Where(x => x.CredentialId == cred.Id)
                 .ToListAsync();
@@ -907,7 +907,7 @@ else
 
     private async Task LoadAddresses()
     {
-        _addresses = await DataContext.Query<IdentityAddress>()
+        _addresses = await Db.Query<IdentityAddress>()
             .Where(x => x.IdentityInfoId == Id)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
@@ -918,7 +918,7 @@ else
         _sessions = [];
         foreach (var cred in _credentials)
         {
-            var sessions = await DataContext.Query<Session>()
+            var sessions = await Db.Query<Session>()
                 .Where(x => x.CredentialId == cred.Id)
                 .ToListAsync();
             _sessions.AddRange(sessions);
@@ -931,7 +931,7 @@ else
         _authLogs = [];
         foreach (var cred in _credentials)
         {
-            var logs = await DataContext.Query<AuthorizationLog>()
+            var logs = await Db.Query<AuthorizationLog>()
                 .Where(x => x.CredentialId == cred.Id)
                 .ToListAsync();
             _authLogs.AddRange(logs);
@@ -944,7 +944,7 @@ else
         _wallets = [];
         foreach (var cred in _credentials)
         {
-            var wallets = await DataContext.Query<Wallet>()
+            var wallets = await Db.Query<Wallet>()
                 .Where(x => x.CredentialId == cred.Id)
                 .ToListAsync();
             _wallets.AddRange(wallets);
@@ -954,11 +954,11 @@ else
 
     private async Task LoadLookups()
     {
-        _roleTypes = await DataContext.Query<IdentityRoleType>()
+        _roleTypes = await Db.Query<IdentityRoleType>()
             .OrderBy(x => x.Name)
             .ToListAsync();
 
-        _contactTypes = await DataContext.Query<IdentityContactType>()
+        _contactTypes = await Db.Query<IdentityContactType>()
             .OrderBy(x => x.Name)
             .ToListAsync();
     }
@@ -988,7 +988,7 @@ else
         _saving = true;
         try
         {
-            var fresh = await DataContext.Query<IdentityInformation>()
+            var fresh = await Db.Query<IdentityInformation>()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -1009,10 +1009,10 @@ else
             fresh.IsVerified = _editForm.IsVerifiedString == "true";
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Update(fresh);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show("User updated successfully.");
                 _editUserDialogOpen = false;
@@ -1020,7 +1020,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Show($"Error: {result.Error}");
             }
         }
         catch (Exception ex)
@@ -1063,10 +1063,10 @@ else
                 CreatedAt = DateTime.UtcNow
             };
 
-            DataContext.Add(credential);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Add(credential);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show("Credential created.");
                 _createCredDialogOpen = false;
@@ -1074,7 +1074,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Show($"Error: {result.Error}");
             }
         }
         catch (Exception ex)
@@ -1126,10 +1126,10 @@ else
                 CreatedAt = DateTime.UtcNow
             };
 
-            DataContext.Add(role);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Add(role);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show("Role assigned.");
                 _assignRoleDialogOpen = false;
@@ -1137,7 +1137,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Show($"Error: {result.Error}");
             }
         }
         catch (Exception ex)
@@ -1162,22 +1162,22 @@ else
 
         try
         {
-            var fresh = await DataContext.Query<IdentityRole>()
+            var fresh = await Db.Query<IdentityRole>()
                 .Where(x => x.Id == _removingRole.Id)
                 .FirstOrDefaultAsync();
 
             if (fresh is not null)
             {
-                DataContext.Remove(fresh);
-                var result = await DataContext.SaveChangesAsync();
+                Db.Remove(fresh);
+                var result = await Db.SaveAsync();
 
-                if (result.IsSuccess)
+                if (result.Success)
                 {
                     ToastService.Show("Role removed.");
                 }
                 else
                 {
-                    ToastService.Show($"Error: {result.Message}");
+                    ToastService.Show($"Error: {result.Error}");
                 }
             }
         }
@@ -1236,7 +1236,7 @@ else
         {
             if (_editingContact is not null)
             {
-                var fresh = await DataContext.Query<IdentityContact>()
+                var fresh = await Db.Query<IdentityContact>()
                     .Where(x => x.Id == _editingContact.Id)
                     .FirstOrDefaultAsync();
 
@@ -1247,9 +1247,9 @@ else
                     fresh.TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null;
                     fresh.ModifiedAt = DateTime.UtcNow;
 
-                    DataContext.Update(fresh);
-                    var result = await DataContext.SaveChangesAsync();
-                    ToastService.Show(result.IsSuccess ? "Contact updated." : $"Error: {result.Message}");
+                    Db.Update(fresh);
+                    var result = await Db.SaveAsync();
+                    ToastService.Show(result.Success ? "Contact updated." : $"Error: {result.Error}");
                 }
             }
             else
@@ -1265,9 +1265,9 @@ else
                     CreatedAt = DateTime.UtcNow
                 };
 
-                DataContext.Add(contact);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Contact created." : $"Error: {result.Message}");
+                Db.Add(contact);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Contact created." : $"Error: {result.Error}");
             }
 
             _contactDialogOpen = false;
@@ -1287,15 +1287,15 @@ else
     {
         try
         {
-            var fresh = await DataContext.Query<IdentityContact>()
+            var fresh = await Db.Query<IdentityContact>()
                 .Where(x => x.Id == contact.Id)
                 .FirstOrDefaultAsync();
 
             if (fresh is not null)
             {
-                DataContext.Remove(fresh);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Contact deleted." : $"Error: {result.Message}");
+                Db.Remove(fresh);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Contact deleted." : $"Error: {result.Error}");
                 await LoadContacts();
             }
         }
@@ -1336,7 +1336,7 @@ else
         {
             if (_editingAddress is not null)
             {
-                var fresh = await DataContext.Query<IdentityAddress>()
+                var fresh = await Db.Query<IdentityAddress>()
                     .Where(x => x.Id == _editingAddress.Id)
                     .FirstOrDefaultAsync();
 
@@ -1350,9 +1350,9 @@ else
                     fresh.DefaultAddress = _addressForm.IsDefault == "true";
                     fresh.ModifiedAt = DateTime.UtcNow;
 
-                    DataContext.Update(fresh);
-                    var result = await DataContext.SaveChangesAsync();
-                    ToastService.Show(result.IsSuccess ? "Address updated." : $"Error: {result.Message}");
+                    Db.Update(fresh);
+                    var result = await Db.SaveAsync();
+                    ToastService.Show(result.Success ? "Address updated." : $"Error: {result.Error}");
                 }
             }
             else
@@ -1372,9 +1372,9 @@ else
                     CreatedAt = DateTime.UtcNow
                 };
 
-                DataContext.Add(address);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Address created." : $"Error: {result.Message}");
+                Db.Add(address);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Address created." : $"Error: {result.Error}");
             }
 
             _addressDialogOpen = false;
@@ -1394,15 +1394,15 @@ else
     {
         try
         {
-            var fresh = await DataContext.Query<IdentityAddress>()
+            var fresh = await Db.Query<IdentityAddress>()
                 .Where(x => x.Id == address.Id)
                 .FirstOrDefaultAsync();
 
             if (fresh is not null)
             {
-                DataContext.Remove(fresh);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Address deleted." : $"Error: {result.Message}");
+                Db.Remove(fresh);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Address deleted." : $"Error: {result.Error}");
                 await LoadAddresses();
             }
         }
@@ -1418,7 +1418,7 @@ else
     {
         try
         {
-            var fresh = await DataContext.Query<Session>()
+            var fresh = await Db.Query<Session>()
                 .Where(x => x.Id == session.Id)
                 .FirstOrDefaultAsync();
 
@@ -1431,17 +1431,17 @@ else
             fresh.Status = CurrentSessionState.Inactive;
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Update(fresh);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show("Session terminated.");
                 await LoadSessions();
             }
             else
             {
-                ToastService.Show($"Error: {result.Message}");
+                ToastService.Show($"Error: {result.Error}");
             }
         }
         catch (Exception ex)
