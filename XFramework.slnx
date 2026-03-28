@@ -67,6 +67,7 @@
     <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
   </Folder>
   <Folder Name="/Tests/">
+    <Project Path="srcTestsControlPanel.E2ETestsControlPanel.E2ETests.csproj" />
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
     <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     <Project Path="src\Tests\IdentityServer.IntegrationTests\IdentityServer.IntegrationTests.csproj" />
