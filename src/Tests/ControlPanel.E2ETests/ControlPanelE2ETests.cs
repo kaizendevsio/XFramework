@@ -152,7 +152,7 @@ public class ControlPanelE2ETests : PageTest
 
         // Verify user in grid
         await Page.WaitForTimeoutAsync(1000);
-        await Expect(Page.GetByText($"{_userName} {_userLastName}")).ToBeVisibleAsync();
+        await Expect(Page.GetByText(_identityName)).ToBeVisibleAsync();
     }
 
     [Test, Order(22)]
@@ -161,7 +161,7 @@ public class ControlPanelE2ETests : PageTest
         await Page.GotoAsync("/identity/users");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        await Expect(Page.GetByText($"{_userName} {_userLastName}")).ToBeVisibleAsync();
+        await Expect(Page.GetByText(_identityName)).ToBeVisibleAsync();
     }
 
     [Test, Order(23)]
@@ -180,7 +180,7 @@ public class ControlPanelE2ETests : PageTest
         await Expect(Page).ToHaveURLAsync(new Regex("/identity/users/"));
 
         // User name should be visible
-        await Expect(Page.GetByText($"{_userName} {_userLastName}")).ToBeVisibleAsync();
+        await Expect(Page.GetByText(_identityName)).ToBeVisibleAsync();
 
         // Tabs should be visible
         await Expect(Page.GetByRole(AriaRole.Tab, new() { NameRegex = new Regex("Credentials") })).ToBeVisibleAsync();
