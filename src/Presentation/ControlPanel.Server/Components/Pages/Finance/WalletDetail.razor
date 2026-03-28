@@ -476,6 +476,7 @@ else
             var transaction = new WalletTransaction
             {
                 Id = Guid.NewGuid(),
+                TenantId = _wallet!.TenantId,
                 WalletId = Id,
                 CredentialId = fresh.CredentialId,
                 Amount = amount,
@@ -556,6 +557,7 @@ else
             var transaction = new WalletTransaction
             {
                 Id = Guid.NewGuid(),
+                TenantId = _wallet!.TenantId,
                 WalletId = Id,
                 CredentialId = fresh.CredentialId,
                 Amount = amount,
@@ -630,6 +632,7 @@ else
             var transaction = new WalletTransaction
             {
                 Id = Guid.NewGuid(),
+                TenantId = _wallet!.TenantId,
                 WalletId = Id,
                 CredentialId = fresh.CredentialId,
                 Amount = Math.Abs(difference),

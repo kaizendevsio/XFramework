@@ -270,9 +270,19 @@
         _saving = true;
         try
         {
+            // Get the first available tenant for the new user
+            var tenant = await DataContext.Query<Tenant>().FirstOrDefaultAsync();
+            if (tenant is null)
+            {
+                ToastService.Show("No tenants exist. Create a tenant first.");
+                _saving = false;
+                return;
+            }
+
             var user = new IdentityInformation
             {
                 Id = Guid.NewGuid(),
+                TenantId = tenant.Id,
                 FirstName = _form.FirstName,
                 MiddleName = _form.MiddleName,
                 LastName = _form.LastName,

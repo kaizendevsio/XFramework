@@ -11,8 +11,8 @@ builder.Services.AddRazorComponents()
 // Add BlazorBlueprint services
 builder.Services.AddBlazorBlueprintComponents();
 
-// Database + IDataContext (ServerDataContext = direct EF Core)
-builder.Services.AddDbContext<DbContext, AppDbContext>((_, options) => options
+// Database — register AppDbContext as both DbContext (for IDataContext) and itself (for admin IgnoreQueryFilters)
+builder.Services.AddDbContext<AppDbContext>((_, options) => options
     .UseNpgsql(
         string.IsNullOrEmpty(builder.Configuration["DefaultDatabaseConnection"])
             ? builder.Configuration.GetConnectionString("DefaultDatabaseConnection")
@@ -21,7 +21,10 @@ builder.Services.AddDbContext<DbContext, AppDbContext>((_, options) => options
     .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
     .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning)));
 
+builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<AppDbContext>());
 builder.Services.AddServerDataContext<AppDbContext>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ControlPanel.Server.Services.AdminDbContext>();
 
 var app = builder.Build();
 

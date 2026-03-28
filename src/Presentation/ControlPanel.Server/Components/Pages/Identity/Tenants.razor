@@ -482,7 +482,7 @@
                      OnConfirm="@ConfirmDeleteConfig" />
 
 @code {
-    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     // ── Tenant list state ──
@@ -527,7 +527,7 @@
     {
         try
         {
-            _tenants = await DataContext.Query<Tenant>()
+            _tenants = await Db.Query<Tenant>()
                 .Where(x => !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
@@ -582,7 +582,7 @@
         {
             if (_isEditingTenant)
             {
-                var tenant = await DataContext.Query<Tenant>()
+                var tenant = await Db.Query<Tenant>()
                     .Where(x => x.Id == _editingTenantId)
                     .FirstOrDefaultAsync();
 
@@ -601,10 +601,10 @@
                 tenant.ParentTenantId = Guid.TryParse(_tenantForm.ParentTenantIdString, out var pid) ? pid : null;
                 tenant.ModifiedAt = DateTime.UtcNow;
 
-                DataContext.Update(tenant);
-                var result = await DataContext.SaveChangesAsync();
+                Db.Update(tenant);
+                var result = await Db.SaveAsync();
 
-                if (result.IsSuccess)
+                if (result.Success)
                 {
                     ToastService.Show("Tenant updated successfully.");
                     if (_selectedTenant?.Id == tenant.Id)
@@ -614,14 +614,16 @@
                 }
                 else
                 {
-                    ToastService.Show($"Failed to update tenant: {result.Message}");
+                    ToastService.Show($"Failed to update tenant: {result.Error}");
                 }
             }
             else
             {
+                var tenantId = Guid.NewGuid();
                 var tenant = new Tenant
                 {
-                    Id = Guid.NewGuid(),
+                    Id = tenantId,
+                    TenantId = tenantId,
                     Name = _tenantForm.Name,
                     Description = _tenantForm.Description,
                     Version = decimal.TryParse(_tenantForm.VersionString, out var v) ? v : 1.0m,
@@ -633,16 +635,16 @@
                     IsEnabled = true
                 };
 
-                DataContext.Add(tenant);
-                var result = await DataContext.SaveChangesAsync();
+                Db.Add(tenant);
+                var result = await Db.SaveAsync();
 
-                if (result.IsSuccess)
+                if (result.Success)
                 {
                     ToastService.Show("Tenant created successfully.");
                 }
                 else
                 {
-                    ToastService.Show($"Failed to create tenant: {result.Message}");
+                    ToastService.Show($"Failed to create tenant: {result.Error}");
                 }
             }
 
@@ -663,7 +665,7 @@
     {
         try
         {
-            var fresh = await DataContext.Query<Tenant>()
+            var fresh = await Db.Query<Tenant>()
                 .Where(x => x.Id == tenant.Id)
                 .FirstOrDefaultAsync();
 
@@ -676,10 +678,10 @@
             fresh.IsEnabled = !fresh.IsEnabled;
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Update(fresh);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show(fresh.IsEnabled ? "Tenant enabled." : "Tenant disabled.");
                 if (_selectedTenant?.Id == fresh.Id)
@@ -689,7 +691,7 @@
             }
             else
             {
-                ToastService.Show($"Failed to toggle tenant: {result.Message}");
+                ToastService.Show($"Failed to toggle tenant: {result.Error}");
             }
 
             await LoadTenants();
@@ -712,7 +714,7 @@
 
         try
         {
-            var fresh = await DataContext.Query<Tenant>()
+            var fresh = await Db.Query<Tenant>()
                 .Where(x => x.Id == _deletingTenant.Id)
                 .FirstOrDefaultAsync();
 
@@ -728,10 +730,10 @@
             fresh.DeletedAt = DateTime.UtcNow;
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            DataContext.Update(fresh);
-            var result = await DataContext.SaveChangesAsync();
+            Db.Update(fresh);
+            var result = await Db.SaveAsync();
 
-            if (result.IsSuccess)
+            if (result.Success)
             {
                 ToastService.Show("Tenant deleted.");
                 if (_selectedTenant?.Id == fresh.Id)
@@ -744,7 +746,7 @@
             }
             else
             {
-                ToastService.Show($"Failed to delete tenant: {result.Message}");
+                ToastService.Show($"Failed to delete tenant: {result.Error}");
             }
 
             _deleteDialogOpen = false;
@@ -769,24 +771,24 @@
     {
         try
         {
-            _detailUsers = await DataContext.Query<IdentityInformation>()
+            _detailUsers = await Db.Query<IdentityInformation>()
                 .Where(x => x.TenantId == tenantId)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
 
-            _detailConfigs = await DataContext.Query<RegistryConfiguration>()
+            _detailConfigs = await Db.Query<RegistryConfiguration>()
                 .Include(x => x.Group)
                 .Where(x => x.TenantId == tenantId)
                 .OrderBy(x => x.Key)
                 .ToListAsync();
 
-            _detailRoleTypes = await DataContext.Query<IdentityRoleType>()
+            _detailRoleTypes = await Db.Query<IdentityRoleType>()
                 .Include(x => x.Group)
                 .Where(x => x.TenantId == tenantId)
                 .OrderBy(x => x.Name)
                 .ToListAsync();
 
-            _configGroups = await DataContext.Query<RegistryConfigurationGroup>()
+            _configGroups = await Db.Query<RegistryConfigurationGroup>()
                 .OrderBy(x => x.Name)
                 .ToListAsync();
         }
@@ -833,7 +835,7 @@
         {
             if (_isEditingConfig)
             {
-                var config = await DataContext.Query<RegistryConfiguration>()
+                var config = await Db.Query<RegistryConfiguration>()
                     .Where(x => x.Id == _editingConfigId)
                     .FirstOrDefaultAsync();
 
@@ -849,9 +851,9 @@
                 config.GroupId = Guid.TryParse(_configForm.GroupIdString, out var gid) ? gid : config.GroupId;
                 config.ModifiedAt = DateTime.UtcNow;
 
-                DataContext.Update(config);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Configuration updated." : $"Error: {result.Message}");
+                Db.Update(config);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Configuration updated." : $"Error: {result.Error}");
             }
             else
             {
@@ -867,9 +869,9 @@
                     IsEnabled = true
                 };
 
-                DataContext.Add(config);
-                var result = await DataContext.SaveChangesAsync();
-                ToastService.Show(result.IsSuccess ? "Configuration created." : $"Error: {result.Message}");
+                Db.Add(config);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Configuration created." : $"Error: {result.Error}");
             }
 
             _configDialogOpen = false;
@@ -893,9 +895,9 @@
 
         try
         {
-            DataContext.Remove(_deletingConfig);
-            var result = await DataContext.SaveChangesAsync();
-            ToastService.Show(result.IsSuccess ? "Configuration deleted." : $"Error: {result.Message}");
+            Db.Remove(_deletingConfig);
+            var result = await Db.SaveAsync();
+            ToastService.Show(result.Success ? "Configuration deleted." : $"Error: {result.Error}");
 
             _deleteConfigDialogOpen = false;
             _deletingConfig = null;

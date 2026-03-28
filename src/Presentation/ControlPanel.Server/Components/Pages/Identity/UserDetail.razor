@@ -1055,6 +1055,7 @@ else
             var credential = new IdentityCredential
             {
                 Id = Guid.NewGuid(),
+                TenantId = _user!.TenantId,
                 IdentityInfoId = Id,
                 UserName = _credForm.UserName,
                 UserAlias = _credForm.UserAlias,
@@ -1117,6 +1118,7 @@ else
             var role = new IdentityRole
             {
                 Id = Guid.NewGuid(),
+                TenantId = _user!.TenantId,
                 CredentialId = credId,
                 TypeId = typeId,
                 RoleExpiration = expiration,
@@ -1255,6 +1257,7 @@ else
                 var contact = new IdentityContact
                 {
                     Id = Guid.NewGuid(),
+                    TenantId = _user!.TenantId,
                     CredentialId = credId,
                     TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null,
                     Value = _contactForm.Value,
@@ -1357,6 +1360,7 @@ else
                 var address = new IdentityAddress
                 {
                     Id = Guid.NewGuid(),
+                    TenantId = _user!.TenantId,
                     IdentityInfoId = Id,
                     UnitNumber = _addressForm.UnitNumber,
                     Street = _addressForm.Street,

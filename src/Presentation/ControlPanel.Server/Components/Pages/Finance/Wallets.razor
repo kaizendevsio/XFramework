@@ -276,9 +276,14 @@
         _isSaving = true;
         try
         {
+            // Get credential's TenantId
+            var cred = await DataContext.Query<IdentityCredential>().Where(x => x.Id == credentialId).FirstOrDefaultAsync();
+            var walletTenantId = cred?.TenantId ?? Guid.Empty;
+
             var wallet = new Wallet
             {
                 Id = Guid.NewGuid(),
+                TenantId = walletTenantId,
                 CredentialId = credentialId,
                 WalletTypeId = _newWalletTypeId != "none" && Guid.TryParse(_newWalletTypeId, out var walletTypeId) ? walletTypeId : null,
                 AccountNumber = string.IsNullOrWhiteSpace(_newAccountNumber) ? null : _newAccountNumber.Trim(),
