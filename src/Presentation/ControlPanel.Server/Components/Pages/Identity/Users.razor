@@ -10,11 +10,11 @@
         </div>
         <div class="flex items-center gap-2">
             <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
-                <LucideRefreshCw class="mr-2 h-4 w-4" />
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
                 Refresh
             </BbButton>
             <BbButton OnClick="@OpenCreateDialog">
-                <LucidePlus class="mr-2 h-4 w-4" />
+                <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                 Create User
             </BbButton>
         </div>
@@ -74,22 +74,22 @@
                                 <div class="flex items-center gap-1">
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                               OnClick="@(() => NavigateToDetail(item.Id))">
-                                        <LucideEye class="h-4 w-4" />
+                                        <LucideIcon Name="eye" class="h-4 w-4" />
                                     </BbButton>
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                               OnClick="@(() => ToggleEnabled(item))">
                                         @if (item.IsEnabled)
                                         {
-                                            <LucideBan class="h-4 w-4" />
+                                            <LucideIcon Name="ban" class="h-4 w-4" />
                                         }
                                         else
                                         {
-                                            <LucideCheck class="h-4 w-4" />
+                                            <LucideIcon Name="check" class="h-4 w-4" />
                                         }
                                     </BbButton>
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                               OnClick="@(() => OpenDeleteDialog(item))">
-                                        <LucideTrash2 class="h-4 w-4 text-destructive" />
+                                        <LucideIcon Name="trash-2" class="h-4 w-4 text-destructive" />
                                     </BbButton>
                                 </div>
                             </ChildContent>

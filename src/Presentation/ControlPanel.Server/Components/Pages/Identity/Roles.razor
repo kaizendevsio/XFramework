@@ -6,7 +6,7 @@
     <div class="flex items-center justify-between">
         <BbTypography Variant="TypographyVariant.H3">Roles</BbTypography>
         <BbButton OnClick="@OpenAddDialog">
-            <LucidePlus class="mr-2 h-4 w-4" />
+            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
             Add Role
         </BbButton>
     </div>
@@ -25,7 +25,7 @@
                 <ChildContent Context="item">
                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                               OnClick="@(() => OpenDeleteDialog(item))">
-                        <LucideTrash2 class="h-4 w-4" />
+                        <LucideIcon Name="trash-2" class="h-4 w-4" />
                     </BbButton>
                 </ChildContent>
             </BbDataGridTemplateColumn>

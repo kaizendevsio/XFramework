@@ -11,7 +11,7 @@
             <BbTypography Variant="TypographyVariant.Muted">Manage tenants, their users, configurations, and role types.</BbTypography>
         </div>
         <BbButton OnClick="@OpenCreateDialog">
-            <LucidePlus class="mr-2 h-4 w-4" />
+            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
             Create Tenant
         </BbButton>
     </div>
@@ -78,26 +78,26 @@
                             <div class="flex items-center gap-1">
                                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                           OnClick="@(() => SelectTenant(item))">
-                                    <LucideEye class="h-4 w-4" />
+                                    <LucideIcon Name="eye" class="h-4 w-4" />
                                 </BbButton>
                                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                           OnClick="@(() => OpenEditDialog(item))">
-                                    <LucidePencil class="h-4 w-4" />
+                                    <LucideIcon Name="pencil" class="h-4 w-4" />
                                 </BbButton>
                                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                           OnClick="@(() => ToggleEnabled(item))">
                                     @if (item.IsEnabled)
                                     {
-                                        <LucidePause class="h-4 w-4" />
+                                        <LucideIcon Name="pause" class="h-4 w-4" />
                                     }
                                     else
                                     {
-                                        <LucidePlay class="h-4 w-4" />
+                                        <LucideIcon Name="play" class="h-4 w-4" />
                                     }
                                 </BbButton>
                                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                           OnClick="@(() => OpenDeleteDialog(item))">
-                                    <LucideTrash2 class="h-4 w-4" />
+                                    <LucideIcon Name="trash-2" class="h-4 w-4" />
                                 </BbButton>
                             </div>
                         </ChildContent>
@@ -114,7 +114,7 @@
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                           OnClick="@(() => _selectedTenant = null)">
-                    <LucideX class="h-4 w-4" />
+                    <LucideIcon Name="x" class="h-4 w-4" />
                 </BbButton>
                 <div>
                     <BbTypography Variant="TypographyVariant.H4">@(_selectedTenant.Name ?? "Unnamed Tenant")</BbTypography>
@@ -252,7 +252,7 @@
                             <div class="flex items-center justify-between">
                                 <BbCardTitle>Registry Configurations</BbCardTitle>
                                 <BbButton Size="ButtonSize.Small" OnClick="@OpenAddConfigDialog">
-                                    <LucidePlus class="mr-2 h-4 w-4" />
+                                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                                     Add Configuration
                                 </BbButton>
                             </div>
@@ -288,11 +288,11 @@
                                                 <div class="flex items-center gap-1">
                                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                               OnClick="@(() => OpenEditConfigDialog(cfg))">
-                                                        <LucidePencil class="h-4 w-4" />
+                                                        <LucideIcon Name="pencil" class="h-4 w-4" />
                                                     </BbButton>
                                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                               OnClick="@(() => OpenDeleteConfigDialog(cfg))">
-                                                        <LucideTrash2 class="h-4 w-4" />
+                                                        <LucideIcon Name="trash-2" class="h-4 w-4" />
                                                     </BbButton>
                                                 </div>
                                             </ChildContent>
@@ -412,7 +412,7 @@
             <BbButton OnClick="@SaveTenant" Disabled="@_saving">
                 @if (_saving)
                 {
-                    <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                 }
                 @(_isEditingTenant ? "Update" : "Create")
             </BbButton>

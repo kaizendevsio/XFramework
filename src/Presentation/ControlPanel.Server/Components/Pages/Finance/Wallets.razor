@@ -10,7 +10,7 @@
             <BbTypography Variant="TypographyVariant.Muted">Manage user wallets, balances, and account statuses</BbTypography>
         </div>
         <BbButton OnClick="@OpenCreateDialog">
-            <LucidePlus class="mr-2 h-4 w-4" />
+            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
             Create Wallet
         </BbButton>
     </div>
@@ -117,20 +117,20 @@
                             <div class="flex items-center gap-1">
                                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                           OnClick="@(() => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))">
-                                    <LucideEye class="h-4 w-4" />
+                                    <LucideIcon Name="eye" class="h-4 w-4" />
                                 </BbButton>
                                 @if (item.Status == WalletStatus.Active)
                                 {
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                               OnClick="@(() => ToggleFreeze(item))">
-                                        <LucideLock class="h-4 w-4" />
+                                        <LucideIcon Name="lock" class="h-4 w-4" />
                                     </BbButton>
                                 }
                                 else if (item.Status == WalletStatus.Frozen)
                                 {
                                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                               OnClick="@(() => ToggleFreeze(item))">
-                                        <LucideLockOpen class="h-4 w-4" />
+                                        <LucideIcon Name="lock-open" class="h-4 w-4" />
                                     </BbButton>
                                 }
                             </div>
@@ -184,7 +184,7 @@
             <BbButton OnClick="@CreateWallet" Disabled="@_isSaving">
                 @if (_isSaving)
                 {
-                    <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                 }
                 Create Wallet
             </BbButton>

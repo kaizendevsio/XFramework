@@ -11,7 +11,7 @@ else if (_user is null)
 {
     <div class="space-y-4">
         <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/identity/users"))">
-            <LucideArrowLeft class="mr-2 h-4 w-4" />
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
             Back to Users
         </BbButton>
         <BbAlert Variant="AlertVariant.Danger">
@@ -28,7 +28,7 @@ else
             <div class="flex items-center gap-4">
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                           OnClick="@(() => Navigation.NavigateTo("/identity/users"))">
-                    <LucideArrowLeft class="h-4 w-4" />
+                    <LucideIcon Name="arrow-left" class="h-4 w-4" />
                 </BbButton>
                 <div>
                     <div class="flex items-center gap-2">
@@ -43,11 +43,11 @@ else
             </div>
             <div class="flex items-center gap-2">
                 <BbButton Variant="ButtonVariant.Outline" OnClick="@ReloadAllData">
-                    <LucideRefreshCw class="mr-2 h-4 w-4" />
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
                     Refresh
                 </BbButton>
                 <BbButton OnClick="@OpenEditUserDialog">
-                    <LucidePencil class="mr-2 h-4 w-4" />
+                    <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
                     Edit User
                 </BbButton>
             </div>
@@ -115,7 +115,7 @@ else
                         <div class="flex items-center justify-between">
                             <BbCardTitle>Credentials</BbCardTitle>
                             <BbButton Size="ButtonSize.Small" OnClick="@OpenCreateCredentialDialog">
-                                <LucidePlus class="mr-2 h-4 w-4" />
+                                <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                                 Add Credential
                             </BbButton>
                         </div>
@@ -158,7 +158,7 @@ else
                         <div class="flex items-center justify-between">
                             <BbCardTitle>Assigned Roles</BbCardTitle>
                             <BbButton Size="ButtonSize.Small" OnClick="@OpenAssignRoleDialog">
-                                <LucidePlus class="mr-2 h-4 w-4" />
+                                <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                                 Assign Role
                             </BbButton>
                         </div>
@@ -203,7 +203,7 @@ else
                                     <ChildContent Context="role">
                                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                   OnClick="@(() => OpenRemoveRoleDialog(role))">
-                                            <LucideTrash2 class="h-4 w-4 text-destructive" />
+                                            <LucideIcon Name="trash-2" class="h-4 w-4 text-destructive" />
                                         </BbButton>
                                     </ChildContent>
                                 </BbDataGridTemplateColumn>
@@ -220,7 +220,7 @@ else
                         <div class="flex items-center justify-between">
                             <BbCardTitle>Contacts</BbCardTitle>
                             <BbButton Size="ButtonSize.Small" OnClick="@OpenCreateContactDialog">
-                                <LucidePlus class="mr-2 h-4 w-4" />
+                                <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                                 Add Contact
                             </BbButton>
                         </div>
@@ -248,11 +248,11 @@ else
                                         <div class="flex items-center gap-1">
                                             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                       OnClick="@(() => OpenEditContactDialog(contact))">
-                                                <LucidePencil class="h-4 w-4" />
+                                                <LucideIcon Name="pencil" class="h-4 w-4" />
                                             </BbButton>
                                             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                       OnClick="@(() => DeleteContact(contact))">
-                                                <LucideTrash2 class="h-4 w-4 text-destructive" />
+                                                <LucideIcon Name="trash-2" class="h-4 w-4 text-destructive" />
                                             </BbButton>
                                         </div>
                                     </ChildContent>
@@ -270,7 +270,7 @@ else
                         <div class="flex items-center justify-between">
                             <BbCardTitle>Addresses</BbCardTitle>
                             <BbButton Size="ButtonSize.Small" OnClick="@OpenCreateAddressDialog">
-                                <LucidePlus class="mr-2 h-4 w-4" />
+                                <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                                 Add Address
                             </BbButton>
                         </div>
@@ -295,11 +295,11 @@ else
                                         <div class="flex items-center gap-1">
                                             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                       OnClick="@(() => OpenEditAddressDialog(addr))">
-                                                <LucidePencil class="h-4 w-4" />
+                                                <LucideIcon Name="pencil" class="h-4 w-4" />
                                             </BbButton>
                                             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                                                       OnClick="@(() => DeleteAddress(addr))">
-                                                <LucideTrash2 class="h-4 w-4 text-destructive" />
+                                                <LucideIcon Name="trash-2" class="h-4 w-4 text-destructive" />
                                             </BbButton>
                                         </div>
                                     </ChildContent>
@@ -462,7 +462,7 @@ else
                                     <ChildContent Context="wallet">
                                         <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
                                                   OnClick="@(() => Navigation.NavigateTo($"/finance/wallets/{wallet.Id}"))">
-                                            <LucideExternalLink class="mr-1 h-3 w-3" />
+                                            <LucideIcon Name="external-link" class="mr-1 h-3 w-3" />
                                             View
                                         </BbButton>
                                     </ChildContent>

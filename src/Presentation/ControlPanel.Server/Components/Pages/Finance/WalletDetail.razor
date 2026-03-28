@@ -14,7 +14,7 @@ else
         <div class="flex items-center gap-4">
             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
                       OnClick="@(() => NavigationManager.NavigateTo("/finance/wallets"))">
-                <LucideArrowLeft class="h-4 w-4" />
+                <LucideIcon Name="arrow-left" class="h-4 w-4" />
             </BbButton>
             <div class="flex-1">
                 <BbTypography Variant="TypographyVariant.H3">
@@ -28,21 +28,21 @@ else
                 @if (_wallet.Status == WalletStatus.Active)
                 {
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@FreezeWallet">
-                        <LucideLock class="mr-2 h-4 w-4" />
+                        <LucideIcon Name="lock" class="mr-2 h-4 w-4" />
                         Freeze Wallet
                     </BbButton>
                 }
                 else if (_wallet.Status == WalletStatus.Frozen)
                 {
                     <BbButton Variant="ButtonVariant.Outline" OnClick="@UnfreezeWallet">
-                        <LucideLockOpen class="mr-2 h-4 w-4" />
+                        <LucideIcon Name="lock-open" class="mr-2 h-4 w-4" />
                         Unfreeze Wallet
                     </BbButton>
                 }
                 @if (_wallet.Status != WalletStatus.Closed)
                 {
                     <BbButton Variant="ButtonVariant.Destructive" OnClick="@(() => _showCloseDialog = true)">
-                        <LucideXCircle class="mr-2 h-4 w-4" />
+                        <LucideIcon Name="x-circle" class="mr-2 h-4 w-4" />
                         Close Wallet
                     </BbButton>
                 }
@@ -163,9 +163,9 @@ else
                         <BbButton OnClick="@AddFunds" Disabled="@_isProcessing">
                             @if (_isProcessing)
                             {
-                                <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                                <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                             }
-                            <LucidePlus class="mr-2 h-4 w-4" />
+                            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
                             Add Funds
                         </BbButton>
                     </BbTabsContent>
@@ -194,9 +194,9 @@ else
                         <BbButton Variant="ButtonVariant.Destructive" OnClick="@WithdrawFunds" Disabled="@_isProcessing">
                             @if (_isProcessing)
                             {
-                                <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                                <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                             }
-                            <LucideMinus class="mr-2 h-4 w-4" />
+                            <LucideIcon Name="minus" class="mr-2 h-4 w-4" />
                             Withdraw Funds
                         </BbButton>
                     </BbTabsContent>
@@ -225,9 +225,9 @@ else
                         <BbButton Variant="ButtonVariant.Outline" OnClick="@AdjustBalance" Disabled="@_isProcessing">
                             @if (_isProcessing)
                             {
-                                <LucideLoader2 class="mr-2 h-4 w-4 animate-spin" />
+                                <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
                             }
-                            <LucideSettings class="mr-2 h-4 w-4" />
+                            <LucideIcon Name="settings" class="mr-2 h-4 w-4" />
                             Apply Adjustment
                         </BbButton>
                     </BbTabsContent>
