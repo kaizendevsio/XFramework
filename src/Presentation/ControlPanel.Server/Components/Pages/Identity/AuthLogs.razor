@@ -31,8 +31,12 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _logs = await Db.Query<AuthorizationLog>()
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        try
+        {
+            _logs = await Db.Query<AuthorizationLog>()
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+        }
+        catch { /* query may fail */ }
     }
 }

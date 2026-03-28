@@ -98,7 +98,7 @@ public class ControlPanelE2ETests : PageTest
         await Page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Create" }).ClickAsync();
 
         // Verify success toast
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("successfully", new() { Timeout = 5000 });
+        await Expect(Page.GetByRole(AriaRole.Alert).First).ToContainTextAsync("successfully", new() { Timeout = 5000 });
 
         // Verify tenant appears in grid
         await Page.WaitForTimeoutAsync(1000);
@@ -148,7 +148,7 @@ public class ControlPanelE2ETests : PageTest
         await Page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Create User" }).ClickAsync();
 
         // Verify success
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("successfully", new() { Timeout = 5000 });
+        await Expect(Page.GetByRole(AriaRole.Alert).First).ToContainTextAsync("successfully", new() { Timeout = 5000 });
 
         // Verify user in grid
         await Page.WaitForTimeoutAsync(1000);

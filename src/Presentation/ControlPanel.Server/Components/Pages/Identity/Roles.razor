@@ -86,10 +86,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadData();
-        _roleTypes = await Db.Query<IdentityRoleType>()
-            .OrderBy(x => x.Name)
-            .ToListAsync();
+        try
+        {
+            await LoadData();
+            _roleTypes = await Db.Query<IdentityRoleType>()
+                .OrderBy(x => x.Name)
+                .ToListAsync();
+        }
+        catch { /* query may fail */ }
     }
 
     private async Task LoadData()

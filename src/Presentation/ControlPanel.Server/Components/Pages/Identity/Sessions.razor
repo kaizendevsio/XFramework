@@ -34,9 +34,16 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _sessions = await Db.Query<Session>()
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        try
+        {
+            _sessions = await Db.Query<Session>()
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Sessions load error: {ex.Message}");
+        }
     }
 
     private static string GetStatusText(CurrentSessionState status) => status switch
