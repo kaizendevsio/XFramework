@@ -1,0 +1,161 @@
+@page "/admin/reference-data"
+@using ControlPanel.Server.Services
+
+<PageTitle>Reference Data - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div>
+        <h2 class="text-2xl font-bold tracking-tight">Reference Data</h2>
+        <p class="text-sm text-muted-foreground">System lookup tables and reference types. These are shared across tenants.</p>
+    </div>
+
+    <BbTabs DefaultValue="role-types">
+        <BbTabsList>
+            <BbTabsTrigger Value="role-types">Role Types</BbTabsTrigger>
+            <BbTabsTrigger Value="role-type-groups">Role Groups</BbTabsTrigger>
+            <BbTabsTrigger Value="contact-types">Contact Types</BbTabsTrigger>
+            <BbTabsTrigger Value="contact-groups">Contact Groups</BbTabsTrigger>
+            <BbTabsTrigger Value="address-types">Address Types</BbTabsTrigger>
+            <BbTabsTrigger Value="verification-types">Verification Types</BbTabsTrigger>
+            <BbTabsTrigger Value="session-types">Session Types</BbTabsTrigger>
+            <BbTabsTrigger Value="wallet-types">Wallet Types</BbTabsTrigger>
+            <BbTabsTrigger Value="currency-types">Currency Types</BbTabsTrigger>
+            <BbTabsTrigger Value="exchange-rates">Exchange Rates</BbTabsTrigger>
+        </BbTabsList>
+
+        <BbTabsContent Value="role-types">
+            <BbDataGrid Items="@_roleTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.RoleLevel)" Title="Level" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="role-type-groups">
+            <BbDataGrid Items="@_roleTypeGroups" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="contact-types">
+            <BbDataGrid Items="@_contactTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="contact-groups">
+            <BbDataGrid Items="@_contactGroups" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="address-types">
+            <BbDataGrid Items="@_addressTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="verification-types">
+            <BbDataGrid Items="@_verificationTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.DefaultExpiry)" Title="Default Expiry" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Priority)" Title="Priority" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="session-types">
+            <BbDataGrid Items="@_sessionTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Ref" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="wallet-types">
+            <BbDataGrid Items="@_walletTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Desc)" Title="Description" />
+                    <BbDataGridPropertyColumn Property="@(x => x.MinTransferRule)" Title="Min Transfer" />
+                    <BbDataGridPropertyColumn Property="@(x => x.MaxTransferRule)" Title="Max Transfer" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="currency-types">
+            <BbDataGrid Items="@_currencyTypes" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.CurrencyIsoCode3)" Title="ISO Code" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+
+        <BbTabsContent Value="exchange-rates">
+            <BbDataGrid Items="@_exchangeRates" ShowPagination="true" InitialPageSize="20">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.SourceCurrencyTypeId)" Title="Source Currency" />
+                    <BbDataGridPropertyColumn Property="@(x => x.TargetCurrencyTypeId)" Title="Target Currency" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Rate" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Fee)" Title="Fee" />
+                    <BbDataGridPropertyColumn Property="@(x => x.EffectivityDate)" Title="Effective" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.ExpiryDate)" Title="Expires" />
+                </Columns>
+            </BbDataGrid>
+        </BbTabsContent>
+    </BbTabs>
+</div>
+
+@code {
+    [Inject] private AdminDbContext Db { get; set; } = default!;
+
+    private List<IdentityRoleType> _roleTypes = [];
+    private List<IdentityRoleTypeGroup> _roleTypeGroups = [];
+    private List<IdentityContactType> _contactTypes = [];
+    private List<IdentityContactGroup> _contactGroups = [];
+    private List<IdentityAddressType> _addressTypes = [];
+    private List<IdentityVerificationType> _verificationTypes = [];
+    private List<SessionType> _sessionTypes = [];
+    private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
+    private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _currencyTypes = [];
+    private List<ExchangeRate> _exchangeRates = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _roleTypes = await Db.Query<IdentityRoleType>().OrderBy(x => x.Name).ToListAsync();
+            _roleTypeGroups = await Db.Query<IdentityRoleTypeGroup>().OrderBy(x => x.Name).ToListAsync();
+            _contactTypes = await Db.Query<IdentityContactType>().OrderBy(x => x.Name).ToListAsync();
+            _contactGroups = await Db.Query<IdentityContactGroup>().OrderBy(x => x.Name).ToListAsync();
+            _addressTypes = await Db.Query<IdentityAddressType>().OrderBy(x => x.Name).ToListAsync();
+            _verificationTypes = await Db.Query<IdentityVerificationType>().OrderBy(x => x.Name).ToListAsync();
+            _sessionTypes = await Db.Query<SessionType>().OrderBy(x => x.Name).ToListAsync();
+            _walletTypes = await Db.Query<global::Wallets.Domain.Shared.Contracts.WalletType>().OrderBy(x => x.Name).ToListAsync();
+            _currencyTypes = await Db.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>().OrderBy(x => x.Name).ToListAsync();
+            _exchangeRates = await Db.Query<ExchangeRate>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        }
+        catch { /* Non-critical - empty tabs are fine */ }
+    }
+}

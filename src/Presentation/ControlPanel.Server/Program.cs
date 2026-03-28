@@ -8,8 +8,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add BlazorBlueprint services
-builder.Services.AddBlazorBlueprintComponents();
+// Add BlazorBlueprint services with theme configuration
+builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
+{
+    options.DefaultBaseColor = BaseColor.Slate;
+    options.DefaultPrimaryColor = PrimaryColor.Blue;
+    options.DefaultDarkMode = true;
+    options.DetectSystemPreference = true;
+    options.DefaultRadius = 0.5;
+    options.PersistToLocalStorage = true;
+});
 
 // Database — register AppDbContext as both DbContext (for IDataContext) and itself (for admin IgnoreQueryFilters)
 builder.Services.AddDbContext<AppDbContext>((_, options) => options

@@ -7,11 +7,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <!-- Theme CSS variables - must load first -->
-    <link href="styles/themes/default.css" rel="stylesheet" />
+    <!-- BlazorBlueprint theme system (OKLCH palettes, dark mode, sidebar vars) -->
+    <link href="_content/BlazorBlueprint.Components/css/themes.css" rel="stylesheet" />
     <!-- BlazorBlueprint component styles -->
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
-    <!-- App styles (Tailwind utilities for template pages) -->
+    <!-- App styles (Tailwind utilities) -->
     <link href="css/app.css" rel="stylesheet" />
     <HeadOutlet />
 </head>
@@ -30,9 +30,5 @@
     </script>
 
     <script src="_framework/blazor.web.js"></script>
-    <script>
-        window.toggleDarkMode = () => document.documentElement.classList.toggle('dark');
-        window.isDarkModeEnabled = () => document.documentElement.classList.contains('dark');
-    </script>
 </body>
 </html>
