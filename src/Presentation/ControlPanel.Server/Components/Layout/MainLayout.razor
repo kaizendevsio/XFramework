@@ -80,14 +80,16 @@
     private string _selectedTenantId = "";
     private string _selectedTenantName = "";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender) return;
         try
         {
             _tenants = await Db.Query<IdentityServer.Domain.Shared.Contracts.Tenant>()
                 .Where(t => !t.IsDeleted)
                 .OrderBy(t => t.Name)
                 .ToListAsync();
+            StateHasChanged();
         }
         catch { /* Tenant loading is non-critical */ }
     }
