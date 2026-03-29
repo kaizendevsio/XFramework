@@ -1,4 +1,4 @@
-namespace Bolt.Client.Media;
+namespace Bolt.Media;
 
 public enum QualityLayer { L1_Normal, L2_ReduceResolution, L3_CompressLZ4, L4_CompressZstd, L5_AudioOnly }
 

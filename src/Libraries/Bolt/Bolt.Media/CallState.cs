@@ -1,4 +1,4 @@
-namespace Bolt.Client.Media;
+namespace Bolt.Media;
 
 public enum CallStatus { Initiating, Ringing, Active, Held, Ended, Rejected, Missed }
 

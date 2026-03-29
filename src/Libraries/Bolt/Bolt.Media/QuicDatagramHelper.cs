@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace Bolt.Client.Media;
+namespace Bolt.Media;
 
 /// <summary>
 /// Helper for QUIC unreliable datagram support.

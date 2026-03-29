@@ -1,4 +1,4 @@
-namespace Bolt.Client.Media;
+namespace Bolt.Media;
 
 public record FecResult(uint GroupStartSequence, byte GroupSize, byte[] ParityData, int[] OriginalLengths);
 

@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 
-namespace Bolt.Client.Media;
+namespace Bolt.Media;
 
 public readonly record struct BufferedFrame(uint SequenceNumber, uint Timestamp, ReadOnlyMemory<byte> Data, bool IsKeyframe);
 

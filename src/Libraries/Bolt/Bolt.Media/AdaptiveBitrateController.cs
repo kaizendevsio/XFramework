@@ -1,7 +1,8 @@
+using Bolt.Client;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
 
-namespace Bolt.Client.Media;
+namespace Bolt.Media;
 
 /// <summary>
 /// Adaptive bitrate controller that works on both sides of a media stream:

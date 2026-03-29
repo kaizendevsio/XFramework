@@ -68,4 +68,6 @@ public enum FrameType : byte
     CallSignal = 0x24,
     /// <summary>FEC parity frame.</summary>
     FecFrame = 0x25,
+    /// <summary>NACK retransmission request.</summary>
+    NackRequest = 0x26,
 }

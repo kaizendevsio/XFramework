@@ -159,6 +159,7 @@ public sealed class BoltServer : IDisposable
                 break;
             case FrameType.MediaFeedback:
             case FrameType.MediaKeyRequest:
+            case FrameType.NackRequest:
                 await RouteMediaFeedbackAsync(connection, buffer, length, ct);
                 break;
             case FrameType.CallSignal:
@@ -269,9 +270,37 @@ public sealed class BoltServer : IDisposable
         if (!BoltCodec.TryReadRequestHeader(buffer.AsSpan(0, length), out _, out var recipientHash, out var totalSize))
             return;
 
+        // Broadcast: recipientHash == 0 → send to all connected clients (except sender)
+        if (recipientHash == 0)
+        {
+            var data = buffer.AsMemory(0, totalSize);
+            foreach (var (_, bag) in _connectionsByServiceHash)
+            {
+                foreach (var client in bag)
+                {
+                    if (client.IsAlive && client.StreamId != sender.StreamId)
+                        await client.SendAsync(data, ct);
+                }
+            }
+            return;
+        }
+
         var recipient = GetRecipient(recipientHash);
         if (recipient is not null)
             await recipient.SendAsync(buffer.AsMemory(0, totalSize), ct);
+    }
+
+    /// <summary>Get the count of currently connected clients.</summary>
+    public int ConnectedClientCount => _connectionsByStreamId.Count;
+
+    /// <summary>Get all connected client IDs for presence queries.</summary>
+    public IEnumerable<string> GetConnectedClientIds()
+    {
+        foreach (var (_, conn) in _connectionsByStreamId)
+        {
+            if (conn.IsAlive && conn.ClientId is not null)
+                yield return conn.ClientId;
+        }
     }
 
     // ── Stream routing ──
@@ -337,10 +366,25 @@ public sealed class BoltServer : IDisposable
             return;
 
         var data = buffer.AsMemory(0, length);
+
+        // Simulcast-aware routing: if this stream has a layer ID, only forward to
+        // recipients whose preferred layer matches (or who have no preference = forward all)
+        var isSimulcast = route.SimulcastLayerId.HasValue;
+
         foreach (var recipient in route.Recipients)
         {
-            if (recipient.StreamId != sender.StreamId && recipient.IsAlive)
-                await recipient.SendAsync(data, ct);
+            if (recipient.StreamId == sender.StreamId || !recipient.IsAlive)
+                continue;
+
+            // Simulcast filtering: skip if recipient prefers a different layer
+            if (isSimulcast && _activeCalls.TryGetValue(route.CallId, out var callState))
+            {
+                if (callState.RecipientPreferredLayer.TryGetValue(recipient.StreamId, out var preferred)
+                    && preferred != route.SimulcastLayerId!.Value)
+                    continue; // Recipient prefers a different layer — skip
+            }
+
+            await recipient.SendAsync(data, ct);
         }
 
         // Tap: send a copy to media processors (non-blocking, drops if full)
@@ -409,11 +453,31 @@ public sealed class BoltServer : IDisposable
     /// </summary>
     private async Task RouteMediaFeedbackAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
-        if (!BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var streamId))
+        var span = buffer.AsSpan(0, length);
+        if (!BoltCodec.TryReadMediaFrameHeader(span, out var streamId))
             return;
 
         if (!_activeMediaStreams.TryGetValue(streamId, out var route))
             return;
+
+        // Simulcast layer selection: if feedback contains Decrease/KeyframeNeeded,
+        // downgrade the recipient to a lower layer; if Increase, upgrade.
+        if (route.SimulcastLayerId.HasValue
+            && (FrameType)buffer[0] == FrameType.MediaFeedback
+            && BoltCodec.TryReadMediaFeedback(span, out var feedback)
+            && _activeCalls.TryGetValue(route.CallId, out var callState))
+        {
+            var currentLayer = callState.RecipientPreferredLayer.GetOrAdd(sender.StreamId, route.SimulcastLayerId.Value);
+            switch (feedback.QualityHint)
+            {
+                case QualityHint.Decrease or QualityHint.KeyframeNeeded when currentLayer > 0:
+                    callState.RecipientPreferredLayer[sender.StreamId] = (byte)(currentLayer - 1);
+                    break;
+                case QualityHint.Increase when currentLayer < 2:
+                    callState.RecipientPreferredLayer[sender.StreamId] = (byte)(currentLayer + 1);
+                    break;
+            }
+        }
 
         // Feedback goes back to the stream's sender
         if (route.Sender.IsAlive)
@@ -1082,6 +1146,13 @@ internal sealed class MediaStreamRoute
     public BoltHubConnection Sender { get; init; } = null!;
     public List<BoltHubConnection> Recipients { get; } = new();
     public Guid CallId { get; init; }
+
+    /// <summary>
+    /// For simulcast: maps this stream to a simulcast layer group.
+    /// All streams in the same group (callId + sender) represent different quality layers.
+    /// The hub forwards only the selected layer per recipient.
+    /// </summary>
+    public byte? SimulcastLayerId { get; set; }
 }
 
 /// <summary>Server-side call status.</summary>
@@ -1099,4 +1170,17 @@ internal sealed class ServerCallState
     public List<BoltHubConnection> Participants { get; } = new();
     public List<Guid> MediaStreamIds { get; } = new();
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Simulcast: per-recipient preferred layer. Key = recipient StreamId, Value = preferred SimulcastLayerId.
+    /// When a recipient sends MediaFeedback with a quality hint, the hub updates this
+    /// and only forwards media streams matching the preferred layer.
+    /// </summary>
+    public ConcurrentDictionary<string, byte> RecipientPreferredLayer { get; } = new();
+
+    /// <summary>
+    /// Simulcast: maps sender StreamId → list of simulcast stream IDs (grouped by layer).
+    /// Key = sender connection StreamId, Value = dict of layerId → media streamId.
+    /// </summary>
+    public ConcurrentDictionary<string, ConcurrentDictionary<byte, Guid>> SimulcastGroups { get; } = new();
 }

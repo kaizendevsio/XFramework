@@ -31,6 +31,7 @@ public static class BoltCodec
     public const int MediaKeyRequestSize = 1 + 16;                        // 17 bytes
     public const int CallSignalHeaderSize = 1 + 16 + 1 + 4;              // 22 bytes
     public const int FecFrameHeaderSize = 1 + 16 + 4 + 1 + 4;            // 26 bytes
+    public const int NackRequestHeaderSize = 1 + 16 + 2;                  // 19 bytes (+ nackCount * 4)
 
     #region Encoding
 
@@ -245,6 +246,20 @@ public static class BoltCodec
         span[21] = fecGroupSize;
         BinaryPrimitives.WriteInt32LittleEndian(span.Slice(22), payload.Length);
         payload.CopyTo(span.Slice(26));
+        writer.Advance(totalSize);
+        return totalSize;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteNackRequest(IBufferWriter<byte> writer, Guid streamId, ReadOnlySpan<uint> missingSequences)
+    {
+        var totalSize = NackRequestHeaderSize + missingSequences.Length * 4;
+        var span = writer.GetSpan(totalSize);
+        span[0] = (byte)FrameType.NackRequest;
+        WriteGuid(span.Slice(1), streamId);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(17), (ushort)missingSequences.Length);
+        for (int i = 0; i < missingSequences.Length; i++)
+            BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(19 + i * 4), missingSequences[i]);
         writer.Advance(totalSize);
         return totalSize;
     }
@@ -560,6 +575,25 @@ public static class BoltCodec
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryReadNackRequest(ReadOnlySpan<byte> buffer, out NackRequestHeader header)
+    {
+        header = default;
+        if (buffer.Length < NackRequestHeaderSize) return false;
+
+        var nackCount = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(17));
+        var totalSize = NackRequestHeaderSize + nackCount * 4;
+        if (buffer.Length < totalSize) return false;
+
+        header = new NackRequestHeader
+        {
+            StreamId = ReadGuid(buffer.Slice(1)),
+            NackCount = nackCount,
+            SequencesOffset = NackRequestHeaderSize,
+        };
+        return true;
+    }
+
     #endregion
 
     #region Hashing
@@ -658,6 +692,8 @@ public struct MediaFrameHeader
     public int PayloadLength;
 
     public bool IsKeyframe => (Flags & 0x01) != 0;
+    public bool IsFecProtected => (Flags & 0x08) != 0;
+    public bool IsEncrypted => (Flags & 0x10) != 0;
     public bool IsDropEligible => (Flags & 0x40) != 0;
     public bool IsCompressed => (Flags & 0x80) != 0;
 
@@ -733,4 +769,21 @@ public struct FecFrameHeader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlyMemory<byte> GetPayload(ReadOnlyMemory<byte> sourceBuffer)
         => sourceBuffer.Slice(PayloadOffset, PayloadLength);
+}
+
+/// <summary>Decoded NACK request header. Missing sequences start at SequencesOffset.</summary>
+public struct NackRequestHeader
+{
+    public Guid StreamId;
+    public ushort NackCount;
+    public int SequencesOffset;
+
+    /// <summary>Read the missing sequence numbers from the source buffer.</summary>
+    public uint[] GetMissingSequences(ReadOnlySpan<byte> sourceBuffer)
+    {
+        var seqs = new uint[NackCount];
+        for (int i = 0; i < NackCount; i++)
+            seqs[i] = BinaryPrimitives.ReadUInt32LittleEndian(sourceBuffer.Slice(SequencesOffset + i * 4));
+        return seqs;
+    }
 }

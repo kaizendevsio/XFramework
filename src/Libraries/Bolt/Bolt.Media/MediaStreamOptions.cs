@@ -1,4 +1,4 @@
-namespace Bolt.Client.Media;
+namespace Bolt.Media;
 
 public enum MediaMode { Audio, Video }
 

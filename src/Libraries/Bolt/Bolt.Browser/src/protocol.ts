@@ -25,6 +25,7 @@ export const FrameType = {
     MediaKeyRequest: 0x23,
     CallSignal:      0x24,
     FecFrame:        0x25,
+    NackRequest:     0x26,
 } as const;
 
 export type FrameTypeValue = (typeof FrameType)[keyof typeof FrameType];
@@ -44,6 +45,7 @@ export const CodecId = {
     H264: 0x02,
     VP9:  0x03,
     AV1:  0x04,
+    H265: 0x05,
 } as const;
 
 export type CodecIdValue = (typeof CodecId)[keyof typeof CodecId];
@@ -60,6 +62,7 @@ export const SignalType = {
     RemoveParticipant: 0x09,
     DirectOffer:       0x0A,
     DirectAnswer:      0x0B,
+    KeyExchange:       0x0C,
 } as const;
 
 export type SignalTypeValue = (typeof SignalType)[keyof typeof SignalType];
@@ -76,9 +79,11 @@ export type QualityHintValue = (typeof QualityHint)[keyof typeof QualityHint];
 // ─── Media frame flags ───────────────────────────────────────────────────────
 
 export const MediaFrameFlags = {
-    Keyframe:     0x01,
-    DropEligible: 0x40,
-    Compressed:   0x80,
+    Keyframe:      0x01,
+    FecProtected:  0x08,
+    Encrypted:     0x10,
+    DropEligible:  0x40,
+    Compressed:    0x80,
 } as const;
 
 // ─── Header sizes (must match BoltCodec.cs constants exactly) ────────────────
@@ -92,6 +97,7 @@ export const HEADER_SIZE = {
     MediaKeyRequest:17,  // 1 + 16
     CallSignal:     22,  // 1 + 16 + 1 + 4
     FecFrame:       26,  // 1 + 16 + 4 + 1 + 4
+    NackRequest:    19,  // 1 + 16 + 2 (+ nackCount * 4)
     StreamOpen:     25,  // 1 + 16 + 4 + 4
     StreamData:     21,  // 1 + 16 + 4
     StreamClose:    19,  // 1 + 16 + 2
@@ -144,6 +150,42 @@ export interface FecFrameData {
     fecGroupStart: number;
     fecGroupSize: number;
     payload: Uint8Array;
+}
+
+export interface NackRequestData {
+    streamId: string;
+    missingSequences: number[];
+}
+
+// ─── RPC frame types ────────────────────────────────────────────────────────
+
+export interface RequestFrameData {
+    requestId: string;
+    recipientHash: number;
+    commandHash: number;
+    payload: Uint8Array;
+}
+
+export interface ResponseFrameData {
+    requestId: string;
+    statusCode: number;
+    payload: Uint8Array;
+}
+
+export interface StreamOpenData {
+    streamId: string;
+    recipientHash: number;
+    commandHash: number;
+}
+
+export interface StreamDataFrame {
+    streamId: string;
+    payload: Uint8Array;
+}
+
+export interface StreamCloseData {
+    streamId: string;
+    statusCode: number;
 }
 
 // ─── GUID helpers (little-endian, matches .NET Guid binary layout) ───────────
@@ -590,6 +632,243 @@ export function readFecFrame(data: Uint8Array): FecFrameData | null {
         fecGroupStart: readUint32LE(view, 17),
         fecGroupSize: readUint8(view, 21),
         payload: data.slice(26, 26 + payloadLen),
+    };
+}
+
+// ─── RPC frame encoding/decoding ────────────────────────────────────────────
+
+/**
+ * Encode a Request frame.
+ * Layout: [1:type] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]
+ */
+export function writeRequest(
+    requestId: string,
+    recipientHash: number,
+    commandHash: number,
+    payload: Uint8Array,
+): Uint8Array {
+    const totalSize = HEADER_SIZE.Request + payload.length;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.Request);
+    writeGuid(buf, 1, requestId);
+    writeInt32LE(view, 17, recipientHash);
+    writeInt32LE(view, 21, commandHash);
+    writeInt32LE(view, 25, payload.length);
+    buf.set(payload, 29);
+
+    return buf;
+}
+
+/**
+ * Read a Request frame.
+ */
+export function readRequest(data: Uint8Array): RequestFrameData | null {
+    if (data.length < HEADER_SIZE.Request) return null;
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const payloadLen = readInt32LE(view, 25);
+    if (data.length < HEADER_SIZE.Request + payloadLen) return null;
+
+    return {
+        requestId: bytesToGuid(data, 1),
+        recipientHash: readInt32LE(view, 17),
+        commandHash: readInt32LE(view, 21),
+        payload: data.slice(29, 29 + payloadLen),
+    };
+}
+
+/**
+ * Encode a Response frame.
+ * Layout: [1:type] [16:requestId] [2:statusCode] [4:payloadLen] [payload]
+ */
+export function writeResponse(
+    requestId: string,
+    statusCode: number,
+    payload: Uint8Array,
+): Uint8Array {
+    const totalSize = HEADER_SIZE.Response + payload.length;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.Response);
+    writeGuid(buf, 1, requestId);
+    writeInt32LE(view, 17, statusCode); // int16 LE (same as .NET short)
+    writeInt32LE(view, 19, payload.length);
+    buf.set(payload, 23);
+
+    return buf;
+}
+
+/**
+ * Read a Response frame.
+ */
+export function readResponse(data: Uint8Array): ResponseFrameData | null {
+    if (data.length < HEADER_SIZE.Response) return null;
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const payloadLen = readInt32LE(view, 19);
+    if (data.length < HEADER_SIZE.Response + payloadLen) return null;
+
+    return {
+        requestId: bytesToGuid(data, 1),
+        statusCode: view.getInt16(17, true),
+        payload: data.slice(23, 23 + payloadLen),
+    };
+}
+
+/**
+ * Encode a Push frame (fire-and-forget, same layout as Request).
+ * Layout: [1:type=0x05] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]
+ */
+export function writePush(
+    recipientHash: number,
+    commandHash: number,
+    payload: Uint8Array,
+): Uint8Array {
+    const requestId = newGuid();
+    const totalSize = HEADER_SIZE.Request + payload.length;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.Push);
+    writeGuid(buf, 1, requestId);
+    writeInt32LE(view, 17, recipientHash);
+    writeInt32LE(view, 21, commandHash);
+    writeInt32LE(view, 25, payload.length);
+    buf.set(payload, 29);
+
+    return buf;
+}
+
+// ─── Stream frame encoding/decoding ─────────────────────────────────────────
+
+/**
+ * Encode a StreamOpen frame.
+ * Layout: [1:type] [16:streamId] [4:recipientHash] [4:commandHash]
+ */
+export function writeStreamOpen(streamId: string, recipientHash: number, commandHash: number): Uint8Array {
+    const buf = new Uint8Array(HEADER_SIZE.StreamOpen);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.StreamOpen);
+    writeGuid(buf, 1, streamId);
+    writeInt32LE(view, 17, recipientHash);
+    writeInt32LE(view, 21, commandHash);
+
+    return buf;
+}
+
+/**
+ * Encode a StreamData frame.
+ * Layout: [1:type] [16:streamId] [4:payloadLen] [payload]
+ */
+export function writeStreamData(streamId: string, payload: Uint8Array): Uint8Array {
+    const totalSize = HEADER_SIZE.StreamData + payload.length;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.StreamData);
+    writeGuid(buf, 1, streamId);
+    writeInt32LE(view, 17, payload.length);
+    buf.set(payload, 21);
+
+    return buf;
+}
+
+/**
+ * Encode a StreamClose frame.
+ * Layout: [1:type] [16:streamId] [2:statusCode]
+ */
+export function writeStreamClose(streamId: string, statusCode = 200): Uint8Array {
+    const buf = new Uint8Array(HEADER_SIZE.StreamClose);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.StreamClose);
+    writeGuid(buf, 1, streamId);
+    writeInt32LE(view, 17, statusCode); // int16 LE
+
+    return buf;
+}
+
+/**
+ * Read a StreamOpen frame.
+ */
+export function readStreamOpen(data: Uint8Array): StreamOpenData | null {
+    if (data.length < HEADER_SIZE.StreamOpen) return null;
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    return {
+        streamId: bytesToGuid(data, 1),
+        recipientHash: readInt32LE(view, 17),
+        commandHash: readInt32LE(view, 21),
+    };
+}
+
+/**
+ * Read a StreamData frame.
+ */
+export function readStreamData(data: Uint8Array): StreamDataFrame | null {
+    if (data.length < HEADER_SIZE.StreamData) return null;
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const payloadLen = readInt32LE(view, 17);
+    if (data.length < HEADER_SIZE.StreamData + payloadLen) return null;
+    return {
+        streamId: bytesToGuid(data, 1),
+        payload: data.slice(21, 21 + payloadLen),
+    };
+}
+
+/**
+ * Read a StreamClose frame.
+ */
+export function readStreamClose(data: Uint8Array): StreamCloseData | null {
+    if (data.length < HEADER_SIZE.StreamClose) return null;
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    return {
+        streamId: bytesToGuid(data, 1),
+        statusCode: view.getInt16(17, true),
+    };
+}
+
+/**
+ * Encode a NackRequest frame.
+ * Layout: [1:type] [16:streamId] [2:nackCount] [nackCount * 4:missingSeqs]
+ */
+export function writeNackRequest(streamId: string, missingSequences: number[]): Uint8Array {
+    const totalSize = HEADER_SIZE.NackRequest + missingSequences.length * 4;
+    const buf = new Uint8Array(totalSize);
+    const view = new DataView(buf.buffer);
+
+    writeUint8(view, 0, FrameType.NackRequest);
+    writeGuid(buf, 1, streamId);
+    writeUint16LE(view, 17, missingSequences.length);
+    for (let i = 0; i < missingSequences.length; i++) {
+        writeUint32LE(view, 19 + i * 4, missingSequences[i]);
+    }
+    return buf;
+}
+
+/**
+ * Read a NackRequest frame.
+ * Layout: [1:type] [16:streamId] [2:nackCount] [nackCount * 4:missingSeqs]
+ */
+export function readNackRequest(data: Uint8Array): NackRequestData | null {
+    if (data.length < HEADER_SIZE.NackRequest) return null;
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const nackCount = readUint16LE(view, 17);
+    const totalSize = HEADER_SIZE.NackRequest + nackCount * 4;
+    if (data.length < totalSize) return null;
+
+    const missingSequences: number[] = [];
+    for (let i = 0; i < nackCount; i++) {
+        missingSequences.push(readUint32LE(view, 19 + i * 4));
+    }
+
+    return {
+        streamId: bytesToGuid(data, 1),
+        missingSequences,
     };
 }
 

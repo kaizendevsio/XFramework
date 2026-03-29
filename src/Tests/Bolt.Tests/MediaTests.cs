@@ -1,7 +1,7 @@
 using System.Buffers;
 using System.Net;
 using Bolt.Client;
-using Bolt.Client.Media;
+using Bolt.Media;
 using Bolt.Protocol;
 using Bolt.Server;
 using FluentAssertions;
@@ -183,6 +183,66 @@ public class ProtocolCodecTests
         BoltCodec.TryReadMediaConfig(writer.WrittenSpan, out var config).Should().BeTrue();
         config.StreamId.Should().Be(streamId);
         config.ExtensionLength.Should().Be(0);
+    }
+
+    [Test]
+    public void NackRequest_EncodeDecodeRoundTrip()
+    {
+        var streamId = Guid.NewGuid();
+        var missing = new uint[] { 10, 15, 20, 42 };
+
+        var writer = new ArrayBufferWriter<byte>(128);
+        BoltCodec.WriteNackRequest(writer, streamId, missing);
+
+        var buffer = writer.WrittenSpan;
+        buffer[0].Should().Be((byte)FrameType.NackRequest);
+
+        var success = BoltCodec.TryReadNackRequest(buffer, out var header);
+        success.Should().BeTrue();
+        header.StreamId.Should().Be(streamId);
+        header.NackCount.Should().Be(4);
+
+        var seqs = header.GetMissingSequences(buffer);
+        seqs.Should().Equal(missing);
+    }
+
+    [Test]
+    public void NackRequest_EmptySequences_RoundTrips()
+    {
+        var streamId = Guid.NewGuid();
+        var writer = new ArrayBufferWriter<byte>(64);
+        BoltCodec.WriteNackRequest(writer, streamId, ReadOnlySpan<uint>.Empty);
+
+        var success = BoltCodec.TryReadNackRequest(writer.WrittenSpan, out var header);
+        success.Should().BeTrue();
+        header.NackCount.Should().Be(0);
+        header.GetMissingSequences(writer.WrittenSpan).Should().BeEmpty();
+    }
+
+    [Test]
+    public void MediaFrameHeader_EncryptedFlag()
+    {
+        var writer = new ArrayBufferWriter<byte>(128);
+        byte flags = 0x10; // encrypted
+        BoltCodec.WriteMediaFrame(writer, Guid.NewGuid(), 1, 960, flags, new byte[] { 0xAA });
+
+        BoltCodec.TryReadMediaFrame(writer.WrittenSpan, out var header).Should().BeTrue();
+        header.IsEncrypted.Should().BeTrue();
+        header.IsKeyframe.Should().BeFalse();
+        header.IsFecProtected.Should().BeFalse();
+    }
+
+    [Test]
+    public void MediaFrameHeader_CombinedFlags()
+    {
+        var writer = new ArrayBufferWriter<byte>(128);
+        byte flags = 0x01 | 0x08 | 0x10; // keyframe + FEC + encrypted
+        BoltCodec.WriteMediaFrame(writer, Guid.NewGuid(), 1, 960, flags, new byte[] { 0xBB });
+
+        BoltCodec.TryReadMediaFrame(writer.WrittenSpan, out var header).Should().BeTrue();
+        header.IsKeyframe.Should().BeTrue();
+        header.IsFecProtected.Should().BeTrue();
+        header.IsEncrypted.Should().BeTrue();
     }
 
     [Test]
@@ -670,6 +730,8 @@ public class CallLifecycleTests
     private WebApplication _serverApp = null!;
     private BoltClient _clientA = null!;
     private BoltClient _clientB = null!;
+    private BoltMediaClient _mediaA = null!;
+    private BoltMediaClient _mediaB = null!;
     private ILoggerFactory _loggerFactory = null!;
 
     // Use a unique port range per fixture to avoid conflicts with benchmarks
@@ -702,11 +764,16 @@ public class CallLifecycleTests
 
         await _clientA.ConnectAsync();
         await _clientB.ConnectAsync();
+
+        _mediaA = new BoltMediaClient(_clientA, _loggerFactory.CreateLogger<BoltMediaClient>());
+        _mediaB = new BoltMediaClient(_clientB, _loggerFactory.CreateLogger<BoltMediaClient>());
     }
 
     [TearDown]
     public async Task TearDown()
     {
+        try { await _mediaA.DisposeAsync(); } catch { }
+        try { await _mediaB.DisposeAsync(); } catch { }
         try { await _clientA.DisposeAsync(); } catch { }
         try { await _clientB.DisposeAsync(); } catch { }
         try { await _serverApp.StopAsync(); } catch { }
@@ -721,13 +788,13 @@ public class CallLifecycleTests
         // Instead, the Ring signal sets status to Ringing internally.
         // We can observe the Initiate arriving on client B via OnIncomingCall.
         var incomingTcs = new TaskCompletionSource<IncomingCallInfo>();
-        _clientB.OnIncomingCall += info =>
+        _mediaB.OnIncomingCall += info =>
         {
             incomingTcs.TrySetResult(info);
             return Task.CompletedTask;
         };
 
-        var callId = await _clientA.StartCallAsync("client_b");
+        var callId = await _mediaA.StartCallAsync("client_b");
 
         // Client B should receive the incoming call (Initiate signal)
         var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -742,25 +809,25 @@ public class CallLifecycleTests
         var incomingTcs = new TaskCompletionSource<IncomingCallInfo>();
         var answeredOnCallerTcs = new TaskCompletionSource<Guid>();
 
-        _clientB.OnIncomingCall += info =>
+        _mediaB.OnIncomingCall += info =>
         {
             incomingTcs.TrySetResult(info);
             return Task.CompletedTask;
         };
-        _clientA.OnCallAnswered += callId =>
+        _mediaA.OnCallAnswered += callId =>
         {
             answeredOnCallerTcs.TrySetResult(callId);
             return Task.CompletedTask;
         };
 
-        var callId = await _clientA.StartCallAsync("client_b");
+        var callId = await _mediaA.StartCallAsync("client_b");
 
         // Wait for client B to receive the call
         var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
         incoming.CallId.Should().Be(callId);
 
         // Client B answers
-        await _clientB.AnswerCallAsync(callId);
+        await _mediaB.AnswerCallAsync(callId);
 
         // Client A should be notified that the call was answered
         var answeredCallId = await answeredOnCallerTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -773,24 +840,24 @@ public class CallLifecycleTests
         var incomingTcs = new TaskCompletionSource<IncomingCallInfo>();
         var rejectedTcs = new TaskCompletionSource<Guid>();
 
-        _clientB.OnIncomingCall += info =>
+        _mediaB.OnIncomingCall += info =>
         {
             incomingTcs.TrySetResult(info);
             return Task.CompletedTask;
         };
-        _clientA.OnCallRejected += (callId, reason) =>
+        _mediaA.OnCallRejected += (callId, reason) =>
         {
             rejectedTcs.TrySetResult(callId);
             return Task.CompletedTask;
         };
 
-        var callId = await _clientA.StartCallAsync("client_b");
+        var callId = await _mediaA.StartCallAsync("client_b");
 
         var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
         incoming.CallId.Should().Be(callId);
 
         // Client B rejects
-        await _clientB.RejectCallAsync(callId);
+        await _mediaB.RejectCallAsync(callId);
 
         // Client A should be notified of rejection
         var rejectedCallId = await rejectedTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -804,30 +871,30 @@ public class CallLifecycleTests
         var answeredTcs = new TaskCompletionSource<Guid>();
         var endedOnBTcs = new TaskCompletionSource<Guid>();
 
-        _clientB.OnIncomingCall += info =>
+        _mediaB.OnIncomingCall += info =>
         {
             incomingTcs.TrySetResult(info);
             return Task.CompletedTask;
         };
-        _clientA.OnCallAnswered += callId =>
+        _mediaA.OnCallAnswered += callId =>
         {
             answeredTcs.TrySetResult(callId);
             return Task.CompletedTask;
         };
-        _clientB.OnCallEnded += callId =>
+        _mediaB.OnCallEnded += callId =>
         {
             endedOnBTcs.TrySetResult(callId);
             return Task.CompletedTask;
         };
 
         // Start and answer call
-        var callId = await _clientA.StartCallAsync("client_b");
+        var callId = await _mediaA.StartCallAsync("client_b");
         var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await _clientB.AnswerCallAsync(incoming.CallId);
+        await _mediaB.AnswerCallAsync(incoming.CallId);
         await answeredTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         // Client A ends the call
-        await _clientA.EndCallAsync(callId);
+        await _mediaA.EndCallAsync(callId);
 
         // Client B should receive the end signal
         var endedCallId = await endedOnBTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -838,14 +905,14 @@ public class CallLifecycleTests
     public async Task StartCall_ToNonexistentRecipient_CallerGetsEnd()
     {
         var endedTcs = new TaskCompletionSource<Guid>();
-        _clientA.OnCallEnded += callId =>
+        _mediaA.OnCallEnded += callId =>
         {
             endedTcs.TrySetResult(callId);
             return Task.CompletedTask;
         };
 
         // Call a non-existent client
-        var callId = await _clientA.StartCallAsync("nonexistent_client");
+        var callId = await _mediaA.StartCallAsync("nonexistent_client");
 
         // Server should send End back since recipient is not found
         var endedCallId = await endedTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -876,6 +943,8 @@ public class MediaFrameExchangeTests
     private WebApplication _serverApp = null!;
     private BoltClient _clientA = null!;
     private BoltClient _clientB = null!;
+    private BoltMediaClient _mediaA = null!;
+    private BoltMediaClient _mediaB = null!;
     private ILoggerFactory _loggerFactory = null!;
 
     private static int _portCounter = 19200;
@@ -907,11 +976,16 @@ public class MediaFrameExchangeTests
 
         await _clientA.ConnectAsync();
         await _clientB.ConnectAsync();
+
+        _mediaA = new BoltMediaClient(_clientA, _loggerFactory.CreateLogger<BoltMediaClient>());
+        _mediaB = new BoltMediaClient(_clientB, _loggerFactory.CreateLogger<BoltMediaClient>());
     }
 
     [TearDown]
     public async Task TearDown()
     {
+        try { await _mediaA.DisposeAsync(); } catch { }
+        try { await _mediaB.DisposeAsync(); } catch { }
         try { await _clientA.DisposeAsync(); } catch { }
         try { await _clientB.DisposeAsync(); } catch { }
         try { await _serverApp.StopAsync(); } catch { }
@@ -924,20 +998,20 @@ public class MediaFrameExchangeTests
         var incomingTcs = new TaskCompletionSource<IncomingCallInfo>();
         var answeredTcs = new TaskCompletionSource<Guid>();
 
-        _clientB.OnIncomingCall += info =>
+        _mediaB.OnIncomingCall += info =>
         {
             incomingTcs.TrySetResult(info);
             return Task.CompletedTask;
         };
-        _clientA.OnCallAnswered += callId =>
+        _mediaA.OnCallAnswered += callId =>
         {
             answeredTcs.TrySetResult(callId);
             return Task.CompletedTask;
         };
 
-        var callId = await _clientA.StartCallAsync("media_client_b");
+        var callId = await _mediaA.StartCallAsync("media_client_b");
         var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await _clientB.AnswerCallAsync(incoming.CallId);
+        await _mediaB.AnswerCallAsync(incoming.CallId);
         await answeredTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         // Now send a MediaConfig from A which should create a media stream on B
@@ -975,20 +1049,20 @@ public class MediaFrameExchangeTests
         var incomingTcs = new TaskCompletionSource<IncomingCallInfo>();
         var answeredTcs = new TaskCompletionSource<Guid>();
 
-        _clientB.OnIncomingCall += info =>
+        _mediaB.OnIncomingCall += info =>
         {
             incomingTcs.TrySetResult(info);
             return Task.CompletedTask;
         };
-        _clientA.OnCallAnswered += callId =>
+        _mediaA.OnCallAnswered += callId =>
         {
             answeredTcs.TrySetResult(callId);
             return Task.CompletedTask;
         };
 
-        var callId = await _clientA.StartCallAsync("media_client_b");
+        var callId = await _mediaA.StartCallAsync("media_client_b");
         var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await _clientB.AnswerCallAsync(incoming.CallId);
+        await _mediaB.AnswerCallAsync(incoming.CallId);
         await answeredTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         // RPC still works while call is active
@@ -1010,28 +1084,28 @@ public class MediaFrameExchangeTests
             var answeredTcs = new TaskCompletionSource<Guid>();
             var endedTcs = new TaskCompletionSource<Guid>();
 
-            _clientB.OnIncomingCall += info =>
+            _mediaB.OnIncomingCall += info =>
             {
                 incomingTcs.TrySetResult(info);
                 return Task.CompletedTask;
             };
-            _clientA.OnCallAnswered += callId =>
+            _mediaA.OnCallAnswered += callId =>
             {
                 answeredTcs.TrySetResult(callId);
                 return Task.CompletedTask;
             };
-            _clientB.OnCallEnded += callId =>
+            _mediaB.OnCallEnded += callId =>
             {
                 endedTcs.TrySetResult(callId);
                 return Task.CompletedTask;
             };
 
-            var callId = await _clientA.StartCallAsync("media_client_b");
+            var callId = await _mediaA.StartCallAsync("media_client_b");
             var incoming = await incomingTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            await _clientB.AnswerCallAsync(incoming.CallId);
+            await _mediaB.AnswerCallAsync(incoming.CallId);
             await answeredTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            await _clientA.EndCallAsync(callId);
+            await _mediaA.EndCallAsync(callId);
             var ended = await endedTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
             ended.Should().Be(callId);
         }
@@ -1047,5 +1121,407 @@ public class MediaFrameExchangeTests
             await Task.Delay(100);
         }
         throw new TimeoutException($"Service at {url} not healthy within {timeoutSeconds}s");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 6. Encryption Tests (ECDH key exchange + AES-GCM round trip)
+// ═══════════════════════════════════════════════════════════════════
+
+[TestFixture]
+public class EncryptionTests
+{
+    [Test]
+    public void KeyExchange_BothSidesDeriveIdenticalKey()
+    {
+        using var alice = new MediaEncryption();
+        using var bob = new MediaEncryption();
+
+        var callId = Guid.NewGuid();
+        bob.DeriveKey(alice.PublicKey, callId);
+        alice.DeriveKey(bob.PublicKey, callId);
+
+        alice.IsReady.Should().BeTrue();
+        bob.IsReady.Should().BeTrue();
+
+        var streamId = Guid.NewGuid();
+        var plaintext = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE };
+
+        var encrypted = alice.Encrypt(plaintext, 42, streamId);
+        var decrypted = bob.Decrypt(encrypted, 42, streamId);
+        decrypted.Should().Equal(plaintext);
+    }
+
+    [Test]
+    public void Encrypt_Decrypt_LargePayload()
+    {
+        using var alice = new MediaEncryption();
+        using var bob = new MediaEncryption();
+        var callId = Guid.NewGuid();
+        bob.DeriveKey(alice.PublicKey, callId);
+        alice.DeriveKey(bob.PublicKey, callId);
+
+        var streamId = Guid.NewGuid();
+        var payload = new byte[4096];
+        Random.Shared.NextBytes(payload);
+
+        var encrypted = alice.Encrypt(payload, 100, streamId);
+        encrypted.Length.Should().Be(payload.Length + alice.AuthTagSize);
+
+        var decrypted = bob.Decrypt(encrypted, 100, streamId);
+        decrypted.Should().Equal(payload);
+    }
+
+    [Test]
+    public void Decrypt_WrongSequence_Throws()
+    {
+        using var alice = new MediaEncryption();
+        using var bob = new MediaEncryption();
+        var callId = Guid.NewGuid();
+        bob.DeriveKey(alice.PublicKey, callId);
+        alice.DeriveKey(bob.PublicKey, callId);
+
+        var streamId = Guid.NewGuid();
+        var encrypted = alice.Encrypt(new byte[] { 1, 2, 3, 4, 5 }, 1, streamId);
+
+        var act = () => bob.Decrypt(encrypted, 999, streamId);
+        act.Should().Throw<System.Security.Cryptography.AuthenticationTagMismatchException>();
+    }
+
+    [Test]
+    public void Decrypt_TamperedData_Throws()
+    {
+        using var alice = new MediaEncryption();
+        using var bob = new MediaEncryption();
+        var callId = Guid.NewGuid();
+        bob.DeriveKey(alice.PublicKey, callId);
+        alice.DeriveKey(bob.PublicKey, callId);
+
+        var streamId = Guid.NewGuid();
+        var encrypted = alice.Encrypt(new byte[] { 1, 2, 3 }, 1, streamId);
+        encrypted[0] ^= 0xFF;
+
+        var act = () => bob.Decrypt(encrypted, 1, streamId);
+        act.Should().Throw<System.Security.Cryptography.AuthenticationTagMismatchException>();
+    }
+
+    [Test]
+    public void MultipleFrames_DifferentNonces_AllDecryptCorrectly()
+    {
+        using var alice = new MediaEncryption();
+        using var bob = new MediaEncryption();
+        var callId = Guid.NewGuid();
+        bob.DeriveKey(alice.PublicKey, callId);
+        alice.DeriveKey(bob.PublicKey, callId);
+
+        var streamId = Guid.NewGuid();
+        for (uint seq = 0; seq < 100; seq++)
+        {
+            var payload = new byte[] { (byte)seq, (byte)(seq + 1) };
+            var enc = alice.Encrypt(payload, seq, streamId);
+            var dec = bob.Decrypt(enc, seq, streamId);
+            dec.Should().Equal(payload);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 7. Retransmit Buffer Tests
+// ═══════════════════════════════════════════════════════════════════
+
+[TestFixture]
+public class RetransmitBufferTests
+{
+    [Test]
+    public void Store_And_Retrieve_Frame()
+    {
+        var buffer = new RetransmitBuffer(16);
+        var payload = new byte[] { 0xAA, 0xBB, 0xCC };
+
+        buffer.Store(5, 960, 0x01, payload);
+
+        buffer.TryGet(5, out var frame).Should().BeTrue();
+        frame.SequenceNumber.Should().Be(5);
+        frame.Timestamp.Should().Be(960u);
+        frame.Flags.Should().Be(0x01);
+        frame.Payload.Should().Equal(payload);
+    }
+
+    [Test]
+    public void Retrieve_NonExistent_ReturnsFalse()
+    {
+        var buffer = new RetransmitBuffer(16);
+        buffer.TryGet(42, out _).Should().BeFalse();
+    }
+
+    [Test]
+    public void RingBuffer_EvictsOldEntries()
+    {
+        var buffer = new RetransmitBuffer(4);
+
+        for (uint i = 0; i < 8; i++)
+            buffer.Store(i, i * 960, 0, new byte[] { (byte)i });
+
+        buffer.TryGet(0, out _).Should().BeFalse();
+        buffer.TryGet(3, out _).Should().BeFalse();
+
+        buffer.TryGet(4, out var frame4).Should().BeTrue();
+        frame4.Payload.Should().Equal(new byte[] { 4 });
+
+        buffer.TryGet(7, out var frame7).Should().BeTrue();
+        frame7.Payload.Should().Equal(new byte[] { 7 });
+    }
+
+    [Test]
+    public void Store_CopiesPayload()
+    {
+        var buffer = new RetransmitBuffer(16);
+        var original = new byte[] { 0x01, 0x02 };
+        buffer.Store(1, 0, 0, original);
+
+        original[0] = 0xFF;
+
+        buffer.TryGet(1, out var frame).Should().BeTrue();
+        frame.Payload![0].Should().Be(0x01);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 8. Audio Processing Tests (PLC + VAD)
+// ═══════════════════════════════════════════════════════════════════
+
+[TestFixture]
+public class AudioProcessingTests
+{
+    [Test]
+    public void PLC_FirstLoss_FadesLastGoodFrame()
+    {
+        var plc = new PacketLossConcealment(4);
+        // 2 samples PCM-16LE: max volume
+        var frame = new byte[] { 0xFF, 0x7F, 0xFF, 0x7F }; // 32767, 32767
+        plc.RecordGoodFrame(frame);
+
+        var concealed = plc.GenerateConcealmentFrame();
+        // Should be ~75% of original
+        var sample = System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(concealed);
+        sample.Should().BeInRange((short)(32767 * 0.7), (short)(32767 * 0.8));
+    }
+
+    [Test]
+    public void PLC_MultipleConsecutiveLosses_FadesToSilence()
+    {
+        var plc = new PacketLossConcealment(4);
+        var frame = new byte[] { 0xFF, 0x7F, 0xFF, 0x7F };
+        plc.RecordGoodFrame(frame);
+
+        // Consume 4 consecutive losses
+        plc.GenerateConcealmentFrame(); // fade 75%
+        plc.GenerateConcealmentFrame(); // fade 40%
+        plc.GenerateConcealmentFrame(); // comfort noise
+        var silent = plc.GenerateConcealmentFrame(); // silence
+
+        // After 4 losses, should be all zeros (silence)
+        silent.Should().OnlyContain(b => b == 0);
+    }
+
+    [Test]
+    public void PLC_RecordGoodFrame_ResetsLossCount()
+    {
+        var plc = new PacketLossConcealment(4);
+        var frame = new byte[] { 0xFF, 0x7F, 0xFF, 0x7F };
+        plc.RecordGoodFrame(frame);
+
+        plc.GenerateConcealmentFrame(); // 1 loss
+        plc.GenerateConcealmentFrame(); // 2 losses
+
+        // Record a good frame — resets
+        plc.RecordGoodFrame(frame);
+        var concealed = plc.GenerateConcealmentFrame(); // Should be 75% again, not comfort noise
+
+        var sample = System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(concealed);
+        sample.Should().BeGreaterThan(20000); // ~75% of 32767
+    }
+
+    [Test]
+    public void VAD_Silence_DetectedAsSilence()
+    {
+        var vad = new VoiceActivityDetector();
+        // Silence: all zeros
+        var silence = new byte[960];
+
+        for (int i = 0; i < 20; i++)
+            vad.Analyze(silence);
+
+        vad.IsSpeech.Should().BeFalse();
+    }
+
+    [Test]
+    public void VAD_LoudSignal_DetectedAsSpeech()
+    {
+        var vad = new VoiceActivityDetector();
+
+        // Generate a loud signal (sine-like: alternating max values)
+        var loud = new byte[960];
+        for (int i = 0; i < loud.Length; i += 2)
+        {
+            var sample = (short)(short.MaxValue * 0.8 * Math.Sin(i * 0.1));
+            System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(loud.AsSpan(i), sample);
+        }
+
+        // Feed several frames to get past hangover
+        for (int i = 0; i < 10; i++)
+            vad.Analyze(loud);
+
+        vad.IsSpeech.Should().BeTrue();
+    }
+
+    [Test]
+    public void VAD_TransitionToSilence_HasHangover()
+    {
+        var vad = new VoiceActivityDetector(offsetFrames: 5);
+
+        // Loud signal
+        var loud = new byte[960];
+        for (int i = 0; i < loud.Length; i += 2)
+            System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(loud.AsSpan(i), 20000);
+
+        // Get into speech state
+        for (int i = 0; i < 10; i++)
+            vad.Analyze(loud);
+        vad.IsSpeech.Should().BeTrue();
+
+        // Switch to silence — should stay in speech for a few frames (hangover)
+        var silence = new byte[960];
+        vad.Analyze(silence);
+        vad.Analyze(silence);
+        // Still speech due to hangover
+        vad.IsSpeech.Should().BeTrue();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 9. Codec Negotiation Tests
+// ═══════════════════════════════════════════════════════════════════
+
+[TestFixture]
+public class CodecNegotiationTests
+{
+    [Test]
+    public void Negotiation_BothSidesSupport_ReturnsIntersection()
+    {
+        var caller = new CodecNegotiator();
+        caller.AddCapability(MediaType.Audio, CodecId.Opus, 128);
+        caller.AddCapability(MediaType.Video, CodecId.H264, 2000);
+        caller.AddCapability(MediaType.Video, CodecId.H265, 5000);
+
+        var callee = new CodecNegotiator();
+        callee.AddCapability(MediaType.Audio, CodecId.Opus, 256);
+        callee.AddCapability(MediaType.Video, CodecId.H264, 3000);
+        // Callee doesn't support H265
+
+        // Exchange
+        var callerPayload = caller.SerializeCapabilities();
+        var calleePayload = callee.SerializeCapabilities();
+
+        caller.ProcessRemoteCapabilities(calleePayload);
+        callee.ProcessRemoteCapabilities(callerPayload);
+
+        caller.IsNegotiated.Should().BeTrue();
+        caller.AgreedCapabilities.Should().HaveCount(2); // Opus + H264 only
+        caller.AgreedCapabilities!.Should().Contain(c => c.CodecId == CodecId.Opus);
+        caller.AgreedCapabilities!.Should().Contain(c => c.CodecId == CodecId.H264);
+        caller.AgreedCapabilities!.Should().NotContain(c => c.CodecId == CodecId.H265);
+    }
+
+    [Test]
+    public void Negotiation_TakesMinBitrate()
+    {
+        var caller = new CodecNegotiator();
+        caller.AddCapability(MediaType.Video, CodecId.H264, 5000);
+
+        var callee = new CodecNegotiator();
+        callee.AddCapability(MediaType.Video, CodecId.H264, 2000);
+
+        caller.ProcessRemoteCapabilities(callee.SerializeCapabilities());
+
+        var agreed = caller.AgreedCapabilities!.First(c => c.CodecId == CodecId.H264);
+        agreed.MaxBitrateKbps.Should().Be(2000); // min of 5000 and 2000
+    }
+
+    [Test]
+    public void GetPreferredCodec_PrefersHardwareAccelerated()
+    {
+        var neg = new CodecNegotiator();
+        neg.AddCapability(MediaType.Video, CodecId.H264, 2000, hardwareAccelerated: false);
+        neg.AddCapability(MediaType.Video, CodecId.H265, 3000, hardwareAccelerated: true);
+
+        var remote = new CodecNegotiator();
+        remote.AddCapability(MediaType.Video, CodecId.H264, 2000);
+        remote.AddCapability(MediaType.Video, CodecId.H265, 3000, hardwareAccelerated: true);
+
+        neg.ProcessRemoteCapabilities(remote.SerializeCapabilities());
+
+        var preferred = neg.GetPreferredCodec(MediaType.Video);
+        preferred.Should().NotBeNull();
+        preferred!.Value.CodecId.Should().Be(CodecId.H265);
+        preferred.Value.IsHardwareAccelerated.Should().BeTrue();
+    }
+
+    [Test]
+    public void SerializeDeserialize_RoundTrips()
+    {
+        var neg = new CodecNegotiator();
+        neg.AddDefaultCapabilities();
+
+        var payload = neg.SerializeCapabilities();
+        payload.Length.Should().Be(1 + 4 * CodecCapability.WireSize); // 4 defaults
+
+        var other = new CodecNegotiator();
+        other.AddDefaultCapabilities();
+        other.ProcessRemoteCapabilities(payload);
+
+        other.IsNegotiated.Should().BeTrue();
+        other.AgreedCapabilities.Should().HaveCount(4);
+    }
+
+    [Test]
+    public void DelayBasedController_DetectsOveruseState()
+    {
+        var controller = new DelayBasedController(1000, false);
+
+        // Feed stable frames first (baseline)
+        long recvTime = 0;
+        for (int i = 0; i < 30; i++)
+        {
+            recvTime += 33;
+            controller.RecordFrame((uint)(i * 33), recvTime);
+        }
+        controller.State.Should().NotBe(CongestionState.Overuse);
+
+        // Now feed heavily delayed frames (30ms extra per frame = huge delay gradient)
+        for (int i = 30; i < 200; i++)
+        {
+            recvTime += 33 + 30;
+            controller.RecordFrame((uint)(i * 33), recvTime);
+        }
+
+        // The Kalman filter should have detected overuse by now
+        // (rate-limited bitrate changes need real wall-clock time, but state detection is immediate)
+        controller.State.Should().Be(CongestionState.Overuse);
+    }
+
+    [Test]
+    public void DelayBasedController_StableNetwork_NormalState()
+    {
+        var controller = new DelayBasedController(1000, false);
+
+        long recvTime = 0;
+        for (int i = 0; i < 100; i++)
+        {
+            recvTime += 33; // Perfect delivery
+            controller.RecordFrame((uint)(i * 33), recvTime);
+        }
+
+        controller.State.Should().Be(CongestionState.Normal);
     }
 }
