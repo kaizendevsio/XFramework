@@ -694,7 +694,7 @@ export function writeResponse(
 
     writeUint8(view, 0, FrameType.Response);
     writeGuid(buf, 1, requestId);
-    writeInt32LE(view, 17, statusCode); // int16 LE (same as .NET short)
+    writeUint16LE(view, 17, statusCode & 0xFFFF); // int16 LE (same as .NET short)
     writeInt32LE(view, 19, payload.length);
     buf.set(payload, 23);
 
@@ -787,7 +787,7 @@ export function writeStreamClose(streamId: string, statusCode = 200): Uint8Array
 
     writeUint8(view, 0, FrameType.StreamClose);
     writeGuid(buf, 1, streamId);
-    writeInt32LE(view, 17, statusCode); // int16 LE
+    writeUint16LE(view, 17, statusCode & 0xFFFF); // int16 LE (2 bytes, same as .NET short)
 
     return buf;
 }

@@ -187,6 +187,30 @@ public sealed class BoltClient : IAsyncDisposable
         _handlers[hash] = handler;
     }
 
+    /// <summary>
+    /// Send a fire-and-forget push message (no response expected).
+    /// Use for typing indicators, presence updates, read receipts.
+    /// recipientId of "" with hash 0 broadcasts to all connected clients.
+    /// </summary>
+    public async ValueTask PushAsync(string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
+    {
+        if (!IsConnected) return;
+
+        var recipientHash = string.IsNullOrEmpty(recipientId) ? 0 : _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
+        var commandHash = _hashCache.GetOrAdd(commandName, BoltCodec.Fnv1aHash);
+
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WritePush(writer, Guid.NewGuid(), recipientHash, commandHash, payload.Span);
+        await GetConnection().SendAsync(writer.WrittenMemory, ct);
+    }
+
+    /// <summary>Typed push with MemoryPack serialization.</summary>
+    public async ValueTask PushAsync<T>(string recipientId, string commandName, T data, CancellationToken ct = default)
+    {
+        var payload = MemoryPackSerializer.Serialize(data);
+        await PushAsync(recipientId, commandName, (ReadOnlyMemory<byte>)payload, ct);
+    }
+
     // ── Streaming ────────────────────────────────────────────
 
     public void RegisterStreamHandler(string commandName, Func<BoltStream, Task> handler)

@@ -107,6 +107,26 @@ public static class BoltCodec
         return 2;
     }
 
+    /// <summary>
+    /// Encode a push frame (fire-and-forget, same header as Request but type=0x05).
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WritePush(IBufferWriter<byte> writer, Guid requestId, int recipientHash, int commandHash, ReadOnlySpan<byte> payload)
+    {
+        var totalSize = RequestHeaderSize + payload.Length;
+        var span = writer.GetSpan(totalSize);
+
+        span[0] = (byte)FrameType.Push;
+        WriteGuid(span.Slice(1), requestId);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(17), recipientHash);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(21), commandHash);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(25), payload.Length);
+        payload.CopyTo(span.Slice(29));
+
+        writer.Advance(totalSize);
+        return totalSize;
+    }
+
     // ── Streaming ──
 
     public const int StreamOpenHeaderSize = 1 + 16 + 4 + 4;  // 25 bytes
