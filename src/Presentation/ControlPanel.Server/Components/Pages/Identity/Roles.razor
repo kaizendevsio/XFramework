@@ -4,7 +4,10 @@
 
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <BbTypography Variant="TypographyVariant.H3">Roles</BbTypography>
+        <div>
+            <BbTypography Variant="TypographyVariant.H3">Roles</BbTypography>
+            <p class="text-sm text-muted-foreground">Manage role assignments across all credentials</p>
+        </div>
         <BbButton OnClick="@OpenAddDialog">
             <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
             Add Role
@@ -43,16 +46,24 @@
             <div class="grid gap-2">
                 <BbLabel>Credential ID</BbLabel>
                 <BbInput Value="@_formCredentialId"
-                         ValueChanged="@((string v) => _formCredentialId = v)" />
+                         ValueChanged="@((string v) => _formCredentialId = v)" Placeholder="Enter credential GUID" />
             </div>
             <div class="grid gap-2">
                 <BbLabel>Role Type</BbLabel>
-                <BbSelect Value="@_formTypeId" ValueChanged="@((string v) => _formTypeId = v)">
-                    @foreach (var type in _roleTypes)
-                    {
-                        <BbSelectItem Value="@type.Id.ToString()">@(type.Name ?? type.Id.ToString())</BbSelectItem>
-                    }
-                </BbSelect>
+                @if (_roleTypes.Count == 0)
+                {
+                    <p class="text-sm text-muted-foreground">No role types configured. Add them in Reference Data.</p>
+                }
+                else
+                {
+                    <select class="w-full rounded-md border px-3 py-2 text-sm bg-background" @bind="_formTypeId">
+                        <option value="">Select role type</option>
+                        @foreach (var rt in _roleTypes)
+                        {
+                            <option value="@rt.Id">@rt.Name (Level @rt.RoleLevel)</option>
+                        }
+                    </select>
+                }
             </div>
             <div class="grid gap-2">
                 <BbLabel>Expiration</BbLabel>

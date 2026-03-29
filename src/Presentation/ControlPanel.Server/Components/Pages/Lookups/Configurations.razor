@@ -5,7 +5,10 @@
 <div class="space-y-4">
     <div class="flex items-center justify-between">
         <BbTypography Variant="TypographyVariant.H3">Configurations</BbTypography>
-        <BbButton OnClick="@OpenCreateDialog">Add Configuration</BbButton>
+        <BbButton OnClick="@OpenCreateDialog">
+            <LucideIcon Name="plus" class="h-4 w-4 mr-1" />
+            Add Configuration
+        </BbButton>
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">

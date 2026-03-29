@@ -17,6 +17,12 @@
     </div>
 
     @* ── Tenant List ── *@
+    @if (_loading)
+    {
+        <p class="text-sm text-muted-foreground">Loading tenants...</p>
+    }
+    else
+    {
     <BbCard>
         <BbCardHeader>
             <BbCardTitle>Tenants</BbCardTitle>
@@ -106,6 +112,7 @@
             </BbDataGrid>
         </BbCardContent>
     </BbCard>
+    }
 
     @* ── Tenant Detail Section ── *@
     @if (_selectedTenant is not null)
@@ -378,12 +385,12 @@
                 </div>
                 <div class="grid gap-2">
                     <BbLabel>Status</BbLabel>
-                    <BbSelect Value="@_tenantForm.StatusString" ValueChanged="@((string v) => _tenantForm.StatusString = v)">
-                        <BbSelectItem Value="0">Pending</BbSelectItem>
-                        <BbSelectItem Value="1">Active</BbSelectItem>
-                        <BbSelectItem Value="2">Suspended</BbSelectItem>
-                        <BbSelectItem Value="3">Inactive</BbSelectItem>
-                    </BbSelect>
+                    <select class="w-full rounded-md border px-3 py-2 text-sm bg-background" @bind="_tenantForm.StatusString">
+                        <option value="0">Pending</option>
+                        <option value="1">Active</option>
+                        <option value="2">Suspended</option>
+                        <option value="3">Inactive</option>
+                    </select>
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
@@ -488,6 +495,7 @@
     // ── Tenant list state ──
     private List<Tenant> _tenants = [];
     private bool _saving;
+    private bool _loading;
 
     // ── Tenant create/edit dialog ──
     private bool _tenantDialogOpen;
@@ -525,6 +533,7 @@
 
     private async Task LoadTenants()
     {
+        _loading = true;
         try
         {
             _tenants = await Db.Query<Tenant>()
@@ -535,6 +544,10 @@
         catch (Exception ex)
         {
             ToastService.Show($"Failed to load tenants: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 

@@ -51,6 +51,13 @@
                         <BbBreadcrumbItem>
                             <BbBreadcrumbLink Href="/">Dashboard</BbBreadcrumbLink>
                         </BbBreadcrumbItem>
+                        @foreach (var crumb in GetBreadcrumbs())
+                        {
+                            <BbBreadcrumbSeparator />
+                            <BbBreadcrumbItem>
+                                <BbBreadcrumbPage>@crumb</BbBreadcrumbPage>
+                            </BbBreadcrumbItem>
+                        }
                     </BbBreadcrumbList>
                 </BbBreadcrumb>
                 @if (!string.IsNullOrEmpty(_selectedTenantName))
@@ -75,10 +82,26 @@
 
 @code {
     [Inject] private AdminDbContext Db { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
 
     private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
     private string _selectedTenantId = "";
     private string _selectedTenantName = "";
+
+    private List<string> GetBreadcrumbs()
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath.Trim('/');
+        if (string.IsNullOrEmpty(path)) return [];
+
+        return path.Split('/')
+            .Select(s => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.Replace("-", " ")))
+            .ToList();
+    }
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += (_, _) => InvokeAsync(StateHasChanged);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

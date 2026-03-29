@@ -4,7 +4,10 @@
 
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <BbTypography Variant="TypographyVariant.H3">Transactions</BbTypography>
+        <div>
+            <BbTypography Variant="TypographyVariant.H3">Transactions</BbTypography>
+            <p class="text-sm text-muted-foreground">View all wallet transactions across the system</p>
+        </div>
     </div>
 
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
