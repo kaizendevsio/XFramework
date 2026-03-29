@@ -1,0 +1,768 @@
+@page "/identity/tenants/{Id:guid}"
+
+<PageTitle>Tenant Detail - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <BbTypography Variant="TypographyVariant.Muted">Loading tenant...</BbTypography>
+}
+else if (_tenant is null)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/identity/tenants"))">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Tenants
+        </BbButton>
+        <BbAlert Variant="AlertVariant.Danger">
+            <BbAlertTitle>Tenant Not Found</BbAlertTitle>
+            <BbAlertDescription>No tenant found with the specified ID.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else
+{
+    <div class="space-y-6">
+
+        @* -- Header -- *@
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                          OnClick="@(() => Navigation.NavigateTo("/identity/tenants"))">
+                    <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                </BbButton>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <BbTypography Variant="TypographyVariant.H3">@(_tenant.Name ?? "Unnamed Tenant")</BbTypography>
+                        @{
+                            var headerStatusText = _tenant.Status switch
+                            {
+                                0 => "Pending",
+                                1 => "Active",
+                                2 => "Suspended",
+                                3 => "Inactive",
+                                _ => "Unknown"
+                            };
+                            var headerStatusKey = _tenant.Status switch
+                            {
+                                0 => "pending",
+                                1 => "active",
+                                2 => "suspended",
+                                3 => "inactive",
+                                _ => "inactive"
+                            };
+                        }
+                        <StatusBadge Text="@headerStatusText" Status="@headerStatusKey" />
+                        <StatusBadge Text="@(_tenant.IsEnabled ? "Enabled" : "Disabled")"
+                                     Status="@(_tenant.IsEnabled ? "active" : "inactive")" />
+                    </div>
+                    <BbTypography Variant="TypographyVariant.Muted">ID: @_tenant.Id.ToString()[..8]...</BbTypography>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@ToggleEnabled">
+                    <LucideIcon Name="@(_tenant.IsEnabled ? "power-off" : "power")" class="mr-2 h-4 w-4" />
+                    @(_tenant.IsEnabled ? "Disable" : "Enable")
+                </BbButton>
+                <BbButton OnClick="@OpenEditDialog">
+                    <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
+                    Edit Tenant
+                </BbButton>
+            </div>
+        </div>
+
+        @* -- Summary Card -- *@
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Tenant Summary</BbCardTitle>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Name</BbTypography>
+                        <BbTypography>@(_tenant.Name ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Description</BbTypography>
+                        <BbTypography>@(_tenant.Description ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Status</BbTypography>
+                        @{
+                            var detailStatusText = _tenant.Status switch
+                            {
+                                0 => "Pending",
+                                1 => "Active",
+                                2 => "Suspended",
+                                3 => "Inactive",
+                                _ => "Unknown"
+                            };
+                            var detailStatusKey = _tenant.Status switch
+                            {
+                                0 => "pending",
+                                1 => "active",
+                                2 => "suspended",
+                                3 => "inactive",
+                                _ => "inactive"
+                            };
+                        }
+                        <StatusBadge Text="@detailStatusText" Status="@detailStatusKey" />
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Version</BbTypography>
+                        <BbTypography>@_tenant.Version</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Expiration</BbTypography>
+                        <BbTypography>@(_tenant.Expiration?.ToString("yyyy-MM-dd HH:mm") ?? "No expiration")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Availability Date</BbTypography>
+                        <BbTypography>@(_tenant.AvailabilityDate?.ToString("yyyy-MM-dd HH:mm") ?? "N/A")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Created</BbTypography>
+                        <BbTypography>@_tenant.CreatedAt.ToString("g")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Last Modified</BbTypography>
+                        <BbTypography>@(_tenant.ModifiedAt?.ToString("g") ?? "Never")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Enabled</BbTypography>
+                        <StatusBadge Text="@(_tenant.IsEnabled ? "Enabled" : "Disabled")"
+                                     Status="@(_tenant.IsEnabled ? "active" : "inactive")" />
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Parent Tenant</BbTypography>
+                        <BbTypography>@(_tenant.ParentTenantId?.ToString() ?? "None (root)")</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Users</BbTypography>
+                        <BbTypography>@_detailUsers.Count</BbTypography>
+                    </div>
+                    <div>
+                        <BbTypography Variant="TypographyVariant.Muted">Configurations</BbTypography>
+                        <BbTypography>@_detailConfigs.Count</BbTypography>
+                    </div>
+                </div>
+            </BbCardContent>
+        </BbCard>
+
+        @* -- Detail Tabs -- *@
+        <BbTabs DefaultValue="users">
+            <BbTabsList>
+                <BbTabsTrigger Value="users">Users (@_detailUsers.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="configurations">Configurations (@_detailConfigs.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="roletypes">Role Types (@_detailRoleTypes.Count)</BbTabsTrigger>
+            </BbTabsList>
+
+            @* -- Users Tab -- *@
+            <BbTabsContent Value="users">
+                <BbCard>
+                    <BbCardContent>
+                        @if (_detailUsers.Count == 0)
+                        {
+                            <BbAlert Variant="AlertVariant.Info">
+                                No users found for this tenant.
+                            </BbAlert>
+                        }
+                        else
+                        {
+                            <BbDataGrid Items="@_detailUsers" ShowPagination="true" InitialPageSize="10">
+                                <Columns>
+                                    <BbDataGridPropertyColumn Property="@(x => x.FirstName)" Title="First Name" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.LastName)" Title="Last Name" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.IdentityName)" Title="Identity Name" Sortable="true" />
+                                    <BbDataGridTemplateColumn Title="Verified">
+                                        <ChildContent Context="user">
+                                            <StatusBadge Text="@(user.IsVerified ? "Verified" : "Unverified")"
+                                                         Status="@(user.IsVerified ? "active" : "inactive")" />
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Gender">
+                                        <ChildContent Context="user">
+                                            @(user.Gender?.ToString() ?? "N/A")
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.BirthDate)" Title="Birth Date" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        }
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            @* -- Configurations Tab -- *@
+            <BbTabsContent Value="configurations">
+                <BbCard>
+                    <BbCardHeader>
+                        <div class="flex items-center justify-between">
+                            <BbCardTitle>Registry Configurations</BbCardTitle>
+                            <BbButton Size="ButtonSize.Small" OnClick="@OpenAddConfigDialog">
+                                <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                                Add Configuration
+                            </BbButton>
+                        </div>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        @if (_detailConfigs.Count == 0)
+                        {
+                            <BbAlert Variant="AlertVariant.Info">
+                                No configurations found for this tenant.
+                            </BbAlert>
+                        }
+                        else
+                        {
+                            <BbDataGrid Items="@_detailConfigs" ShowPagination="true" InitialPageSize="10">
+                                <Columns>
+                                    <BbDataGridPropertyColumn Property="@(x => x.Key)" Title="Key" Sortable="true" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" />
+                                    <BbDataGridPropertyColumn Property="@(x => x.Unit)" Title="Unit" />
+                                    <BbDataGridTemplateColumn Title="Group">
+                                        <ChildContent Context="cfg">
+                                            @(cfg.Group?.Name ?? cfg.GroupId.ToString()[..8])
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Enabled">
+                                        <ChildContent Context="cfg">
+                                            <StatusBadge Text="@(cfg.IsEnabled ? "Enabled" : "Disabled")"
+                                                         Status="@(cfg.IsEnabled ? "active" : "inactive")" />
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                    <BbDataGridTemplateColumn Title="Actions">
+                                        <ChildContent Context="cfg">
+                                            <div class="flex items-center gap-1">
+                                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                          OnClick="@(() => OpenEditConfigDialog(cfg))">
+                                                    <LucideIcon Name="pencil" class="h-4 w-4" />
+                                                </BbButton>
+                                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                          OnClick="@(() => OpenDeleteConfigDialog(cfg))">
+                                                    <LucideIcon Name="trash-2" class="h-4 w-4" />
+                                                </BbButton>
+                                            </div>
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                </Columns>
+                            </BbDataGrid>
+                        }
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            @* -- Role Types Tab -- *@
+            <BbTabsContent Value="roletypes">
+                <BbCard>
+                    <BbCardContent>
+                        @if (_detailRoleTypes.Count == 0)
+                        {
+                            <BbAlert Variant="AlertVariant.Info">
+                                No role types found for this tenant.
+                            </BbAlert>
+                        }
+                        else
+                        {
+                            <BbDataGrid Items="@_detailRoleTypes" ShowPagination="true" InitialPageSize="10">
+                                <Columns>
+                                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                                    <BbDataGridTemplateColumn Title="Role Level">
+                                        <ChildContent Context="rt">
+                                            @(rt.RoleLevel?.ToString() ?? "N/A")
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Group">
+                                        <ChildContent Context="rt">
+                                            @(rt.Group?.Name ?? rt.GroupId.ToString()[..8])
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Enabled">
+                                        <ChildContent Context="rt">
+                                            <StatusBadge Text="@(rt.IsEnabled ? "Enabled" : "Disabled")"
+                                                         Status="@(rt.IsEnabled ? "active" : "inactive")" />
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        }
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+        </BbTabs>
+    </div>
+}
+
+@* -- Edit Tenant Dialog -- *@
+<BbDialog Open="@_editDialogOpen" OpenChanged="@(v => _editDialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Edit Tenant</BbDialogTitle>
+            <BbDialogDescription>Update the tenant properties below.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-2">
+                <BbLabel>Name</BbLabel>
+                <BbInput Value="@_tenantForm.Name"
+                         ValueChanged="@((string v) => _tenantForm.Name = v)"
+                         Placeholder="Tenant name" />
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Description</BbLabel>
+                <BbInput Value="@_tenantForm.Description"
+                         ValueChanged="@((string v) => _tenantForm.Description = v)"
+                         Placeholder="Brief description" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="grid gap-2">
+                    <BbLabel>Version</BbLabel>
+                    <BbInput Value="@_tenantForm.VersionString"
+                             ValueChanged="@((string v) => _tenantForm.VersionString = v)"
+                             Placeholder="1.0" />
+                </div>
+                <div class="grid gap-2">
+                    <BbLabel>Status</BbLabel>
+                    <select class="w-full rounded-md border px-3 py-2 text-sm bg-background" @bind="_tenantForm.StatusString">
+                        <option value="0">Pending</option>
+                        <option value="1">Active</option>
+                        <option value="2">Suspended</option>
+                        <option value="3">Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="grid gap-2">
+                    <BbLabel>Expiration Date</BbLabel>
+                    <BbInput Value="@_tenantForm.ExpirationString"
+                             ValueChanged="@((string v) => _tenantForm.ExpirationString = v)"
+                             Placeholder="YYYY-MM-DD" />
+                </div>
+                <div class="grid gap-2">
+                    <BbLabel>Availability Date</BbLabel>
+                    <BbInput Value="@_tenantForm.AvailabilityString"
+                             ValueChanged="@((string v) => _tenantForm.AvailabilityString = v)"
+                             Placeholder="YYYY-MM-DD" />
+                </div>
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Parent Tenant ID</BbLabel>
+                <BbInput Value="@_tenantForm.ParentTenantIdString"
+                         ValueChanged="@((string v) => _tenantForm.ParentTenantIdString = v)"
+                         Placeholder="Optional — leave blank for root tenant" />
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _editDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveTenant" Disabled="@_saving">
+                @if (_saving)
+                {
+                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                }
+                Update
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@* -- Add / Edit Configuration Dialog -- *@
+<BbDialog Open="@_configDialogOpen" OpenChanged="@(v => _configDialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(_isEditingConfig ? "Edit Configuration" : "Add Configuration")</BbDialogTitle>
+            <BbDialogDescription>
+                @(_isEditingConfig ? "Update the configuration value." : "Add a new registry configuration for this tenant.")
+            </BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-2">
+                <BbLabel>Key</BbLabel>
+                <BbInput Value="@_configForm.Key"
+                         ValueChanged="@((string v) => _configForm.Key = v)"
+                         Placeholder="e.g. MaxUsers, FeatureFlags.EnableX" />
+            </div>
+            <div class="grid gap-2">
+                <BbLabel>Value</BbLabel>
+                <BbInput Value="@_configForm.Value"
+                         ValueChanged="@((string v) => _configForm.Value = v)"
+                         Placeholder="Configuration value" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="grid gap-2">
+                    <BbLabel>Unit</BbLabel>
+                    <BbInput Value="@_configForm.Unit"
+                             ValueChanged="@((string v) => _configForm.Unit = v)"
+                             Placeholder="e.g. count, MB, boolean" />
+                </div>
+                <div class="grid gap-2">
+                    <BbLabel>Group</BbLabel>
+                    <select class="w-full rounded-md border px-3 py-2 text-sm bg-background" @bind="_configForm.GroupIdString">
+                        <option value="">-- Select Group --</option>
+                        @foreach (var group in _configGroups)
+                        {
+                            <option value="@group.Id.ToString()">@(group.Name ?? group.Id.ToString()[..8])</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _configDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveConfig" Disabled="@_saving">
+                @(_isEditingConfig ? "Update" : "Create")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@* -- Delete Configuration Confirmation -- *@
+<ConfirmDeleteDialog Open="@_deleteConfigDialogOpen"
+                     OpenChanged="@(v => _deleteConfigDialogOpen = v)"
+                     Message="@($"Delete configuration \"{_deletingConfig?.Key}\"? This cannot be undone.")"
+                     OnConfirm="@ConfirmDeleteConfig" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    // -- Page state --
+    private Tenant? _tenant;
+    private bool _loading;
+    private bool _saving;
+
+    // -- Detail data --
+    private List<IdentityInformation> _detailUsers = [];
+    private List<RegistryConfiguration> _detailConfigs = [];
+    private List<IdentityRoleType> _detailRoleTypes = [];
+
+    // -- Edit tenant dialog --
+    private bool _editDialogOpen;
+    private TenantFormModel _tenantForm = new();
+
+    // -- Config create/edit dialog --
+    private bool _configDialogOpen;
+    private bool _isEditingConfig;
+    private Guid _editingConfigId;
+    private ConfigFormModel _configForm = new();
+    private List<RegistryConfigurationGroup> _configGroups = [];
+
+    // -- Config delete dialog --
+    private bool _deleteConfigDialogOpen;
+    private RegistryConfiguration? _deletingConfig;
+
+    // -- Lifecycle --
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTenant();
+    }
+
+    private async Task LoadTenant()
+    {
+        _loading = true;
+        try
+        {
+            _tenant = await Db.Query<Tenant>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (_tenant is not null)
+            {
+                await LoadDetailData();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load tenant: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadDetailData()
+    {
+        try
+        {
+            _detailUsers = await Db.Query<IdentityInformation>()
+                .Where(x => x.TenantId == Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+
+            _detailConfigs = await Db.Query<RegistryConfiguration>()
+                .Include(x => x.Group)
+                .Where(x => x.TenantId == Id)
+                .OrderBy(x => x.Key)
+                .ToListAsync();
+
+            _detailRoleTypes = await Db.Query<IdentityRoleType>()
+                .Include(x => x.Group)
+                .Where(x => x.TenantId == Id)
+                .OrderBy(x => x.Name)
+                .ToListAsync();
+
+            _configGroups = await Db.Query<RegistryConfigurationGroup>()
+                .OrderBy(x => x.Name)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load tenant details: {ex.Message}");
+        }
+    }
+
+    // -- Edit Tenant --
+
+    private void OpenEditDialog()
+    {
+        if (_tenant is null) return;
+
+        _tenantForm = new TenantFormModel
+        {
+            Name = _tenant.Name,
+            Description = _tenant.Description,
+            VersionString = _tenant.Version.ToString("F1"),
+            StatusString = _tenant.Status?.ToString() ?? "0",
+            ExpirationString = _tenant.Expiration?.ToString("yyyy-MM-dd") ?? "",
+            AvailabilityString = _tenant.AvailabilityDate?.ToString("yyyy-MM-dd") ?? "",
+            ParentTenantIdString = _tenant.ParentTenantId?.ToString() ?? ""
+        };
+        _editDialogOpen = true;
+    }
+
+    private async Task SaveTenant()
+    {
+        if (string.IsNullOrWhiteSpace(_tenantForm.Name))
+        {
+            ToastService.Show("Tenant name is required.");
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            var tenant = await Db.Query<Tenant>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (tenant is null)
+            {
+                ToastService.Show("Tenant not found. It may have been deleted.");
+                return;
+            }
+
+            tenant.Name = _tenantForm.Name;
+            tenant.Description = _tenantForm.Description;
+            tenant.Version = decimal.TryParse(_tenantForm.VersionString, out var v) ? v : tenant.Version;
+            tenant.Status = short.TryParse(_tenantForm.StatusString, out var s) ? s : tenant.Status;
+            tenant.Expiration = DateTime.TryParse(_tenantForm.ExpirationString, out var exp) ? exp : null;
+            tenant.AvailabilityDate = DateTime.TryParse(_tenantForm.AvailabilityString, out var avail) ? avail : null;
+            tenant.ParentTenantId = Guid.TryParse(_tenantForm.ParentTenantIdString, out var pid) ? pid : null;
+            tenant.ModifiedAt = DateTime.UtcNow;
+
+            Db.Update(tenant);
+            var result = await Db.SaveAsync();
+
+            if (result.Success)
+            {
+                ToastService.Show("Tenant updated successfully.");
+                _tenant = tenant;
+            }
+            else
+            {
+                ToastService.Show($"Failed to update tenant: {result.Error}");
+            }
+
+            _editDialogOpen = false;
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error saving tenant: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // -- Enable / Disable --
+
+    private async Task ToggleEnabled()
+    {
+        if (_tenant is null) return;
+
+        try
+        {
+            var fresh = await Db.Query<Tenant>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Tenant not found.");
+                return;
+            }
+
+            fresh.IsEnabled = !fresh.IsEnabled;
+            fresh.ModifiedAt = DateTime.UtcNow;
+
+            Db.Update(fresh);
+            var result = await Db.SaveAsync();
+
+            if (result.Success)
+            {
+                ToastService.Show(fresh.IsEnabled ? "Tenant enabled." : "Tenant disabled.");
+                _tenant = fresh;
+            }
+            else
+            {
+                ToastService.Show($"Failed to toggle tenant: {result.Error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error toggling tenant: {ex.Message}");
+        }
+    }
+
+    // -- Configuration CRUD --
+
+    private void OpenAddConfigDialog()
+    {
+        _isEditingConfig = false;
+        _configForm = new ConfigFormModel();
+        _configDialogOpen = true;
+    }
+
+    private void OpenEditConfigDialog(RegistryConfiguration config)
+    {
+        _isEditingConfig = true;
+        _editingConfigId = config.Id;
+        _configForm = new ConfigFormModel
+        {
+            Key = config.Key,
+            Value = config.Value,
+            Unit = config.Unit,
+            GroupIdString = config.GroupId.ToString()
+        };
+        _configDialogOpen = true;
+    }
+
+    private async Task SaveConfig()
+    {
+        if (string.IsNullOrWhiteSpace(_configForm.Key))
+        {
+            ToastService.Show("Configuration key is required.");
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            if (_isEditingConfig)
+            {
+                var config = await Db.Query<RegistryConfiguration>()
+                    .Where(x => x.Id == _editingConfigId)
+                    .FirstOrDefaultAsync();
+
+                if (config is null)
+                {
+                    ToastService.Show("Configuration not found.");
+                    return;
+                }
+
+                config.Key = _configForm.Key;
+                config.Value = _configForm.Value;
+                config.Unit = _configForm.Unit;
+                config.GroupId = Guid.TryParse(_configForm.GroupIdString, out var gid) ? gid : config.GroupId;
+                config.ModifiedAt = DateTime.UtcNow;
+
+                Db.Update(config);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Configuration updated." : $"Error: {result.Error}");
+            }
+            else
+            {
+                var config = new RegistryConfiguration
+                {
+                    Id = Guid.NewGuid(),
+                    Key = _configForm.Key,
+                    Value = _configForm.Value,
+                    Unit = _configForm.Unit,
+                    GroupId = Guid.TryParse(_configForm.GroupIdString, out var gid) ? gid : Guid.Empty,
+                    TenantId = Id,
+                    CreatedAt = DateTime.UtcNow,
+                    IsEnabled = true
+                };
+
+                Db.Add(config);
+                var result = await Db.SaveAsync();
+                ToastService.Show(result.Success ? "Configuration created." : $"Error: {result.Error}");
+            }
+
+            _configDialogOpen = false;
+            await LoadDetailData();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error saving configuration: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void OpenDeleteConfigDialog(RegistryConfiguration config)
+    {
+        _deletingConfig = config;
+        _deleteConfigDialogOpen = true;
+    }
+
+    private async Task ConfirmDeleteConfig()
+    {
+        if (_deletingConfig is null) return;
+
+        try
+        {
+            Db.Remove(_deletingConfig);
+            var result = await Db.SaveAsync();
+            ToastService.Show(result.Success ? "Configuration deleted." : $"Error: {result.Error}");
+
+            _deleteConfigDialogOpen = false;
+            _deletingConfig = null;
+            await LoadDetailData();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error deleting configuration: {ex.Message}");
+        }
+    }
+
+    // -- Form Models --
+
+    private class TenantFormModel
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string VersionString { get; set; } = "1.0";
+        public string StatusString { get; set; } = "1";
+        public string ExpirationString { get; set; } = "";
+        public string AvailabilityString { get; set; } = "";
+        public string ParentTenantIdString { get; set; } = "";
+    }
+
+    private class ConfigFormModel
+    {
+        public string Key { get; set; } = "";
+        public string? Value { get; set; }
+        public string? Unit { get; set; }
+        public string GroupIdString { get; set; } = "";
+    }
+}
