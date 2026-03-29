@@ -19,21 +19,28 @@ builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
     options.PersistToLocalStorage = true;
 });
 
-// Database — use DbContextFactory for concurrent-safe access in Blazor Server
+// Database — AppDbContext has multiple constructors, so we can't use AddDbContextFactory directly.
+// Instead: register AddDbContext normally + a custom factory for AdminDbContext.
 var connString = string.IsNullOrEmpty(builder.Configuration["DefaultDatabaseConnection"])
     ? builder.Configuration.GetConnectionString("DefaultDatabaseConnection")
     : builder.Configuration["DefaultDatabaseConnection"];
 
-builder.Services.AddDbContextFactory<AppDbContext>(options => options
+builder.Services.AddDbContext<AppDbContext>((sp, options) => options
     .UseNpgsql(connString, npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
     .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
     .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.BoolWithDefaultWarning)));
 
-// Also register scoped AppDbContext (for IDataContext compatibility)
-builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
 builder.Services.AddScoped<DbContext>(sp => sp.GetRequiredService<AppDbContext>());
 builder.Services.AddServerDataContext<AppDbContext>();
 builder.Services.AddHttpContextAccessor();
+
+// Custom factory lambda for AdminDbContext — creates a fresh AppDbContext per call
+builder.Services.AddScoped<ControlPanel.Server.Services.AdminDbContextFactory>(sp =>
+{
+    var httpAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var config = sp.GetRequiredService<IConfiguration>();
+    return new ControlPanel.Server.Services.AdminDbContextFactory(connString!, httpAccessor, config);
+});
 builder.Services.AddScoped<ControlPanel.Server.Services.AdminDbContext>();
 
 var app = builder.Build();
