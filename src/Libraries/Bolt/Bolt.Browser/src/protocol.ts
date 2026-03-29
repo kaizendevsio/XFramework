@@ -530,7 +530,7 @@ export function readMediaFrame(data: Uint8Array): MediaFrameData | null {
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const payloadLen = readInt32LE(view, 26);
-    if (data.length < HEADER_SIZE.MediaFrame + payloadLen) return null;
+    if (payloadLen < 0 || data.length < HEADER_SIZE.MediaFrame + payloadLen) return null;
 
     return {
         streamId: bytesToGuid(data, 1),
@@ -550,7 +550,7 @@ export function readCallSignal(data: Uint8Array): CallSignalData | null {
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const payloadLen = readInt32LE(view, 18);
-    if (data.length < HEADER_SIZE.CallSignal + payloadLen) return null;
+    if (payloadLen < 0 || data.length < HEADER_SIZE.CallSignal + payloadLen) return null;
 
     return {
         callId: bytesToGuid(data, 1),
@@ -569,7 +569,7 @@ export function readMediaConfig(data: Uint8Array): MediaConfigData | null {
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const extensionLen = readInt32LE(view, 48);
-    if (data.length < HEADER_SIZE.MediaConfig + extensionLen) return null;
+    if (extensionLen < 0 || data.length < HEADER_SIZE.MediaConfig + extensionLen) return null;
 
     return {
         streamId: bytesToGuid(data, 1),
@@ -625,7 +625,7 @@ export function readFecFrame(data: Uint8Array): FecFrameData | null {
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const payloadLen = readInt32LE(view, 22);
-    if (data.length < HEADER_SIZE.FecFrame + payloadLen) return null;
+    if (payloadLen < 0 || data.length < HEADER_SIZE.FecFrame + payloadLen) return null;
 
     return {
         streamId: bytesToGuid(data, 1),
@@ -669,7 +669,7 @@ export function readRequest(data: Uint8Array): RequestFrameData | null {
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const payloadLen = readInt32LE(view, 25);
-    if (data.length < HEADER_SIZE.Request + payloadLen) return null;
+    if (payloadLen < 0 || data.length < HEADER_SIZE.Request + payloadLen) return null;
 
     return {
         requestId: bytesToGuid(data, 1),
@@ -709,7 +709,7 @@ export function readResponse(data: Uint8Array): ResponseFrameData | null {
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const payloadLen = readInt32LE(view, 19);
-    if (data.length < HEADER_SIZE.Response + payloadLen) return null;
+    if (payloadLen < 0 || data.length < HEADER_SIZE.Response + payloadLen) return null;
 
     return {
         requestId: bytesToGuid(data, 1),
@@ -812,7 +812,7 @@ export function readStreamData(data: Uint8Array): StreamDataFrame | null {
     if (data.length < HEADER_SIZE.StreamData) return null;
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const payloadLen = readInt32LE(view, 17);
-    if (data.length < HEADER_SIZE.StreamData + payloadLen) return null;
+    if (payloadLen < 0 || data.length < HEADER_SIZE.StreamData + payloadLen) return null;
     return {
         streamId: bytesToGuid(data, 1),
         payload: data.slice(21, 21 + payloadLen),

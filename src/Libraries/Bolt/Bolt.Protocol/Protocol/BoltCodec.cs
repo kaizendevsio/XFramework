@@ -306,6 +306,7 @@ public static class BoltCodec
         if (buffer.Length < RequestHeaderSize) return false;
 
         var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(25));
+        if (payloadLen < 0) return false;
         var totalSize = RequestHeaderSize + payloadLen;
         if (buffer.Length < totalSize) return false;
 
@@ -335,6 +336,7 @@ public static class BoltCodec
         if (buffer.Length < RequestHeaderSize) return false;
 
         var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(25));
+        if (payloadLen < 0) return false;
         totalSize = RequestHeaderSize + payloadLen;
         if (buffer.Length < totalSize) return false;
 
@@ -355,6 +357,7 @@ public static class BoltCodec
         if (buffer.Length < ResponseHeaderSize) return false;
 
         var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(19));
+        if (payloadLen < 0) return false;
         totalSize = ResponseHeaderSize + payloadLen;
         if (buffer.Length < totalSize) return false;
 
@@ -373,6 +376,7 @@ public static class BoltCodec
         if (buffer.Length < ResponseHeaderSize) return false;
 
         var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(19));
+        if (payloadLen < 0) return false;
         var totalSize = ResponseHeaderSize + payloadLen;
         if (buffer.Length < totalSize) return false;
 
@@ -399,9 +403,10 @@ public static class BoltCodec
         if (buffer.Length < 9) return false; // 1 + 4 + at least 4
 
         var idLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(1));
-        if (buffer.Length < 9 + idLen) return false;
+        if (idLen < 0 || buffer.Length < 9 + idLen) return false;
 
         var nameLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(5 + idLen));
+        if (nameLen < 0) return false;
         var totalSize = 9 + idLen + nameLen;
         if (buffer.Length < totalSize) return false;
 
@@ -444,6 +449,7 @@ public static class BoltCodec
 
         streamId = ReadGuid(buffer.Slice(1));
         payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(17));
+        if (payloadLength < 0) return false;
         payloadOffset = StreamDataHeaderSize;
         totalSize = StreamDataHeaderSize + payloadLength;
         return buffer.Length >= totalSize;
@@ -480,7 +486,7 @@ public static class BoltCodec
         if (buffer.Length < MediaFrameHeaderSize) return false;
 
         var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(26));
-        if (buffer.Length < MediaFrameHeaderSize + payloadLength) return false;
+        if (payloadLength < 0 || buffer.Length < MediaFrameHeaderSize + payloadLength) return false;
 
         header = new MediaFrameHeader
         {
@@ -511,7 +517,7 @@ public static class BoltCodec
         if (buffer.Length < MediaConfigHeaderSize) return false;
 
         var extensionLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(48));
-        if (buffer.Length < MediaConfigHeaderSize + extensionLength) return false;
+        if (extensionLength < 0 || buffer.Length < MediaConfigHeaderSize + extensionLength) return false;
 
         config = new MediaConfigData
         {
@@ -563,7 +569,7 @@ public static class BoltCodec
         if (buffer.Length < CallSignalHeaderSize) return false;
 
         var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(18));
-        if (buffer.Length < CallSignalHeaderSize + payloadLength) return false;
+        if (payloadLength < 0 || buffer.Length < CallSignalHeaderSize + payloadLength) return false;
 
         header = new CallSignalHeader
         {
@@ -582,7 +588,7 @@ public static class BoltCodec
         if (buffer.Length < FecFrameHeaderSize) return false;
 
         var payloadLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(22));
-        if (buffer.Length < FecFrameHeaderSize + payloadLength) return false;
+        if (payloadLength < 0 || buffer.Length < FecFrameHeaderSize + payloadLength) return false;
 
         header = new FecFrameHeader
         {
