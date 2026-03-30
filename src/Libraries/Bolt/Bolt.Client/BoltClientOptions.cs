@@ -21,10 +21,12 @@ public class BoltClientOptions
     /// <summary>
     /// Payload size threshold (bytes) above which InvokeAsync transparently switches
     /// to BoltStream chunking instead of a single Request/Response frame.
-    /// Default: 262144 (256KB). Aligns with typical OS network buffer sizes and
-    /// the receive buffer. Set to int.MaxValue to disable auto-streaming.
+    /// Default: 10485760 (10MB). Single frames work fine up to several MB via
+    /// WebSocket fragmentation. Streaming helps for very large transfers where
+    /// holding the entire payload in memory is undesirable.
+    /// Set to int.MaxValue to disable auto-streaming.
     /// </summary>
-    public int LargePayloadThreshold { get; set; } = 262144;
+    public int LargePayloadThreshold { get; set; } = 10 * 1024 * 1024;
 
     /// <summary>Chunk size for large payload streaming. Default: 65536 (64KB).</summary>
     public int StreamChunkSize { get; set; } = 65536;

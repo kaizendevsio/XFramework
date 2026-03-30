@@ -47,7 +47,7 @@ public class PayloadBenchmarks
     private HelloService.HelloServiceClient _grpcClient = null!;
     private PayloadRequest _grpcRequest = null!;
 
-    [Params(100, 1024, 32_768, 131_072, 524_288)]
+    [Params(100, 1024, 32_768, 131_072, 524_288, 1_048_576, 2_097_152)]
     public int PayloadBytes { get; set; }
 
     [GlobalSetup]
