@@ -7,8 +7,8 @@
     @* -- Header -- *@
     <div class="flex items-center justify-between">
         <div>
-            <BbTypography Variant="TypographyVariant.H3">Tenant Management</BbTypography>
-            <BbTypography Variant="TypographyVariant.Muted">Manage tenants, their users, configurations, and role types.</BbTypography>
+            <BbTypographyH3>Tenant Management</BbTypographyH3>
+            <BbTypographyMuted>Manage tenants, their users, configurations, and role types.</BbTypographyMuted>
         </div>
         <BbButton OnClick="@OpenCreateDialog">
             <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
@@ -108,55 +108,43 @@
             <BbDialogDescription>Fill in the details for the new tenant.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Name</BbLabel>
-                <BbInput Value="@_tenantForm.Name"
-                         ValueChanged="@((string v) => _tenantForm.Name = v)"
-                         Placeholder="Tenant name" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Description</BbLabel>
-                <BbInput Value="@_tenantForm.Description"
-                         ValueChanged="@((string v) => _tenantForm.Description = v)"
-                         Placeholder="Brief description" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.Name"
+                              Label="Name"
+                              Placeholder="Tenant name"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.Description"
+                              Label="Description"
+                              Placeholder="Brief description" />
+            <div class="grid grid-cols-2 gap-4">
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.VersionString"
+                                  Label="Version"
+                                  Placeholder="1.0" />
+                <BbFormFieldNativeSelect TValue="string"
+                                         @bind-Value="_tenantForm.StatusString"
+                                         Label="Status">
+                    <option value="0">Pending</option>
+                    <option value="1">Active</option>
+                    <option value="2">Suspended</option>
+                    <option value="3">Inactive</option>
+                </BbFormFieldNativeSelect>
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Version</BbLabel>
-                    <BbInput Value="@_tenantForm.VersionString"
-                             ValueChanged="@((string v) => _tenantForm.VersionString = v)"
-                             Placeholder="1.0" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Status</BbLabel>
-                    <select class="w-full rounded-md border px-3 py-2 text-sm bg-background" @bind="_tenantForm.StatusString">
-                        <option value="0">Pending</option>
-                        <option value="1">Active</option>
-                        <option value="2">Suspended</option>
-                        <option value="3">Inactive</option>
-                    </select>
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.ExpirationString"
+                                  Label="Expiration Date"
+                                  Placeholder="YYYY-MM-DD" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.AvailabilityString"
+                                  Label="Availability Date"
+                                  Placeholder="YYYY-MM-DD" />
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Expiration Date</BbLabel>
-                    <BbInput Value="@_tenantForm.ExpirationString"
-                             ValueChanged="@((string v) => _tenantForm.ExpirationString = v)"
-                             Placeholder="YYYY-MM-DD" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Availability Date</BbLabel>
-                    <BbInput Value="@_tenantForm.AvailabilityString"
-                             ValueChanged="@((string v) => _tenantForm.AvailabilityString = v)"
-                             Placeholder="YYYY-MM-DD" />
-                </div>
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Parent Tenant ID</BbLabel>
-                <BbInput Value="@_tenantForm.ParentTenantIdString"
-                         ValueChanged="@((string v) => _tenantForm.ParentTenantIdString = v)"
-                         Placeholder="Optional — leave blank for root tenant" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.ParentTenantIdString"
+                              Label="Parent Tenant ID"
+                              Placeholder="Optional — leave blank for root tenant" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _tenantDialogOpen = false)">Cancel</BbButton>

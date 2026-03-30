@@ -4,7 +4,7 @@
 
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <BbTypography Variant="TypographyVariant.H3">Configurations</BbTypography>
+        <BbTypographyH3>Configurations</BbTypographyH3>
         <BbButton OnClick="@OpenCreateDialog">
             <LucideIcon Name="plus" class="h-4 w-4 mr-1" />
             Add Configuration
@@ -43,22 +43,23 @@
             <BbDialogDescription>@(_isEditing ? "Update the configuration entry." : "Create a new configuration entry.")</BbDialogDescription>
         </BbDialogHeader>
         <div class="space-y-4 py-4">
-            <div class="space-y-2">
-                <BbLabel>Key</BbLabel>
-                <BbInput Value="@_formKey" ValueChanged="@(v => _formKey = v)" Placeholder="Configuration key" />
-            </div>
-            <div class="space-y-2">
-                <BbLabel>Value</BbLabel>
-                <BbInput Value="@_formValue" ValueChanged="@(v => _formValue = v)" Placeholder="Configuration value" />
-            </div>
-            <div class="space-y-2">
-                <BbLabel>Unit</BbLabel>
-                <BbInput Value="@_formUnit" ValueChanged="@(v => _formUnit = v)" Placeholder="Unit (optional)" />
-            </div>
-            <div class="space-y-2">
-                <BbLabel>Group ID</BbLabel>
-                <BbInput Value="@_formGroupId" ValueChanged="@(v => _formGroupId = v)" Placeholder="Group ID" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formKey"
+                              Label="Key"
+                              Placeholder="Configuration key"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formValue"
+                              Label="Value"
+                              Placeholder="Configuration value" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formUnit"
+                              Label="Unit"
+                              Placeholder="Unit (optional)" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formGroupId"
+                              Label="Group ID"
+                              Placeholder="Group ID" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showFormDialog = false)">Cancel</BbButton>

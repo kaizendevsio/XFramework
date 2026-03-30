@@ -4,7 +4,7 @@
 
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <BbTypography Variant="TypographyVariant.H3">Addresses</BbTypography>
+        <BbTypographyH3>Addresses</BbTypographyH3>
         <BbButton OnClick="@OpenAddDialog">
             <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
             Add Address
@@ -52,40 +52,35 @@
             </BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>User ID (IdentityInfoId)</BbLabel>
-                <BbInput Value="@_formIdentityInfoId"
-                         ValueChanged="@((string v) => _formIdentityInfoId = v)" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formIdentityInfoId"
+                              Label="User ID (IdentityInfoId)"
+                              Placeholder="Enter user GUID"
+                              Required="true" />
+            <div class="grid grid-cols-2 gap-4">
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_formUnitNumber"
+                                  Label="Unit Number"
+                                  Placeholder="Unit / Apt number" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_formStreet"
+                                  Label="Street"
+                                  Placeholder="Street address" />
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Unit Number</BbLabel>
-                    <BbInput Value="@_formUnitNumber"
-                             ValueChanged="@((string v) => _formUnitNumber = v)" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Street</BbLabel>
-                    <BbInput Value="@_formStreet"
-                             ValueChanged="@((string v) => _formStreet = v)" />
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_formBuilding"
+                                  Label="Building"
+                                  Placeholder="Building name" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_formSubdivision"
+                                  Label="Subdivision"
+                                  Placeholder="Subdivision / Village" />
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Building</BbLabel>
-                    <BbInput Value="@_formBuilding"
-                             ValueChanged="@((string v) => _formBuilding = v)" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Subdivision</BbLabel>
-                    <BbInput Value="@_formSubdivision"
-                             ValueChanged="@((string v) => _formSubdivision = v)" />
-                </div>
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Consolidated Name</BbLabel>
-                <BbInput Value="@_formConsolidatedName"
-                         ValueChanged="@((string v) => _formConsolidatedName = v)" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formConsolidatedName"
+                              Label="Consolidated Name"
+                              Placeholder="Full address" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>

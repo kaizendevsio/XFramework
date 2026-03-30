@@ -5,8 +5,8 @@
 <div class="space-y-4">
     <div class="flex items-center justify-between">
         <div>
-            <BbTypography Variant="TypographyVariant.H3">User Management</BbTypography>
-            <BbTypography Variant="TypographyVariant.Muted">Manage identity information records and user accounts</BbTypography>
+            <BbTypographyH3>User Management</BbTypographyH3>
+            <BbTypographyMuted>Manage identity information records and user accounts</BbTypographyMuted>
         </div>
         <div class="flex items-center gap-2">
             <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
@@ -22,7 +22,7 @@
 
     @if (_loading)
     {
-        <BbTypography Variant="TypographyVariant.Muted">Loading users...</BbTypography>
+        <BbTypographyMuted>Loading users...</BbTypographyMuted>
     }
     else
     {
@@ -110,77 +110,53 @@
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>First Name</BbLabel>
-                    <BbInput Value="@_form.FirstName"
-                             ValueChanged="@((string v) => _form.FirstName = v)"
-                             Placeholder="Enter first name" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Last Name</BbLabel>
-                    <BbInput Value="@_form.LastName"
-                             ValueChanged="@((string v) => _form.LastName = v)"
-                             Placeholder="Enter last name" />
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_form.FirstName"
+                                  Label="First Name"
+                                  Placeholder="Enter first name" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_form.LastName"
+                                  Label="Last Name"
+                                  Placeholder="Enter last name" />
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Middle Name</BbLabel>
-                    <BbInput Value="@_form.MiddleName"
-                             ValueChanged="@((string v) => _form.MiddleName = v)"
-                             Placeholder="Enter middle name" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Suffix</BbLabel>
-                    <BbInput Value="@_form.Suffix"
-                             ValueChanged="@((string v) => _form.Suffix = v)"
-                             Placeholder="Jr., Sr., III, etc." />
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_form.MiddleName"
+                                  Label="Middle Name"
+                                  Placeholder="Enter middle name" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_form.Suffix"
+                                  Label="Suffix"
+                                  Placeholder="Jr., Sr., III, etc." />
             </div>
-            <div class="grid gap-2">
-                <BbLabel>Identity Name</BbLabel>
-                <BbInput Value="@_form.IdentityName"
-                         ValueChanged="@((string v) => _form.IdentityName = v)"
-                         Placeholder="Unique identity name" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_form.IdentityName"
+                              Label="Identity Name"
+                              Placeholder="Unique identity name" />
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Birth Date</BbLabel>
-                    <BbInput Value="@_form.BirthDateString"
-                             ValueChanged="@((string v) => _form.BirthDateString = v)"
-                             Placeholder="YYYY-MM-DD" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Gender</BbLabel>
-                    <BbSelect Value="@_form.GenderString"
-                              ValueChanged="@((string v) => _form.GenderString = v)">
-                        <BbSelectTrigger>
-                            <BbSelectValue Placeholder="Select gender" />
-                        </BbSelectTrigger>
-                        <BbSelectContent>
-                            @foreach (var g in Enum.GetValues<Gender>())
-                            {
-                                <BbSelectItem Value="@g.ToString()">@g.ToString()</BbSelectItem>
-                            }
-                        </BbSelectContent>
-                    </BbSelect>
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_form.BirthDateString"
+                                  Label="Birth Date"
+                                  Placeholder="YYYY-MM-DD" />
+                <BbFormFieldSelect TValue="string"
+                                   @bind-Value="_form.GenderString"
+                                   Label="Gender"
+                                   Placeholder="Select gender">
+                    @foreach (var g in Enum.GetValues<Gender>())
+                    {
+                        <BbSelectItem Value="@g.ToString()">@g.ToString()</BbSelectItem>
+                    }
+                </BbFormFieldSelect>
             </div>
-            <div class="grid gap-2">
-                <BbLabel>Civil Status</BbLabel>
-                <BbSelect Value="@_form.CivilStatusString"
-                          ValueChanged="@((string v) => _form.CivilStatusString = v)">
-                    <BbSelectTrigger>
-                        <BbSelectValue Placeholder="Select civil status" />
-                    </BbSelectTrigger>
-                    <BbSelectContent>
-                        @foreach (var cs in Enum.GetValues<CivilStatus>())
-                        {
-                            <BbSelectItem Value="@cs.ToString()">@cs.ToString()</BbSelectItem>
-                        }
-                    </BbSelectContent>
-                </BbSelect>
-            </div>
+            <BbFormFieldSelect TValue="string"
+                               @bind-Value="_form.CivilStatusString"
+                               Label="Civil Status"
+                               Placeholder="Select civil status">
+                @foreach (var cs in Enum.GetValues<CivilStatus>())
+                {
+                    <BbSelectItem Value="@cs.ToString()">@cs.ToString()</BbSelectItem>
+                }
+            </BbFormFieldSelect>
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _createDialogOpen = false)">Cancel</BbButton>

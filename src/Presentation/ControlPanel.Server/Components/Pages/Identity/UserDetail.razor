@@ -5,7 +5,7 @@
 
 @if (_loading)
 {
-    <BbTypography Variant="TypographyVariant.Muted">Loading user...</BbTypography>
+    <BbTypographyMuted>Loading user...</BbTypographyMuted>
 }
 else if (_user is null)
 {
@@ -32,13 +32,13 @@ else
                 </BbButton>
                 <div>
                     <div class="flex items-center gap-2">
-                        <BbTypography Variant="TypographyVariant.H3">@(_user.FullName ?? "Unnamed User")</BbTypography>
+                        <BbTypographyH3>@(_user.FullName ?? "Unnamed User")</BbTypographyH3>
                         <StatusBadge Text="@(_user.IsVerified ? "Verified" : "Unverified")"
                                      Status="@(_user.IsVerified ? "active" : "inactive")" />
                         <StatusBadge Text="@(_user.IsEnabled ? "Enabled" : "Disabled")"
                                      Status="@(_user.IsEnabled ? "active" : "inactive")" />
                     </div>
-                    <BbTypography Variant="TypographyVariant.Muted">@(_user.IdentityName ?? "No identity name") &mdash; ID: @_user.Id.ToString()[..8]...</BbTypography>
+                    <BbTypographyMuted>@(_user.IdentityName ?? "No identity name") &mdash; ID: @_user.Id.ToString()[..8]...</BbTypographyMuted>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -61,36 +61,36 @@ else
             <BbCardContent>
                 <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">First Name</BbTypography>
-                        <BbTypography>@(_user.FirstName ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>First Name</BbTypographyMuted>
+                        <BbTypographyP>@(_user.FirstName ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Middle Name</BbTypography>
-                        <BbTypography>@(_user.MiddleName ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Middle Name</BbTypographyMuted>
+                        <BbTypographyP>@(_user.MiddleName ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Last Name</BbTypography>
-                        <BbTypography>@(_user.LastName ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Last Name</BbTypographyMuted>
+                        <BbTypographyP>@(_user.LastName ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Suffix</BbTypography>
-                        <BbTypography>@(_user.Suffix ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Suffix</BbTypographyMuted>
+                        <BbTypographyP>@(_user.Suffix ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Birth Date</BbTypography>
-                        <BbTypography>@(_user.BirthDate?.ToString("yyyy-MM-dd") ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Birth Date</BbTypographyMuted>
+                        <BbTypographyP>@(_user.BirthDate?.ToString("yyyy-MM-dd") ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Gender</BbTypography>
-                        <BbTypography>@(_user.Gender?.ToString() ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Gender</BbTypographyMuted>
+                        <BbTypographyP>@(_user.Gender?.ToString() ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Civil Status</BbTypography>
-                        <BbTypography>@(_user.CivilStatus?.ToString() ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Civil Status</BbTypographyMuted>
+                        <BbTypographyP>@(_user.CivilStatus?.ToString() ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Created</BbTypography>
-                        <BbTypography>@_user.CreatedAt.ToString("g")</BbTypography>
+                        <BbTypographyMuted>Created</BbTypographyMuted>
+                        <BbTypographyP>@_user.CreatedAt.ToString("g")</BbTypographyP>
                     </div>
                 </div>
             </BbCardContent>
@@ -485,86 +485,56 @@ else
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>First Name</BbLabel>
-                    <BbInput Value="@_editForm.FirstName"
-                             ValueChanged="@((string v) => _editForm.FirstName = v)" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Last Name</BbLabel>
-                    <BbInput Value="@_editForm.LastName"
-                             ValueChanged="@((string v) => _editForm.LastName = v)" />
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_editForm.FirstName"
+                                  Label="First Name" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_editForm.LastName"
+                                  Label="Last Name" />
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Middle Name</BbLabel>
-                    <BbInput Value="@_editForm.MiddleName"
-                             ValueChanged="@((string v) => _editForm.MiddleName = v)" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Suffix</BbLabel>
-                    <BbInput Value="@_editForm.Suffix"
-                             ValueChanged="@((string v) => _editForm.Suffix = v)" />
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_editForm.MiddleName"
+                                  Label="Middle Name" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_editForm.Suffix"
+                                  Label="Suffix" />
             </div>
-            <div class="grid gap-2">
-                <BbLabel>Identity Name</BbLabel>
-                <BbInput Value="@_editForm.IdentityName"
-                         ValueChanged="@((string v) => _editForm.IdentityName = v)" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_editForm.IdentityName"
+                              Label="Identity Name" />
+            <div class="grid grid-cols-2 gap-4">
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_editForm.BirthDateString"
+                                  Label="Birth Date"
+                                  Placeholder="YYYY-MM-DD" />
+                <BbFormFieldSelect TValue="string"
+                                   @bind-Value="_editForm.GenderString"
+                                   Label="Gender"
+                                   Placeholder="Select gender">
+                    @foreach (var g in Enum.GetValues<Gender>())
+                    {
+                        <BbSelectItem Value="@g.ToString()">@g.ToString()</BbSelectItem>
+                    }
+                </BbFormFieldSelect>
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Birth Date</BbLabel>
-                    <BbInput Value="@_editForm.BirthDateString"
-                             ValueChanged="@((string v) => _editForm.BirthDateString = v)"
-                             Placeholder="YYYY-MM-DD" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Gender</BbLabel>
-                    <BbSelect Value="@_editForm.GenderString"
-                              ValueChanged="@((string v) => _editForm.GenderString = v)">
-                        <BbSelectTrigger>
-                            <BbSelectValue Placeholder="Select gender" />
-                        </BbSelectTrigger>
-                        <BbSelectContent>
-                            @foreach (var g in Enum.GetValues<Gender>())
-                            {
-                                <BbSelectItem Value="@g.ToString()">@g.ToString()</BbSelectItem>
-                            }
-                        </BbSelectContent>
-                    </BbSelect>
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Civil Status</BbLabel>
-                    <BbSelect Value="@_editForm.CivilStatusString"
-                              ValueChanged="@((string v) => _editForm.CivilStatusString = v)">
-                        <BbSelectTrigger>
-                            <BbSelectValue Placeholder="Select civil status" />
-                        </BbSelectTrigger>
-                        <BbSelectContent>
-                            @foreach (var cs in Enum.GetValues<CivilStatus>())
-                            {
-                                <BbSelectItem Value="@cs.ToString()">@cs.ToString()</BbSelectItem>
-                            }
-                        </BbSelectContent>
-                    </BbSelect>
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Verified</BbLabel>
-                    <BbSelect Value="@_editForm.IsVerifiedString"
-                              ValueChanged="@((string v) => _editForm.IsVerifiedString = v)">
-                        <BbSelectTrigger>
-                            <BbSelectValue Placeholder="Verification status" />
-                        </BbSelectTrigger>
-                        <BbSelectContent>
-                            <BbSelectItem Value="true">Verified</BbSelectItem>
-                            <BbSelectItem Value="false">Unverified</BbSelectItem>
-                        </BbSelectContent>
-                    </BbSelect>
-                </div>
+                <BbFormFieldSelect TValue="string"
+                                   @bind-Value="_editForm.CivilStatusString"
+                                   Label="Civil Status"
+                                   Placeholder="Select civil status">
+                    @foreach (var cs in Enum.GetValues<CivilStatus>())
+                    {
+                        <BbSelectItem Value="@cs.ToString()">@cs.ToString()</BbSelectItem>
+                    }
+                </BbFormFieldSelect>
+                <BbFormFieldSelect TValue="string"
+                                   @bind-Value="_editForm.IsVerifiedString"
+                                   Label="Verified"
+                                   Placeholder="Verification status">
+                    <BbSelectItem Value="true">Verified</BbSelectItem>
+                    <BbSelectItem Value="false">Unverified</BbSelectItem>
+                </BbFormFieldSelect>
             </div>
         </div>
         <BbDialogFooter>
@@ -584,18 +554,15 @@ else
             <BbDialogDescription>Create a new credential for this user.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Username</BbLabel>
-                <BbInput Value="@_credForm.UserName"
-                         ValueChanged="@((string v) => _credForm.UserName = v)"
-                         Placeholder="Enter username" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Alias</BbLabel>
-                <BbInput Value="@_credForm.UserAlias"
-                         ValueChanged="@((string v) => _credForm.UserAlias = v)"
-                         Placeholder="Enter alias (optional)" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_credForm.UserName"
+                              Label="Username"
+                              Placeholder="Enter username"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_credForm.UserAlias"
+                              Label="Alias"
+                              Placeholder="Enter alias (optional)" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _createCredDialogOpen = false)">Cancel</BbButton>
@@ -614,42 +581,28 @@ else
             <BbDialogDescription>Assign a role to one of this user's credentials.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Credential</BbLabel>
-                <BbSelect Value="@_roleForm.CredentialId"
-                          ValueChanged="@((string v) => _roleForm.CredentialId = v)">
-                    <BbSelectTrigger>
-                        <BbSelectValue Placeholder="Select credential" />
-                    </BbSelectTrigger>
-                    <BbSelectContent>
-                        @foreach (var cred in _credentials)
-                        {
-                            <BbSelectItem Value="@cred.Id.ToString()">@(cred.UserName ?? cred.Id.ToString()[..8])</BbSelectItem>
-                        }
-                    </BbSelectContent>
-                </BbSelect>
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Role Type</BbLabel>
-                <BbSelect Value="@_roleForm.RoleTypeId"
-                          ValueChanged="@((string v) => _roleForm.RoleTypeId = v)">
-                    <BbSelectTrigger>
-                        <BbSelectValue Placeholder="Select role type" />
-                    </BbSelectTrigger>
-                    <BbSelectContent>
-                        @foreach (var rt in _roleTypes)
-                        {
-                            <BbSelectItem Value="@rt.Id.ToString()">@(rt.Name ?? rt.Id.ToString()[..8]) (Level: @(rt.RoleLevel?.ToString() ?? "N/A"))</BbSelectItem>
-                        }
-                    </BbSelectContent>
-                </BbSelect>
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Expiration Date</BbLabel>
-                <BbInput Value="@_roleForm.ExpirationString"
-                         ValueChanged="@((string v) => _roleForm.ExpirationString = v)"
-                         Placeholder="YYYY-MM-DD (blank = 1 year from now)" />
-            </div>
+            <BbFormFieldSelect TValue="string"
+                               @bind-Value="_roleForm.CredentialId"
+                               Label="Credential"
+                               Placeholder="Select credential">
+                @foreach (var cred in _credentials)
+                {
+                    <BbSelectItem Value="@cred.Id.ToString()">@(cred.UserName ?? cred.Id.ToString()[..8])</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <BbFormFieldSelect TValue="string"
+                               @bind-Value="_roleForm.RoleTypeId"
+                               Label="Role Type"
+                               Placeholder="Select role type">
+                @foreach (var rt in _roleTypes)
+                {
+                    <BbSelectItem Value="@rt.Id.ToString()">@(rt.Name ?? rt.Id.ToString()[..8]) (Level: @(rt.RoleLevel?.ToString() ?? "N/A"))</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_roleForm.ExpirationString"
+                              Label="Expiration Date"
+                              Placeholder="YYYY-MM-DD (blank = 1 year from now)" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _assignRoleDialogOpen = false)">Cancel</BbButton>
@@ -674,42 +627,29 @@ else
             <BbDialogDescription>@(_editingContact is not null ? "Update contact information." : "Add a new contact entry.")</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Credential</BbLabel>
-                <BbSelect Value="@_contactForm.CredentialId"
-                          ValueChanged="@((string v) => _contactForm.CredentialId = v)">
-                    <BbSelectTrigger>
-                        <BbSelectValue Placeholder="Select credential" />
-                    </BbSelectTrigger>
-                    <BbSelectContent>
-                        @foreach (var cred in _credentials)
-                        {
-                            <BbSelectItem Value="@cred.Id.ToString()">@(cred.UserName ?? cred.Id.ToString()[..8])</BbSelectItem>
-                        }
-                    </BbSelectContent>
-                </BbSelect>
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Contact Type</BbLabel>
-                <BbSelect Value="@_contactForm.TypeId"
-                          ValueChanged="@((string v) => _contactForm.TypeId = v)">
-                    <BbSelectTrigger>
-                        <BbSelectValue Placeholder="Select type" />
-                    </BbSelectTrigger>
-                    <BbSelectContent>
-                        @foreach (var ct in _contactTypes)
-                        {
-                            <BbSelectItem Value="@ct.Id.ToString()">@(ct.Name ?? ct.Id.ToString()[..8])</BbSelectItem>
-                        }
-                    </BbSelectContent>
-                </BbSelect>
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Value</BbLabel>
-                <BbInput Value="@_contactForm.Value"
-                         ValueChanged="@((string v) => _contactForm.Value = v)"
-                         Placeholder="Email, phone number, etc." />
-            </div>
+            <BbFormFieldSelect TValue="string"
+                               @bind-Value="_contactForm.CredentialId"
+                               Label="Credential"
+                               Placeholder="Select credential">
+                @foreach (var cred in _credentials)
+                {
+                    <BbSelectItem Value="@cred.Id.ToString()">@(cred.UserName ?? cred.Id.ToString()[..8])</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <BbFormFieldSelect TValue="string"
+                               @bind-Value="_contactForm.TypeId"
+                               Label="Contact Type"
+                               Placeholder="Select type">
+                @foreach (var ct in _contactTypes)
+                {
+                    <BbSelectItem Value="@ct.Id.ToString()">@(ct.Name ?? ct.Id.ToString()[..8])</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_contactForm.Value"
+                              Label="Value"
+                              Placeholder="Email, phone number, etc."
+                              Required="true" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _contactDialogOpen = false)">Cancel</BbButton>
@@ -729,50 +669,34 @@ else
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Unit Number</BbLabel>
-                    <BbInput Value="@_addressForm.UnitNumber"
-                             ValueChanged="@((string v) => _addressForm.UnitNumber = v)"
-                             Placeholder="Unit / Apt number" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Building</BbLabel>
-                    <BbInput Value="@_addressForm.Building"
-                             ValueChanged="@((string v) => _addressForm.Building = v)"
-                             Placeholder="Building name" />
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_addressForm.UnitNumber"
+                                  Label="Unit Number"
+                                  Placeholder="Unit / Apt number" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_addressForm.Building"
+                                  Label="Building"
+                                  Placeholder="Building name" />
             </div>
-            <div class="grid gap-2">
-                <BbLabel>Street</BbLabel>
-                <BbInput Value="@_addressForm.Street"
-                         ValueChanged="@((string v) => _addressForm.Street = v)"
-                         Placeholder="Street address" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Subdivision</BbLabel>
-                <BbInput Value="@_addressForm.Subdivision"
-                         ValueChanged="@((string v) => _addressForm.Subdivision = v)"
-                         Placeholder="Subdivision / Village" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Full Address (Consolidated)</BbLabel>
-                <BbInput Value="@_addressForm.ConsolidatedName"
-                         ValueChanged="@((string v) => _addressForm.ConsolidatedName = v)"
-                         Placeholder="Complete address line" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Default Address</BbLabel>
-                <BbSelect Value="@_addressForm.IsDefault"
-                          ValueChanged="@((string v) => _addressForm.IsDefault = v)">
-                    <BbSelectTrigger>
-                        <BbSelectValue Placeholder="Set as default?" />
-                    </BbSelectTrigger>
-                    <BbSelectContent>
-                        <BbSelectItem Value="true">Yes</BbSelectItem>
-                        <BbSelectItem Value="false">No</BbSelectItem>
-                    </BbSelectContent>
-                </BbSelect>
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_addressForm.Street"
+                              Label="Street"
+                              Placeholder="Street address" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_addressForm.Subdivision"
+                              Label="Subdivision"
+                              Placeholder="Subdivision / Village" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_addressForm.ConsolidatedName"
+                              Label="Full Address (Consolidated)"
+                              Placeholder="Complete address line" />
+            <BbFormFieldSelect TValue="string"
+                               @bind-Value="_addressForm.IsDefault"
+                               Label="Default Address"
+                               Placeholder="Set as default?">
+                <BbSelectItem Value="true">Yes</BbSelectItem>
+                <BbSelectItem Value="false">No</BbSelectItem>
+            </BbFormFieldSelect>
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _addressDialogOpen = false)">Cancel</BbButton>

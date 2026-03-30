@@ -5,7 +5,7 @@
 
 @if (_wallet is null)
 {
-    <BbTypography Variant="TypographyVariant.Muted">Loading wallet details...</BbTypography>
+    <BbTypographyMuted>Loading wallet details...</BbTypographyMuted>
 }
 else
 {
@@ -17,12 +17,12 @@ else
                 <LucideIcon Name="arrow-left" class="h-4 w-4" />
             </BbButton>
             <div class="flex-1">
-                <BbTypography Variant="TypographyVariant.H3">
+                <BbTypographyH3>
                     Wallet: @(_wallet.AccountNumber ?? _wallet.Id.ToString()[..8] + "...")
-                </BbTypography>
-                <BbTypography Variant="TypographyVariant.Muted">
+                </BbTypographyH3>
+                <BbTypographyMuted>
                     ID: @_wallet.Id &mdash; Type: @(_wallet.WalletType?.Name ?? "N/A")
-                </BbTypography>
+                </BbTypographyMuted>
             </div>
             <div class="flex items-center gap-2">
                 @if (_wallet.Status == WalletStatus.Active)
@@ -67,38 +67,38 @@ else
                     <BbCard>
                         <BbCardContent>
                             <div class="space-y-1 pt-4">
-                                <BbTypography Variant="TypographyVariant.Muted">Balance</BbTypography>
-                                <BbTypography Variant="TypographyVariant.H3">@_wallet.Balance.ToString("N2")</BbTypography>
+                                <BbTypographyMuted>Balance</BbTypographyMuted>
+                                <BbTypographyH3>@_wallet.Balance.ToString("N2")</BbTypographyH3>
                             </div>
                         </BbCardContent>
                     </BbCard>
                     <BbCard>
                         <BbCardContent>
                             <div class="space-y-1 pt-4">
-                                <BbTypography Variant="TypographyVariant.Muted">Available Balance</BbTypography>
-                                <BbTypography Variant="TypographyVariant.H3" class="@(_wallet.AvailableBalance < 0 ? "text-red-500" : "")">
+                                <BbTypographyMuted>Available Balance</BbTypographyMuted>
+                                <BbTypographyH3 Class="@(_wallet.AvailableBalance < 0 ? "text-red-500" : "")">
                                     @_wallet.AvailableBalance.ToString("N2")
-                                </BbTypography>
+                                </BbTypographyH3>
                             </div>
                         </BbCardContent>
                     </BbCard>
                     <BbCard>
                         <BbCardContent>
                             <div class="space-y-1 pt-4">
-                                <BbTypography Variant="TypographyVariant.Muted">Debit On Hold</BbTypography>
-                                <BbTypography Variant="TypographyVariant.H3" class="@(_wallet.DebitOnHoldBalance > 0 ? "text-yellow-600" : "")">
+                                <BbTypographyMuted>Debit On Hold</BbTypographyMuted>
+                                <BbTypographyH3 Class="@(_wallet.DebitOnHoldBalance > 0 ? "text-yellow-600" : "")">
                                     @_wallet.DebitOnHoldBalance.ToString("N2")
-                                </BbTypography>
+                                </BbTypographyH3>
                             </div>
                         </BbCardContent>
                     </BbCard>
                     <BbCard>
                         <BbCardContent>
                             <div class="space-y-1 pt-4">
-                                <BbTypography Variant="TypographyVariant.Muted">Credit On Hold</BbTypography>
-                                <BbTypography Variant="TypographyVariant.H3" class="@(_wallet.CreditOnHoldBalance > 0 ? "text-yellow-600" : "")">
+                                <BbTypographyMuted>Credit On Hold</BbTypographyMuted>
+                                <BbTypographyH3 Class="@(_wallet.CreditOnHoldBalance > 0 ? "text-yellow-600" : "")">
                                     @_wallet.CreditOnHoldBalance.ToString("N2")
-                                </BbTypography>
+                                </BbTypographyH3>
                             </div>
                         </BbCardContent>
                     </BbCard>
@@ -106,20 +106,20 @@ else
 
                 <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Total Balance</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">@(_wallet.TotalBalance?.ToString("N2") ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Total Balance</BbTypographyMuted>
+                        <BbTypographyLarge>@(_wallet.TotalBalance?.ToString("N2") ?? "N/A")</BbTypographyLarge>
                     </div>
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Transferable Balance</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">@_wallet.TransferableBalance.ToString("N2")</BbTypography>
+                        <BbTypographyMuted>Transferable Balance</BbTypographyMuted>
+                        <BbTypographyLarge>@_wallet.TransferableBalance.ToString("N2")</BbTypographyLarge>
                     </div>
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Account Number</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">@(_wallet.AccountNumber ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Account Number</BbTypographyMuted>
+                        <BbTypographyLarge>@(_wallet.AccountNumber ?? "N/A")</BbTypographyLarge>
                     </div>
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Created</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">@_wallet.CreatedAt.ToString("g")</BbTypography>
+                        <BbTypographyMuted>Created</BbTypographyMuted>
+                        <BbTypographyLarge>@_wallet.CreatedAt.ToString("g")</BbTypographyLarge>
                     </div>
                 </div>
             </BbCardContent>
@@ -141,24 +141,19 @@ else
 
                     <BbTabsContent Value="add-funds">
                         <div class="grid gap-4 py-4 md:grid-cols-3">
-                            <div class="grid gap-2">
-                                <BbLabel>Amount</BbLabel>
-                                <BbInput Value="@_addFundsAmount"
-                                         ValueChanged="@((string v) => _addFundsAmount = v)"
-                                         Placeholder="0.00" />
-                            </div>
-                            <div class="grid gap-2">
-                                <BbLabel>Reference Number</BbLabel>
-                                <BbInput Value="@_addFundsRef"
-                                         ValueChanged="@((string v) => _addFundsRef = v)"
-                                         Placeholder="REF-001" />
-                            </div>
-                            <div class="grid gap-2">
-                                <BbLabel>Remarks</BbLabel>
-                                <BbInput Value="@_addFundsRemarks"
-                                         ValueChanged="@((string v) => _addFundsRemarks = v)"
-                                         Placeholder="Admin credit" />
-                            </div>
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_addFundsAmount"
+                                              Label="Amount"
+                                              Placeholder="0.00"
+                                              Required="true" />
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_addFundsRef"
+                                              Label="Reference Number"
+                                              Placeholder="REF-001" />
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_addFundsRemarks"
+                                              Label="Remarks"
+                                              Placeholder="Admin credit" />
                         </div>
                         <BbButton OnClick="@AddFunds" Disabled="@_isProcessing">
                             @if (_isProcessing)
@@ -172,24 +167,19 @@ else
 
                     <BbTabsContent Value="withdraw-funds">
                         <div class="grid gap-4 py-4 md:grid-cols-3">
-                            <div class="grid gap-2">
-                                <BbLabel>Amount</BbLabel>
-                                <BbInput Value="@_withdrawAmount"
-                                         ValueChanged="@((string v) => _withdrawAmount = v)"
-                                         Placeholder="0.00" />
-                            </div>
-                            <div class="grid gap-2">
-                                <BbLabel>Reference Number</BbLabel>
-                                <BbInput Value="@_withdrawRef"
-                                         ValueChanged="@((string v) => _withdrawRef = v)"
-                                         Placeholder="REF-001" />
-                            </div>
-                            <div class="grid gap-2">
-                                <BbLabel>Remarks</BbLabel>
-                                <BbInput Value="@_withdrawRemarks"
-                                         ValueChanged="@((string v) => _withdrawRemarks = v)"
-                                         Placeholder="Admin debit" />
-                            </div>
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_withdrawAmount"
+                                              Label="Amount"
+                                              Placeholder="0.00"
+                                              Required="true" />
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_withdrawRef"
+                                              Label="Reference Number"
+                                              Placeholder="REF-001" />
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_withdrawRemarks"
+                                              Label="Remarks"
+                                              Placeholder="Admin debit" />
                         </div>
                         <BbButton Variant="ButtonVariant.Destructive" OnClick="@WithdrawFunds" Disabled="@_isProcessing">
                             @if (_isProcessing)
@@ -209,18 +199,15 @@ else
                             </BbAlertDescription>
                         </BbAlert>
                         <div class="grid gap-4 py-4 md:grid-cols-2">
-                            <div class="grid gap-2">
-                                <BbLabel>New Balance</BbLabel>
-                                <BbInput Value="@_adjustBalance"
-                                         ValueChanged="@((string v) => _adjustBalance = v)"
-                                         Placeholder="0.00" />
-                            </div>
-                            <div class="grid gap-2">
-                                <BbLabel>Remarks</BbLabel>
-                                <BbInput Value="@_adjustRemarks"
-                                         ValueChanged="@((string v) => _adjustRemarks = v)"
-                                         Placeholder="Admin balance adjustment" />
-                            </div>
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_adjustBalance"
+                                              Label="New Balance"
+                                              Placeholder="0.00"
+                                              Required="true" />
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_adjustRemarks"
+                                              Label="Remarks"
+                                              Placeholder="Admin balance adjustment" />
                         </div>
                         <BbButton Variant="ButtonVariant.Outline" OnClick="@AdjustBalance" Disabled="@_isProcessing">
                             @if (_isProcessing)
@@ -332,28 +319,28 @@ else
             <BbCardContent>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Min Transfer Rule</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">
+                        <BbTypographyMuted>Min Transfer Rule</BbTypographyMuted>
+                        <BbTypographyLarge>
                             @(_wallet.MinTransferRule?.ToString("N2") ?? "Not set")
-                        </BbTypography>
+                        </BbTypographyLarge>
                     </div>
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Max Transfer Rule</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">
+                        <BbTypographyMuted>Max Transfer Rule</BbTypographyMuted>
+                        <BbTypographyLarge>
                             @(_wallet.MaxTransferRule?.ToString("N2") ?? "Not set")
-                        </BbTypography>
+                        </BbTypographyLarge>
                     </div>
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Bond Balance Rule</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">
+                        <BbTypographyMuted>Bond Balance Rule</BbTypographyMuted>
+                        <BbTypographyLarge>
                             @(_wallet.BondBalanceRule?.ToString("N2") ?? "Not set")
-                        </BbTypography>
+                        </BbTypographyLarge>
                     </div>
                     <div class="space-y-1">
-                        <BbTypography Variant="TypographyVariant.Muted">Maintaining Balance Rule</BbTypography>
-                        <BbTypography Variant="TypographyVariant.Large">
+                        <BbTypographyMuted>Maintaining Balance Rule</BbTypographyMuted>
+                        <BbTypographyLarge>
                             @(_wallet.MaintainingBalanceRule?.ToString("N2") ?? "Not set")
-                        </BbTypography>
+                        </BbTypographyLarge>
                     </div>
                 </div>
             </BbCardContent>

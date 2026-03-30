@@ -4,7 +4,7 @@
 
 @if (_loading)
 {
-    <BbTypography Variant="TypographyVariant.Muted">Loading tenant...</BbTypography>
+    <BbTypographyMuted>Loading tenant...</BbTypographyMuted>
 }
 else if (_tenant is null)
 {
@@ -32,7 +32,7 @@ else
                 </BbButton>
                 <div>
                     <div class="flex items-center gap-2">
-                        <BbTypography Variant="TypographyVariant.H3">@(_tenant.Name ?? "Unnamed Tenant")</BbTypography>
+                        <BbTypographyH3>@(_tenant.Name ?? "Unnamed Tenant")</BbTypographyH3>
                         @{
                             var headerStatusText = _tenant.Status switch
                             {
@@ -55,7 +55,7 @@ else
                         <StatusBadge Text="@(_tenant.IsEnabled ? "Enabled" : "Disabled")"
                                      Status="@(_tenant.IsEnabled ? "active" : "inactive")" />
                     </div>
-                    <BbTypography Variant="TypographyVariant.Muted">ID: @_tenant.Id.ToString()[..8]...</BbTypography>
+                    <BbTypographyMuted>ID: @_tenant.Id.ToString()[..8]...</BbTypographyMuted>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -78,15 +78,15 @@ else
             <BbCardContent>
                 <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Name</BbTypography>
-                        <BbTypography>@(_tenant.Name ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Name</BbTypographyMuted>
+                        <BbTypographyP>@(_tenant.Name ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Description</BbTypography>
-                        <BbTypography>@(_tenant.Description ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Description</BbTypographyMuted>
+                        <BbTypographyP>@(_tenant.Description ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Status</BbTypography>
+                        <BbTypographyMuted>Status</BbTypographyMuted>
                         @{
                             var detailStatusText = _tenant.Status switch
                             {
@@ -108,41 +108,41 @@ else
                         <StatusBadge Text="@detailStatusText" Status="@detailStatusKey" />
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Version</BbTypography>
-                        <BbTypography>@_tenant.Version</BbTypography>
+                        <BbTypographyMuted>Version</BbTypographyMuted>
+                        <BbTypographyP>@_tenant.Version</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Expiration</BbTypography>
-                        <BbTypography>@(_tenant.Expiration?.ToString("yyyy-MM-dd HH:mm") ?? "No expiration")</BbTypography>
+                        <BbTypographyMuted>Expiration</BbTypographyMuted>
+                        <BbTypographyP>@(_tenant.Expiration?.ToString("yyyy-MM-dd HH:mm") ?? "No expiration")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Availability Date</BbTypography>
-                        <BbTypography>@(_tenant.AvailabilityDate?.ToString("yyyy-MM-dd HH:mm") ?? "N/A")</BbTypography>
+                        <BbTypographyMuted>Availability Date</BbTypographyMuted>
+                        <BbTypographyP>@(_tenant.AvailabilityDate?.ToString("yyyy-MM-dd HH:mm") ?? "N/A")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Created</BbTypography>
-                        <BbTypography>@_tenant.CreatedAt.ToString("g")</BbTypography>
+                        <BbTypographyMuted>Created</BbTypographyMuted>
+                        <BbTypographyP>@_tenant.CreatedAt.ToString("g")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Last Modified</BbTypography>
-                        <BbTypography>@(_tenant.ModifiedAt?.ToString("g") ?? "Never")</BbTypography>
+                        <BbTypographyMuted>Last Modified</BbTypographyMuted>
+                        <BbTypographyP>@(_tenant.ModifiedAt?.ToString("g") ?? "Never")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Enabled</BbTypography>
+                        <BbTypographyMuted>Enabled</BbTypographyMuted>
                         <StatusBadge Text="@(_tenant.IsEnabled ? "Enabled" : "Disabled")"
                                      Status="@(_tenant.IsEnabled ? "active" : "inactive")" />
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Parent Tenant</BbTypography>
-                        <BbTypography>@(_tenant.ParentTenantId?.ToString() ?? "None (root)")</BbTypography>
+                        <BbTypographyMuted>Parent Tenant</BbTypographyMuted>
+                        <BbTypographyP>@(_tenant.ParentTenantId?.ToString() ?? "None (root)")</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Users</BbTypography>
-                        <BbTypography>@_detailUsers.Count</BbTypography>
+                        <BbTypographyMuted>Users</BbTypographyMuted>
+                        <BbTypographyP>@_detailUsers.Count</BbTypographyP>
                     </div>
                     <div>
-                        <BbTypography Variant="TypographyVariant.Muted">Configurations</BbTypography>
-                        <BbTypography>@_detailConfigs.Count</BbTypography>
+                        <BbTypographyMuted>Configurations</BbTypographyMuted>
+                        <BbTypographyP>@_detailConfigs.Count</BbTypographyP>
                     </div>
                 </div>
             </BbCardContent>
@@ -302,55 +302,43 @@ else
             <BbDialogDescription>Update the tenant properties below.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Name</BbLabel>
-                <BbInput Value="@_tenantForm.Name"
-                         ValueChanged="@((string v) => _tenantForm.Name = v)"
-                         Placeholder="Tenant name" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Description</BbLabel>
-                <BbInput Value="@_tenantForm.Description"
-                         ValueChanged="@((string v) => _tenantForm.Description = v)"
-                         Placeholder="Brief description" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.Name"
+                              Label="Name"
+                              Placeholder="Tenant name"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.Description"
+                              Label="Description"
+                              Placeholder="Brief description" />
+            <div class="grid grid-cols-2 gap-4">
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.VersionString"
+                                  Label="Version"
+                                  Placeholder="1.0" />
+                <BbFormFieldNativeSelect TValue="string"
+                                         @bind-Value="_tenantForm.StatusString"
+                                         Label="Status">
+                    <option value="0">Pending</option>
+                    <option value="1">Active</option>
+                    <option value="2">Suspended</option>
+                    <option value="3">Inactive</option>
+                </BbFormFieldNativeSelect>
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Version</BbLabel>
-                    <BbInput Value="@_tenantForm.VersionString"
-                             ValueChanged="@((string v) => _tenantForm.VersionString = v)"
-                             Placeholder="1.0" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Status</BbLabel>
-                    <select class="w-full rounded-md border px-3 py-2 text-sm bg-background" @bind="_tenantForm.StatusString">
-                        <option value="0">Pending</option>
-                        <option value="1">Active</option>
-                        <option value="2">Suspended</option>
-                        <option value="3">Inactive</option>
-                    </select>
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.ExpirationString"
+                                  Label="Expiration Date"
+                                  Placeholder="YYYY-MM-DD" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.AvailabilityString"
+                                  Label="Availability Date"
+                                  Placeholder="YYYY-MM-DD" />
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Expiration Date</BbLabel>
-                    <BbInput Value="@_tenantForm.ExpirationString"
-                             ValueChanged="@((string v) => _tenantForm.ExpirationString = v)"
-                             Placeholder="YYYY-MM-DD" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Availability Date</BbLabel>
-                    <BbInput Value="@_tenantForm.AvailabilityString"
-                             ValueChanged="@((string v) => _tenantForm.AvailabilityString = v)"
-                             Placeholder="YYYY-MM-DD" />
-                </div>
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Parent Tenant ID</BbLabel>
-                <BbInput Value="@_tenantForm.ParentTenantIdString"
-                         ValueChanged="@((string v) => _tenantForm.ParentTenantIdString = v)"
-                         Placeholder="Optional — leave blank for root tenant" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.ParentTenantIdString"
+                              Label="Parent Tenant ID"
+                              Placeholder="Optional — leave blank for root tenant" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _editDialogOpen = false)">Cancel</BbButton>
@@ -375,35 +363,30 @@ else
             </BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Key</BbLabel>
-                <BbInput Value="@_configForm.Key"
-                         ValueChanged="@((string v) => _configForm.Key = v)"
-                         Placeholder="e.g. MaxUsers, FeatureFlags.EnableX" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Value</BbLabel>
-                <BbInput Value="@_configForm.Value"
-                         ValueChanged="@((string v) => _configForm.Value = v)"
-                         Placeholder="Configuration value" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_configForm.Key"
+                              Label="Key"
+                              Placeholder="e.g. MaxUsers, FeatureFlags.EnableX"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_configForm.Value"
+                              Label="Value"
+                              Placeholder="Configuration value" />
             <div class="grid grid-cols-2 gap-4">
-                <div class="grid gap-2">
-                    <BbLabel>Unit</BbLabel>
-                    <BbInput Value="@_configForm.Unit"
-                             ValueChanged="@((string v) => _configForm.Unit = v)"
-                             Placeholder="e.g. count, MB, boolean" />
-                </div>
-                <div class="grid gap-2">
-                    <BbLabel>Group</BbLabel>
-                    <select class="w-full rounded-md border px-3 py-2 text-sm bg-background" @bind="_configForm.GroupIdString">
-                        <option value="">-- Select Group --</option>
-                        @foreach (var group in _configGroups)
-                        {
-                            <option value="@group.Id.ToString()">@(group.Name ?? group.Id.ToString()[..8])</option>
-                        }
-                    </select>
-                </div>
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_configForm.Unit"
+                                  Label="Unit"
+                                  Placeholder="e.g. count, MB, boolean" />
+                <BbFormFieldNativeSelect TValue="string"
+                                         @bind-Value="_configForm.GroupIdString"
+                                         Label="Group"
+                                         Placeholder="-- Select Group --">
+                    <option value="">-- Select Group --</option>
+                    @foreach (var group in _configGroups)
+                    {
+                        <option value="@group.Id.ToString()">@(group.Name ?? group.Id.ToString()[..8])</option>
+                    }
+                </BbFormFieldNativeSelect>
             </div>
         </div>
         <BbDialogFooter>

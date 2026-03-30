@@ -4,7 +4,7 @@
 
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <BbTypography Variant="TypographyVariant.H3">Contacts</BbTypography>
+        <BbTypographyH3>Contacts</BbTypographyH3>
         <BbButton OnClick="@OpenAddDialog">
             <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
             Add Contact
@@ -49,26 +49,25 @@
             </BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Value</BbLabel>
-                <BbInput Value="@_formValue"
-                         ValueChanged="@((string v) => _formValue = v)" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Credential ID</BbLabel>
-                <BbInput Value="@_formCredentialId"
-                         ValueChanged="@((string v) => _formCredentialId = v)" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Type ID</BbLabel>
-                <BbInput Value="@_formTypeId"
-                         ValueChanged="@((string v) => _formTypeId = v)" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Group ID</BbLabel>
-                <BbInput Value="@_formGroupId"
-                         ValueChanged="@((string v) => _formGroupId = v)" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formValue"
+                              Label="Value"
+                              Placeholder="Contact value"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formCredentialId"
+                              Label="Credential ID"
+                              Placeholder="Enter credential GUID"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formTypeId"
+                              Label="Type ID"
+                              Placeholder="Contact type GUID" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formGroupId"
+                              Label="Group ID"
+                              Placeholder="Group GUID"
+                              Required="true" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>

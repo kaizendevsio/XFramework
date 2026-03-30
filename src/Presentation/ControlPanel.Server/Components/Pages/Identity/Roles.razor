@@ -5,7 +5,7 @@
 <div class="space-y-4">
     <div class="flex items-center justify-between">
         <div>
-            <BbTypography Variant="TypographyVariant.H3">Roles</BbTypography>
+            <BbTypographyH3>Roles</BbTypographyH3>
             <p class="text-sm text-muted-foreground">Manage role assignments across all credentials</p>
         </div>
         <BbButton OnClick="@OpenAddDialog">
@@ -43,33 +43,35 @@
             <BbDialogDescription>Assign a role to a credential.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Credential ID</BbLabel>
-                <BbInput Value="@_formCredentialId"
-                         ValueChanged="@((string v) => _formCredentialId = v)" Placeholder="Enter credential GUID" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Role Type</BbLabel>
-                @if (_roleTypes.Count == 0)
-                {
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formCredentialId"
+                              Label="Credential ID"
+                              Placeholder="Enter credential GUID"
+                              Required="true" />
+            @if (_roleTypes.Count == 0)
+            {
+                <div>
+                    <BbLabel>Role Type</BbLabel>
                     <p class="text-sm text-muted-foreground">No role types configured. Add them in Reference Data.</p>
-                }
-                else
-                {
-                    <select class="w-full rounded-md border px-3 py-2 text-sm bg-background" @bind="_formTypeId">
-                        <option value="">Select role type</option>
-                        @foreach (var rt in _roleTypes)
-                        {
-                            <option value="@rt.Id">@rt.Name (Level @rt.RoleLevel)</option>
-                        }
-                    </select>
-                }
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Expiration</BbLabel>
-                <BbInput Value="@_formExpiration"
-                         ValueChanged="@((string v) => _formExpiration = v)" Placeholder="YYYY-MM-DD HH:mm" />
-            </div>
+                </div>
+            }
+            else
+            {
+                <BbFormFieldNativeSelect TValue="string"
+                                         @bind-Value="_formTypeId"
+                                         Label="Role Type"
+                                         Placeholder="Select role type">
+                    <option value="">Select role type</option>
+                    @foreach (var rt in _roleTypes)
+                    {
+                        <option value="@rt.Id">@rt.Name (Level @rt.RoleLevel)</option>
+                    }
+                </BbFormFieldNativeSelect>
+            }
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formExpiration"
+                              Label="Expiration"
+                              Placeholder="YYYY-MM-DD HH:mm" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>

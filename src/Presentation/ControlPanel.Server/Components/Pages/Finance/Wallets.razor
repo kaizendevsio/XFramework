@@ -6,8 +6,8 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div>
-            <BbTypography Variant="TypographyVariant.H3">Wallet Management</BbTypography>
-            <BbTypography Variant="TypographyVariant.Muted">Manage user wallets, balances, and account statuses</BbTypography>
+            <BbTypographyH3>Wallet Management</BbTypographyH3>
+            <BbTypographyMuted>Manage user wallets, balances, and account statuses</BbTypographyMuted>
         </div>
         <BbButton OnClick="@OpenCreateDialog">
             <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
@@ -23,7 +23,7 @@
                 <BbCardDescription>All wallet accounts</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbTypography Variant="TypographyVariant.H2">@_totalWallets</BbTypography>
+                <BbTypographyH2>@_totalWallets</BbTypographyH2>
             </BbCardContent>
         </BbCard>
 
@@ -33,7 +33,7 @@
                 <BbCardDescription>Sum of all wallet balances</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbTypography Variant="TypographyVariant.H2">@_totalBalance.ToString("N2")</BbTypography>
+                <BbTypographyH2>@_totalBalance.ToString("N2")</BbTypographyH2>
             </BbCardContent>
         </BbCard>
 
@@ -43,7 +43,7 @@
                 <BbCardDescription>Currently active accounts</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbTypography Variant="TypographyVariant.H2">@_activeWallets</BbTypography>
+                <BbTypographyH2>@_activeWallets</BbTypographyH2>
             </BbCardContent>
         </BbCard>
 
@@ -53,7 +53,7 @@
                 <BbCardDescription>Temporarily frozen accounts</BbCardDescription>
             </BbCardHeader>
             <BbCardContent>
-                <BbTypography Variant="TypographyVariant.H2">@_frozenWallets</BbTypography>
+                <BbTypographyH2>@_frozenWallets</BbTypographyH2>
             </BbCardContent>
         </BbCard>
     </div>
@@ -150,34 +150,30 @@
             <BbDialogDescription>Create a new wallet account for a user credential.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-                <BbLabel>Credential ID</BbLabel>
-                <BbInput Value="@_newCredentialId"
-                         ValueChanged="@((string v) => _newCredentialId = v)"
-                         Placeholder="Enter credential GUID" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Wallet Type</BbLabel>
-                <BbSelect Value="@_newWalletTypeId" ValueChanged="@((string v) => _newWalletTypeId = v)">
-                    <BbSelectItem Value="@("none")">None</BbSelectItem>
-                    @foreach (var wt in _walletTypes)
-                    {
-                        <BbSelectItem Value="@wt.Id.ToString()">@(wt.Name) (@(wt.Code))</BbSelectItem>
-                    }
-                </BbSelect>
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Account Number (optional)</BbLabel>
-                <BbInput Value="@_newAccountNumber"
-                         ValueChanged="@((string v) => _newAccountNumber = v)"
-                         Placeholder="Leave blank for auto-generation" />
-            </div>
-            <div class="grid gap-2">
-                <BbLabel>Initial Balance</BbLabel>
-                <BbInput Value="@_newInitialBalance"
-                         ValueChanged="@((string v) => _newInitialBalance = v)"
-                         Placeholder="0.00" />
-            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_newCredentialId"
+                              Label="Credential ID"
+                              Placeholder="Enter credential GUID"
+                              Required="true" />
+            <BbFormFieldSelect TValue="string"
+                               @bind-Value="_newWalletTypeId"
+                               Label="Wallet Type"
+                               Placeholder="Select wallet type">
+                <BbSelectItem Value="@("none")">None</BbSelectItem>
+                @foreach (var wt in _walletTypes)
+                {
+                    <BbSelectItem Value="@wt.Id.ToString()">@(wt.Name) (@(wt.Code))</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_newAccountNumber"
+                              Label="Account Number"
+                              Placeholder="Leave blank for auto-generation"
+                              HelperText="Optional — auto-generated if left blank" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_newInitialBalance"
+                              Label="Initial Balance"
+                              Placeholder="0.00" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showCreateDialog = false)">Cancel</BbButton>
