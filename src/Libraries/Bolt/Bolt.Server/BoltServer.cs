@@ -80,7 +80,7 @@ public sealed class BoltServer : IDisposable
     {
         var connection = new BoltHubConnection(webSocket);
         var receiveBuffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
-        var messageBuffer = new List<byte>();
+        byte[]? largeBuffer = null;
 
         try
         {
@@ -94,20 +94,32 @@ public sealed class BoltServer : IDisposable
                 if (result.MessageType != WebSocketMessageType.Binary || result.Count == 0)
                     continue;
 
-                // Handle multi-frame WebSocket messages (large payloads > 256KB)
                 byte[] frameBytes;
                 int totalLength;
                 if (!result.EndOfMessage)
                 {
-                    messageBuffer.Clear();
-                    messageBuffer.AddRange(receiveBuffer.AsSpan(0, result.Count).ToArray());
+                    // Multi-frame: accumulate into growing pooled buffer (zero MemoryStream alloc)
+                    var assembled = result.Count;
+                    var capacity = Math.Max(result.Count * 4, 512 * 1024);
+                    if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
+                    largeBuffer = ArrayPool<byte>.Shared.Rent(capacity);
+                    receiveBuffer.AsSpan(0, result.Count).CopyTo(largeBuffer);
+
                     while (!result.EndOfMessage)
                     {
                         result = await webSocket.ReceiveAsync(receiveBuffer.AsMemory(), ct);
-                        messageBuffer.AddRange(receiveBuffer.AsSpan(0, result.Count).ToArray());
+                        if (assembled + result.Count > largeBuffer.Length)
+                        {
+                            var newBuf = ArrayPool<byte>.Shared.Rent(largeBuffer.Length * 2);
+                            largeBuffer.AsSpan(0, assembled).CopyTo(newBuf);
+                            ArrayPool<byte>.Shared.Return(largeBuffer);
+                            largeBuffer = newBuf;
+                        }
+                        receiveBuffer.AsSpan(0, result.Count).CopyTo(largeBuffer.AsSpan(assembled));
+                        assembled += result.Count;
                     }
-                    frameBytes = messageBuffer.ToArray();
-                    totalLength = frameBytes.Length;
+                    frameBytes = largeBuffer;
+                    totalLength = assembled;
                 }
                 else
                 {
@@ -130,6 +142,7 @@ public sealed class BoltServer : IDisposable
         finally
         {
             ArrayPool<byte>.Shared.Return(receiveBuffer);
+            if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             RemoveConnection(connection);
 
             if (webSocket.State is WebSocketState.Open or WebSocketState.CloseReceived)

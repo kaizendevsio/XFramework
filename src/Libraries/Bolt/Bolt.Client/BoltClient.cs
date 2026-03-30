@@ -489,7 +489,7 @@ public sealed class BoltClient : IAsyncDisposable
     private async Task ReceiveLoopAsync(BoltConnection conn, CancellationToken ct)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
-        var messageBuffer = new List<byte>(); // For multi-frame WebSocket messages
+        byte[]? largeBuffer = null; // Rented from pool for multi-frame messages
         try
         {
             while (!ct.IsCancellationRequested && conn.WebSocket.State == WebSocketState.Open)
@@ -500,23 +500,39 @@ public sealed class BoltClient : IAsyncDisposable
 
                 // Handle multi-frame WebSocket messages (large payloads)
                 byte[] frameBytes;
+                int totalLength;
                 if (!result.EndOfMessage)
                 {
-                    messageBuffer.Clear();
-                    messageBuffer.AddRange(buffer.AsSpan(0, result.Count).ToArray());
+                    // Multi-frame: accumulate into a growing pooled buffer
+                    var assembled = result.Count;
+                    var capacity = Math.Max(result.Count * 4, 512 * 1024);
+                    if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
+                    largeBuffer = ArrayPool<byte>.Shared.Rent(capacity);
+                    buffer.AsSpan(0, result.Count).CopyTo(largeBuffer);
+
                     while (!result.EndOfMessage)
                     {
                         result = await conn.WebSocket.ReceiveAsync(buffer.AsMemory(), ct);
-                        messageBuffer.AddRange(buffer.AsSpan(0, result.Count).ToArray());
+                        // Grow if needed
+                        if (assembled + result.Count > largeBuffer.Length)
+                        {
+                            var newBuf = ArrayPool<byte>.Shared.Rent(largeBuffer.Length * 2);
+                            largeBuffer.AsSpan(0, assembled).CopyTo(newBuf);
+                            ArrayPool<byte>.Shared.Return(largeBuffer);
+                            largeBuffer = newBuf;
+                        }
+                        buffer.AsSpan(0, result.Count).CopyTo(largeBuffer.AsSpan(assembled));
+                        assembled += result.Count;
                     }
-                    frameBytes = messageBuffer.ToArray();
+                    frameBytes = largeBuffer;
+                    totalLength = assembled;
                 }
                 else
                 {
                     frameBytes = buffer;
+                    totalLength = result.Count;
                 }
 
-                var totalLength = result.EndOfMessage && messageBuffer.Count == 0 ? result.Count : frameBytes.Length;
                 var data = frameBytes.AsSpan(0, totalLength);
                 var frameType = BoltCodec.PeekFrameType(data);
 
@@ -558,6 +574,7 @@ public sealed class BoltClient : IAsyncDisposable
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
+            if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             if (!_disposed)
             {
                 _connections.Remove(conn);
@@ -578,7 +595,19 @@ public sealed class BoltClient : IAsyncDisposable
         if (!BoltCodec.TryReadResponse(data, out var frame, out _)) return;
         if (_pendingCalls.TryRemove(frame.RequestId, out var rpcCall))
         {
-            var payload = frame.PayloadLength > 0 ? frame.GetPayload(data).ToArray() : Array.Empty<byte>();
+            // Copy payload — the receive buffer is reused on next iteration.
+            // For large payloads, the caller should process and release quickly.
+            ReadOnlyMemory<byte> payload;
+            if (frame.PayloadLength > 0)
+            {
+                var copy = GC.AllocateUninitializedArray<byte>(frame.PayloadLength);
+                frame.GetPayload(data).CopyTo(copy);
+                payload = copy;
+            }
+            else
+            {
+                payload = ReadOnlyMemory<byte>.Empty;
+            }
             rpcCall.SetResult(new BoltRpcResponse { StatusCode = frame.StatusCode, Data = payload });
         }
     }
