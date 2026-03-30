@@ -68,7 +68,7 @@ public class PayloadBenchmarks
     private async Task SetupBolt()
     {
         var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls("http://localhost:18500");
+        builder.WebHost.UseUrls("http://localhost:18600");
         builder.Services.AddSingleton<BoltServer>();
         builder.Logging.SetMinimumLevel(LogLevel.Error);
         _boltApp = builder.Build();
@@ -76,18 +76,18 @@ public class PayloadBenchmarks
         _boltApp.MapBolt("/bolt");
         _boltApp.MapGet("/health", () => "ok");
         _ = Task.Run(() => _boltApp.RunAsync());
-        await WaitForHealth("http://localhost:18500/health");
+        await WaitForHealth("http://localhost:18600/health");
 
         var lf = _boltApp.Services.GetRequiredService<ILoggerFactory>();
-        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60, LargePayloadThreshold = 262144 };
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 60 }; // Uses default 1MB threshold
 
-        _boltService = new BoltClient(new Uri("ws://localhost:18500/bolt"),
+        _boltService = new BoltClient(new Uri("ws://localhost:18600/bolt"),
             "payload_svc", "PayloadSvc", opts, lf.CreateLogger<BoltClient>());
         _boltService.RegisterHandler("echo", (payload, _) =>
             Task.FromResult((HttpStatusCode.OK, payload)));
         await _boltService.ConnectAsync();
 
-        _boltCaller = new BoltClient(new Uri("ws://localhost:18500/bolt"),
+        _boltCaller = new BoltClient(new Uri("ws://localhost:18600/bolt"),
             "payload_caller", "PayloadCaller", opts, lf.CreateLogger<BoltClient>());
         await _boltCaller.ConnectAsync();
     }
@@ -97,8 +97,8 @@ public class PayloadBenchmarks
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.ConfigureKestrel(o =>
         {
-            o.ListenLocalhost(18501, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
-            o.ListenLocalhost(18502, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
+            o.ListenLocalhost(18601, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
+            o.ListenLocalhost(18602, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
         });
         builder.Services.AddGrpc();
         builder.Logging.SetMinimumLevel(LogLevel.Error);
@@ -106,9 +106,9 @@ public class PayloadBenchmarks
         _grpcApp.MapGrpcService<GrpcEchoPayloadBackend>();
         _grpcApp.MapGet("/health", () => "ok");
         _ = Task.Run(() => _grpcApp.RunAsync());
-        await WaitForHealth("http://localhost:18502/health");
+        await WaitForHealth("http://localhost:18602/health");
 
-        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18501");
+        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18601");
         _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
     }
 

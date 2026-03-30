@@ -26,7 +26,7 @@ public class BoltClientOptions
     /// holding the entire payload in memory is undesirable.
     /// Set to int.MaxValue to disable auto-streaming.
     /// </summary>
-    public int LargePayloadThreshold { get; set; } = 10 * 1024 * 1024;
+    public int LargePayloadThreshold { get; set; } = 1024 * 1024;
 
     /// <summary>Chunk size for large payload streaming. Default: 65536 (64KB).</summary>
     public int StreamChunkSize { get; set; } = 65536;
