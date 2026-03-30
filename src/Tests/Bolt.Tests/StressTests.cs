@@ -321,6 +321,79 @@ public class RpcStressTests
     }
 
     [Test]
+    public async Task LargeResponse_AutoStreaming_256KB_TransparentToConsumer()
+    {
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 30, LargePayloadThreshold = 1024 };
+        var clientA = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "large_resp_a", "LargeRespA", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var clientB = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "large_resp_b", "LargeRespB", opts, _loggerFactory.CreateLogger<BoltClient>());
+
+        // Handler returns a LARGE response (256KB)
+        var bigResponse = new byte[256 * 1024];
+        Random.Shared.NextBytes(bigResponse);
+
+        clientB.RegisterHandler("getbig", (payload, _) =>
+        {
+            var resp = MemoryPackSerializer.Serialize(new StressBigMsg { Data = bigResponse });
+            return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)resp));
+        });
+
+        await clientA.ConnectAsync();
+        await clientB.ConnectAsync();
+
+        // Small request, large response — response should auto-stream back
+        var smallRequest = MemoryPackSerializer.Serialize(new StressMsg { Id = 1, Data = "give me big data" });
+        var (status, response) = await clientA.InvokeAsync("large_resp_b", "getbig", smallRequest);
+
+        status.Should().Be(HttpStatusCode.OK);
+        var result = MemoryPackSerializer.Deserialize<StressBigMsg>(response.Span);
+        result!.Data.Should().Equal(bigResponse);
+
+        await clientA.DisposeAsync();
+        await clientB.DisposeAsync();
+    }
+
+    [Test]
+    public async Task BothDirections_LargeRequestAndLargeResponse()
+    {
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 30, LargePayloadThreshold = 1024 };
+        var clientA = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "bidir_a", "BidirA", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var clientB = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "bidir_b", "BidirB", opts, _loggerFactory.CreateLogger<BoltClient>());
+
+        clientB.RegisterHandler("transform", (payload, _) =>
+        {
+            // Return a response that's the same size as the request (large both ways)
+            var input = MemoryPackSerializer.Deserialize<StressBigMsg>(payload.Span);
+            var output = new byte[input!.Data.Length];
+            for (int i = 0; i < output.Length; i++) output[i] = (byte)(input.Data[i] ^ 0xFF);
+            var resp = MemoryPackSerializer.Serialize(new StressBigMsg { Data = output });
+            return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)resp));
+        });
+
+        await clientA.ConnectAsync();
+        await clientB.ConnectAsync();
+
+        var bigData = new byte[128 * 1024];
+        Random.Shared.NextBytes(bigData);
+        var request = MemoryPackSerializer.Serialize(new StressBigMsg { Data = bigData });
+
+        var (status, response) = await clientA.InvokeAsync("bidir_b", "transform", request);
+
+        status.Should().Be(HttpStatusCode.OK);
+        var result = MemoryPackSerializer.Deserialize<StressBigMsg>(response.Span);
+        result!.Data.Length.Should().Be(bigData.Length);
+        // Verify XOR transformation
+        for (int i = 0; i < bigData.Length; i++)
+            result.Data[i].Should().Be((byte)(bigData[i] ^ 0xFF));
+
+        await clientA.DisposeAsync();
+        await clientB.DisposeAsync();
+    }
+
+    [Test]
     public async Task SmallPayload_StillUsesNormalRpc()
     {
         var opts = new BoltClientOptions { RpcTimeoutSeconds = 15, LargePayloadThreshold = 65536 };

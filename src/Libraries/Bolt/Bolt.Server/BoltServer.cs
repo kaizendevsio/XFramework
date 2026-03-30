@@ -80,6 +80,7 @@ public sealed class BoltServer : IDisposable
     {
         var connection = new BoltHubConnection(webSocket);
         var receiveBuffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
+        var messageBuffer = new List<byte>();
 
         try
         {
@@ -93,7 +94,28 @@ public sealed class BoltServer : IDisposable
                 if (result.MessageType != WebSocketMessageType.Binary || result.Count == 0)
                     continue;
 
-                await ProcessFrameAsync(connection, receiveBuffer, result.Count, ct);
+                // Handle multi-frame WebSocket messages (large payloads > 256KB)
+                byte[] frameBytes;
+                int totalLength;
+                if (!result.EndOfMessage)
+                {
+                    messageBuffer.Clear();
+                    messageBuffer.AddRange(receiveBuffer.AsSpan(0, result.Count).ToArray());
+                    while (!result.EndOfMessage)
+                    {
+                        result = await webSocket.ReceiveAsync(receiveBuffer.AsMemory(), ct);
+                        messageBuffer.AddRange(receiveBuffer.AsSpan(0, result.Count).ToArray());
+                    }
+                    frameBytes = messageBuffer.ToArray();
+                    totalLength = frameBytes.Length;
+                }
+                else
+                {
+                    frameBytes = receiveBuffer;
+                    totalLength = result.Count;
+                }
+
+                await ProcessFrameAsync(connection, frameBytes, totalLength, ct);
             }
         }
         catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
