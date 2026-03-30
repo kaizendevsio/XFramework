@@ -6,6 +6,7 @@ using XFramework.Integration.Drivers;
 using XFramework.Integration.Services;
 using IdentityServer.Integration.Drivers;
 using Wallets.Integration.Drivers;
+using XFramework.Domain.Shared.BusinessObjects;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,12 @@ builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
     options.DefaultRadius = 0.5;
     options.PersistToLocalStorage = true;
 });
+
+// Bolt infrastructure — dependencies required by BoltDriverSignalR
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<CacheManager>();
+builder.Services.AddSingleton(_ => new DeviceAgentProvider(Environment.MachineName));
 
 // Bolt — SignalR-based RPC transport to microservices
 builder.Services.TryAddSingleton<ISignalRService, SignalRService>();
