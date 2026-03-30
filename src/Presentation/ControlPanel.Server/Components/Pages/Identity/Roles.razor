@@ -14,6 +14,12 @@
         </BbButton>
     </div>
 
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
     <BbDataGrid Items="@_roles">
         <Columns>
             <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
@@ -34,6 +40,7 @@
             </BbDataGridTemplateColumn>
         </Columns>
     </BbDataGrid>
+    }
 </div>
 
 <BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
@@ -90,6 +97,7 @@
 
     private List<IdentityRole> _roles = [];
     private List<IdentityRoleType> _roleTypes = [];
+    private bool _loading = true;
     private bool _dialogOpen;
     private bool _deleteDialogOpen;
     private IdentityRole? _deletingRole;
@@ -99,6 +107,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _loading = true;
         try
         {
             await LoadData();
@@ -107,6 +116,10 @@
                 .ToListAsync();
         }
         catch { /* query may fail */ }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task LoadData()

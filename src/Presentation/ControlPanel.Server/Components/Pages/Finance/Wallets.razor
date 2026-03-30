@@ -3,6 +3,12 @@
 
 <PageTitle>Wallet Management - Control Panel</PageTitle>
 
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else
+{
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div>
@@ -65,7 +71,8 @@
             <BbCardDescription>@_items.Count wallet(s) loaded</BbCardDescription>
         </BbCardHeader>
         <BbCardContent>
-            <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+            <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20"
+                        OnRowClick="@(item => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))" Class="cursor-pointer">
                 <Columns>
                     <BbDataGridTemplateColumn Title="Account Number" Sortable="true">
                         <ChildContent Context="item">
@@ -141,6 +148,7 @@
         </BbCardContent>
     </BbCard>
 </div>
+}
 
 @* Create Wallet Dialog *@
 <BbDialog Open="@_showCreateDialog" OpenChanged="@(v => _showCreateDialog = v)">
@@ -195,6 +203,7 @@
 
     private List<Wallet> _items = [];
     private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
+    private bool _loading = true;
     private bool _showCreateDialog;
     private bool _isSaving;
 
@@ -212,6 +221,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _loading = true;
         try
         {
             await LoadData();
@@ -222,6 +232,10 @@
         catch (Exception ex)
         {
             ToastService.Show($"Failed to load wallets: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 

@@ -11,6 +11,12 @@
         </BbButton>
     </div>
 
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
     <BbDataGrid Items="@_contacts">
         <Columns>
             <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
@@ -38,6 +44,7 @@
             </BbDataGridTemplateColumn>
         </Columns>
     </BbDataGrid>
+    }
 </div>
 
 <BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
@@ -85,6 +92,7 @@
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<IdentityContact> _contacts = [];
+    private bool _loading = true;
     private bool _dialogOpen;
     private bool _deleteDialogOpen;
     private bool _isEditing;
@@ -98,7 +106,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadData();
+        _loading = true;
+        try
+        {
+            await LoadData();
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task LoadData()

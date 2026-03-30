@@ -7,6 +7,12 @@
         <BbTypographyH3>Verifications</BbTypographyH3>
     </div>
 
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
     <BbDataGrid Items="@_verifications">
         <Columns>
             <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
@@ -45,19 +51,29 @@
             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
         </Columns>
     </BbDataGrid>
+    }
 </div>
 
 @code {
     [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<IdentityVerification> _verifications = [];
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        _verifications = await Db.Query<IdentityVerification>()
-            .Include(x => x.VerificationType)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        _loading = true;
+        try
+        {
+            _verifications = await Db.Query<IdentityVerification>()
+                .Include(x => x.VerificationType)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private static string Truncate(string? value, int maxLength)

@@ -5,7 +5,7 @@
 
 @if (_loading)
 {
-    <BbTypographyMuted>Loading user...</BbTypographyMuted>
+    <CenteredSpinner />
 }
 else if (_user is null)
 {
@@ -41,60 +41,40 @@ else
                     <BbTypographyMuted>@(_user.IdentityName ?? "No identity name") &mdash; ID: @_user.Id.ToString()[..8]...</BbTypographyMuted>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@ReloadAllData">
-                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                    Refresh
-                </BbButton>
-                <BbButton OnClick="@OpenEditUserDialog">
-                    <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
-                    Edit User
-                </BbButton>
-            </div>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@ReloadAllData">
+                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                Refresh
+            </BbButton>
         </div>
 
         <!-- User Summary Card -->
-        <BbCard>
-            <BbCardHeader>
-                <BbCardTitle>User Information</BbCardTitle>
-            </BbCardHeader>
-            <BbCardContent>
-                <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <div>
-                        <BbTypographyMuted>First Name</BbTypographyMuted>
-                        <BbTypographyP>@(_user.FirstName ?? "N/A")</BbTypographyP>
-                    </div>
-                    <div>
-                        <BbTypographyMuted>Middle Name</BbTypographyMuted>
-                        <BbTypographyP>@(_user.MiddleName ?? "N/A")</BbTypographyP>
-                    </div>
-                    <div>
-                        <BbTypographyMuted>Last Name</BbTypographyMuted>
-                        <BbTypographyP>@(_user.LastName ?? "N/A")</BbTypographyP>
-                    </div>
-                    <div>
-                        <BbTypographyMuted>Suffix</BbTypographyMuted>
-                        <BbTypographyP>@(_user.Suffix ?? "N/A")</BbTypographyP>
-                    </div>
-                    <div>
-                        <BbTypographyMuted>Birth Date</BbTypographyMuted>
-                        <BbTypographyP>@(_user.BirthDate?.ToString("yyyy-MM-dd") ?? "N/A")</BbTypographyP>
-                    </div>
-                    <div>
-                        <BbTypographyMuted>Gender</BbTypographyMuted>
-                        <BbTypographyP>@(_user.Gender?.ToString() ?? "N/A")</BbTypographyP>
-                    </div>
-                    <div>
-                        <BbTypographyMuted>Civil Status</BbTypographyMuted>
-                        <BbTypographyP>@(_user.CivilStatus?.ToString() ?? "N/A")</BbTypographyP>
-                    </div>
-                    <div>
-                        <BbTypographyMuted>Created</BbTypographyMuted>
-                        <BbTypographyP>@_user.CreatedAt.ToString("g")</BbTypographyP>
-                    </div>
-                </div>
-            </BbCardContent>
-        </BbCard>
+        <EditableForm @ref="_editableForm" TModel="IdentityInformation" Model="_user"
+                      OnSave="SaveUserEdit" OnDiscard="DiscardUserEdit"
+                      Saving="_saving" Title="User Information">
+            <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <EditableField Label="First Name" @bind-Value="_editFirstName" />
+                <EditableField Label="Middle Name" @bind-Value="_editMiddleName" />
+                <EditableField Label="Last Name" @bind-Value="_editLastName" />
+                <EditableField Label="Suffix" @bind-Value="_editSuffix" />
+                <EditableField Label="Identity Name" @bind-Value="_editIdentityName" />
+                <EditableField Label="Birth Date" @bind-Value="_editBirthDate"
+                               DisplayValue="@(_user.BirthDate?.ToString("yyyy-MM-dd") ?? "N/A")"
+                               Placeholder="YYYY-MM-DD" />
+                <EditableField Label="Gender" @bind-Value="_editGender"
+                               FieldType="EditableFieldType.Select"
+                               Options="_genderOptions"
+                               DisplayValue="@(_user.Gender?.ToString() ?? "N/A")" />
+                <EditableField Label="Civil Status" @bind-Value="_editCivilStatus"
+                               FieldType="EditableFieldType.Select"
+                               Options="_civilStatusOptions"
+                               DisplayValue="@(_user.CivilStatus?.ToString() ?? "N/A")" />
+                <EditableField Label="Verified" @bind-Value="_editIsVerified"
+                               FieldType="EditableFieldType.Select"
+                               Options="_verifiedOptions"
+                               DisplayValue="@(_user.IsVerified ? "Verified" : "Unverified")" />
+                <EditableField Label="Created" DisplayValue="@_user.CreatedAt.ToString("g")" ReadOnly="true" />
+            </div>
+        </EditableForm>
 
         <!-- Tabbed Detail Sections -->
         <BbTabs DefaultValue="credentials">
@@ -476,76 +456,6 @@ else
     </div>
 }
 
-<!-- Edit User Dialog -->
-<BbDialog Open="@_editUserDialogOpen" OpenChanged="@(v => _editUserDialogOpen = v)">
-    <BbDialogContent>
-        <BbDialogHeader>
-            <BbDialogTitle>Edit User Information</BbDialogTitle>
-            <BbDialogDescription>Update identity information for this user.</BbDialogDescription>
-        </BbDialogHeader>
-        <div class="grid gap-4 py-4">
-            <div class="grid grid-cols-2 gap-4">
-                <BbFormFieldInput TValue="string"
-                                  @bind-Value="_editForm.FirstName"
-                                  Label="First Name" />
-                <BbFormFieldInput TValue="string"
-                                  @bind-Value="_editForm.LastName"
-                                  Label="Last Name" />
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <BbFormFieldInput TValue="string"
-                                  @bind-Value="_editForm.MiddleName"
-                                  Label="Middle Name" />
-                <BbFormFieldInput TValue="string"
-                                  @bind-Value="_editForm.Suffix"
-                                  Label="Suffix" />
-            </div>
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_editForm.IdentityName"
-                              Label="Identity Name" />
-            <div class="grid grid-cols-2 gap-4">
-                <BbFormFieldInput TValue="string"
-                                  @bind-Value="_editForm.BirthDateString"
-                                  Label="Birth Date"
-                                  Placeholder="YYYY-MM-DD" />
-                <BbFormFieldSelect TValue="string"
-                                   @bind-Value="_editForm.GenderString"
-                                   Label="Gender"
-                                   Placeholder="Select gender">
-                    @foreach (var g in Enum.GetValues<Gender>())
-                    {
-                        <BbSelectItem Value="@g.ToString()">@g.ToString()</BbSelectItem>
-                    }
-                </BbFormFieldSelect>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <BbFormFieldSelect TValue="string"
-                                   @bind-Value="_editForm.CivilStatusString"
-                                   Label="Civil Status"
-                                   Placeholder="Select civil status">
-                    @foreach (var cs in Enum.GetValues<CivilStatus>())
-                    {
-                        <BbSelectItem Value="@cs.ToString()">@cs.ToString()</BbSelectItem>
-                    }
-                </BbFormFieldSelect>
-                <BbFormFieldSelect TValue="string"
-                                   @bind-Value="_editForm.IsVerifiedString"
-                                   Label="Verified"
-                                   Placeholder="Verification status">
-                    <BbSelectItem Value="true">Verified</BbSelectItem>
-                    <BbSelectItem Value="false">Unverified</BbSelectItem>
-                </BbFormFieldSelect>
-            </div>
-        </div>
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _editUserDialogOpen = false)">Cancel</BbButton>
-            <BbButton OnClick="@SaveUserEdit" Disabled="@_saving">
-                @(_saving ? "Saving..." : "Save Changes")
-            </BbButton>
-        </BbDialogFooter>
-    </BbDialogContent>
-</BbDialog>
-
 <!-- Create Credential Dialog -->
 <BbDialog Open="@_createCredDialogOpen" OpenChanged="@(v => _createCredDialogOpen = v)">
     <BbDialogContent>
@@ -732,9 +642,22 @@ else
     private bool _loading = true;
     private bool _saving;
 
-    // Edit User dialog
-    private bool _editUserDialogOpen;
-    private EditUserForm _editForm = new();
+    // Editable form
+    private EditableForm<IdentityInformation>? _editableForm;
+    private string? _editFirstName;
+    private string? _editMiddleName;
+    private string? _editLastName;
+    private string? _editSuffix;
+    private string? _editIdentityName;
+    private string? _editBirthDate;
+    private string? _editGender;
+    private string? _editCivilStatus;
+    private string? _editIsVerified;
+
+    // Select options
+    private List<SelectOption<string>> _genderOptions = Enum.GetValues<Gender>().Select(g => new SelectOption<string>(g.ToString(), g.ToString())).ToList();
+    private List<SelectOption<string>> _civilStatusOptions = Enum.GetValues<CivilStatus>().Select(cs => new SelectOption<string>(cs.ToString(), cs.ToString())).ToList();
+    private static readonly List<SelectOption<string>> _verifiedOptions = [new("true", "Verified"), new("false", "Unverified")];
 
     // Create Credential dialog
     private bool _createCredDialogOpen;
@@ -774,6 +697,7 @@ else
 
             if (_user is null) return;
 
+            SyncEditFields();
             await LoadCredentials();
             await LoadRoles();
             await LoadContacts();
@@ -889,23 +813,21 @@ else
 
     // ─── Edit User ────────────────────────────────────────────────────
 
-    private void OpenEditUserDialog()
+    private void SyncEditFields()
     {
         if (_user is null) return;
-        _editForm = new EditUserForm
-        {
-            FirstName = _user.FirstName,
-            MiddleName = _user.MiddleName,
-            LastName = _user.LastName,
-            Suffix = _user.Suffix,
-            IdentityName = _user.IdentityName,
-            BirthDateString = _user.BirthDate?.ToString("yyyy-MM-dd") ?? "",
-            GenderString = _user.Gender?.ToString() ?? "",
-            CivilStatusString = _user.CivilStatus?.ToString() ?? "",
-            IsVerifiedString = _user.IsVerified.ToString().ToLower()
-        };
-        _editUserDialogOpen = true;
+        _editFirstName = _user.FirstName;
+        _editMiddleName = _user.MiddleName;
+        _editLastName = _user.LastName;
+        _editSuffix = _user.Suffix;
+        _editIdentityName = _user.IdentityName;
+        _editBirthDate = _user.BirthDate?.ToString("yyyy-MM-dd") ?? "";
+        _editGender = _user.Gender?.ToString() ?? "";
+        _editCivilStatus = _user.CivilStatus?.ToString() ?? "";
+        _editIsVerified = _user.IsVerified.ToString().ToLower();
     }
+
+    private void DiscardUserEdit() => SyncEditFields();
 
     private async Task SaveUserEdit()
     {
@@ -922,15 +844,15 @@ else
                 return;
             }
 
-            fresh.FirstName = _editForm.FirstName;
-            fresh.MiddleName = _editForm.MiddleName;
-            fresh.LastName = _editForm.LastName;
-            fresh.Suffix = _editForm.Suffix;
-            fresh.IdentityName = _editForm.IdentityName;
-            fresh.BirthDate = DateOnly.TryParse(_editForm.BirthDateString, out var d) ? d : null;
-            fresh.Gender = Enum.TryParse<Gender>(_editForm.GenderString, out var g) ? g : null;
-            fresh.CivilStatus = Enum.TryParse<CivilStatus>(_editForm.CivilStatusString, out var cs) ? cs : null;
-            fresh.IsVerified = _editForm.IsVerifiedString == "true";
+            fresh.FirstName = _editFirstName;
+            fresh.MiddleName = _editMiddleName;
+            fresh.LastName = _editLastName;
+            fresh.Suffix = _editSuffix;
+            fresh.IdentityName = _editIdentityName;
+            fresh.BirthDate = DateOnly.TryParse(_editBirthDate, out var d) ? d : null;
+            fresh.Gender = Enum.TryParse<Gender>(_editGender, out var g) ? g : null;
+            fresh.CivilStatus = Enum.TryParse<CivilStatus>(_editCivilStatus, out var cs) ? cs : null;
+            fresh.IsVerified = _editIsVerified == "true";
             fresh.ModifiedAt = DateTime.UtcNow;
 
             Db.Update(fresh);
@@ -939,8 +861,9 @@ else
             if (result.Success)
             {
                 ToastService.Show("User updated successfully.");
-                _editUserDialogOpen = false;
                 _user = fresh;
+                SyncEditFields();
+                _editableForm?.ExitEditMode();
             }
             else
             {
@@ -1375,19 +1298,6 @@ else
     }
 
     // ─── Form Models ──────────────────────────────────────────────────
-
-    private class EditUserForm
-    {
-        public string? FirstName { get; set; }
-        public string? MiddleName { get; set; }
-        public string? LastName { get; set; }
-        public string? Suffix { get; set; }
-        public string? IdentityName { get; set; }
-        public string BirthDateString { get; set; } = "";
-        public string GenderString { get; set; } = "";
-        public string CivilStatusString { get; set; } = "";
-        public string IsVerifiedString { get; set; } = "false";
-    }
 
     private class CredentialForm
     {

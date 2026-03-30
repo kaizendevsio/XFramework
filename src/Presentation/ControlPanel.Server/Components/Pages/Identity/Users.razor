@@ -22,7 +22,7 @@
 
     @if (_loading)
     {
-        <BbTypographyMuted>Loading users...</BbTypographyMuted>
+        <CenteredSpinner />
     }
     else
     {
@@ -31,7 +31,8 @@
                 <BbCardTitle>All Users (@_users.Count)</BbCardTitle>
             </BbCardHeader>
             <BbCardContent>
-                <BbDataGrid Items="@_users" ShowPagination="true" InitialPageSize="20">
+                <BbDataGrid Items="@_users" ShowPagination="true" InitialPageSize="20"
+                            OnRowClick="@(item => Navigation.NavigateTo($"/identity/users/{item.Id}"))" Class="cursor-pointer">
                     <Columns>
                         <BbDataGridTemplateColumn Title="Full Name" Sortable="true">
                             <ChildContent Context="item">

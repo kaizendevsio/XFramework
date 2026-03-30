@@ -3,9 +3,13 @@
 
 <PageTitle>Wallet Detail - Control Panel</PageTitle>
 
-@if (_wallet is null)
+@if (_loading)
 {
-    <BbTypographyMuted>Loading wallet details...</BbTypographyMuted>
+    <CenteredSpinner />
+}
+else if (_wallet is null)
+{
+    <BbTypographyMuted>Wallet not found.</BbTypographyMuted>
 }
 else
 {
@@ -380,6 +384,7 @@ else
 
     private Wallet? _wallet;
     private List<WalletTransaction> _transactions = [];
+    private bool _loading = true;
     private bool _isProcessing;
     private bool _showCloseDialog;
 
@@ -399,6 +404,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        _loading = true;
         try
         {
             await LoadWallet();
@@ -407,6 +413,10 @@ else
         catch (Exception ex)
         {
             ToastService.Show($"Failed to load wallet: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 

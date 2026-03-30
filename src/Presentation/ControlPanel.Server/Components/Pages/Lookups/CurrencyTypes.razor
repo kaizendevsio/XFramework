@@ -7,6 +7,12 @@
         <BbTypographyH3>Currency Types</BbTypographyH3>
     </div>
 
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
         <Columns>
             <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
@@ -16,15 +22,25 @@
             <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
         </Columns>
     </BbDataGrid>
+    }
 </div>
 
 @code {
     [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _items = [];
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        _items = await Db.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _loading = true;
+        try
+        {
+            _items = await Db.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 }

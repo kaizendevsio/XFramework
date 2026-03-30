@@ -2,6 +2,12 @@
 
 <PageTitle>Dashboard - Control Panel</PageTitle>
 
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else
+{
 <div class="space-y-6">
     <div class="space-y-1">
         <h2 class="text-2xl font-bold tracking-tight">Dashboard</h2>
@@ -58,11 +64,13 @@
         </BbCard>
     </div>
 </div>
+}
 
 @code {
     [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
     [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
 
+    private bool _loading = true;
     private int _userCount;
     private int _sessionCount;
     private int _walletCount;
@@ -71,6 +79,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _loading = true;
         try
         {
             _userCount = await Db.Query<IdentityServer.Domain.Shared.Contracts.IdentityInformation>().CountAsync();
@@ -84,6 +93,10 @@
         {
             Logger.LogError(ex, "Failed to load dashboard stats");
             _error = $"Failed to load stats: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 }

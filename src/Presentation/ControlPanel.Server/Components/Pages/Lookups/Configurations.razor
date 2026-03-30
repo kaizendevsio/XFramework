@@ -11,6 +11,12 @@
         </BbButton>
     </div>
 
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
     <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
         <Columns>
             <BbDataGridPropertyColumn Property="@(x => x.Key)" Title="Key" Sortable="true" />
@@ -34,6 +40,7 @@
             </BbDataGridTemplateColumn>
         </Columns>
     </BbDataGrid>
+    }
 </div>
 
 <BbDialog Open="@_showFormDialog" OpenChanged="@(v => _showFormDialog = v)">
@@ -77,6 +84,7 @@
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<RegistryConfiguration> _items = [];
+    private bool _loading = true;
     private bool _showFormDialog;
     private bool _showDeleteDialog;
     private bool _isEditing;
@@ -90,7 +98,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _items = await Db.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _loading = true;
+        try
+        {
+            _items = await Db.Query<RegistryConfiguration>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private void OpenCreateDialog()

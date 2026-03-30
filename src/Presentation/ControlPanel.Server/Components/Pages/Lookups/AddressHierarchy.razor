@@ -2,6 +2,12 @@
 
 <PageTitle>Address Hierarchy - Control Panel</PageTitle>
 
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else
+{
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <BbTypographyH3>Address Hierarchy</BbTypographyH3>
@@ -88,6 +94,7 @@
         </BbCardContent>
     </BbCard>
 </div>
+}
 
 @code {
     [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
@@ -97,13 +104,22 @@
     private List<AddressProvince> _provinces = [];
     private List<AddressCity> _cities = [];
     private List<AddressBarangay> _barangays = [];
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        _countries = await Db.Query<AddressCountry>().OrderBy(x => x.Name).ToListAsync();
-        _regions = await Db.Query<AddressRegion>().OrderBy(x => x.Description).Take(100).ToListAsync();
-        _provinces = await Db.Query<AddressProvince>().OrderBy(x => x.Description).Take(200).ToListAsync();
-        _cities = await Db.Query<AddressCity>().OrderBy(x => x.Description).Take(500).ToListAsync();
-        _barangays = await Db.Query<AddressBarangay>().OrderBy(x => x.Description).Take(500).ToListAsync();
+        _loading = true;
+        try
+        {
+            _countries = await Db.Query<AddressCountry>().OrderBy(x => x.Name).ToListAsync();
+            _regions = await Db.Query<AddressRegion>().OrderBy(x => x.Description).Take(100).ToListAsync();
+            _provinces = await Db.Query<AddressProvince>().OrderBy(x => x.Description).Take(200).ToListAsync();
+            _cities = await Db.Query<AddressCity>().OrderBy(x => x.Description).Take(500).ToListAsync();
+            _barangays = await Db.Query<AddressBarangay>().OrderBy(x => x.Description).Take(500).ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 }

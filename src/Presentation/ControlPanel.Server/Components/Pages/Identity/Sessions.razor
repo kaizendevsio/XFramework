@@ -10,6 +10,12 @@
         </div>
     </div>
 
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
     <BbDataGrid Items="@_sessions">
         <Columns>
             <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
@@ -28,15 +34,18 @@
             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
         </Columns>
     </BbDataGrid>
+    }
 </div>
 
 @code {
     [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<Session> _sessions = [];
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        _loading = true;
         try
         {
             _sessions = await Db.Query<Session>()
@@ -46,6 +55,10 @@
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Sessions load error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 

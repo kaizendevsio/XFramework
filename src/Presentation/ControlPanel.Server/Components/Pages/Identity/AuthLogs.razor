@@ -10,6 +10,12 @@
         </div>
     </div>
 
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
     <BbDataGrid Items="@_logs">
         <Columns>
             <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
@@ -25,15 +31,18 @@
             <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
         </Columns>
     </BbDataGrid>
+    }
 </div>
 
 @code {
     [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
 
     private List<AuthorizationLog> _logs = [];
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        _loading = true;
         try
         {
             _logs = await Db.Query<AuthorizationLog>()
@@ -41,5 +50,9 @@
                 .ToListAsync();
         }
         catch { /* query may fail */ }
+        finally
+        {
+            _loading = false;
+        }
     }
 }

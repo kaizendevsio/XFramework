@@ -1,0 +1,73 @@
+@typeparam TModel
+
+<BbCard>
+    <BbCardHeader>
+        <div class="flex items-center justify-between">
+            <BbCardTitle>@Title</BbCardTitle>
+            @if (!_context.IsEditing)
+            {
+                <BbButton Variant="ButtonVariant.Outline" OnClick="EnterEditMode">
+                    <LucideIcon Name="pencil" class="mr-2 h-4 w-4" />
+                    Edit
+                </BbButton>
+            }
+            else
+            {
+                <div class="flex items-center gap-2">
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="Discard" Disabled="@Saving">
+                        Discard Changes
+                    </BbButton>
+                    <BbButton OnClick="Save" Disabled="@(!_context.IsDirty || Saving)">
+                        @if (Saving)
+                        {
+                            <BbSpinner Size="SpinnerSize.Small" Class="mr-2" />
+                        }
+                        Save
+                    </BbButton>
+                </div>
+            }
+        </div>
+    </BbCardHeader>
+    <BbCardContent>
+        <CascadingValue Value="_context">
+            @ChildContent
+        </CascadingValue>
+    </BbCardContent>
+</BbCard>
+
+@code {
+    [Parameter] public TModel? Model { get; set; }
+    [Parameter] public string Title { get; set; } = "Details";
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnDiscard { get; set; }
+    [Parameter] public bool Saving { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private readonly EditableFormContext _context = new();
+
+    public bool IsEditing => _context.IsEditing;
+    public bool IsDirty => _context.IsDirty;
+
+    private void EnterEditMode()
+    {
+        _context.IsEditing = true;
+        _context.IsDirty = false;
+    }
+
+    private async Task Save()
+    {
+        await OnSave.InvokeAsync();
+    }
+
+    public void ExitEditMode()
+    {
+        _context.Reset();
+        StateHasChanged();
+    }
+
+    private async Task Discard()
+    {
+        _context.Reset();
+        await OnDiscard.InvokeAsync();
+    }
+}
