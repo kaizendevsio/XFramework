@@ -30,7 +30,7 @@
         </BbCardHeader>
         <BbCardContent>
             <BbDataGrid Items="@_tenants" ShowPagination="true" InitialPageSize="15"
-                        OnRowClick="@(item => Navigation.NavigateTo($"/identity/tenants/{item.Id}"))" Class="cursor-pointer">
+                        OnRowClick="@((Tenant item) => Navigation.NavigateTo($"/identity/tenants/{item.Id}"))" Class="cursor-pointer">
                 <Columns>
                     <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
                     <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />

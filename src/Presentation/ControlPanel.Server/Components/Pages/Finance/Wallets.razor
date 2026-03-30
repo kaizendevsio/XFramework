@@ -72,7 +72,7 @@ else
         </BbCardHeader>
         <BbCardContent>
             <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20"
-                        OnRowClick="@(item => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))" Class="cursor-pointer">
+                        OnRowClick="@((Wallet item) => NavigationManager.NavigateTo($"/finance/wallets/{item.Id}"))" Class="cursor-pointer">
                 <Columns>
                     <BbDataGridTemplateColumn Title="Account Number" Sortable="true">
                         <ChildContent Context="item">
