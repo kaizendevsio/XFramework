@@ -282,6 +282,10 @@ public sealed class BoltClient : IAsyncDisposable
                         var reqData = data.ToArray();
                         _ = HandleIncomingRequestAsync(conn, reqData, reqData.Length, ct);
                         break;
+                    case FrameType.Push:
+                        var pushData = data.ToArray();
+                        _ = HandleIncomingPushAsync(pushData, pushData.Length);
+                        break;
                     case FrameType.StreamOpen:
                         HandleStreamOpen(conn, data, ct);
                         break;
@@ -360,6 +364,27 @@ public sealed class BoltClient : IAsyncDisposable
         if (!BoltCodec.TryReadStreamClose(data, out var streamId, out var statusCode)) return;
         if (_activeStreams.TryRemove(streamId, out var stream))
             stream.MarkClosed(statusCode);
+    }
+
+    private async Task HandleIncomingPushAsync(byte[] data, int length)
+    {
+        // Push uses same frame layout as Request — parse with TryReadRequest
+        var span = data.AsSpan(0, length);
+        if (!BoltCodec.TryReadRequest(span, out var frame, out _)) return;
+
+        if (_handlers.TryGetValue(frame.CommandHash, out var handler))
+        {
+            try
+            {
+                var payload = frame.GetPayload(data.AsMemory(0, length));
+                await handler(payload, frame.RequestId);
+                // No response sent for Push (fire-and-forget)
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Push handler error for command hash {CommandHash}", frame.CommandHash);
+            }
+        }
     }
 
     private async Task HandleIncomingRequestAsync(BoltConnection conn, byte[] data, int length, CancellationToken ct)
