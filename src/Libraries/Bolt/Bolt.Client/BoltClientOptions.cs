@@ -17,4 +17,14 @@ public class BoltClientOptions
 
     /// <summary>Pending send count threshold to trigger connection scale-up. Default: 48.</summary>
     public int ScaleUpThreshold { get; set; } = 48;
+
+    /// <summary>
+    /// Payload size threshold (bytes) above which InvokeAsync transparently switches
+    /// to BoltStream chunking instead of a single Request frame.
+    /// Default: 65536 (64KB). Set to int.MaxValue to disable.
+    /// </summary>
+    public int LargePayloadThreshold { get; set; } = 65536;
+
+    /// <summary>Chunk size for large payload streaming. Default: 32768 (32KB).</summary>
+    public int StreamChunkSize { get; set; } = 32768;
 }

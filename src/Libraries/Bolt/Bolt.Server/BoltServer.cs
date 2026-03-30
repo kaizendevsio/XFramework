@@ -278,7 +278,8 @@ public sealed class BoltServer : IDisposable
             {
                 foreach (var client in bag)
                 {
-                    if (client.IsAlive && client.StreamId != sender.StreamId)
+                    // Backpressure: skip push to congested clients (push is best-effort)
+                    if (client.IsAlive && client.StreamId != sender.StreamId && !client.IsUnderPressure)
                         await client.SendAsync(data, ct);
                 }
             }
@@ -286,7 +287,7 @@ public sealed class BoltServer : IDisposable
         }
 
         var recipient = GetRecipient(recipientHash);
-        if (recipient is not null)
+        if (recipient is not null && !recipient.IsUnderPressure)
             await recipient.SendAsync(buffer.AsMemory(0, totalSize), ct);
     }
 
@@ -382,6 +383,14 @@ public sealed class BoltServer : IDisposable
                 if (callState.RecipientPreferredLayer.TryGetValue(recipient.StreamId, out var preferred)
                     && preferred != route.SimulcastLayerId!.Value)
                     continue; // Recipient prefers a different layer — skip
+            }
+
+            // Backpressure: skip drop-eligible media frames if recipient is congested
+            if (recipient.IsUnderPressure)
+            {
+                // Check if frame is drop-eligible (flag 0x40)
+                if (length > 25 && (buffer[25] & 0x40) != 0)
+                    continue; // Drop this frame — recipient can't keep up
             }
 
             await recipient.SendAsync(data, ct);
@@ -1097,20 +1106,44 @@ public sealed class BoltHubConnection
     public int ServiceHash { get; set; }
     public bool IsAlive => _webSocket.State == WebSocketState.Open;
 
+    /// <summary>Pending bytes queued for this connection. Used for backpressure decisions.</summary>
+    public long PendingBytes => Interlocked.Read(ref _pendingBytes);
+    private long _pendingBytes;
+
+    /// <summary>Backpressure threshold: drop media frames when pending exceeds this (1MB).</summary>
+    public const long BackpressureDropThreshold = 1024 * 1024;
+
+    /// <summary>Backpressure threshold: send feedback signal to reduce sender rate (2MB).</summary>
+    public const long BackpressureFeedbackThreshold = 2 * 1024 * 1024;
+
+    /// <summary>True if this connection is under backpressure (pending > drop threshold).</summary>
+    public bool IsUnderPressure => PendingBytes > BackpressureDropThreshold;
+
     public BoltHubConnection(WebSocket webSocket) => _webSocket = webSocket;
 
     /// <summary>
-    /// Send data with fast-path for uncontended lock.
+    /// Send data with fast-path for uncontended lock. Tracks pending bytes for backpressure.
     /// </summary>
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
+        Interlocked.Add(ref _pendingBytes, data.Length);
+
         // Fast path: no contention — send synchronously, zero overhead
         if (_sendLock.Wait(0))
         {
             try
             {
                 if (_webSocket.State == WebSocketState.Open)
-                    return _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+                {
+                    var task = _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+                    if (task.IsCompleted)
+                    {
+                        Interlocked.Add(ref _pendingBytes, -data.Length);
+                        return task;
+                    }
+                    return AwaitAndTrack(task, data.Length);
+                }
+                Interlocked.Add(ref _pendingBytes, -data.Length);
                 return ValueTask.CompletedTask;
             }
             finally
@@ -1120,6 +1153,12 @@ public sealed class BoltHubConnection
         }
         // Slow path: contention — await lock
         return SendSlowAsync(data, ct);
+    }
+
+    private async ValueTask AwaitAndTrack(ValueTask task, int size)
+    {
+        try { await task; }
+        finally { Interlocked.Add(ref _pendingBytes, -size); }
     }
 
     private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
@@ -1133,6 +1172,7 @@ public sealed class BoltHubConnection
         finally
         {
             _sendLock.Release();
+            Interlocked.Add(ref _pendingBytes, -data.Length);
         }
     }
 }

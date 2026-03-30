@@ -283,6 +283,70 @@ public class RpcStressTests
         await clientB.DisposeAsync();
     }
 
+    [Test]
+    public async Task LargePayload_AutoStreaming_1MB_TransparentToConsumer()
+    {
+        // Configure with low threshold so auto-streaming kicks in
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 30, LargePayloadThreshold = 1024 };
+        var clientA = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "large_auto_a", "LargeAutoA", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var clientB = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "large_auto_b", "LargeAutoB", opts, _loggerFactory.CreateLogger<BoltClient>());
+
+        clientB.RegisterHandler("bigprocess", (payload, _) =>
+        {
+            // Echo back the size as proof we received the full payload
+            var size = payload.Length;
+            var resp = MemoryPackSerializer.Serialize(new StressMsg { Id = size, Data = "ok" });
+            return Task.FromResult((HttpStatusCode.OK, (ReadOnlyMemory<byte>)resp));
+        });
+
+        await clientA.ConnectAsync();
+        await clientB.ConnectAsync();
+
+        // Send 256KB payload — way above 1KB threshold, will auto-stream
+        var bigData = new byte[256 * 1024];
+        Random.Shared.NextBytes(bigData);
+        var payload = MemoryPackSerializer.Serialize(new StressBigMsg { Data = bigData });
+
+        // Consumer calls InvokeAsync exactly the same as a small payload
+        var (status, response) = await clientA.InvokeAsync("large_auto_b", "bigprocess", payload);
+
+        status.Should().Be(HttpStatusCode.OK);
+        var result = MemoryPackSerializer.Deserialize<StressMsg>(response.Span);
+        result!.Id.Should().Be(payload.Length, "handler should have received the full reassembled payload");
+
+        await clientA.DisposeAsync();
+        await clientB.DisposeAsync();
+    }
+
+    [Test]
+    public async Task SmallPayload_StillUsesNormalRpc()
+    {
+        var opts = new BoltClientOptions { RpcTimeoutSeconds = 15, LargePayloadThreshold = 65536 };
+        var clientA = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "small_rpc_a", "SmallA", opts, _loggerFactory.CreateLogger<BoltClient>());
+        var clientB = new BoltClient(new Uri($"ws://localhost:{_port}/bolt"),
+            "small_rpc_b", "SmallB", opts, _loggerFactory.CreateLogger<BoltClient>());
+
+        clientB.RegisterHandler("echo", (payload, _) =>
+            Task.FromResult((HttpStatusCode.OK, payload)));
+
+        await clientA.ConnectAsync();
+        await clientB.ConnectAsync();
+
+        // Small payload — should use normal Request frame, not streaming
+        var smallPayload = MemoryPackSerializer.Serialize(new StressMsg { Id = 42, Data = "small" });
+        var (status, response) = await clientA.InvokeAsync("small_rpc_b", "echo", smallPayload);
+
+        status.Should().Be(HttpStatusCode.OK);
+        var result = MemoryPackSerializer.Deserialize<StressMsg>(response.Span);
+        result!.Id.Should().Be(42);
+
+        await clientA.DisposeAsync();
+        await clientB.DisposeAsync();
+    }
+
     private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
     {
         using var client = new HttpClient();

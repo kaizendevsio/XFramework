@@ -37,6 +37,9 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly ConcurrentDictionary<int, Func<BoltStream, Task>> _streamHandlers = new();
     private TimeSpan _rpcTimeout;
 
+    // Large RPC: internal command hash for auto-streamed payloads
+    private static readonly int LargeRpcCommandHash = BoltCodec.Fnv1aHash("__bolt_large_rpc__");
+
     // Frame handler extensibility — allows Bolt.Media to hook into the receive loop
     private readonly ConcurrentDictionary<byte, Action<BoltConnection, byte[], int>> _frameHandlers = new();
 
@@ -63,6 +66,9 @@ public sealed class BoltClient : IAsyncDisposable
 
     public async Task ConnectAsync(CancellationToken ct = default)
     {
+        // Auto-register the internal large RPC stream handler
+        RegisterLargeRpcStreamHandler();
+
         var minConns = Math.Max(1, _config.MinConnections);
         for (int i = 0; i < minConns; i++)
         {
@@ -74,6 +80,99 @@ public sealed class BoltClient : IAsyncDisposable
             _clientId, _clientName, _connections.Count);
         await DrainOfflineQueueAsync(ct);
     }
+
+    /// <summary>
+    /// Registers the internal handler that reassembles large RPC payloads sent via BoltStream.
+    /// When a stream opens with the __bolt_large_rpc__ command, this handler:
+    /// 1. Reads the metadata header (requestId, commandHash, totalSize)
+    /// 2. Accumulates payload chunks
+    /// 3. Calls the registered RPC handler with the full reassembled payload
+    /// 4. Sends the Response back as a normal frame
+    /// </summary>
+    private void RegisterLargeRpcStreamHandler()
+    {
+        // Receiver side: reassemble large RPC payload from stream chunks
+        RegisterStreamHandler("__bolt_large_rpc__", async (stream) =>
+        {
+            // Read metadata header: [16:requestId][4:commandHash][4:totalSize][4:senderHash]
+            var (hasHeader, headerData) = await stream.ReadAsync();
+            if (!hasHeader || headerData.Length < 28) return;
+
+            var headerSpan = headerData.Span;
+            var requestId = new Guid(headerSpan[..16]);
+            var commandHash = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(headerSpan[16..]);
+            var totalSize = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(headerSpan[20..]);
+            var senderHash = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(headerSpan[24..]);
+
+            if (totalSize < 0 || totalSize > 100 * 1024 * 1024) return; // 100MB safety limit
+
+            // Reassemble payload chunks
+            var buffer = new byte[totalSize];
+            var bytesRead = 0;
+            await foreach (var chunk in stream.ReadAllAsync())
+            {
+                var len = Math.Min(chunk.Length, totalSize - bytesRead);
+                chunk[..len].CopyTo(buffer.AsMemory(bytesRead));
+                bytesRead += len;
+                if (bytesRead >= totalSize) break;
+            }
+
+            // Build response
+            HttpStatusCode statusCode;
+            ReadOnlyMemory<byte> responsePayload;
+
+            if (_handlers.TryGetValue(commandHash, out var handler))
+            {
+                try
+                {
+                    (statusCode, responsePayload) = await handler(buffer, requestId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Large RPC handler error for commandHash {Hash}", commandHash);
+                    statusCode = HttpStatusCode.InternalServerError;
+                    responsePayload = ReadOnlyMemory<byte>.Empty;
+                }
+            }
+            else
+            {
+                statusCode = HttpStatusCode.NotImplemented;
+                responsePayload = ReadOnlyMemory<byte>.Empty;
+            }
+
+            // Send response back to sender via Push with embedded response data
+            // Format: [16:requestId][2:statusCode][payload]
+            var respData = new byte[18 + responsePayload.Length];
+            requestId.TryWriteBytes(respData);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(respData.AsSpan(16), (short)statusCode);
+            responsePayload.CopyTo(respData.AsMemory(18));
+
+            var conn = GetConnection();
+            var writer = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WritePush(writer, Guid.NewGuid(), senderHash, LargeRpcResponseHash, respData);
+            await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
+        });
+
+        // Sender side: resolve pending large RPC calls when response arrives via Push
+        RegisterHandler("__bolt_large_rpc_response__", (payload, _) =>
+        {
+            if (payload.Length < 18) return Task.FromResult((HttpStatusCode.BadRequest, ReadOnlyMemory<byte>.Empty));
+
+            var span = payload.Span;
+            var requestId = new Guid(span[..16]);
+            var statusCode = (HttpStatusCode)System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(span[16..]);
+            var respPayload = payload.Length > 18 ? payload[18..].ToArray() : Array.Empty<byte>();
+
+            if (_pendingCalls.TryRemove(requestId, out var rpcCall))
+            {
+                rpcCall.SetResult(new BoltRpcResponse { StatusCode = statusCode, Data = respPayload });
+            }
+
+            return Task.FromResult((HttpStatusCode.OK, ReadOnlyMemory<byte>.Empty));
+        });
+    }
+
+    private static readonly int LargeRpcResponseHash = BoltCodec.Fnv1aHash("__bolt_large_rpc_response__");
 
     private async Task<BoltConnection> CreateConnectionAsync(CancellationToken ct)
     {
@@ -135,6 +234,10 @@ public sealed class BoltClient : IAsyncDisposable
     public async Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Data)> InvokeAsync(
         string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
+        // Auto-stream large payloads transparently
+        if (payload.Length > _config.LargePayloadThreshold)
+            return await InvokeLargeAsync(recipientId, commandName, payload, ct);
+
         var requestId = Guid.NewGuid();
         var recipientHash = _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
         var commandHash = _hashCache.GetOrAdd(commandName, BoltCodec.Fnv1aHash);
@@ -167,6 +270,57 @@ public sealed class BoltClient : IAsyncDisposable
         finally { _pendingCalls.TryRemove(requestId, out _); }
     }
 
+    /// <summary>
+    /// Transparently stream a large payload via BoltStream, then wait for the RPC response.
+    /// The recipient reassembles the stream and processes it as a normal RPC call.
+    /// </summary>
+    private async Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Data)> InvokeLargeAsync(
+        string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct)
+    {
+        if (!IsConnected) throw new InvalidOperationException("Not connected");
+
+        var requestId = Guid.NewGuid();
+        var recipientHash = _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
+        var commandHash = _hashCache.GetOrAdd(commandName, BoltCodec.Fnv1aHash);
+
+        // Register pending RPC — response comes back as normal Response frame
+        var rpcCall = PooledRpcCall.Rent();
+        _pendingCalls[requestId] = rpcCall;
+
+        try
+        {
+            // Open stream with special large-RPC command hash
+            var stream = await OpenStreamAsync(recipientId, "__bolt_large_rpc__", ct);
+
+            // First chunk: metadata header [16:requestId][4:commandHash][4:totalSize][4:senderHash]
+            var header = new byte[28];
+            requestId.TryWriteBytes(header);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(16), commandHash);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(20), payload.Length);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(24), _hashCache.GetOrAdd(_clientId, BoltCodec.Fnv1aHash));
+            await stream.SendAsync((ReadOnlyMemory<byte>)header, ct);
+
+            // Send payload in chunks
+            var chunkSize = _config.StreamChunkSize;
+            for (int offset = 0; offset < payload.Length; offset += chunkSize)
+            {
+                var len = Math.Min(chunkSize, payload.Length - offset);
+                await stream.SendAsync(payload.Slice(offset, len), ct);
+            }
+
+            // Close stream — signals "all data sent"
+            await stream.CloseAsync(ct: ct);
+
+            // Response arrives as a Request with __bolt_large_rpc_response__ command
+            // (handled by RegisterLargeRpcResponseHandler, which resolves our pending call)
+            using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
+            rpcCall.RegisterTimeout(timeoutCts.Token);
+            var response = await rpcCall.GetTask();
+            return (response.StatusCode, response.Data);
+        }
+        finally { _pendingCalls.TryRemove(requestId, out _); }
+    }
+
     public async Task<TResponse?> SendAsync<TRequest, TResponse>(string recipientId, string commandName, TRequest request, CancellationToken ct = default)
     {
         var payload = MemoryPackSerializer.Serialize(request);
@@ -185,6 +339,20 @@ public sealed class BoltClient : IAsyncDisposable
     {
         var hash = BoltCodec.Fnv1aHash(commandName);
         _handlers[hash] = handler;
+    }
+
+    /// <summary>
+    /// Register a handler with CancellationToken that is cancelled when the connection drops.
+    /// </summary>
+    public void RegisterHandler(string commandName, Func<ReadOnlyMemory<byte>, Guid, CancellationToken, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
+    {
+        var hash = BoltCodec.Fnv1aHash(commandName);
+        _handlers[hash] = (payload, requestId) =>
+        {
+            // Use a token linked to the client's connection state
+            var cts = new CancellationTokenSource(_rpcTimeout);
+            return handler(payload, requestId, cts.Token);
+        };
     }
 
     /// <summary>
