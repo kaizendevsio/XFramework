@@ -635,7 +635,8 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
@@ -706,9 +707,8 @@ else
         _loading = true;
         try
         {
-            _user = await Db.Query<IdentityInformation>()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
+            var response = await IdentityWrapper.IdentityInformation.Get(Id);
+            _user = response?.Response;
 
             if (_user is null) return;
 
@@ -734,96 +734,136 @@ else
 
     private async Task LoadCredentials()
     {
-        _credentials = await Db.Query<IdentityCredential>()
-            .Where(x => x.IdentityInfoId == Id)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        try
+        {
+            var response = await IdentityWrapper.IdentityCredential.GetList(100, 1, filter:
+            [
+                new() { PropertyName = nameof(IdentityCredential.IdentityInfoId), Operation = QueryFilterOperation.Equal, Value = Id }
+            ]);
+            _credentials = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { _credentials = []; }
     }
 
     private async Task LoadRoles()
     {
-        _roles = [];
-        foreach (var cred in _credentials)
+        try
         {
-            var roles = await Db.Query<IdentityRole>()
-                .Include(x => x.Type)
-                .Where(x => x.CredentialId == cred.Id)
-                .ToListAsync();
-            _roles.AddRange(roles);
+            var credentialIds = _credentials.Select(c => c.Id).ToList();
+            _roles = [];
+            foreach (var credId in credentialIds)
+            {
+                var response = await IdentityWrapper.IdentityRole.GetList(100, 1, includeNavigations: true, filter:
+                [
+                    new() { PropertyName = nameof(IdentityRole.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
+                ]);
+                _roles.AddRange(response?.Response?.Items ?? []);
+            }
+            _roles = _roles.OrderByDescending(x => x.CreatedAt).ToList();
         }
-        _roles = _roles.OrderByDescending(x => x.CreatedAt).ToList();
+        catch { _roles = []; }
     }
 
     private async Task LoadContacts()
     {
-        _contacts = [];
-        foreach (var cred in _credentials)
+        try
         {
-            var contacts = await Db.Query<IdentityContact>()
-                .Include(x => x.Type)
-                .Where(x => x.CredentialId == cred.Id)
-                .ToListAsync();
-            _contacts.AddRange(contacts);
+            var credentialIds = _credentials.Select(c => c.Id).ToList();
+            _contacts = [];
+            foreach (var credId in credentialIds)
+            {
+                var response = await IdentityWrapper.IdentityContact.GetList(100, 1, includeNavigations: true, filter:
+                [
+                    new() { PropertyName = nameof(IdentityContact.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
+                ]);
+                _contacts.AddRange(response?.Response?.Items ?? []);
+            }
+            _contacts = _contacts.OrderByDescending(x => x.CreatedAt).ToList();
         }
-        _contacts = _contacts.OrderByDescending(x => x.CreatedAt).ToList();
+        catch { _contacts = []; }
     }
 
     private async Task LoadAddresses()
     {
-        _addresses = await Db.Query<IdentityAddress>()
-            .Where(x => x.IdentityInfoId == Id)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        try
+        {
+            var response = await IdentityWrapper.IdentityAddress.GetList(100, 1, filter:
+            [
+                new() { PropertyName = nameof(IdentityAddress.IdentityInfoId), Operation = QueryFilterOperation.Equal, Value = Id }
+            ]);
+            _addresses = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { _addresses = []; }
     }
 
     private async Task LoadSessions()
     {
-        _sessions = [];
-        foreach (var cred in _credentials)
+        try
         {
-            var sessions = await Db.Query<Session>()
-                .Where(x => x.CredentialId == cred.Id)
-                .ToListAsync();
-            _sessions.AddRange(sessions);
+            var credentialIds = _credentials.Select(c => c.Id).ToList();
+            _sessions = [];
+            foreach (var credId in credentialIds)
+            {
+                var response = await IdentityWrapper.Session.GetList(100, 1, filter:
+                [
+                    new() { PropertyName = nameof(Session.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
+                ]);
+                _sessions.AddRange(response?.Response?.Items ?? []);
+            }
+            _sessions = _sessions.OrderByDescending(x => x.CreatedAt).ToList();
         }
-        _sessions = _sessions.OrderByDescending(x => x.CreatedAt).ToList();
+        catch { _sessions = []; }
     }
 
     private async Task LoadAuthLogs()
     {
-        _authLogs = [];
-        foreach (var cred in _credentials)
+        try
         {
-            var logs = await Db.Query<AuthorizationLog>()
-                .Where(x => x.CredentialId == cred.Id)
-                .ToListAsync();
-            _authLogs.AddRange(logs);
+            var credentialIds = _credentials.Select(c => c.Id).ToList();
+            _authLogs = [];
+            foreach (var credId in credentialIds)
+            {
+                var response = await IdentityWrapper.AuthorizationLog.GetList(100, 1, filter:
+                [
+                    new() { PropertyName = nameof(AuthorizationLog.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
+                ]);
+                _authLogs.AddRange(response?.Response?.Items ?? []);
+            }
+            _authLogs = _authLogs.OrderByDescending(x => x.CreatedAt).ToList();
         }
-        _authLogs = _authLogs.OrderByDescending(x => x.CreatedAt).ToList();
+        catch { _authLogs = []; }
     }
 
     private async Task LoadWallets()
     {
-        _wallets = [];
-        foreach (var cred in _credentials)
+        try
         {
-            var wallets = await Db.Query<Wallet>()
-                .Where(x => x.CredentialId == cred.Id)
-                .ToListAsync();
-            _wallets.AddRange(wallets);
+            var credentialIds = _credentials.Select(c => c.Id).ToList();
+            _wallets = [];
+            foreach (var credId in credentialIds)
+            {
+                var response = await WalletsWrapper.Wallet.GetList(100, 1, filter:
+                [
+                    new() { PropertyName = nameof(Wallet.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
+                ]);
+                _wallets.AddRange(response?.Response?.Items ?? []);
+            }
+            _wallets = _wallets.OrderByDescending(x => x.CreatedAt).ToList();
         }
-        _wallets = _wallets.OrderByDescending(x => x.CreatedAt).ToList();
+        catch { _wallets = []; }
     }
 
     private async Task LoadLookups()
     {
-        _roleTypes = await Db.Query<IdentityRoleType>()
-            .OrderBy(x => x.Name)
-            .ToListAsync();
+        try
+        {
+            var roleTypeResponse = await IdentityWrapper.IdentityRoleType.GetList(100, 1);
+            _roleTypes = roleTypeResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
 
-        _contactTypes = await Db.Query<IdentityContactType>()
-            .OrderBy(x => x.Name)
-            .ToListAsync();
+            var contactTypeResponse = await IdentityWrapper.IdentityContactType.GetList(100, 1);
+            _contactTypes = contactTypeResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
+        }
+        catch { /* lookups may fail */ }
     }
 
     // ─── Edit User ────────────────────────────────────────────────────
@@ -849,9 +889,8 @@ else
         _saving = true;
         try
         {
-            var fresh = await Db.Query<IdentityInformation>()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
+            var getResponse = await IdentityWrapper.IdentityInformation.Get(Id);
+            var fresh = getResponse?.Response;
 
             if (fresh is null)
             {
@@ -870,10 +909,9 @@ else
             fresh.IsVerified = _editIsVerified == "true";
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            Db.Update(fresh);
-            var result = await Db.SaveAsync();
+            var result = await IdentityWrapper.IdentityInformation.Patch(fresh);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("User updated successfully.");
                 _user = fresh;
@@ -882,7 +920,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result.Error}");
+                ToastService.Show($"Error: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -931,15 +969,14 @@ else
                 IdentityInfoId = Id,
                 UserName = _credForm.UserName,
                 UserAlias = _credForm.UserAlias,
-                PasswordByte = System.Security.Cryptography.SHA512.HashData(System.Text.Encoding.UTF8.GetBytes(_credForm.Password)),
+                PasswordByte = System.Text.Encoding.ASCII.GetBytes(BCrypt.Net.BCrypt.HashPassword(inputKey: _credForm.Password, workFactor: 11)),
                 IsEnabled = true,
                 CreatedAt = DateTime.UtcNow
             };
 
-            Db.Add(credential);
-            var result = await Db.SaveAsync();
+            var result = await IdentityWrapper.IdentityCredential.Create(credential);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("Credential created.");
                 _createCredDialogOpen = false;
@@ -947,7 +984,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result.Error}");
+                ToastService.Show($"Error: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -999,10 +1036,9 @@ else
                 CreatedAt = DateTime.UtcNow
             };
 
-            Db.Add(role);
-            var result = await Db.SaveAsync();
+            var result = await IdentityWrapper.IdentityRole.Create(role);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("Role assigned.");
                 _assignRoleDialogOpen = false;
@@ -1010,7 +1046,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result.Error}");
+                ToastService.Show($"Error: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -1035,23 +1071,17 @@ else
 
         try
         {
-            var fresh = await Db.Query<IdentityRole>()
-                .Where(x => x.Id == _removingRole.Id)
-                .FirstOrDefaultAsync();
+            _removingRole.IsDeleted = true;
+            _removingRole.IsEnabled = false;
+            var result = await IdentityWrapper.IdentityRole.Patch(_removingRole);
 
-            if (fresh is not null)
+            if (result?.IsSuccess == true)
             {
-                Db.Remove(fresh);
-                var result = await Db.SaveAsync();
-
-                if (result.Success)
-                {
-                    ToastService.Show("Role removed.");
-                }
-                else
-                {
-                    ToastService.Show($"Error: {result.Error}");
-                }
+                ToastService.Show("Role removed.");
+            }
+            else
+            {
+                ToastService.Show($"Error: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -1109,9 +1139,8 @@ else
         {
             if (_editingContact is not null)
             {
-                var fresh = await Db.Query<IdentityContact>()
-                    .Where(x => x.Id == _editingContact.Id)
-                    .FirstOrDefaultAsync();
+                var getResponse = await IdentityWrapper.IdentityContact.Get(_editingContact.Id);
+                var fresh = getResponse?.Response;
 
                 if (fresh is not null)
                 {
@@ -1120,9 +1149,8 @@ else
                     fresh.TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null;
                     fresh.ModifiedAt = DateTime.UtcNow;
 
-                    Db.Update(fresh);
-                    var result = await Db.SaveAsync();
-                    ToastService.Show(result.Success ? "Contact updated." : $"Error: {result.Error}");
+                    var result = await IdentityWrapper.IdentityContact.Patch(fresh);
+                    ToastService.Show(result?.IsSuccess == true ? "Contact updated." : $"Error: {result?.Message}");
                 }
             }
             else
@@ -1138,9 +1166,8 @@ else
                     CreatedAt = DateTime.UtcNow
                 };
 
-                Db.Add(contact);
-                var result = await Db.SaveAsync();
-                ToastService.Show(result.Success ? "Contact created." : $"Error: {result.Error}");
+                var result = await IdentityWrapper.IdentityContact.Create(contact);
+                ToastService.Show(result?.IsSuccess == true ? "Contact created." : $"Error: {result?.Message}");
             }
 
             _contactDialogOpen = false;
@@ -1160,17 +1187,11 @@ else
     {
         try
         {
-            var fresh = await Db.Query<IdentityContact>()
-                .Where(x => x.Id == contact.Id)
-                .FirstOrDefaultAsync();
-
-            if (fresh is not null)
-            {
-                Db.Remove(fresh);
-                var result = await Db.SaveAsync();
-                ToastService.Show(result.Success ? "Contact deleted." : $"Error: {result.Error}");
-                await LoadContacts();
-            }
+            contact.IsDeleted = true;
+            contact.IsEnabled = false;
+            var result = await IdentityWrapper.IdentityContact.Patch(contact);
+            ToastService.Show(result?.IsSuccess == true ? "Contact deleted." : $"Error: {result?.Message}");
+            await LoadContacts();
         }
         catch (Exception ex)
         {
@@ -1209,9 +1230,8 @@ else
         {
             if (_editingAddress is not null)
             {
-                var fresh = await Db.Query<IdentityAddress>()
-                    .Where(x => x.Id == _editingAddress.Id)
-                    .FirstOrDefaultAsync();
+                var getResponse = await IdentityWrapper.IdentityAddress.Get(_editingAddress.Id);
+                var fresh = getResponse?.Response;
 
                 if (fresh is not null)
                 {
@@ -1223,9 +1243,8 @@ else
                     fresh.DefaultAddress = _addressForm.IsDefault == "true";
                     fresh.ModifiedAt = DateTime.UtcNow;
 
-                    Db.Update(fresh);
-                    var result = await Db.SaveAsync();
-                    ToastService.Show(result.Success ? "Address updated." : $"Error: {result.Error}");
+                    var result = await IdentityWrapper.IdentityAddress.Patch(fresh);
+                    ToastService.Show(result?.IsSuccess == true ? "Address updated." : $"Error: {result?.Message}");
                 }
             }
             else
@@ -1245,9 +1264,8 @@ else
                     CreatedAt = DateTime.UtcNow
                 };
 
-                Db.Add(address);
-                var result = await Db.SaveAsync();
-                ToastService.Show(result.Success ? "Address created." : $"Error: {result.Error}");
+                var result = await IdentityWrapper.IdentityAddress.Create(address);
+                ToastService.Show(result?.IsSuccess == true ? "Address created." : $"Error: {result?.Message}");
             }
 
             _addressDialogOpen = false;
@@ -1267,17 +1285,11 @@ else
     {
         try
         {
-            var fresh = await Db.Query<IdentityAddress>()
-                .Where(x => x.Id == address.Id)
-                .FirstOrDefaultAsync();
-
-            if (fresh is not null)
-            {
-                Db.Remove(fresh);
-                var result = await Db.SaveAsync();
-                ToastService.Show(result.Success ? "Address deleted." : $"Error: {result.Error}");
-                await LoadAddresses();
-            }
+            address.IsDeleted = true;
+            address.IsEnabled = false;
+            var result = await IdentityWrapper.IdentityAddress.Patch(address);
+            ToastService.Show(result?.IsSuccess == true ? "Address deleted." : $"Error: {result?.Message}");
+            await LoadAddresses();
         }
         catch (Exception ex)
         {
@@ -1291,9 +1303,8 @@ else
     {
         try
         {
-            var fresh = await Db.Query<Session>()
-                .Where(x => x.Id == session.Id)
-                .FirstOrDefaultAsync();
+            var getResponse = await IdentityWrapper.Session.Get(session.Id);
+            var fresh = getResponse?.Response;
 
             if (fresh is null)
             {
@@ -1304,17 +1315,16 @@ else
             fresh.Status = CurrentSessionState.Inactive;
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            Db.Update(fresh);
-            var result = await Db.SaveAsync();
+            var result = await IdentityWrapper.Session.Patch(fresh);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("Session terminated.");
                 await LoadSessions();
             }
             else
             {
-                ToastService.Show($"Error: {result.Error}");
+                ToastService.Show($"Error: {result?.Message}");
             }
         }
         catch (Exception ex)

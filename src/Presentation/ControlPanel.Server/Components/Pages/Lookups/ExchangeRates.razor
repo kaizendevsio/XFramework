@@ -27,7 +27,7 @@
 </div>
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
 
     private List<ExchangeRate> _items = [];
     private bool _loading = true;
@@ -37,7 +37,8 @@
         _loading = true;
         try
         {
-            _items = await Db.Query<ExchangeRate>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+            var response = await WalletsWrapper.ExchangeRate.GetList(100, 1);
+            _items = response?.Response?.Items?.ToList() ?? [];
         }
         finally
         {

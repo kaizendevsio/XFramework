@@ -92,8 +92,9 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<IdentityRole> _roles = [];
     private List<IdentityRoleType> _roleTypes = [];
@@ -111,9 +112,8 @@
         try
         {
             await LoadData();
-            _roleTypes = await Db.Query<IdentityRoleType>()
-                .OrderBy(x => x.Name)
-                .ToListAsync();
+            var roleTypeResponse = await IdentityWrapper.IdentityRoleType.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
+            _roleTypes = roleTypeResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
         }
         catch { /* query may fail */ }
         finally
@@ -124,10 +124,12 @@
 
     private async Task LoadData()
     {
-        _roles = await Db.Query<IdentityRole>()
-            .Include(x => x.Type)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        try
+        {
+            var response = await IdentityWrapper.IdentityRole.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId, includeNavigations: true);
+            _roles = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { /* query may fail */ }
     }
 
     private void OpenAddDialog()
@@ -152,32 +154,49 @@
             return;
         }
 
-        var role = new IdentityRole
+        try
         {
-            Id = Guid.NewGuid(),
-            CredentialId = credentialId,
-            TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null,
-            RoleExpiration = DateTime.TryParse(_formExpiration, out var exp) ? exp : DateTime.UtcNow.AddYears(1),
-            CreatedAt = DateTime.UtcNow
-        };
+            var role = new IdentityRole
+            {
+                Id = Guid.NewGuid(),
+                CredentialId = credentialId,
+                TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null,
+                RoleExpiration = DateTime.TryParse(_formExpiration, out var exp) ? exp : DateTime.UtcNow.AddYears(1),
+                CreatedAt = DateTime.UtcNow
+            };
 
-        Db.Add(role);
-        var result = await Db.SaveAsync();
-        ToastService.Show(result.Success ? "Role created." : $"Error: {result.Error}");
-        _dialogOpen = false;
-        await LoadData();
+            var result = await IdentityWrapper.IdentityRole.Create(role);
+            ToastService.Show(result?.IsSuccess == true ? "Role created." : $"Error: {result?.Message}");
+            _dialogOpen = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error: {ex.Message}");
+        }
     }
 
     private async Task ConfirmDelete()
     {
         if (_deletingRole is not null)
         {
-            Db.Remove(_deletingRole);
-            var result = await Db.SaveAsync();
-            ToastService.Show(result.Success ? "Role deleted." : $"Error: {result.Error}");
-            _deleteDialogOpen = false;
-            _deletingRole = null;
-            await LoadData();
+            try
+            {
+                _deletingRole.IsDeleted = true;
+                _deletingRole.IsEnabled = false;
+                var result = await IdentityWrapper.IdentityRole.Patch(_deletingRole);
+                ToastService.Show(result?.IsSuccess == true ? "Role deleted." : $"Error: {result?.Message}");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Show($"Error: {ex.Message}");
+            }
+            finally
+            {
+                _deleteDialogOpen = false;
+                _deletingRole = null;
+                await LoadData();
+            }
         }
     }
 }

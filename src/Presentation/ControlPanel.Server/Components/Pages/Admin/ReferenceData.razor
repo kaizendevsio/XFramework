@@ -1,5 +1,4 @@
 @page "/admin/reference-data"
-@using ControlPanel.Server.Services
 
 <PageTitle>Reference Data - Control Panel</PageTitle>
 
@@ -517,7 +516,8 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private bool _loading = true;
@@ -548,6 +548,7 @@
     // Delete state
     private string _deleteName = "";
     private object? _deleteTarget;
+    private string _deleteEntityType = "";
 
     // Data lists
     private List<IdentityRoleType> _roleTypes = [];
@@ -592,16 +593,31 @@
 
     private async Task LoadAllData()
     {
-        _roleTypes = await Db.Query<IdentityRoleType>().OrderBy(x => x.Name).ToListAsync();
-        _roleTypeGroups = await Db.Query<IdentityRoleTypeGroup>().OrderBy(x => x.Name).ToListAsync();
-        _contactTypes = await Db.Query<IdentityContactType>().OrderBy(x => x.Name).ToListAsync();
-        _contactGroups = await Db.Query<IdentityContactGroup>().OrderBy(x => x.Name).ToListAsync();
-        _addressTypes = await Db.Query<IdentityAddressType>().OrderBy(x => x.Name).ToListAsync();
-        _verificationTypes = await Db.Query<IdentityVerificationType>().OrderBy(x => x.Name).ToListAsync();
-        _sessionTypes = await Db.Query<SessionType>().OrderBy(x => x.Name).ToListAsync();
-        _walletTypes = await Db.Query<global::Wallets.Domain.Shared.Contracts.WalletType>().OrderBy(x => x.Name).ToListAsync();
-        _currencyTypes = await Db.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>().OrderBy(x => x.Name).ToListAsync();
-        _exchangeRates = await Db.Query<ExchangeRate>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+        var roleTypesTask = IdentityWrapper.IdentityRoleType.GetList(100, 1);
+        var roleTypeGroupsTask = IdentityWrapper.IdentityRoleTypeGroup.GetList(100, 1);
+        var contactTypesTask = IdentityWrapper.IdentityContactType.GetList(100, 1);
+        var contactGroupsTask = IdentityWrapper.IdentityContactGroup.GetList(100, 1);
+        var addressTypesTask = IdentityWrapper.IdentityAddressType.GetList(100, 1);
+        var verificationTypesTask = IdentityWrapper.IdentityVerificationType.GetList(100, 1);
+        var sessionTypesTask = IdentityWrapper.SessionType.GetList(100, 1);
+        var walletTypesTask = WalletsWrapper.WalletType.GetList(100, 1);
+        var currencyTypesTask = WalletsWrapper.CurrencyType.GetList(100, 1);
+        var exchangeRatesTask = WalletsWrapper.ExchangeRate.GetList(100, 1);
+
+        await Task.WhenAll(roleTypesTask, roleTypeGroupsTask, contactTypesTask, contactGroupsTask,
+            addressTypesTask, verificationTypesTask, sessionTypesTask, walletTypesTask,
+            currencyTypesTask, exchangeRatesTask);
+
+        _roleTypes = roleTypesTask.Result?.Response?.Items?.ToList() ?? [];
+        _roleTypeGroups = roleTypeGroupsTask.Result?.Response?.Items?.ToList() ?? [];
+        _contactTypes = contactTypesTask.Result?.Response?.Items?.ToList() ?? [];
+        _contactGroups = contactGroupsTask.Result?.Response?.Items?.ToList() ?? [];
+        _addressTypes = addressTypesTask.Result?.Response?.Items?.ToList() ?? [];
+        _verificationTypes = verificationTypesTask.Result?.Response?.Items?.ToList() ?? [];
+        _sessionTypes = sessionTypesTask.Result?.Response?.Items?.ToList() ?? [];
+        _walletTypes = walletTypesTask.Result?.Response?.Items?.ToList() ?? [];
+        _currencyTypes = currencyTypesTask.Result?.Response?.Items?.ToList() ?? [];
+        _exchangeRates = exchangeRatesTask.Result?.Response?.Items?.ToList() ?? [];
     }
 
     private async Task ReloadActiveTab()
@@ -611,34 +627,44 @@
             switch (_activeTab)
             {
                 case "role-types":
-                    _roleTypes = await Db.Query<IdentityRoleType>().OrderBy(x => x.Name).ToListAsync();
+                    var rt = await IdentityWrapper.IdentityRoleType.GetList(100, 1);
+                    _roleTypes = rt?.Response?.Items?.ToList() ?? [];
                     break;
                 case "role-type-groups":
-                    _roleTypeGroups = await Db.Query<IdentityRoleTypeGroup>().OrderBy(x => x.Name).ToListAsync();
+                    var rtg = await IdentityWrapper.IdentityRoleTypeGroup.GetList(100, 1);
+                    _roleTypeGroups = rtg?.Response?.Items?.ToList() ?? [];
                     break;
                 case "contact-types":
-                    _contactTypes = await Db.Query<IdentityContactType>().OrderBy(x => x.Name).ToListAsync();
+                    var ct = await IdentityWrapper.IdentityContactType.GetList(100, 1);
+                    _contactTypes = ct?.Response?.Items?.ToList() ?? [];
                     break;
                 case "contact-groups":
-                    _contactGroups = await Db.Query<IdentityContactGroup>().OrderBy(x => x.Name).ToListAsync();
+                    var cg = await IdentityWrapper.IdentityContactGroup.GetList(100, 1);
+                    _contactGroups = cg?.Response?.Items?.ToList() ?? [];
                     break;
                 case "address-types":
-                    _addressTypes = await Db.Query<IdentityAddressType>().OrderBy(x => x.Name).ToListAsync();
+                    var at = await IdentityWrapper.IdentityAddressType.GetList(100, 1);
+                    _addressTypes = at?.Response?.Items?.ToList() ?? [];
                     break;
                 case "verification-types":
-                    _verificationTypes = await Db.Query<IdentityVerificationType>().OrderBy(x => x.Name).ToListAsync();
+                    var vt = await IdentityWrapper.IdentityVerificationType.GetList(100, 1);
+                    _verificationTypes = vt?.Response?.Items?.ToList() ?? [];
                     break;
                 case "session-types":
-                    _sessionTypes = await Db.Query<SessionType>().OrderBy(x => x.Name).ToListAsync();
+                    var st = await IdentityWrapper.SessionType.GetList(100, 1);
+                    _sessionTypes = st?.Response?.Items?.ToList() ?? [];
                     break;
                 case "wallet-types":
-                    _walletTypes = await Db.Query<global::Wallets.Domain.Shared.Contracts.WalletType>().OrderBy(x => x.Name).ToListAsync();
+                    var wt = await WalletsWrapper.WalletType.GetList(100, 1);
+                    _walletTypes = wt?.Response?.Items?.ToList() ?? [];
                     break;
                 case "currency-types":
-                    _currencyTypes = await Db.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>().OrderBy(x => x.Name).ToListAsync();
+                    var crt = await WalletsWrapper.CurrencyType.GetList(100, 1);
+                    _currencyTypes = crt?.Response?.Items?.ToList() ?? [];
                     break;
                 case "exchange-rates":
-                    _exchangeRates = await Db.Query<ExchangeRate>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+                    var er = await WalletsWrapper.ExchangeRate.GetList(100, 1);
+                    _exchangeRates = er?.Response?.Items?.ToList() ?? [];
                     break;
             }
         }
@@ -734,6 +760,7 @@
     {
         _deleteTarget = target;
         _deleteName = displayName;
+        _deleteEntityType = target.GetType().Name;
         _deleteDialogOpen = true;
     }
 
@@ -741,12 +768,25 @@
     {
         if (_deleteTarget is null) return;
 
-        Db.Remove(_deleteTarget);
-        var result = await Db.SaveAsync();
-        ToastService.Show(result.Success ? $"{TabDisplayName} deleted." : $"Error: {result.Error}");
+        CmdResponse? result = _deleteEntityType switch
+        {
+            "IdentityRoleType" => await IdentityWrapper.IdentityRoleType.Delete((IdentityRoleType)_deleteTarget),
+            "IdentityRoleTypeGroup" => await IdentityWrapper.IdentityRoleTypeGroup.Delete((IdentityRoleTypeGroup)_deleteTarget),
+            "IdentityContactType" => await IdentityWrapper.IdentityContactType.Delete((IdentityContactType)_deleteTarget),
+            "IdentityContactGroup" => await IdentityWrapper.IdentityContactGroup.Delete((IdentityContactGroup)_deleteTarget),
+            "IdentityAddressType" => await IdentityWrapper.IdentityAddressType.Delete((IdentityAddressType)_deleteTarget),
+            "IdentityVerificationType" => await IdentityWrapper.IdentityVerificationType.Delete((IdentityVerificationType)_deleteTarget),
+            "SessionType" => await IdentityWrapper.SessionType.Delete((SessionType)_deleteTarget),
+            "WalletType" => await WalletsWrapper.WalletType.Delete((global::Wallets.Domain.Shared.Contracts.WalletType)_deleteTarget),
+            "CurrencyType" => await WalletsWrapper.CurrencyType.Delete((global::Wallets.Domain.Shared.Contracts.CurrencyType)_deleteTarget),
+            "ExchangeRate" => await WalletsWrapper.ExchangeRate.Delete((ExchangeRate)_deleteTarget),
+            _ => null
+        };
+        ToastService.Show(result?.IsSuccess == true ? $"{TabDisplayName} deleted." : $"Error: {result?.Message}");
         _deleteDialogOpen = false;
         _deleteTarget = null;
         _deleteName = "";
+        _deleteEntityType = "";
         await ReloadActiveTab();
     }
 
@@ -798,17 +838,19 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<IdentityRoleType>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Name = _formName;
-            entity.RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : entity.RoleLevel;
-            entity.SystemReferenceId = ParseSystemRef();
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new IdentityRoleType
+            {
+                Id = _editingId,
+                Name = _formName,
+                RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : null,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityRoleType.Patch(entity));
         }
         else
         {
-            Db.Add(new IdentityRoleType
+            var entity = new IdentityRoleType
             {
                 Id = Guid.NewGuid(),
                 Name = _formName,
@@ -816,9 +858,9 @@
                 SystemReferenceId = ParseSystemRef(),
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityRoleType.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveRoleTypeGroup()
@@ -827,17 +869,19 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<IdentityRoleTypeGroup>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Name = _formName;
-            entity.Description = _formDescription;
-            entity.SystemReferenceId = ParseSystemRef();
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new IdentityRoleTypeGroup
+            {
+                Id = _editingId,
+                Name = _formName,
+                Description = _formDescription,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityRoleTypeGroup.Patch(entity));
         }
         else
         {
-            Db.Add(new IdentityRoleTypeGroup
+            var entity = new IdentityRoleTypeGroup
             {
                 Id = Guid.NewGuid(),
                 Name = _formName,
@@ -845,9 +889,9 @@
                 SystemReferenceId = ParseSystemRef(),
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityRoleTypeGroup.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveContactType()
@@ -856,25 +900,27 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<IdentityContactType>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Name = _formName;
-            entity.SystemReferenceId = ParseSystemRef();
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new IdentityContactType
+            {
+                Id = _editingId,
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityContactType.Patch(entity));
         }
         else
         {
-            Db.Add(new IdentityContactType
+            var entity = new IdentityContactType
             {
                 Id = Guid.NewGuid(),
                 Name = _formName,
                 SystemReferenceId = ParseSystemRef(),
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityContactType.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveContactGroup()
@@ -883,25 +929,27 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<IdentityContactGroup>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Name = _formName;
-            entity.SystemReferenceId = ParseSystemRef();
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new IdentityContactGroup
+            {
+                Id = _editingId,
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityContactGroup.Patch(entity));
         }
         else
         {
-            Db.Add(new IdentityContactGroup
+            var entity = new IdentityContactGroup
             {
                 Id = Guid.NewGuid(),
                 Name = _formName,
                 SystemReferenceId = ParseSystemRef(),
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityContactGroup.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveAddressType()
@@ -910,25 +958,27 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<IdentityAddressType>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Name = _formName;
-            entity.SystemReferenceId = ParseSystemRef();
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new IdentityAddressType
+            {
+                Id = _editingId,
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityAddressType.Patch(entity));
         }
         else
         {
-            Db.Add(new IdentityAddressType
+            var entity = new IdentityAddressType
             {
                 Id = Guid.NewGuid(),
                 Name = _formName,
                 SystemReferenceId = ParseSystemRef(),
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityAddressType.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveVerificationType()
@@ -937,18 +987,20 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<IdentityVerificationType>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Name = _formName;
-            entity.DefaultExpiry = long.TryParse(_formDefaultExpiry, out var exp) ? exp : entity.DefaultExpiry;
-            entity.Priority = short.TryParse(_formPriority, out var pri) ? pri : entity.Priority;
-            entity.SystemReferenceId = ParseSystemRef();
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new IdentityVerificationType
+            {
+                Id = _editingId,
+                Name = _formName,
+                DefaultExpiry = long.TryParse(_formDefaultExpiry, out var exp) ? exp : null,
+                Priority = short.TryParse(_formPriority, out var pri) ? pri : null,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityVerificationType.Patch(entity));
         }
         else
         {
-            Db.Add(new IdentityVerificationType
+            var entity = new IdentityVerificationType
             {
                 Id = Guid.NewGuid(),
                 Name = _formName,
@@ -957,9 +1009,9 @@
                 SystemReferenceId = ParseSystemRef(),
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => IdentityWrapper.IdentityVerificationType.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveSessionType()
@@ -968,25 +1020,27 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<SessionType>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Name = _formName;
-            entity.SystemReferenceId = ParseSystemRef();
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new SessionType
+            {
+                Id = _editingId,
+                Name = _formName,
+                SystemReferenceId = ParseSystemRef(),
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => IdentityWrapper.SessionType.Patch(entity));
         }
         else
         {
-            Db.Add(new SessionType
+            var entity = new SessionType
             {
                 Id = Guid.NewGuid(),
                 Name = _formName,
                 SystemReferenceId = ParseSystemRef(),
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => IdentityWrapper.SessionType.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveWalletType()
@@ -999,19 +1053,21 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<global::Wallets.Domain.Shared.Contracts.WalletType>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Code = _formCode;
-            entity.Name = _formName;
-            entity.Desc = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription;
-            entity.MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : entity.MinTransferRule;
-            entity.MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : entity.MaxTransferRule;
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new global::Wallets.Domain.Shared.Contracts.WalletType
+            {
+                Id = _editingId,
+                Code = _formCode,
+                Name = _formName,
+                Desc = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
+                MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null,
+                MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => WalletsWrapper.WalletType.Patch(entity));
         }
         else
         {
-            Db.Add(new global::Wallets.Domain.Shared.Contracts.WalletType
+            var entity = new global::Wallets.Domain.Shared.Contracts.WalletType
             {
                 Id = Guid.NewGuid(),
                 Code = _formCode,
@@ -1021,9 +1077,9 @@
                 MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => WalletsWrapper.WalletType.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveCurrencyType()
@@ -1032,17 +1088,19 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.Name = _formName;
-            entity.CurrencyIsoCode3 = string.IsNullOrWhiteSpace(_formCurrencyCode) ? null : _formCurrencyCode;
-            entity.Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription;
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new global::Wallets.Domain.Shared.Contracts.CurrencyType
+            {
+                Id = _editingId,
+                Name = _formName,
+                CurrencyIsoCode3 = string.IsNullOrWhiteSpace(_formCurrencyCode) ? null : _formCurrencyCode,
+                Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => WalletsWrapper.CurrencyType.Patch(entity));
         }
         else
         {
-            Db.Add(new global::Wallets.Domain.Shared.Contracts.CurrencyType
+            var entity = new global::Wallets.Domain.Shared.Contracts.CurrencyType
             {
                 Id = Guid.NewGuid(),
                 Name = _formName,
@@ -1050,9 +1108,9 @@
                 Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => WalletsWrapper.CurrencyType.Create(entity));
         }
-        await PersistAndClose();
     }
 
     private async Task SaveExchangeRate()
@@ -1071,20 +1129,22 @@
 
         if (_isEditing)
         {
-            var entity = await Db.Query<ExchangeRate>().FirstOrDefaultAsync(x => x.Id == _editingId);
-            if (entity is null) { ToastService.Show("Record not found."); return; }
-            entity.SourceCurrencyTypeId = sourceId;
-            entity.TargetCurrencyTypeId = targetId;
-            entity.Value = rate;
-            entity.Fee = decimal.TryParse(_formFee, out var fee) ? fee : entity.Fee;
-            entity.EffectivityDate = DateTime.TryParse(_formEffectivity, out var eff) ? eff : entity.EffectivityDate;
-            entity.ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? exp : entity.ExpiryDate;
-            entity.ModifiedAt = DateTime.UtcNow;
-            Db.Update(entity);
+            var entity = new ExchangeRate
+            {
+                Id = _editingId,
+                SourceCurrencyTypeId = sourceId,
+                TargetCurrencyTypeId = targetId,
+                Value = rate,
+                Fee = decimal.TryParse(_formFee, out var fee) ? fee : null,
+                EffectivityDate = DateTime.TryParse(_formEffectivity, out var eff) ? eff : null,
+                ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? exp : null,
+                ModifiedAt = DateTime.UtcNow
+            };
+            await PersistAndClose(() => WalletsWrapper.ExchangeRate.Patch(entity));
         }
         else
         {
-            Db.Add(new ExchangeRate
+            var entity = new ExchangeRate
             {
                 Id = Guid.NewGuid(),
                 SourceCurrencyTypeId = sourceId,
@@ -1095,17 +1155,17 @@
                 ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? exp : null,
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
-            });
+            };
+            await PersistAndClose(() => WalletsWrapper.ExchangeRate.Create(entity));
         }
-        await PersistAndClose();
     }
 
-    private async Task PersistAndClose()
+    private async Task PersistAndClose<T>(Func<Task<CmdResponse<T>?>> action)
     {
-        var result = await Db.SaveAsync();
-        if (!result.Success)
+        var result = await action();
+        if (result?.IsSuccess != true)
         {
-            ToastService.Show($"Error: {result.Error}");
+            ToastService.Show($"Error: {result?.Message}");
             return;
         }
 

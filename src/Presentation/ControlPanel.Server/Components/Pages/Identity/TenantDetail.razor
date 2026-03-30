@@ -258,7 +258,7 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
@@ -305,7 +305,8 @@ else
         _loading = true;
         try
         {
-            _tenant = await Db.Query<Tenant>().Where(x => x.Id == Id).FirstOrDefaultAsync();
+            var response = await IdentityWrapper.Tenant.Get(Id);
+            _tenant = response?.Response;
             if (_tenant is not null)
             {
                 SyncEditFields();
@@ -332,10 +333,17 @@ else
     {
         try
         {
-            _detailUsers = await Db.Query<IdentityInformation>().Where(x => x.TenantId == Id).OrderByDescending(x => x.CreatedAt).ToListAsync();
-            _detailConfigs = await Db.Query<RegistryConfiguration>().Include(x => x.Group).Where(x => x.TenantId == Id).OrderBy(x => x.Key).ToListAsync();
-            _detailRoleTypes = await Db.Query<IdentityRoleType>().Include(x => x.Group).Where(x => x.TenantId == Id).OrderBy(x => x.Name).ToListAsync();
-            _configGroups = await Db.Query<RegistryConfigurationGroup>().OrderBy(x => x.Name).ToListAsync();
+            var usersResponse = await IdentityWrapper.IdentityInformation.GetList(100, 1, tenantId: Id);
+            _detailUsers = usersResponse?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+
+            var configsResponse = await IdentityWrapper.RegistryConfiguration.GetList(100, 1, tenantId: Id, includeNavigations: true);
+            _detailConfigs = configsResponse?.Response?.Items?.OrderBy(x => x.Key).ToList() ?? [];
+
+            var roleTypesResponse = await IdentityWrapper.IdentityRoleType.GetList(100, 1, tenantId: Id, includeNavigations: true);
+            _detailRoleTypes = roleTypesResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
+
+            var groupsResponse = await IdentityWrapper.RegistryConfigurationGroup.GetList(100, 1);
+            _configGroups = groupsResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
         }
         catch (Exception ex) { ToastService.Show($"Failed to load tenant details: {ex.Message}"); }
     }
@@ -346,7 +354,8 @@ else
         _saving = true;
         try
         {
-            var tenant = await Db.Query<Tenant>().Where(x => x.Id == Id).FirstOrDefaultAsync();
+            var getResponse = await IdentityWrapper.Tenant.Get(Id);
+            var tenant = getResponse?.Response;
             if (tenant is null) { ToastService.Show("Tenant not found."); return; }
 
             tenant.Name = _editName;
@@ -358,10 +367,9 @@ else
             tenant.ParentTenantId = Guid.TryParse(_editParentTenantId, out var pid) ? pid : null;
             tenant.ModifiedAt = DateTime.UtcNow;
 
-            Db.Update(tenant);
-            var result = await Db.SaveAsync();
-            if (result.Success) { ToastService.Show("Tenant updated."); _tenant = tenant; _editableForm?.ExitEditMode(); }
-            else { ToastService.Show($"Failed: {result.Error}"); }
+            var result = await IdentityWrapper.Tenant.Patch(tenant);
+            if (result?.IsSuccess == true) { ToastService.Show("Tenant updated."); _tenant = tenant; _editableForm?.ExitEditMode(); }
+            else { ToastService.Show($"Failed: {result?.Message}"); }
         }
         catch (Exception ex) { ToastService.Show($"Error: {ex.Message}"); }
         finally { _saving = false; }
@@ -374,14 +382,14 @@ else
         if (_tenant is null) return;
         try
         {
-            var fresh = await Db.Query<Tenant>().Where(x => x.Id == Id).FirstOrDefaultAsync();
+            var getResponse = await IdentityWrapper.Tenant.Get(Id);
+            var fresh = getResponse?.Response;
             if (fresh is null) { ToastService.Show("Tenant not found."); return; }
             fresh.IsEnabled = !fresh.IsEnabled;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
-            var result = await Db.SaveAsync();
-            if (result.Success) { ToastService.Show(fresh.IsEnabled ? "Tenant enabled." : "Tenant disabled."); _tenant = fresh; }
-            else { ToastService.Show($"Failed: {result.Error}"); }
+            var result = await IdentityWrapper.Tenant.Patch(fresh);
+            if (result?.IsSuccess == true) { ToastService.Show(fresh.IsEnabled ? "Tenant enabled." : "Tenant disabled."); _tenant = fresh; }
+            else { ToastService.Show($"Failed: {result?.Message}"); }
         }
         catch (Exception ex) { ToastService.Show($"Error: {ex.Message}"); }
     }
@@ -402,20 +410,20 @@ else
         {
             if (_isEditingConfig)
             {
-                var c = await Db.Query<RegistryConfiguration>().Where(x => x.Id == _editingConfigId).FirstOrDefaultAsync();
+                var getResponse = await IdentityWrapper.RegistryConfiguration.Get(_editingConfigId);
+                var c = getResponse?.Response;
                 if (c is null) { ToastService.Show("Not found."); return; }
                 c.Key = _configForm.Key; c.Value = _configForm.Value; c.Unit = _configForm.Unit;
                 c.GroupId = Guid.TryParse(_configForm.GroupIdString, out var gid) ? gid : c.GroupId;
                 c.ModifiedAt = DateTime.UtcNow;
-                Db.Update(c);
-                var r = await Db.SaveAsync();
-                ToastService.Show(r.Success ? "Updated." : $"Error: {r.Error}");
+                var r = await IdentityWrapper.RegistryConfiguration.Patch(c);
+                ToastService.Show(r?.IsSuccess == true ? "Updated." : $"Error: {r?.Message}");
             }
             else
             {
-                Db.Add(new RegistryConfiguration { Id = Guid.NewGuid(), Key = _configForm.Key, Value = _configForm.Value, Unit = _configForm.Unit, GroupId = Guid.TryParse(_configForm.GroupIdString, out var gid) ? gid : Guid.Empty, TenantId = Id, CreatedAt = DateTime.UtcNow, IsEnabled = true });
-                var r = await Db.SaveAsync();
-                ToastService.Show(r.Success ? "Created." : $"Error: {r.Error}");
+                var config = new RegistryConfiguration { Id = Guid.NewGuid(), Key = _configForm.Key, Value = _configForm.Value, Unit = _configForm.Unit, GroupId = Guid.TryParse(_configForm.GroupIdString, out var gid) ? gid : Guid.Empty, TenantId = Id, CreatedAt = DateTime.UtcNow, IsEnabled = true };
+                var r = await IdentityWrapper.RegistryConfiguration.Create(config);
+                ToastService.Show(r?.IsSuccess == true ? "Created." : $"Error: {r?.Message}");
             }
             _configDialogOpen = false;
             await LoadDetailData();
@@ -429,9 +437,10 @@ else
         if (_deletingConfig is null) return;
         try
         {
-            Db.Remove(_deletingConfig);
-            var r = await Db.SaveAsync();
-            ToastService.Show(r.Success ? "Deleted." : $"Error: {r.Error}");
+            _deletingConfig.IsDeleted = true;
+            _deletingConfig.IsEnabled = false;
+            var r = await IdentityWrapper.RegistryConfiguration.Patch(_deletingConfig);
+            ToastService.Show(r?.IsSuccess == true ? "Deleted." : $"Error: {r?.Message}");
             _deleteConfigDialogOpen = false; _deletingConfig = null;
             await LoadDetailData();
         }

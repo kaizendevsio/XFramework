@@ -23,7 +23,7 @@
 </div>
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
 
     private List<IdentityContactType> _items = [];
     private bool _loading = true;
@@ -33,7 +33,8 @@
         _loading = true;
         try
         {
-            _items = await Db.Query<IdentityContactType>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+            var response = await IdentityWrapper.IdentityContactType.GetList(100, 1);
+            _items = response?.Response?.Items?.ToList() ?? [];
         }
         finally
         {

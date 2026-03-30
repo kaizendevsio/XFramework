@@ -12,21 +12,16 @@
         <!-- BlueprintUI -->
         <PackageReference Include="BlazorBlueprint.Components" />
         <PackageReference Include="BlazorBlueprint.Icons.Lucide" />
-        <!-- Database -->
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     </ItemGroup>
 
     <ItemGroup>
-        <!-- IDataContext + ServerDataContext (EF Core direct) -->
-        <ProjectReference Include="..\..\Kernel\XFramework.Core\XFramework.Core.csproj" />
-        <ProjectReference Include="..\..\Kernel\XFramework.Domain\XFramework.Domain.csproj" />
-        <!-- Domain.Shared for entity types + EF configurations -->
+        <!-- Domain.Shared for entity types -->
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
-        <!-- Bolt service wrappers for complex business operations -->
+        <!-- Service wrappers (Bolt CRUD + custom operations) -->
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
-        <!-- Bolt client infrastructure -->
+        <!-- Bolt client infrastructure (SignalRService, BoltDriverSignalR) -->
         <ProjectReference Include="..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
     </ItemGroup>
 

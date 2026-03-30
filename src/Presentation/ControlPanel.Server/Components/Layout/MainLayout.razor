@@ -81,12 +81,13 @@
 <BbPortalHost />
 
 @code {
-    [Inject] private AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
     private string _selectedTenantId = "";
-    private string _selectedTenantName = "";
+    private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
 
     private List<string> GetBreadcrumbs()
     {
@@ -108,10 +109,8 @@
         if (!firstRender) return;
         try
         {
-            _tenants = await Db.Query<IdentityServer.Domain.Shared.Contracts.Tenant>()
-                .Where(t => !t.IsDeleted)
-                .OrderBy(t => t.Name)
-                .ToListAsync();
+            var response = await IdentityWrapper.Tenant.GetList(100, 1);
+            _tenants = response?.Response?.Items?.Where(t => !t.IsDeleted).OrderBy(t => t.Name).ToList() ?? [];
             StateHasChanged();
         }
         catch { /* Tenant loading is non-critical */ }
@@ -119,13 +118,14 @@
 
     private void OnTenantChanged()
     {
-        if (Guid.TryParse(_selectedTenantId, out _))
+        if (Guid.TryParse(_selectedTenantId, out var tenantId))
         {
-            _selectedTenantName = _tenants.FirstOrDefault(t => t.Id.ToString() == _selectedTenantId)?.Name ?? "";
+            var name = _tenants.FirstOrDefault(t => t.Id == tenantId)?.Name ?? "";
+            TenantFilter.SetTenant(tenantId, name);
         }
         else
         {
-            _selectedTenantName = "";
+            TenantFilter.Clear();
         }
     }
 }

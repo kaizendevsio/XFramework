@@ -378,7 +378,7 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
@@ -422,18 +422,31 @@ else
 
     private async Task LoadWallet()
     {
-        _wallet = await Db.Query<Wallet>()
-            .Include(x => x.WalletType)
-            .Where(x => x.Id == Id)
-            .FirstOrDefaultAsync();
+        var result = await WalletsWrapper.Wallet.Get(
+            Id,
+            includeNavigations: true,
+            includes: [nameof(Wallet.WalletType)]);
+        _wallet = result?.Response;
     }
 
     private async Task LoadTransactions()
     {
-        _transactions = await Db.Query<WalletTransaction>()
-            .Where(x => x.WalletId == Id)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        var result = await WalletsWrapper.WalletTransaction.GetList(
+            pageSize: 100,
+            pageNumber: 1,
+            filter:
+            [
+                new()
+                {
+                    PropertyName = nameof(WalletTransaction.WalletId),
+                    Operation = QueryFilterOperation.Equal,
+                    Value = Id
+                }
+            ]);
+        if (result?.IsSuccess == true)
+        {
+            _transactions = result.Response?.Items.ToList() ?? [];
+        }
     }
 
     private string GetStatusKey(WalletStatus status) => status switch
@@ -456,9 +469,9 @@ else
         _isProcessing = true;
         try
         {
-            var fresh = await Db.Query<Wallet>()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
+            // Fetch fresh wallet state
+            var freshResult = await WalletsWrapper.Wallet.Get(Id);
+            var fresh = freshResult?.Response;
 
             if (fresh is null)
             {
@@ -488,15 +501,20 @@ else
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            Db.Add(transaction);
+            var txResult = await WalletsWrapper.WalletTransaction.Create(transaction);
+
+            if (txResult?.IsSuccess != true)
+            {
+                ToastService.Show($"Failed to create transaction: {txResult?.Message}");
+                return;
+            }
 
             // Update wallet balance
             fresh.Balance = newBalance;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
+            var walletResult = await WalletsWrapper.Wallet.Patch(fresh);
 
-            var result = await Db.SaveAsync();
-            if (result.Success)
+            if (walletResult?.IsSuccess == true)
             {
                 ToastService.Show($"Added {amount:N2} to wallet. New balance: {newBalance:N2}");
                 _addFundsAmount = "";
@@ -507,7 +525,7 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to add funds: {result.Error}");
+                ToastService.Show($"Failed to update wallet balance: {walletResult?.Message}");
             }
         }
         catch (Exception ex)
@@ -531,9 +549,9 @@ else
         _isProcessing = true;
         try
         {
-            var fresh = await Db.Query<Wallet>()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
+            // Fetch fresh wallet state
+            var freshResult = await WalletsWrapper.Wallet.Get(Id);
+            var fresh = freshResult?.Response;
 
             if (fresh is null)
             {
@@ -569,15 +587,20 @@ else
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            Db.Add(transaction);
+            var txResult = await WalletsWrapper.WalletTransaction.Create(transaction);
+
+            if (txResult?.IsSuccess != true)
+            {
+                ToastService.Show($"Failed to create transaction: {txResult?.Message}");
+                return;
+            }
 
             // Update wallet balance
             fresh.Balance = newBalance;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
+            var walletResult = await WalletsWrapper.Wallet.Patch(fresh);
 
-            var result = await Db.SaveAsync();
-            if (result.Success)
+            if (walletResult?.IsSuccess == true)
             {
                 ToastService.Show($"Withdrew {amount:N2} from wallet. New balance: {newBalance:N2}");
                 _withdrawAmount = "";
@@ -588,7 +611,7 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to withdraw funds: {result.Error}");
+                ToastService.Show($"Failed to update wallet balance: {walletResult?.Message}");
             }
         }
         catch (Exception ex)
@@ -612,9 +635,9 @@ else
         _isProcessing = true;
         try
         {
-            var fresh = await Db.Query<Wallet>()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
+            // Fetch fresh wallet state
+            var freshResult = await WalletsWrapper.Wallet.Get(Id);
+            var fresh = freshResult?.Response;
 
             if (fresh is null)
             {
@@ -646,15 +669,20 @@ else
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            Db.Add(transaction);
+            var txResult = await WalletsWrapper.WalletTransaction.Create(transaction);
+
+            if (txResult?.IsSuccess != true)
+            {
+                ToastService.Show($"Failed to create transaction: {txResult?.Message}");
+                return;
+            }
 
             // Update wallet balance directly
             fresh.Balance = newBalance;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
+            var walletResult = await WalletsWrapper.Wallet.Patch(fresh);
 
-            var result = await Db.SaveAsync();
-            if (result.Success)
+            if (walletResult?.IsSuccess == true)
             {
                 ToastService.Show($"Balance adjusted from {oldBalance:N2} to {newBalance:N2}.");
                 _adjustBalance = "";
@@ -664,7 +692,7 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to adjust balance: {result.Error}");
+                ToastService.Show($"Failed to adjust balance: {walletResult?.Message}");
             }
         }
         catch (Exception ex)
@@ -681,9 +709,8 @@ else
     {
         try
         {
-            var fresh = await Db.Query<Wallet>()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
+            var freshResult = await WalletsWrapper.Wallet.Get(Id);
+            var fresh = freshResult?.Response;
 
             if (fresh is null)
             {
@@ -699,17 +726,16 @@ else
 
             fresh.Status = WalletStatus.Frozen;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
 
-            var result = await Db.SaveAsync();
-            if (result.Success)
+            var result = await WalletsWrapper.Wallet.Patch(fresh);
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("Wallet frozen successfully.");
                 await LoadWallet();
             }
             else
             {
-                ToastService.Show($"Failed to freeze wallet: {result.Error}");
+                ToastService.Show($"Failed to freeze wallet: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -722,9 +748,8 @@ else
     {
         try
         {
-            var fresh = await Db.Query<Wallet>()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
+            var freshResult = await WalletsWrapper.Wallet.Get(Id);
+            var fresh = freshResult?.Response;
 
             if (fresh is null)
             {
@@ -740,17 +765,16 @@ else
 
             fresh.Status = WalletStatus.Active;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
 
-            var result = await Db.SaveAsync();
-            if (result.Success)
+            var result = await WalletsWrapper.Wallet.Patch(fresh);
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("Wallet unfrozen successfully.");
                 await LoadWallet();
             }
             else
             {
-                ToastService.Show($"Failed to unfreeze wallet: {result.Error}");
+                ToastService.Show($"Failed to unfreeze wallet: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -763,9 +787,8 @@ else
     {
         try
         {
-            var fresh = await Db.Query<Wallet>()
-                .Where(x => x.Id == Id)
-                .FirstOrDefaultAsync();
+            var freshResult = await WalletsWrapper.Wallet.Get(Id);
+            var fresh = freshResult?.Response;
 
             if (fresh is null)
             {
@@ -782,10 +805,9 @@ else
 
             fresh.Status = WalletStatus.Closed;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
 
-            var result = await Db.SaveAsync();
-            if (result.Success)
+            var result = await WalletsWrapper.Wallet.Patch(fresh);
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("Wallet closed successfully.");
                 _showCloseDialog = false;
@@ -793,7 +815,7 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to close wallet: {result.Error}");
+                ToastService.Show($"Failed to close wallet: {result?.Message}");
             }
         }
         catch (Exception ex)

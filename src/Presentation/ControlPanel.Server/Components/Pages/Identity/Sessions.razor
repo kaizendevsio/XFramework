@@ -38,19 +38,24 @@
 </div>
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<Session> _sessions = [];
     private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
         _loading = true;
         try
         {
-            _sessions = await Db.Query<Session>()
-                .OrderByDescending(x => x.CreatedAt)
-                .ToListAsync();
+            var response = await IdentityWrapper.Session.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
+            _sessions = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
         }
         catch (Exception ex)
         {

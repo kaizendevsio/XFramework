@@ -55,21 +55,26 @@
 </div>
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<IdentityVerification> _verifications = [];
     private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
         _loading = true;
         try
         {
-            _verifications = await Db.Query<IdentityVerification>()
-                .Include(x => x.VerificationType)
-                .OrderByDescending(x => x.CreatedAt)
-                .ToListAsync();
+            var response = await IdentityWrapper.IdentityVerification.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId, includeNavigations: true);
+            _verifications = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
         }
+        catch { /* query may fail */ }
         finally
         {
             _loading = false;

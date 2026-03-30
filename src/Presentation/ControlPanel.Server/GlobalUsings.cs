@@ -1,3 +1,2 @@
-global using Microsoft.EntityFrameworkCore;
-global using XFramework.Domain.Contexts;
+global using System.Net;
 global using XFramework.Domain.Shared.Interfaces;

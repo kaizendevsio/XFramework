@@ -51,17 +51,31 @@
 </div>
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<WalletTransaction> _items = [];
     private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
         _loading = true;
         try
         {
-            _items = await Db.Query<WalletTransaction>().OrderByDescending(x => x.CreatedAt).ToListAsync();
+            var result = await WalletsWrapper.WalletTransaction.GetList(
+                pageSize: 100,
+                pageNumber: 1,
+                tenantId: TenantFilter.SelectedTenantId,
+                includeNavigations: true);
+            if (result?.IsSuccess == true)
+            {
+                _items = result.Response?.Items.ToList() ?? [];
+            }
         }
         finally
         {

@@ -197,9 +197,11 @@ else
 </BbDialog>
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<Wallet> _items = [];
     private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
@@ -225,9 +227,16 @@ else
         try
         {
             await LoadData();
-            _walletTypes = await Db.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
-                .OrderBy(x => x.Name)
-                .ToListAsync();
+            var wtResult = await WalletsWrapper.WalletType.GetList(
+                pageSize: 100,
+                pageNumber: 1,
+                includeNavigations: false);
+            if (wtResult?.IsSuccess == true)
+            {
+                _walletTypes = wtResult.Response?.Items
+                    .OrderBy(x => x.Name)
+                    .ToList() ?? [];
+            }
         }
         catch (Exception ex)
         {
@@ -241,10 +250,17 @@ else
 
     private async Task LoadData()
     {
-        _items = await Db.Query<Wallet>()
-            .Include(x => x.WalletType)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        var result = await WalletsWrapper.Wallet.GetList(
+            pageSize: 100,
+            pageNumber: 1,
+            tenantId: TenantFilter.SelectedTenantId,
+            includeNavigations: true,
+            includes: [nameof(Wallet.WalletType)]);
+
+        if (result?.IsSuccess == true)
+        {
+            _items = result.Response?.Items.ToList() ?? [];
+        }
 
         _totalWallets = _items.Count;
         _totalBalance = _items.Sum(x => x.Balance);
@@ -287,8 +303,8 @@ else
         try
         {
             // Get credential's TenantId
-            var cred = await Db.Query<IdentityCredential>().Where(x => x.Id == credentialId).FirstOrDefaultAsync();
-            var walletTenantId = cred?.TenantId ?? Guid.Empty;
+            var credResult = await IdentityWrapper.IdentityCredential.Get(credentialId);
+            var walletTenantId = credResult?.Response?.TenantId ?? Guid.Empty;
 
             var wallet = new Wallet
             {
@@ -303,10 +319,9 @@ else
                 IsEnabled = true
             };
 
-            Db.Add(wallet);
-            var result = await Db.SaveAsync();
+            var result = await WalletsWrapper.Wallet.Create(wallet);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("Wallet created successfully.");
                 _showCreateDialog = false;
@@ -314,7 +329,7 @@ else
             }
             else
             {
-                ToastService.Show($"Failed to create wallet: {result.Error}");
+                ToastService.Show($"Failed to create wallet: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -333,9 +348,8 @@ else
 
         try
         {
-            var fresh = await Db.Query<Wallet>()
-                .Where(x => x.Id == wallet.Id)
-                .FirstOrDefaultAsync();
+            var freshResult = await WalletsWrapper.Wallet.Get(wallet.Id);
+            var fresh = freshResult?.Response;
 
             if (fresh is null)
             {
@@ -353,17 +367,16 @@ else
             fresh.Status = newStatus;
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            Db.Update(fresh);
-            var result = await Db.SaveAsync();
+            var result = await WalletsWrapper.Wallet.Patch(fresh);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show($"Wallet {(newStatus == WalletStatus.Frozen ? "frozen" : "unfrozen")} successfully.");
                 await LoadData();
             }
             else
             {
-                ToastService.Show($"Failed to update wallet: {result.Error}");
+                ToastService.Show($"Failed to update wallet: {result?.Message}");
             }
         }
         catch (Exception ex)

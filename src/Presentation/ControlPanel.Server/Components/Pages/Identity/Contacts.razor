@@ -88,8 +88,9 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<IdentityContact> _contacts = [];
     private bool _loading = true;
@@ -119,10 +120,12 @@
 
     private async Task LoadData()
     {
-        _contacts = await Db.Query<IdentityContact>()
-            .Include(x => x.Type)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        try
+        {
+            var response = await IdentityWrapper.IdentityContact.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId, includeNavigations: true);
+            _contacts = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { /* query may fail */ }
     }
 
     private void OpenAddDialog()
@@ -172,37 +175,42 @@
             return;
         }
 
-        if (_isEditing)
+        try
         {
-            var contact = await Db.Query<IdentityContact>()
-                .Where(x => x.Id == _editingId)
-                .FirstOrDefaultAsync();
-
-            if (contact is not null)
+            if (_isEditing)
             {
-                contact.Value = _formValue;
-                contact.CredentialId = credentialId;
-                contact.TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null;
-                contact.GroupId = groupId;
-                Db.Update(contact);
-                var result = await Db.SaveAsync();
-                ToastService.Show(result.Success ? "Contact updated." : $"Error: {result.Error}");
+                var getResponse = await IdentityWrapper.IdentityContact.Get(_editingId);
+                var contact = getResponse?.Response;
+
+                if (contact is not null)
+                {
+                    contact.Value = _formValue;
+                    contact.CredentialId = credentialId;
+                    contact.TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null;
+                    contact.GroupId = groupId;
+                    contact.ModifiedAt = DateTime.UtcNow;
+                    var result = await IdentityWrapper.IdentityContact.Patch(contact);
+                    ToastService.Show(result?.IsSuccess == true ? "Contact updated." : $"Error: {result?.Message}");
+                }
+            }
+            else
+            {
+                var contact = new IdentityContact
+                {
+                    Id = Guid.NewGuid(),
+                    Value = _formValue,
+                    CredentialId = credentialId,
+                    TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null,
+                    GroupId = groupId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                var result = await IdentityWrapper.IdentityContact.Create(contact);
+                ToastService.Show(result?.IsSuccess == true ? "Contact created." : $"Error: {result?.Message}");
             }
         }
-        else
+        catch (Exception ex)
         {
-            var contact = new IdentityContact
-            {
-                Id = Guid.NewGuid(),
-                Value = _formValue,
-                CredentialId = credentialId,
-                TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null,
-                GroupId = groupId,
-                CreatedAt = DateTime.UtcNow
-            };
-            Db.Add(contact);
-            var result = await Db.SaveAsync();
-            ToastService.Show(result.Success ? "Contact created." : $"Error: {result.Error}");
+            ToastService.Show($"Error: {ex.Message}");
         }
 
         _dialogOpen = false;
@@ -213,12 +221,23 @@
     {
         if (_deletingContact is not null)
         {
-            Db.Remove(_deletingContact);
-            var result = await Db.SaveAsync();
-            ToastService.Show(result.Success ? "Contact deleted." : $"Error: {result.Error}");
-            _deleteDialogOpen = false;
-            _deletingContact = null;
-            await LoadData();
+            try
+            {
+                _deletingContact.IsDeleted = true;
+                _deletingContact.IsEnabled = false;
+                var result = await IdentityWrapper.IdentityContact.Patch(_deletingContact);
+                ToastService.Show(result?.IsSuccess == true ? "Contact deleted." : $"Error: {result?.Message}");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Show($"Error: {ex.Message}");
+            }
+            finally
+            {
+                _deleteDialogOpen = false;
+                _deletingContact = null;
+                await LoadData();
+            }
         }
     }
 }

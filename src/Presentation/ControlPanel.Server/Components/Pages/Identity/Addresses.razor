@@ -101,8 +101,9 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<IdentityAddress> _addresses = [];
     private bool _loading = true;
@@ -134,9 +135,12 @@
 
     private async Task LoadData()
     {
-        _addresses = await Db.Query<IdentityAddress>()
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync();
+        try
+        {
+            var response = await IdentityWrapper.IdentityAddress.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
+            _addresses = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { /* query may fail */ }
     }
 
     private void OpenAddDialog()
@@ -178,41 +182,46 @@
             return;
         }
 
-        if (_isEditing)
+        try
         {
-            var addr = await Db.Query<IdentityAddress>()
-                .Where(x => x.Id == _editingId)
-                .FirstOrDefaultAsync();
-
-            if (addr is not null)
+            if (_isEditing)
             {
-                addr.IdentityInfoId = identityInfoId;
-                addr.UnitNumber = _formUnitNumber;
-                addr.Street = _formStreet;
-                addr.Building = _formBuilding;
-                addr.Subdivision = _formSubdivision;
-                addr.ConsolidatedName = _formConsolidatedName;
-                Db.Update(addr);
-                var result = await Db.SaveAsync();
-                ToastService.Show(result.Success ? "Address updated." : $"Error: {result.Error}");
+                var getResponse = await IdentityWrapper.IdentityAddress.Get(_editingId);
+                var addr = getResponse?.Response;
+
+                if (addr is not null)
+                {
+                    addr.IdentityInfoId = identityInfoId;
+                    addr.UnitNumber = _formUnitNumber;
+                    addr.Street = _formStreet;
+                    addr.Building = _formBuilding;
+                    addr.Subdivision = _formSubdivision;
+                    addr.ConsolidatedName = _formConsolidatedName;
+                    addr.ModifiedAt = DateTime.UtcNow;
+                    var result = await IdentityWrapper.IdentityAddress.Patch(addr);
+                    ToastService.Show(result?.IsSuccess == true ? "Address updated." : $"Error: {result?.Message}");
+                }
+            }
+            else
+            {
+                var addr = new IdentityAddress
+                {
+                    Id = Guid.NewGuid(),
+                    IdentityInfoId = identityInfoId,
+                    UnitNumber = _formUnitNumber,
+                    Street = _formStreet,
+                    Building = _formBuilding,
+                    Subdivision = _formSubdivision,
+                    ConsolidatedName = _formConsolidatedName,
+                    CreatedAt = DateTime.UtcNow
+                };
+                var result = await IdentityWrapper.IdentityAddress.Create(addr);
+                ToastService.Show(result?.IsSuccess == true ? "Address created." : $"Error: {result?.Message}");
             }
         }
-        else
+        catch (Exception ex)
         {
-            var addr = new IdentityAddress
-            {
-                Id = Guid.NewGuid(),
-                IdentityInfoId = identityInfoId,
-                UnitNumber = _formUnitNumber,
-                Street = _formStreet,
-                Building = _formBuilding,
-                Subdivision = _formSubdivision,
-                ConsolidatedName = _formConsolidatedName,
-                CreatedAt = DateTime.UtcNow
-            };
-            Db.Add(addr);
-            var result = await Db.SaveAsync();
-            ToastService.Show(result.Success ? "Address created." : $"Error: {result.Error}");
+            ToastService.Show($"Error: {ex.Message}");
         }
 
         _dialogOpen = false;
@@ -223,12 +232,23 @@
     {
         if (_deletingAddress is not null)
         {
-            Db.Remove(_deletingAddress);
-            var result = await Db.SaveAsync();
-            ToastService.Show(result.Success ? "Address deleted." : $"Error: {result.Error}");
-            _deleteDialogOpen = false;
-            _deletingAddress = null;
-            await LoadData();
+            try
+            {
+                _deletingAddress.IsDeleted = true;
+                _deletingAddress.IsEnabled = false;
+                var result = await IdentityWrapper.IdentityAddress.Patch(_deletingAddress);
+                ToastService.Show(result?.IsSuccess == true ? "Address deleted." : $"Error: {result?.Message}");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Show($"Error: {ex.Message}");
+            }
+            finally
+            {
+                _deleteDialogOpen = false;
+                _deletingAddress = null;
+                await LoadData();
+            }
         }
     }
 }

@@ -175,9 +175,10 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private ControlPanel.Server.Services.AdminDbContext Db { get; set; } = default!;
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<IdentityInformation> _users = [];
     private Dictionary<Guid, string?> _credentialUsernames = new();
@@ -202,17 +203,16 @@
         _loading = true;
         try
         {
-            _users = await Db.Query<IdentityInformation>()
-                .OrderByDescending(x => x.CreatedAt)
-                .ToListAsync();
+            var response = await IdentityWrapper.IdentityInformation.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
+            _users = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
 
-            // Load primary username for each user sequentially (DbContext not thread-safe)
+            // Load credentials to map usernames
             _credentialUsernames.Clear();
+            var credResponse = await IdentityWrapper.IdentityCredential.GetList(500, 1, tenantId: TenantFilter.SelectedTenantId);
+            var credentials = credResponse?.Response?.Items ?? [];
             foreach (var user in _users)
             {
-                var cred = await Db.Query<IdentityCredential>()
-                    .Where(x => x.IdentityInfoId == user.Id)
-                    .FirstOrDefaultAsync();
+                var cred = credentials.FirstOrDefault(c => c.IdentityInfoId == user.Id);
                 _credentialUsernames[user.Id] = cred?.UserName;
             }
         }
@@ -248,7 +248,8 @@
         try
         {
             // Get the first available tenant for the new user
-            var tenant = await Db.Query<Tenant>().FirstOrDefaultAsync();
+            var tenantResponse = await IdentityWrapper.Tenant.GetList(1, 1);
+            var tenant = tenantResponse?.Response?.Items?.FirstOrDefault();
             if (tenant is null)
             {
                 ToastService.Show("No tenants exist. Create a tenant first.");
@@ -272,10 +273,9 @@
                 CreatedAt = DateTime.UtcNow
             };
 
-            Db.Add(user);
-            var result = await Db.SaveAsync();
+            var result = await IdentityWrapper.IdentityInformation.Create(user);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("User created successfully.");
                 _createDialogOpen = false;
@@ -283,7 +283,7 @@
             }
             else
             {
-                ToastService.Show($"Error creating user: {result.Error}");
+                ToastService.Show($"Error creating user: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -300,9 +300,8 @@
     {
         try
         {
-            var fresh = await Db.Query<IdentityInformation>()
-                .Where(x => x.Id == user.Id)
-                .FirstOrDefaultAsync();
+            var getResponse = await IdentityWrapper.IdentityInformation.Get(user.Id);
+            var fresh = getResponse?.Response;
 
             if (fresh is null)
             {
@@ -312,17 +311,16 @@
 
             fresh.IsEnabled = !fresh.IsEnabled;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
-            var result = await Db.SaveAsync();
+            var result = await IdentityWrapper.IdentityInformation.Patch(fresh);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show(fresh.IsEnabled ? "User enabled." : "User disabled.");
                 await LoadData();
             }
             else
             {
-                ToastService.Show($"Error: {result.Error}");
+                ToastService.Show($"Error: {result?.Message}");
             }
         }
         catch (Exception ex)
@@ -343,9 +341,8 @@
 
         try
         {
-            var fresh = await Db.Query<IdentityInformation>()
-                .Where(x => x.Id == _deletingUser.Id)
-                .FirstOrDefaultAsync();
+            var getResponse = await IdentityWrapper.IdentityInformation.Get(_deletingUser.Id);
+            var fresh = getResponse?.Response;
 
             if (fresh is null)
             {
@@ -357,16 +354,15 @@
             fresh.IsEnabled = false;
             fresh.DeletedAt = DateTime.UtcNow;
             fresh.ModifiedAt = DateTime.UtcNow;
-            Db.Update(fresh);
-            var result = await Db.SaveAsync();
+            var result = await IdentityWrapper.IdentityInformation.Patch(fresh);
 
-            if (result.Success)
+            if (result?.IsSuccess == true)
             {
                 ToastService.Show("User deleted.");
             }
             else
             {
-                ToastService.Show($"Error: {result.Error}");
+                ToastService.Show($"Error: {result?.Message}");
             }
         }
         catch (Exception ex)
