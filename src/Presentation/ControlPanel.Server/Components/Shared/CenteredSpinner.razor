@@ -1,3 +1,38 @@
-<div class="flex items-center justify-center py-12">
-    <BbSpinner Size="SpinnerSize.Large" />
+<div class="space-y-6 animate-pulse">
+    @* Header skeleton *@
+    <div class="flex items-center justify-between">
+        <div class="space-y-2">
+            <BbSkeleton Width="250px" Height="28px" />
+            <BbSkeleton Width="180px" Height="16px" />
+        </div>
+        <BbSkeleton Width="120px" Height="36px" />
+    </div>
+
+    @* Card skeleton *@
+    <div class="rounded-lg border p-6 space-y-4">
+        <BbSkeleton Width="150px" Height="20px" />
+        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+            @for (var i = 0; i < 8; i++)
+            {
+                <div class="space-y-2">
+                    <BbSkeleton Width="80px" Height="12px" />
+                    <BbSkeleton Height="18px" Class="w-full" />
+                </div>
+            }
+        </div>
+    </div>
+
+    @* Table skeleton *@
+    <div class="rounded-lg border p-6 space-y-3">
+        <BbSkeleton Width="200px" Height="20px" />
+        @for (var i = 0; i < 5; i++)
+        {
+            <div class="flex gap-4">
+                <BbSkeleton Height="16px" Class="flex-1" />
+                <BbSkeleton Height="16px" Class="flex-1" />
+                <BbSkeleton Height="16px" Class="flex-1" />
+                <BbSkeleton Height="16px" Width="80px" />
+            </div>
+        }
+    </div>
 </div>

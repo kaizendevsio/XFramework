@@ -46,47 +46,49 @@ else
             </BbButton>
         </div>
 
-        @* -- Summary Card (EditableForm) -- *@
-        <EditableForm @ref="_editableForm" TModel="Tenant" Model="_tenant"
-                      OnSave="SaveTenant" OnDiscard="DiscardTenantEdit"
-                      Saving="_saving" Title="Tenant Summary">
-            <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <EditableField Label="Name" @bind-Value="_editName" Required="true" />
-                <EditableField Label="Description" @bind-Value="_editDescription" />
-                <EditableField Label="Status" @bind-Value="_editStatus"
-                               FieldType="EditableFieldType.Select"
-                               Options="_statusOptions"
-                               DisplayValue="@GetStatusText(_tenant.Status)" />
-                <EditableField Label="Version" @bind-Value="_editVersion" />
-                <EditableField Label="Expiration" @bind-Value="_editExpiration"
-                               DisplayValue="@(_tenant.Expiration?.ToString("yyyy-MM-dd") ?? "No expiration")"
-                               Placeholder="YYYY-MM-DD" />
-                <EditableField Label="Availability Date" @bind-Value="_editAvailability"
-                               DisplayValue="@(_tenant.AvailabilityDate?.ToString("yyyy-MM-dd") ?? "N/A")"
-                               Placeholder="YYYY-MM-DD" />
-                <EditableField Label="Parent Tenant" @bind-Value="_editParentTenantId"
-                               DisplayValue="@(_tenant.ParentTenantId?.ToString() ?? "None (root)")"
-                               Placeholder="GUID or blank for root" />
-                <EditableField Label="Created" DisplayValue="@_tenant.CreatedAt.ToString("g")" ReadOnly="true" />
-                <EditableField Label="Last Modified" DisplayValue="@(_tenant.ModifiedAt?.ToString("g") ?? "Never")" ReadOnly="true" />
-                <EditableField Label="Enabled" ReadOnly="true">
-                    <CustomDisplay>
-                        <StatusBadge Text="@(_tenant.IsEnabled ? "Enabled" : "Disabled")"
-                                     Status="@(_tenant.IsEnabled ? "active" : "inactive")" />
-                    </CustomDisplay>
-                </EditableField>
-                <EditableField Label="Users" DisplayValue="@_detailUsers.Count.ToString()" ReadOnly="true" />
-                <EditableField Label="Configurations" DisplayValue="@_detailConfigs.Count.ToString()" ReadOnly="true" />
-            </div>
-        </EditableForm>
-
         @* -- Detail Tabs -- *@
-        <BbTabs DefaultValue="users">
+        <BbTabs DefaultValue="summary">
             <BbTabsList>
+                <BbTabsTrigger Value="summary">Tenant Summary</BbTabsTrigger>
                 <BbTabsTrigger Value="users">Users (@_detailUsers.Count)</BbTabsTrigger>
                 <BbTabsTrigger Value="configurations">Configurations (@_detailConfigs.Count)</BbTabsTrigger>
                 <BbTabsTrigger Value="roletypes">Role Types (@_detailRoleTypes.Count)</BbTabsTrigger>
             </BbTabsList>
+
+            <BbTabsContent Value="summary">
+                <EditableForm @ref="_editableForm" TModel="Tenant" Model="_tenant"
+                              OnSave="SaveTenant" OnDiscard="DiscardTenantEdit"
+                              Saving="_saving" Title="Tenant Summary">
+                    <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                        <EditableField Label="Name" @bind-Value="_editName" Required="true" />
+                        <EditableField Label="Description" @bind-Value="_editDescription" />
+                        <EditableField Label="Status" @bind-Value="_editStatus"
+                                       FieldType="EditableFieldType.Select"
+                                       Options="_statusOptions"
+                                       DisplayValue="@GetStatusText(_tenant.Status)" />
+                        <EditableField Label="Version" @bind-Value="_editVersion" />
+                        <EditableField Label="Expiration" @bind-Value="_editExpiration"
+                                       DisplayValue="@(_tenant.Expiration?.ToString("yyyy-MM-dd") ?? "No expiration")"
+                                       Placeholder="YYYY-MM-DD" />
+                        <EditableField Label="Availability Date" @bind-Value="_editAvailability"
+                                       DisplayValue="@(_tenant.AvailabilityDate?.ToString("yyyy-MM-dd") ?? "N/A")"
+                                       Placeholder="YYYY-MM-DD" />
+                        <EditableField Label="Parent Tenant" @bind-Value="_editParentTenantId"
+                                       DisplayValue="@(_tenant.ParentTenantId?.ToString() ?? "None (root)")"
+                                       Placeholder="GUID or blank for root" />
+                        <EditableField Label="Created" DisplayValue="@_tenant.CreatedAt.ToString("g")" ReadOnly="true" />
+                        <EditableField Label="Last Modified" DisplayValue="@(_tenant.ModifiedAt?.ToString("g") ?? "Never")" ReadOnly="true" />
+                        <EditableField Label="Enabled" ReadOnly="true">
+                            <CustomDisplay>
+                                <StatusBadge Text="@(_tenant.IsEnabled ? "Enabled" : "Disabled")"
+                                             Status="@(_tenant.IsEnabled ? "active" : "inactive")" />
+                            </CustomDisplay>
+                        </EditableField>
+                        <EditableField Label="Users" DisplayValue="@_detailUsers.Count.ToString()" ReadOnly="true" />
+                        <EditableField Label="Configurations" DisplayValue="@_detailConfigs.Count.ToString()" ReadOnly="true" />
+                    </div>
+                </EditableForm>
+            </BbTabsContent>
 
             <BbTabsContent Value="users">
                 <BbCard>

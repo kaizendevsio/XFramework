@@ -47,38 +47,10 @@ else
             </BbButton>
         </div>
 
-        <!-- User Summary Card -->
-        <EditableForm @ref="_editableForm" TModel="IdentityInformation" Model="_user"
-                      OnSave="SaveUserEdit" OnDiscard="DiscardUserEdit"
-                      Saving="_saving" Title="User Information">
-            <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <EditableField Label="First Name" @bind-Value="_editFirstName" />
-                <EditableField Label="Middle Name" @bind-Value="_editMiddleName" />
-                <EditableField Label="Last Name" @bind-Value="_editLastName" />
-                <EditableField Label="Suffix" @bind-Value="_editSuffix" />
-                <EditableField Label="Identity Name" @bind-Value="_editIdentityName" />
-                <EditableField Label="Birth Date" @bind-Value="_editBirthDate"
-                               DisplayValue="@(_user.BirthDate?.ToString("yyyy-MM-dd") ?? "N/A")"
-                               Placeholder="YYYY-MM-DD" />
-                <EditableField Label="Gender" @bind-Value="_editGender"
-                               FieldType="EditableFieldType.Select"
-                               Options="_genderOptions"
-                               DisplayValue="@(_user.Gender?.ToString() ?? "N/A")" />
-                <EditableField Label="Civil Status" @bind-Value="_editCivilStatus"
-                               FieldType="EditableFieldType.Select"
-                               Options="_civilStatusOptions"
-                               DisplayValue="@(_user.CivilStatus?.ToString() ?? "N/A")" />
-                <EditableField Label="Verified" @bind-Value="_editIsVerified"
-                               FieldType="EditableFieldType.Select"
-                               Options="_verifiedOptions"
-                               DisplayValue="@(_user.IsVerified ? "Verified" : "Unverified")" />
-                <EditableField Label="Created" DisplayValue="@_user.CreatedAt.ToString("g")" ReadOnly="true" />
-            </div>
-        </EditableForm>
-
         <!-- Tabbed Detail Sections -->
-        <BbTabs DefaultValue="credentials">
+        <BbTabs DefaultValue="info">
             <BbTabsList>
+                <BbTabsTrigger Value="info">User Info</BbTabsTrigger>
                 <BbTabsTrigger Value="credentials">Credentials (@_credentials.Count)</BbTabsTrigger>
                 <BbTabsTrigger Value="roles">Roles (@_roles.Count)</BbTabsTrigger>
                 <BbTabsTrigger Value="contacts">Contacts (@_contacts.Count)</BbTabsTrigger>
@@ -87,6 +59,37 @@ else
                 <BbTabsTrigger Value="auth-logs">Auth Logs (@_authLogs.Count)</BbTabsTrigger>
                 <BbTabsTrigger Value="wallets">Wallets (@_wallets.Count)</BbTabsTrigger>
             </BbTabsList>
+
+            <!-- User Info Tab -->
+            <BbTabsContent Value="info">
+                <EditableForm @ref="_editableForm" TModel="IdentityInformation" Model="_user"
+                              OnSave="SaveUserEdit" OnDiscard="DiscardUserEdit"
+                              Saving="_saving" Title="User Information">
+                    <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                        <EditableField Label="First Name" @bind-Value="_editFirstName" />
+                        <EditableField Label="Middle Name" @bind-Value="_editMiddleName" />
+                        <EditableField Label="Last Name" @bind-Value="_editLastName" />
+                        <EditableField Label="Suffix" @bind-Value="_editSuffix" />
+                        <EditableField Label="Identity Name" @bind-Value="_editIdentityName" />
+                        <EditableField Label="Birth Date" @bind-Value="_editBirthDate"
+                                       DisplayValue="@(_user.BirthDate?.ToString("yyyy-MM-dd") ?? "N/A")"
+                                       Placeholder="YYYY-MM-DD" />
+                        <EditableField Label="Gender" @bind-Value="_editGender"
+                                       FieldType="EditableFieldType.Select"
+                                       Options="_genderOptions"
+                                       DisplayValue="@(_user.Gender?.ToString() ?? "N/A")" />
+                        <EditableField Label="Civil Status" @bind-Value="_editCivilStatus"
+                                       FieldType="EditableFieldType.Select"
+                                       Options="_civilStatusOptions"
+                                       DisplayValue="@(_user.CivilStatus?.ToString() ?? "N/A")" />
+                        <EditableField Label="Verified" @bind-Value="_editIsVerified"
+                                       FieldType="EditableFieldType.Select"
+                                       Options="_verifiedOptions"
+                                       DisplayValue="@(_user.IsVerified ? "Verified" : "Unverified")" />
+                        <EditableField Label="Created" DisplayValue="@_user.CreatedAt.ToString("g")" ReadOnly="true" />
+                    </div>
+                </EditableForm>
+            </BbTabsContent>
 
             <!-- Credentials Tab -->
             <BbTabsContent Value="credentials">
@@ -473,6 +476,18 @@ else
                               @bind-Value="_credForm.UserAlias"
                               Label="Alias"
                               Placeholder="Enter alias (optional)" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_credForm.Password"
+                              Label="Password"
+                              Placeholder="Enter password"
+                              Type="InputType.Password"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_credForm.ConfirmPassword"
+                              Label="Confirm Password"
+                              Placeholder="Re-enter password"
+                              Type="InputType.Password"
+                              Required="true" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _createCredDialogOpen = false)">Cancel</BbButton>
@@ -895,6 +910,16 @@ else
             ToastService.Show("Username is required.");
             return;
         }
+        if (string.IsNullOrWhiteSpace(_credForm.Password))
+        {
+            ToastService.Show("Password is required.");
+            return;
+        }
+        if (_credForm.Password != _credForm.ConfirmPassword)
+        {
+            ToastService.Show("Passwords do not match.");
+            return;
+        }
 
         _saving = true;
         try
@@ -906,6 +931,7 @@ else
                 IdentityInfoId = Id,
                 UserName = _credForm.UserName,
                 UserAlias = _credForm.UserAlias,
+                PasswordByte = System.Security.Cryptography.SHA512.HashData(System.Text.Encoding.UTF8.GetBytes(_credForm.Password)),
                 IsEnabled = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -1303,6 +1329,8 @@ else
     {
         public string? UserName { get; set; }
         public string? UserAlias { get; set; }
+        public string? Password { get; set; }
+        public string? ConfirmPassword { get; set; }
     }
 
     private class RoleForm
