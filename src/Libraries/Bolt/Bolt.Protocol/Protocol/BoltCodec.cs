@@ -21,7 +21,7 @@ namespace Bolt.Protocol;
 /// </summary>
 public static class BoltCodec
 {
-    public const int RequestHeaderSize = 1 + 16 + 4 + 4 + 4;   // 29 bytes
+    public const int RequestHeaderSize = 1 + 16 + 4 + 4 + 4 + 4;   // 33 bytes (added senderHash)
     public const int ResponseHeaderSize = 1 + 16 + 2 + 4;       // 23 bytes
 
     // Media frame header sizes
@@ -36,11 +36,10 @@ public static class BoltCodec
     #region Encoding
 
     /// <summary>
-    /// Encode a request frame into the provided buffer writer.
-    /// Returns the total bytes written.
+    /// Encode a request frame: [1:type][16:requestId][4:recipientHash][4:senderHash][4:commandHash][4:payloadLen][payload]
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int WriteRequest(IBufferWriter<byte> writer, Guid requestId, int recipientHash, int commandHash, ReadOnlySpan<byte> payload)
+    public static int WriteRequest(IBufferWriter<byte> writer, Guid requestId, int recipientHash, int senderHash, int commandHash, ReadOnlySpan<byte> payload)
     {
         var totalSize = RequestHeaderSize + payload.Length;
         var span = writer.GetSpan(totalSize);
@@ -48,9 +47,10 @@ public static class BoltCodec
         span[0] = (byte)FrameType.Request;
         WriteGuid(span.Slice(1), requestId);
         BinaryPrimitives.WriteInt32LittleEndian(span.Slice(17), recipientHash);
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(21), commandHash);
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(25), payload.Length);
-        payload.CopyTo(span.Slice(29));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(21), senderHash);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(25), commandHash);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(29), payload.Length);
+        payload.CopyTo(span.Slice(33));
 
         writer.Advance(totalSize);
         return totalSize;
@@ -111,7 +111,7 @@ public static class BoltCodec
     /// Encode a push frame (fire-and-forget, same header as Request but type=0x05).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int WritePush(IBufferWriter<byte> writer, Guid requestId, int recipientHash, int commandHash, ReadOnlySpan<byte> payload)
+    public static int WritePush(IBufferWriter<byte> writer, Guid requestId, int recipientHash, int senderHash, int commandHash, ReadOnlySpan<byte> payload)
     {
         var totalSize = RequestHeaderSize + payload.Length;
         var span = writer.GetSpan(totalSize);
@@ -119,9 +119,10 @@ public static class BoltCodec
         span[0] = (byte)FrameType.Push;
         WriteGuid(span.Slice(1), requestId);
         BinaryPrimitives.WriteInt32LittleEndian(span.Slice(17), recipientHash);
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(21), commandHash);
-        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(25), payload.Length);
-        payload.CopyTo(span.Slice(29));
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(21), senderHash);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(25), commandHash);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(29), payload.Length);
+        payload.CopyTo(span.Slice(33));
 
         writer.Advance(totalSize);
         return totalSize;
@@ -305,7 +306,7 @@ public static class BoltCodec
 
         if (buffer.Length < RequestHeaderSize) return false;
 
-        var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(25));
+        var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(29));
         if (payloadLen < 0) return false;
         var totalSize = RequestHeaderSize + payloadLen;
         if (buffer.Length < totalSize) return false;
@@ -314,7 +315,8 @@ public static class BoltCodec
         {
             RequestId = ReadGuid(buffer.Slice(1)),
             RecipientHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(17)),
-            CommandHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(21)),
+            SenderHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(21)),
+            CommandHash = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(25)),
             PayloadOffset = RequestHeaderSize,
             PayloadLength = payloadLen
         };
@@ -323,8 +325,7 @@ public static class BoltCodec
     }
 
     /// <summary>
-    /// Read only the request header (29 bytes) for routing without touching payload.
-    /// Used by the server to extract RequestId + RecipientHash for forwarding.
+    /// Read only the request header (33 bytes) for routing without touching payload.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryReadRequestHeader(ReadOnlySpan<byte> buffer, out Guid requestId, out int recipientHash, out int totalSize)
@@ -335,7 +336,7 @@ public static class BoltCodec
 
         if (buffer.Length < RequestHeaderSize) return false;
 
-        var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(25));
+        var payloadLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(29));
         if (payloadLen < 0) return false;
         totalSize = RequestHeaderSize + payloadLen;
         if (buffer.Length < totalSize) return false;
@@ -670,6 +671,7 @@ public struct RequestFrame
 {
     public Guid RequestId;
     public int RecipientHash;
+    public int SenderHash;
     public int CommandHash;
     public int PayloadOffset;
     public int PayloadLength;

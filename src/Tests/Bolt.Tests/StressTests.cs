@@ -810,11 +810,11 @@ public class CodecSecurityTests
     public void NegativePayloadLength_Request_ReturnsFalse()
     {
         var writer = new ArrayBufferWriter<byte>(64);
-        BoltCodec.WriteRequest(writer, Guid.NewGuid(), 123, 456, new byte[] { 1, 2, 3 });
+        BoltCodec.WriteRequest(writer, Guid.NewGuid(), 123, 789, 456, new byte[] { 1, 2, 3 });
 
-        // Corrupt the payload length to negative
+        // Corrupt the payload length to negative (payloadLen is at offset 29 in new format)
         var data = writer.WrittenSpan.ToArray();
-        BitConverter.TryWriteBytes(data.AsSpan(25), -100);
+        BitConverter.TryWriteBytes(data.AsSpan(29), -100);
 
         BoltCodec.TryReadRequest(data, out _, out _).Should().BeFalse();
     }

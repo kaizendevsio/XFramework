@@ -89,7 +89,7 @@ export const MediaFrameFlags = {
 // ─── Header sizes (must match BoltCodec.cs constants exactly) ────────────────
 
 export const HEADER_SIZE = {
-    Request:        29,  // 1 + 16 + 4 + 4 + 4
+    Request:        33,  // 1 + 16 + 4 + 4 + 4 + 4 (added senderHash)
     Response:       23,  // 1 + 16 + 2 + 4
     MediaFrame:     30,  // 1 + 16 + 4 + 4 + 1 + 4
     MediaConfig:    52,  // 1 + 16 + 16 + 1 + 1 + 4 + 4 + 4 + 1 + 4
@@ -162,6 +162,7 @@ export interface NackRequestData {
 export interface RequestFrameData {
     requestId: string;
     recipientHash: number;
+    senderHash: number;
     commandHash: number;
     payload: Uint8Array;
 }
@@ -644,6 +645,7 @@ export function readFecFrame(data: Uint8Array): FecFrameData | null {
 export function writeRequest(
     requestId: string,
     recipientHash: number,
+    senderHash: number,
     commandHash: number,
     payload: Uint8Array,
 ): Uint8Array {
@@ -654,28 +656,31 @@ export function writeRequest(
     writeUint8(view, 0, FrameType.Request);
     writeGuid(buf, 1, requestId);
     writeInt32LE(view, 17, recipientHash);
-    writeInt32LE(view, 21, commandHash);
-    writeInt32LE(view, 25, payload.length);
-    buf.set(payload, 29);
+    writeInt32LE(view, 21, senderHash);
+    writeInt32LE(view, 25, commandHash);
+    writeInt32LE(view, 29, payload.length);
+    buf.set(payload, 33);
 
     return buf;
 }
 
 /**
  * Read a Request frame.
+ * Layout: [1:type][16:requestId][4:recipientHash][4:senderHash][4:commandHash][4:payloadLen][payload]
  */
 export function readRequest(data: Uint8Array): RequestFrameData | null {
     if (data.length < HEADER_SIZE.Request) return null;
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    const payloadLen = readInt32LE(view, 25);
+    const payloadLen = readInt32LE(view, 29);
     if (payloadLen < 0 || data.length < HEADER_SIZE.Request + payloadLen) return null;
 
     return {
         requestId: bytesToGuid(data, 1),
         recipientHash: readInt32LE(view, 17),
-        commandHash: readInt32LE(view, 21),
-        payload: data.slice(29, 29 + payloadLen),
+        senderHash: readInt32LE(view, 21),
+        commandHash: readInt32LE(view, 25),
+        payload: data.slice(33, 33 + payloadLen),
     };
 }
 
@@ -720,10 +725,11 @@ export function readResponse(data: Uint8Array): ResponseFrameData | null {
 
 /**
  * Encode a Push frame (fire-and-forget, same layout as Request).
- * Layout: [1:type=0x05] [16:requestId] [4:recipientHash] [4:commandHash] [4:payloadLen] [payload]
+ * Layout: [1:type=0x05] [16:requestId] [4:recipientHash] [4:senderHash] [4:commandHash] [4:payloadLen] [payload]
  */
 export function writePush(
     recipientHash: number,
+    senderHash: number,
     commandHash: number,
     payload: Uint8Array,
 ): Uint8Array {
@@ -735,9 +741,10 @@ export function writePush(
     writeUint8(view, 0, FrameType.Push);
     writeGuid(buf, 1, requestId);
     writeInt32LE(view, 17, recipientHash);
-    writeInt32LE(view, 21, commandHash);
-    writeInt32LE(view, 25, payload.length);
-    buf.set(payload, 29);
+    writeInt32LE(view, 21, senderHash);
+    writeInt32LE(view, 25, commandHash);
+    writeInt32LE(view, 29, payload.length);
+    buf.set(payload, 33);
 
     return buf;
 }

@@ -21,6 +21,7 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly Uri _serverUri;
     private readonly string _clientId;
     private readonly string _clientName;
+    private readonly int _senderHash;
     private readonly BoltClientOptions _config;
     private readonly ILogger _logger;
 
@@ -58,6 +59,7 @@ public sealed class BoltClient : IAsyncDisposable
     {
         _serverUri = serverUri;
         _clientId = clientId;
+        _senderHash = BoltCodec.Fnv1aHash(clientId);
         _clientName = clientName;
         _config = config;
         _logger = logger;
@@ -151,7 +153,7 @@ public sealed class BoltClient : IAsyncDisposable
 
                 var conn = GetConnection();
                 var writer = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WritePush(writer, Guid.NewGuid(), senderHash, LargeRpcResponseHash, respData);
+                BoltCodec.WritePush(writer, Guid.NewGuid(), senderHash, _senderHash, LargeRpcResponseHash, respData);
                 await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
             }
             else
@@ -304,7 +306,7 @@ public sealed class BoltClient : IAsyncDisposable
         try
         {
             var writer = RentedBufferWriter.GetThreadLocal();
-            BoltCodec.WriteRequest(writer, requestId, recipientHash, commandHash, payload.Span);
+            BoltCodec.WriteRequest(writer, requestId, recipientHash, _senderHash, commandHash, payload.Span);
 
             if (!IsConnected)
             {
@@ -425,7 +427,7 @@ public sealed class BoltClient : IAsyncDisposable
         var commandHash = _hashCache.GetOrAdd(commandName, BoltCodec.Fnv1aHash);
 
         var writer = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WritePush(writer, Guid.NewGuid(), recipientHash, commandHash, payload.Span);
+        BoltCodec.WritePush(writer, Guid.NewGuid(), recipientHash, _senderHash, commandHash, payload.Span);
         await GetConnection().SendAsync(writer.WrittenMemory, ct);
     }
 
@@ -637,49 +639,65 @@ public sealed class BoltClient : IAsyncDisposable
         var span = data.AsSpan(0, length);
         if (!BoltCodec.TryReadRequest(span, out var frame, out _)) return;
 
-        // For large response streaming, we need the caller's hash.
-        // The Request frame contains recipientHash (us), not the caller.
-        // But the hub stored the caller in _pendingInvocations and will route
-        // Response frames back. For BoltStream responses, we use recipientHash=0
-        // which the hub will route to the original request sender.
-        // Actually, the hub's stream routing uses the recipientHash from StreamOpen
-        // to find the target. We pass 0 and let the Response frame handle routing.
-        var callerHash = frame.RecipientHash; // This is actually OUR hash — see below
-
         if (_handlers.TryGetValue(frame.CommandHash, out var handler))
         {
             try
             {
                 var payload = frame.GetPayload(data.AsMemory(0, length));
                 var (statusCode, responsePayload) = await handler(payload, frame.RequestId);
-                await SendResponseAsync(conn, frame.RequestId, statusCode, responsePayload, ct);
+                await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, statusCode, responsePayload, ct);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Handler error for command hash {CommandHash}", frame.CommandHash);
-                await SendResponseAsync(conn, frame.RequestId, HttpStatusCode.InternalServerError, ReadOnlyMemory<byte>.Empty, ct);
+                await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, HttpStatusCode.InternalServerError, ReadOnlyMemory<byte>.Empty, ct);
             }
         }
         else
         {
-            await SendResponseAsync(conn, frame.RequestId, HttpStatusCode.NotImplemented, ReadOnlyMemory<byte>.Empty, ct);
+            await SendResponseAsync(conn, frame.RequestId, frame.SenderHash, HttpStatusCode.NotImplemented, ReadOnlyMemory<byte>.Empty, ct);
         }
     }
 
     /// <summary>
-    /// Send an RPC response. Uses a single Response frame for all sizes.
-    /// WebSocket handles fragmentation automatically, and both client/server receive loops
-    /// reassemble multi-frame messages. The hub routes responses by requestId.
-    ///
-    /// For the auto-streaming path (InvokeLargeAsync), the response goes through
-    /// BoltStream (Push or StreamOpen) since those bypass the hub's response routing.
+    /// Send an RPC response. Small → single Response frame (hub routes by requestId).
+    /// Large → BoltStream chunking back to caller (using senderHash from Request frame).
+    /// Fully symmetric with the request path.
     /// </summary>
-    private async Task SendResponseAsync(BoltConnection conn, Guid requestId,
+    private async Task SendResponseAsync(BoltConnection conn, Guid requestId, int callerSenderHash,
         HttpStatusCode statusCode, ReadOnlyMemory<byte> responsePayload, CancellationToken ct)
     {
-        var writer = RentedBufferWriter.GetThreadLocal();
-        BoltCodec.WriteResponse(writer, requestId, statusCode, responsePayload.Span);
-        await conn.SendAsync(writer.WrittenMemory, ct);
+        if (responsePayload.Length <= _config.LargePayloadThreshold)
+        {
+            var writer = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteResponse(writer, requestId, statusCode, responsePayload.Span);
+            await conn.SendAsync(writer.WrittenMemory, ct);
+        }
+        else
+        {
+            // Large response: BoltStream back to caller — same mechanism as request path
+            var respStream = new BoltStream(Guid.NewGuid(), conn);
+            _activeStreams[respStream.StreamId] = respStream;
+
+            var openWriter = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteStreamOpen(openWriter, respStream.StreamId, callerSenderHash, LargeRpcResponseStreamHash);
+            await conn.SendAsync(openWriter.WrittenMemory, ct);
+
+            // Header: [16:requestId][2:statusCode][4:totalSize]
+            var header = new byte[22];
+            requestId.TryWriteBytes(header);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(header.AsSpan(16), (short)statusCode);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(18), responsePayload.Length);
+            await respStream.SendAsync((ReadOnlyMemory<byte>)header, ct);
+
+            var chunkSize = _config.StreamChunkSize;
+            for (int offset = 0; offset < responsePayload.Length; offset += chunkSize)
+            {
+                var len = Math.Min(chunkSize, responsePayload.Length - offset);
+                await respStream.SendAsync(responsePayload.Slice(offset, len), ct);
+            }
+            await respStream.CloseAsync(ct: ct);
+        }
     }
 
     private async Task DrainOfflineQueueAsync(CancellationToken ct)

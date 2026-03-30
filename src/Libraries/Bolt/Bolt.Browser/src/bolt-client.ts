@@ -223,7 +223,8 @@ export class BoltBrowserClient {
     const recipientHash = this.getHash(recipientId);
     const commandHash = this.getHash(commandName);
 
-    const frame = writeRequest(requestId, recipientHash, commandHash, payload);
+    const senderHash = this.getHash(this.clientId);
+    const frame = writeRequest(requestId, recipientHash, senderHash, commandHash, payload);
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -259,8 +260,9 @@ export class BoltBrowserClient {
     if (!this.connected || !this.ws) return;
 
     const recipientHash = this.getHash(recipientId);
+    const senderHash = this.getHash(this.clientId);
     const commandHash = this.getHash(commandName);
-    const frame = writePush(recipientHash, commandHash, payload);
+    const frame = writePush(recipientHash, senderHash, commandHash, payload);
     this.ws.send(frame);
   }
 
