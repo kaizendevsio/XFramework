@@ -637,35 +637,44 @@ public sealed class BoltClient : IAsyncDisposable
         var span = data.AsSpan(0, length);
         if (!BoltCodec.TryReadRequest(span, out var frame, out _)) return;
 
+        // For large response streaming, we need the caller's hash.
+        // The Request frame contains recipientHash (us), not the caller.
+        // But the hub stored the caller in _pendingInvocations and will route
+        // Response frames back. For BoltStream responses, we use recipientHash=0
+        // which the hub will route to the original request sender.
+        // Actually, the hub's stream routing uses the recipientHash from StreamOpen
+        // to find the target. We pass 0 and let the Response frame handle routing.
+        var callerHash = frame.RecipientHash; // This is actually OUR hash — see below
+
         if (_handlers.TryGetValue(frame.CommandHash, out var handler))
         {
             try
             {
                 var payload = frame.GetPayload(data.AsMemory(0, length));
                 var (statusCode, responsePayload) = await handler(payload, frame.RequestId);
-                await SendResponseAsync(conn, frame.RequestId, frame.RecipientHash, statusCode, responsePayload, ct);
+                await SendResponseAsync(conn, frame.RequestId, statusCode, responsePayload, ct);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Handler error for command hash {CommandHash}", frame.CommandHash);
-                await SendResponseAsync(conn, frame.RequestId, 0, HttpStatusCode.InternalServerError, ReadOnlyMemory<byte>.Empty, ct);
+                await SendResponseAsync(conn, frame.RequestId, HttpStatusCode.InternalServerError, ReadOnlyMemory<byte>.Empty, ct);
             }
         }
         else
         {
-            await SendResponseAsync(conn, frame.RequestId, 0, HttpStatusCode.NotImplemented, ReadOnlyMemory<byte>.Empty, ct);
+            await SendResponseAsync(conn, frame.RequestId, HttpStatusCode.NotImplemented, ReadOnlyMemory<byte>.Empty, ct);
         }
     }
 
     /// <summary>
-    /// Send an RPC response. Small responses use a single Response frame.
-    /// Large responses (> LargePayloadThreshold) auto-stream via __bolt_large_rpc_response_stream__.
+    /// Send an RPC response. Uses a single Response frame for all sizes.
+    /// WebSocket handles fragmentation automatically, and both client/server receive loops
+    /// reassemble multi-frame messages. The hub routes responses by requestId.
+    ///
+    /// For the auto-streaming path (InvokeLargeAsync), the response goes through
+    /// BoltStream (Push or StreamOpen) since those bypass the hub's response routing.
     /// </summary>
-    /// <summary>
-    /// Send an RPC response. WebSocket handles fragmentation for large payloads,
-    /// and the receive loop reassembles multi-frame messages, so any response size works.
-    /// </summary>
-    private async Task SendResponseAsync(BoltConnection conn, Guid requestId, int callerHash,
+    private async Task SendResponseAsync(BoltConnection conn, Guid requestId,
         HttpStatusCode statusCode, ReadOnlyMemory<byte> responsePayload, CancellationToken ct)
     {
         var writer = RentedBufferWriter.GetThreadLocal();
