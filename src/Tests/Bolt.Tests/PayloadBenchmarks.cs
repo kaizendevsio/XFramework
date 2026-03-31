@@ -1,10 +1,16 @@
 using System.Net;
+using System.Net.Quic;
+using System.Net.Security;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Reports;
 using Bolt.Client;
+using Bolt.Client.Transport;
+using Bolt.Protocol.Transport;
 using Bolt.Server;
 using Bolt.Tests.Grpc;
 using Google.Protobuf;
@@ -19,10 +25,10 @@ using Perfolizer.Horology;
 namespace Bolt.Tests;
 
 /// <summary>
-/// Head-to-head payload size benchmark: Bolt vs gRPC.
-/// Both transports echo raw bytes of varying sizes.
+/// Head-to-head payload size benchmark: Bolt (WebSocket) vs Bolt (QUIC) vs gRPC.
+/// All three transports echo raw bytes of varying sizes.
 ///
-/// Tests answer: "How do Bolt and gRPC compare as payloads grow?"
+/// Tests answer: "How do Bolt WebSocket, Bolt QUIC, and gRPC compare as payloads grow?"
 ///
 /// Payload sizes:
 /// - 100B:   tiny (metadata, status codes)
@@ -30,16 +36,25 @@ namespace Bolt.Tests;
 /// - 32KB:   small file, JSON response
 /// - 128KB:  medium (below Bolt auto-stream threshold)
 /// - 512KB:  large (above 256KB → Bolt auto-streams via BoltStream)
+///
+/// Note: Bolt_Quic_Echo only runs meaningfully when the platform supports QUIC
+/// (QuicConnection.IsSupported). On unsupported platforms it returns a dummy value.
 /// </summary>
 [Config(typeof(PayloadBenchConfig))]
 [MemoryDiagnoser]
 public class PayloadBenchmarks
 {
-    // Bolt
+    // Bolt (WebSocket)
     private WebApplication _boltApp = null!;
     private BoltClient _boltService = null!;
     private BoltClient _boltCaller = null!;
     private byte[] _boltPayload = null!;
+
+    // Bolt (QUIC)
+    private BoltClient? _boltQuicService;
+    private BoltClient? _boltQuicCaller;
+    private X509Certificate2? _quicCert;
+    private CancellationTokenSource? _quicListenerCts;
 
     // gRPC
     private WebApplication _grpcApp = null!;
@@ -57,11 +72,17 @@ public class PayloadBenchmarks
         await SetupGrpc();
         GeneratePayloads();
 
-        // Warmup both
+        // Warmup all transports
         for (int i = 0; i < 10; i++)
         {
             await _boltCaller.InvokeAsync("payload_svc", "echo", _boltPayload);
             await _grpcClient.EchoPayloadAsync(_grpcRequest);
+        }
+
+        if (_boltQuicCaller != null)
+        {
+            for (int i = 0; i < 10; i++)
+                await _boltQuicCaller.InvokeAsync("quic_payload_svc", "echo", _boltPayload);
         }
     }
 
@@ -90,6 +111,41 @@ public class PayloadBenchmarks
         _boltCaller = new BoltClient(new Uri("ws://localhost:18600/bolt"),
             "payload_caller", "PayloadCaller", opts, lf.CreateLogger<BoltClient>());
         await _boltCaller.ConnectAsync();
+
+        // QUIC transport (only when platform supports it)
+        if (QuicConnection.IsSupported && QuicListener.IsSupported)
+        {
+            try
+            {
+                var server = _boltApp.Services.GetRequiredService<BoltServer>();
+                _quicCert = GenerateSelfSignedCert();
+                _quicListenerCts = new CancellationTokenSource();
+                await StartQuicListenerAsync(server, 18603, _quicCert, _quicListenerCts.Token);
+
+                var quicOpts = new BoltClientOptions
+                {
+                    RpcTimeoutSeconds = 60,
+                    TransportAttemptTimeoutMs = 10_000,
+                    PreferredTransports = [BoltTransport.Quic]
+                };
+
+                _boltQuicService = new BoltClient(new Uri("quic://127.0.0.1:18603/bolt"),
+                    "quic_payload_svc", "QuicPayloadSvc", quicOpts, lf.CreateLogger<BoltClient>());
+                _boltQuicService.RegisterHandler("echo", (payload, _) =>
+                    Task.FromResult((HttpStatusCode.OK, payload)));
+                await _boltQuicService.ConnectAsync();
+
+                _boltQuicCaller = new BoltClient(new Uri("quic://127.0.0.1:18603/bolt"),
+                    "quic_payload_caller", "QuicPayloadCaller", quicOpts, lf.CreateLogger<BoltClient>());
+                await _boltQuicCaller.ConnectAsync();
+            }
+            catch
+            {
+                // QUIC may report supported but fail at runtime; benchmarks degrade gracefully
+                _boltQuicService = null;
+                _boltQuicCaller = null;
+            }
+        }
     }
 
     private async Task SetupGrpc()
@@ -140,14 +196,81 @@ public class PayloadBenchmarks
         return await _grpcClient.EchoPayloadAsync(_grpcRequest);
     }
 
+    [Benchmark]
+    public async Task<(HttpStatusCode, ReadOnlyMemory<byte>)> Bolt_Quic_Echo()
+    {
+        if (_boltQuicCaller == null)
+            return (HttpStatusCode.ServiceUnavailable, ReadOnlyMemory<byte>.Empty);
+
+        return await _boltQuicCaller.InvokeAsync("quic_payload_svc", "echo", _boltPayload);
+    }
+
     [GlobalCleanup]
     public async Task Cleanup()
     {
+        try { if (_boltQuicCaller != null) await _boltQuicCaller.DisposeAsync(); } catch { }
+        try { if (_boltQuicService != null) await _boltQuicService.DisposeAsync(); } catch { }
+        _quicListenerCts?.Cancel();
+        _quicCert?.Dispose();
         try { await _boltCaller.DisposeAsync(); } catch { }
         try { await _boltService.DisposeAsync(); } catch { }
         _grpcChannel?.Dispose();
         try { await _grpcApp.StopAsync(); } catch { }
         try { await _boltApp.StopAsync(); } catch { }
+    }
+
+    private static async Task StartQuicListenerAsync(BoltServer server, int port, X509Certificate2 cert, CancellationToken ct)
+    {
+        if (!QuicListener.IsSupported) return;
+
+        var listener = await QuicListener.ListenAsync(new QuicListenerOptions
+        {
+            ListenEndPoint = new IPEndPoint(IPAddress.Loopback, port),
+            ApplicationProtocols = [new SslApplicationProtocol("bolt")],
+            ConnectionOptionsCallback = (_, _, _) => ValueTask.FromResult(new QuicServerConnectionOptions
+            {
+                DefaultStreamErrorCode = 0,
+                DefaultCloseErrorCode = 0,
+                MaxInboundBidirectionalStreams = 256,
+                ServerAuthenticationOptions = new SslServerAuthenticationOptions
+                {
+                    ServerCertificate = cert,
+                    ApplicationProtocols = [new SslApplicationProtocol("bolt")]
+                }
+            })
+        }, ct);
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    var quicConn = await listener.AcceptConnectionAsync(ct);
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var transport = new QuicBoltConnection(quicConn);
+                            await transport.AcceptPrimaryStreamAsync(ct);
+                            await server.HandleConnectionAsync(transport, ct);
+                        }
+                        catch { }
+                    }, ct);
+                }
+            }
+            catch (OperationCanceledException) { }
+            finally { await listener.DisposeAsync(); }
+        }, ct);
+    }
+
+    private static X509Certificate2 GenerateSelfSignedCert()
+    {
+        using var rsa = RSA.Create(2048);
+        var req = new CertificateRequest(
+            "CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var cert = req.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddYears(1));
+        return new X509Certificate2(cert.Export(X509ContentType.Pfx));
     }
 
     private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
