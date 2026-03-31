@@ -1161,34 +1161,32 @@ public sealed class BoltHubConnection
         // Fast path: no contention — send synchronously, zero overhead
         if (_sendLock.Wait(0))
         {
-            try
+            if (_transport.IsConnected)
             {
-                if (_transport.IsConnected)
+                var task = _transport.SendAsync(data, ct);
+                if (task.IsCompleted)
                 {
-                    var task = _transport.SendAsync(data, ct);
-                    if (task.IsCompleted)
-                    {
-                        Interlocked.Add(ref _pendingBytes, -data.Length);
-                        return task;
-                    }
-                    return AwaitAndTrack(task, data.Length);
+                    // Synchronous completion — release lock immediately
+                    _sendLock.Release();
+                    Interlocked.Add(ref _pendingBytes, -data.Length);
+                    return task;
                 }
-                Interlocked.Add(ref _pendingBytes, -data.Length);
-                return ValueTask.CompletedTask;
+                // Async completion — hold lock until write finishes
+                // (QUIC/WebTransport streams throw on concurrent writes)
+                return AwaitSendAndRelease(task, data.Length);
             }
-            finally
-            {
-                _sendLock.Release();
-            }
+            _sendLock.Release();
+            Interlocked.Add(ref _pendingBytes, -data.Length);
+            return ValueTask.CompletedTask;
         }
         // Slow path: contention — await lock
         return SendSlowAsync(data, ct);
     }
 
-    private async ValueTask AwaitAndTrack(ValueTask task, int size)
+    private async ValueTask AwaitSendAndRelease(ValueTask task, int size)
     {
         try { await task; }
-        finally { Interlocked.Add(ref _pendingBytes, -size); }
+        finally { _sendLock.Release(); Interlocked.Add(ref _pendingBytes, -size); }
     }
 
     private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)

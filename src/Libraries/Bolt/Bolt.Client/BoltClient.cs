@@ -891,25 +891,31 @@ public sealed class BoltConnection
         Interlocked.Increment(ref _pendingSends);
         if (_sendLock.Wait(0))
         {
-            try
+            if (Transport.IsConnected)
             {
-                if (Transport.IsConnected)
+                var task = Transport.SendAsync(data, ct);
+                if (task.IsCompleted)
                 {
-                    var task = Transport.SendAsync(data, ct);
-                    if (task.IsCompleted) { Interlocked.Decrement(ref _pendingSends); return task; }
-                    return AwaitAndDecrement(task);
+                    // Synchronous completion — release lock immediately
+                    _sendLock.Release();
+                    Interlocked.Decrement(ref _pendingSends);
+                    return task;
                 }
-                Interlocked.Decrement(ref _pendingSends);
-                return ValueTask.CompletedTask;
+                // Async completion — hold lock until write finishes
+                // (QUIC/WebTransport streams throw on concurrent writes)
+                return AwaitSendAndRelease(task);
             }
-            finally { _sendLock.Release(); }
+            _sendLock.Release();
+            Interlocked.Decrement(ref _pendingSends);
+            return ValueTask.CompletedTask;
         }
         return SendSlowAsync(data, ct);
     }
 
-    private async ValueTask AwaitAndDecrement(ValueTask task)
+    private async ValueTask AwaitSendAndRelease(ValueTask task)
     {
-        try { await task; } finally { Interlocked.Decrement(ref _pendingSends); }
+        try { await task; }
+        finally { _sendLock.Release(); Interlocked.Decrement(ref _pendingSends); }
     }
 
     private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
