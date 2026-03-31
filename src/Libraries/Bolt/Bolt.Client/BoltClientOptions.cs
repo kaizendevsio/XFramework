@@ -1,3 +1,5 @@
+using Bolt.Protocol.Transport;
+
 namespace Bolt.Client;
 
 /// <summary>
@@ -6,6 +8,17 @@ namespace Bolt.Client;
 /// </summary>
 public class BoltClientOptions
 {
+    /// <summary>
+    /// Preferred transport order. The negotiator tries each in sequence, using the first
+    /// that succeeds. Transports unavailable on the current platform are auto-skipped.
+    /// Default: QUIC, WebTransport, WebSocket.
+    /// </summary>
+    public BoltTransport[] PreferredTransports { get; set; } =
+        [BoltTransport.Quic, BoltTransport.WebTransport, BoltTransport.WebSocket];
+
+    /// <summary>Timeout per transport attempt before trying the next one. Default: 3000ms.</summary>
+    public int TransportAttemptTimeoutMs { get; set; } = 3000;
+
     /// <summary>RPC call timeout in seconds. Default: 30.</summary>
     public int RpcTimeoutSeconds { get; set; } = 30;
 
