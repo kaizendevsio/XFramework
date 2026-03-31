@@ -1,3 +1,4 @@
+using Bolt.Protocol.Transport;
 using Bolt.Server.Media;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -68,7 +69,8 @@ public static class BoltServerExtensions
 
             var server = context.RequestServices.GetRequiredService<BoltServer>();
             var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            await server.HandleConnectionAsync(webSocket, context.RequestAborted);
+            var transport = new WebSocketBoltConnection(webSocket);
+            await server.HandleConnectionAsync(transport, context.RequestAborted);
         });
 
         return endpoints;

@@ -2,10 +2,10 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net;
-using System.Net.WebSockets;
 using System.Threading.Channels;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
+using Bolt.Protocol.Transport;
 using Bolt.Server.Media;
 using Microsoft.Extensions.Logging;
 
@@ -76,47 +76,48 @@ public sealed class BoltServer : IDisposable
         _localHandlers[hash] = handler;
     }
 
-    public async Task HandleConnectionAsync(WebSocket webSocket, CancellationToken ct)
+    public async Task HandleConnectionAsync(IBoltConnection transport, CancellationToken ct)
     {
-        var connection = new BoltHubConnection(webSocket);
+        var connection = new BoltHubConnection(transport);
         var receiveBuffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
         byte[]? largeBuffer = null;
 
         try
         {
-            while (webSocket.State == WebSocketState.Open && !ct.IsCancellationRequested)
+            while (transport.IsConnected && !ct.IsCancellationRequested)
             {
-                var result = await webSocket.ReceiveAsync(receiveBuffer.AsMemory(), ct);
+                var (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), ct);
 
-                if (result.MessageType == WebSocketMessageType.Close)
+                // (0, true) signals connection closed
+                if (bytesRead == 0 && endOfMessage)
                     break;
 
-                if (result.MessageType != WebSocketMessageType.Binary || result.Count == 0)
+                if (bytesRead == 0)
                     continue;
 
                 byte[] frameBytes;
                 int totalLength;
-                if (!result.EndOfMessage)
+                if (!endOfMessage)
                 {
                     // Multi-frame: accumulate into growing pooled buffer (zero MemoryStream alloc)
-                    var assembled = result.Count;
-                    var capacity = Math.Max(result.Count * 4, 512 * 1024);
+                    var assembled = bytesRead;
+                    var capacity = Math.Max(bytesRead * 4, 512 * 1024);
                     if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
                     largeBuffer = ArrayPool<byte>.Shared.Rent(capacity);
-                    receiveBuffer.AsSpan(0, result.Count).CopyTo(largeBuffer);
+                    receiveBuffer.AsSpan(0, bytesRead).CopyTo(largeBuffer);
 
-                    while (!result.EndOfMessage)
+                    while (!endOfMessage)
                     {
-                        result = await webSocket.ReceiveAsync(receiveBuffer.AsMemory(), ct);
-                        if (assembled + result.Count > largeBuffer.Length)
+                        (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), ct);
+                        if (assembled + bytesRead > largeBuffer.Length)
                         {
                             var newBuf = ArrayPool<byte>.Shared.Rent(largeBuffer.Length * 2);
                             largeBuffer.AsSpan(0, assembled).CopyTo(newBuf);
                             ArrayPool<byte>.Shared.Return(largeBuffer);
                             largeBuffer = newBuf;
                         }
-                        receiveBuffer.AsSpan(0, result.Count).CopyTo(largeBuffer.AsSpan(assembled));
-                        assembled += result.Count;
+                        receiveBuffer.AsSpan(0, bytesRead).CopyTo(largeBuffer.AsSpan(assembled));
+                        assembled += bytesRead;
                     }
                     frameBytes = largeBuffer;
                     totalLength = assembled;
@@ -124,15 +125,11 @@ public sealed class BoltServer : IDisposable
                 else
                 {
                     frameBytes = receiveBuffer;
-                    totalLength = result.Count;
+                    totalLength = bytesRead;
                 }
 
                 await ProcessFrameAsync(connection, frameBytes, totalLength, ct);
             }
-        }
-        catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
-        {
-            _logger.LogDebug("Client {ClientId} disconnected", connection.ClientId ?? "unregistered");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -145,11 +142,8 @@ public sealed class BoltServer : IDisposable
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             RemoveConnection(connection);
 
-            if (webSocket.State is WebSocketState.Open or WebSocketState.CloseReceived)
-            {
-                try { await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None); }
-                catch { }
-            }
+            try { await transport.CloseAsync(); }
+            catch { }
         }
     }
 
@@ -1132,14 +1126,15 @@ public sealed class BoltServer : IDisposable
 
 public sealed class BoltHubConnection
 {
-    private readonly WebSocket _webSocket;
+    private readonly IBoltConnection _transport;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
     public string StreamId { get; } = Guid.NewGuid().ToString("N");
     public string? ClientId { get; set; }
     public string? ClientName { get; set; }
     public int ServiceHash { get; set; }
-    public bool IsAlive => _webSocket.State == WebSocketState.Open;
+    public bool IsAlive => _transport.IsConnected;
+    public BoltTransport TransportType => _transport.TransportType;
 
     /// <summary>Pending bytes queued for this connection. Used for backpressure decisions.</summary>
     public long PendingBytes => Interlocked.Read(ref _pendingBytes);
@@ -1154,7 +1149,7 @@ public sealed class BoltHubConnection
     /// <summary>True if this connection is under backpressure (pending > drop threshold).</summary>
     public bool IsUnderPressure => PendingBytes > BackpressureDropThreshold;
 
-    public BoltHubConnection(WebSocket webSocket) => _webSocket = webSocket;
+    public BoltHubConnection(IBoltConnection transport) => _transport = transport;
 
     /// <summary>
     /// Send data with fast-path for uncontended lock. Tracks pending bytes for backpressure.
@@ -1168,9 +1163,9 @@ public sealed class BoltHubConnection
         {
             try
             {
-                if (_webSocket.State == WebSocketState.Open)
+                if (_transport.IsConnected)
                 {
-                    var task = _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+                    var task = _transport.SendAsync(data, ct);
                     if (task.IsCompleted)
                     {
                         Interlocked.Add(ref _pendingBytes, -data.Length);
@@ -1201,8 +1196,8 @@ public sealed class BoltHubConnection
         await _sendLock.WaitAsync(ct);
         try
         {
-            if (_webSocket.State == WebSocketState.Open)
-                await _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+            if (_transport.IsConnected)
+                await _transport.SendAsync(data, ct);
         }
         finally
         {
