@@ -47,7 +47,7 @@ public class PayloadBenchmarks
     private HelloService.HelloServiceClient _grpcClient = null!;
     private PayloadRequest _grpcRequest = null!;
 
-    [Params(100, 1024, 32_768, 131_072, 524_288, 1_048_576, 2_097_152)]
+    [Params(100, 1024, 32_768, 131_072, 524_288, 1_048_576, 2_097_152, 5_242_880, 10_485_760, 20_971_520)]
     public int PayloadBytes { get; set; }
 
     [GlobalSetup]
@@ -100,7 +100,7 @@ public class PayloadBenchmarks
             o.ListenLocalhost(18601, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
             o.ListenLocalhost(18602, lo => lo.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1);
         });
-        builder.Services.AddGrpc();
+        builder.Services.AddGrpc(o => o.MaxReceiveMessageSize = 64 * 1024 * 1024);
         builder.Logging.SetMinimumLevel(LogLevel.Error);
         _grpcApp = builder.Build();
         _grpcApp.MapGrpcService<GrpcEchoPayloadBackend>();
@@ -108,7 +108,11 @@ public class PayloadBenchmarks
         _ = Task.Run(() => _grpcApp.RunAsync());
         await WaitForHealth("http://localhost:18602/health");
 
-        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18601");
+        _grpcChannel = GrpcChannel.ForAddress("http://localhost:18601", new GrpcChannelOptions
+        {
+            MaxReceiveMessageSize = 64 * 1024 * 1024,
+            MaxSendMessageSize = 64 * 1024 * 1024
+        });
         _grpcClient = new HelloService.HelloServiceClient(_grpcChannel);
     }
 

@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Net.Quic;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
@@ -65,10 +64,6 @@ public class ConcurrentBenchmarks
     private WebApplication _grpcHubApp = null!;
     private GrpcChannel _grpcChannel = null!;
     private HealthService.HealthServiceClient _grpcClient = null!;
-
-    // QUIC
-    private QuicDirectServer _quicServer = null!;
-    private QuicDirectClient _quicClient = null!;
 
     private const string BoltUrl = "http://localhost:19300";
     private const string IdentityServerUrl = "http://localhost:19361";
@@ -187,8 +182,6 @@ public class ConcurrentBenchmarks
         // 10. gRPC
         await SetupGrpc();
 
-        // 11. QUIC
-        await SetupQuic();
     }
 
     private async Task SetupThinProtocol()
@@ -248,18 +241,6 @@ public class ConcurrentBenchmarks
         _grpcClient = new HealthService.HealthServiceClient(_grpcChannel);
     }
 
-    private async Task SetupQuic()
-    {
-        if (!QuicListener.IsSupported) return;
-        var ep = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 19365);
-        var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
-        _quicServer = new QuicDirectServer(lf.CreateLogger<QuicDirectServer>());
-        _quicServer.RegisterHandler(typeof(HealthCheckRequest).GetTypeFullName(), HealthCheckHandler);
-        await _quicServer.StartAsync(ep);
-        _quicClient = new QuicDirectClient(ep);
-        await _quicClient.ConnectAsync();
-    }
-
     private static async Task<(System.Net.HttpStatusCode, ReadOnlyMemory<byte>)> HealthCheckHandler(ReadOnlyMemory<byte> payload, Guid requestId)
     {
         var request = MemoryPackSerializer.Deserialize<HealthCheckRequest>(payload.Span)!;
@@ -315,18 +296,6 @@ public class ConcurrentBenchmarks
     }
 
     [Benchmark]
-    public async Task Quic_Concurrent()
-    {
-        var tasks = new Task[Concurrency];
-        for (int i = 0; i < Concurrency; i++)
-        {
-            var payload = MemoryPackSerializer.Serialize(MakeRequest());
-            tasks[i] = _quicClient.InvokeAsync(typeof(HealthCheckRequest).GetTypeFullName(), payload);
-        }
-        await Task.WhenAll(tasks);
-    }
-
-    [Benchmark]
     public async Task ThinProtocol_Concurrent()
     {
         var tasks = new Task[Concurrency];
@@ -345,8 +314,6 @@ public class ConcurrentBenchmarks
     {
         _httpClient?.Dispose();
         _grpcChannel?.Dispose();
-        try { await _quicClient.DisposeAsync(); } catch { }
-        try { await _quicServer.DisposeAsync(); } catch { }
         try { await _grpcHubApp.StopAsync(); } catch { }
         try { await _grpcBackendApp.StopAsync(); } catch { }
         try { await _thinCallerClient.DisposeAsync(); } catch { }

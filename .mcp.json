@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "blazorblueprint": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@blazorblueprint/mcp@latest"]
+    },
+    "playwright": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@playwright/mcp@latest"]
+    }
+  }
+}
