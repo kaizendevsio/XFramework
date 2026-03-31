@@ -12,6 +12,12 @@ public sealed class WebSocketBoltConnection : IBoltConnection
 
     public WebSocketBoltConnection(WebSocket webSocket) => _ws = webSocket;
 
+    /// <summary>
+    /// Exposes the underlying WebSocket for backward-compatible code paths.
+    /// Will be removed when all consumers migrate to IBoltConnection.
+    /// </summary>
+    public WebSocket UnderlyingWebSocket => _ws;
+
     public BoltTransport TransportType => BoltTransport.WebSocket;
 
     public bool SupportsDatagrams => false;

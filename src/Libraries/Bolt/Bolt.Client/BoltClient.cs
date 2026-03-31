@@ -1,9 +1,10 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net;
-using System.Net.WebSockets;
+using Bolt.Client.Transport;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
+using Bolt.Protocol.Transport;
 using MemoryPack;
 using Microsoft.Extensions.Logging;
 
@@ -24,6 +25,7 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly int _senderHash;
     private readonly BoltClientOptions _config;
     private readonly ILogger _logger;
+    private readonly BoltTransportNegotiator _negotiator;
 
     private readonly List<BoltConnection> _connections = [];
     private int _roundRobin;
@@ -64,6 +66,7 @@ public sealed class BoltClient : IAsyncDisposable
         _config = config;
         _logger = logger;
         _rpcTimeout = TimeSpan.FromSeconds(config.RpcTimeoutSeconds > 0 ? config.RpcTimeoutSeconds : 30);
+        _negotiator = new BoltTransportNegotiator(logger);
     }
 
     public async Task ConnectAsync(CancellationToken ct = default)
@@ -244,19 +247,20 @@ public sealed class BoltClient : IAsyncDisposable
 
     private async Task<BoltConnection> CreateConnectionAsync(CancellationToken ct)
     {
-        var ws = new ClientWebSocket();
-        await ws.ConnectAsync(_serverUri, ct);
+        var transport = await _negotiator.ConnectAsync(_serverUri, _config, ct);
+        var conn = new BoltConnection(transport);
 
+        // Send registration frame (same for all transports)
         var writer = new ArrayBufferWriter<byte>(128);
         BoltCodec.WriteRegister(writer, _clientId, _clientName);
-        await ws.SendAsync(writer.WrittenMemory, WebSocketMessageType.Binary, true, ct);
+        await transport.SendAsync(writer.WrittenMemory, ct);
 
+        // Read registration ack
         var ackBuffer = new byte[2];
-        var result = await ws.ReceiveAsync(ackBuffer, ct);
-        if (result.Count < 2 || (FrameType)ackBuffer[0] != FrameType.RegisterAck || ackBuffer[1] != 1)
+        var (ackBytes, _) = await transport.ReceiveAsync(ackBuffer, ct);
+        if (ackBytes < 2 || (FrameType)ackBuffer[0] != FrameType.RegisterAck || ackBuffer[1] != 1)
             throw new InvalidOperationException("Server rejected registration");
 
-        var conn = new BoltConnection(ws);
         var receiveCts = new CancellationTokenSource();
         conn.ReceiveCts = receiveCts;
         conn.ReceiveLoop = Task.Run(() => ReceiveLoopAsync(conn, receiveCts.Token));
@@ -290,7 +294,7 @@ public sealed class BoltClient : IAsyncDisposable
                 var delay = TimeSpan.FromMilliseconds(Math.Min(baseDelay.TotalMilliseconds * Math.Pow(2, attempt), maxDelay.TotalMilliseconds));
                 var jitter = TimeSpan.FromMilliseconds(random.Next(0, (int)(delay.TotalMilliseconds * 0.3)));
                 await Task.Delay(delay + jitter, ct);
-                foreach (var c in _connections) c.WebSocket.Dispose();
+                foreach (var c in _connections) { try { await c.Transport.DisposeAsync(); } catch { } }
                 _connections.Clear();
             }
         }
@@ -516,37 +520,38 @@ public sealed class BoltClient : IAsyncDisposable
         byte[]? largeBuffer = null; // Rented from pool for multi-frame messages
         try
         {
-            while (!ct.IsCancellationRequested && conn.WebSocket.State == WebSocketState.Open)
+            while (!ct.IsCancellationRequested && conn.Transport.IsConnected)
             {
-                var result = await conn.WebSocket.ReceiveAsync(buffer.AsMemory(), ct);
-                if (result.MessageType == WebSocketMessageType.Close) break;
-                if (result.MessageType != WebSocketMessageType.Binary || result.Count == 0) continue;
+                var (bytesRead, endOfMessage) = await conn.Transport.ReceiveAsync(buffer.AsMemory(), ct);
+                if (bytesRead == 0 && endOfMessage) break; // Connection closed
+                if (bytesRead == 0) continue;
 
-                // Handle multi-frame WebSocket messages (large payloads)
+                // Handle multi-frame messages (large payloads)
                 byte[] frameBytes;
                 int totalLength;
-                if (!result.EndOfMessage)
+                if (!endOfMessage)
                 {
                     // Multi-frame: accumulate into a growing pooled buffer
-                    var assembled = result.Count;
-                    var capacity = Math.Max(result.Count * 4, 512 * 1024);
+                    var assembled = bytesRead;
+                    var capacity = Math.Max(bytesRead * 4, 512 * 1024);
                     if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
                     largeBuffer = ArrayPool<byte>.Shared.Rent(capacity);
-                    buffer.AsSpan(0, result.Count).CopyTo(largeBuffer);
+                    buffer.AsSpan(0, bytesRead).CopyTo(largeBuffer);
 
-                    while (!result.EndOfMessage)
+                    while (!endOfMessage)
                     {
-                        result = await conn.WebSocket.ReceiveAsync(buffer.AsMemory(), ct);
+                        (bytesRead, endOfMessage) = await conn.Transport.ReceiveAsync(buffer.AsMemory(), ct);
+                        if (bytesRead == 0 && endOfMessage) break;
                         // Grow if needed
-                        if (assembled + result.Count > largeBuffer.Length)
+                        if (assembled + bytesRead > largeBuffer.Length)
                         {
                             var newBuf = ArrayPool<byte>.Shared.Rent(largeBuffer.Length * 2);
                             largeBuffer.AsSpan(0, assembled).CopyTo(newBuf);
                             ArrayPool<byte>.Shared.Return(largeBuffer);
                             largeBuffer = newBuf;
                         }
-                        buffer.AsSpan(0, result.Count).CopyTo(largeBuffer.AsSpan(assembled));
-                        assembled += result.Count;
+                        buffer.AsSpan(0, bytesRead).CopyTo(largeBuffer.AsSpan(assembled));
+                        assembled += bytesRead;
                     }
                     frameBytes = largeBuffer;
                     totalLength = assembled;
@@ -554,7 +559,7 @@ public sealed class BoltClient : IAsyncDisposable
                 else
                 {
                     frameBytes = buffer;
-                    totalLength = result.Count;
+                    totalLength = bytesRead;
                 }
 
                 var data = frameBytes.AsSpan(0, totalLength);
@@ -602,7 +607,7 @@ public sealed class BoltClient : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) { }
-        catch (WebSocketException ex) { _logger.LogWarning("WebSocket receive error: {Error}", ex.Message); }
+        catch (Exception ex) { _logger.LogWarning("Bolt {Transport} receive error: {Error}", conn.TransportType, ex.Message); }
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
@@ -803,13 +808,8 @@ public sealed class BoltClient : IAsyncDisposable
             conn.ReceiveCts?.Cancel();
             if (conn.ReceiveLoop is not null)
                 try { await conn.ReceiveLoop; } catch { }
-            try
-            {
-                if (conn.WebSocket.State == WebSocketState.Open)
-                    await conn.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
-            }
-            catch { }
-            conn.WebSocket.Dispose();
+            try { await conn.Transport.CloseAsync(); } catch { }
+            try { await conn.Transport.DisposeAsync(); } catch { }
             conn.ReceiveCts?.Dispose();
         }
         _connections.Clear();
@@ -817,19 +817,58 @@ public sealed class BoltClient : IAsyncDisposable
 }
 
 /// <summary>
-/// A single WebSocket connection in the Bolt client pool.
+/// A single transport connection in the Bolt client pool.
+/// Wraps IBoltConnection with send locking and pending-send tracking.
 /// </summary>
 public sealed class BoltConnection
 {
-    public ClientWebSocket WebSocket { get; }
+    public IBoltConnection Transport { get; }
+    public BoltTransport TransportType { get; }
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private int _pendingSends;
+
+    /// <summary>
+    /// Backward-compatible WebSocket accessor for Bolt.Media P2P code.
+    /// Returns the underlying ClientWebSocket when transport is WebSocket, null otherwise.
+    /// Will be removed when Bolt.Media migrates to IBoltConnection (Task 7/8).
+    /// </summary>
+    [Obsolete("Use Transport property instead. This exists for Bolt.Media backward compatibility.")]
+    public System.Net.WebSockets.ClientWebSocket WebSocket =>
+        Transport is WebSocketBoltConnection wsConn
+            ? GetUnderlyingWebSocket(wsConn)
+            : throw new InvalidOperationException($"WebSocket property not available on {TransportType} transport. Use Transport instead.");
+
+    [Obsolete("Temporary helper for WebSocket backward compat")]
+    private static System.Net.WebSockets.ClientWebSocket GetUnderlyingWebSocket(WebSocketBoltConnection wsConn)
+    {
+        // Access the underlying WebSocket field via the WebSocket property on WebSocketBoltConnection
+        // WebSocketBoltConnection wraps a WebSocket (base class), but DirectConnectionManager needs ClientWebSocket
+        // For P2P, the WebSocket is always a ClientWebSocket
+        var ws = wsConn.UnderlyingWebSocket;
+        return ws as System.Net.WebSockets.ClientWebSocket
+            ?? throw new InvalidOperationException("Underlying WebSocket is not a ClientWebSocket");
+    }
 
     public CancellationTokenSource? ReceiveCts { get; set; }
     public Task? ReceiveLoop { get; set; }
     public int PendingSends => _pendingSends;
 
-    public BoltConnection(ClientWebSocket webSocket) => WebSocket = webSocket;
+    public BoltConnection(IBoltConnection transport)
+    {
+        Transport = transport;
+        TransportType = transport.TransportType;
+    }
+
+    /// <summary>
+    /// Backward-compatible constructor for Bolt.Media P2P (DirectConnectionManager).
+    /// Wraps a raw ClientWebSocket in a WebSocketBoltConnection.
+    /// Will be removed when Bolt.Media migrates to IBoltConnection (Task 7/8).
+    /// </summary>
+    [Obsolete("Use BoltConnection(IBoltConnection) constructor instead.")]
+    public BoltConnection(System.Net.WebSockets.ClientWebSocket webSocket)
+        : this(new WebSocketBoltConnection(webSocket))
+    {
+    }
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
@@ -838,9 +877,9 @@ public sealed class BoltConnection
         {
             try
             {
-                if (WebSocket.State == WebSocketState.Open)
+                if (Transport.IsConnected)
                 {
-                    var task = WebSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+                    var task = Transport.SendAsync(data, ct);
                     if (task.IsCompleted) { Interlocked.Decrement(ref _pendingSends); return task; }
                     return AwaitAndDecrement(task);
                 }
@@ -862,8 +901,8 @@ public sealed class BoltConnection
         await _sendLock.WaitAsync(ct);
         try
         {
-            if (WebSocket.State == WebSocketState.Open)
-                await WebSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
+            if (Transport.IsConnected)
+                await Transport.SendAsync(data, ct);
         }
         finally { _sendLock.Release(); Interlocked.Decrement(ref _pendingSends); }
     }
