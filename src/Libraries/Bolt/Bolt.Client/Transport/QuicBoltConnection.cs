@@ -20,8 +20,6 @@ public sealed class QuicBoltConnection : IBoltConnection
     private readonly QuicConnection _connection;
     private readonly Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask>? _datagramSend;
     private QuicStream? _primaryStream;
-    private readonly SemaphoreSlim _sendLock = new(1, 1);
-
     // Receive state: tracks partially read messages across ReceiveAsync calls
     private int _remainingMessageBytes;
     private readonly byte[] _lengthBuf = new byte[4];
@@ -59,21 +57,16 @@ public sealed class QuicBoltConnection : IBoltConnection
     {
         if (_primaryStream is null) throw new InvalidOperationException("Primary stream not opened");
 
-        await _sendLock.WaitAsync(ct);
+        // No lock needed — BoltConnection.SendAsync already serializes sends per connection.
+        var totalSize = 4 + data.Length;
+        var buf = ArrayPool<byte>.Shared.Rent(totalSize);
         try
         {
-            // Write length prefix + payload in one call
-            var totalSize = 4 + data.Length;
-            var buf = ArrayPool<byte>.Shared.Rent(totalSize);
-            try
-            {
-                BinaryPrimitives.WriteUInt32LittleEndian(buf, (uint)data.Length);
-                data.Span.CopyTo(buf.AsSpan(4));
-                await _primaryStream.WriteAsync(buf.AsMemory(0, totalSize), ct);
-            }
-            finally { ArrayPool<byte>.Shared.Return(buf); }
+            BinaryPrimitives.WriteUInt32LittleEndian(buf, (uint)data.Length);
+            data.Span.CopyTo(buf.AsSpan(4));
+            await _primaryStream.WriteAsync(buf.AsMemory(0, totalSize), ct);
         }
-        finally { _sendLock.Release(); }
+        finally { ArrayPool<byte>.Shared.Return(buf); }
     }
 
     public async ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
@@ -131,7 +124,6 @@ public sealed class QuicBoltConnection : IBoltConnection
         if (_primaryStream is not null)
             await _primaryStream.DisposeAsync();
         await _connection.DisposeAsync();
-        _sendLock.Dispose();
     }
 
     /// <summary>Read exactly the requested bytes, or return 0 if stream is closed.</summary>

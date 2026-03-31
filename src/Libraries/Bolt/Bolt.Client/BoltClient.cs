@@ -28,7 +28,6 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly BoltTransportNegotiator _negotiator;
 
     private readonly List<BoltConnection> _connections = [];
-    private int _roundRobin;
     private volatile bool _isRegistered;
     private volatile bool _disposed;
 
@@ -329,9 +328,14 @@ public sealed class BoltClient : IAsyncDisposable
             else
             {
                 var conn = GetConnection();
-                await conn.SendAsync(writer.WrittenMemory, ct);
+
+                // Proactive scale-up: if the least-loaded connection is still saturated, open a new one before sending
                 if (conn.PendingSends > _config.ScaleUpThreshold && _connections.Count < _config.MaxConnections)
-                    _ = ScaleUpAsync();
+                {
+                    _ = ScaleUpAsync(); // Start opening new connection in background
+                }
+
+                await conn.SendAsync(writer.WrittenMemory, ct);
             }
 
             using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
@@ -510,8 +514,20 @@ public sealed class BoltClient : IAsyncDisposable
     {
         var count = _connections.Count;
         if (count == 1) return _connections[0];
-        var idx = (uint)Interlocked.Increment(ref _roundRobin) % count;
-        return _connections[(int)idx];
+
+        // Pick the connection with the fewest pending sends
+        var best = _connections[0];
+        var bestPending = best.PendingSends;
+        for (int i = 1; i < count; i++)
+        {
+            var pending = _connections[i].PendingSends;
+            if (pending < bestPending)
+            {
+                best = _connections[i];
+                bestPending = pending;
+            }
+        }
+        return best;
     }
 
     private async Task ReceiveLoopAsync(BoltConnection conn, CancellationToken ct)

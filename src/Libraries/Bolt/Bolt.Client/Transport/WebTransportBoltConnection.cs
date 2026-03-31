@@ -19,7 +19,6 @@ public sealed class WebTransportBoltConnection : IBoltConnection
     private readonly Stream _stream;
     private readonly Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask>? _datagramSend;
     private readonly Func<ValueTask>? _sessionClose;
-    private readonly SemaphoreSlim _sendLock = new(1, 1);
     private volatile bool _closed;
 
     // Receive state
@@ -50,21 +49,17 @@ public sealed class WebTransportBoltConnection : IBoltConnection
 
     public async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
-        await _sendLock.WaitAsync(ct);
+        // No lock needed — BoltConnection.SendAsync already serializes.
+        var totalSize = 4 + data.Length;
+        var buf = ArrayPool<byte>.Shared.Rent(totalSize);
         try
         {
-            var totalSize = 4 + data.Length;
-            var buf = ArrayPool<byte>.Shared.Rent(totalSize);
-            try
-            {
-                BinaryPrimitives.WriteUInt32LittleEndian(buf, (uint)data.Length);
-                data.Span.CopyTo(buf.AsSpan(4));
-                await _stream.WriteAsync(buf.AsMemory(0, totalSize), ct);
-                await _stream.FlushAsync(ct);
-            }
-            finally { ArrayPool<byte>.Shared.Return(buf); }
+            BinaryPrimitives.WriteUInt32LittleEndian(buf, (uint)data.Length);
+            data.Span.CopyTo(buf.AsSpan(4));
+            await _stream.WriteAsync(buf.AsMemory(0, totalSize), ct);
+            await _stream.FlushAsync(ct);
         }
-        finally { _sendLock.Release(); }
+        finally { ArrayPool<byte>.Shared.Return(buf); }
     }
 
     public async ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
@@ -113,7 +108,6 @@ public sealed class WebTransportBoltConnection : IBoltConnection
     {
         _closed = true;
         await _stream.DisposeAsync();
-        _sendLock.Dispose();
     }
 
     private static async Task<int> ReadExactlyOrEofAsync(Stream stream, Memory<byte> buffer, CancellationToken ct)

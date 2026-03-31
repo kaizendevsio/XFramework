@@ -139,9 +139,10 @@ public class PayloadBenchmarks
                     "quic_payload_caller", "QuicPayloadCaller", quicOpts, lf.CreateLogger<BoltClient>());
                 await _boltQuicCaller.ConnectAsync();
             }
-            catch
+            catch (Exception ex)
             {
                 // QUIC may report supported but fail at runtime; benchmarks degrade gracefully
+                Console.WriteLine($"QUIC setup failed: {ex.Message}");
                 _boltQuicService = null;
                 _boltQuicCaller = null;
             }
@@ -428,8 +429,9 @@ public class ThroughputBenchmarks
                     "quic_tp_caller", "QuicThroughputCaller", quicOpts, lf.CreateLogger<BoltClient>());
                 await _boltQuicCaller.ConnectAsync();
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"QUIC setup failed: {ex.Message}");
                 _boltQuicService = null;
                 _boltQuicCaller = null;
             }
@@ -705,8 +707,9 @@ public class ConcurrencyBenchmarks
                     "quic_cc_caller", "QuicConcurrencyCaller", quicOpts, lf.CreateLogger<BoltClient>());
                 await _boltQuicCaller.ConnectAsync();
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"QUIC setup failed: {ex.Message}");
                 _boltQuicService = null;
                 _boltQuicCaller = null;
             }
