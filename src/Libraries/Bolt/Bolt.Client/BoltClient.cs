@@ -108,8 +108,10 @@ public sealed class BoltClient : IAsyncDisposable
 
             if (totalSize < 0 || totalSize > 100 * 1024 * 1024) return; // 100MB safety limit
 
-            // Reassemble payload chunks
-            var buffer = new byte[totalSize];
+            // Reassemble payload chunks into pooled buffer
+            var buffer = ArrayPool<byte>.Shared.Rent(totalSize);
+            try
+            {
             var bytesRead = 0;
             await foreach (var chunk in stream.ReadAllAsync())
             {
@@ -127,7 +129,7 @@ public sealed class BoltClient : IAsyncDisposable
             {
                 try
                 {
-                    (statusCode, responsePayload) = await handler(buffer, requestId);
+                    (statusCode, responsePayload) = await handler(buffer.AsMemory(0, totalSize), requestId);
                 }
                 catch (Exception ex)
                 {
@@ -145,16 +147,21 @@ public sealed class BoltClient : IAsyncDisposable
             // Response: small → single Push, large → stream back
             if (responsePayload.Length <= _config.LargePayloadThreshold)
             {
-                // Small response: single Push frame
-                var respData = new byte[18 + responsePayload.Length];
-                requestId.TryWriteBytes(respData);
-                System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(respData.AsSpan(16), (short)statusCode);
-                responsePayload.CopyTo(respData.AsMemory(18));
+                // Small response: single Push frame — pool the response data buffer
+                var respLen = 18 + responsePayload.Length;
+                var respBuf = ArrayPool<byte>.Shared.Rent(respLen);
+                try
+                {
+                    requestId.TryWriteBytes(respBuf);
+                    System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(respBuf.AsSpan(16), (short)statusCode);
+                    responsePayload.CopyTo(respBuf.AsMemory(18));
 
-                var conn = GetConnection();
-                var writer = RentedBufferWriter.GetThreadLocal();
-                BoltCodec.WritePush(writer, Guid.NewGuid(), senderHash, _senderHash, LargeRpcResponseHash, respData);
-                await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
+                    var conn = GetConnection();
+                    var writer = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WritePush(writer, Guid.NewGuid(), senderHash, _senderHash, LargeRpcResponseHash, respBuf.AsSpan(0, respLen));
+                    await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
+                }
+                finally { ArrayPool<byte>.Shared.Return(respBuf); }
             }
             else
             {
@@ -184,6 +191,8 @@ public sealed class BoltClient : IAsyncDisposable
                 }
                 await respStream.CloseAsync();
             }
+            }
+            finally { ArrayPool<byte>.Shared.Return(buffer); }
         });
 
         // Sender side: resolve pending large RPC calls when SMALL response arrives via Push
@@ -215,18 +224,18 @@ public sealed class BoltClient : IAsyncDisposable
 
             if (totalSize < 0 || totalSize > 100 * 1024 * 1024) return;
 
-            var buffer = new byte[totalSize];
+            var owner = new PooledMemoryOwner(totalSize);
             var bytesRead = 0;
             await foreach (var chunk in respStream.ReadAllAsync())
             {
                 var len = Math.Min(chunk.Length, totalSize - bytesRead);
-                chunk[..len].CopyTo(buffer.AsMemory(bytesRead));
+                chunk.Span[..len].CopyTo(owner.WritableSpan.Slice(bytesRead));
                 bytesRead += len;
                 if (bytesRead >= totalSize) break;
             }
 
             if (_pendingCalls.TryRemove(requestId, out var rpcCall))
-                rpcCall.SetResult(new BoltRpcResponse { StatusCode = statusCode, Data = buffer });
+                rpcCall.SetResult(new BoltRpcResponse { StatusCode = statusCode, Data = owner.Memory });
         });
     }
 
@@ -382,16 +391,26 @@ public sealed class BoltClient : IAsyncDisposable
 
     public async Task<TResponse?> SendAsync<TRequest, TResponse>(string recipientId, string commandName, TRequest request, CancellationToken ct = default)
     {
-        var payload = MemoryPackSerializer.Serialize(request);
-        var result = await InvokeAsync(recipientId, commandName, payload, ct);
-        return result.Data.Length > 0 ? MemoryPackSerializer.Deserialize<TResponse>(result.Data.Span) : default;
+        var serWriter = new RentedBufferWriter(256);
+        try
+        {
+            MemoryPackSerializer.Serialize(serWriter, request);
+            var result = await InvokeAsync(recipientId, commandName, serWriter.WrittenMemory, ct);
+            return result.Data.Length > 0 ? MemoryPackSerializer.Deserialize<TResponse>(result.Data.Span) : default;
+        }
+        finally { serWriter.Dispose(); }
     }
 
     public async Task<HttpStatusCode> SendAsync<TRequest>(string recipientId, string commandName, TRequest request, CancellationToken ct = default)
     {
-        var payload = MemoryPackSerializer.Serialize(request);
-        var result = await InvokeAsync(recipientId, commandName, payload, ct);
-        return result.StatusCode;
+        var serWriter = new RentedBufferWriter(256);
+        try
+        {
+            MemoryPackSerializer.Serialize(serWriter, request);
+            var result = await InvokeAsync(recipientId, commandName, serWriter.WrittenMemory, ct);
+            return result.StatusCode;
+        }
+        finally { serWriter.Dispose(); }
     }
 
     public void RegisterHandler(string commandName, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>> handler)
@@ -434,8 +453,13 @@ public sealed class BoltClient : IAsyncDisposable
     /// <summary>Typed push with MemoryPack serialization.</summary>
     public async ValueTask PushAsync<T>(string recipientId, string commandName, T data, CancellationToken ct = default)
     {
-        var payload = MemoryPackSerializer.Serialize(data);
-        await PushAsync(recipientId, commandName, (ReadOnlyMemory<byte>)payload, ct);
+        var serWriter = new RentedBufferWriter(256);
+        try
+        {
+            MemoryPackSerializer.Serialize(serWriter, data);
+            await PushAsync(recipientId, commandName, serWriter.WrittenMemory, ct);
+        }
+        finally { serWriter.Dispose(); }
     }
 
     // ── Streaming ────────────────────────────────────────────
@@ -542,13 +566,19 @@ public sealed class BoltClient : IAsyncDisposable
                         HandleIncomingResponse(data);
                         break;
                     case FrameType.Request:
-                        var reqData = data.ToArray();
-                        _ = HandleIncomingRequestAsync(conn, reqData, reqData.Length, ct);
+                    {
+                        var reqBuf = ArrayPool<byte>.Shared.Rent(totalLength);
+                        data.CopyTo(reqBuf);
+                        _ = DispatchRequestPooledAsync(conn, reqBuf, totalLength, ct);
                         break;
+                    }
                     case FrameType.Push:
-                        var pushData = data.ToArray();
-                        _ = HandleIncomingPushAsync(pushData, pushData.Length);
+                    {
+                        var pushBuf = ArrayPool<byte>.Shared.Rent(totalLength);
+                        data.CopyTo(pushBuf);
+                        _ = DispatchPushPooledAsync(pushBuf, totalLength);
                         break;
+                    }
                     case FrameType.StreamOpen:
                         HandleStreamOpen(conn, data, ct);
                         break;
@@ -562,8 +592,10 @@ public sealed class BoltClient : IAsyncDisposable
                         // Extensible dispatch: Bolt.Media registers handlers for 0x20-0x26
                         if (_frameHandlers.TryGetValue((byte)frameType, out var handler))
                         {
-                            var handlerData = data.ToArray();
-                            handler(conn, handlerData, result.Count);
+                            var handlerBuf = ArrayPool<byte>.Shared.Rent(totalLength);
+                            data.CopyTo(handlerBuf);
+                            handler(conn, handlerBuf, totalLength);
+                            // Note: frame handlers own the buffer lifetime (Bolt.Media returns it)
                         }
                         break;
                 }
@@ -590,19 +622,31 @@ public sealed class BoltClient : IAsyncDisposable
         }
     }
 
+    private async Task DispatchRequestPooledAsync(BoltConnection conn, byte[] pooledBuf, int length, CancellationToken ct)
+    {
+        try { await HandleIncomingRequestAsync(conn, pooledBuf, length, ct); }
+        finally { ArrayPool<byte>.Shared.Return(pooledBuf); }
+    }
+
+    private async Task DispatchPushPooledAsync(byte[] pooledBuf, int length)
+    {
+        try { await HandleIncomingPushAsync(pooledBuf, length); }
+        finally { ArrayPool<byte>.Shared.Return(pooledBuf); }
+    }
+
     private void HandleIncomingResponse(ReadOnlySpan<byte> data)
     {
         if (!BoltCodec.TryReadResponse(data, out var frame, out _)) return;
         if (_pendingCalls.TryRemove(frame.RequestId, out var rpcCall))
         {
-            // Copy payload — the receive buffer is reused on next iteration.
-            // For large payloads, the caller should process and release quickly.
+            // Copy payload into a PooledMemoryOwner — backed by ArrayPool, auto-returned via GC.
+            // Cost: ~32B object header (vs 512KB+ LOH alloc before).
             ReadOnlyMemory<byte> payload;
             if (frame.PayloadLength > 0)
             {
-                var copy = GC.AllocateUninitializedArray<byte>(frame.PayloadLength);
-                frame.GetPayload(data).CopyTo(copy);
-                payload = copy;
+                var owner = new PooledMemoryOwner(frame.PayloadLength);
+                frame.GetPayload(data).CopyTo(owner.WritableSpan);
+                payload = owner.Memory;
             }
             else
             {
@@ -632,7 +676,11 @@ public sealed class BoltClient : IAsyncDisposable
     {
         if (!BoltCodec.TryReadStreamData(data, out var streamId, out var payloadOffset, out var payloadLength, out _)) return;
         if (_activeStreams.TryGetValue(streamId, out var stream))
-            stream.EnqueueInbound(data.Slice(payloadOffset, payloadLength).ToArray());
+        {
+            var owner = new PooledMemoryOwner(payloadLength);
+            data.Slice(payloadOffset, payloadLength).CopyTo(owner.WritableSpan);
+            stream.EnqueueInbound(owner.Memory);
+        }
     }
 
     private void HandleStreamClose(ReadOnlySpan<byte> data)
