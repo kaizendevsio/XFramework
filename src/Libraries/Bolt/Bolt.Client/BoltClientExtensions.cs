@@ -1,3 +1,4 @@
+using Bolt.Protocol.Transport;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -29,11 +30,28 @@ public class BoltClientBuilder
     /// <summary>Configure connection options.</summary>
     public BoltClientBuilder WithOptions(Action<BoltClientOptions> configure) { configure(Options); return this; }
 
-    /// <summary>Set the minimum number of WebSocket connections. Default: 1.</summary>
+    /// <summary>Set the minimum number of connections. Default: 1.</summary>
     public BoltClientBuilder WithMinConnections(int min) { Options.MinConnections = min; return this; }
 
-    /// <summary>Set the maximum number of WebSocket connections. Default: ProcessorCount.</summary>
+    /// <summary>Set the maximum number of connections. Default: ProcessorCount.</summary>
     public BoltClientBuilder WithMaxConnections(int max) { Options.MaxConnections = max; return this; }
+
+    /// <summary>
+    /// Configure preferred transports. Default: QUIC, WebTransport, WebSocket.
+    /// Example: bolt.WithTransports(BoltTransport.WebSocket) to force WebSocket only.
+    /// </summary>
+    public BoltClientBuilder WithTransports(params BoltTransport[] transports)
+    {
+        Options.PreferredTransports = transports;
+        return this;
+    }
+
+    /// <summary>Set the timeout per transport attempt in milliseconds. Default: 3000.</summary>
+    public BoltClientBuilder WithTransportTimeout(int ms)
+    {
+        Options.TransportAttemptTimeoutMs = ms;
+        return this;
+    }
 
     /// <summary>Set the RPC timeout in seconds. Default: 30.</summary>
     public BoltClientBuilder WithTimeout(int seconds) { Options.RpcTimeoutSeconds = seconds; return this; }
