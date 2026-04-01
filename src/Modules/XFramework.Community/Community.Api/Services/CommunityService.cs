@@ -253,4 +253,40 @@ public sealed class CommunityService : ICommunityService
             return Result<List<CommunityConnection>>.Failure("An error occurred while retrieving connections", 500);
         }
     }
+
+    /// <inheritdoc />
+    public async Task<Result<CmdResponse>> UpdateIdentityFileAsync(
+        UpdateIdentityFileRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (request.RequestingIdentityId != request.IdentityId)
+                return Result<CmdResponse>.Forbidden("You can only update your own identity files");
+
+            var file = await _dataContext.Query<CommunityIdentityFile>()
+                .Where(f => f.Id == request.FileId && f.IdentityId == request.IdentityId && !f.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (file == null)
+                return Result<CmdResponse>.NotFound($"Identity file with Id {request.FileId} does not exist");
+
+            file.StorageId = request.StorageFileId;
+            file.ModifiedAt = DateTime.UtcNow;
+
+            _dataContext.Update(file);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Identity file updated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("UpdateIdentityFile", "CommunityIdentityFile", request.FileId, ex.Message, ex);
+            return Result<CmdResponse>.Failure("An error occurred while updating identity file", 500);
+        }
+    }
 }

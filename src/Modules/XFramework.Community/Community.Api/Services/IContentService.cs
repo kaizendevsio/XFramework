@@ -65,4 +65,25 @@ public interface IContentService
     Task<Result<PaginatedResult<SearchIdentitiesResponse>>> SearchIdentitiesAsync(
         SearchIdentitiesRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Attaches a file to content
+    /// </summary>
+    Task<Result<CmdResponse>> CreateContentFileAsync(
+        CreateContentFileVsaRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists files attached to content
+    /// </summary>
+    Task<Result<List<ContentFileResponse>>> GetContentFilesAsync(
+        GetContentFilesRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a file from content
+    /// </summary>
+    Task<Result<CmdResponse>> DeleteContentFileAsync(
+        DeleteContentFileRequest request,
+        CancellationToken cancellationToken = default);
 }
