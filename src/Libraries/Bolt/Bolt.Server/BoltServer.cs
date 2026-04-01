@@ -79,6 +79,7 @@ public sealed class BoltServer : IDisposable
     public async Task HandleConnectionAsync(IBoltConnection transport, CancellationToken ct)
     {
         var connection = new BoltHubConnection(transport);
+        connection.StartSendLoop(ct);
         var receiveBuffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
         byte[]? largeBuffer = null;
 
@@ -138,6 +139,7 @@ public sealed class BoltServer : IDisposable
         }
         finally
         {
+            connection.CompleteSendChannel();
             ArrayPool<byte>.Shared.Return(receiveBuffer);
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             RemoveConnection(connection);
@@ -1124,10 +1126,18 @@ public sealed class BoltServer : IDisposable
     }
 }
 
+/// <summary>
+/// Server-side wrapper for a connected client's transport.
+/// Uses a Channel-based send queue with a dedicated background send loop
+/// so callers never block — writes go into the channel instantly.
+/// The single-reader send loop drains the channel and writes to the transport
+/// one at a time, eliminating lock contention for all transports.
+/// </summary>
 public sealed class BoltHubConnection
 {
     private readonly IBoltConnection _transport;
-    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly Channel<ReadOnlyMemory<byte>> _sendChannel;
+    private Task? _sendLoop;
 
     public string StreamId { get; } = Guid.NewGuid().ToString("N");
     public string? ClientId { get; set; }
@@ -1149,60 +1159,59 @@ public sealed class BoltHubConnection
     /// <summary>True if this connection is under backpressure (pending > drop threshold).</summary>
     public bool IsUnderPressure => PendingBytes > BackpressureDropThreshold;
 
-    public BoltHubConnection(IBoltConnection transport) => _transport = transport;
-
-    /// <summary>
-    /// Send data with fast-path for uncontended lock. Tracks pending bytes for backpressure.
-    /// </summary>
-    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    public BoltHubConnection(IBoltConnection transport)
     {
-        Interlocked.Add(ref _pendingBytes, data.Length);
-
-        // Fast path: no contention — send synchronously, zero overhead
-        if (_sendLock.Wait(0))
-        {
-            if (_transport.IsConnected)
+        _transport = transport;
+        _sendChannel = Channel.CreateBounded<ReadOnlyMemory<byte>>(
+            new BoundedChannelOptions(4096)
             {
-                var task = _transport.SendAsync(data, ct);
-                if (task.IsCompleted)
-                {
-                    // Synchronous completion — release lock immediately
-                    _sendLock.Release();
-                    Interlocked.Add(ref _pendingBytes, -data.Length);
-                    return task;
-                }
-                // Async completion — hold lock until write finishes
-                // (QUIC/WebTransport streams throw on concurrent writes)
-                return AwaitSendAndRelease(task, data.Length);
-            }
-            _sendLock.Release();
-            Interlocked.Add(ref _pendingBytes, -data.Length);
-            return ValueTask.CompletedTask;
-        }
-        // Slow path: contention — await lock
-        return SendSlowAsync(data, ct);
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = false
+            });
     }
 
-    private async ValueTask AwaitSendAndRelease(ValueTask task, int size)
+    /// <summary>Start the background send loop. Call once after construction.</summary>
+    public void StartSendLoop(CancellationToken ct)
     {
-        try { await task; }
-        finally { _sendLock.Release(); Interlocked.Add(ref _pendingBytes, -size); }
+        _sendLoop = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var data in _sendChannel.Reader.ReadAllAsync(ct))
+                {
+                    try
+                    {
+                        if (_transport.IsConnected)
+                            await _transport.SendAsync(data, ct);
+                    }
+                    catch (OperationCanceledException) { }
+                    catch { /* Transport error — receive loop will detect disconnect */ }
+                    finally { Interlocked.Add(ref _pendingBytes, -data.Length); }
+                }
+            }
+            catch (OperationCanceledException) { }
+        }, ct);
+    }
+
+    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        // Copy data — the caller's buffer (often a thread-local RentedBufferWriter or pooled receive buffer)
+        // may be reused before the background send loop processes this item.
+        var copy = data.ToArray();
+        Interlocked.Add(ref _pendingBytes, copy.Length);
+        if (_sendChannel.Writer.TryWrite(copy))
+            return ValueTask.CompletedTask;
+        return SendSlowAsync(copy, ct);
     }
 
     private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        await _sendLock.WaitAsync(ct);
-        try
-        {
-            if (_transport.IsConnected)
-                await _transport.SendAsync(data, ct);
-        }
-        finally
-        {
-            _sendLock.Release();
-            Interlocked.Add(ref _pendingBytes, -data.Length);
-        }
+        await _sendChannel.Writer.WriteAsync(data, ct);
     }
+
+    /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>
+    public void CompleteSendChannel() => _sendChannel.Writer.TryComplete();
 }
 
 /// <summary>

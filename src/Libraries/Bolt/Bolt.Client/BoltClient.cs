@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net;
+using System.Threading.Channels;
 using Bolt.Client.Transport;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
@@ -262,6 +263,7 @@ public sealed class BoltClient : IAsyncDisposable
 
         var receiveCts = new CancellationTokenSource();
         conn.ReceiveCts = receiveCts;
+        conn.StartSendLoop(receiveCts.Token);
         conn.ReceiveLoop = Task.Run(() => ReceiveLoopAsync(conn, receiveCts.Token));
         return conn;
     }
@@ -293,7 +295,7 @@ public sealed class BoltClient : IAsyncDisposable
                 var delay = TimeSpan.FromMilliseconds(Math.Min(baseDelay.TotalMilliseconds * Math.Pow(2, attempt), maxDelay.TotalMilliseconds));
                 var jitter = TimeSpan.FromMilliseconds(random.Next(0, (int)(delay.TotalMilliseconds * 0.3)));
                 await Task.Delay(delay + jitter, ct);
-                foreach (var c in _connections) { try { await c.Transport.DisposeAsync(); } catch { } }
+                foreach (var c in _connections) { c.CompleteSendChannel(); c.ReceiveCts?.Cancel(); try { await c.Transport.DisposeAsync(); } catch { } }
                 _connections.Clear();
             }
         }
@@ -821,7 +823,10 @@ public sealed class BoltClient : IAsyncDisposable
         _disposed = true;
         foreach (var conn in _connections)
         {
+            conn.CompleteSendChannel();
             conn.ReceiveCts?.Cancel();
+            if (conn.SendLoop is not null)
+                try { await conn.SendLoop; } catch { }
             if (conn.ReceiveLoop is not null)
                 try { await conn.ReceiveLoop; } catch { }
             try { await conn.Transport.CloseAsync(); } catch { }
@@ -834,13 +839,16 @@ public sealed class BoltClient : IAsyncDisposable
 
 /// <summary>
 /// A single transport connection in the Bolt client pool.
-/// Wraps IBoltConnection with send locking and pending-send tracking.
+/// Uses a Channel-based send queue with a dedicated background send loop
+/// so callers never block — writes go into the channel instantly.
+/// The single-reader send loop drains the channel and writes to the transport
+/// one at a time, eliminating lock contention for all transports (WebSocket, QUIC, WebTransport).
 /// </summary>
 public sealed class BoltConnection
 {
     public IBoltConnection Transport { get; }
     public BoltTransport TransportType { get; }
-    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly Channel<(ReadOnlyMemory<byte> Data, CancellationToken Ct)> _sendChannel;
     private int _pendingSends;
 
     /// <summary>
@@ -867,12 +875,20 @@ public sealed class BoltConnection
 
     public CancellationTokenSource? ReceiveCts { get; set; }
     public Task? ReceiveLoop { get; set; }
+    public Task? SendLoop { get; set; }
     public int PendingSends => _pendingSends;
 
     public BoltConnection(IBoltConnection transport)
     {
         Transport = transport;
         TransportType = transport.TransportType;
+        _sendChannel = Channel.CreateBounded<(ReadOnlyMemory<byte>, CancellationToken)>(
+            new BoundedChannelOptions(4096)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = false
+            });
     }
 
     /// <summary>
@@ -886,48 +902,47 @@ public sealed class BoltConnection
     {
     }
 
-    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    /// <summary>Start the background send loop. Call once after construction.</summary>
+    public void StartSendLoop(CancellationToken ct)
     {
-        Interlocked.Increment(ref _pendingSends);
-        if (_sendLock.Wait(0))
+        SendLoop = Task.Run(async () =>
         {
-            if (Transport.IsConnected)
+            try
             {
-                var task = Transport.SendAsync(data, ct);
-                if (task.IsCompleted)
+                await foreach (var (data, sendCt) in _sendChannel.Reader.ReadAllAsync(ct))
                 {
-                    // Synchronous completion — release lock immediately
-                    _sendLock.Release();
-                    Interlocked.Decrement(ref _pendingSends);
-                    return task;
+                    try
+                    {
+                        if (Transport.IsConnected)
+                            await Transport.SendAsync(data, sendCt);
+                    }
+                    catch (OperationCanceledException) { }
+                    catch { /* Transport error — receive loop will detect disconnect */ }
+                    finally { Interlocked.Decrement(ref _pendingSends); }
                 }
-                // Async completion — hold lock until write finishes
-                // (QUIC/WebTransport streams throw on concurrent writes)
-                return AwaitSendAndRelease(task);
             }
-            _sendLock.Release();
-            Interlocked.Decrement(ref _pendingSends);
-            return ValueTask.CompletedTask;
-        }
-        return SendSlowAsync(data, ct);
+            catch (OperationCanceledException) { }
+        }, ct);
     }
 
-    private async ValueTask AwaitSendAndRelease(ValueTask task)
+    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        try { await task; }
-        finally { _sendLock.Release(); Interlocked.Decrement(ref _pendingSends); }
+        // Copy data — the caller's buffer (often a thread-local RentedBufferWriter) may be
+        // reused before the background send loop processes this item.
+        var copy = data.ToArray();
+        Interlocked.Increment(ref _pendingSends);
+        if (_sendChannel.Writer.TryWrite((copy, ct)))
+            return ValueTask.CompletedTask;
+        return SendSlowAsync(copy, ct);
     }
 
     private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        await _sendLock.WaitAsync(ct);
-        try
-        {
-            if (Transport.IsConnected)
-                await Transport.SendAsync(data, ct);
-        }
-        finally { _sendLock.Release(); Interlocked.Decrement(ref _pendingSends); }
+        await _sendChannel.Writer.WriteAsync((data, ct), ct);
     }
+
+    /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>
+    public void CompleteSendChannel() => _sendChannel.Writer.TryComplete();
 }
 
 /// <summary>Response data from an RPC call.</summary>
