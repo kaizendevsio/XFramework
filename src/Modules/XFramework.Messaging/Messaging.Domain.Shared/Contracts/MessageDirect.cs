@@ -50,7 +50,7 @@ public partial class MessageDirect : BaseModel
     public DateTime? SentAt { get; set; }
     
     [MemoryPackOrder(14)]
-    public DateTime? RecievedAt { get; set; }
+    public DateTime? ReceivedAt { get; set; }
 
     [MemoryPackOrder(15)]
     public virtual ICollection<MessageDirect> InverseParentMessage { get; set; } = [];

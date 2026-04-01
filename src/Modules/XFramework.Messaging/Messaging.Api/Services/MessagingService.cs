@@ -122,7 +122,7 @@ public sealed class MessagingService(
             record.Status = MessageStatus.Sent;
             record.AgentClusterId = request.AgentClusterId;
             record.SentAt = request.SentAt;
-            record.RecievedAt = request.RecievedAt;
+            record.ReceivedAt = request.ReceivedAt;
 
             dataContext.Update(record);
             await dataContext.SaveChangesAsync(ct);

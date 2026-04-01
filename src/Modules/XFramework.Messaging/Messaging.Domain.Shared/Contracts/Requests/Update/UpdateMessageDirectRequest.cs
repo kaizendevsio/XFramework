@@ -10,5 +10,5 @@ public partial record UpdateMessageDirectRequest : RequestBase,
     public Guid? Id { get; set; }
     public Guid AgentClusterId { get; set; }
     public DateTime? SentAt { get; set; }
-    public DateTime? RecievedAt { get; set; }
+    public DateTime? ReceivedAt { get; set; }
 }
