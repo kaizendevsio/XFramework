@@ -81,7 +81,7 @@ public sealed class BoltTransportNegotiator
         }, ct);
 
         var quicConn = new QuicBoltConnection(connection);
-        await quicConn.OpenPrimaryStreamAsync(ct);
+        quicConn.StartAcceptLoop(ct);
         return quicConn;
     }
 

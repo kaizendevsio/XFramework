@@ -135,6 +135,7 @@ public class QuicTransportIntegrationTests
                 DefaultStreamErrorCode = 0,
                 DefaultCloseErrorCode = 0,
                 MaxInboundBidirectionalStreams = 256,
+                    MaxInboundUnidirectionalStreams = 256,
                 ServerAuthenticationOptions = new SslServerAuthenticationOptions
                 {
                     ServerCertificate = _cert,
@@ -164,7 +165,7 @@ public class QuicTransportIntegrationTests
         try
         {
             var transport = new QuicBoltConnection(quicConn);
-            await transport.AcceptPrimaryStreamAsync(ct);
+            transport.StartAcceptLoop(ct);
             await _server.HandleConnectionAsync(transport, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

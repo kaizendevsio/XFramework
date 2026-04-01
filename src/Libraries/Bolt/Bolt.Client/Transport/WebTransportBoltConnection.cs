@@ -45,6 +45,8 @@ public sealed class WebTransportBoltConnection : IBoltConnection
 
     public bool SupportsDatagrams => _datagramSend is not null;
 
+    public bool SupportsParallelSend => false;
+
     public bool IsConnected => !_closed && _stream.CanRead && _stream.CanWrite;
 
     public async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)

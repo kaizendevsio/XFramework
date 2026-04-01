@@ -233,6 +233,7 @@ public class PayloadBenchmarks
                 DefaultStreamErrorCode = 0,
                 DefaultCloseErrorCode = 0,
                 MaxInboundBidirectionalStreams = 256,
+                    MaxInboundUnidirectionalStreams = 256,
                 ServerAuthenticationOptions = new SslServerAuthenticationOptions
                 {
                     ServerCertificate = cert,
@@ -253,7 +254,7 @@ public class PayloadBenchmarks
                         try
                         {
                             var transport = new QuicBoltConnection(quicConn);
-                            await transport.AcceptPrimaryStreamAsync(ct);
+                            transport.StartAcceptLoop(ct);
                             await server.HandleConnectionAsync(transport, ct);
                         }
                         catch { }
@@ -529,6 +530,7 @@ public class ThroughputBenchmarks
                 DefaultStreamErrorCode = 0,
                 DefaultCloseErrorCode = 0,
                 MaxInboundBidirectionalStreams = 256,
+                    MaxInboundUnidirectionalStreams = 256,
                 ServerAuthenticationOptions = new SslServerAuthenticationOptions
                 {
                     ServerCertificate = cert,
@@ -549,7 +551,7 @@ public class ThroughputBenchmarks
                         try
                         {
                             var transport = new QuicBoltConnection(quicConn);
-                            await transport.AcceptPrimaryStreamAsync(ct);
+                            transport.StartAcceptLoop(ct);
                             await server.HandleConnectionAsync(transport, ct);
                         }
                         catch { }
@@ -809,6 +811,7 @@ public class ConcurrencyBenchmarks
                 DefaultStreamErrorCode = 0,
                 DefaultCloseErrorCode = 0,
                 MaxInboundBidirectionalStreams = 256,
+                    MaxInboundUnidirectionalStreams = 256,
                 ServerAuthenticationOptions = new SslServerAuthenticationOptions
                 {
                     ServerCertificate = cert,
@@ -829,7 +832,7 @@ public class ConcurrencyBenchmarks
                         try
                         {
                             var transport = new QuicBoltConnection(quicConn);
-                            await transport.AcceptPrimaryStreamAsync(ct);
+                            transport.StartAcceptLoop(ct);
                             await server.HandleConnectionAsync(transport, ct);
                         }
                         catch { }

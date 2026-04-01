@@ -31,6 +31,14 @@ public interface IBoltConnection : IAsyncDisposable
     /// <summary>Whether this transport supports unreliable datagrams (QUIC/WebTransport only).</summary>
     bool SupportsDatagrams { get; }
 
+    /// <summary>
+    /// True if this transport supports parallel sends without external serialization.
+    /// QUIC: each send opens its own stream (inherently parallel).
+    /// WebSocket: requires serialized sends (single connection).
+    /// When true, BoltConnection bypasses the Channel send queue for direct sends.
+    /// </summary>
+    bool SupportsParallelSend { get; }
+
     /// <summary>Connection is open and usable.</summary>
     bool IsConnected { get; }
 
