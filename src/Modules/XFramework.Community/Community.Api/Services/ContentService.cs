@@ -18,13 +18,16 @@ namespace Community.Api.Services;
 public sealed class ContentService : IContentService
 {
     private readonly IDataContext _dataContext;
+    private readonly IConnectionService _connectionService;
     private readonly ILogger<ContentService> _logger;
 
     public ContentService(
         IDataContext dataContext,
+        IConnectionService connectionService,
         ILogger<ContentService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
+        _connectionService = connectionService ?? throw new ArgumentNullException(nameof(connectionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -291,6 +294,10 @@ public sealed class ContentService : IContentService
                 return Result<CmdResponse>.NotFound($"Community identity with Id {request.IdentityId} does not exist");
             }
 
+            // Block check
+            if (await _connectionService.IsBlockedAsync(request.IdentityId, content.SocialMediaIdentityId, cancellationToken))
+                return Result<CmdResponse>.Forbidden("Cannot react — a block exists between you and the content author");
+
             // Prevent duplicate (same identity + same type on same content)
             var existingReaction = await _dataContext.Query<CommunityContentReaction>()
                 .Where(r => r.ContentId == request.ContentId
@@ -477,6 +484,17 @@ public sealed class ContentService : IContentService
                 query = query.Where(i =>
                     (i.HandleName != null && i.HandleName.ToLower().Contains(searchTerm)) ||
                     (i.Alias != null && i.Alias.ToLower().Contains(searchTerm)));
+            }
+
+            // Block enforcement: exclude blocked identities if a requester context is provided
+            if (request.RequestingIdentityId.HasValue && request.RequestingIdentityId.Value != Guid.Empty)
+            {
+                var blockedIds = await _connectionService.GetBlockedIdentityIdsAsync(request.RequestingIdentityId.Value, cancellationToken);
+                if (blockedIds.Count > 0)
+                {
+                    var blockedList = blockedIds.ToList();
+                    query = query.Where(i => !blockedList.Contains(i.Id));
+                }
             }
 
             var totalItems = await query.CountAsync(cancellationToken);

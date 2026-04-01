@@ -42,6 +42,10 @@ public sealed class ConnectionService : IConnectionService
                 return Result<CmdResponse>.Failure("Cannot create a connection to yourself", 400);
             }
 
+            // Check if either party has blocked the other
+            if (await IsBlockedAsync(request.SourceIdentityId, request.TargetIdentityId, cancellationToken))
+                return Result<CmdResponse>.Forbidden("Cannot create connection — a block exists between these identities");
+
             // Validate source identity exists
             var sourceIdentity = await _dataContext.Query<CommunityIdentity>()
                 .Where(i => i.Id == request.SourceIdentityId)
@@ -170,5 +174,31 @@ public sealed class ConnectionService : IConnectionService
             _logger.CommunityConnectionDeleteError(request.Id, ex);
             return Result<CmdResponse>.Failure("An error occurred while deleting the connection", 500);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsBlockedAsync(Guid identityA, Guid identityB, CancellationToken cancellationToken = default)
+    {
+        return await _dataContext.Query<CommunityConnection>()
+            .Where(c => c.TypeId == Community.Domain.Shared.CommunityConnectionTypes.Block)
+            .Where(c => !c.IsDeleted && c.IsEnabled)
+            .Where(c =>
+                (c.SourceSocialMediaIdentityId == identityA && c.TargetSocialMediaIdentityId == identityB) ||
+                (c.SourceSocialMediaIdentityId == identityB && c.TargetSocialMediaIdentityId == identityA))
+            .AnyAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<HashSet<Guid>> GetBlockedIdentityIdsAsync(Guid identityId, CancellationToken cancellationToken = default)
+    {
+        var blocked = await _dataContext.Query<CommunityConnection>()
+            .Where(c => c.TypeId == Community.Domain.Shared.CommunityConnectionTypes.Block)
+            .Where(c => !c.IsDeleted && c.IsEnabled)
+            .Where(c => c.SourceSocialMediaIdentityId == identityId || c.TargetSocialMediaIdentityId == identityId)
+            .ToListAsync(cancellationToken);
+
+        return blocked.Select(c => c.SourceSocialMediaIdentityId == identityId
+            ? c.TargetSocialMediaIdentityId
+            : c.SourceSocialMediaIdentityId).ToHashSet();
     }
 }
