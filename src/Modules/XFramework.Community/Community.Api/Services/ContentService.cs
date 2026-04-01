@@ -214,6 +214,55 @@ public sealed class ContentService : IContentService
     }
 
     /// <inheritdoc />
+    public async Task<Result<CmdResponse>> EditContentAsync(
+        EditContentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.Id == request.ContentId && !c.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (content == null)
+            {
+                _logger.EntityNotFound("CommunityContent", request.ContentId);
+                return Result<CmdResponse>.NotFound($"Content with Id {request.ContentId} does not exist");
+            }
+
+            if (content.SocialMediaIdentityId != request.RequestingIdentityId)
+            {
+                _logger.BusinessRuleViolation("EditContent", $"Identity {request.RequestingIdentityId} does not own content {request.ContentId}");
+                return Result<CmdResponse>.Forbidden("You do not have permission to edit this content");
+            }
+
+            if (request.Text is not null)
+                content.Text = request.Text;
+
+            if (request.Title is not null)
+                content.Title = request.Title;
+
+            content.ModifiedAt = DateTime.UtcNow;
+
+            _dataContext.Update(content);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            _logger.EntityUpdated("CommunityContent", request.ContentId);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Content updated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("EditContent", "CommunityContent", request.ContentId, ex.Message, ex);
+            return Result<CmdResponse>.Failure("An error occurred while editing content", 500);
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<Result<CmdResponse>> CreateContentReactionAsync(
         CreateContentReactionRequest request,
         CancellationToken cancellationToken = default)

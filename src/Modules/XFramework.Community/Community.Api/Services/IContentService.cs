@@ -32,6 +32,13 @@ public interface IContentService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Edits content owned by the requester (partial update)
+    /// </summary>
+    Task<Result<CmdResponse>> EditContentAsync(
+        EditContentRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates a reaction on a content item
     /// </summary>
     Task<Result<CmdResponse>> CreateContentReactionAsync(
