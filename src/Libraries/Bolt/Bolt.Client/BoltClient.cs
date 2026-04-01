@@ -206,7 +206,17 @@ public sealed class BoltClient : IAsyncDisposable
             var span = payload.Span;
             var requestId = new Guid(span[..16]);
             var statusCode = (HttpStatusCode)System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(span[16..]);
-            var respPayload = payload.Length > 18 ? payload[18..].ToArray() : Array.Empty<byte>();
+            ReadOnlyMemory<byte> respPayload;
+            if (payload.Length > 18)
+            {
+                var owner = new PooledMemoryOwner(payload.Length - 18);
+                payload.Span[18..].CopyTo(owner.WritableSpan);
+                respPayload = owner.Memory;
+            }
+            else
+            {
+                respPayload = ReadOnlyMemory<byte>.Empty;
+            }
 
             if (_pendingCalls.TryRemove(requestId, out var rpcCall))
                 rpcCall.SetResult(new BoltRpcResponse { StatusCode = statusCode, Data = respPayload });
@@ -251,14 +261,16 @@ public sealed class BoltClient : IAsyncDisposable
         var conn = new BoltConnection(transport);
 
         // Send registration frame (same for all transports)
-        var writer = new ArrayBufferWriter<byte>(128);
-        BoltCodec.WriteRegister(writer, _clientId, _clientName);
-        await transport.SendAsync(writer.WrittenMemory, ct);
+        var regWriter = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteRegister(regWriter, _clientId, _clientName);
+        await transport.SendAsync(regWriter.WrittenMemory, ct);
 
         // Read registration ack
-        var ackBuffer = new byte[2];
+        var ackBuffer = ArrayPool<byte>.Shared.Rent(2);
         var (ackBytes, _) = await transport.ReceiveAsync(ackBuffer, ct);
-        if (ackBytes < 2 || (FrameType)ackBuffer[0] != FrameType.RegisterAck || ackBuffer[1] != 1)
+        var ackValid = ackBytes >= 2 && (FrameType)ackBuffer[0] == FrameType.RegisterAck && ackBuffer[1] == 1;
+        ArrayPool<byte>.Shared.Return(ackBuffer);
+        if (!ackValid)
             throw new InvalidOperationException("Server rejected registration");
 
         var receiveCts = new CancellationTokenSource();
@@ -848,7 +860,7 @@ public sealed class BoltConnection
 {
     public IBoltConnection Transport { get; }
     public BoltTransport TransportType { get; }
-    private readonly Channel<(ReadOnlyMemory<byte> Data, CancellationToken Ct)> _sendChannel;
+    private readonly Channel<(byte[] Buffer, int Length, CancellationToken Ct)> _sendChannel;
     private int _pendingSends;
 
     /// <summary>
@@ -882,7 +894,7 @@ public sealed class BoltConnection
     {
         Transport = transport;
         TransportType = transport.TransportType;
-        _sendChannel = Channel.CreateBounded<(ReadOnlyMemory<byte>, CancellationToken)>(
+        _sendChannel = Channel.CreateBounded<(byte[], int, CancellationToken)>(
             new BoundedChannelOptions(4096)
             {
                 FullMode = BoundedChannelFullMode.Wait,
@@ -909,16 +921,20 @@ public sealed class BoltConnection
         {
             try
             {
-                await foreach (var (data, sendCt) in _sendChannel.Reader.ReadAllAsync(ct))
+                await foreach (var (buf, len, sendCt) in _sendChannel.Reader.ReadAllAsync(ct))
                 {
                     try
                     {
                         if (Transport.IsConnected)
-                            await Transport.SendAsync(data, sendCt);
+                            await Transport.SendAsync(buf.AsMemory(0, len), sendCt);
                     }
                     catch (OperationCanceledException) { }
                     catch { /* Transport error — receive loop will detect disconnect */ }
-                    finally { Interlocked.Decrement(ref _pendingSends); }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(buf);
+                        Interlocked.Decrement(ref _pendingSends);
+                    }
                 }
             }
             catch (OperationCanceledException) { }
@@ -927,18 +943,21 @@ public sealed class BoltConnection
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        // Copy data — the caller's buffer (often a thread-local RentedBufferWriter) may be
-        // reused before the background send loop processes this item.
-        var copy = data.ToArray();
+        // Snapshot into a pooled buffer — the caller's buffer (often a thread-local
+        // RentedBufferWriter) may be reused before the send loop processes this item.
+        // The pooled buffer is returned to ArrayPool after the transport write completes.
+        var len = data.Length;
+        var buf = ArrayPool<byte>.Shared.Rent(len);
+        data.Span.CopyTo(buf);
         Interlocked.Increment(ref _pendingSends);
-        if (_sendChannel.Writer.TryWrite((copy, ct)))
+        if (_sendChannel.Writer.TryWrite((buf, len, ct)))
             return ValueTask.CompletedTask;
-        return SendSlowAsync(copy, ct);
+        return SendSlowAsync(buf, len, ct);
     }
 
-    private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)
     {
-        await _sendChannel.Writer.WriteAsync((data, ct), ct);
+        await _sendChannel.Writer.WriteAsync((buf, len, ct), ct);
     }
 
     /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>

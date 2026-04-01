@@ -1136,7 +1136,7 @@ public sealed class BoltServer : IDisposable
 public sealed class BoltHubConnection
 {
     private readonly IBoltConnection _transport;
-    private readonly Channel<ReadOnlyMemory<byte>> _sendChannel;
+    private readonly Channel<(byte[] Buffer, int Length)> _sendChannel;
     private Task? _sendLoop;
 
     public string StreamId { get; } = Guid.NewGuid().ToString("N");
@@ -1162,7 +1162,7 @@ public sealed class BoltHubConnection
     public BoltHubConnection(IBoltConnection transport)
     {
         _transport = transport;
-        _sendChannel = Channel.CreateBounded<ReadOnlyMemory<byte>>(
+        _sendChannel = Channel.CreateBounded<(byte[], int)>(
             new BoundedChannelOptions(4096)
             {
                 FullMode = BoundedChannelFullMode.Wait,
@@ -1178,16 +1178,20 @@ public sealed class BoltHubConnection
         {
             try
             {
-                await foreach (var data in _sendChannel.Reader.ReadAllAsync(ct))
+                await foreach (var (buf, len) in _sendChannel.Reader.ReadAllAsync(ct))
                 {
                     try
                     {
                         if (_transport.IsConnected)
-                            await _transport.SendAsync(data, ct);
+                            await _transport.SendAsync(buf.AsMemory(0, len), ct);
                     }
                     catch (OperationCanceledException) { }
                     catch { /* Transport error — receive loop will detect disconnect */ }
-                    finally { Interlocked.Add(ref _pendingBytes, -data.Length); }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(buf);
+                        Interlocked.Add(ref _pendingBytes, -len);
+                    }
                 }
             }
             catch (OperationCanceledException) { }
@@ -1196,18 +1200,20 @@ public sealed class BoltHubConnection
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        // Copy data — the caller's buffer (often a thread-local RentedBufferWriter or pooled receive buffer)
-        // may be reused before the background send loop processes this item.
-        var copy = data.ToArray();
-        Interlocked.Add(ref _pendingBytes, copy.Length);
-        if (_sendChannel.Writer.TryWrite(copy))
+        // Snapshot into a pooled buffer — the caller's buffer (thread-local RentedBufferWriter
+        // or pooled receive buffer) may be reused before the send loop processes this item.
+        var len = data.Length;
+        var buf = ArrayPool<byte>.Shared.Rent(len);
+        data.Span.CopyTo(buf);
+        Interlocked.Add(ref _pendingBytes, len);
+        if (_sendChannel.Writer.TryWrite((buf, len)))
             return ValueTask.CompletedTask;
-        return SendSlowAsync(copy, ct);
+        return SendSlowAsync(buf, len, ct);
     }
 
-    private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)
     {
-        await _sendChannel.Writer.WriteAsync(data, ct);
+        await _sendChannel.Writer.WriteAsync((buf, len), ct);
     }
 
     /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>
