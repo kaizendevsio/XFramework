@@ -15,5 +15,8 @@ public sealed class ServicesInstaller : IInstaller
         // Register Community Services (VSA Architecture)
         services.AddScoped<ICommunityService, CommunityService>();
         services.AddScoped<IContentService, ContentService>();
+        services.AddScoped<IConnectionService, ConnectionService>();
+        services.AddScoped<IFeedService, FeedService>();
+        services.AddScoped<INotificationService, NotificationService>();
     }
 }

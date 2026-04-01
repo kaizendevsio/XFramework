@@ -14,10 +14,6 @@ builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
     builder.Configuration,
     "Community");
 
-// Register Community services
-builder.Services.AddScoped<ICommunityService, CommunityService>();
-builder.Services.AddScoped<IContentService, ContentService>();
-
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
