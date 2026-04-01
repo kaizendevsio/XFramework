@@ -4,7 +4,7 @@ namespace Messaging.Domain.Shared.Contracts;
 [MemoryPackable(GenerateType.CircularReference)]
 public partial class MessageReaction : BaseModel
 {
-    
+
     [MemoryPackOrder(0)]
     public Guid MessageId { get; set; }
 
@@ -16,4 +16,10 @@ public partial class MessageReaction : BaseModel
 
     [MemoryPackOrder(3)]
     public virtual Message Message { get; set; } = null!;
+
+    [MemoryPackOrder(4)]
+    public Guid MessageThreadMemberId { get; set; }
+
+    [MemoryPackOrder(5)]
+    public virtual MessageThreadMember MessageThreadMember { get; set; } = null!;
 }

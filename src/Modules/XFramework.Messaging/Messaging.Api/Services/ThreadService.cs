@@ -717,6 +717,7 @@ public sealed class ThreadService(
             var duplicateExists = await dataContext.Query<MessageReaction>()
                 .Where(r => r.MessageId == request.MessageId)
                 .Where(r => r.TypeId == request.TypeId)
+                .Where(r => r.MessageThreadMemberId == member.Id)
                 .Where(r => !r.IsDeleted && r.IsEnabled)
                 .AnyAsync(ct);
 
@@ -727,6 +728,7 @@ public sealed class ThreadService(
             {
                 MessageId = request.MessageId,
                 TypeId = request.TypeId,
+                MessageThreadMemberId = member.Id,
                 IsEnabled = true
             };
 
@@ -775,6 +777,9 @@ public sealed class ThreadService(
 
             if (member is null)
                 return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
+
+            if (reaction.MessageThreadMemberId != member.Id)
+                return Result<CmdResponse>.Forbidden("You can only delete your own reactions");
 
             reaction.IsDeleted = true;
             reaction.IsEnabled = false;
