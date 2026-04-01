@@ -200,6 +200,51 @@ public sealed class ThreadService(
         }
     }
 
+    public async Task<Result<CmdResponse>> UpdateThreadAsync(UpdateThreadRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var thread = await dataContext.Query<MessageThread>()
+                .Where(t => t.Id == request.ThreadId)
+                .Where(t => !t.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (thread is null)
+                return Result<CmdResponse>.NotFound("Thread not found");
+
+            var member = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.CredentialId == request.RequesterCredentialId)
+                .Where(m => !m.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (member is null)
+                return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
+
+            if (request.Name is not null)
+                thread.Name = request.Name;
+
+            if (request.Description is not null)
+                thread.Description = request.Description;
+
+            thread.ModifiedAt = DateTime.UtcNow;
+
+            dataContext.Update(thread);
+            await dataContext.SaveChangesAsync(ct);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Thread updated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating thread {ThreadId}", request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error updating thread: {ex.Message}");
+        }
+    }
+
     public async Task<Result<CmdResponse>> AddThreadMemberAsync(AddThreadMemberRequest request, CancellationToken ct = default)
     {
         try
