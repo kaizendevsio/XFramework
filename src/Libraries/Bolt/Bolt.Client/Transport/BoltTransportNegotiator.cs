@@ -81,9 +81,9 @@ public sealed class BoltTransportNegotiator
         }, ct);
 
         var quicConn = new QuicBoltConnection(connection);
-        // Don't pass the attempt-timeout CT — the accept loop must live as long as the connection.
+        // Don't pass the attempt-timeout CT — the pool must live as long as the connection.
         // It gets cancelled when QuicBoltConnection.CloseAsync/DisposeAsync is called.
-        quicConn.StartAcceptLoop();
+        await quicConn.StartStreamPoolAsync();
         return quicConn;
     }
 

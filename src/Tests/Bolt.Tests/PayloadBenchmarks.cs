@@ -254,7 +254,7 @@ public class PayloadBenchmarks
                         try
                         {
                             var transport = new QuicBoltConnection(quicConn);
-                            transport.StartAcceptLoop(ct);
+                            await transport.AcceptStreamPoolAsync(ct: ct);
                             await server.HandleConnectionAsync(transport, ct);
                         }
                         catch { }
@@ -551,7 +551,7 @@ public class ThroughputBenchmarks
                         try
                         {
                             var transport = new QuicBoltConnection(quicConn);
-                            transport.StartAcceptLoop(ct);
+                            await transport.AcceptStreamPoolAsync(ct: ct);
                             await server.HandleConnectionAsync(transport, ct);
                         }
                         catch { }
@@ -832,7 +832,7 @@ public class ConcurrencyBenchmarks
                         try
                         {
                             var transport = new QuicBoltConnection(quicConn);
-                            transport.StartAcceptLoop(ct);
+                            await transport.AcceptStreamPoolAsync(ct: ct);
                             await server.HandleConnectionAsync(transport, ct);
                         }
                         catch { }

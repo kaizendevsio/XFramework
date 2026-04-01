@@ -165,7 +165,7 @@ public class QuicTransportIntegrationTests
         try
         {
             var transport = new QuicBoltConnection(quicConn);
-            transport.StartAcceptLoop(ct);
+            await transport.AcceptStreamPoolAsync(ct: ct);
             await _server.HandleConnectionAsync(transport, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

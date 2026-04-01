@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Net.Quic;
 using System.Threading.Channels;
 using Bolt.Protocol.Transport;
@@ -6,39 +7,39 @@ using Bolt.Protocol.Transport;
 namespace Bolt.Client.Transport;
 
 /// <summary>
-/// IBoltConnection implementation over QUIC with stream-per-RPC design.
+/// IBoltConnection implementation over QUIC with pooled persistent streams.
 ///
-/// Each SendAsync opens a fresh bidirectional stream, writes the frame, and closes writes.
-/// This leverages QUIC's native multiplexing — multiple concurrent sends create parallel
-/// streams with zero contention (no locks, no shared state, no send queue needed).
+/// Opens N persistent bidirectional streams at connection time. Sends are distributed
+/// across streams via round-robin with per-stream locks. Receives are read from all
+/// streams in parallel, feeding into one inbound channel.
 ///
-/// Inbound messages arrive on their own streams, accepted by a background loop that reads
-/// each stream to completion and queues the frame into a Channel for ReceiveAsync consumers.
+/// This gives parallel throughput without the per-RPC stream creation/destruction
+/// overhead of stream-per-RPC (~20 kernel calls eliminated per RPC).
 ///
-/// No persistent primary stream, no length-prefix framing — stream boundary IS the message
-/// boundary (the sender calls CompleteWrites() to signal end of frame).
-///
-/// Datagrams are supported via an optional delegate. .NET's System.Net.Quic does not yet
-/// expose the QUIC datagram extension (RFC 9221); when it does, pass the delegate at construction.
+/// Length-prefixed framing: [4:messageLength (uint32 LE)] [payload]
 /// </summary>
 public sealed class QuicBoltConnection : IBoltConnection
 {
     private readonly QuicConnection _connection;
-    private readonly Channel<(byte[] Buffer, int Length)> _inboundFrames;
     private readonly Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask>? _datagramSend;
-    private Task? _acceptLoop;
-    private CancellationTokenSource? _acceptCts;
+    private readonly Channel<(byte[] Buffer, int Length)> _inboundFrames;
 
-    // ReceiveAsync state: tracks partially consumed frame across calls
+    // Stream pool: persistent bidirectional streams with per-stream write locks
+    private QuicStream[]? _poolStreams;
+    private SemaphoreSlim[]? _poolLocks;
+    private int _poolSize;
+    private int _roundRobin;
+
+    // Accept loop for server-initiated inbound streams (before pool is ready, or extra streams)
+    private CancellationTokenSource? _cts;
+    private readonly List<Task> _backgroundTasks = [];
+
+    // Receive state: partially consumed frame for ReceiveAsync
     private byte[]? _currentBuffer;
     private int _currentOffset;
     private int _currentLength;
 
-    /// <param name="connection">An established QUIC connection.</param>
-    /// <param name="datagramSend">Optional delegate for unreliable datagram sends (RFC 9221).
-    /// Not yet available in System.Net.Quic; wire up when the runtime exposes the API.</param>
-    public QuicBoltConnection(
-        QuicConnection connection,
+    public QuicBoltConnection(QuicConnection connection,
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask>? datagramSend = null)
     {
         _connection = connection;
@@ -53,74 +54,78 @@ public sealed class QuicBoltConnection : IBoltConnection
     }
 
     public BoltTransport TransportType => BoltTransport.Quic;
-
     public bool SupportsDatagrams => _datagramSend is not null;
-
     public bool SupportsParallelSend => true;
+    public bool IsConnected => _poolStreams is not null || _cts is not null;
 
-    public bool IsConnected => !_connection.RemoteCertificate?.Equals(null) ?? _acceptLoop is not null;
-
-    /// <summary>Start accepting inbound streams. Call once after connection is established.</summary>
-    public void StartAcceptLoop(CancellationToken ct = default)
+    /// <summary>
+    /// Open the persistent stream pool and start read loops.
+    /// Call once after QUIC connection is established (client side).
+    /// </summary>
+    public async Task StartStreamPoolAsync(int poolSize = 4, CancellationToken ct = default)
     {
-        _acceptCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _acceptLoop = Task.Run(async () =>
+        _cts = new CancellationTokenSource();
+        _poolSize = poolSize;
+        _poolStreams = new QuicStream[poolSize];
+        _poolLocks = new SemaphoreSlim[poolSize];
+
+        for (int i = 0; i < poolSize; i++)
         {
-            try
-            {
-                while (!_acceptCts.Token.IsCancellationRequested)
-                {
-                    var stream = await _connection.AcceptInboundStreamAsync(_acceptCts.Token);
-                    _ = ReadStreamIntoChannelAsync(stream, _acceptCts.Token);
-                }
-            }
-            catch (OperationCanceledException) { }
-            catch (QuicException) { } // Connection closed
-            finally { _inboundFrames.Writer.TryComplete(); }
-        }, _acceptCts.Token);
+            _poolStreams[i] = await _connection.OpenOutboundStreamAsync(QuicStreamType.Bidirectional, ct);
+            _poolLocks[i] = new SemaphoreSlim(1, 1);
+            // Start reading responses from this bidirectional stream
+            _backgroundTasks.Add(Task.Run(() => ReadStreamLoopAsync(_poolStreams[i], _cts.Token)));
+        }
+
+        // Also accept any server-initiated inbound streams
+        _backgroundTasks.Add(Task.Run(() => AcceptLoopAsync(_cts.Token)));
     }
 
-    private async Task ReadStreamIntoChannelAsync(QuicStream stream, CancellationToken ct)
+    /// <summary>
+    /// Accept persistent streams from the remote side (server-side usage).
+    /// The client opens N bidirectional streams; the server accepts and reads from them.
+    /// </summary>
+    public async Task AcceptStreamPoolAsync(int poolSize = 4, CancellationToken ct = default)
     {
-        try
-        {
-            var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
-            var totalRead = 0;
-            int read;
-            while ((read = await stream.ReadAsync(buffer.AsMemory(totalRead), ct)) > 0)
-            {
-                totalRead += read;
-                // Grow buffer if needed
-                if (totalRead >= buffer.Length - 1024)
-                {
-                    var newBuf = ArrayPool<byte>.Shared.Rent(buffer.Length * 2);
-                    buffer.AsSpan(0, totalRead).CopyTo(newBuf);
-                    ArrayPool<byte>.Shared.Return(buffer);
-                    buffer = newBuf;
-                }
-            }
+        _cts = new CancellationTokenSource();
+        _poolSize = poolSize;
+        _poolStreams = new QuicStream[poolSize];
+        _poolLocks = new SemaphoreSlim[poolSize];
 
-            if (totalRead > 0)
-                await _inboundFrames.Writer.WriteAsync((buffer, totalRead), ct);
-            else
-                ArrayPool<byte>.Shared.Return(buffer);
+        for (int i = 0; i < poolSize; i++)
+        {
+            _poolStreams[i] = await _connection.AcceptInboundStreamAsync(ct);
+            _poolLocks[i] = new SemaphoreSlim(1, 1);
+            // Start reading from this stream
+            _backgroundTasks.Add(Task.Run(() => ReadStreamLoopAsync(_poolStreams[i], _cts.Token)));
         }
-        catch { /* Stream read error — frame lost, not fatal */ }
-        finally { await stream.DisposeAsync(); }
     }
 
     public async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
-        // Stream-per-send: each call opens its own unidirectional stream.
-        // Unidirectional = write-only, no read side to abort on dispose.
-        // No locks needed — QUIC handles stream multiplexing natively.
-        var stream = await _connection.OpenOutboundStreamAsync(QuicStreamType.Unidirectional, ct);
+        if (_poolStreams is null || _poolLocks is null)
+            throw new InvalidOperationException("Stream pool not started");
+
+        // Round-robin across pooled streams
+        var idx = (uint)Interlocked.Increment(ref _roundRobin) % _poolSize;
+        var stream = _poolStreams[idx];
+        var streamLock = _poolLocks[idx];
+
+        // Write length-prefixed message under per-stream lock
+        await streamLock.WaitAsync(ct);
         try
         {
-            await stream.WriteAsync(data, ct);
-            stream.CompleteWrites();
+            var totalSize = 4 + data.Length;
+            var buf = ArrayPool<byte>.Shared.Rent(totalSize);
+            try
+            {
+                BinaryPrimitives.WriteUInt32LittleEndian(buf, (uint)data.Length);
+                data.Span.CopyTo(buf.AsSpan(4));
+                await stream.WriteAsync(buf.AsMemory(0, totalSize), ct);
+            }
+            finally { ArrayPool<byte>.Shared.Return(buf); }
         }
-        finally { await stream.DisposeAsync(); }
+        finally { streamLock.Release(); }
     }
 
     public async ValueTask<(int BytesRead, bool EndOfMessage)> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
@@ -141,7 +146,7 @@ public sealed class QuicBoltConnection : IBoltConnection
             return (toCopy, false);
         }
 
-        // Wait for next complete frame from accept loop
+        // Wait for next complete frame from any read loop
         if (await _inboundFrames.Reader.WaitToReadAsync(ct))
         {
             if (_inboundFrames.Reader.TryRead(out var frame))
@@ -151,7 +156,6 @@ public sealed class QuicBoltConnection : IBoltConnection
                 buf.AsSpan(0, toCopy).CopyTo(buffer.Span);
                 if (toCopy < len)
                 {
-                    // Frame larger than caller's buffer — store remainder
                     _currentBuffer = buf;
                     _currentOffset = toCopy;
                     _currentLength = len;
@@ -161,7 +165,7 @@ public sealed class QuicBoltConnection : IBoltConnection
                 return (toCopy, true);
             }
         }
-        return (0, true); // Channel completed = connection closed
+        return (0, true);
     }
 
     public async ValueTask SendDatagramAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
@@ -169,34 +173,100 @@ public sealed class QuicBoltConnection : IBoltConnection
         if (_datagramSend is not null)
         {
             try { await _datagramSend(data, ct); }
-            catch { /* Unreliable -- failures silently ignored */ }
+            catch { }
         }
     }
 
     public async ValueTask CloseAsync(CancellationToken ct = default)
     {
-        _acceptCts?.Cancel();
-        if (_acceptLoop is not null)
-            try { await _acceptLoop; } catch { }
+        _cts?.Cancel();
+        foreach (var task in _backgroundTasks)
+            try { await task; } catch { }
+        if (_poolStreams is not null)
+            foreach (var stream in _poolStreams)
+                try { stream.CompleteWrites(); await stream.DisposeAsync(); } catch { }
         await _connection.CloseAsync(0, ct);
     }
 
     public async ValueTask DisposeAsync()
     {
-        _acceptCts?.Cancel();
+        _cts?.Cancel();
         if (_currentBuffer is not null)
         {
             ArrayPool<byte>.Shared.Return(_currentBuffer);
             _currentBuffer = null;
         }
-        // Drain any remaining frames in the channel
         while (_inboundFrames.Reader.TryRead(out var frame))
             ArrayPool<byte>.Shared.Return(frame.Buffer);
+        if (_poolStreams is not null)
+            foreach (var stream in _poolStreams)
+                try { await stream.DisposeAsync(); } catch { }
+        if (_poolLocks is not null)
+            foreach (var lk in _poolLocks)
+                lk.Dispose();
         await _connection.DisposeAsync();
-        _acceptCts?.Dispose();
+        _cts?.Dispose();
     }
 
-    // Backward compat — called by old code, now a no-op (accept loop replaces primary stream)
-    public Task OpenPrimaryStreamAsync(CancellationToken ct = default) => Task.CompletedTask;
-    public Task AcceptPrimaryStreamAsync(CancellationToken ct = default) => Task.CompletedTask;
+    // -- Background loops --
+
+    /// <summary>Read length-prefixed messages from a persistent stream into the inbound channel.</summary>
+    private async Task ReadStreamLoopAsync(QuicStream stream, CancellationToken ct)
+    {
+        var lengthBuf = new byte[4];
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                // Read 4-byte length prefix
+                var prefixRead = await ReadExactlyOrEofAsync(stream, lengthBuf.AsMemory(), ct);
+                if (prefixRead == 0) break;
+
+                var messageLength = (int)BinaryPrimitives.ReadUInt32LittleEndian(lengthBuf);
+                if (messageLength <= 0) continue;
+
+                // Read full message into pooled buffer
+                var msgBuf = ArrayPool<byte>.Shared.Rent(messageLength);
+                var read = await ReadExactlyOrEofAsync(stream, msgBuf.AsMemory(0, messageLength), ct);
+                if (read == 0) { ArrayPool<byte>.Shared.Return(msgBuf); break; }
+
+                await _inboundFrames.Writer.WriteAsync((msgBuf, messageLength), ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (QuicException) { } // Stream/connection closed
+    }
+
+    /// <summary>Accept any additional inbound streams from the remote (server-initiated).</summary>
+    private async Task AcceptLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var stream = await _connection.AcceptInboundStreamAsync(ct);
+                _backgroundTasks.Add(Task.Run(() => ReadStreamLoopAsync(stream, ct)));
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (QuicException) { }
+        finally { _inboundFrames.Writer.TryComplete(); }
+    }
+
+    private static async Task<int> ReadExactlyOrEofAsync(QuicStream stream, Memory<byte> buffer, CancellationToken ct)
+    {
+        var totalRead = 0;
+        while (totalRead < buffer.Length)
+        {
+            var read = await stream.ReadAsync(buffer[totalRead..], ct);
+            if (read == 0) return totalRead == 0 ? 0 : totalRead;
+            totalRead += read;
+        }
+        return totalRead;
+    }
+
+    // Backward compat stubs (used by old code, redirect to new methods)
+    public Task OpenPrimaryStreamAsync(CancellationToken ct = default) => StartStreamPoolAsync(ct: ct);
+    public Task AcceptPrimaryStreamAsync(CancellationToken ct = default) => AcceptStreamPoolAsync(ct: ct);
+    public void StartAcceptLoop(CancellationToken ct = default) => _ = StartStreamPoolAsync(ct: ct);
 }
