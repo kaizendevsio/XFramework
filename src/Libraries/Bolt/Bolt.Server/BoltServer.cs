@@ -1200,27 +1200,29 @@ public sealed class BoltHubConnection
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        Interlocked.Add(ref _pendingBytes, data.Length);
-
-        // QUIC/WebTransport: direct parallel send — each call opens its own stream
-        if (_transport.SupportsParallelSend)
-            return SendDirectAsync(data, ct);
-
-        // WebSocket: queue through Channel (serialized single-writer)
+        // Snapshot into a pooled buffer — the caller's buffer (thread-local RentedBufferWriter
+        // or pooled receive buffer) may be reused before the async transport write completes.
         var len = data.Length;
         var buf = ArrayPool<byte>.Shared.Rent(len);
         data.Span.CopyTo(buf);
+        Interlocked.Add(ref _pendingBytes, len);
+
+        // QUIC/WebTransport: direct parallel send — each call opens its own stream
+        if (_transport.SupportsParallelSend)
+            return SendDirectPooledAsync(buf, len, ct);
+
+        // WebSocket: queue through Channel (serialized single-writer)
         if (_sendChannel.Writer.TryWrite((buf, len)))
             return ValueTask.CompletedTask;
         return SendSlowAsync(buf, len, ct);
     }
 
-    private async ValueTask SendDirectAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    private async ValueTask SendDirectPooledAsync(byte[] buf, int len, CancellationToken ct)
     {
-        try { await _transport.SendAsync(data, ct); }
+        try { await _transport.SendAsync(buf.AsMemory(0, len), ct); }
         catch (OperationCanceledException) { }
         catch { /* Transport error — receive loop will detect disconnect */ }
-        finally { Interlocked.Add(ref _pendingBytes, -data.Length); }
+        finally { ArrayPool<byte>.Shared.Return(buf); Interlocked.Add(ref _pendingBytes, -len); }
     }
 
     private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)

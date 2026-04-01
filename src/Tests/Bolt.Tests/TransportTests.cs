@@ -292,6 +292,49 @@ public class QuicTransportIntegrationTests
         await client.DisposeAsync();
     }
 
+    [Test]
+    public async Task Quic_50ConcurrentRpcs_AllSucceed()
+    {
+        SkipIfQuicUnavailable();
+
+        var lf = _hubApp.Services.GetRequiredService<ILoggerFactory>();
+        var quicOpts = new BoltClientOptions
+        {
+            RpcTimeoutSeconds = 30,
+            TransportAttemptTimeoutMs = 10_000,
+            PreferredTransports = [BoltTransport.Quic]
+        };
+
+        var service = new BoltClient(
+            new Uri($"quic://127.0.0.1:{QuicPort}/bolt"),
+            "quic_conc_svc", "QuicConcSvc", quicOpts, lf.CreateLogger<BoltClient>());
+        service.RegisterHandler("echo", (payload, _) =>
+            Task.FromResult((HttpStatusCode.OK, payload)));
+        await service.ConnectAsync();
+
+        var caller = new BoltClient(
+            new Uri($"quic://127.0.0.1:{QuicPort}/bolt"),
+            "quic_conc_caller", "QuicConcCaller", quicOpts, lf.CreateLogger<BoltClient>());
+        await caller.ConnectAsync();
+
+        // Fire 50 parallel RPCs
+        var testData = new byte[1024];
+        Random.Shared.NextBytes(testData);
+        var tasks = new Task<(HttpStatusCode, ReadOnlyMemory<byte>)>[50];
+        for (int i = 0; i < 50; i++)
+            tasks[i] = caller.InvokeAsync("quic_conc_svc", "echo", testData);
+
+        var results = await Task.WhenAll(tasks);
+        foreach (var (status, response) in results)
+        {
+            status.Should().Be(HttpStatusCode.OK);
+            response.Length.Should().Be(1024);
+        }
+
+        await caller.DisposeAsync();
+        await service.DisposeAsync();
+    }
+
     [OneTimeTearDown]
     public async Task Cleanup()
     {
