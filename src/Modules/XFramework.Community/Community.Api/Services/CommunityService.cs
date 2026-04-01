@@ -1,3 +1,4 @@
+using Community.Domain.Shared;
 using Community.Domain.Shared.Contracts.Requests;
 using Microsoft.Extensions.Logging;
 using XFramework.Core.Patterns;
@@ -69,7 +70,7 @@ public sealed class CommunityService : ICommunityService
             var identityFileTypes = await _dataContext.Query<CommunityIdentityFileType>().ToListAsync(cancellationToken);
             var storageFileTypes = await _dataContext.Query<StorageFileType>().ToListAsync(cancellationToken);
 
-            var pngType = storageFileTypes.FirstOrDefault(i => i.Id == new Guid("af6b9396-ba01-4f88-a5d0-e0cfbc038146"));
+            var pngType = storageFileTypes.FirstOrDefault(i => i.Id == CommunityStorageFileTypes.Png);
 
             // Create community identity entity
             var entity = new CommunityIdentity
@@ -88,7 +89,7 @@ public sealed class CommunityService : ICommunityService
                     // Profile Photo
                     new()
                     {
-                        Type = identityFileTypes.FirstOrDefault(i => i.Id == new Guid("996dd417-170c-4ac9-b565-62caf4ab5ccf")),
+                        Type = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.ProfilePhoto),
                         Storage = new()
                         {
                             ContentPath = "",
@@ -98,7 +99,7 @@ public sealed class CommunityService : ICommunityService
                     // Cover Photo
                     new()
                     {
-                        Type = identityFileTypes.FirstOrDefault(i => i.Id == new Guid("8716ec30-b061-45cc-ad5b-77bda960d90e")),
+                        Type = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.CoverPhoto),
                         Storage = new()
                         {
                             ContentPath = "",
