@@ -122,6 +122,7 @@ public sealed class QuicBoltConnection : IBoltConnection
                 BinaryPrimitives.WriteUInt32LittleEndian(buf, (uint)data.Length);
                 data.Span.CopyTo(buf.AsSpan(4));
                 await stream.WriteAsync(buf.AsMemory(0, totalSize), ct);
+                await stream.FlushAsync(ct);
             }
             finally { ArrayPool<byte>.Shared.Return(buf); }
         }

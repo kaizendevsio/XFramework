@@ -164,8 +164,10 @@ public class QuicTransportIntegrationTests
     {
         try
         {
+            Console.WriteLine("[SERVER] Accepted QUIC connection, accepting stream pool...");
             var transport = new QuicBoltConnection(quicConn);
             await transport.AcceptStreamPoolAsync(ct: ct);
+            Console.WriteLine("[SERVER] Stream pool accepted, starting HandleConnectionAsync...");
             await _server.HandleConnectionAsync(transport, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
