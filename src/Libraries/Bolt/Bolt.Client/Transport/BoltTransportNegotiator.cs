@@ -70,8 +70,8 @@ public sealed class BoltTransportNegotiator
                 (await Dns.GetHostAddressesAsync(serverUri.Host, ct))[0], port),
             DefaultStreamErrorCode = 0,
             DefaultCloseErrorCode = 0,
-            MaxInboundBidirectionalStreams = 256,
-            MaxInboundUnidirectionalStreams = 256,
+            MaxInboundBidirectionalStreams = 1024,
+            MaxInboundUnidirectionalStreams = 1024,
             ClientAuthenticationOptions = new SslClientAuthenticationOptions
             {
                 ApplicationProtocols = [new SslApplicationProtocol("bolt")],
@@ -81,7 +81,9 @@ public sealed class BoltTransportNegotiator
         }, ct);
 
         var quicConn = new QuicBoltConnection(connection);
-        quicConn.StartAcceptLoop(ct);
+        // Don't pass the attempt-timeout CT — the accept loop must live as long as the connection.
+        // It gets cancelled when QuicBoltConnection.CloseAsync/DisposeAsync is called.
+        quicConn.StartAcceptLoop();
         return quicConn;
     }
 

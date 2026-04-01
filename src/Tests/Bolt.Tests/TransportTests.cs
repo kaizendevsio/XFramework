@@ -134,8 +134,8 @@ public class QuicTransportIntegrationTests
             {
                 DefaultStreamErrorCode = 0,
                 DefaultCloseErrorCode = 0,
-                MaxInboundBidirectionalStreams = 256,
-                    MaxInboundUnidirectionalStreams = 256,
+                MaxInboundBidirectionalStreams = 1024,
+                    MaxInboundUnidirectionalStreams = 1024,
                 ServerAuthenticationOptions = new SslServerAuthenticationOptions
                 {
                     ServerCertificate = _cert,
