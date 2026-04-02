@@ -22,8 +22,6 @@ public sealed class WebSocketBoltConnection : IBoltConnection
 
     public bool SupportsDatagrams => false;
 
-    public bool SupportsParallelSend => false;
-
     public bool IsConnected => _ws.State == WebSocketState.Open;
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)

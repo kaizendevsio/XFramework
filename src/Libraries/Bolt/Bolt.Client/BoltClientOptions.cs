@@ -11,10 +11,9 @@ public class BoltClientOptions
     /// <summary>
     /// Preferred transport order. The negotiator tries each in sequence, using the first
     /// that succeeds. Transports unavailable on the current platform are auto-skipped.
-    /// Default: QUIC, WebTransport, WebSocket.
+    /// Default: WebSocket (QUIC is only used for media datagrams, not RPC).
     /// </summary>
-    public BoltTransport[] PreferredTransports { get; set; } =
-        [BoltTransport.Quic, BoltTransport.WebTransport, BoltTransport.WebSocket];
+    public BoltTransport[] PreferredTransports { get; set; } = [BoltTransport.WebSocket];
 
     /// <summary>Timeout per transport attempt before trying the next one. Default: 3000ms.</summary>
     public int TransportAttemptTimeoutMs { get; set; } = 3000;

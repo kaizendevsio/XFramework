@@ -3,7 +3,7 @@ namespace Bolt.Protocol.Transport;
 /// <summary>Available transport protocols for Bolt connections.</summary>
 public enum BoltTransport
 {
-    /// <summary>Raw QUIC with ALPN "bolt". Default for .NET server-to-server.</summary>
+    /// <summary>QUIC datagrams for media frames only. Not used for RPC transport.</summary>
     Quic,
     /// <summary>HTTP/3 WebTransport. Default for browsers (Chrome/Edge).</summary>
     WebTransport,

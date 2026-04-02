@@ -6,7 +6,7 @@ namespace Bolt.Client.Transport;
 
 /// <summary>
 /// IBoltConnection implementation over WebTransport (HTTP/3).
-/// Uses same 4-byte length-prefixed framing as QuicBoltConnection.
+/// Uses 4-byte length-prefixed framing over byte-oriented streams.
 ///
 /// WebTransport provides both reliable streams and unreliable datagrams,
 /// accessible from browsers (Chrome/Edge) via the WebTransport API.
@@ -44,8 +44,6 @@ public sealed class WebTransportBoltConnection : IBoltConnection
     public BoltTransport TransportType => BoltTransport.WebTransport;
 
     public bool SupportsDatagrams => _datagramSend is not null;
-
-    public bool SupportsParallelSend => false;
 
     public bool IsConnected => !_closed && _stream.CanRead && _stream.CanWrite;
 

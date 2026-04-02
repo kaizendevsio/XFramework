@@ -950,22 +950,10 @@ public sealed class BoltConnection
         data.Span.CopyTo(buf);
         Interlocked.Increment(ref _pendingSends);
 
-        // QUIC/WebTransport: direct parallel send — each call opens its own stream
-        if (Transport.SupportsParallelSend)
-            return SendDirectPooledAsync(buf, len, ct);
-
-        // WebSocket: queue through Channel (serialized single-writer)
+        // All sends go through Channel (serialized single-writer)
         if (_sendChannel.Writer.TryWrite((buf, len, ct)))
             return ValueTask.CompletedTask;
         return SendSlowAsync(buf, len, ct);
-    }
-
-    private async ValueTask SendDirectPooledAsync(byte[] buf, int len, CancellationToken ct)
-    {
-        try { await Transport.SendAsync(buf.AsMemory(0, len), ct); }
-        catch (OperationCanceledException) { }
-        catch { /* Transport error — receive loop will detect disconnect */ }
-        finally { ArrayPool<byte>.Shared.Return(buf); Interlocked.Decrement(ref _pendingSends); }
     }
 
     private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)

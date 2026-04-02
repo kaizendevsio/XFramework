@@ -1207,22 +1207,10 @@ public sealed class BoltHubConnection
         data.Span.CopyTo(buf);
         Interlocked.Add(ref _pendingBytes, len);
 
-        // QUIC/WebTransport: direct parallel send — each call opens its own stream
-        if (_transport.SupportsParallelSend)
-            return SendDirectPooledAsync(buf, len, ct);
-
-        // WebSocket: queue through Channel (serialized single-writer)
+        // All sends go through Channel (serialized single-writer)
         if (_sendChannel.Writer.TryWrite((buf, len)))
             return ValueTask.CompletedTask;
         return SendSlowAsync(buf, len, ct);
-    }
-
-    private async ValueTask SendDirectPooledAsync(byte[] buf, int len, CancellationToken ct)
-    {
-        try { await _transport.SendAsync(buf.AsMemory(0, len), ct); }
-        catch (OperationCanceledException) { }
-        catch { /* Transport error — receive loop will detect disconnect */ }
-        finally { ArrayPool<byte>.Shared.Return(buf); Interlocked.Add(ref _pendingBytes, -len); }
     }
 
     private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)
