@@ -36,6 +36,8 @@ public enum FrameType : byte
     CallSignal = 0x24,
     /// <summary>FEC parity frame: [1:type] [16:streamId] [4:fecGroupStart] [1:fecGroupSize] [4:payloadLen] [payload]</summary>
     FecFrame = 0x25,
+    /// <summary>NACK retransmission request: [1:type] [16:streamId] [2:nackCount] [nackCount * 4:missingSeqs]</summary>
+    NackRequest = 0x26,
 }
 
 /// <summary>Media type identifier.</summary>
@@ -53,6 +55,7 @@ public enum CodecId : byte
     H264 = 0x02,
     VP9 = 0x03,
     AV1 = 0x04,
+    H265 = 0x05,
 }
 
 /// <summary>Call signal type.</summary>
@@ -69,6 +72,7 @@ public enum SignalType : byte
     RemoveParticipant = 0x09,
     DirectOffer = 0x0A,
     DirectAnswer = 0x0B,
+    KeyExchange = 0x0C,
 }
 
 /// <summary>Quality hint from receiver to sender.</summary>

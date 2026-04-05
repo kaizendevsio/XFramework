@@ -20,12 +20,12 @@ public sealed class UpdateDirectMessageValidator : AbstractValidator<UpdateMessa
             .LessThanOrEqualTo(DateTime.UtcNow).WithMessage("SentAt cannot be in the future")
             .When(x => x.SentAt.HasValue);
 
-        RuleFor(x => x.RecievedAt)
-            .LessThanOrEqualTo(DateTime.UtcNow).WithMessage("RecievedAt cannot be in the future")
-            .When(x => x.RecievedAt.HasValue);
+        RuleFor(x => x.ReceivedAt)
+            .LessThanOrEqualTo(DateTime.UtcNow).WithMessage("ReceivedAt cannot be in the future")
+            .When(x => x.ReceivedAt.HasValue);
 
-        RuleFor(x => x.RecievedAt)
-            .GreaterThanOrEqualTo(x => x.SentAt).WithMessage("RecievedAt must be after SentAt")
-            .When(x => x.SentAt.HasValue && x.RecievedAt.HasValue);
+        RuleFor(x => x.ReceivedAt)
+            .GreaterThanOrEqualTo(x => x.SentAt).WithMessage("ReceivedAt must be after SentAt")
+            .When(x => x.SentAt.HasValue && x.ReceivedAt.HasValue);
     }
 }

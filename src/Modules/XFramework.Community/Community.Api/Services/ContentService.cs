@@ -18,13 +18,16 @@ namespace Community.Api.Services;
 public sealed class ContentService : IContentService
 {
     private readonly IDataContext _dataContext;
+    private readonly IConnectionService _connectionService;
     private readonly ILogger<ContentService> _logger;
 
     public ContentService(
         IDataContext dataContext,
+        IConnectionService connectionService,
         ILogger<ContentService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
+        _connectionService = connectionService ?? throw new ArgumentNullException(nameof(connectionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -214,6 +217,55 @@ public sealed class ContentService : IContentService
     }
 
     /// <inheritdoc />
+    public async Task<Result<CmdResponse>> EditContentAsync(
+        EditContentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.Id == request.ContentId && !c.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (content == null)
+            {
+                _logger.EntityNotFound("CommunityContent", request.ContentId);
+                return Result<CmdResponse>.NotFound($"Content with Id {request.ContentId} does not exist");
+            }
+
+            if (content.SocialMediaIdentityId != request.RequestingIdentityId)
+            {
+                _logger.BusinessRuleViolation("EditContent", $"Identity {request.RequestingIdentityId} does not own content {request.ContentId}");
+                return Result<CmdResponse>.Forbidden("You do not have permission to edit this content");
+            }
+
+            if (request.Text is not null)
+                content.Text = request.Text;
+
+            if (request.Title is not null)
+                content.Title = request.Title;
+
+            content.ModifiedAt = DateTime.UtcNow;
+
+            _dataContext.Update(content);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            _logger.EntityUpdated("CommunityContent", request.ContentId);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Content updated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("EditContent", "CommunityContent", request.ContentId, ex.Message, ex);
+            return Result<CmdResponse>.Failure("An error occurred while editing content", 500);
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<Result<CmdResponse>> CreateContentReactionAsync(
         CreateContentReactionRequest request,
         CancellationToken cancellationToken = default)
@@ -241,6 +293,10 @@ public sealed class ContentService : IContentService
                 _logger.CommunityIdentityNotFound(request.IdentityId);
                 return Result<CmdResponse>.NotFound($"Community identity with Id {request.IdentityId} does not exist");
             }
+
+            // Block check
+            if (await _connectionService.IsBlockedAsync(request.IdentityId, content.SocialMediaIdentityId, cancellationToken))
+                return Result<CmdResponse>.Forbidden("Cannot react — a block exists between you and the content author");
 
             // Prevent duplicate (same identity + same type on same content)
             var existingReaction = await _dataContext.Query<CommunityContentReaction>()
@@ -430,6 +486,17 @@ public sealed class ContentService : IContentService
                     (i.Alias != null && i.Alias.ToLower().Contains(searchTerm)));
             }
 
+            // Block enforcement: exclude blocked identities if a requester context is provided
+            if (request.RequestingIdentityId.HasValue && request.RequestingIdentityId.Value != Guid.Empty)
+            {
+                var blockedIds = await _connectionService.GetBlockedIdentityIdsAsync(request.RequestingIdentityId.Value, cancellationToken);
+                if (blockedIds.Count > 0)
+                {
+                    var blockedList = blockedIds.ToList();
+                    query = query.Where(i => !blockedList.Contains(i.Id));
+                }
+            }
+
             var totalItems = await query.CountAsync(cancellationToken);
 
             var pageIndex = request.PageIndex < 1 ? 1 : request.PageIndex;
@@ -465,6 +532,124 @@ public sealed class ContentService : IContentService
         {
             _logger.OperationFailed("SearchIdentities", "CommunityIdentity", Guid.Empty, ex.Message, ex);
             return Result<PaginatedResult<SearchIdentitiesResponse>>.Failure("An error occurred while searching identities", 500);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<CmdResponse>> CreateContentFileAsync(
+        CreateContentFileVsaRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.Id == request.ContentId && !c.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (content == null)
+                return Result<CmdResponse>.NotFound($"Content with Id {request.ContentId} does not exist");
+
+            if (content.SocialMediaIdentityId != request.RequestingIdentityId)
+                return Result<CmdResponse>.Forbidden("You do not have permission to attach files to this content");
+
+            var entity = new CommunityContentFile
+            {
+                ContentId = request.ContentId,
+                StorageId = request.StorageFileId,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+
+            _dataContext.Add(entity);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.Created,
+                Message = "File attached successfully"
+            }, 201);
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("CreateContentFile", "CommunityContentFile", Guid.Empty, ex.Message, ex);
+            return Result<CmdResponse>.Failure("An error occurred while attaching file", 500);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<List<ContentFileResponse>>> GetContentFilesAsync(
+        GetContentFilesRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var contentExists = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.Id == request.ContentId && !c.IsDeleted)
+                .AnyAsync(cancellationToken);
+
+            if (!contentExists)
+                return Result<List<ContentFileResponse>>.NotFound($"Content with Id {request.ContentId} does not exist");
+
+            var files = await _dataContext.Query<CommunityContentFile>()
+                .Where(f => f.ContentId == request.ContentId && !f.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            var result = files.Select(f => new ContentFileResponse
+            {
+                Id = f.Id,
+                ContentId = f.ContentId,
+                StorageFileId = f.StorageId,
+                CreatedAt = f.CreatedAt
+            }).ToList();
+
+            return Result<List<ContentFileResponse>>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("GetContentFiles", "CommunityContentFile", request.ContentId, ex.Message, ex);
+            return Result<List<ContentFileResponse>>.Failure("An error occurred while retrieving files", 500);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<CmdResponse>> DeleteContentFileAsync(
+        DeleteContentFileRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.Id == request.ContentId && !c.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (content == null)
+                return Result<CmdResponse>.NotFound($"Content with Id {request.ContentId} does not exist");
+
+            if (content.SocialMediaIdentityId != request.RequestingIdentityId)
+                return Result<CmdResponse>.Forbidden("You do not have permission to remove files from this content");
+
+            var file = await _dataContext.Query<CommunityContentFile>()
+                .Where(f => f.Id == request.FileId && f.ContentId == request.ContentId && !f.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (file == null)
+                return Result<CmdResponse>.NotFound($"File with Id {request.FileId} does not exist");
+
+            file.IsDeleted = true;
+            file.DeletedAt = DateTime.UtcNow;
+            _dataContext.Update(file);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "File removed successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("DeleteContentFile", "CommunityContentFile", request.FileId, ex.Message, ex);
+            return Result<CmdResponse>.Failure("An error occurred while removing file", 500);
         }
     }
 }

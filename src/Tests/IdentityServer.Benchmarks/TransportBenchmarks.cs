@@ -35,10 +35,8 @@ using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.ThinProtocol;
-using System.Net.Quic;
 using Grpc.Net.Client;
 using IdentityServer.Benchmarks.Grpc;
-using Bolt.Hub.ThinProtocol;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.Benchmarks;
@@ -68,10 +66,6 @@ public class TransportBenchmarks
     private WebApplication _grpcHubApp = null!;
     private GrpcChannel _grpcChannel = null!;
     private HealthService.HealthServiceClient _grpcClient = null!;
-
-    // QUIC (direct — no hub, server-to-server)
-    private QuicDirectServer _quicServer = null!;
-    private QuicDirectClient _quicClient = null!;
 
     private const string BoltUrl = "http://localhost:19000";
     private const string IdentityServerUrl = "http://localhost:19261";
@@ -170,48 +164,6 @@ public class TransportBenchmarks
         // 11. Setup gRPC (benchmark-only)
         await SetupGrpc();
 
-        // 12. Setup QUIC
-        await SetupQuic();
-    }
-
-    private async Task SetupQuic()
-    {
-        if (!QuicListener.IsSupported)
-        {
-            Console.WriteLine("QUIC not supported on this platform, skipping QUIC benchmark");
-            return;
-        }
-
-        var quicEndPoint = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 19265);
-        var loggerFactory = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
-
-        // Direct QUIC server — handles requests directly (no hub routing)
-        _quicServer = new QuicDirectServer(loggerFactory.CreateLogger<QuicDirectServer>());
-        _quicServer.RegisterHandler(typeof(HealthCheckRequest).GetTypeFullName(),
-            async (payload, requestId) =>
-            {
-                var request = MemoryPackSerializer.Deserialize<HealthCheckRequest>(payload.Span)!;
-                var result = await IdentityServer.Api.Features.Health.Check.HealthCheckEndpoint.Handle(request, CancellationToken.None);
-                var response = new QueryResponse<HealthCheckResponse>
-                {
-                    HttpStatusCode = (System.Net.HttpStatusCode)result.StatusCode,
-                    Response = result.Data,
-                    Message = result.Message
-                };
-                return ((System.Net.HttpStatusCode)result.StatusCode, (ReadOnlyMemory<byte>)MemoryPackSerializer.Serialize(response));
-            });
-        await _quicServer.StartAsync(quicEndPoint);
-
-        // Direct QUIC client
-        _quicClient = new QuicDirectClient(quicEndPoint);
-        await _quicClient.ConnectAsync();
-
-        // Warmup
-        for (var i = 0; i < 5; i++)
-        {
-            var warmupPayload = MemoryPackSerializer.Serialize(_request);
-            await _quicClient.InvokeAsync(typeof(HealthCheckRequest).GetTypeFullName(), warmupPayload);
-        }
     }
 
     private async Task SetupGrpc()
@@ -328,8 +280,6 @@ public class TransportBenchmarks
     {
         _httpClient?.Dispose();
         _grpcChannel?.Dispose();
-        try { await _quicClient.DisposeAsync(); } catch { }
-        try { await _quicServer.DisposeAsync(); } catch { }
         try { await _grpcHubApp.StopAsync(); } catch { }
         try { await _grpcBackendApp.StopAsync(); } catch { }
         try { await _thinCallerClient.DisposeAsync(); } catch { }
@@ -374,29 +324,6 @@ public class TransportBenchmarks
             IpAddress = "127.0.0.1",
             Name = "Benchmark"
         });
-    }
-
-    [Benchmark]
-    public async Task<QueryResponse<HealthCheckResponse>?> Quic_HealthCheck()
-    {
-        var req = new HealthCheckRequest
-        {
-            Metadata = new RequestMetadata
-            {
-                TenantId = TestTenantId,
-                RequestId = Guid.NewGuid(),
-                IpAddress = "127.0.0.1",
-                Name = "Benchmark",
-                DeviceName = "BenchDevice",
-                DeviceAgent = "BenchAgent"
-            }
-        };
-
-        var payload = MemoryPackSerializer.Serialize(req);
-        var (statusCode, data) = await _quicClient.InvokeAsync(
-            typeof(HealthCheckRequest).GetTypeFullName(), payload);
-
-        return MemoryPackSerializer.Deserialize<QueryResponse<HealthCheckResponse>>(data.Span);
     }
 
     [Benchmark]

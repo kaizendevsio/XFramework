@@ -12,6 +12,7 @@ public partial record SearchIdentitiesRequest : RequestBase,
 {
     public string? SearchTerm { get; set; }
     public Guid? TypeId { get; set; }
+    public Guid? RequestingIdentityId { get; set; }
     public int PageIndex { get; set; } = 1;
     public int PageSize { get; set; } = 20;
 }
