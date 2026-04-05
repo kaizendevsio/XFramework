@@ -1,0 +1,89 @@
+@page "/identity/verifications"
+
+<PageTitle>Verifications - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Verifications</BbTypographyH3>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_verifications">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Verification Type">
+                <ChildContent Context="item">
+                    @(item.VerificationType?.Name ?? item.VerificationTypeId?.ToString() ?? "N/A")
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Status">
+                <ChildContent Context="item">
+                    @{
+                        var statusText = item.Status switch
+                        {
+                            0 => "Pending",
+                            1 => "Verified",
+                            2 => "Rejected",
+                            _ => "Unknown"
+                        };
+                        var statusKey = item.Status switch
+                        {
+                            0 => "pending",
+                            1 => "active",
+                            2 => "failed",
+                            _ => "inactive"
+                        };
+                    }
+                    <StatusBadge Text="@statusText" Status="@statusKey" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Token">
+                <ChildContent Context="item">
+                    @(Truncate(item.Token, 20))
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.Expiry)" Title="Expiry" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<IdentityVerification> _verifications = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var response = await IdentityWrapper.IdentityVerification.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId, includeNavigations: true);
+            _verifications = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { /* query may fail */ }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value)) return "N/A";
+        return value.Length <= maxLength ? value : value[..maxLength] + "...";
+    }
+}

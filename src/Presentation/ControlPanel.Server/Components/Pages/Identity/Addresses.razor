@@ -1,0 +1,254 @@
+@page "/identity/addresses"
+
+<PageTitle>Addresses - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Addresses</BbTypographyH3>
+        <BbButton OnClick="@OpenAddDialog">
+            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+            Add Address
+        </BbButton>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_addresses">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.IdentityInfoId)" Title="User ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Street)" Title="Street" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Building)" Title="Building" />
+            <BbDataGridPropertyColumn Property="@(x => x.Subdivision)" Title="Subdivision" />
+            <BbDataGridPropertyColumn Property="@(x => x.ConsolidatedName)" Title="Full Address" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Default">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@(item.DefaultAddress == true ? "Default" : "No")"
+                                 Status="@(item.DefaultAddress == true ? "active" : "inactive")" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Actions">
+                <ChildContent Context="item">
+                    <div class="flex items-center gap-2">
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => OpenEditDialog(item))">
+                            <LucideIcon Name="pencil" class="h-4 w-4" />
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                  OnClick="@(() => OpenDeleteDialog(item))">
+                            <LucideIcon Name="trash-2" class="h-4 w-4" />
+                        </BbButton>
+                    </div>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+<BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(_isEditing ? "Edit Address" : "Add Address")</BbDialogTitle>
+            <BbDialogDescription>
+                @(_isEditing ? "Update address details." : "Create a new address record.")
+            </BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formIdentityInfoId"
+                              Label="User ID (IdentityInfoId)"
+                              Placeholder="Enter user GUID"
+                              Required="true" />
+            <div class="grid grid-cols-2 gap-4">
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_formUnitNumber"
+                                  Label="Unit Number"
+                                  Placeholder="Unit / Apt number" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_formStreet"
+                                  Label="Street"
+                                  Placeholder="Street address" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_formBuilding"
+                                  Label="Building"
+                                  Placeholder="Building name" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_formSubdivision"
+                                  Label="Subdivision"
+                                  Placeholder="Subdivision / Village" />
+            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formConsolidatedName"
+                              Label="Consolidated Name"
+                              Placeholder="Full address" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveAddress">@(_isEditing ? "Update" : "Create")</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<ConfirmDeleteDialog Open="@_deleteDialogOpen"
+                     OpenChanged="@(v => _deleteDialogOpen = v)"
+                     OnConfirm="@ConfirmDelete" />
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<IdentityAddress> _addresses = [];
+    private bool _loading = true;
+    private bool _dialogOpen;
+    private bool _deleteDialogOpen;
+    private bool _isEditing;
+    private Guid _editingId;
+    private IdentityAddress? _deletingAddress;
+
+    private string _formIdentityInfoId = "";
+    private string _formUnitNumber = "";
+    private string _formStreet = "";
+    private string _formBuilding = "";
+    private string _formSubdivision = "";
+    private string _formConsolidatedName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            await LoadData();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var response = await IdentityWrapper.IdentityAddress.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
+            _addresses = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { /* query may fail */ }
+    }
+
+    private void OpenAddDialog()
+    {
+        _isEditing = false;
+        _formIdentityInfoId = "";
+        _formUnitNumber = "";
+        _formStreet = "";
+        _formBuilding = "";
+        _formSubdivision = "";
+        _formConsolidatedName = "";
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(IdentityAddress addr)
+    {
+        _isEditing = true;
+        _editingId = addr.Id;
+        _formIdentityInfoId = addr.IdentityInfoId.ToString();
+        _formUnitNumber = addr.UnitNumber ?? "";
+        _formStreet = addr.Street ?? "";
+        _formBuilding = addr.Building ?? "";
+        _formSubdivision = addr.Subdivision ?? "";
+        _formConsolidatedName = addr.ConsolidatedName ?? "";
+        _dialogOpen = true;
+    }
+
+    private void OpenDeleteDialog(IdentityAddress addr)
+    {
+        _deletingAddress = addr;
+        _deleteDialogOpen = true;
+    }
+
+    private async Task SaveAddress()
+    {
+        if (!Guid.TryParse(_formIdentityInfoId, out var identityInfoId))
+        {
+            ToastService.Show("Invalid User ID.");
+            return;
+        }
+
+        try
+        {
+            if (_isEditing)
+            {
+                var getResponse = await IdentityWrapper.IdentityAddress.Get(_editingId);
+                var addr = getResponse?.Response;
+
+                if (addr is not null)
+                {
+                    addr.IdentityInfoId = identityInfoId;
+                    addr.UnitNumber = _formUnitNumber;
+                    addr.Street = _formStreet;
+                    addr.Building = _formBuilding;
+                    addr.Subdivision = _formSubdivision;
+                    addr.ConsolidatedName = _formConsolidatedName;
+                    addr.ModifiedAt = DateTime.UtcNow;
+                    var result = await IdentityWrapper.IdentityAddress.Patch(addr);
+                    ToastService.Show(result?.IsSuccess == true ? "Address updated." : $"Error: {result?.Message}");
+                }
+            }
+            else
+            {
+                var addr = new IdentityAddress
+                {
+                    Id = Guid.NewGuid(),
+                    IdentityInfoId = identityInfoId,
+                    UnitNumber = _formUnitNumber,
+                    Street = _formStreet,
+                    Building = _formBuilding,
+                    Subdivision = _formSubdivision,
+                    ConsolidatedName = _formConsolidatedName,
+                    CreatedAt = DateTime.UtcNow
+                };
+                var result = await IdentityWrapper.IdentityAddress.Create(addr);
+                ToastService.Show(result?.IsSuccess == true ? "Address created." : $"Error: {result?.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error: {ex.Message}");
+        }
+
+        _dialogOpen = false;
+        await LoadData();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingAddress is not null)
+        {
+            try
+            {
+                _deletingAddress.IsDeleted = true;
+                _deletingAddress.IsEnabled = false;
+                var result = await IdentityWrapper.IdentityAddress.Patch(_deletingAddress);
+                ToastService.Show(result?.IsSuccess == true ? "Address deleted." : $"Error: {result?.Message}");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Show($"Error: {ex.Message}");
+            }
+            finally
+            {
+                _deleteDialogOpen = false;
+                _deletingAddress = null;
+                await LoadData();
+            }
+        }
+    }
+}

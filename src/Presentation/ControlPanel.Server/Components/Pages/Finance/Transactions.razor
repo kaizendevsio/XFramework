@@ -1,0 +1,85 @@
+@page "/finance/transactions"
+
+<PageTitle>Transactions - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <BbTypographyH3>Transactions</BbTypographyH3>
+            <p class="text-sm text-muted-foreground">View all wallet transactions across the system</p>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Type">
+                <ChildContent Context="item">
+                    <BbBadge Variant="@(item.TransactionType == TransactionType.Credit ? BadgeVariant.Default : BadgeVariant.Destructive)">
+                        @item.TransactionType
+                    </BbBadge>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Held">
+                <ChildContent Context="item">
+                    <BbBadge Variant="@(item.Held ? BadgeVariant.Outline : BadgeVariant.Secondary)">
+                        @(item.Held ? "Yes" : "No")
+                    </BbBadge>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Released">
+                <ChildContent Context="item">
+                    <BbBadge Variant="@(item.Released ? BadgeVariant.Default : BadgeVariant.Secondary)">
+                        @(item.Released ? "Yes" : "No")
+                    </BbBadge>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<WalletTransaction> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var result = await WalletsWrapper.WalletTransaction.GetList(
+                pageSize: 100,
+                pageNumber: 1,
+                tenantId: TenantFilter.SelectedTenantId,
+                includeNavigations: true);
+            if (result?.IsSuccess == true)
+            {
+                _items = result.Response?.Items.ToList() ?? [];
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

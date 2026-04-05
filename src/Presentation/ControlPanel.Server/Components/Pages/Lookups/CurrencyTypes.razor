@@ -1,0 +1,47 @@
+@page "/lookups/currency-types"
+
+<PageTitle>Currency Types - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Currency Types</BbTypographyH3>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CurrencyIsoCode3)" Title="ISO Code" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+            <BbDataGridPropertyColumn Property="@(x => x.Type)" Title="Type" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+
+    private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await WalletsWrapper.CurrencyType.GetList(100, 1);
+            _items = response?.Response?.Items?.ToList() ?? [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

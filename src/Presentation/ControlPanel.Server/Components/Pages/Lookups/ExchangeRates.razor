@@ -1,0 +1,48 @@
+@page "/lookups/exchange-rates"
+
+<PageTitle>Exchange Rates - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Exchange Rates</BbTypographyH3>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.SourceCurrencyTypeId)" Title="Source Currency ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.TargetCurrencyTypeId)" Title="Target Currency ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Value)" Title="Value" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Fee)" Title="Fee" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.EffectivityDate)" Title="Effectivity Date" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.ExpiryDate)" Title="Expiry Date" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+
+    private List<ExchangeRate> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await WalletsWrapper.ExchangeRate.GetList(100, 1);
+            _items = response?.Response?.Items?.ToList() ?? [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

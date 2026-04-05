@@ -56,6 +56,7 @@
   <Folder Name="/Presentation/">
     <Project Path="src\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
     <Project Path="src\Presentation\ControlPanel\ControlPanel.csproj" />
+    <Project Path="src\Presentation\ControlPanel.Server\ControlPanel.Server.csproj" />
     <Project Path="src\Presentation\Fluid\Fluid.csproj" />
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
   </Folder>
@@ -63,9 +64,12 @@
     <Project Path="src\Libraries\Bolt\Bolt.Protocol\Bolt.Protocol.csproj" />
     <Project Path="src\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
     <Project Path="src\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
+    <Project Path="src\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" />
+    <Project Path="src\Libraries\Bolt\Bolt.Media.Browser\Bolt.Media.Browser.csproj" />
     <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
   </Folder>
   <Folder Name="/Tests/">
+    <Project Path="srcTestsControlPanel.E2ETestsControlPanel.E2ETests.csproj" />
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
     <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />
     <Project Path="src\Tests\IdentityServer.IntegrationTests\IdentityServer.IntegrationTests.csproj" />

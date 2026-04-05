@@ -1,0 +1,63 @@
+@page "/identity/auth-logs"
+
+<PageTitle>Auth Logs - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <BbTypographyH3>Authorization Logs</BbTypographyH3>
+            <p class="text-sm text-muted-foreground">View authentication audit trail</p>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_logs">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Ipaddress)" Title="IP Address" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Success">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@(item.IsSuccess == true ? "Success" : "Failed")"
+                                 Status="@(item.IsSuccess == true ? "success" : "failed")" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.LoginSource)" Title="Login Source" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.DeviceName)" Title="Device" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<AuthorizationLog> _logs = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var response = await IdentityWrapper.AuthorizationLog.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
+            _logs = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { /* query may fail */ }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

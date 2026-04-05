@@ -1,0 +1,30 @@
+@inject DialogService DialogService
+
+<BbAlertDialog Open="@Open" OpenChanged="@OpenChanged">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Are you sure?</BbAlertDialogTitle>
+            <BbAlertDialogDescription>
+                @if (string.IsNullOrEmpty(Message))
+                {
+                    <text>This action cannot be undone. This will permanently delete this record.</text>
+                }
+                else
+                {
+                    @Message
+                }
+            </BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>Cancel</BbAlertDialogCancel>
+            <BbAlertDialogAction OnClick="@OnConfirm">Delete</BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+}

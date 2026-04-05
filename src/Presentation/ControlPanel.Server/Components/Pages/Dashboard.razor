@@ -1,0 +1,108 @@
+@page "/"
+
+<PageTitle>Dashboard - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else
+{
+<div class="space-y-6">
+    <div class="space-y-1">
+        <h2 class="text-2xl font-bold tracking-tight">Dashboard</h2>
+        <p class="text-sm text-muted-foreground">XFramework Control Panel — Identity Server &amp; Wallets Administration</p>
+    </div>
+
+    @if (_error is not null)
+    {
+        <BbAlert Variant="AlertVariant.Danger">
+            <BbAlertTitle>Database Error</BbAlertTitle>
+            <BbAlertDescription>@_error</BbAlertDescription>
+        </BbAlert>
+    }
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Users</BbCardTitle>
+                <BbCardDescription>Total registered users</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypographyH2>@_userCount</BbTypographyH2>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Active Sessions</BbCardTitle>
+                <BbCardDescription>Currently active sessions</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypographyH2>@_sessionCount</BbTypographyH2>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Wallets</BbCardTitle>
+                <BbCardDescription>Total wallets created</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypographyH2>@_walletCount</BbTypographyH2>
+            </BbCardContent>
+        </BbCard>
+
+        <BbCard>
+            <BbCardHeader>
+                <BbCardTitle>Tenants</BbCardTitle>
+                <BbCardDescription>Total tenants</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <BbTypographyH2>@_tenantCount</BbTypographyH2>
+            </BbCardContent>
+        </BbCard>
+    </div>
+</div>
+}
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
+
+    private bool _loading = true;
+    private long _userCount;
+    private long _sessionCount;
+    private long _walletCount;
+    private long _tenantCount;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            var usersTask = IdentityWrapper.IdentityInformation.GetList(1, 1);
+            var sessionsTask = IdentityWrapper.Session.GetList(1, 1);
+            var walletsTask = WalletsWrapper.Wallet.GetList(1, 1);
+            var tenantsTask = IdentityWrapper.Tenant.GetList(1, 1);
+
+            await Task.WhenAll(usersTask, sessionsTask, walletsTask, tenantsTask);
+
+            _userCount = usersTask.Result?.Response?.TotalItems ?? 0;
+            _sessionCount = sessionsTask.Result?.Response?.TotalItems ?? 0;
+            _walletCount = walletsTask.Result?.Response?.TotalItems ?? 0;
+            _tenantCount = tenantsTask.Result?.Response?.TotalItems ?? 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load dashboard stats");
+            _error = $"Failed to load stats: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

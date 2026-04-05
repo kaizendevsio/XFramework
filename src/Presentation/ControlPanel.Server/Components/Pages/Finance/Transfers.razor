@@ -1,0 +1,64 @@
+@page "/finance/transfers"
+
+<PageTitle>Transfers - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Transfers</BbTypographyH3>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.SenderTransactionId)" Title="Sender Transaction ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.RecipientTransactionId)" Title="Recipient Transaction ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.TransactionFee)" Title="Fee" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Purpose">
+                <ChildContent Context="item">
+                    <BbBadge Variant="BadgeVariant.Outline">@item.TransactionPurpose</BbBadge>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<WalletTransfer> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var result = await WalletsWrapper.WalletTransfer.GetList(
+                pageSize: 100,
+                pageNumber: 1,
+                tenantId: TenantFilter.SelectedTenantId,
+                includeNavigations: true);
+            if (result?.IsSuccess == true)
+            {
+                _items = result.Response?.Items.ToList() ?? [];
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

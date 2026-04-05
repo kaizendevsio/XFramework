@@ -1,0 +1,93 @@
+@page "/identity/sessions"
+
+<PageTitle>Sessions - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <BbTypographyH3>Sessions</BbTypographyH3>
+            <p class="text-sm text-muted-foreground">Monitor and manage active user sessions</p>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_sessions">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Status">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@GetStatusText(item.Status)"
+                                 Status="@GetStatusKey(item.Status)" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridTemplateColumn Title="Session Data">
+                <ChildContent Context="item">
+                    @(Truncate(item.SessionData, 50))
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires At" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<Session> _sessions = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var response = await IdentityWrapper.Session.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
+            _sessions = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Sessions load error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string GetStatusText(CurrentSessionState status) => status switch
+    {
+        CurrentSessionState.Active => "Active",
+        CurrentSessionState.Inactive => "Inactive",
+        CurrentSessionState.Expired => "Expired",
+        CurrentSessionState.Suspended => "Suspended",
+        _ => "Unknown"
+    };
+
+    private static string GetStatusKey(CurrentSessionState status) => status switch
+    {
+        CurrentSessionState.Active => "active",
+        CurrentSessionState.Inactive => "inactive",
+        CurrentSessionState.Expired => "expired",
+        CurrentSessionState.Suspended => "suspended",
+        _ => "inactive"
+    };
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value)) return "N/A";
+        return value.Length <= maxLength ? value : value[..maxLength] + "...";
+    }
+}

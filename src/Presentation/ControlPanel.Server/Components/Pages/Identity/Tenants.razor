@@ -1,0 +1,341 @@
+@page "/identity/tenants"
+
+<PageTitle>Tenant Management - Control Panel</PageTitle>
+
+<div class="space-y-6">
+
+    @* -- Header -- *@
+    <div class="flex items-center justify-between">
+        <div>
+            <BbTypographyH3>Tenant Management</BbTypographyH3>
+            <BbTypographyMuted>Manage tenants, their users, configurations, and role types.</BbTypographyMuted>
+        </div>
+        <BbButton OnClick="@OpenCreateDialog">
+            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+            Create Tenant
+        </BbButton>
+    </div>
+
+    @* -- Tenant List -- *@
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>Tenants</BbCardTitle>
+            <BbCardDescription>@_tenants.Count tenant(s) found</BbCardDescription>
+        </BbCardHeader>
+        <BbCardContent>
+            <BbDataGrid Items="@_tenants" ShowPagination="true" InitialPageSize="15"
+                        OnRowClick="@((Tenant item) => Navigation.NavigateTo($"/identity/tenants/{item.Id}"))" Class="cursor-pointer">
+                <Columns>
+                    <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                    <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+                    <BbDataGridTemplateColumn Title="Status">
+                        <ChildContent Context="item">
+                            @{
+                                var statusText = item.Status switch
+                                {
+                                    0 => "Pending",
+                                    1 => "Active",
+                                    2 => "Suspended",
+                                    3 => "Inactive",
+                                    _ => "Unknown"
+                                };
+                                var statusKey = item.Status switch
+                                {
+                                    0 => "pending",
+                                    1 => "active",
+                                    2 => "suspended",
+                                    3 => "inactive",
+                                    _ => "inactive"
+                                };
+                            }
+                            <StatusBadge Text="@statusText" Status="@statusKey" />
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.Version)" Title="Version" Sortable="true" />
+                    <BbDataGridTemplateColumn Title="Expiration" Sortable="true">
+                        <ChildContent Context="item">
+                            @if (item.Expiration.HasValue)
+                            {
+                                var isExpired = item.Expiration.Value < DateTime.UtcNow;
+                                <span class="@(isExpired ? "text-red-500 font-medium" : "")">
+                                    @item.Expiration.Value.ToString("yyyy-MM-dd")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted-foreground">No expiration</span>
+                            }
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                    <BbDataGridTemplateColumn Title="Enabled">
+                        <ChildContent Context="item">
+                            <StatusBadge Text="@(item.IsEnabled ? "Enabled" : "Disabled")"
+                                         Status="@(item.IsEnabled ? "active" : "inactive")" />
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                    <BbDataGridTemplateColumn Title="Actions">
+                        <ChildContent Context="item">
+                            <div class="flex items-center gap-1">
+                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                          OnClick="@(() => Navigation.NavigateTo($"/identity/tenants/{item.Id}"))">
+                                    <LucideIcon Name="eye" class="h-4 w-4" />
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                          OnClick="@(() => OpenDeleteDialog(item))">
+                                    <LucideIcon Name="trash-2" class="h-4 w-4" />
+                                </BbButton>
+                            </div>
+                        </ChildContent>
+                    </BbDataGridTemplateColumn>
+                </Columns>
+            </BbDataGrid>
+        </BbCardContent>
+    </BbCard>
+    }
+</div>
+
+@* -- Create Tenant Dialog -- *@
+<BbDialog Open="@_tenantDialogOpen" OpenChanged="@(v => _tenantDialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Create Tenant</BbDialogTitle>
+            <BbDialogDescription>Fill in the details for the new tenant.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.Name"
+                              Label="Name"
+                              Placeholder="Tenant name"
+                              Required="true" />
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.Description"
+                              Label="Description"
+                              Placeholder="Brief description" />
+            <div class="grid grid-cols-2 gap-4">
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.VersionString"
+                                  Label="Version"
+                                  Placeholder="1.0" />
+                <BbFormFieldNativeSelect TValue="string"
+                                         @bind-Value="_tenantForm.StatusString"
+                                         Label="Status">
+                    <option value="0">Pending</option>
+                    <option value="1">Active</option>
+                    <option value="2">Suspended</option>
+                    <option value="3">Inactive</option>
+                </BbFormFieldNativeSelect>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.ExpirationString"
+                                  Label="Expiration Date"
+                                  Placeholder="YYYY-MM-DD" />
+                <BbFormFieldInput TValue="string"
+                                  @bind-Value="_tenantForm.AvailabilityString"
+                                  Label="Availability Date"
+                                  Placeholder="YYYY-MM-DD" />
+            </div>
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_tenantForm.ParentTenantIdString"
+                              Label="Parent Tenant ID"
+                              Placeholder="Optional — leave blank for root tenant" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _tenantDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@CreateTenant" Disabled="@_saving">
+                @if (_saving)
+                {
+                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                }
+                Create
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@* -- Delete Tenant Confirmation -- *@
+<ConfirmDeleteDialog Open="@_deleteDialogOpen"
+                     OpenChanged="@(v => _deleteDialogOpen = v)"
+                     Message="@($"This will soft-delete the tenant \"{_deletingTenant?.Name}\". The tenant and its data will be marked as deleted.")"
+                     OnConfirm="@ConfirmDeleteTenant" />
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    // -- Tenant list state --
+    private List<Tenant> _tenants = [];
+    private bool _saving;
+    private bool _loading;
+
+    // -- Tenant create dialog --
+    private bool _tenantDialogOpen;
+    private TenantFormModel _tenantForm = new();
+
+    // -- Tenant delete dialog --
+    private bool _deleteDialogOpen;
+    private Tenant? _deletingTenant;
+
+    // -- Lifecycle --
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTenants();
+    }
+
+    private async Task LoadTenants()
+    {
+        _loading = true;
+        try
+        {
+            var response = await IdentityWrapper.Tenant.GetList(100, 1);
+            _tenants = response?.Response?.Items?
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load tenants: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // -- Create Tenant --
+
+    private void OpenCreateDialog()
+    {
+        _tenantForm = new TenantFormModel
+        {
+            VersionString = "1.0",
+            StatusString = "1"
+        };
+        _tenantDialogOpen = true;
+    }
+
+    private async Task CreateTenant()
+    {
+        if (string.IsNullOrWhiteSpace(_tenantForm.Name))
+        {
+            ToastService.Show("Tenant name is required.");
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            var tenantId = Guid.NewGuid();
+            var tenant = new Tenant
+            {
+                Id = tenantId,
+                TenantId = tenantId,
+                Name = _tenantForm.Name,
+                Description = _tenantForm.Description,
+                Version = decimal.TryParse(_tenantForm.VersionString, out var v) ? v : 1.0m,
+                Status = short.TryParse(_tenantForm.StatusString, out var s) ? s : (short)1,
+                Expiration = DateTime.TryParse(_tenantForm.ExpirationString, out var exp) ? exp : null,
+                AvailabilityDate = DateTime.TryParse(_tenantForm.AvailabilityString, out var avail) ? avail : null,
+                ParentTenantId = Guid.TryParse(_tenantForm.ParentTenantIdString, out var pid) ? pid : null,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
+            };
+
+            var result = await IdentityWrapper.Tenant.Create(tenant);
+
+            if (result?.IsSuccess == true)
+            {
+                ToastService.Show("Tenant created successfully.");
+            }
+            else
+            {
+                ToastService.Show($"Failed to create tenant: {result?.Message}");
+            }
+
+            _tenantDialogOpen = false;
+            await LoadTenants();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error creating tenant: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // -- Delete Tenant --
+
+    private void OpenDeleteDialog(Tenant tenant)
+    {
+        _deletingTenant = tenant;
+        _deleteDialogOpen = true;
+    }
+
+    private async Task ConfirmDeleteTenant()
+    {
+        if (_deletingTenant is null) return;
+
+        try
+        {
+            var getResponse = await IdentityWrapper.Tenant.Get(_deletingTenant.Id);
+            var fresh = getResponse?.Response;
+
+            if (fresh is null)
+            {
+                ToastService.Show("Tenant not found.");
+                _deleteDialogOpen = false;
+                return;
+            }
+
+            fresh.IsDeleted = true;
+            fresh.IsEnabled = false;
+            fresh.DeletedAt = DateTime.UtcNow;
+            fresh.ModifiedAt = DateTime.UtcNow;
+
+            var result = await IdentityWrapper.Tenant.Patch(fresh);
+
+            if (result?.IsSuccess == true)
+            {
+                ToastService.Show("Tenant deleted.");
+            }
+            else
+            {
+                ToastService.Show($"Failed to delete tenant: {result?.Message}");
+            }
+
+            _deleteDialogOpen = false;
+            _deletingTenant = null;
+            await LoadTenants();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error deleting tenant: {ex.Message}");
+        }
+    }
+
+    // -- Form Model --
+
+    private class TenantFormModel
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string VersionString { get; set; } = "1.0";
+        public string StatusString { get; set; } = "1";
+        public string ExpirationString { get; set; } = "";
+        public string AvailabilityString { get; set; } = "";
+        public string ParentTenantIdString { get; set; } = "";
+    }
+}

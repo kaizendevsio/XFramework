@@ -1,0 +1,44 @@
+@page "/lookups/address-types"
+
+<PageTitle>Address Types - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Address Types</BbTypographyH3>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.SystemReferenceId)" Title="System Reference ID" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+
+    private List<IdentityAddressType> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            var response = await IdentityWrapper.IdentityAddressType.GetList(100, 1);
+            _items = response?.Response?.Items?.ToList() ?? [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

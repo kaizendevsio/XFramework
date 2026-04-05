@@ -1,0 +1,202 @@
+@page "/identity/roles"
+
+<PageTitle>Roles - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <BbTypographyH3>Roles</BbTypographyH3>
+            <p class="text-sm text-muted-foreground">Manage role assignments across all credentials</p>
+        </div>
+        <BbButton OnClick="@OpenAddDialog">
+            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+            Add Role
+        </BbButton>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_roles">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Role Type">
+                <ChildContent Context="item">
+                    @(item.Type?.Name ?? item.TypeId?.ToString() ?? "N/A")
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.RoleExpiration)" Title="Expiration" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Actions">
+                <ChildContent Context="item">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                              OnClick="@(() => OpenDeleteDialog(item))">
+                        <LucideIcon Name="trash-2" class="h-4 w-4" />
+                    </BbButton>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+<BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Add Role</BbDialogTitle>
+            <BbDialogDescription>Assign a role to a credential.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formCredentialId"
+                              Label="Credential ID"
+                              Placeholder="Enter credential GUID"
+                              Required="true" />
+            @if (_roleTypes.Count == 0)
+            {
+                <div>
+                    <BbLabel>Role Type</BbLabel>
+                    <p class="text-sm text-muted-foreground">No role types configured. Add them in Reference Data.</p>
+                </div>
+            }
+            else
+            {
+                <BbFormFieldNativeSelect TValue="string"
+                                         @bind-Value="_formTypeId"
+                                         Label="Role Type"
+                                         Placeholder="Select role type">
+                    <option value="">Select role type</option>
+                    @foreach (var rt in _roleTypes)
+                    {
+                        <option value="@rt.Id">@rt.Name (Level @rt.RoleLevel)</option>
+                    }
+                </BbFormFieldNativeSelect>
+            }
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_formExpiration"
+                              Label="Expiration"
+                              Placeholder="YYYY-MM-DD HH:mm" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveRole">Create</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<ConfirmDeleteDialog Open="@_deleteDialogOpen"
+                     OpenChanged="@(v => _deleteDialogOpen = v)"
+                     OnConfirm="@ConfirmDelete" />
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<IdentityRole> _roles = [];
+    private List<IdentityRoleType> _roleTypes = [];
+    private bool _loading = true;
+    private bool _dialogOpen;
+    private bool _deleteDialogOpen;
+    private IdentityRole? _deletingRole;
+    private string _formCredentialId = "";
+    private string _formTypeId = "";
+    private string _formExpiration = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            await LoadData();
+            var roleTypeResponse = await IdentityWrapper.IdentityRoleType.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
+            _roleTypes = roleTypeResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
+        }
+        catch { /* query may fail */ }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var response = await IdentityWrapper.IdentityRole.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId, includeNavigations: true);
+            _roles = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+        }
+        catch { /* query may fail */ }
+    }
+
+    private void OpenAddDialog()
+    {
+        _formCredentialId = "";
+        _formTypeId = "";
+        _formExpiration = DateTime.UtcNow.AddYears(1).ToString("yyyy-MM-ddTHH:mm");
+        _dialogOpen = true;
+    }
+
+    private void OpenDeleteDialog(IdentityRole role)
+    {
+        _deletingRole = role;
+        _deleteDialogOpen = true;
+    }
+
+    private async Task SaveRole()
+    {
+        if (!Guid.TryParse(_formCredentialId, out var credentialId))
+        {
+            ToastService.Show("Invalid Credential ID.");
+            return;
+        }
+
+        try
+        {
+            var role = new IdentityRole
+            {
+                Id = Guid.NewGuid(),
+                CredentialId = credentialId,
+                TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null,
+                RoleExpiration = DateTime.TryParse(_formExpiration, out var exp) ? exp : DateTime.UtcNow.AddYears(1),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var result = await IdentityWrapper.IdentityRole.Create(role);
+            ToastService.Show(result?.IsSuccess == true ? "Role created." : $"Error: {result?.Message}");
+            _dialogOpen = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error: {ex.Message}");
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingRole is not null)
+        {
+            try
+            {
+                _deletingRole.IsDeleted = true;
+                _deletingRole.IsEnabled = false;
+                var result = await IdentityWrapper.IdentityRole.Patch(_deletingRole);
+                ToastService.Show(result?.IsSuccess == true ? "Role deleted." : $"Error: {result?.Message}");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Show($"Error: {ex.Message}");
+            }
+            finally
+            {
+                _deleteDialogOpen = false;
+                _deletingRole = null;
+                await LoadData();
+            }
+        }
+    }
+}

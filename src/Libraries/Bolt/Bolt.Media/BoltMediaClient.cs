@@ -23,6 +23,9 @@ public sealed class BoltMediaClient : IAsyncDisposable
     private readonly BoltClient _client;
     private readonly ILogger _logger;
 
+    /// <summary>The underlying BoltClient for direct transport access.</summary>
+    public BoltClient Client => _client;
+
     private readonly ConcurrentDictionary<Guid, ClientCallInfo> _activeCalls = new();
     private readonly ConcurrentDictionary<Guid, BoltMediaStream> _mediaStreams = new();
     private readonly ConcurrentDictionary<Guid, AdaptiveBitrateController> _bitrateControllers = new();
@@ -272,7 +275,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
             enc = CreateEncryption();
             _callEncryption[callId] = enc;
         }
-        enc.DeriveKey(remotePublicKey, callId);
+        await enc.DeriveKeyAsync(remotePublicKey, callId);
 
         if (_activeCalls.TryGetValue(callId, out var call) && !call.IsOutgoing && !call.KeySent)
         {

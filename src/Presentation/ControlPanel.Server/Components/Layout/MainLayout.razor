@@ -1,0 +1,131 @@
+@inherits LayoutComponentBase
+@using ControlPanel.Server.Services
+
+<div class="flex min-h-screen bg-background text-foreground">
+    @* Fixed left sidebar — always visible *@
+    <aside class="w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground">
+        <div class="flex flex-col h-full">
+            @* Header *@
+            <div class="flex items-center gap-2 px-4 h-14 border-b border-sidebar-border">
+                <div class="flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
+                    X
+                </div>
+                <div>
+                    <span class="text-sm font-semibold">Control Panel</span>
+                    <p class="text-[10px] text-muted-foreground leading-none">XFramework Admin</p>
+                </div>
+            </div>
+
+            @* Tenant selector *@
+            <div class="px-3 py-2 border-b border-sidebar-border">
+                <label class="text-[10px] text-muted-foreground uppercase tracking-wider">Active Tenant</label>
+                <select class="w-full mt-1 text-xs rounded-md border border-sidebar-border bg-sidebar px-2 py-1.5 text-sidebar-foreground"
+                        @bind="_selectedTenantId"
+                        @bind:after="OnTenantChanged">
+                    <option value="">All Tenants</option>
+                    @foreach (var t in _tenants)
+                    {
+                        <option value="@t.Id">@t.Name</option>
+                    }
+                </select>
+            </div>
+
+            @* Scrollable nav *@
+            <nav class="flex-1 overflow-y-auto p-3">
+                <NavMenu />
+            </nav>
+
+            @* Footer *@
+            <div class="border-t border-sidebar-border px-4 py-3">
+                <span class="text-xs text-muted-foreground">v1.0 — XFramework</span>
+            </div>
+        </div>
+    </aside>
+
+    @* Main content *@
+    <div class="flex-1 flex flex-col min-w-0">
+        <header class="flex items-center justify-between px-6 h-14 border-b shrink-0">
+            <div class="flex items-center gap-2">
+                <BbBreadcrumb>
+                    <BbBreadcrumbList>
+                        <BbBreadcrumbItem>
+                            <BbBreadcrumbLink Href="/">Dashboard</BbBreadcrumbLink>
+                        </BbBreadcrumbItem>
+                        @foreach (var crumb in GetBreadcrumbs())
+                        {
+                            <BbBreadcrumbSeparator />
+                            <BbBreadcrumbItem>
+                                <BbBreadcrumbPage>@crumb</BbBreadcrumbPage>
+                            </BbBreadcrumbItem>
+                        }
+                    </BbBreadcrumbList>
+                </BbBreadcrumb>
+                @if (!string.IsNullOrEmpty(_selectedTenantName))
+                {
+                    <BbBadge Variant="BadgeVariant.Outline" Class="ml-2 text-[10px]">@_selectedTenantName</BbBadge>
+                }
+            </div>
+            <div class="flex items-center gap-2">
+                <BbDarkModeToggle Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" />
+                <BbThemeSwitcher />
+            </div>
+        </header>
+        <main class="flex-1 p-6 overflow-y-auto">
+            @Body
+        </main>
+    </div>
+</div>
+
+<BbToastProvider Position="ToastPosition.BottomRight" />
+<BbDialogProvider />
+<BbPortalHost />
+
+@code {
+    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
+    private string _selectedTenantId = "";
+    private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
+
+    private List<string> GetBreadcrumbs()
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath.Trim('/');
+        if (string.IsNullOrEmpty(path)) return [];
+
+        return path.Split('/')
+            .Select(s => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.Replace("-", " ")))
+            .ToList();
+    }
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += (_, _) => InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var response = await IdentityWrapper.Tenant.GetList(100, 1);
+            _tenants = response?.Response?.Items?.Where(t => !t.IsDeleted).OrderBy(t => t.Name).ToList() ?? [];
+            StateHasChanged();
+        }
+        catch { /* Tenant loading is non-critical */ }
+    }
+
+    private void OnTenantChanged()
+    {
+        if (Guid.TryParse(_selectedTenantId, out var tenantId))
+        {
+            var name = _tenants.FirstOrDefault(t => t.Id == tenantId)?.Name ?? "";
+            TenantFilter.SetTenant(tenantId, name);
+        }
+        else
+        {
+            TenantFilter.Clear();
+        }
+    }
+}

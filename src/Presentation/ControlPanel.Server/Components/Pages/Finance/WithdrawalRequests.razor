@@ -1,0 +1,77 @@
+@page "/finance/withdrawal-requests"
+
+<PageTitle>Withdrawal Requests - Control Panel</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <BbTypographyH3>Withdrawal Requests</BbTypographyH3>
+    </div>
+
+    @if (_loading)
+    {
+        <CenteredSpinner />
+    }
+    else
+    {
+    <BbDataGrid Items="@_items" ShowPagination="true" InitialPageSize="20">
+        <Columns>
+            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.WalletId)" Title="Wallet ID" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Amount)" Title="Amount" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Fee)" Title="Fee" Sortable="true" />
+            <BbDataGridTemplateColumn Title="Status">
+                <ChildContent Context="item">
+                    <StatusBadge Text="@item.WithdrawalStatus.ToString()" Status="@GetWithdrawalStatusCategory(item.WithdrawalStatus)" />
+                </ChildContent>
+            </BbDataGridTemplateColumn>
+            <BbDataGridPropertyColumn Property="@(x => x.ReferenceNumber)" Title="Reference" Sortable="true" />
+            <BbDataGridPropertyColumn Property="@(x => x.Remarks)" Title="Remarks" />
+            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+        </Columns>
+    </BbDataGrid>
+    }
+</div>
+
+@code {
+    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
+
+    private List<WithdrawalRequest> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var result = await WalletsWrapper.WithdrawalRequest.GetList(
+                pageSize: 100,
+                pageNumber: 1,
+                tenantId: TenantFilter.SelectedTenantId,
+                includeNavigations: true);
+            if (result?.IsSuccess == true)
+            {
+                _items = result.Response?.Items.ToList() ?? [];
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string GetWithdrawalStatusCategory(TransactionStatus status) => status switch
+    {
+        TransactionStatus.Pending or TransactionStatus.OnHold or TransactionStatus.Scheduled => "pending",
+        TransactionStatus.Ok or TransactionStatus.Completed => "active",
+        TransactionStatus.Accepted or TransactionStatus.OnGoing or TransactionStatus.ForDelivery => "approved",
+        TransactionStatus.Failed or TransactionStatus.Cancelled or TransactionStatus.Rejected => "failed",
+        TransactionStatus.Expired or TransactionStatus.Reversed or TransactionStatus.Refunded => "error",
+        _ => "inactive"
+    };
+}
