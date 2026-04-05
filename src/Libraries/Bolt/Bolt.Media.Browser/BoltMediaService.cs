@@ -28,6 +28,7 @@ public sealed class BoltMediaService : IAsyncDisposable
 
     private Guid _activeAudioStreamId;
     private Guid _activeVideoStreamId;
+    private bool _hasVideo;
     private bool _initialized;
 
     // ── Events for Blazor UI ──
@@ -117,6 +118,8 @@ public sealed class BoltMediaService : IAsyncDisposable
     {
         EnsureInitialized();
 
+        _hasVideo = video;
+
         _audio.OnEncoded -= OnAudioEncodedForStream;
         _audio.OnEncoded += OnAudioEncodedForStream;
 
@@ -132,12 +135,20 @@ public sealed class BoltMediaService : IAsyncDisposable
     }
 
     /// <summary>Answer an incoming call.</summary>
-    public async Task AnswerCallAsync(Guid callId)
+    public async Task AnswerCallAsync(Guid callId, bool video = false)
     {
         EnsureInitialized();
 
+        _hasVideo = video;
+
         _audio.OnEncoded -= OnAudioEncodedForStream;
         _audio.OnEncoded += OnAudioEncodedForStream;
+
+        if (video)
+        {
+            _video.OnEncoded -= OnVideoEncodedForStream;
+            _video.OnEncoded += OnVideoEncodedForStream;
+        }
 
         await _mediaClient!.AnswerCallAsync(callId);
     }
@@ -190,10 +201,10 @@ public sealed class BoltMediaService : IAsyncDisposable
     {
         var client = _mediaClient!.Client;
         var conn = client.GetPrimaryConnection();
+        var writer = Bolt.Protocol.Buffers.RentedBufferWriter.GetThreadLocal();
 
         // Send audio MediaConfig to peer
         _activeAudioStreamId = Guid.NewGuid();
-        var writer = Bolt.Protocol.Buffers.RentedBufferWriter.GetThreadLocal();
         BoltCodec.WriteMediaConfig(writer, _activeAudioStreamId, callId, MediaType.Audio, CodecId.Opus,
             _options.AudioSampleRate, _options.AudioChannels, _options.AudioBitrateKbps, 0, ReadOnlySpan<byte>.Empty);
         await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
@@ -210,6 +221,25 @@ public sealed class BoltMediaService : IAsyncDisposable
 
         // Start playback loop for received audio frames
         StartPlaybackLoop(audioStream);
+
+        // Send video MediaConfig if video is active for this call
+        if (_hasVideo || _video.IsCapturing)
+        {
+            _activeVideoStreamId = Guid.NewGuid();
+            BoltCodec.WriteMediaConfig(writer, _activeVideoStreamId, callId, MediaType.Video, CodecId.H264,
+                _options.VideoWidth, _options.VideoHeight, _options.VideoBitrateKbps, 0, ReadOnlySpan<byte>.Empty);
+            await conn.SendAsync(writer.WrittenMemory, CancellationToken.None);
+            writer.Reset();
+
+            var videoStream = new BoltMediaStream(conn, _activeVideoStreamId, callId, false);
+            if (_options.EnableFec) videoStream.EnableFec(_options.FecVideoGroupSize);
+            videoStream.EnableNack(256);
+            videoStream.EnableBandwidthProbing(_options.VideoBitrateKbps);
+            videoStream.OnBitrateChanged += kbps => _ = _video.ReconfigureBitrateAsync(kbps);
+            videoStream.OnKeyframeNeeded += () => _ = _video.RequestKeyframeAsync();
+
+            StartPlaybackLoop(videoStream);
+        }
 
         if (OnCallAnswered is not null) await OnCallAnswered(callId);
     }

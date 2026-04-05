@@ -275,7 +275,7 @@ public sealed class BoltMediaClient : IAsyncDisposable
             enc = CreateEncryption();
             _callEncryption[callId] = enc;
         }
-        enc.DeriveKey(remotePublicKey, callId);
+        await enc.DeriveKeyAsync(remotePublicKey, callId);
 
         if (_activeCalls.TryGetValue(callId, out var call) && !call.IsOutgoing && !call.KeySent)
         {

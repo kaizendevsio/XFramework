@@ -13,6 +13,7 @@ class AudioPipeline {
         this.captureRunning = false;
         this.audioContext = null;
         this.dotNetRef = null;
+        this.nextPlayTime = 0;
     }
 
     async initEncoder(sampleRate, channels, bitrate) {
@@ -117,6 +118,11 @@ class AudioPipeline {
             return;
         }
 
+        // Resume AudioContext if suspended (browser autoplay policy)
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+
         const numberOfFrames = audioData.numberOfFrames;
         const channels = audioData.numberOfChannels;
         const sampleRate = audioData.sampleRate;
@@ -132,7 +138,13 @@ class AudioPipeline {
         const source = this.audioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(this.audioContext.destination);
-        source.start();
+
+        // Schedule precisely to avoid glitches; reset if we've fallen behind
+        if (this.nextPlayTime < this.audioContext.currentTime) {
+            this.nextPlayTime = this.audioContext.currentTime;
+        }
+        source.start(this.nextPlayTime);
+        this.nextPlayTime += buffer.duration;
     }
 
     async dispose() {

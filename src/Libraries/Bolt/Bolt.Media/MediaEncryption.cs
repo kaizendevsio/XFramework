@@ -28,6 +28,21 @@ public interface IMediaEncryption : IDisposable
 
     /// <summary>Decrypt a media frame (ciphertext + auth tag). Returns plaintext.</summary>
     byte[] Decrypt(ReadOnlySpan<byte> ciphertextWithTag, uint sequenceNumber, Guid streamId);
+
+    /// <summary>Async variant of DeriveKey for environments where sync crypto is unsafe (e.g. Blazor WASM JS interop).</summary>
+    Task DeriveKeyAsync(byte[] remotePublicKeyDer, Guid callId)
+    {
+        DeriveKey(remotePublicKeyDer, callId);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Async variant of Encrypt for environments where sync crypto is unsafe (e.g. Blazor WASM JS interop).</summary>
+    Task<byte[]> EncryptAsync(byte[] plaintext, uint sequenceNumber, Guid streamId)
+        => Task.FromResult(Encrypt(plaintext, sequenceNumber, streamId));
+
+    /// <summary>Async variant of Decrypt for environments where sync crypto is unsafe (e.g. Blazor WASM JS interop).</summary>
+    Task<byte[]> DecryptAsync(byte[] ciphertextWithTag, uint sequenceNumber, Guid streamId)
+        => Task.FromResult(Decrypt(ciphertextWithTag, sequenceNumber, streamId));
 }
 
 /// <summary>
@@ -166,8 +181,9 @@ public sealed class ExternalMediaEncryption : IMediaEncryption
 
     public void DeriveKey(ReadOnlySpan<byte> remotePublicKeyDer, Guid callId)
     {
-        // Synchronous wrapper — the actual async work happens in the delegate
-        _deriveKey(remotePublicKeyDer.ToArray(), callId).GetAwaiter().GetResult();
+        // Synchronous wrapper — safe only when the delegate returns an already-completed Task
+        var task = _deriveKey(remotePublicKeyDer.ToArray(), callId);
+        task.GetAwaiter().GetResult();
         _isReady = true;
     }
 
@@ -181,6 +197,27 @@ public sealed class ExternalMediaEncryption : IMediaEncryption
     {
         if (!_isReady) throw new InvalidOperationException("Key not derived yet");
         return _decrypt(ciphertextWithTag.ToArray(), sequenceNumber, streamId).GetAwaiter().GetResult();
+    }
+
+    /// <summary>Truly async — preferred over DeriveKey in Blazor WASM to avoid deadlocks.</summary>
+    public async Task DeriveKeyAsync(byte[] remotePublicKeyDer, Guid callId)
+    {
+        await _deriveKey(remotePublicKeyDer, callId);
+        _isReady = true;
+    }
+
+    /// <summary>Truly async — preferred over Encrypt in Blazor WASM to avoid deadlocks.</summary>
+    public async Task<byte[]> EncryptAsync(byte[] plaintext, uint sequenceNumber, Guid streamId)
+    {
+        if (!_isReady) throw new InvalidOperationException("Key not derived yet");
+        return await _encrypt(plaintext, sequenceNumber, streamId);
+    }
+
+    /// <summary>Truly async — preferred over Decrypt in Blazor WASM to avoid deadlocks.</summary>
+    public async Task<byte[]> DecryptAsync(byte[] ciphertextWithTag, uint sequenceNumber, Guid streamId)
+    {
+        if (!_isReady) throw new InvalidOperationException("Key not derived yet");
+        return await _decrypt(ciphertextWithTag, sequenceNumber, streamId);
     }
 
     public void Dispose() { }
