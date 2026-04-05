@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+        <PackageId>Bolt.Net.Media.Browser</PackageId>
+        <Version>$(BoltVersion)</Version>
+        <Authors>KaizenDevs</Authors>
+        <Description>Bolt Media browser integration for Blazor WASM — JS interop for WebCodecs, Web Crypto, and getUserMedia. Add-on for Bolt.Net.Media.</Description>
+        <PackageTags>blazor;wasm;media;webcodecs;webcrypto;bolt;voip;video;audio</PackageTags>
+        <RepositoryUrl>https://github.com/kaizendevsio/XFramework</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/kaizendevsio/XFramework</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Bolt.Media\Bolt.Media.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    </ItemGroup>
+
+</Project>

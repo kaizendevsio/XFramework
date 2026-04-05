@@ -64,6 +64,8 @@
     <Project Path="src\Libraries\Bolt\Bolt.Protocol\Bolt.Protocol.csproj" />
     <Project Path="src\Libraries\Bolt\Bolt.Server\Bolt.Server.csproj" />
     <Project Path="src\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
+    <Project Path="src\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" />
+    <Project Path="src\Libraries\Bolt\Bolt.Media.Browser\Bolt.Media.Browser.csproj" />
     <Project Path="src\Tests\Bolt.Tests\Bolt.Tests.csproj" />
   </Folder>
   <Folder Name="/Tests/">
