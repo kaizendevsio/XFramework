@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.OutputCaching;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace XFramework.Core.Extensions;
 

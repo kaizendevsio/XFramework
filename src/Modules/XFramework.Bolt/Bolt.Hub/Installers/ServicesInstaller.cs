@@ -1,7 +1,6 @@
 using Bolt.Server;
 using Bolt.Hub.Interfaces;
 using Bolt.Hub.Services;
-using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Interfaces;
 
 namespace Bolt.Hub.Installers;

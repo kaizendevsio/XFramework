@@ -1,15 +1,9 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.DependencyInjection;
 using Bolt.Hub.Extensions;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Interfaces;
 using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;

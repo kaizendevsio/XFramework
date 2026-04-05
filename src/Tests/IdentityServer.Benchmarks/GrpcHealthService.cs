@@ -1,5 +1,4 @@
 using Grpc.Core;
-using Grpc.Net.Client;
 using IdentityServer.Benchmarks.Grpc;
 
 namespace IdentityServer.Benchmarks;

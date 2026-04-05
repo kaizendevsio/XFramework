@@ -1,8 +1,3 @@
-using Community.Domain.Shared.Contracts.Requests;
-using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts;
-
 namespace Community.Api.Services;
 
 /// <summary>

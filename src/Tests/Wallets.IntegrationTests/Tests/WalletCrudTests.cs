@@ -1,11 +1,8 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Wallets.Api.Features.Wallets.Create;
 using Wallets.Api.Features.Wallets.Shared;
-using XFramework.Domain.Shared.Contracts;
-using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Domain.Shared.Contracts;
 
 namespace Wallets.IntegrationTests.Tests;

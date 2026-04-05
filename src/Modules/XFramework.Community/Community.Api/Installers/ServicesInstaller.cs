@@ -1,6 +1,4 @@
 using XFramework.Core.Extensions;
-using XFramework.Extensions;
-using Community.Api.Services;
 using XFramework.Domain.Shared.Interfaces;
 
 namespace Community.Api.Installers;

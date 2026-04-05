@@ -1,4 +1,3 @@
-using System.Net;
 using Coins.Api.BusinessObjects;
 
 namespace Coins.Api.Services;

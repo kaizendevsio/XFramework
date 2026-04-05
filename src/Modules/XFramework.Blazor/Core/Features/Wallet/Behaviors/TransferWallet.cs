@@ -1,8 +1,4 @@
 ﻿using Wallets.Integration.Drivers;
-using XFramework.Blazor.Entity.Models.Requests.Common;
-using XFramework.Blazor.Entity.Models.Requests.Wallet;
-using XFramework.Blazor.Entity.Validations.Wallet;
-using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Wallet;
 

@@ -1,5 +1,3 @@
-using XFramework.Domain.Shared.DataContext;
-
 namespace Bolt.Hub.Services;
 
 public interface IQueryExecutionService

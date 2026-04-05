@@ -2,7 +2,6 @@ using Coins.Api.BusinessObjects;
 using Coins.Api.Interfaces.Wrappers;
 using Coins.Api.Services;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
 namespace Coins.Tests;

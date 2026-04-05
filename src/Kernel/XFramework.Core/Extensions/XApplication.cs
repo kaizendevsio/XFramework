@@ -1,11 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Scalar.AspNetCore;
 using XFramework.Core.Extensions;
-using XFramework.Extensions;
 using XFramework.Domain.Shared.Extensions;
 using XFramework.Integration.Abstractions;
-using XFramework.Integration.Extensions;
 
 // ReSharper disable once CheckNamespace
 namespace XFramework.Extensions;

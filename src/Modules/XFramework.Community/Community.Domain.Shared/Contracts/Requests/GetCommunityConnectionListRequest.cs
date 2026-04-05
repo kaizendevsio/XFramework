@@ -1,7 +1,3 @@
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts;
-using XFramework.Domain.Shared.Contracts.Requests;
-
 namespace Community.Domain.Shared.Contracts.Requests;
 
 public record GetCommunityConnectionListRequest : RequestBase

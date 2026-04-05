@@ -1,7 +1,4 @@
-using IdentityServer.Api.Services;
-using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
-using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
 
 namespace IdentityServer.Api.Features.Verification.Check;

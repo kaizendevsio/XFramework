@@ -1,6 +1,4 @@
-﻿using XFramework.Domain.Shared.Interfaces;
-
-namespace IdentityServer.Api.Installers;
+﻿namespace IdentityServer.Api.Installers;
 
 public sealed class HostedServiceInstaller : IInstaller
 {

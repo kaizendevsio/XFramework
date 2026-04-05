@@ -1,5 +1,3 @@
-using Messaging.Domain.Shared.Contracts.Responses;
-
 namespace Messaging.Domain.Shared.Contracts.Requests.Attachments;
 
 using TRequest = GetMessageFilesRequest;

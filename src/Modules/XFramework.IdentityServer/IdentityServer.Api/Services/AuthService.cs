@@ -1,25 +1,16 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
-using System.Text;
 using System.Text.Json;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using ByteSizeLib;
 using IdentityServer.Domain.Shared;
-using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using Messaging.Domain.Shared;
 using Messaging.Integration.Drivers;
 using XFramework.Core.Loggers;
-using XFramework.Core.Patterns;
 using XFramework.Core.Services;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Integration.Services.Helpers;
-using XFramework.Domain.Shared.Contracts;
-using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
-using XFramework.Domain.Shared.Enums;
-using XFramework.Integration.Abstractions;
 using XFramework.Integration.Services;
 using Session = IdentityServer.Domain.Shared.Contracts.Session;
 

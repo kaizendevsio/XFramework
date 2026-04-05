@@ -1,5 +1,3 @@
-using XFramework.Blazor.Core.Features.Cart;
-
 namespace XFramework.Blazor.Core.Features.Cart;
 
 public partial class CartState

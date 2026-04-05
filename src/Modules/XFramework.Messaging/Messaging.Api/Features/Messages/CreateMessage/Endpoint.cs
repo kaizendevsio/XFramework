@@ -1,4 +1,3 @@
-using Messaging.Api.Services;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;

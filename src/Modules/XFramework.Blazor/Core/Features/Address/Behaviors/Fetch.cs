@@ -1,6 +1,5 @@
 using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Entity.Enums;
-using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Address;
 

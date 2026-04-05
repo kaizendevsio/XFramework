@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
-using Microsoft.Extensions.Logging;
 
 namespace Wallets.Api.Events;
 

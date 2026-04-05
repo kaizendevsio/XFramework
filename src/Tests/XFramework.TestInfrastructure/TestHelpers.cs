@@ -1,11 +1,9 @@
 using System.Text;
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Wallets.Domain.Shared.Contracts;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.TestInfrastructure;
 

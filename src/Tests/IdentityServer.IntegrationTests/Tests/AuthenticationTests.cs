@@ -1,14 +1,11 @@
 using System.Diagnostics;
 using System.Net;
-using System.Net.Http.Json;
 using System.Text;
 using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using Microsoft.EntityFrameworkCore;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts;
 using IdentityServer.Domain.Shared.Contracts;
-using Wallets.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Enums;
 using Session = IdentityServer.Domain.Shared.Contracts.Session;
 

@@ -1,6 +1,5 @@
 using FluentValidation;
 using Wallets.Api.Services;
-using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
 

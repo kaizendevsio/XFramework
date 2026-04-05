@@ -1,5 +1,3 @@
-using XFramework.Core.Attributes;
-
 namespace Gateway.Endpoints;
 
 // COMMENTED OUT: Migrating to manual VSA endpoints

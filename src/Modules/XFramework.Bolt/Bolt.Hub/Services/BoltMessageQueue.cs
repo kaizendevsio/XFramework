@@ -1,6 +1,5 @@
 using System.Threading.Channels;
 using XFramework.Domain.Shared.Configurations;
-using XFramework.Domain.Shared.Contracts.Base;
 
 namespace Bolt.Hub.Services;
 

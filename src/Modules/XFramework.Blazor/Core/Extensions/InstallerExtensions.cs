@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.FileProviders;
-using Serilog;
-using XFramework.Blazor.Core.Interfaces;
+﻿using Serilog;
 using XFramework.Domain.Shared.Extensions;
 
 namespace XFramework.Blazor.Core.Extensions;

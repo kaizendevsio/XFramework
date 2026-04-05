@@ -3,7 +3,6 @@ using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Core.Features.Wallet;
 using XFramework.Blazor.Entity.Models.Requests.Common;
-using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Session;
 

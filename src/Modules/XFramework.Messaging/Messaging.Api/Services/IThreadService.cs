@@ -5,7 +5,6 @@ using Messaging.Domain.Shared.Contracts.Requests.Reactions;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.Contracts;
 
 namespace Messaging.Api.Services;
 

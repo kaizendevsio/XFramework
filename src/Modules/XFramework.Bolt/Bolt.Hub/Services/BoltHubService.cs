@@ -1,13 +1,10 @@
 using Microsoft.AspNetCore.Http.Connections.Features;
 using Microsoft.AspNetCore.SignalR;
 using Bolt.Domain.Shared.BusinessObjects;
-using Bolt.Domain.Shared.Contracts.Requests;
-using Bolt.Domain.Shared.Contracts.Responses;
 using Bolt.Domain.Shared.Enums;
 using Bolt.Hub.Hubs;
 using Bolt.Hub.Interfaces;
 using XFramework.Core.Loggers;
-using XFramework.Core.Patterns;
 using System.Collections.Concurrent;
 using XFramework.Domain.Shared.Configurations;
 

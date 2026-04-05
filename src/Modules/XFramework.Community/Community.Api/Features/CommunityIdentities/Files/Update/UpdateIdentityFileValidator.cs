@@ -1,6 +1,3 @@
-using FluentValidation;
-using Community.Domain.Shared.Contracts.Requests;
-
 namespace Community.Api.Features.CommunityIdentities.Files.Update;
 
 public sealed class UpdateIdentityFileValidator : AbstractValidator<UpdateIdentityFileRequest>

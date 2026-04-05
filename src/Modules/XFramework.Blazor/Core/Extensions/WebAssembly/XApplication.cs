@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using Microsoft.AspNetCore.Components.Web;
+﻿using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using XFramework.Blazor.Core.Extensions.WebAssembly;
 using XFramework.Domain.Shared.Extensions;

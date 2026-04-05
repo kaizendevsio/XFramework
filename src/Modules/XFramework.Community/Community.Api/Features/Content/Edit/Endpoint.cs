@@ -1,7 +1,3 @@
-using Community.Api.Services;
-using Community.Domain.Shared.Contracts.Requests;
-using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Integration.Attributes;
 
 namespace Community.Api.Features.Content.Edit;

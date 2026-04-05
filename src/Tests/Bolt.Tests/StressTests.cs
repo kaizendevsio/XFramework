@@ -8,9 +8,6 @@ using Bolt.Protocol;
 using Bolt.Server;
 using FluentAssertions;
 using MemoryPack;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 
 namespace Bolt.Tests;

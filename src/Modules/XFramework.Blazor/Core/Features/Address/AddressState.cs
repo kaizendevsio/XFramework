@@ -1,6 +1,4 @@
-﻿using XFramework.Domain.Shared.Contracts;
-
-namespace XFramework.Blazor.Core.Features.Address;
+﻿namespace XFramework.Blazor.Core.Features.Address;
 
 public partial class AddressState : State<AddressState>
 {

@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
-
-namespace Fluid.Modules.Tables.Pages;
+﻿namespace Fluid.Modules.Tables.Pages;
 
 public partial class TableColumns
 {

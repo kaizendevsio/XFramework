@@ -11,9 +11,6 @@ using Google.Protobuf;
 using Grpc.Core;
 using Grpc.Net.Client;
 using MemoryPack;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Perfolizer.Horology;
 
 namespace Bolt.Tests;

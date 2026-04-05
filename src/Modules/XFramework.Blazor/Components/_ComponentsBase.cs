@@ -6,7 +6,6 @@ using XFramework.Blazor.Core.Features.Cart;
 using XFramework.Blazor.Core.Features.Identity;
 using XFramework.Blazor.Core.Features.Layout;
 using XFramework.Blazor.Core.Features.Wallet;
-using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Components;
 

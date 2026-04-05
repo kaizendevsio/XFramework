@@ -1,6 +1,3 @@
-using FluentValidation;
-using Community.Domain.Shared.Contracts.Requests;
-
 namespace Community.Api.Features.Content.Files.Delete;
 
 public sealed class DeleteContentFileValidator : AbstractValidator<DeleteContentFileRequest>

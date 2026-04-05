@@ -1,7 +1,5 @@
-using IdentityServer.Api.Services;
 using Messaging.Integration.Drivers;
 using XFramework.Core.Extensions;
-using XFramework.Domain.Shared.Interfaces;
 
 namespace IdentityServer.Api.Installers;
 

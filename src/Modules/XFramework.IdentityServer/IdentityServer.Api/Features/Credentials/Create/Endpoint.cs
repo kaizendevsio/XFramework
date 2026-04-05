@@ -1,8 +1,4 @@
 using FluentValidation;
-using IdentityServer.Api.Services;
-using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.Contracts;
-using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Attributes;
 using CreateRequest = XFramework.Domain.Shared.Contracts.Requests.Create<IdentityServer.Domain.Shared.Contracts.IdentityCredential>;
 

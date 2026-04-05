@@ -1,6 +1,5 @@
 ﻿using FluentValidation;
 using XFramework.Blazor.Core.Features.Wallet;
-using XFramework.Blazor.Entity.Models.Requests.Wallet;
 
 namespace XFramework.Blazor.Entity.Validations.Wallet;
 

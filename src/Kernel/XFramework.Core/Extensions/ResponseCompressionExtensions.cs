@@ -1,7 +1,5 @@
 using System.IO.Compression;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.ResponseCompression;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace XFramework.Core.Extensions;
 

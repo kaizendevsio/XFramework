@@ -1,5 +1,3 @@
-using XFramework.Domain.Shared.Attributes;
-
 namespace Community.Domain.Shared.Contracts;
 
 

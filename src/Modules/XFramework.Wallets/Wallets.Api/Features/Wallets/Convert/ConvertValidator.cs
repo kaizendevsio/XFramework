@@ -1,5 +1,4 @@
 using FluentValidation;
-using Wallets.Domain.Shared.Contracts.Requests;
 
 namespace Wallets.Api.Features.Wallets.Convert;
 
