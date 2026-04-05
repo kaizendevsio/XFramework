@@ -1,23 +1,13 @@
-using System.Diagnostics;
 using System.Net;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
-using BenchmarkDotNet.Reports;
-using BenchmarkDotNet.Running;
 using Bolt.Client;
 using Bolt.Server;
 using Bolt.Tests.Grpc;
-using Grpc.Core;
 using Grpc.Net.Client;
 using MemoryPack;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.SignalR;
-using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Perfolizer.Horology;
 
 namespace Bolt.Tests;
 

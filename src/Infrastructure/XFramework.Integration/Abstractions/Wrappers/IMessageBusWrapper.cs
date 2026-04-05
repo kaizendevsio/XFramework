@@ -1,6 +1,5 @@
 using Bolt.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Contracts.Base;
-using XFramework.Integration.Entity.Contracts.Responses;
 
 namespace XFramework.Integration.Abstractions.Wrappers;
 

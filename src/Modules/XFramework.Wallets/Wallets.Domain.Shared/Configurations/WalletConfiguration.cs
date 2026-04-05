@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wallets.Domain.Shared.Contracts;
-using Wallets.Domain.Shared.Enums;
 
 namespace Wallets.Domain.Shared.Configurations;
 

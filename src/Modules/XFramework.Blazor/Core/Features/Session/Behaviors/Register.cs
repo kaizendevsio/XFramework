@@ -1,9 +1,7 @@
-﻿using System.Collections.Specialized;
-using IdentityServer.Domain.Shared;
+﻿using IdentityServer.Domain.Shared;
 using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Core.Features.Wallet;
 using XFramework.Blazor.Entity.Models.Requests.Common;
-using XFramework.Domain.Shared.Contracts;
 using XFramework.Integration.Services.Helpers;
 
 namespace XFramework.Blazor.Core.Features.Session;

@@ -1,4 +1,3 @@
-using System.Net.Http;
 using Coins.Api.BusinessObjects;
 
 namespace Coins.Api.Interfaces.Wrappers;

@@ -1,5 +1,3 @@
-using XFramework.Domain.Shared.Contracts;
-
 namespace Wallets.Api.Features.Wallets.Shared;
 
 /// <summary>

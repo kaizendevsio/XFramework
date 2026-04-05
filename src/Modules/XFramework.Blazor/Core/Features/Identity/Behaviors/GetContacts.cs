@@ -1,5 +1,4 @@
 ﻿using IdentityServer.Integration.Drivers;
-using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Identity;
 

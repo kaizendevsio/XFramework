@@ -1,6 +1,4 @@
-using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.Contracts;
 
 namespace Wallets.Api.Services;
 

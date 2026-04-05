@@ -1,7 +1,6 @@
 ﻿using IdentityServer.Domain.Shared;
 using Microsoft.Extensions.Logging;
 using Wallets.Integration.Drivers;
-using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Contracts.Responses;
 
 namespace XFramework.Blazor.Core.Features.Wallet;

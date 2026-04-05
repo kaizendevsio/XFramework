@@ -1,6 +1,4 @@
-﻿using XFramework.Domain.Shared.Contracts;
-
-namespace IdentityServer.Domain.Shared.Contracts.Responses;
+﻿namespace IdentityServer.Domain.Shared.Contracts.Responses;
 
 [MemoryPackable]
 public partial record AuthenticateIdentityResponse

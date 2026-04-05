@@ -1,11 +1,6 @@
 using System.Diagnostics;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Logging;
-using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Loggers;
 using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.Enums;
 
 namespace Wallets.Api.Services;

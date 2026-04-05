@@ -1,5 +1,3 @@
-using XFramework.Domain.Shared.Enums;
-
 namespace Messaging.Domain.Shared.Contracts;
 
 

@@ -1,12 +1,10 @@
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.Net;
 using System.Net.WebSockets;
 using Microsoft.Extensions.Logging;
 using Bolt.Domain.Shared.Buffers;
 using Bolt.Domain.Shared.Protocol;
 using XFramework.Domain.Shared.Configurations;
-using XFramework.Integration.Services;
 
 namespace XFramework.Integration.ThinProtocol;
 

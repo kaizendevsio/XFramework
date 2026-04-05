@@ -1,15 +1,6 @@
 using Community.Domain.Shared;
-using Community.Domain.Shared.Contracts.Requests;
-using Microsoft.Extensions.Logging;
-using XFramework.Core.Patterns;
-using XFramework.Core.Services;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
-using Community.Domain.Shared.Enums;
 using XFramework.Core.Loggers;
-using System.Net;
-using Mapster;
 
 namespace Community.Api.Services;
 

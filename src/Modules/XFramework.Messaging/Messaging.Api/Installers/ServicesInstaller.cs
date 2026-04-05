@@ -1,9 +1,6 @@
-using Messaging.Api.Services;
 using SmsGateway.Integration.Drivers;
 using XFramework.Core.Extensions;
-using XFramework.Extensions;
 using XFramework.Domain.Shared.Interfaces;
-using XFramework.Integration.Extensions;
 
 namespace Messaging.Api.Installers;
 

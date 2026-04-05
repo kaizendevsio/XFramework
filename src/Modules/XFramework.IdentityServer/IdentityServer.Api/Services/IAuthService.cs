@@ -1,9 +1,4 @@
-using IdentityServer.Domain.Shared;
-using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
-using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.Contracts;
-using XFramework.Domain.Shared.Contracts.Requests;
 
 namespace IdentityServer.Api.Services;
 

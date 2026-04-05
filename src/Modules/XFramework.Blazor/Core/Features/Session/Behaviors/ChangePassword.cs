@@ -1,5 +1,4 @@
-﻿using IdentityServer.Domain.Shared.Contracts.Requests;
-using IdentityServer.Integration.Drivers;
+﻿using IdentityServer.Integration.Drivers;
 using XFramework.Blazor.Entity.Models.Requests.Common;
 
 namespace XFramework.Blazor.Core.Features.Session;

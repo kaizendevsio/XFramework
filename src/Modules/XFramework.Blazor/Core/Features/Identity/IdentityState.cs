@@ -1,5 +1,4 @@
-﻿using XFramework.Domain.Shared.Contracts;
-using XFramework.Domain.Shared.Contracts.Responses;
+﻿using XFramework.Domain.Shared.Contracts.Responses;
 
 namespace XFramework.Blazor.Core.Features.Identity;
 

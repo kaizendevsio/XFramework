@@ -1,7 +1,3 @@
-using Community.Api.Services;
-using Community.Domain.Shared.Contracts.Requests;
-using Community.Domain.Shared.Contracts.Responses;
-using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;
 
 namespace Community.Api.Features.Content.Files.GetList;

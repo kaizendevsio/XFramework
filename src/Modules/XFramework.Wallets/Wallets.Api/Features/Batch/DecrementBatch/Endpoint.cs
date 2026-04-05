@@ -1,8 +1,4 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Wallets.Api.Services;
-using Wallets.Domain.Shared.Contracts.Requests;
-using XFramework.Core.Patterns;
 using XFramework.Core.Services;
 
 namespace Wallets.Api.Features.Batch.DecrementBatch;

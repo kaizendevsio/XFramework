@@ -1,8 +1,4 @@
-﻿using XFramework.Blazor.Entity.Models.Requests.Wallet;
-using XFramework.Domain.Shared.Contracts;
-using Wallets.Domain.Shared.Contracts;
-
-namespace XFramework.Blazor.Core.Features.Wallet;
+﻿namespace XFramework.Blazor.Core.Features.Wallet;
 
 public partial class WalletState : State<WalletState>
 {

@@ -1,17 +1,12 @@
 using System.Diagnostics;
 using System.Text;
-using Microsoft.Extensions.Logging;
 using Wallets.Api.Events;
-using Wallets.Domain.Shared.Contracts.Requests;
 using XFramework.Core.Loggers;
 using XFramework.Core.Observability;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
-using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
-using XFramework.Domain.Shared.Interfaces;
-using XFramework.Integration.Abstractions;
 
 namespace Wallets.Api.Services;
 

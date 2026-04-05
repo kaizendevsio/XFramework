@@ -1,10 +1,8 @@
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.Net;
 using System.Net.WebSockets;
 using Bolt.Domain.Shared.Protocol;
 using Bolt.Domain.Shared.Buffers;
-using Microsoft.Extensions.Logging;
 
 namespace Bolt.Hub.ThinProtocol;
 

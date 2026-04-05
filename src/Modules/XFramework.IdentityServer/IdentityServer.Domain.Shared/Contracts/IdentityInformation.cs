@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 using XFramework.Domain.Shared.Attributes;
-using XFramework.Domain.Shared.Enums;
 
 namespace IdentityServer.Domain.Shared.Contracts;
 

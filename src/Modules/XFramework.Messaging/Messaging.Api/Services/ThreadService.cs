@@ -1,17 +1,13 @@
 using System.Net;
 using Messaging.Domain.Shared;
-using Messaging.Domain.Shared.Contracts;
 using Messaging.Domain.Shared.Contracts.Requests.Attachments;
 using Messaging.Domain.Shared.Contracts.Requests.Delete;
 using Messaging.Domain.Shared.Contracts.Requests.Edit;
 using Messaging.Domain.Shared.Contracts.Requests.Reactions;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
-using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
 
 namespace Messaging.Api.Services;

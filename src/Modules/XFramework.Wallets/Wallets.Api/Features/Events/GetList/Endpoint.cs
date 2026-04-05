@@ -1,5 +1,4 @@
 using Wallets.Api.Events;
-using Wallets.Domain.Shared.Contracts.Requests;
 using Wallets.Domain.Shared.Contracts.Responses;
 using XFramework.Core.Patterns;
 using XFramework.Integration.Attributes;

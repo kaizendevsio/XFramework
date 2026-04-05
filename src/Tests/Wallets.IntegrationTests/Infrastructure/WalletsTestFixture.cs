@@ -1,9 +1,7 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.DependencyInjection;
 using Bolt.Hub.Extensions;
 using Testcontainers.PostgreSql;
 using Wallets.Integration.Drivers;
@@ -11,7 +9,6 @@ using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Interfaces;
 using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;

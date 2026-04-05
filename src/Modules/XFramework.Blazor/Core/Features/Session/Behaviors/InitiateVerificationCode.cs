@@ -3,7 +3,6 @@ using IdentityServer.Integration.Drivers;
 using Messaging.Integration.Drivers;
 using XFramework.Blazor.Entity.Models.Requests.Common;
 using XFramework.Blazor.Entity.Models.Requests.Session;
-using XFramework.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Session;
 

@@ -1,7 +1,5 @@
 using System.Threading.Channels;
-using Microsoft.Extensions.Logging;
 using Bolt.Domain.Shared.BusinessObjects;
-using Bolt.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.Configurations;
 
 namespace Bolt.Hub.Services;

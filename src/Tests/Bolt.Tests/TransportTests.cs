@@ -1,12 +1,8 @@
 using System.Net.WebSockets;
 using Bolt.Client;
-using Bolt.Client.Transport;
 using Bolt.Protocol.Transport;
 using Bolt.Server;
 using FluentAssertions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 
 namespace Bolt.Tests;

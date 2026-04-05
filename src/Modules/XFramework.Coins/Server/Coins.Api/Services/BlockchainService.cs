@@ -1,7 +1,5 @@
-using System.Net;
 using Coins.Api.BusinessObjects;
 using Coins.Api.Interfaces.Wrappers;
-using Microsoft.Extensions.Logging;
 
 namespace Coins.Api.Services;
 

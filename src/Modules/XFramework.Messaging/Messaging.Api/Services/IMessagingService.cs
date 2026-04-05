@@ -1,7 +1,6 @@
 using Messaging.Domain.Shared.Contracts.Requests.Create;
 using Messaging.Domain.Shared.Contracts.Requests.Update;
 using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.Contracts;
 
 namespace Messaging.Api.Services;
 

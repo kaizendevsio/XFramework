@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
-
-namespace ControlPanel.Modules.Tenants.Pages;
+﻿namespace ControlPanel.Modules.Tenants.Pages;
 
 public partial class TenantDetails
 {

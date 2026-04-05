@@ -2,7 +2,6 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Integration.DataContext.ExpressionVisitor;
-using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Integration.DataContext;

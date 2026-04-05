@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.SignalR;
 using Bolt.Domain.Shared.BusinessObjects;
 using Bolt.Hub.Hubs;
 using Bolt.Hub.Interfaces;
-using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Domain.Shared.Configurations;
 
 namespace Bolt.Hub.Services;

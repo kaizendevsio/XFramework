@@ -1,11 +1,8 @@
-using Microsoft.Extensions.Logging;
 using SmsGateway.Domain.Shared.Contracts.Requests.Create;
 using SmsGateway.Domain.Shared.Contracts.Requests.Get;
 using SmsGateway.Domain.Shared.Contracts.Responses.Sms;
 using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Core.Loggers;
-using XFramework.Domain.Shared.Enums;
 
 namespace SmsGateway.Api.Services;
 

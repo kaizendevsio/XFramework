@@ -1,5 +1,3 @@
-using IdentityServer.Domain.Shared.Contracts.Responses;
-
 namespace IdentityServer.Domain.Shared.Contracts.Requests;
 
 [MemoryPackable]

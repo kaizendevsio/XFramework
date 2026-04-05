@@ -2,7 +2,6 @@ using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
 using XFramework.Core.RateLimiting;
-using XFramework.Domain.Contexts;
 
 var builder = XApplication.Configure<Program>();
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Bolt.Hub");

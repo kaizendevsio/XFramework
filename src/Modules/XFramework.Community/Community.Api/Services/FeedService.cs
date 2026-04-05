@@ -1,9 +1,4 @@
-using Community.Domain.Shared.Contracts;
-using Community.Domain.Shared.Contracts.Requests;
-using Community.Domain.Shared.Contracts.Responses;
-using Microsoft.Extensions.Logging;
 using XFramework.Core.Loggers;
-using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.DataContext;
 
 namespace Community.Api.Services;
