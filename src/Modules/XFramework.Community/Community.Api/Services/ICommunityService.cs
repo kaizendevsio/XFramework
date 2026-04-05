@@ -1,8 +1,3 @@
-using Community.Domain.Shared.Contracts.Requests;
-using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts;
-
 namespace Community.Api.Services;
 
 /// <summary>
@@ -38,6 +33,16 @@ public interface ICommunityService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result containing list of community connections</returns>
     Task<Result<List<CommunityConnection>>> GetConnectionListAsync(
-        GetCommunityConnectionListRequest request, 
+        GetCommunityConnectionListRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the storage reference for an existing identity file (e.g. profile or cover photo)
+    /// </summary>
+    /// <param name="request">The update identity file request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Result containing command response</returns>
+    Task<Result<CmdResponse>> UpdateIdentityFileAsync(
+        UpdateIdentityFileRequest request,
         CancellationToken cancellationToken = default);
 }

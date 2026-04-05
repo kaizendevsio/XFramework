@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Enums;
 
 namespace XFramework.Integration.DataContext.ExpressionVisitor;

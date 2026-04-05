@@ -1,5 +1,3 @@
-using XFramework.Core.Attributes;
-
 namespace Wallets.Api.Endpoints;
 
 // COMMENTED OUT: Migrating to manual VSA endpoints

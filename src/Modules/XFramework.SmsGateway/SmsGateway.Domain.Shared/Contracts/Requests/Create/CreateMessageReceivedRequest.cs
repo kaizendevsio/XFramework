@@ -1,5 +1,3 @@
-using XFramework.Domain.Shared.Contracts.Requests;
-
 namespace SmsGateway.Domain.Shared.Contracts.Requests.Create;
 
 /// <summary>

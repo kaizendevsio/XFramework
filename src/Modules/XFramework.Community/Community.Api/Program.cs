@@ -1,6 +1,4 @@
 using Community.Api.Generated;
-using Community.Api.Services;
-using FluentValidation;
 using XFramework.Extensions;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -13,10 +11,6 @@ builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Communi
 builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
     builder.Configuration,
     "Community");
-
-// Register Community services
-builder.Services.AddScoped<ICommunityService, CommunityService>();
-builder.Services.AddScoped<IContentService, ContentService>();
 
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();

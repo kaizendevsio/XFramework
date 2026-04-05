@@ -1,9 +1,6 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
 using Wallets.Api.Features.Wallets.Shared;
 using Wallets.Api.Services;
-using XFramework.Core.Patterns;
 
 namespace Wallets.Api.Features.Wallets.GetByCredential;
 

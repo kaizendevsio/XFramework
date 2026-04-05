@@ -1,8 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
 using Bolt.Domain.Shared.BusinessObjects;
-using Bolt.Domain.Shared.Contracts.Requests;
-using Bolt.Domain.Shared.Contracts.Responses;
-using XFramework.Core.Patterns;
 
 namespace Bolt.Hub.Services;
 

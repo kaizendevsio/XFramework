@@ -1,12 +1,9 @@
 using System.Net;
 using Messaging.Domain.Shared.Contracts.Requests.Create;
 using Messaging.Domain.Shared.Contracts.Requests.Update;
-using Microsoft.Extensions.Logging;
 using SmsGateway.Integration.Drivers;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
 using XFramework.Integration.Services.Helpers;
@@ -122,7 +119,7 @@ public sealed class MessagingService(
             record.Status = MessageStatus.Sent;
             record.AgentClusterId = request.AgentClusterId;
             record.SentAt = request.SentAt;
-            record.RecievedAt = request.RecievedAt;
+            record.ReceivedAt = request.ReceivedAt;
 
             dataContext.Update(record);
             await dataContext.SaveChangesAsync(ct);

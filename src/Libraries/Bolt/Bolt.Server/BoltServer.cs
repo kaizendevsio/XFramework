@@ -2,10 +2,10 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net;
-using System.Net.WebSockets;
 using System.Threading.Channels;
 using Bolt.Protocol;
 using Bolt.Protocol.Buffers;
+using Bolt.Protocol.Transport;
 using Bolt.Server.Media;
 using Microsoft.Extensions.Logging;
 
@@ -18,7 +18,7 @@ namespace Bolt.Server;
 ///
 /// Zero SignalR overhead — frames go directly: binary WebSocket ↔ MemoryPack.
 /// </summary>
-public sealed class BoltServer
+public sealed class BoltServer : IDisposable
 {
     private readonly ILogger<BoltServer> _logger;
     private readonly ConcurrentDictionary<string, BoltHubConnection> _connectionsByStreamId = new();
@@ -76,29 +76,61 @@ public sealed class BoltServer
         _localHandlers[hash] = handler;
     }
 
-    public async Task HandleConnectionAsync(WebSocket webSocket, CancellationToken ct)
+    public async Task HandleConnectionAsync(IBoltConnection transport, CancellationToken ct)
     {
-        var connection = new BoltHubConnection(webSocket);
+        var connection = new BoltHubConnection(transport);
+        connection.StartSendLoop(ct);
         var receiveBuffer = ArrayPool<byte>.Shared.Rent(256 * 1024);
+        byte[]? largeBuffer = null;
 
         try
         {
-            while (webSocket.State == WebSocketState.Open && !ct.IsCancellationRequested)
+            while (transport.IsConnected && !ct.IsCancellationRequested)
             {
-                var result = await webSocket.ReceiveAsync(receiveBuffer.AsMemory(), ct);
+                var (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), ct);
 
-                if (result.MessageType == WebSocketMessageType.Close)
+                // (0, true) signals connection closed
+                if (bytesRead == 0 && endOfMessage)
                     break;
 
-                if (result.MessageType != WebSocketMessageType.Binary || result.Count == 0)
+                if (bytesRead == 0)
                     continue;
 
-                await ProcessFrameAsync(connection, receiveBuffer, result.Count, ct);
+                byte[] frameBytes;
+                int totalLength;
+                if (!endOfMessage)
+                {
+                    // Multi-frame: accumulate into growing pooled buffer (zero MemoryStream alloc)
+                    var assembled = bytesRead;
+                    var capacity = Math.Max(bytesRead * 4, 512 * 1024);
+                    if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
+                    largeBuffer = ArrayPool<byte>.Shared.Rent(capacity);
+                    receiveBuffer.AsSpan(0, bytesRead).CopyTo(largeBuffer);
+
+                    while (!endOfMessage)
+                    {
+                        (bytesRead, endOfMessage) = await transport.ReceiveAsync(receiveBuffer.AsMemory(), ct);
+                        if (assembled + bytesRead > largeBuffer.Length)
+                        {
+                            var newBuf = ArrayPool<byte>.Shared.Rent(largeBuffer.Length * 2);
+                            largeBuffer.AsSpan(0, assembled).CopyTo(newBuf);
+                            ArrayPool<byte>.Shared.Return(largeBuffer);
+                            largeBuffer = newBuf;
+                        }
+                        receiveBuffer.AsSpan(0, bytesRead).CopyTo(largeBuffer.AsSpan(assembled));
+                        assembled += bytesRead;
+                    }
+                    frameBytes = largeBuffer;
+                    totalLength = assembled;
+                }
+                else
+                {
+                    frameBytes = receiveBuffer;
+                    totalLength = bytesRead;
+                }
+
+                await ProcessFrameAsync(connection, frameBytes, totalLength, ct);
             }
-        }
-        catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
-        {
-            _logger.LogDebug("Client {ClientId} disconnected", connection.ClientId ?? "unregistered");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -107,14 +139,13 @@ public sealed class BoltServer
         }
         finally
         {
+            connection.CompleteSendChannel();
             ArrayPool<byte>.Shared.Return(receiveBuffer);
+            if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             RemoveConnection(connection);
 
-            if (webSocket.State is WebSocketState.Open or WebSocketState.CloseReceived)
-            {
-                try { await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None); }
-                catch { }
-            }
+            try { await transport.CloseAsync(); }
+            catch { }
         }
     }
 
@@ -159,6 +190,7 @@ public sealed class BoltServer
                 break;
             case FrameType.MediaFeedback:
             case FrameType.MediaKeyRequest:
+            case FrameType.NackRequest:
                 await RouteMediaFeedbackAsync(connection, buffer, length, ct);
                 break;
             case FrameType.CallSignal:
@@ -269,9 +301,38 @@ public sealed class BoltServer
         if (!BoltCodec.TryReadRequestHeader(buffer.AsSpan(0, length), out _, out var recipientHash, out var totalSize))
             return;
 
+        // Broadcast: recipientHash == 0 → send to all connected clients (except sender)
+        if (recipientHash == 0)
+        {
+            var data = buffer.AsMemory(0, totalSize);
+            foreach (var (_, bag) in _connectionsByServiceHash)
+            {
+                foreach (var client in bag)
+                {
+                    // Backpressure: skip push to congested clients (push is best-effort)
+                    if (client.IsAlive && client.StreamId != sender.StreamId && !client.IsUnderPressure)
+                        await client.SendAsync(data, ct);
+                }
+            }
+            return;
+        }
+
         var recipient = GetRecipient(recipientHash);
-        if (recipient is not null)
+        if (recipient is not null && !recipient.IsUnderPressure)
             await recipient.SendAsync(buffer.AsMemory(0, totalSize), ct);
+    }
+
+    /// <summary>Get the count of currently connected clients.</summary>
+    public int ConnectedClientCount => _connectionsByStreamId.Count;
+
+    /// <summary>Get all connected client IDs for presence queries.</summary>
+    public IEnumerable<string> GetConnectedClientIds()
+    {
+        foreach (var (_, conn) in _connectionsByStreamId)
+        {
+            if (conn.IsAlive && conn.ClientId is not null)
+                yield return conn.ClientId;
+        }
     }
 
     // ── Stream routing ──
@@ -337,10 +398,33 @@ public sealed class BoltServer
             return;
 
         var data = buffer.AsMemory(0, length);
+
+        // Simulcast-aware routing: if this stream has a layer ID, only forward to
+        // recipients whose preferred layer matches (or who have no preference = forward all)
+        var isSimulcast = route.SimulcastLayerId.HasValue;
+
         foreach (var recipient in route.Recipients)
         {
-            if (recipient.StreamId != sender.StreamId && recipient.IsAlive)
-                await recipient.SendAsync(data, ct);
+            if (recipient.StreamId == sender.StreamId || !recipient.IsAlive)
+                continue;
+
+            // Simulcast filtering: skip if recipient prefers a different layer
+            if (isSimulcast && _activeCalls.TryGetValue(route.CallId, out var callState))
+            {
+                if (callState.RecipientPreferredLayer.TryGetValue(recipient.StreamId, out var preferred)
+                    && preferred != route.SimulcastLayerId!.Value)
+                    continue; // Recipient prefers a different layer — skip
+            }
+
+            // Backpressure: skip drop-eligible media frames if recipient is congested
+            if (recipient.IsUnderPressure)
+            {
+                // Check if frame is drop-eligible (flag 0x40)
+                if (length > 25 && (buffer[25] & 0x40) != 0)
+                    continue; // Drop this frame — recipient can't keep up
+            }
+
+            await recipient.SendAsync(data, ct);
         }
 
         // Tap: send a copy to media processors (non-blocking, drops if full)
@@ -409,11 +493,31 @@ public sealed class BoltServer
     /// </summary>
     private async Task RouteMediaFeedbackAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
-        if (!BoltCodec.TryReadMediaFrameHeader(buffer.AsSpan(0, length), out var streamId))
+        var span = buffer.AsSpan(0, length);
+        if (!BoltCodec.TryReadMediaFrameHeader(span, out var streamId))
             return;
 
         if (!_activeMediaStreams.TryGetValue(streamId, out var route))
             return;
+
+        // Simulcast layer selection: if feedback contains Decrease/KeyframeNeeded,
+        // downgrade the recipient to a lower layer; if Increase, upgrade.
+        if (route.SimulcastLayerId.HasValue
+            && (FrameType)buffer[0] == FrameType.MediaFeedback
+            && BoltCodec.TryReadMediaFeedback(span, out var feedback)
+            && _activeCalls.TryGetValue(route.CallId, out var callState))
+        {
+            var currentLayer = callState.RecipientPreferredLayer.GetOrAdd(sender.StreamId, route.SimulcastLayerId.Value);
+            switch (feedback.QualityHint)
+            {
+                case QualityHint.Decrease or QualityHint.KeyframeNeeded when currentLayer > 0:
+                    callState.RecipientPreferredLayer[sender.StreamId] = (byte)(currentLayer - 1);
+                    break;
+                case QualityHint.Increase when currentLayer < 2:
+                    callState.RecipientPreferredLayer[sender.StreamId] = (byte)(currentLayer + 1);
+                    break;
+            }
+        }
 
         // Feedback goes back to the stream's sender
         if (route.Sender.IsAlive)
@@ -1012,57 +1116,110 @@ public sealed class BoltServer
     }
 
     public int ConnectedClients => _connectionsByStreamId.Count;
+
+    public void Dispose()
+    {
+        _mediaTapCts.Cancel();
+        _mediaTapChannel.Writer.TryComplete();
+        _cleanupTimer.Dispose();
+        _mediaTapCts.Dispose();
+    }
 }
 
+/// <summary>
+/// Server-side wrapper for a connected client's transport.
+/// Uses a Channel-based send queue with a dedicated background send loop
+/// so callers never block — writes go into the channel instantly.
+/// The single-reader send loop drains the channel and writes to the transport
+/// one at a time, eliminating lock contention for all transports.
+/// </summary>
 public sealed class BoltHubConnection
 {
-    private readonly WebSocket _webSocket;
-    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly IBoltConnection _transport;
+    private readonly Channel<(byte[] Buffer, int Length)> _sendChannel;
+    private Task? _sendLoop;
 
     public string StreamId { get; } = Guid.NewGuid().ToString("N");
     public string? ClientId { get; set; }
     public string? ClientName { get; set; }
     public int ServiceHash { get; set; }
-    public bool IsAlive => _webSocket.State == WebSocketState.Open;
+    public bool IsAlive => _transport.IsConnected;
+    public BoltTransport TransportType => _transport.TransportType;
 
-    public BoltHubConnection(WebSocket webSocket) => _webSocket = webSocket;
+    /// <summary>Pending bytes queued for this connection. Used for backpressure decisions.</summary>
+    public long PendingBytes => Interlocked.Read(ref _pendingBytes);
+    private long _pendingBytes;
 
-    /// <summary>
-    /// Send data with fast-path for uncontended lock.
-    /// </summary>
-    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    /// <summary>Backpressure threshold: drop media frames when pending exceeds this (1MB).</summary>
+    public const long BackpressureDropThreshold = 1024 * 1024;
+
+    /// <summary>Backpressure threshold: send feedback signal to reduce sender rate (2MB).</summary>
+    public const long BackpressureFeedbackThreshold = 2 * 1024 * 1024;
+
+    /// <summary>True if this connection is under backpressure (pending > drop threshold).</summary>
+    public bool IsUnderPressure => PendingBytes > BackpressureDropThreshold;
+
+    public BoltHubConnection(IBoltConnection transport)
     {
-        // Fast path: no contention — send synchronously, zero overhead
-        if (_sendLock.Wait(0))
+        _transport = transport;
+        _sendChannel = Channel.CreateBounded<(byte[], int)>(
+            new BoundedChannelOptions(4096)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = false
+            });
+    }
+
+    /// <summary>Start the background send loop. Call once after construction.</summary>
+    public void StartSendLoop(CancellationToken ct)
+    {
+        _sendLoop = Task.Run(async () =>
         {
             try
             {
-                if (_webSocket.State == WebSocketState.Open)
-                    return _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
-                return ValueTask.CompletedTask;
+                await foreach (var (buf, len) in _sendChannel.Reader.ReadAllAsync(ct))
+                {
+                    try
+                    {
+                        if (_transport.IsConnected)
+                            await _transport.SendAsync(buf.AsMemory(0, len), ct);
+                    }
+                    catch (OperationCanceledException) { }
+                    catch { /* Transport error — receive loop will detect disconnect */ }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(buf);
+                        Interlocked.Add(ref _pendingBytes, -len);
+                    }
+                }
             }
-            finally
-            {
-                _sendLock.Release();
-            }
-        }
-        // Slow path: contention — await lock
-        return SendSlowAsync(data, ct);
+            catch (OperationCanceledException) { }
+        }, ct);
     }
 
-    private async ValueTask SendSlowAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        await _sendLock.WaitAsync(ct);
-        try
-        {
-            if (_webSocket.State == WebSocketState.Open)
-                await _webSocket.SendAsync(data, WebSocketMessageType.Binary, true, ct);
-        }
-        finally
-        {
-            _sendLock.Release();
-        }
+        // Snapshot into a pooled buffer — the caller's buffer (thread-local RentedBufferWriter
+        // or pooled receive buffer) may be reused before the async transport write completes.
+        var len = data.Length;
+        var buf = ArrayPool<byte>.Shared.Rent(len);
+        data.Span.CopyTo(buf);
+        Interlocked.Add(ref _pendingBytes, len);
+
+        // All sends go through Channel (serialized single-writer)
+        if (_sendChannel.Writer.TryWrite((buf, len)))
+            return ValueTask.CompletedTask;
+        return SendSlowAsync(buf, len, ct);
     }
+
+    private async ValueTask SendSlowAsync(byte[] buf, int len, CancellationToken ct)
+    {
+        await _sendChannel.Writer.WriteAsync((buf, len), ct);
+    }
+
+    /// <summary>Signal that no more sends will be enqueued. The send loop will drain and exit.</summary>
+    public void CompleteSendChannel() => _sendChannel.Writer.TryComplete();
 }
 
 /// <summary>
@@ -1074,6 +1231,13 @@ internal sealed class MediaStreamRoute
     public BoltHubConnection Sender { get; init; } = null!;
     public List<BoltHubConnection> Recipients { get; } = new();
     public Guid CallId { get; init; }
+
+    /// <summary>
+    /// For simulcast: maps this stream to a simulcast layer group.
+    /// All streams in the same group (callId + sender) represent different quality layers.
+    /// The hub forwards only the selected layer per recipient.
+    /// </summary>
+    public byte? SimulcastLayerId { get; set; }
 }
 
 /// <summary>Server-side call status.</summary>
@@ -1091,4 +1255,17 @@ internal sealed class ServerCallState
     public List<BoltHubConnection> Participants { get; } = new();
     public List<Guid> MediaStreamIds { get; } = new();
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Simulcast: per-recipient preferred layer. Key = recipient StreamId, Value = preferred SimulcastLayerId.
+    /// When a recipient sends MediaFeedback with a quality hint, the hub updates this
+    /// and only forwards media streams matching the preferred layer.
+    /// </summary>
+    public ConcurrentDictionary<string, byte> RecipientPreferredLayer { get; } = new();
+
+    /// <summary>
+    /// Simulcast: maps sender StreamId → list of simulcast stream IDs (grouped by layer).
+    /// Key = sender connection StreamId, Value = dict of layerId → media streamId.
+    /// </summary>
+    public ConcurrentDictionary<string, ConcurrentDictionary<byte, Guid>> SimulcastGroups { get; } = new();
 }

@@ -1,6 +1,3 @@
-using FluentValidation;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Wallets.Api.Features.Wallets.Shared;
 using Wallets.Api.Services;
 using XFramework.Core.Patterns;

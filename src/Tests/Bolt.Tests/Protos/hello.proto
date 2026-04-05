@@ -4,6 +4,7 @@ option csharp_namespace = "Bolt.Tests.Grpc";
 
 service HelloService {
   rpc SayHello (HelloRequest) returns (HelloReply);
+  rpc EchoPayload (PayloadRequest) returns (PayloadReply);
 }
 
 message HelloRequest {
@@ -12,4 +13,12 @@ message HelloRequest {
 
 message HelloReply {
   string message = 1;
+}
+
+message PayloadRequest {
+  bytes data = 1;
+}
+
+message PayloadReply {
+  bytes data = 1;
 }

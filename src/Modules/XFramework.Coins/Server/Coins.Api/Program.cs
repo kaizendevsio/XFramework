@@ -1,5 +1,4 @@
 using Coins.Api.Generated;
-using FluentValidation;
 using XFramework.Extensions;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;

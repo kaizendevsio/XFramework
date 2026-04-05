@@ -1,16 +1,13 @@
 using System.Net;
-using Messaging.Domain.Shared.Contracts;
+using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts.Requests.Attachments;
 using Messaging.Domain.Shared.Contracts.Requests.Delete;
 using Messaging.Domain.Shared.Contracts.Requests.Edit;
 using Messaging.Domain.Shared.Contracts.Requests.Reactions;
 using Messaging.Domain.Shared.Contracts.Requests.Threads;
 using Messaging.Domain.Shared.Contracts.Responses;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services;
-using XFramework.Domain.Shared.Contracts;
 using XFramework.Domain.Shared.DataContext;
 
 namespace Messaging.Api.Services;
@@ -197,6 +194,51 @@ public sealed class ThreadService(
         {
             logger.LogError(ex, "Error getting thread: {ThreadId}", request.Id);
             return Result<GetThreadResponse>.Failure($"Error getting thread: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> UpdateThreadAsync(UpdateThreadRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var thread = await dataContext.Query<MessageThread>()
+                .Where(t => t.Id == request.ThreadId)
+                .Where(t => !t.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (thread is null)
+                return Result<CmdResponse>.NotFound("Thread not found");
+
+            var member = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.CredentialId == request.RequesterCredentialId)
+                .Where(m => !m.IsDeleted)
+                .FirstOrDefaultAsync(ct);
+
+            if (member is null)
+                return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
+
+            if (request.Name is not null)
+                thread.Name = request.Name;
+
+            if (request.Description is not null)
+                thread.Description = request.Description;
+
+            thread.ModifiedAt = DateTime.UtcNow;
+
+            dataContext.Update(thread);
+            await dataContext.SaveChangesAsync(ct);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Thread updated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating thread {ThreadId}", request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error updating thread: {ex.Message}");
         }
     }
 
@@ -404,6 +446,31 @@ public sealed class ThreadService(
                 .Skip(pageIndex * pageSize)
                 .Take(pageSize)
                 .ToListAsync(ct);
+
+            // Auto-create "Delivered" records for messages this member hasn't seen
+            var fetchedMessageIds = messages.Select(m => m.Id).ToList();
+            var existingDeliveries = await dataContext.Query<MessageDelivery>()
+                .Where(d => d.MessageThreadMemberId == requesterMember.Id)
+                .Where(d => fetchedMessageIds.Contains(d.MessageId))
+                .Where(d => !d.IsDeleted)
+                .ToListAsync(ct);
+            var existingDeliveryMessageIds = existingDeliveries.Select(d => d.MessageId).ToList();
+
+            var undeliveredIds = fetchedMessageIds.Except(existingDeliveryMessageIds).ToList();
+            if (undeliveredIds.Count > 0)
+            {
+                foreach (var msgId in undeliveredIds)
+                {
+                    dataContext.Add(new MessageDelivery
+                    {
+                        MessageThreadMemberId = requesterMember.Id,
+                        MessageId = msgId,
+                        TypeId = MessageDeliveryTypes.Delivered,
+                        IsEnabled = true
+                    });
+                }
+                await dataContext.SaveChangesAsync(ct);
+            }
 
             // Get the member info for senders
             var memberIds = messages.Select(m => m.MessageThreadMemberId).Distinct().ToList();
@@ -646,6 +713,7 @@ public sealed class ThreadService(
             var duplicateExists = await dataContext.Query<MessageReaction>()
                 .Where(r => r.MessageId == request.MessageId)
                 .Where(r => r.TypeId == request.TypeId)
+                .Where(r => r.MessageThreadMemberId == member.Id)
                 .Where(r => !r.IsDeleted && r.IsEnabled)
                 .AnyAsync(ct);
 
@@ -656,6 +724,7 @@ public sealed class ThreadService(
             {
                 MessageId = request.MessageId,
                 TypeId = request.TypeId,
+                MessageThreadMemberId = member.Id,
                 IsEnabled = true
             };
 
@@ -705,6 +774,9 @@ public sealed class ThreadService(
             if (member is null)
                 return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
 
+            if (reaction.MessageThreadMemberId != member.Id)
+                return Result<CmdResponse>.Forbidden("You can only delete your own reactions");
+
             reaction.IsDeleted = true;
             reaction.IsEnabled = false;
             reaction.DeletedAt = DateTime.UtcNow;
@@ -723,6 +795,68 @@ public sealed class ThreadService(
         {
             logger.LogError(ex, "Error deleting reaction {ReactionId}", request.ReactionId);
             return Result<CmdResponse>.Failure($"Error deleting reaction: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> MarkMessagesReadAsync(MarkMessagesReadRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var member = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => m.CredentialId == request.RequesterCredentialId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+
+            if (member is null)
+                return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
+
+            var existingDeliveries = await dataContext.Query<MessageDelivery>()
+                .Where(d => d.MessageThreadMemberId == member.Id)
+                .Where(d => request.MessageIds.Contains(d.MessageId))
+                .Where(d => !d.IsDeleted)
+                .ToListAsync(ct);
+
+            var existingByMessage = existingDeliveries.ToDictionary(d => d.MessageId);
+            var markedCount = 0;
+
+            foreach (var messageId in request.MessageIds)
+            {
+                if (existingByMessage.TryGetValue(messageId, out var delivery))
+                {
+                    if (delivery.TypeId == MessageDeliveryTypes.Read)
+                        continue;
+
+                    delivery.TypeId = MessageDeliveryTypes.Read;
+                    delivery.ModifiedAt = DateTime.UtcNow;
+                    dataContext.Update(delivery);
+                    markedCount++;
+                }
+                else
+                {
+                    dataContext.Add(new MessageDelivery
+                    {
+                        MessageThreadMemberId = member.Id,
+                        MessageId = messageId,
+                        TypeId = MessageDeliveryTypes.Read,
+                        IsEnabled = true
+                    });
+                    markedCount++;
+                }
+            }
+
+            await dataContext.SaveChangesAsync(ct);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = $"{markedCount} message(s) marked as read"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error marking messages as read in thread {ThreadId}", request.ThreadId);
+            return Result<CmdResponse>.Failure($"Error marking messages as read: {ex.Message}");
         }
     }
 }

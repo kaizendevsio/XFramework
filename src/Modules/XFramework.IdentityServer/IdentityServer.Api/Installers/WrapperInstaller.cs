@@ -1,5 +1,4 @@
 ﻿using Messaging.Integration.Drivers;
-using XFramework.Domain.Shared.Interfaces;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
 

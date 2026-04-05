@@ -1,6 +1,4 @@
-﻿using IdentityServer.Domain.Shared.Contracts.Responses;
-
-namespace IdentityServer.Domain.Shared.Contracts.Requests;
+﻿namespace IdentityServer.Domain.Shared.Contracts.Requests;
 
 using TRequest = AuthenticateIdentityRequest;
 using TResponse = QueryResponse<AuthenticateIdentityResponse>;

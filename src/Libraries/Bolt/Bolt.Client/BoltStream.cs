@@ -83,12 +83,17 @@ public sealed class BoltStream : IAsyncDisposable
     // ── Typed streaming (MemoryPack auto-serialization) ──
 
     /// <summary>
-    /// Send a typed object — auto-serialized with MemoryPack.
+    /// Send a typed object — auto-serialized with MemoryPack into a pooled buffer.
     /// </summary>
-    public ValueTask SendAsync<T>(T item, CancellationToken ct = default)
+    public async ValueTask SendAsync<T>(T item, CancellationToken ct = default)
     {
-        var bytes = MemoryPackSerializer.Serialize(item);
-        return SendAsync(bytes, ct);
+        var serWriter = new RentedBufferWriter(256);
+        try
+        {
+            MemoryPackSerializer.Serialize(serWriter, item);
+            await SendAsync(serWriter.WrittenMemory, ct);
+        }
+        finally { serWriter.Dispose(); }
     }
 
     /// <summary>
@@ -98,11 +103,17 @@ public sealed class BoltStream : IAsyncDisposable
     /// </summary>
     public async Task SendAllAsync<T>(IAsyncEnumerable<T> items, CancellationToken ct = default)
     {
-        await foreach (var item in items.WithCancellation(ct))
+        var serWriter = new RentedBufferWriter(256);
+        try
         {
-            var bytes = MemoryPackSerializer.Serialize(item);
-            await SendAsync(bytes, ct);
+            await foreach (var item in items.WithCancellation(ct))
+            {
+                serWriter.Reset();
+                MemoryPackSerializer.Serialize(serWriter, item);
+                await SendAsync(serWriter.WrittenMemory, ct);
+            }
         }
+        finally { serWriter.Dispose(); }
         await CloseAsync(ct: ct);
     }
 

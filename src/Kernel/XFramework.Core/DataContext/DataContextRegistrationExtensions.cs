@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Core.DataContext;

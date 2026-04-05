@@ -1,6 +1,5 @@
 using FluentValidation;
 using Messaging.Api.Generated;
-using Messaging.Api.Services;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;

@@ -1,14 +1,6 @@
-using Community.Domain.Shared.Contracts.Requests;
-using Microsoft.Extensions.Logging;
-using XFramework.Core.Patterns;
-using XFramework.Core.Services;
-using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Contracts;
+using Community.Domain.Shared;
 using XFramework.Domain.Shared.DataContext;
-using Community.Domain.Shared.Enums;
 using XFramework.Core.Loggers;
-using System.Net;
-using Mapster;
 
 namespace Community.Api.Services;
 
@@ -69,7 +61,7 @@ public sealed class CommunityService : ICommunityService
             var identityFileTypes = await _dataContext.Query<CommunityIdentityFileType>().ToListAsync(cancellationToken);
             var storageFileTypes = await _dataContext.Query<StorageFileType>().ToListAsync(cancellationToken);
 
-            var pngType = storageFileTypes.FirstOrDefault(i => i.Id == new Guid("af6b9396-ba01-4f88-a5d0-e0cfbc038146"));
+            var pngType = storageFileTypes.FirstOrDefault(i => i.Id == CommunityStorageFileTypes.Png);
 
             // Create community identity entity
             var entity = new CommunityIdentity
@@ -88,7 +80,7 @@ public sealed class CommunityService : ICommunityService
                     // Profile Photo
                     new()
                     {
-                        Type = identityFileTypes.FirstOrDefault(i => i.Id == new Guid("996dd417-170c-4ac9-b565-62caf4ab5ccf")),
+                        Type = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.ProfilePhoto),
                         Storage = new()
                         {
                             ContentPath = "",
@@ -98,7 +90,7 @@ public sealed class CommunityService : ICommunityService
                     // Cover Photo
                     new()
                     {
-                        Type = identityFileTypes.FirstOrDefault(i => i.Id == new Guid("8716ec30-b061-45cc-ad5b-77bda960d90e")),
+                        Type = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.CoverPhoto),
                         Storage = new()
                         {
                             ContentPath = "",
@@ -250,6 +242,42 @@ public sealed class CommunityService : ICommunityService
         {
             _logger.CommunityConnectionsError(request.CommunityIdentityId, ex);
             return Result<List<CommunityConnection>>.Failure("An error occurred while retrieving connections", 500);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<CmdResponse>> UpdateIdentityFileAsync(
+        UpdateIdentityFileRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (request.RequestingIdentityId != request.IdentityId)
+                return Result<CmdResponse>.Forbidden("You can only update your own identity files");
+
+            var file = await _dataContext.Query<CommunityIdentityFile>()
+                .Where(f => f.Id == request.FileId && f.IdentityId == request.IdentityId && !f.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (file == null)
+                return Result<CmdResponse>.NotFound($"Identity file with Id {request.FileId} does not exist");
+
+            file.StorageId = request.StorageFileId;
+            file.ModifiedAt = DateTime.UtcNow;
+
+            _dataContext.Update(file);
+            await _dataContext.SaveChangesAsync(cancellationToken);
+
+            return Result<CmdResponse>.Success(new CmdResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                Message = "Identity file updated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.OperationFailed("UpdateIdentityFile", "CommunityIdentityFile", request.FileId, ex.Message, ex);
+            return Result<CmdResponse>.Failure("An error occurred while updating identity file", 500);
         }
     }
 }

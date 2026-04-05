@@ -1,6 +1,4 @@
-﻿using XFramework.Core.Attributes;
-
-namespace IdentityServer.Api.Endpoints;
+﻿namespace IdentityServer.Api.Endpoints;
 
 // COMMENTED OUT: Migrating to manual VSA endpoints
 // [GenerateEndpoints("XFramework.Domain.Shared.Contracts",new[] {

@@ -1,8 +1,3 @@
-using Community.Domain.Shared.Contracts.Requests;
-using Community.Domain.Shared.Contracts.Responses;
-using XFramework.Core.Patterns;
-using XFramework.Domain.Shared.BusinessObjects;
-
 namespace Community.Api.Services;
 
 /// <summary>
@@ -32,6 +27,13 @@ public interface IContentService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Edits content owned by the requester (partial update)
+    /// </summary>
+    Task<Result<CmdResponse>> EditContentAsync(
+        EditContentRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates a reaction on a content item
     /// </summary>
     Task<Result<CmdResponse>> CreateContentReactionAsync(
@@ -57,5 +59,26 @@ public interface IContentService
     /// </summary>
     Task<Result<PaginatedResult<SearchIdentitiesResponse>>> SearchIdentitiesAsync(
         SearchIdentitiesRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Attaches a file to content
+    /// </summary>
+    Task<Result<CmdResponse>> CreateContentFileAsync(
+        CreateContentFileVsaRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists files attached to content
+    /// </summary>
+    Task<Result<List<ContentFileResponse>>> GetContentFilesAsync(
+        GetContentFilesRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a file from content
+    /// </summary>
+    Task<Result<CmdResponse>> DeleteContentFileAsync(
+        DeleteContentFileRequest request,
         CancellationToken cancellationToken = default);
 }

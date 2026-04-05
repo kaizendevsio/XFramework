@@ -1,6 +1,4 @@
-﻿using XFramework.Domain.Shared.Contracts;
-
-namespace ControlPanel.Modules.Identity.ViewModels;
+﻿namespace ControlPanel.Modules.Identity.ViewModels;
 
 public class UserVm
 {

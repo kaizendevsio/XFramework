@@ -5,9 +5,6 @@ using Coins.Api.Features.Blockchain.Send;
 using Coins.Api.Interfaces;
 using Coins.Api.Interfaces.Wrappers;
 using Coins.Api.Services;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using XFramework.Domain.Shared.Interfaces;
 
 namespace Coins.Api.Installers;

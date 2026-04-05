@@ -28,3 +28,9 @@ public static class GenericSender
 {
     public static readonly string System = "+630000000000";
 }
+
+public static class MessageDeliveryTypes
+{
+    public static readonly Guid Delivered = new("b1000000-0000-0000-0000-000000000001");
+    public static readonly Guid Read = new("b1000000-0000-0000-0000-000000000002");
+}

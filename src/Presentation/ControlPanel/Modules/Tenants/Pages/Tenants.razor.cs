@@ -1,9 +1,7 @@
-﻿using System.Runtime.InteropServices;
-using IdentityServer.Integration.Drivers;
+﻿using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Components;
 // Tenant wrapper is now part of IIdentityServerServiceWrapper
 using XFramework.Domain.Shared.Contracts.Responses;
-using IdentityServer.Domain.Shared.Contracts;
 
 namespace ControlPanel.Modules.Tenants.Pages;
 

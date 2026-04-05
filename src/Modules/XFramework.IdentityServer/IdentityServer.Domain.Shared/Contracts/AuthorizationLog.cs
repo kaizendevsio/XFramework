@@ -1,5 +1,4 @@
 using XFramework.Domain.Shared.Attributes;
-using XFramework.Domain.Shared.Enums;
 
 namespace IdentityServer.Domain.Shared.Contracts;
 

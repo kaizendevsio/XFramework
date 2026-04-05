@@ -1,5 +1,4 @@
 using MessagePack;
-using XFramework.Domain.Shared.BusinessObjects;
 
 namespace Bolt.Domain.Shared.BusinessObjects;
 

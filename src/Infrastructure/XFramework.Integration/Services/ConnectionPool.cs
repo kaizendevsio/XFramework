@@ -1,12 +1,6 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Bolt.Domain.Shared.Abstractions;
-using Bolt.Domain.Shared.BusinessObjects;
-using Bolt.Domain.Shared.Contracts.Requests;
-using Bolt.Domain.Shared.Contracts.Responses;
 using XFramework.Domain.Shared.Configurations;
 
 namespace XFramework.Integration.Services;

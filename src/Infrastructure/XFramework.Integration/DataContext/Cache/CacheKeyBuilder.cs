@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Integration.DataContext.Cache;

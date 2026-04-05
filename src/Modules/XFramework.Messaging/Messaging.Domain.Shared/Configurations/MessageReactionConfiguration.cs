@@ -30,5 +30,10 @@ public class MessageReactionConfiguration : IEntityTypeConfiguration<MessageReac
             .HasForeignKey(d => d.MessageId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("messagereaction_message_id_fk");
+
+        entity.HasOne(d => d.MessageThreadMember).WithMany()
+            .HasForeignKey(d => d.MessageThreadMemberId)
+            .OnDelete(DeleteBehavior.ClientSetNull)
+            .HasConstraintName("messagereaction_messagethreadmember_id_fk");
     }
 }

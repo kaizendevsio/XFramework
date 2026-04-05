@@ -1,5 +1,4 @@
 using XFramework.Blazor.Core.Features.Cart.Models;
-using XFramework.Inventario.Domain.Shared.Contracts;
 
 namespace XFramework.Blazor.Core.Features.Cart;
 

@@ -1,6 +1,6 @@
 /**
  * WebCodecs integration for hardware-accelerated audio/video encoding/decoding.
- * Uses the browser's native codecs (Opus, H.264) via the WebCodecs API.
+ * Uses the browser's native codecs (Opus, H.264, H.265) via the WebCodecs API.
  */
 
 export class AudioCodecHelper {
@@ -58,12 +58,14 @@ export class AudioCodecHelper {
     this.decoder?.decode(chunk);
   }
 
-  reconfigureBitrate(newBitrate: number): void {
-    // AudioEncoder reconfigure requires full config
+  reconfigureBitrate(sampleRate: number, channels: number, newBitrate: number): void {
     if (this.encoder?.state === 'configured') {
-      // Note: Opus encoder may not support dynamic reconfigure in all browsers
-      // Fallback: close and re-create encoder
-      console.log(`AudioCodec: bitrate change requested to ${newBitrate}bps`);
+      this.encoder.configure({
+        codec: 'opus',
+        sampleRate,
+        numberOfChannels: channels,
+        bitrate: newBitrate,
+      });
     }
   }
 
@@ -75,20 +77,63 @@ export class AudioCodecHelper {
   }
 }
 
+/** Video codec type for WebCodecs initialization. */
+export type VideoCodecType = 'h264' | 'h265';
+
+/** Codec strings for WebCodecs. */
+const CODEC_STRINGS: Record<VideoCodecType, string> = {
+  h264: 'avc1.42001f', // H.264 Baseline Level 3.1
+  h265: 'hev1.1.6.L93.B0', // H.265 Main Profile Level 3.1
+};
+
 export class VideoCodecHelper {
   private encoder: VideoEncoder | null = null;
   private decoder: VideoDecoder | null = null;
-  private keyframeInterval = 60; // Request keyframe every N frames
+  private keyframeInterval = 60;
   private frameCount = 0;
+  private codecType: VideoCodecType = 'h264';
+  private width = 1280;
+  private height = 720;
+  private framerate = 30;
 
   /** Fires when the encoder produces an encoded chunk. */
   public onEncodedChunk?: (data: Uint8Array, isKeyframe: boolean) => void;
   /** Fires when the decoder produces a decoded video frame. */
   public onDecodedFrame?: (frame: VideoFrame) => void;
 
-  async initEncoder(width = 1280, height = 720, bitrate = 2_000_000, framerate = 30): Promise<void> {
+  /**
+   * Check if H.265 encoding is supported in this browser.
+   * Not all browsers support HEVC via WebCodecs.
+   */
+  static async isH265Supported(): Promise<boolean> {
+    try {
+      const support = await VideoEncoder.isConfigSupported({
+        codec: CODEC_STRINGS.h265,
+        width: 1280,
+        height: 720,
+        bitrate: 2_000_000,
+        framerate: 30,
+      });
+      return support.supported === true;
+    } catch {
+      return false;
+    }
+  }
+
+  async initEncoder(
+    width = 1280,
+    height = 720,
+    bitrate = 2_000_000,
+    framerate = 30,
+    codec: VideoCodecType = 'h264'
+  ): Promise<void> {
+    this.codecType = codec;
+    this.width = width;
+    this.height = height;
+    this.framerate = framerate;
+
     this.encoder = new VideoEncoder({
-      output: (chunk, metadata) => {
+      output: (chunk) => {
         const buf = new Uint8Array(chunk.byteLength);
         chunk.copyTo(buf);
         const isKeyframe = chunk.type === 'key';
@@ -98,7 +143,7 @@ export class VideoCodecHelper {
     });
 
     this.encoder.configure({
-      codec: 'avc1.42001f', // H.264 Baseline Level 3.1
+      codec: CODEC_STRINGS[codec],
       width,
       height,
       bitrate,
@@ -107,7 +152,9 @@ export class VideoCodecHelper {
     });
   }
 
-  async initDecoder(): Promise<void> {
+  async initDecoder(codec: VideoCodecType = 'h264'): Promise<void> {
+    this.codecType = codec;
+
     this.decoder = new VideoDecoder({
       output: (frame) => {
         this.onDecodedFrame?.(frame);
@@ -116,7 +163,7 @@ export class VideoCodecHelper {
     });
 
     this.decoder.configure({
-      codec: 'avc1.42001f',
+      codec: CODEC_STRINGS[codec],
     });
   }
 
@@ -139,19 +186,35 @@ export class VideoCodecHelper {
 
   /** Force the next frame to be a keyframe. */
   requestKeyframe(): void {
-    this.frameCount = this.keyframeInterval - 1; // Next encode will be keyframe
+    this.frameCount = this.keyframeInterval - 1;
   }
 
   /** Reconfigure encoder with new bitrate. */
   reconfigureBitrate(newBitrate: number): void {
     if (this.encoder?.state === 'configured') {
-      // VideoEncoder supports reconfigure for bitrate changes
       this.encoder.configure({
-        codec: 'avc1.42001f',
-        width: 1280,
-        height: 720,
+        codec: CODEC_STRINGS[this.codecType],
+        width: this.width,
+        height: this.height,
         bitrate: newBitrate,
-        framerate: 30,
+        framerate: this.framerate,
+        latencyMode: 'realtime',
+      });
+    }
+  }
+
+  /** Reconfigure encoder with new resolution and framerate. */
+  reconfigureResolution(width: number, height: number, framerate?: number): void {
+    if (this.encoder?.state === 'configured') {
+      this.width = width;
+      this.height = height;
+      if (framerate) this.framerate = framerate;
+      this.encoder.configure({
+        codec: CODEC_STRINGS[this.codecType],
+        width,
+        height,
+        bitrate: 2_000_000, // Will be overridden by ABR
+        framerate: this.framerate,
         latencyMode: 'realtime',
       });
     }

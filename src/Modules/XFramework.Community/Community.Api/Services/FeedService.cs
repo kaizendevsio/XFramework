@@ -1,9 +1,4 @@
-using Community.Domain.Shared.Contracts;
-using Community.Domain.Shared.Contracts.Requests;
-using Community.Domain.Shared.Contracts.Responses;
-using Microsoft.Extensions.Logging;
 using XFramework.Core.Loggers;
-using XFramework.Core.Patterns;
 using XFramework.Domain.Shared.DataContext;
 
 namespace Community.Api.Services;
@@ -14,13 +9,16 @@ namespace Community.Api.Services;
 public sealed class FeedService : IFeedService
 {
     private readonly IDataContext _dataContext;
+    private readonly IConnectionService _connectionService;
     private readonly ILogger<FeedService> _logger;
 
     public FeedService(
         IDataContext dataContext,
+        IConnectionService connectionService,
         ILogger<FeedService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
+        _connectionService = connectionService ?? throw new ArgumentNullException(nameof(connectionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -55,6 +53,13 @@ public sealed class FeedService : IFeedService
 
             // Include the identity's own ID to show their own content too
             var feedSourceIds = new List<Guid>(followedIdentityIds) { request.IdentityId };
+
+            // Remove blocked identities from feed sources
+            var blockedIds = await _connectionService.GetBlockedIdentityIdsAsync(request.IdentityId, cancellationToken);
+            if (blockedIds.Count > 0)
+            {
+                feedSourceIds.RemoveAll(id => blockedIds.Contains(id));
+            }
 
             // Get the total count for pagination
             var totalCount = await _dataContext.Query<CommunityContent>()

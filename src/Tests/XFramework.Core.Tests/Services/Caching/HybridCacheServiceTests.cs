@@ -14,7 +14,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using NUnit.Framework;
 using StackExchange.Redis;
-using XFramework.Core.Patterns;
 using XFramework.Core.Services.Caching;
 
 namespace XFramework.Core.Tests.Services.Caching;

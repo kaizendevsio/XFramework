@@ -13,7 +13,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using Scalar.AspNetCore;
 using XFramework.Core.Loggers;
 using XFramework.Core.Middlewares;
 using XFramework.Core.Services;

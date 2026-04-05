@@ -6,8 +6,6 @@ using XFramework.Blazor.Core.Features.Cache;
 using XFramework.Blazor.Core.Features.Layout;
 using XFramework.Blazor.Core.Features.Wallet;
 using XFramework.Blazor.Entity.Enums;
-using XFramework.Blazor.Entity.Models.Requests.Common;
-using XFramework.Integration.Security;
 
 namespace XFramework.Blazor.Core.Features;
 

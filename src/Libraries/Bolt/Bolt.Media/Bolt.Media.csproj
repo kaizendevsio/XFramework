@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+        <PackageId>Bolt.Net.Media</PackageId>
+        <Version>$(BoltVersion)</Version>
+        <Authors>KaizenDevs</Authors>
+        <Description>Bolt Media — voice/video call support for Bolt protocol. E2E encryption, adaptive bitrate, FEC, NACK retransmission, simulcast, P2P direct connections. Add-on package for Bolt.Net.Client.</Description>
+        <PackageTags>media;voip;video;audio;calls;bolt;webrtc-alternative;encryption;fec</PackageTags>
+        <RepositoryUrl>https://github.com/kaizendevsio/XFramework</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/kaizendevsio/XFramework</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>BOLT-MEDIA.md</PackageReadmeFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Bolt.Client\Bolt.Client.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\BOLT-MEDIA.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
+</Project>

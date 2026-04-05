@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
-using HashidsNet;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -10,10 +9,7 @@ using Bolt.Domain.Shared.Abstractions;
 using Bolt.Domain.Shared.BusinessObjects;
 using Bolt.Domain.Shared.Contracts.Requests;
 using Bolt.Domain.Shared.Contracts.Responses;
-using Bolt.Domain.Shared.Enums;
-using TypeSupport.Extensions;
 using XFramework.Domain.Shared.Configurations;
-using XFramework.Domain.Shared.Contracts.Base;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Drivers;
 using XFramework.Integration.Security;

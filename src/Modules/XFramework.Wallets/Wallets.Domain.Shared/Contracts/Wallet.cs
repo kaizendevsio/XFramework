@@ -1,4 +1,3 @@
-using Wallets.Domain.Shared.Enums;
 using XFramework.Domain.Shared.Attributes;
 
 namespace Wallets.Domain.Shared.Contracts;

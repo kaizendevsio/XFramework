@@ -1,11 +1,8 @@
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Coins.Api.BusinessObjects;
 using Coins.Api.Configurations;
 using Coins.Api.Interfaces.Wrappers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 
 namespace Coins.Api.Drivers;
 

@@ -1,5 +1,3 @@
-using XFramework.Core.Attributes;
-
 namespace Inventario.Api.Endpoints;
 
 // COMMENTED OUT: Migrating to manual VSA endpoints

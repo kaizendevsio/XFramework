@@ -1,7 +1,6 @@
 ﻿
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using XFramework.Core.DataContext;
-using XFramework.Domain.Shared.Interfaces;
 using XFramework.Domain.Interceptors;
 
 namespace IdentityServer.Api.Installers;
