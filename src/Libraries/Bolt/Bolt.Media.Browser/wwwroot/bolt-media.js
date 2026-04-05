@@ -302,15 +302,66 @@ class VideoPipeline {
     }
 }
 
+// ─── Device Manager ─────────────────────────────────
+
+class DeviceManager {
+    static async enumerateAudioInputs() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices
+            .filter(d => d.kind === 'audioinput')
+            .map(d => ({ deviceId: d.deviceId, label: d.label || `Microphone ${d.deviceId.slice(0, 8)}`, groupId: d.groupId }));
+    }
+
+    static async enumerateVideoInputs() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices
+            .filter(d => d.kind === 'videoinput')
+            .map(d => ({ deviceId: d.deviceId, label: d.label || `Camera ${d.deviceId.slice(0, 8)}`, groupId: d.groupId }));
+    }
+
+    static async enumerateAudioOutputs() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices
+            .filter(d => d.kind === 'audiooutput')
+            .map(d => ({ deviceId: d.deviceId, label: d.label || `Speaker ${d.deviceId.slice(0, 8)}`, groupId: d.groupId }));
+    }
+
+    static async checkPermissions() {
+        const result = { audio: 'prompt', video: 'prompt' };
+        try {
+            const mic = await navigator.permissions.query({ name: 'microphone' });
+            result.audio = mic.state;
+        } catch { }
+        try {
+            const cam = await navigator.permissions.query({ name: 'camera' });
+            result.video = cam.state;
+        } catch { }
+        return result;
+    }
+
+    static async requestPermissions(audio, video) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio, video });
+            stream.getTracks().forEach(t => t.stop());
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    static isWebCodecsSupported() {
+        return typeof AudioEncoder !== 'undefined' && typeof VideoEncoder !== 'undefined';
+    }
+}
+
 // ─── Exports ────────────────────────────────────────
 
 export function createAudioPipeline() { return new AudioPipeline(); }
 export function createVideoPipeline() { return new VideoPipeline(); }
 
-// Device manager exports (placeholder — Task 5)
-export async function enumerateAudioInputs() { return []; }
-export async function enumerateVideoInputs() { return []; }
-export async function enumerateAudioOutputs() { return []; }
-export async function checkPermissions() { return { audio: 'prompt', video: 'prompt' }; }
-export async function requestPermissions(audio, video) { return false; }
-export function isWebCodecsSupported() { return typeof AudioEncoder !== 'undefined' && typeof VideoEncoder !== 'undefined'; }
+export async function enumerateAudioInputs() { return await DeviceManager.enumerateAudioInputs(); }
+export async function enumerateVideoInputs() { return await DeviceManager.enumerateVideoInputs(); }
+export async function enumerateAudioOutputs() { return await DeviceManager.enumerateAudioOutputs(); }
+export async function checkPermissions() { return await DeviceManager.checkPermissions(); }
+export async function requestPermissions(audio, video) { return await DeviceManager.requestPermissions(audio, video); }
+export function isWebCodecsSupported() { return DeviceManager.isWebCodecsSupported(); }
