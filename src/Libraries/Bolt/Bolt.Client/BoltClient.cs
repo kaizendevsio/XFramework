@@ -46,6 +46,10 @@ public sealed class BoltClient : IAsyncDisposable
     // Frame handler extensibility — allows Bolt.Media to hook into the receive loop
     private readonly ConcurrentDictionary<byte, Action<BoltConnection, byte[], int>> _frameHandlers = new();
 
+    // Pub/sub state
+    private readonly ConcurrentDictionary<int, TransientSubscription> _transientSubscriptions = new();
+    private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), DurableSubscription> _durableSubscriptions = new();
+
     /// <summary>
     /// Register a handler for a specific frame type. Used by Bolt.Media to handle media frames (0x20-0x26).
     /// </summary>
@@ -67,6 +71,9 @@ public sealed class BoltClient : IAsyncDisposable
         _logger = logger;
         _rpcTimeout = TimeSpan.FromSeconds(config.RpcTimeoutSeconds > 0 ? config.RpcTimeoutSeconds : 30);
         _negotiator = new BoltTransportNegotiator(logger);
+
+        // Wire pub/sub Event frame dispatch
+        RegisterFrameHandler(FrameType.Event, HandleEventFrame);
     }
 
     public async Task ConnectAsync(CancellationToken ct = default)
@@ -484,6 +491,155 @@ public sealed class BoltClient : IAsyncDisposable
         finally { serWriter.Dispose(); }
     }
 
+    // ── Pub/Sub ──────────────────────────────────────────────
+
+    private void HandleEventFrame(BoltConnection conn, byte[] buffer, int length)
+    {
+        if (!BoltCodec.TryReadEvent(buffer.AsSpan(0, length), out var topicHash, out var sequence, out var isReplay, out var payloadOffset, out var payloadLength, out _))
+            return;
+
+        var payload = new byte[payloadLength];
+        buffer.AsSpan(payloadOffset, payloadLength).CopyTo(payload);
+
+        // Try transient first
+        if (_transientSubscriptions.TryGetValue(topicHash, out var transient))
+        {
+            transient.Channel.Writer.TryWrite(payload);
+            return;
+        }
+
+        // Try durable: there may be multiple durable subscriptions for the same topic with different subscriberIds
+        foreach (var kvp in _durableSubscriptions)
+        {
+            if (kvp.Key.TopicHash == topicHash)
+                kvp.Value.Channel.Writer.TryWrite((sequence, isReplay, payload));
+        }
+    }
+
+    /// <summary>
+    /// Subscribe to a topic. Receives published messages as they arrive (transient — no persistence, no replay).
+    /// Cancelling the cancellation token unsubscribes.
+    /// </summary>
+    public async IAsyncEnumerable<T> SubscribeAsync<T>(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        var channel = Channel.CreateUnbounded<byte[]>();
+        var sub = new TransientSubscription { Topic = topic, Channel = channel };
+
+        if (!_transientSubscriptions.TryAdd(topicHash, sub))
+            throw new InvalidOperationException($"Already subscribed to topic '{topic}'");
+
+        // Send Subscribe frame
+        var conn = GetPrimaryConnection();
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteSubscribe(writer, topic, _clientId, durable: false);
+        await conn.SendAsync(writer.WrittenMemory, ct);
+        writer.Reset();
+
+        try
+        {
+            while (await channel.Reader.WaitToReadAsync(ct))
+            {
+                while (channel.Reader.TryRead(out var payload))
+                {
+                    var item = MemoryPackSerializer.Deserialize<T>(payload);
+                    if (item is not null) yield return item;
+                }
+            }
+        }
+        finally
+        {
+            _transientSubscriptions.TryRemove(topicHash, out _);
+            try
+            {
+                var w = RentedBufferWriter.GetThreadLocal();
+                BoltCodec.WriteUnsubscribe(w, topic, _clientId);
+                await conn.SendAsync(w.WrittenMemory, CancellationToken.None);
+                w.Reset();
+            }
+            catch { /* best-effort */ }
+        }
+    }
+
+    /// <summary>
+    /// Subscribe to a topic durably. On reconnect, queued messages are replayed.
+    /// Each message must be acked via DurableMessage.AckAsync to prevent re-delivery.
+    /// </summary>
+    public async IAsyncEnumerable<DurableMessage<T>> SubscribeDurableAsync<T>(string topic, string subscriberId, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        var key = (topicHash, subscriberId);
+        var channel = Channel.CreateUnbounded<(long, bool, byte[])>();
+        var sub = new DurableSubscription { Topic = topic, SubscriberId = subscriberId, Channel = channel };
+
+        if (!_durableSubscriptions.TryAdd(key, sub))
+            throw new InvalidOperationException($"Already subscribed to topic '{topic}' with subscriberId '{subscriberId}'");
+
+        var conn = GetPrimaryConnection();
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteSubscribe(writer, topic, subscriberId, durable: true);
+        await conn.SendAsync(writer.WrittenMemory, ct);
+        writer.Reset();
+
+        try
+        {
+            while (await channel.Reader.WaitToReadAsync(ct))
+            {
+                while (channel.Reader.TryRead(out var entry))
+                {
+                    var (seq, isReplay, payload) = entry;
+                    var item = MemoryPackSerializer.Deserialize<T>(payload);
+                    if (item is null) continue;
+
+                    yield return new DurableMessage<T>(item, seq, isReplay, async (s, c) =>
+                    {
+                        await AckAsync(topic, subscriberId, s, c);
+                    });
+                }
+            }
+        }
+        finally
+        {
+            _durableSubscriptions.TryRemove(key, out _);
+            try
+            {
+                var w = RentedBufferWriter.GetThreadLocal();
+                BoltCodec.WriteUnsubscribe(w, topic, subscriberId);
+                await conn.SendAsync(w.WrittenMemory, CancellationToken.None);
+                w.Reset();
+            }
+            catch { /* best-effort */ }
+        }
+    }
+
+    /// <summary>
+    /// Publish a message to a topic. If durable=true, the Hub queues the message for any
+    /// currently-registered durable subscribers (so offline subscribers receive it on reconnect).
+    /// If durable=false, the message is fan-out only.
+    /// </summary>
+    public async ValueTask PublishAsync<T>(string topic, T payload, bool durable = false, CancellationToken ct = default)
+    {
+        var bytes = MemoryPackSerializer.Serialize(payload);
+        var conn = GetPrimaryConnection();
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WritePublish(writer, topic, durable, bytes);
+        await conn.SendAsync(writer.WrittenMemory, ct);
+        writer.Reset();
+    }
+
+    /// <summary>
+    /// Acknowledge durable messages up to and including upToSequence for a (topic, subscriber) pair.
+    /// </summary>
+    public async ValueTask AckAsync(string topic, string subscriberId, long upToSequence, CancellationToken ct = default)
+    {
+        var topicHash = BoltCodec.Fnv1aHash(topic);
+        var conn = GetPrimaryConnection();
+        var writer = RentedBufferWriter.GetThreadLocal();
+        BoltCodec.WriteAck(writer, topicHash, subscriberId, upToSequence);
+        await conn.SendAsync(writer.WrittenMemory, ct);
+        writer.Reset();
+    }
+
     // ── Streaming ────────────────────────────────────────────
 
     public void RegisterStreamHandler(string commandName, Func<BoltStream, Task> handler)
@@ -826,7 +982,41 @@ public sealed class BoltClient : IAsyncDisposable
     private async Task ReconnectAsync()
     {
         _logger.LogInformation("Attempting reconnection...");
-        try { await ConnectWithRetryAsync(CancellationToken.None); }
+        try
+        {
+            await ConnectWithRetryAsync(CancellationToken.None);
+
+            // Re-send all active subscriptions after reconnect
+            foreach (var (_, sub) in _transientSubscriptions)
+            {
+                try
+                {
+                    var w = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteSubscribe(w, sub.Topic, _clientId, durable: false);
+                    await GetPrimaryConnection().SendAsync(w.WrittenMemory, CancellationToken.None);
+                    w.Reset();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to re-send transient subscription for topic {Topic}", sub.Topic);
+                }
+            }
+
+            foreach (var (_, sub) in _durableSubscriptions)
+            {
+                try
+                {
+                    var w = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteSubscribe(w, sub.Topic, sub.SubscriberId, durable: true);
+                    await GetPrimaryConnection().SendAsync(w.WrittenMemory, CancellationToken.None);
+                    w.Reset();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to re-send durable subscription for topic {Topic} subscriber {SubscriberId}", sub.Topic, sub.SubscriberId);
+                }
+            }
+        }
         catch (Exception ex) { _logger.LogError(ex, "Reconnection failed"); }
     }
 
@@ -846,6 +1036,19 @@ public sealed class BoltClient : IAsyncDisposable
             conn.ReceiveCts?.Dispose();
         }
         _connections.Clear();
+    }
+
+    private sealed class TransientSubscription
+    {
+        public required string Topic { get; init; }
+        public required Channel<byte[]> Channel { get; init; }
+    }
+
+    private sealed class DurableSubscription
+    {
+        public required string Topic { get; init; }
+        public required string SubscriberId { get; init; }
+        public required Channel<(long Sequence, bool IsReplay, byte[] Payload)> Channel { get; init; }
     }
 }
 
