@@ -15,6 +15,20 @@ public enum FrameType : byte
     RegisterAck = 0x04,
     /// <summary>Fire-and-forget push: same header as Request</summary>
     Push = 0x05,
+    /// <summary>Subscribe to a topic: [1:type] [4:topicHash] [1:flags] [4:subscriberIdLen] [subscriberId] [4:topicLen] [topic]</summary>
+    Subscribe = 0x06,
+    /// <summary>Unsubscribe from a topic: [1:type] [4:topicHash] [4:subscriberIdLen] [subscriberId]</summary>
+    Unsubscribe = 0x07,
+    /// <summary>Publish to a topic: [1:type] [4:topicHash] [1:flags] [4:payloadLen] [payload]</summary>
+    Publish = 0x08,
+    /// <summary>Hub-delivered event: [1:type] [4:topicHash] [8:sequenceNumber] [1:flags] [4:payloadLen] [payload]</summary>
+    Event = 0x09,
+    /// <summary>Acknowledge durable messages: [1:type] [4:topicHash] [4:subscriberIdLen] [subscriberId] [8:upToSequenceNumber]</summary>
+    Ack = 0x0A,
+    /// <summary>Hub-side query execution (transitional shim): [1:type] [16:requestId] [4:payloadLen] [payload]</summary>
+    ExecuteQuery = 0x0B,
+    /// <summary>Hub-side change execution (transitional shim): [1:type] [16:requestId] [4:payloadLen] [payload]</summary>
+    ExecuteChanges = 0x0C,
     /// <summary>Open bidirectional stream: [1:type] [16:streamId] [4:recipientHash] [4:commandHash]</summary>
     StreamOpen = 0x10,
     /// <summary>Stream data chunk: [1:type] [16:streamId] [4:payloadLen] [payload]</summary>
