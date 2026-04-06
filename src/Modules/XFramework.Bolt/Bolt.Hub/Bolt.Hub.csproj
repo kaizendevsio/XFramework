@@ -32,6 +32,9 @@
         <!-- OpenTelemetry Exporters -->
         <PackageReference Include="OpenTelemetry.Exporter.Console" />
         <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+
+        <!-- Redis -->
+        <PackageReference Include="StackExchange.Redis" />
     </ItemGroup>
 
 </Project>
