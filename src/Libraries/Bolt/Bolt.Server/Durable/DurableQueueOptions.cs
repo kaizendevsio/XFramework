@@ -1,4 +1,4 @@
-namespace Bolt.Hub.Durable;
+namespace Bolt.Server.Durable;
 
 /// <summary>
 /// Configuration for durable subscription queues.

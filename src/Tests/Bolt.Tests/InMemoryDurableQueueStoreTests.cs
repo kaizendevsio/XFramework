@@ -1,4 +1,4 @@
-using Bolt.Hub.Durable;
+using Bolt.Server.Durable;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

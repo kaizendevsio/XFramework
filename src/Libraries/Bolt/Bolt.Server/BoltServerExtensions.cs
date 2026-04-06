@@ -40,7 +40,15 @@ public static class BoltServerExtensions
         services.AddSingleton<BoltServer>(sp =>
         {
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<BoltServer>>();
-            var server = new BoltServer(logger);
+            var durableStore = sp.GetService<Bolt.Server.Durable.IDurableQueueStore>();
+            var durableOptions = sp.GetService<Microsoft.Extensions.Options.IOptions<Bolt.Server.Durable.DurableQueueOptions>>();
+
+            BoltServer server;
+            if (durableStore is not null && durableOptions is not null)
+                server = new BoltServer(logger, durableStore, durableOptions);
+            else
+                server = new BoltServer(logger);
+
             foreach (var processor in options.MediaProcessors)
                 server.RegisterMediaProcessor(processor);
             return server;

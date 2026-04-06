@@ -1,3 +1,4 @@
+using Bolt.Server;
 using MessagePack;
 using Microsoft.AspNetCore.ResponseCompression;
 using XFramework.Domain.Shared.Configurations;
@@ -16,6 +17,23 @@ public sealed class BoltInstaller : IInstaller
         var streamFlowConfiguration = new BoltConfiguration();
         configuration.Bind(nameof(BoltConfiguration), streamFlowConfiguration);
         services.AddSingleton(streamFlowConfiguration);
+
+        // Bolt thin protocol server
+        services.AddBoltServer();
+
+        // Durable queue store (Redis if configured, in-memory fallback)
+        services.Configure<Bolt.Server.Durable.DurableQueueOptions>(configuration.GetSection("BoltConfiguration:Durable"));
+        var redisConn = configuration["BoltConfiguration:Durable:RedisConnectionString"];
+        if (!string.IsNullOrWhiteSpace(redisConn))
+        {
+            services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(_ =>
+                StackExchange.Redis.ConnectionMultiplexer.Connect(redisConn));
+            services.AddSingleton<Bolt.Server.Durable.IDurableQueueStore, Bolt.Server.Durable.RedisDurableQueueStore>();
+        }
+        else
+        {
+            services.AddSingleton<Bolt.Server.Durable.IDurableQueueStore, Bolt.Server.Durable.InMemoryDurableQueueStore>();
+        }
 
         // Configure SignalR with MessagePack for binary serialization and performance optimization
         services.AddSignalR(options =>

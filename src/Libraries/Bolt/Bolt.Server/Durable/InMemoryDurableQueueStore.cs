@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Bolt.Hub.Durable;
+namespace Bolt.Server.Durable;
 
 /// <summary>
 /// In-process durable queue store. Messages do not survive Hub restarts.

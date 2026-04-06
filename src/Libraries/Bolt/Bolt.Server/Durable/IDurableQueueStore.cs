@@ -1,4 +1,4 @@
-namespace Bolt.Hub.Durable;
+namespace Bolt.Server.Durable;
 
 /// <summary>
 /// Backend for durable subscription queues. Each (topicHash, subscriberId) has its own

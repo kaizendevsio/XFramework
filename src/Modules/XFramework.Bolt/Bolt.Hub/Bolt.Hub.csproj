@@ -33,8 +33,7 @@
         <PackageReference Include="OpenTelemetry.Exporter.Console" />
         <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
 
-        <!-- Redis -->
-        <PackageReference Include="StackExchange.Redis" />
+        <!-- Redis — now provided transitively via Bolt.Server reference -->
     </ItemGroup>
 
 </Project>

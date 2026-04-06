@@ -46,6 +46,17 @@ public sealed class BoltServer : IDisposable
     private readonly Timer _cleanupTimer;
     private const int InvocationTimeoutMs = 30_000;
 
+    // Pub/sub state — transient (live fan-out only)
+    private readonly ConcurrentDictionary<int, ConcurrentDictionary<BoltHubConnection, byte>> _liveSubscribersByTopic = new();
+    private readonly ConcurrentDictionary<BoltHubConnection, ConcurrentDictionary<int, byte>> _liveSubscriptionsByConnection = new();
+
+    // Pub/sub state — durable (persistent identity)
+    private readonly ConcurrentDictionary<(int TopicHash, string SubscriberId), BoltHubConnection> _liveDurableConnections = new();
+
+    // Durable queue backend (injected)
+    private readonly Bolt.Server.Durable.IDurableQueueStore? _durableStore;
+    private readonly Bolt.Server.Durable.DurableQueueOptions? _durableOptions;
+
     public BoltServer(ILogger<BoltServer> logger)
     {
         _logger = logger;
@@ -57,6 +68,16 @@ public sealed class BoltServer : IDisposable
                 SingleReader = true,
             });
         _ = Task.Run(() => MediaTapLoopAsync(_mediaTapCts.Token));
+    }
+
+    public BoltServer(
+        ILogger<BoltServer> logger,
+        Bolt.Server.Durable.IDurableQueueStore durableStore,
+        Microsoft.Extensions.Options.IOptions<Bolt.Server.Durable.DurableQueueOptions> durableOptions)
+        : this(logger)
+    {
+        _durableStore = durableStore;
+        _durableOptions = durableOptions.Value;
     }
 
     /// <summary>
@@ -167,6 +188,18 @@ public sealed class BoltServer : IDisposable
                 break;
             case FrameType.Push:
                 await HandlePushAsync(connection, buffer, length, ct);
+                break;
+            case FrameType.Subscribe:
+                await HandleSubscribeFrameAsync(connection, buffer, length, ct);
+                break;
+            case FrameType.Unsubscribe:
+                HandleUnsubscribeFrame(connection, buffer, length);
+                break;
+            case FrameType.Publish:
+                await HandlePublishFrameAsync(connection, buffer, length, ct);
+                break;
+            case FrameType.Ack:
+                await HandleAckFrameAsync(connection, buffer, length, ct);
                 break;
             case FrameType.StreamOpen:
                 HandleStreamOpen(connection, buffer, length);
@@ -951,6 +984,140 @@ public sealed class BoltServer : IDisposable
         }
     }
 
+    // ── Pub/Sub handlers ──
+
+    private async Task HandleSubscribeFrameAsync(BoltHubConnection conn, byte[] buffer, int length, CancellationToken ct)
+    {
+        if (!BoltCodec.TryReadSubscribe(buffer.AsSpan(0, length), out var topicHash, out var durable, out var subscriberId, out var topic, out _))
+            return;
+
+        // Add to live subscribers
+        var topicSet = _liveSubscribersByTopic.GetOrAdd(topicHash, _ => new ConcurrentDictionary<BoltHubConnection, byte>());
+        topicSet.TryAdd(conn, 0);
+
+        var connSet = _liveSubscriptionsByConnection.GetOrAdd(conn, _ => new ConcurrentDictionary<int, byte>());
+        connSet.TryAdd(topicHash, 0);
+
+        if (!durable)
+        {
+            _logger.LogDebug("Transient subscribe: topic={Topic}", topic);
+            return;
+        }
+
+        if (_durableStore is null)
+        {
+            _logger.LogWarning("Durable subscribe requested but no IDurableQueueStore configured. Falling back to transient.");
+            return;
+        }
+
+        // Durable: register subscriber, set live mapping, replay queued messages
+        await _durableStore.RegisterDurableSubscriberAsync(topicHash, subscriberId, ct);
+        _liveDurableConnections[(topicHash, subscriberId)] = conn;
+
+        var lastAcked = await _durableStore.GetLastAckedSequenceAsync(topicHash, subscriberId, ct);
+        var maxBatch = _durableOptions?.MaxReplayBatchSize ?? 1000;
+        var replayCount = 0;
+        await foreach (var (seq, payload) in _durableStore.ReadFromAsync(topicHash, subscriberId, lastAcked, maxBatch, ct))
+        {
+            var w = RentedBufferWriter.GetThreadLocal();
+            BoltCodec.WriteEvent(w, topicHash, seq, isReplay: true, payload);
+            await conn.SendAsync(w.WrittenMemory, ct);
+            w.Reset();
+            replayCount++;
+        }
+
+        _logger.LogDebug("Durable subscribe: topic={Topic} subscriber={Subscriber} replayed={Count}", topic, subscriberId, replayCount);
+    }
+
+    private void HandleUnsubscribeFrame(BoltHubConnection conn, byte[] buffer, int length)
+    {
+        if (!BoltCodec.TryReadUnsubscribe(buffer.AsSpan(0, length), out var topicHash, out var subscriberId, out _))
+            return;
+
+        if (_liveSubscribersByTopic.TryGetValue(topicHash, out var topicSet))
+            topicSet.TryRemove(conn, out _);
+
+        if (_liveSubscriptionsByConnection.TryGetValue(conn, out var connSet))
+            connSet.TryRemove(topicHash, out _);
+
+        _liveDurableConnections.TryRemove((topicHash, subscriberId), out _);
+
+        _logger.LogDebug("Unsubscribe: topicHash={TopicHash} subscriber={Subscriber}", topicHash, subscriberId);
+    }
+
+    private async Task HandlePublishFrameAsync(BoltHubConnection publisher, byte[] buffer, int length, CancellationToken ct)
+    {
+        if (!BoltCodec.TryReadPublish(buffer.AsSpan(0, length), out var topicHash, out var durableEligible, out var payloadOffset, out var payloadLength, out _))
+            return;
+
+        var payload = new byte[payloadLength];
+        buffer.AsSpan(payloadOffset, payloadLength).CopyTo(payload);
+
+        var deliveredConnections = new HashSet<BoltHubConnection>();
+
+        // Durable path: enqueue and deliver live if connected
+        if (durableEligible && _durableStore is not null)
+        {
+            var durableSubs = await _durableStore.GetDurableSubscribersAsync(topicHash, ct);
+            foreach (var subscriberId in durableSubs)
+            {
+                long seq;
+                try
+                {
+                    seq = await _durableStore.AppendAsync(topicHash, subscriberId, payload, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Durable append failed for topic={TopicHash} subscriber={Subscriber}", topicHash, subscriberId);
+                    continue;
+                }
+
+                if (_liveDurableConnections.TryGetValue((topicHash, subscriberId), out var liveConn) && liveConn != publisher)
+                {
+                    var w = RentedBufferWriter.GetThreadLocal();
+                    BoltCodec.WriteEvent(w, topicHash, seq, isReplay: false, payload);
+                    try { await liveConn.SendAsync(w.WrittenMemory, ct); }
+                    catch { }
+                    w.Reset();
+                    deliveredConnections.Add(liveConn);
+                }
+            }
+        }
+
+        // Live fan-out for transient subscribers (skip publisher and skip durable-already-delivered)
+        if (_liveSubscribersByTopic.TryGetValue(topicHash, out var topicSetForPublish))
+        {
+            foreach (var (subscriberConn, _) in topicSetForPublish)
+            {
+                if (subscriberConn == publisher) continue;
+                if (deliveredConnections.Contains(subscriberConn)) continue;
+
+                var w = RentedBufferWriter.GetThreadLocal();
+                BoltCodec.WriteEvent(w, topicHash, sequenceNumber: 0, isReplay: false, payload);
+                try { await subscriberConn.SendAsync(w.WrittenMemory, ct); }
+                catch { }
+                w.Reset();
+            }
+        }
+    }
+
+    private async Task HandleAckFrameAsync(BoltHubConnection conn, byte[] buffer, int length, CancellationToken ct)
+    {
+        if (!BoltCodec.TryReadAck(buffer.AsSpan(0, length), out var topicHash, out var subscriberId, out var upToSequence, out _))
+            return;
+
+        if (_durableStore is null) return;
+
+        try
+        {
+            await _durableStore.AckAsync(topicHash, subscriberId, upToSequence, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Durable ack failed for topic={TopicHash} subscriber={Subscriber}", topicHash, subscriberId);
+        }
+    }
+
     private BoltHubConnection? GetRecipient(int serviceHash)
     {
         if (!_connectionsByServiceHash.TryGetValue(serviceHash, out var bag))
@@ -1053,6 +1220,21 @@ public sealed class BoltServer : IDisposable
             if (route.Sender.StreamId == connection.StreamId)
                 _activeMediaStreams.TryRemove(streamId, out _);
         }
+
+        // Clean up pub/sub subscriptions for this connection
+        if (_liveSubscriptionsByConnection.TryRemove(connection, out var topics))
+        {
+            foreach (var (topicHash, _) in topics)
+            {
+                if (_liveSubscribersByTopic.TryGetValue(topicHash, out var topicSet))
+                    topicSet.TryRemove(connection, out _);
+            }
+        }
+
+        // Remove this connection from any live durable bindings
+        var keysToRemove = _liveDurableConnections.Where(kvp => kvp.Value == connection).Select(kvp => kvp.Key).ToList();
+        foreach (var key in keysToRemove)
+            _liveDurableConnections.TryRemove(key, out _);
     }
 
     private void CleanupStaleInvocations(object? state)

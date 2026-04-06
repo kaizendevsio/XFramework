@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
-namespace Bolt.Hub.Durable;
+namespace Bolt.Server.Durable;
 
 /// <summary>
 /// Redis-backed durable queue store using Redis Streams.
