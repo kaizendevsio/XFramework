@@ -24,4 +24,6 @@ public interface IMessageBusWrapper : IXFrameworkService
     public Task Subscribe<TResponse>(BoltSubscriptionRequest<TResponse> request)
         where TResponse : class;
     public Task Unsubscribe(BoltSubscriptionRequest request);
+    public Task SubscribeDurableAsync<TResponse>(string topic, string subscriberId, Func<TResponse, Task> handler, CancellationToken ct = default)
+        where TResponse : class;
 }

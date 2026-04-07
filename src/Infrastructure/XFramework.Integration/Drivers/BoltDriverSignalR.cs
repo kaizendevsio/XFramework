@@ -406,4 +406,10 @@ public class BoltDriverSignalR : IMessageBusWrapper
         SignalRService.Connection.Remove(request.Name);
         return Task.CompletedTask;
     }
+
+    public Task SubscribeDurableAsync<TResponse>(string topic, string subscriberId, Func<TResponse, Task> handler, CancellationToken ct = default)
+        where TResponse : class
+    {
+        throw new NotSupportedException("Durable subscriptions are only supported by BoltDriver (the new BoltClient-backed implementation). Migrate this service to use AddXFrameworkBoltClient.");
+    }
 }
