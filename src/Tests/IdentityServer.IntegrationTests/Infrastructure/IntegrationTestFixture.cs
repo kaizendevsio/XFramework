@@ -3,7 +3,6 @@ using FluentValidation;
 using IdentityServer.Api.Generated;
 using IdentityServer.Api.Services;
 using IdentityServer.Integration.Drivers;
-using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Bolt.Hub.Extensions;
@@ -12,9 +11,7 @@ using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
 using XFramework.Extensions;
-using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Extensions;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
@@ -86,11 +83,6 @@ public class IntegrationTestFixture
 
         // 7. Wait for both Bolt clients to connect and register
         await WaitForBoltClients();
-
-        // 8. Register IdentityServer's generated Bolt handlers on its SignalR connection.
-        //    ScanAndRegisterHandlers() only scans the entry assembly (testhost in tests),
-        //    so we manually scan the IdentityServer assembly for ISignalREventHandler implementations.
-        RegisterBoltHandlers();
     }
 
     [OneTimeTearDown]
@@ -176,15 +168,17 @@ public class IntegrationTestFixture
 
     private static async Task WaitForBoltClients()
     {
-        var idServerSignalR = _identityServerApp.Services.GetRequiredService<ISignalRService>();
         var testClient = _testClientApp.Services.GetRequiredService<BoltClient>();
+
+        // Handler registration is now automatic via BoltHandlerRegistrationHostedService
+        // when AddXFrameworkBoltClient() is called in the service's startup.
+        // Give the BoltClient time to connect and the hosted service to register handlers.
+        await Task.Delay(2000);
 
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
-            var idConnected = idServerSignalR.Connection?.State == HubConnectionState.Connected;
-            var testConnected = testClient.IsConnected;
-            if (idConnected && testConnected)
+            if (testClient.IsConnected)
             {
                 await Task.Delay(1000);
                 return;
@@ -192,22 +186,7 @@ public class IntegrationTestFixture
             await Task.Delay(250);
         }
 
-        throw new TimeoutException("Bolt clients failed to connect within 15s");
-    }
-
-    private static void RegisterBoltHandlers()
-    {
-        var signalRService = _identityServerApp.Services.GetRequiredService<ISignalRService>();
-        var logger = _identityServerApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
-        var scopeFactory = _identityServerApp.Services.GetRequiredService<IServiceScopeFactory>();
-
-        var handlers = typeof(AuthService).Assembly.GetExportedTypes()
-            .Where(t => typeof(ISignalREventHandler).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
-            .Select(Activator.CreateInstance)
-            .Cast<ISignalREventHandler>();
-
-        foreach (var handler in handlers)
-            handler.Handle(signalRService.Connection!, logger, scopeFactory);
+        throw new TimeoutException("Bolt test client failed to connect within 15s");
     }
 
     private static void OverrideConfiguration(WebApplicationBuilder builder, string clientName, string clientGuid)

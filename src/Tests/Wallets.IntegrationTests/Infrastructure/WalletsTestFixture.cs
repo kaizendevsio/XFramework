@@ -1,6 +1,5 @@
 using Bolt.Client;
 using FluentValidation;
-using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Bolt.Hub.Extensions;
@@ -11,9 +10,7 @@ using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Extensions;
-using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Extensions;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
@@ -73,7 +70,6 @@ public class WalletsTestFixture
         await WaitForHealth($"{TestClientUrl}/health/live");
 
         await WaitForBoltClients();
-        RegisterBoltHandlers();
     }
 
     [OneTimeTearDown]
@@ -156,36 +152,24 @@ public class WalletsTestFixture
 
     private static async Task WaitForBoltClients()
     {
-        var walletsSignalR = _walletsApp.Services.GetRequiredService<ISignalRService>();
         var testClient = _testClientApp.Services.GetRequiredService<BoltClient>();
+
+        // Handler registration is now automatic via BoltHandlerRegistrationHostedService
+        // when AddXFrameworkBoltClient() is called in the service's startup.
+        // Give the BoltClient time to connect and the hosted service to register handlers.
+        await Task.Delay(2000);
 
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
-            if (walletsSignalR.Connection?.State == HubConnectionState.Connected &&
-                testClient.IsConnected)
+            if (testClient.IsConnected)
             {
                 await Task.Delay(1000);
                 return;
             }
             await Task.Delay(250);
         }
-        throw new TimeoutException("Bolt clients failed to connect within 15s");
-    }
-
-    private static void RegisterBoltHandlers()
-    {
-        var signalRService = _walletsApp.Services.GetRequiredService<ISignalRService>();
-        var logger = _walletsApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
-        var scopeFactory = _walletsApp.Services.GetRequiredService<IServiceScopeFactory>();
-
-        var handlers = typeof(Wallets.Api.Services.IWalletOperationsService).Assembly.GetExportedTypes()
-            .Where(t => typeof(ISignalREventHandler).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
-            .Select(Activator.CreateInstance)
-            .Cast<ISignalREventHandler>();
-
-        foreach (var handler in handlers)
-            handler.Handle(signalRService.Connection!, logger, scopeFactory);
+        throw new TimeoutException("Bolt test client failed to connect within 15s");
     }
 
     private static void OverrideConfig(WebApplicationBuilder builder, string clientName, string clientGuid)

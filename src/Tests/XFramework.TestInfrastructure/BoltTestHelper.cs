@@ -1,14 +1,11 @@
 using Bolt.Client;
-using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Caching.Memory;
 using Bolt.Hub.Extensions;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Extensions;
-using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Extensions;
 using IdentityServer.Domain.Shared.Contracts;
 
@@ -95,43 +92,28 @@ public static class BoltTestHelper
     }
 
     /// <summary>
-    /// Waits for both Bolt clients to connect and register.
+    /// Waits for the test client Bolt connection to be established.
+    /// Handler registration is now automatic via BoltHandlerRegistrationHostedService
+    /// when AddXFrameworkBoltClient() is called in the service's startup.
     /// </summary>
     public static async Task WaitForBoltClients(WebApplication serviceApp, WebApplication testClientApp)
     {
-        var serviceSignalR = serviceApp.Services.GetRequiredService<ISignalRService>();
         var testClientBolt = testClientApp.Services.GetRequiredService<BoltClient>();
+
+        // Give both service and test client time to connect and register handlers.
+        await Task.Delay(2000);
 
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
-            if (serviceSignalR.Connection?.State == HubConnectionState.Connected &&
-                testClientBolt.IsConnected)
+            if (testClientBolt.IsConnected)
             {
                 await Task.Delay(1000);
                 return;
             }
             await Task.Delay(250);
         }
-        throw new TimeoutException("Bolt clients failed to connect within 15s");
-    }
-
-    /// <summary>
-    /// Registers Bolt handlers from a service assembly (needed because testhost entry assembly != service assembly).
-    /// </summary>
-    public static void RegisterBoltHandlers(WebApplication serviceApp, Type assemblyMarkerType)
-    {
-        var signalRService = serviceApp.Services.GetRequiredService<ISignalRService>();
-        var logger = serviceApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
-        var scopeFactory = serviceApp.Services.GetRequiredService<IServiceScopeFactory>();
-
-        var handlers = assemblyMarkerType.Assembly.GetExportedTypes()
-            .Where(t => typeof(ISignalREventHandler).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
-            .Select(Activator.CreateInstance)
-            .Cast<ISignalREventHandler>();
-
-        foreach (var handler in handlers)
-            handler.Handle(signalRService.Connection!, logger, scopeFactory);
+        throw new TimeoutException("Bolt test client failed to connect within 15s");
     }
 
     /// <summary>

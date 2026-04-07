@@ -12,7 +12,6 @@ using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Drivers;
 using MemoryPack;
-using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Bolt.Hub.Extensions;
@@ -24,9 +23,7 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Extensions;
 using XFramework.Extensions;
-using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
-using XFramework.Integration.Drivers;
 using XFramework.Integration.Extensions;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
@@ -149,24 +146,16 @@ public class ConcurrentBenchmarks
         await WaitForHealth($"{TestClientUrl}/health/live");
 
         // 7. Wait for Bolt clients
-        var idSignalR = _identityServerApp.Services.GetRequiredService<ISignalRService>();
+        // Handler registration is now automatic via BoltHandlerRegistrationHostedService.
         var tcBoltClient = _testClientApp.Services.GetRequiredService<BoltClient>();
+        await Task.Delay(2000);
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
-            if (idSignalR.Connection?.State == HubConnectionState.Connected &&
-                tcBoltClient.IsConnected)
+            if (tcBoltClient.IsConnected)
             { await Task.Delay(1000); break; }
             await Task.Delay(250);
         }
-
-        // 8. Register Bolt handlers on IdentityServer (still SignalR-based until Task 13)
-        var logger = _identityServerApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
-        var scopeFactory = _identityServerApp.Services.GetRequiredService<IServiceScopeFactory>();
-        foreach (var handler in typeof(AuthService).Assembly.GetExportedTypes()
-            .Where(t => typeof(ISignalREventHandler).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
-            .Select(Activator.CreateInstance).Cast<ISignalREventHandler>())
-            handler.Handle(idSignalR.Connection!, logger, scopeFactory);
 
         _httpClient = new HttpClient { BaseAddress = new Uri(IdentityServerUrl) };
         _serviceWrapper = _testClientApp.Services.GetRequiredService<IIdentityServerServiceWrapper>();
