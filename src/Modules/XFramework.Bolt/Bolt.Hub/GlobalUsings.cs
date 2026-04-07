@@ -6,7 +6,6 @@ global using Microsoft.Extensions.Configuration;
 global using XFramework.Domain.Shared.BusinessObjects;
 global using Microsoft.EntityFrameworkCore;
 global using Bolt.Domain.Shared.Contracts.Requests;
-global using Bolt.Domain.Shared.Contracts.Responses;
 global using Bolt.Hub.Extensions;
 global using XFramework.Core.Services;
 global using XFramework.Core.Patterns;
