@@ -83,7 +83,6 @@ public static class InstallerExtensions
     public static void InstallStandardServices<T>(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddValidatorsFromAssembly(typeof(RequestBase).GetTypeInfo().Assembly);
-        services.TryAddSingleton<ISignalRService, SignalRService>();
         services.TryAddSingleton<IHelperService, HelperService>();
         services.TryAddSingleton<IJwtService, JwtService>();
         services.TryAddSingleton<CacheManager>();

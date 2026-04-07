@@ -2,7 +2,6 @@
 using Scalar.AspNetCore;
 using XFramework.Core.Extensions;
 using XFramework.Domain.Shared.Extensions;
-using XFramework.Integration.Abstractions;
 
 // ReSharper disable once CheckNamespace
 namespace XFramework.Extensions;
@@ -62,14 +61,6 @@ public static class XApplication
         return app;
     }
     
-    public static IApplicationBuilder UseCustomRequestsInAssembly<T>(this IApplicationBuilder app)
-    {
-        var signalRService = app.ApplicationServices.GetRequiredService<ISignalRService>();
-        
-        signalRService.AddHandlersFromAssembly<T>();
-        return app;
-    }
-
     public static IApplicationBuilder EnsureDatabase<TDbContext>(this IApplicationBuilder app)
         where TDbContext : DbContext
     {
