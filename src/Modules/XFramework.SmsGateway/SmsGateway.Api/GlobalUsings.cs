@@ -8,7 +8,6 @@ global using Microsoft.EntityFrameworkCore;
 global using System.Text;
 global using XFramework.Domain.Shared.Enums;
 global using XFramework.Integration.Services.Helpers;
-global using Microsoft.AspNetCore.SignalR.Client;
 global using SmsGateway.Domain.Shared.Contracts.Requests;
 global using XFramework.Domain.Contexts;
 global using XFramework.Integration.Abstractions;
