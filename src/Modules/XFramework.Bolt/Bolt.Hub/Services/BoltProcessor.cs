@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
-using Microsoft.AspNetCore.SignalR;
 using Bolt.Domain.Shared.BusinessObjects;
-using Bolt.Hub.Hubs;
 using Bolt.Hub.Interfaces;
 using XFramework.Domain.Shared.Configurations;
 
@@ -31,7 +29,6 @@ public sealed class BoltProcessor : BackgroundService
 {
     private readonly BoltMessageQueue _messageQueue;
     private readonly ICachingService _cachingService;
-    private readonly IHubContext<MessageQueueHub> _hubContext;
     private readonly BoltConfiguration _configuration;
     private readonly ILogger<BoltProcessor> _logger;
     private readonly DeadLetterQueue _dlq;
@@ -40,14 +37,12 @@ public sealed class BoltProcessor : BackgroundService
     public BoltProcessor(
         BoltMessageQueue messageQueue,
         ICachingService cachingService,
-        IHubContext<MessageQueueHub> hubContext,
         BoltConfiguration configuration,
         ILogger<BoltProcessor> logger,
         DeadLetterQueue dlq)
     {
         _messageQueue = messageQueue ?? throw new ArgumentNullException(nameof(messageQueue));
         _cachingService = cachingService ?? throw new ArgumentNullException(nameof(cachingService));
-        _hubContext = hubContext ?? throw new ArgumentNullException(nameof(hubContext));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dlq = dlq ?? throw new ArgumentNullException(nameof(dlq));
@@ -212,13 +207,12 @@ public sealed class BoltProcessor : BackgroundService
 
                 if (recipientClient != null)
                 {
-                    // Client is online, deliver the message
-                    await _hubContext.Clients
-                        .Client(recipientClient.StreamId)
-                        .SendAsync(message.CommandName, message, stoppingToken);
-
+                    // SignalR hub removed — delivery via thin protocol is handled by Bolt.Server
+                    // This processor is now a no-op drain loop; queued messages are delivered by
+                    // the thin protocol server once it has full queue support (Task 14).
                     _logger.LogInformation(
-                        "Delivered queued message. RequestId: {RequestId}, Recipient: {RecipientName} ({RecipientId})",
+                        "Queued message drain (no-op): RequestId={RequestId}, Recipient={RecipientName} ({RecipientId}). " +
+                        "Delivery via SignalR hub removed — thin protocol delivery pending (Task 14).",
                         message.RequestId, recipientClient.Name, message.RecipientId);
 
                     return; // Success
