@@ -1,19 +1,25 @@
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
-using Microsoft.AspNetCore.SignalR.Client;
 using XFramework.Integration.DataContext.ExpressionVisitor;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Integration.DataContext;
 
+/// <summary>
+/// Remote query implementation that proxies EF Core queries through the Bolt hub.
+/// DB proxy migration to the Bolt thin protocol is parked work (see Task 14).
+/// This class retains the QueryDescriptor building logic so CachingQuery can still
+/// inspect it for cache-key construction; execution methods throw NotImplementedException.
+/// </summary>
 public class RemoteQuery<T> : IRemoteQuery<T> where T : class
 {
-    private readonly HubConnection _connection;
     private readonly QueryDescriptor _descriptor;
 
-    public RemoteQuery(HubConnection connection)
+    private const string PendingMigrationMessage =
+        "DB proxy migration to Bolt thin protocol is pending — see DB proxy decentralization parked work (Task 14).";
+
+    public RemoteQuery()
     {
-        _connection = connection;
         _descriptor = new QueryDescriptor
         {
             EntityTypeName = typeof(T).Name
@@ -109,131 +115,53 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         return this;
     }
 
-    public async Task<List<T>> ToListAsync(CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.ToList;
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<List<T>>((ReadOnlySpan<byte>)resultBytes) ?? [];
-    }
+    public Task<List<T>> ToListAsync(CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<T?> FirstOrDefaultAsync(CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.FirstOrDefault;
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<T?> FirstOrDefaultAsync(CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.SingleOrDefault;
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
     public async IAsyncEnumerable<T> ToAsyncEnumerable([EnumeratorCancellation] CancellationToken ct = default)
     {
-        _descriptor.Mode = QueryExecutionMode.Stream;
-        var descriptorBytes = MemoryPack.MemoryPackSerializer.Serialize(_descriptor);
-
-        await foreach (var chunk in _connection.StreamAsync<byte[]>("StreamQuery", descriptorBytes, ct))
-        {
-            var item = MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)chunk);
-            if (item is not null)
-                yield return item;
-        }
+        throw new NotImplementedException(PendingMigrationMessage);
+        yield break; // Unreachable — satisfies compiler for IAsyncEnumerable
     }
 
-    public async Task<int> CountAsync(CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.Count;
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<int>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<int> CountAsync(CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<bool> AnyAsync(CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.Any;
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<bool>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<bool> AnyAsync(CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.AnyWithPredicate;
-        _descriptor.PredicateFilters = QueryExpressionVisitor.Parse(predicate);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<bool>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<bool> AllAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.All;
-        _descriptor.PredicateFilters = QueryExpressionVisitor.Parse(predicate);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<bool>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<bool> AllAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<TResult?> MinAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.Min;
-        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<TResult>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<TResult?> MinAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<TResult?> MaxAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.Max;
-        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<TResult>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<TResult?> MaxAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<T?> MinByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.MinBy;
-        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(keySelector);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<T?> MinByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<T?> MaxByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.MaxBy;
-        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(keySelector);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<T>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<T?> MaxByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<decimal> SumAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.Sum;
-        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<decimal>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<decimal> SumAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<double> AverageAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.Average;
-        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<double>((ReadOnlySpan<byte>)resultBytes);
-    }
+    public Task<double> AverageAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
+        => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async Task<List<GroupResult<TKey, T>>> GroupByAsync<TKey>(
+    public Task<List<GroupResult<TKey, T>>> GroupByAsync<TKey>(
         Expression<Func<T, TKey>> keySelector,
         CancellationToken ct = default)
-    {
-        _descriptor.Mode = QueryExecutionMode.GroupBy;
-        _descriptor.GroupByProperty = SortExpressionParser.GetPropertyName(keySelector);
-        var resultBytes = await ExecuteAsync(ct);
-        return MemoryPack.MemoryPackSerializer.Deserialize<List<GroupResult<TKey, T>>>((ReadOnlySpan<byte>)resultBytes) ?? [];
-    }
-
-    private async Task<byte[]> ExecuteAsync(CancellationToken ct)
-    {
-        var descriptorBytes = MemoryPack.MemoryPackSerializer.Serialize(_descriptor);
-        return await _connection.InvokeAsync<byte[]>("ExecuteQuery", descriptorBytes, ct);
-    }
+        => throw new NotImplementedException(PendingMigrationMessage);
 }
