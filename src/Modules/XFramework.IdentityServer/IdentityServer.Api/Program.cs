@@ -34,9 +34,8 @@ var app = (WebApplication)builder.Build();
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
 app.EnsureDatabase<DbContext>();
-// Bolt handlers are now source-generated from [BoltHandler] on endpoint methods.
-// UseCustomRequestsInAssembly is no longer needed — the generated ISignalREventHandler
-// implementations are auto-discovered by ScanAndRegisterHandlers() at startup.
+// Bolt handlers are source-generated from [BoltHandler] on endpoint methods and
+// auto-registered on the BoltClient by BoltHandlerRegistrationHostedService at startup.
 app.MapXFrameworkHealthChecks("IdentityServer");
 
 // API Documentation
