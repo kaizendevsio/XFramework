@@ -9,7 +9,7 @@ namespace XFramework.SourceGenerators;
 /// Source generator that scans for [BoltHandler] and [MapPost/Get/Put/Patch/Delete]
 /// attributes on static methods and generates:
 ///
-///   1. Bolt ISignalREventHandler — routes SignalR messages to the Handle method
+///   1. Bolt IBoltHandler — registers a MemoryPack-based callback on BoltClient via RegisterHandler
 ///   2. REST adapter — converts Result&lt;T&gt; to HTTP status codes
 ///   3. Map extension method — registers the endpoint with ASP.NET routing
 ///   4. Auto-detected FluentValidation — runs validator before handler if one exists
@@ -317,13 +317,13 @@ public class BoltHandlerGenerator : ISourceGenerator
         }
 
         if (h.HasCancellationToken)
-            callArgs.Append(", CancellationToken.None");
+            callArgs.Append(", ct");
 
         var isQueryResponse = h.SfResponseTypeFullName?.Contains("QueryResponse") == true;
-        string resultConversion;
+        string resultBuild;
         if (isQueryResponse && h.IsGenericResult && h.ResultDataTypeFullName != null)
         {
-            resultConversion = $@"                    var sfResponse = new {h.SfResponseTypeFullName}();
+            resultBuild = $@"                    var sfResponse = new {h.SfResponseTypeFullName}();
                     sfResponse.HttpStatusCode = (System.Net.HttpStatusCode)result.StatusCode;
                     if (result.IsSuccess)
                         sfResponse.Response = result.Data;
@@ -332,7 +332,7 @@ public class BoltHandlerGenerator : ISourceGenerator
         }
         else
         {
-            resultConversion = $@"                    var sfResponse = new {h.SfResponseTypeFullName}();
+            resultBuild = $@"                    var sfResponse = new {h.SfResponseTypeFullName}();
                     sfResponse.HttpStatusCode = (System.Net.HttpStatusCode)result.StatusCode;
                     sfResponse.Message = result.Message;";
         }
@@ -342,49 +342,43 @@ public class BoltHandlerGenerator : ISourceGenerator
 using System;
 using System.Net;
 using System.Threading;
-using Microsoft.AspNetCore.SignalR.Client;
+using Bolt.Client;
+using MemoryPack;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using XFramework.Domain.Shared.Extensions;
 using XFramework.Integration.Abstractions;
-using XFramework.Integration.Drivers;
-using XFramework.Integration.Services.Helpers;
-using Bolt.Domain.Shared.Contracts.Requests;
 
 namespace {h.Namespace}.Generated;
 
-public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : BaseSignalRHandler, ISignalREventHandler
+public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
 {{
-    public void Handle(HubConnection connection, ILogger<BaseSignalRHandler> logger, IServiceScopeFactory scopeFactory)
+    public void Register(BoltClient client, ILogger logger, IServiceScopeFactory scopeFactory)
     {{
         logger.LogInformation(""Registering Bolt handler for {{RequestType}} -> {{Endpoint}}"",
             ""{h.RequestTypeName}"", ""{h.ClassFullName}.{h.MethodName}"");
 
-        connection.On(typeof({h.RequestTypeFullName}).GetTypeFullName(),
-            async (BoltMessage<{h.RequestTypeFullName}> message) =>
+        client.RegisterHandler(""{h.RequestTypeName}"",
+            async (ReadOnlyMemory<byte> payload, Guid requestId, CancellationToken ct) =>
             {{
                 try
                 {{
                     using var scope = scopeFactory.CreateScope();
-                    var request = message.Data.AsCommandQuery<{h.RequestTypeFullName}>();
+                    var request = MemoryPackSerializer.Deserialize<{h.RequestTypeFullName}>(payload.Span);
+                    if (request is null)
+                        return ((System.Net.HttpStatusCode)400, ReadOnlyMemory<byte>.Empty);
+
 {diResolves}
                     var result = await {h.ClassFullName}.{h.MethodName}({callArgs});
 
-{resultConversion}
+{resultBuild}
 
-                    await RespondToInvoke(connection, message.RequestId, message.ClientId, sfResponse);
+                    var responseBytes = MemoryPackSerializer.Serialize(sfResponse);
+                    return ((System.Net.HttpStatusCode)result.StatusCode, (ReadOnlyMemory<byte>)responseBytes);
                 }}
                 catch (Exception ex)
                 {{
                     logger.LogError(ex, ""Bolt handler error for {{RequestType}}"", ""{h.RequestTypeName}"");
-                    var err = new {h.SfResponseTypeFullName}();
-                    err.HttpStatusCode = HttpStatusCode.InternalServerError;
-                    err.Message = ""An error occurred while processing the request"";
-                    await RespondToInvoke(connection, message.RequestId, message.ClientId, err);
-                }}
-                finally
-                {{
-                    message.Dispose();
+                    return (System.Net.HttpStatusCode.InternalServerError, ReadOnlyMemory<byte>.Empty);
                 }}
             }});
     }}
@@ -549,22 +543,38 @@ public static class {h.ClassName}_RestEndpoint
         var usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
         var assemblyName = context.Compilation.AssemblyName ?? "Unknown";
         var entries = string.Join("\n", handlers.Select(h =>
-            $"        typeof({h.ClassName}_{h.MethodName}_BoltHandler),"));
+            $"        new {h.ClassName}_{h.MethodName}_BoltHandler(),"));
 
         return $@"// <auto-generated/>
 #nullable enable
 using System;
 using System.Collections.Generic;
+using Bolt.Client;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using XFramework.Integration.Abstractions;
 {usings}
 
 namespace {assemblyName}.Generated;
 
 public static class BoltHandlerRegistry
 {{
-    public static IReadOnlyList<Type> HandlerTypes {{ get; }} = new[]
+    public static IReadOnlyList<IBoltHandler> Handlers {{ get; }} = new IBoltHandler[]
     {{
 {entries}
     }};
+
+    /// <summary>
+    /// Register all generated Bolt handlers on the given BoltClient.
+    /// Call from your app startup after BoltClient is created.
+    /// </summary>
+    public static void RegisterAll(BoltClient client, ILogger logger, IServiceScopeFactory scopeFactory)
+    {{
+        foreach (var handler in Handlers)
+        {{
+            handler.Register(client, logger, scopeFactory);
+        }}
+    }}
 }}";
     }
 

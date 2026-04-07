@@ -1,5 +1,4 @@
 ﻿using Bolt.Server;
-using Bolt.Hub.Hubs;
 
 namespace Bolt.Hub.Extensions;
 
@@ -9,12 +8,9 @@ public static class ApplicationBuilderExtension
     {
         var app = appBuilder as WebApplication;
 
-        // Bolt protocol endpoint
+        // Bolt thin-protocol WebSocket endpoint
         app.UseWebSockets();
         app.MapBolt("/bolt/ws");
-
-        // Legacy SignalR hub — kept temporarily for existing tests/benchmarks during migration
-        app.MapHub<MessageQueueHub>("/stream-flow/queue");
 
         return app as IApplicationBuilder;
     }

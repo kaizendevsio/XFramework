@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
+using Bolt.Client;
 using FluentValidation;
 using Grpc.Net.Client;
 using IdentityServer.Api.Generated;
@@ -11,7 +12,6 @@ using IdentityServer.Domain.Shared.Contracts.Requests;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using IdentityServer.Integration.Drivers;
 using MemoryPack;
-using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Bolt.Hub.Extensions;
@@ -23,10 +23,8 @@ using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Extensions;
 using XFramework.Extensions;
-using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
-using XFramework.Integration.Drivers;
-using XFramework.Integration.ThinProtocol;
+using XFramework.Integration.Extensions;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.Benchmarks;
@@ -131,13 +129,16 @@ public class ConcurrentBenchmarks
         tcBuilder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["BoltConfiguration:ClientName"] = "ConcBenchClient",
-            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
+            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Error",
         });
+        // NOTE(Task13): Test client uses thin-protocol BoltDriver. IdentityServer still uses
+        // SignalR for handler registration, so Bolt benchmarks will time out until Task 13.
         tcBuilder.Services.InstallStandardServices<ConcurrentBenchmarks>(tcBuilder.Configuration);
         tcBuilder.Services.AddSingleton(new DeviceAgentProvider("Benchmark"));
-        tcBuilder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
+        tcBuilder.Services.AddXFrameworkBoltClient(tcBuilder.Configuration);
         tcBuilder.Services.AddIdentityServerWrapperServices();
         _testClientApp = tcBuilder.Build();
         _testClientApp.MapGet("/health/live", () => Results.Ok("healthy"));
@@ -145,24 +146,16 @@ public class ConcurrentBenchmarks
         await WaitForHealth($"{TestClientUrl}/health/live");
 
         // 7. Wait for Bolt clients
-        var idSignalR = _identityServerApp.Services.GetRequiredService<ISignalRService>();
-        var tcSignalR = _testClientApp.Services.GetRequiredService<ISignalRService>();
+        // Handler registration is now automatic via BoltHandlerRegistrationHostedService.
+        var tcBoltClient = _testClientApp.Services.GetRequiredService<BoltClient>();
+        await Task.Delay(2000);
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
-            if (idSignalR.Connection?.State == HubConnectionState.Connected &&
-                tcSignalR.Connection?.State == HubConnectionState.Connected)
+            if (tcBoltClient.IsConnected)
             { await Task.Delay(1000); break; }
             await Task.Delay(250);
         }
-
-        // 8. Register Bolt handlers
-        var logger = _identityServerApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
-        var scopeFactory = _identityServerApp.Services.GetRequiredService<IServiceScopeFactory>();
-        foreach (var handler in typeof(AuthService).Assembly.GetExportedTypes()
-            .Where(t => typeof(ISignalREventHandler).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
-            .Select(Activator.CreateInstance).Cast<ISignalREventHandler>())
-            handler.Handle(idSignalR.Connection!, logger, scopeFactory);
 
         _httpClient = new HttpClient { BaseAddress = new Uri(IdentityServerUrl) };
         _serviceWrapper = _testClientApp.Services.GetRequiredService<IIdentityServerServiceWrapper>();
@@ -178,7 +171,7 @@ public class ConcurrentBenchmarks
     private async Task SetupThinProtocol()
     {
         var thinServerUri = new Uri($"ws://localhost:19300/bolt/ws");
-        var config = new BoltConfiguration { RpcTimeoutSeconds = 30 };
+        var config = new BoltClientOptions { RpcTimeoutSeconds = 30 };
         var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
         var serviceId = "3902761a822d4c6b8e2d323fd501bcd6";
 

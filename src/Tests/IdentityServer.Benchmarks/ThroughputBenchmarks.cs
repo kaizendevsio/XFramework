@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
+using Bolt.Client;
 using FluentValidation;
 using Grpc.Net.Client;
 using IdentityServer.Api.Generated;
@@ -17,10 +18,8 @@ using Testcontainers.PostgreSql;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Domain.Shared.Configurations;
 using XFramework.Domain.Shared.Extensions;
 using XFramework.Extensions;
-using XFramework.Integration.ThinProtocol;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.Benchmarks;
@@ -131,7 +130,7 @@ public class ThroughputBenchmarks
     private async Task SetupBolt()
     {
         var thinServerUri = new Uri($"ws://localhost:19400/bolt/ws");
-        var config = new BoltConfiguration { RpcTimeoutSeconds = 60 };
+        var config = new BoltClientOptions { RpcTimeoutSeconds = 60 };
         var lf = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
         var serviceId = "3902761a822d4c6b8e2d323fd501bcd6";
 

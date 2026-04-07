@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Http.Connections.Features;
 using Microsoft.AspNetCore.SignalR;
 using Bolt.Domain.Shared.BusinessObjects;
 using Bolt.Domain.Shared.Enums;
-using Bolt.Hub.Hubs;
 using Bolt.Hub.Interfaces;
 using XFramework.Core.Loggers;
 using System.Collections.Concurrent;
@@ -18,7 +17,6 @@ namespace Bolt.Hub.Services;
 public sealed class BoltHubService : IBoltHubService
 {
     private readonly ICachingService _cachingService;
-    private readonly IHubContext<MessageQueueHub> _hubContext;
     private readonly BoltConfiguration _configuration;
     private readonly ILogger<BoltHubService> _logger;
     private readonly DeadLetterQueue _dlq;
@@ -30,13 +28,11 @@ public sealed class BoltHubService : IBoltHubService
 
     public BoltHubService(
         ICachingService cachingService,
-        IHubContext<MessageQueueHub> hubContext,
         BoltConfiguration configuration,
         ILogger<BoltHubService> logger,
         DeadLetterQueue dlq)
     {
         _cachingService = cachingService ?? throw new ArgumentNullException(nameof(cachingService));
-        _hubContext = hubContext ?? throw new ArgumentNullException(nameof(hubContext));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dlq = dlq ?? throw new ArgumentNullException(nameof(dlq));
@@ -63,10 +59,6 @@ public sealed class BoltHubService : IBoltHubService
         if (senderClient == null)
         {
             _logger.BoltClientUnauthorized(context.ConnectionId);
-            
-            await _hubContext.Clients.Client(context.ConnectionId)
-                .SendAsync("TelemetryCall", "Client Unknown or Unauthorized", cancellationToken);
-            
             return Result.Failure("Client Unknown or Unauthorized", 403);
         }
 
@@ -76,8 +68,7 @@ public sealed class BoltHubService : IBoltHubService
             switch (message.ExchangeType)
             {
                 case MessageExchangeType.FanOut:
-                    await _hubContext.Clients.All.SendAsync(message.CommandName, message,
-                        cancellationToken: cancellationToken);
+                    // SignalR hub removed — FanOut delivery not supported via thin protocol yet (Task 14)
                     _logger.BoltFanOutSent(message.RequestId.ToString(), senderClient.Name);
                     break;
 
@@ -86,8 +77,7 @@ public sealed class BoltHubService : IBoltHubService
                     break;
 
                 case MessageExchangeType.Topic:
-                    await _hubContext.Clients.Group(message.Topic)
-                        .SendAsync(message.CommandName, message, cancellationToken: cancellationToken);
+                    // SignalR hub removed — Topic delivery not supported via thin protocol yet (Task 14)
                     _logger.BoltTopicSent(message.RequestId.ToString(), message.Topic, senderClient.Name);
                     break;
 
@@ -181,9 +171,9 @@ public sealed class BoltHubService : IBoltHubService
                 ? SelectClientForLoadBalancing(availableClients, message.RecipientId)
                 : availableClients[0];
 
-            // Send the message to the recipient
-            await _hubContext.Clients.Client(recipient.StreamId)
-                .SendAsync(message.CommandName, message, cancellationToken);
+            // SignalR hub removed — direct client delivery via thin protocol is handled by Bolt.Server
+            // This method is no longer called from MessageQueueHub (deleted in Task 13)
+            _logger.LogDebug("InvokeMethodAsync called for {RecipientId} — SignalR hub removed", message.RecipientId);
 
             // Wait for response with CancellationToken-based timeout (cheaper than Task.Delay allocation)
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -297,29 +287,12 @@ public sealed class BoltHubService : IBoltHubService
 
         if (currentClient != null)
         {
-            // Client is online, deliver immediately
+            // SignalR hub removed — direct client delivery via thin protocol is handled by Bolt.Server
+            // This code path is no longer reachable since MessageQueueHub was deleted (Task 13)
             _logger.BoltDirectSent(message.ExchangeType.ToString(), message.RequestId.ToString(),
                 sender.Name, currentClient.Name, (int)message.ResponseStatusCode);
-
-            try
-            {
-                await _hubContext.Clients.Client(currentClient.StreamId)
-                    .SendAsync(message.CommandName, message, cancellationToken);
-
-                currentClient.LastSeenAt = DateTime.UtcNow;
-                Interlocked.Increment(ref currentClient.SuccessCount);
-            }
-            catch
-            {
-                Interlocked.Increment(ref currentClient.FailureCount);
-                currentClient.LastFailureAt = DateTime.UtcNow;
-                if (currentClient.FailureCount > 5 && currentClient.FailureCount > currentClient.SuccessCount)
-                {
-                    currentClient.IsCircuitOpen = true;
-                }
-
-                throw;
-            }
+            currentClient.LastSeenAt = DateTime.UtcNow;
+            Interlocked.Increment(ref currentClient.SuccessCount);
 
             return;
         }

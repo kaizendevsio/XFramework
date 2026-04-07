@@ -1,43 +1,29 @@
-using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using XFramework.Integration.Abstractions;
 
 namespace XFramework.Integration.DataContext.Cache;
 
+/// <summary>
+/// Handles server-push cache invalidation notifications from the Bolt hub.
+/// Migration to Bolt thin protocol push notifications is parked work (see Task 14).
+/// </summary>
 public class CacheInvalidationHandler
 {
     private readonly IClientCacheService _cache;
     private readonly ILogger<CacheInvalidationHandler> _logger;
-    private IDisposable? _subscription;
 
     public CacheInvalidationHandler(
         IClientCacheService cache,
-        ISignalRService signalRService,
         ILogger<CacheInvalidationHandler> logger)
     {
         _cache = cache;
         _logger = logger;
 
-        if (signalRService.Connection is not null)
-        {
-            Subscribe(signalRService.Connection);
-        }
-    }
-
-    private void Subscribe(HubConnection connection)
-    {
-        _subscription = connection.On<string[]>("InvalidateCache", async entityTypeNames =>
-        {
-            foreach (var entityType in entityTypeNames)
-            {
-                _logger.LogDebug("Server-push cache invalidation for entity type '{EntityType}'", entityType);
-                await _cache.RemoveByPrefixAsync(CacheKeyBuilder.PrefixForEntity(entityType));
-            }
-        });
+        // TODO (Task 14): Subscribe to Bolt thin-protocol push notifications for cache invalidation.
+        // The previous SignalR-based subscription has been removed.
     }
 
     public void Dispose()
     {
-        _subscription?.Dispose();
     }
 }

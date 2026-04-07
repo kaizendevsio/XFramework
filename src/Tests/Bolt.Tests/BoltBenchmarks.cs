@@ -369,13 +369,13 @@ public class GrpcHelloHub : HelloService.HelloServiceBase
 // ── SignalR hubs (backend + router — same hop count as Bolt Hub and gRPC Hub) ──
 
 /// <summary>Backend — handles actual logic (like IdentityServer in Bolt)</summary>
-public class HelloBackendHub : Hub
+public class HelloBackendHub : Microsoft.AspNetCore.SignalR.Hub
 {
     public string SayHello(string name) => $"Hello {name}";
 }
 
 /// <summary>Router — proxies to backend (like BoltServer hub routing)</summary>
-public class HelloRouterHub : Hub
+public class HelloRouterHub : Microsoft.AspNetCore.SignalR.Hub
 {
     private readonly HubConnection _backend;
     public HelloRouterHub(HubConnection backend) => _backend = backend;

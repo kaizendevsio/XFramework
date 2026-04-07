@@ -1,9 +1,5 @@
 using BlazorBlueprint.Components;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using XFramework.Integration.Abstractions;
-using XFramework.Integration.Abstractions.Wrappers;
-using XFramework.Integration.Drivers;
-using XFramework.Integration.Services;
+using XFramework.Integration.Extensions;
 using IdentityServer.Integration.Drivers;
 using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
@@ -25,15 +21,8 @@ builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
     options.PersistToLocalStorage = true;
 });
 
-// Bolt infrastructure — dependencies required by BoltDriverSignalR
-builder.Services.AddMemoryCache();
-builder.Services.AddHttpClient();
-builder.Services.AddSingleton<CacheManager>();
-builder.Services.AddSingleton(_ => new DeviceAgentProvider(Environment.MachineName));
-
-// Bolt — SignalR-based RPC transport to microservices
-builder.Services.TryAddSingleton<ISignalRService, SignalRService>();
-builder.Services.TryAddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
+// Bolt — thin binary RPC transport to microservices
+builder.Services.AddXFrameworkBoltClient(builder.Configuration);
 
 // Service wrappers — auto-generated CRUD + custom operations for each microservice
 builder.Services.AddIdentityServerWrapperServices();

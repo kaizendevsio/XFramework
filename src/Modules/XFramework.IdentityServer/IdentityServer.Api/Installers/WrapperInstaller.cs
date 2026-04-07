@@ -1,6 +1,5 @@
 ﻿using Messaging.Integration.Drivers;
-using XFramework.Integration.Abstractions.Wrappers;
-using XFramework.Integration.Drivers;
+using XFramework.Integration.Extensions;
 
 namespace IdentityServer.Api.Installers;
 
@@ -8,7 +7,7 @@ public class WrapperInstaller : IInstaller
 {
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
-        services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
+        services.AddXFrameworkBoltClient(configuration);
         services.AddSingleton<IMessagingServiceWrapper, MessagingServiceWrapper>();
     }
 }

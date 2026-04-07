@@ -34,6 +34,7 @@
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Client\Bolt.Client.csproj" />
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media\Bolt.Media.csproj" />
         <ProjectReference Include="..\..\Libraries\Bolt\Bolt.Media.Browser\Bolt.Media.Browser.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Bolt\Bolt.Hub\Bolt.Hub.csproj" />
     </ItemGroup>
 
 </Project>
