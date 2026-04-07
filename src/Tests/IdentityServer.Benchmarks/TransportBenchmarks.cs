@@ -4,6 +4,7 @@ using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
+using Bolt.Client;
 using FluentValidation;
 using IdentityServer.Api.Generated;
 using IdentityServer.Api.Services;
@@ -27,7 +28,7 @@ using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
-using XFramework.Integration.ThinProtocol;
+using XFramework.Integration.Extensions;
 using Grpc.Net.Client;
 using IdentityServer.Benchmarks.Grpc;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
@@ -217,7 +218,7 @@ public class TransportBenchmarks
     private async Task SetupThinProtocol()
     {
         var thinServerUri = new Uri($"ws://localhost:19000/bolt/ws");
-        var config = new BoltConfiguration { RpcTimeoutSeconds = 30 };
+        var config = new BoltClientOptions { RpcTimeoutSeconds = 30 };
         var loggerFactory = _streamFlowApp.Services.GetRequiredService<ILoggerFactory>();
 
         // Compute hashes for routing
@@ -388,14 +389,17 @@ public class TransportBenchmarks
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["BoltConfiguration:ClientName"] = "BenchClient",
-            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
+            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Error",
         });
 
+        // NOTE(Task13): Test client uses thin-protocol BoltDriver. IdentityServer still uses
+        // SignalR for handler registration, so Bolt benchmarks will time out until Task 13.
         builder.Services.InstallStandardServices<TransportBenchmarks>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("Benchmark"));
-        builder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
+        builder.Services.AddXFrameworkBoltClient(builder.Configuration);
         builder.Services.AddIdentityServerWrapperServices();
 
         var app = builder.Build();
@@ -408,13 +412,13 @@ public class TransportBenchmarks
     private async Task WaitForBoltClients()
     {
         var idServerSignalR = _identityServerApp.Services.GetRequiredService<ISignalRService>();
-        var testClientSignalR = _testClientApp.Services.GetRequiredService<ISignalRService>();
+        var testClientBolt = _testClientApp.Services.GetRequiredService<BoltClient>();
 
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
             var idConnected = idServerSignalR.Connection?.State == HubConnectionState.Connected;
-            var testConnected = testClientSignalR.Connection?.State == HubConnectionState.Connected;
+            var testConnected = testClientBolt.IsConnected;
             if (idConnected && testConnected)
             {
                 await Task.Delay(1000);
@@ -427,6 +431,7 @@ public class TransportBenchmarks
 
     private void RegisterBoltHandlers()
     {
+        // IdentityServer still uses SignalR-based handler registration (updated in Task 13)
         var signalRService = _identityServerApp.Services.GetRequiredService<ISignalRService>();
         var logger = _identityServerApp.Services.GetRequiredService<ILogger<BaseSignalRHandler>>();
         var scopeFactory = _identityServerApp.Services.GetRequiredService<IServiceScopeFactory>();

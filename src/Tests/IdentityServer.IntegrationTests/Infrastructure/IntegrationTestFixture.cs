@@ -1,3 +1,4 @@
+using Bolt.Client;
 using FluentValidation;
 using IdentityServer.Api.Generated;
 using IdentityServer.Api.Services;
@@ -14,6 +15,7 @@ using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
+using XFramework.Integration.Extensions;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace IdentityServer.IntegrationTests;
@@ -148,15 +150,19 @@ public class IntegrationTestFixture
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["BoltConfiguration:ClientName"] = "TestClient",
-            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
+            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Warning",
         });
 
-        // Core services needed by SignalRService and service wrappers
+        // Core services needed by service wrappers.
+        // NOTE(Task13): Test client uses thin-protocol BoltDriver. IdentityServer still uses
+        // SignalR for handler registration, so StreamFlow tests will time out until Task 13
+        // updates the source generator to emit thin-protocol handlers.
         builder.Services.InstallStandardServices<IntegrationTestFixture>(builder.Configuration);
         builder.Services.AddSingleton(new XFramework.Domain.Shared.BusinessObjects.DeviceAgentProvider("IntegrationTest"));
-        builder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
+        builder.Services.AddXFrameworkBoltClient(builder.Configuration);
 
         // Register the IdentityServer service wrapper (generated — uses Bolt transport)
         builder.Services.AddIdentityServerWrapperServices();
@@ -171,13 +177,13 @@ public class IntegrationTestFixture
     private static async Task WaitForBoltClients()
     {
         var idServerSignalR = _identityServerApp.Services.GetRequiredService<ISignalRService>();
-        var testClientSignalR = _testClientApp.Services.GetRequiredService<ISignalRService>();
+        var testClient = _testClientApp.Services.GetRequiredService<BoltClient>();
 
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
             var idConnected = idServerSignalR.Connection?.State == HubConnectionState.Connected;
-            var testConnected = testClientSignalR.Connection?.State == HubConnectionState.Connected;
+            var testConnected = testClient.IsConnected;
             if (idConnected && testConnected)
             {
                 await Task.Delay(1000);

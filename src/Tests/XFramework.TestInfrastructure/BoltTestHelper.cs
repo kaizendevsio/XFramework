@@ -1,3 +1,4 @@
+using Bolt.Client;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Caching.Memory;
 using Bolt.Hub.Extensions;
@@ -8,6 +9,7 @@ using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
+using XFramework.Integration.Extensions;
 using IdentityServer.Domain.Shared.Contracts;
 
 namespace XFramework.TestInfrastructure;
@@ -56,14 +58,18 @@ public static class BoltTestHelper
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["BoltConfiguration:ClientName"] = clientName,
-            ["BoltConfiguration:ServerUrls:0"] = $"{streamFlowUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
+            ["BoltConfiguration:ServerUrls:0"] = $"{streamFlowUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Warning",
         });
 
+        // NOTE(Task13): Test client uses thin-protocol BoltDriver. Service apps still use
+        // SignalR for handler registration, so StreamFlow tests will time out until Task 13
+        // updates the source generator to emit thin-protocol handlers.
         builder.Services.InstallStandardServices<TestConstants>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("IntegrationTest"));
-        builder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
+        builder.Services.AddXFrameworkBoltClient(builder.Configuration);
         registerWrappers(builder.Services);
 
         var app = builder.Build();
@@ -94,13 +100,13 @@ public static class BoltTestHelper
     public static async Task WaitForBoltClients(WebApplication serviceApp, WebApplication testClientApp)
     {
         var serviceSignalR = serviceApp.Services.GetRequiredService<ISignalRService>();
-        var testClientSignalR = testClientApp.Services.GetRequiredService<ISignalRService>();
+        var testClientBolt = testClientApp.Services.GetRequiredService<BoltClient>();
 
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
             if (serviceSignalR.Connection?.State == HubConnectionState.Connected &&
-                testClientSignalR.Connection?.State == HubConnectionState.Connected)
+                testClientBolt.IsConnected)
             {
                 await Task.Delay(1000);
                 return;

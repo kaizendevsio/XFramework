@@ -1,3 +1,4 @@
+using Bolt.Client;
 using FluentValidation;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ using XFramework.Extensions;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Drivers;
+using XFramework.Integration.Extensions;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace Wallets.IntegrationTests;
@@ -131,14 +133,18 @@ public class WalletsTestFixture
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["BoltConfiguration:ClientName"] = "WalletTestClient",
-            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue",
+            ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
+            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Serilog:MinimumLevel:Default"] = "Warning",
         });
 
+        // NOTE(Task13): Test client uses thin-protocol BoltDriver. Wallets service still uses
+        // SignalR for handler registration, so StreamFlow tests will time out until Task 13
+        // updates the source generator to emit thin-protocol handlers.
         builder.Services.InstallStandardServices<WalletsTestFixture>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("WalletTest"));
-        builder.Services.AddSingleton<IMessageBusWrapper, BoltDriverSignalR>();
+        builder.Services.AddXFrameworkBoltClient(builder.Configuration);
         builder.Services.AddWalletsWrapperServices();
 
         var app = builder.Build();
@@ -151,13 +157,13 @@ public class WalletsTestFixture
     private static async Task WaitForBoltClients()
     {
         var walletsSignalR = _walletsApp.Services.GetRequiredService<ISignalRService>();
-        var testClientSignalR = _testClientApp.Services.GetRequiredService<ISignalRService>();
+        var testClient = _testClientApp.Services.GetRequiredService<BoltClient>();
 
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
             if (walletsSignalR.Connection?.State == HubConnectionState.Connected &&
-                testClientSignalR.Connection?.State == HubConnectionState.Connected)
+                testClient.IsConnected)
             {
                 await Task.Delay(1000);
                 return;
