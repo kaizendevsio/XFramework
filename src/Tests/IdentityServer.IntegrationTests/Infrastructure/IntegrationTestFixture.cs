@@ -113,10 +113,10 @@ public class IntegrationTestFixture
     {
         var builder = XApplication.Configure<AuthService>();
         builder.WebHost.UseUrls(IdentityServerUrl);
-        // ClientName = "IdentityServer.Test" → SignalRService registers as SHA256("IdentityServer")
-        // This matches the generated wrapper's TargetClient
+        // ClientName = "IdentityServer.Test" — the generated service wrapper's TargetClient
+        // matches the service GUID below (3902761a...) via BoltCodec.Fnv1aHash routing
         OverrideConfiguration(builder, "IdentityServer.Test", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();

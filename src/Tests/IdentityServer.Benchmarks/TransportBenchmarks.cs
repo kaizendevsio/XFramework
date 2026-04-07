@@ -361,7 +361,7 @@ public class TransportBenchmarks
         var builder = XApplication.Configure<AuthService>();
         builder.WebHost.UseUrls(IdentityServerUrl);
         OverrideConfig(builder, "IdentityServer.Bench", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();

@@ -101,7 +101,7 @@ public class WalletsTestFixture
         var builder = XApplication.Configure<Wallets.Api.Services.WalletOperationsService>();
         builder.WebHost.UseUrls(WalletsUrl);
         OverrideConfig(builder, "Wallets.Test", "4902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
         builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletOperationsService>();
 

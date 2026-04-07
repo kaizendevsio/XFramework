@@ -162,7 +162,7 @@ public static class BoltTestHelper
             ["ConnectionStrings:DefaultDatabaseConnection"] = connectionString,
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
-            ["BoltConfiguration:ServerUrls:0"] = $"{streamFlowUrl}/stream-flow/queue",
+            ["BoltConfiguration:ServerUrls:0"] = $"{streamFlowUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
             ["JwtOptions:ValidAudience"] = "http://localhost",
             ["JwtOptions:ValidIssuer"] = "http://localhost",
