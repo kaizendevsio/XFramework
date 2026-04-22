@@ -5,6 +5,7 @@ using Wallets.Api.Features.Batch.TransferBatch;
 using Wallets.Api.Features.Wallets.Get;
 using Wallets.Api.Features.Wallets.GetByCredential;
 using Wallets.Api.Generated;
+using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
@@ -27,6 +28,9 @@ builder.Services.AddOpenApi("v1", options =>
 
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Register DataContext handler for entity query/mutation via Bolt
+builder.Services.AddDataContextHandler(typeof(Program).Assembly);
 
 // Rate limiting — global 100/min per IP
 builder.Services.AddXFrameworkRateLimiting();

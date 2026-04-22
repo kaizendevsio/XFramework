@@ -40,10 +40,6 @@ public static class BoltCodec
     // Unsubscribe header is variable: 1 + 4 + 4 + N (9 + subscriberId)
     // Ack header is variable: 1 + 4 + 4 + N + 8 (17 + subscriberId)
 
-    // ExecuteQuery/ExecuteChanges shim (DB proxy transitional)
-    public const int ExecuteQueryHeaderSize = 1 + 16 + 4;          // 21 bytes + payload
-    public const int ExecuteChangesHeaderSize = 1 + 16 + 4;        // 21 bytes + payload
-
     #region Encoding
 
     /// <summary>

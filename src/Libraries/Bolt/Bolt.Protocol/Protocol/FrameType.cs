@@ -25,10 +25,6 @@ public enum FrameType : byte
     Event = 0x09,
     /// <summary>Acknowledge durable messages: [1:type] [4:topicHash] [4:subscriberIdLen] [subscriberId] [8:upToSequenceNumber]</summary>
     Ack = 0x0A,
-    /// <summary>Hub-side query execution (transitional shim): [1:type] [16:requestId] [4:payloadLen] [payload]</summary>
-    ExecuteQuery = 0x0B,
-    /// <summary>Hub-side change execution (transitional shim): [1:type] [16:requestId] [4:payloadLen] [payload]</summary>
-    ExecuteChanges = 0x0C,
     /// <summary>Open bidirectional stream: [1:type] [16:streamId] [4:recipientHash] [4:commandHash]</summary>
     StreamOpen = 0x10,
     /// <summary>Stream data chunk: [1:type] [16:streamId] [4:payloadLen] [payload]</summary>

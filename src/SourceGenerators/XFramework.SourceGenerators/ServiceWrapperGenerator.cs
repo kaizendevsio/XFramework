@@ -71,11 +71,13 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             using XFramework.Domain.Shared.Contracts.Requests;
             using XFramework.Domain.Shared.Contracts.Responses;
             using XFramework.Domain.Shared.Interfaces;
+            using XFramework.Domain.Shared.DataContext;
             using XFramework.Integration.Drivers;
             using XFramework.Integration.Abstractions;
             using XFramework.Integration.Abstractions.Wrappers;
             using Microsoft.Extensions.DependencyInjection;
             using Microsoft.Extensions.Configuration;
+            using Bolt.Client;
             using XFramework;
             using System.Linq.Expressions;
             using Serilog;
@@ -93,7 +95,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         sb.AppendLine("{");
 
         // ── Interface ──
-        sb.AppendLine($"public partial interface I{serviceName}ServiceWrapper : IXFrameworkService, IServiceWrapper");
+        sb.AppendLine($"public partial interface I{serviceName}ServiceWrapper : IXFrameworkService, IServiceWrapper, IDataContextServiceWrapper");
         sb.AppendLine("{");
         foreach (var model in models)
         {
@@ -117,10 +119,46 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         {
             sb.AppendLine($"I{models[i]}CrudService {models[i]}{(i < models.Count - 1 ? "," : "")}");
         }
-        sb.AppendLine($", IMessageBusWrapper messageBusDriver, IConfiguration configuration");
+        sb.AppendLine($", IMessageBusWrapper messageBusDriver, IConfiguration configuration, BoltClient boltClient");
         sb.AppendLine($") : DriverBase(messageBusDriver, configuration), I{serviceName}ServiceWrapper");
         sb.AppendLine("{");
         sb.AppendLine($"    public override void Initialize() => TargetClient = \"{serviceId}\";");
+        sb.AppendLine();
+        sb.AppendLine($$"""
+                            public async System.Threading.Tasks.Task<byte[]> ExecuteQueryAsync(byte[] queryDescriptorBytes, System.Threading.CancellationToken ct = default)
+                            {
+                                if (string.IsNullOrEmpty(TargetClient)) Initialize();
+                                var (status, data) = await boltClient.InvokeAsync(TargetClient, "__db_query__", queryDescriptorBytes, ct);
+                                return data.ToArray();
+                            }
+
+                            public async System.Threading.Tasks.Task<byte[]> ExecuteChangesAsync(byte[] saveChangesRequestBytes, System.Threading.CancellationToken ct = default)
+                            {
+                                if (string.IsNullOrEmpty(TargetClient)) Initialize();
+                                var (status, data) = await boltClient.InvokeAsync(TargetClient, "__db_changes__", saveChangesRequestBytes, ct);
+                                return data.ToArray();
+                            }
+
+                            public async System.Collections.Generic.IAsyncEnumerable<byte[]> ExecuteQueryStreamAsync(
+                                byte[] queryDescriptorBytes,
+                                [System.Runtime.CompilerServices.EnumeratorCancellation] System.Threading.CancellationToken ct = default)
+                            {
+                                if (string.IsNullOrEmpty(TargetClient)) Initialize();
+                                var stream = await boltClient.OpenStreamAsync(TargetClient, "__db_query_stream__", ct);
+                                try
+                                {
+                                    await stream.SendAsync((System.ReadOnlyMemory<byte>)queryDescriptorBytes, ct);
+                                    await foreach (var chunk in stream.ReadAllAsync(ct))
+                                    {
+                                        yield return chunk.ToArray();
+                                    }
+                                }
+                                finally
+                                {
+                                    await stream.DisposeAsync();
+                                }
+                            }
+                        """);
 
         foreach (var req in customRequests)
         {

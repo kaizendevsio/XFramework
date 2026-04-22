@@ -1,9 +1,10 @@
 using Community.Api.Generated;
-using XFramework.Extensions;
+using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
 using XFramework.Core.RateLimiting;
+using XFramework.Extensions;
 
 var builder = XApplication.Configure<Program>();
 
@@ -14,6 +15,9 @@ builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
 
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Register DataContext handler for entity query/mutation via Bolt
+builder.Services.AddDataContextHandler(typeof(Program).Assembly);
 
 // Rate limiting — global 100/min per IP
 builder.Services.AddXFrameworkRateLimiting();

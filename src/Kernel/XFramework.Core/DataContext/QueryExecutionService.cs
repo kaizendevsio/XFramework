@@ -1,9 +1,10 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using XFramework.Core.DataContext;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using XFramework.Domain.Shared.DataContext;
 
-namespace Bolt.Hub.Services;
+namespace XFramework.Core.DataContext;
 
 public sealed class QueryExecutionService(
     IServiceProvider serviceProvider,
@@ -36,7 +37,14 @@ public sealed class QueryExecutionService(
             var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
 
             var result = await QueryDescriptorExecutor.ExecuteAsync(dbContext, entityType, descriptor, ct);
-            return MemoryPack.MemoryPackSerializer.Serialize(result);
+
+            // MemoryPackSerializer.Serialize(object?) uses the object formatter which fails
+            // for runtime-typed results. Use the actual result type for correct serialization.
+            if (result is null)
+                return [];
+
+            var resultType = GetResultType(descriptor.Mode, entityType);
+            return MemoryPack.MemoryPackSerializer.Serialize(resultType, result);
         }
         catch (Exception ex)
         {
@@ -44,6 +52,18 @@ public sealed class QueryExecutionService(
             return SerializeError(ex.Message);
         }
     }
+
+    private static Type GetResultType(QueryExecutionMode mode, Type entityType) => mode switch
+    {
+        QueryExecutionMode.ToList => typeof(List<>).MakeGenericType(entityType),
+        QueryExecutionMode.FirstOrDefault or QueryExecutionMode.SingleOrDefault
+            or QueryExecutionMode.MinBy or QueryExecutionMode.MaxBy => entityType,
+        QueryExecutionMode.Count => typeof(int),
+        QueryExecutionMode.Any or QueryExecutionMode.AnyWithPredicate or QueryExecutionMode.All => typeof(bool),
+        QueryExecutionMode.Sum => typeof(decimal),
+        QueryExecutionMode.Average => typeof(double),
+        _ => typeof(object)
+    };
 
     public async IAsyncEnumerable<byte[]> ExecuteStreamAsync(
         byte[] queryDescriptorBytes,
@@ -81,6 +101,40 @@ public sealed class QueryExecutionService(
                 if (!_entityTypes.TryGetValue(change.EntityTypeName, out var entityType))
                     return SerializeError($"Entity type '{change.EntityTypeName}' is not registered.");
 
+                // For Update operations, try FieldPatch first before deserializing as entity
+                if (change.Operation == ChangeOperation.Update)
+                {
+                    FieldPatch? patch = null;
+                    try
+                    {
+                        patch = MemoryPack.MemoryPackSerializer.Deserialize<FieldPatch>(
+                            (ReadOnlySpan<byte>)change.SerializedEntity);
+                    }
+                    catch { }
+
+                    if (patch is { EntityId.Length: > 0, Changes.Count: > 0 })
+                    {
+                        var pkValue = MemoryPack.MemoryPackSerializer.Deserialize<Guid>(
+                            (ReadOnlySpan<byte>)patch.EntityId);
+                        var existing = await dbContext.FindAsync(entityType, pkValue);
+                        if (existing is null)
+                            return SerializeError($"Entity '{change.EntityTypeName}' with PK '{pkValue}' not found.");
+
+                        foreach (var (propertyName, valueBytes) in patch.Changes)
+                        {
+                            var prop = entityType.GetProperty(propertyName);
+                            if (prop is null) continue;
+
+                            var value = MemoryPack.MemoryPackSerializer.Deserialize(
+                                prop.PropertyType, (ReadOnlySpan<byte>)valueBytes);
+                            prop.SetValue(existing, value);
+                        }
+
+                        continue;
+                    }
+                }
+
+                // Deserialize as full entity for Add, Remove, or Update fallback
                 var entity = MemoryPack.MemoryPackSerializer.Deserialize(entityType, (ReadOnlySpan<byte>)change.SerializedEntity);
                 if (entity is null)
                     return SerializeError($"Failed to deserialize entity of type '{change.EntityTypeName}'.");

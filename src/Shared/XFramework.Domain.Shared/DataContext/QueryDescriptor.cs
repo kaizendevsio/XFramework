@@ -18,4 +18,6 @@ public partial class QueryDescriptor
     [MemoryPackOrder(10)] public string? AggregateProperty { get; set; }
     [MemoryPackOrder(11)] public string? GroupByProperty { get; set; }
     [MemoryPackOrder(12)] public List<QueryFilter>? PredicateFilters { get; set; }
+    [MemoryPackOrder(13)] public int? ChunkSize { get; set; }
+    [MemoryPackOrder(14)] public RequestMetadata? Metadata { get; set; }
 }
