@@ -4,9 +4,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.Configurations;
+using XFramework.Domain.Shared.DataContext;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Abstractions.Wrappers;
+using XFramework.Integration.DataContext;
 using XFramework.Integration.Drivers;
 
 namespace XFramework.Integration.Extensions;
@@ -47,6 +50,19 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IMessageBusWrapper, BoltDriver>();
 
+        return services;
+    }
+
+    /// <summary>
+    /// Registers RemoteDataContext as the IDataContext implementation for remote/WASM clients.
+    /// </summary>
+    public static IServiceCollection AddRemoteDataContext(this IServiceCollection services)
+    {
+        services.AddScoped<IDataContext>(sp =>
+        {
+            var metadata = sp.GetService<RequestMetadata>() ?? new RequestMetadata();
+            return new RemoteDataContext(sp, metadata);
+        });
         return services;
     }
 }

@@ -1,5 +1,6 @@
 using FluentValidation;
 using IdentityServer.Api.Generated;
+using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
@@ -12,6 +13,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Register DataContext handler for entity query/mutation via Bolt
+builder.Services.AddDataContextHandler(typeof(Program).Assembly);
 
 // Rate limiting — global 100/min per IP + stricter "auth" and "password-reset" policies
 builder.Services.AddXFrameworkRateLimiting();

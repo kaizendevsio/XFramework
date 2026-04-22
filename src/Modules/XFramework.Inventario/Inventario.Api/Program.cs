@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
+using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
@@ -24,6 +25,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp => null!);
 
 // Register FluentValidation validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Register DataContext handler for entity query/mutation via Bolt
+builder.Services.AddDataContextHandler(typeof(Program).Assembly);
 
 // Auto-discover and register all generated services
 builder.Services.AddGeneratedServices();
