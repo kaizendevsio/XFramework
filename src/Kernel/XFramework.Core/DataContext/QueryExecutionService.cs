@@ -37,7 +37,14 @@ public sealed class QueryExecutionService(
             var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
 
             var result = await QueryDescriptorExecutor.ExecuteAsync(dbContext, entityType, descriptor, ct);
-            return MemoryPack.MemoryPackSerializer.Serialize(result);
+
+            // MemoryPackSerializer.Serialize(object?) uses the object formatter which fails
+            // for runtime-typed results. Use the actual result type for correct serialization.
+            if (result is null)
+                return [];
+
+            var resultType = GetResultType(descriptor.Mode, entityType);
+            return MemoryPack.MemoryPackSerializer.Serialize(resultType, result);
         }
         catch (Exception ex)
         {
@@ -45,6 +52,18 @@ public sealed class QueryExecutionService(
             return SerializeError(ex.Message);
         }
     }
+
+    private static Type GetResultType(QueryExecutionMode mode, Type entityType) => mode switch
+    {
+        QueryExecutionMode.ToList => typeof(List<>).MakeGenericType(entityType),
+        QueryExecutionMode.FirstOrDefault or QueryExecutionMode.SingleOrDefault
+            or QueryExecutionMode.MinBy or QueryExecutionMode.MaxBy => entityType,
+        QueryExecutionMode.Count => typeof(int),
+        QueryExecutionMode.Any or QueryExecutionMode.AnyWithPredicate or QueryExecutionMode.All => typeof(bool),
+        QueryExecutionMode.Sum => typeof(decimal),
+        QueryExecutionMode.Average => typeof(double),
+        _ => typeof(object)
+    };
 
     public async IAsyncEnumerable<byte[]> ExecuteStreamAsync(
         byte[] queryDescriptorBytes,

@@ -7,10 +7,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Bolt.Hub.Extensions;
 using Testcontainers.PostgreSql;
+using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.DataContext;
 using XFramework.Extensions;
+using XFramework.Integration.Security;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Extensions;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
@@ -40,6 +44,13 @@ public class IntegrationTestFixture
     /// </summary>
     public static IIdentityServerServiceWrapper ServiceWrapper =>
         _testClientApp.Services.GetRequiredService<IIdentityServerServiceWrapper>();
+
+    /// <summary>
+    /// RemoteDataContext that queries IdentityServer through the Bolt transport.
+    /// Creates a new scope each call so tests get a fresh context.
+    /// </summary>
+    public static IDataContext DataContext =>
+        _testClientApp.Services.CreateScope().ServiceProvider.GetRequiredService<IDataContext>();
 
     public static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
 
@@ -109,17 +120,50 @@ public class IntegrationTestFixture
         return app;
     }
 
+    /// <summary>
+    /// The generated wrapper TargetClient = SHA256("IdentityServer").
+    /// The BoltClient must register with this same ID so the hub routes requests correctly.
+    /// </summary>
+    private static readonly string IdentityServerServiceId =
+        XFramework.Integration.Security.Cryptography.ToSha256("IdentityServer");
+
     private static WebApplication StartIdentityServer()
     {
-        var builder = XApplication.Configure<AuthService>();
+        // Build manually (instead of XApplication.Configure<AuthService>()) so that config
+        // overrides are applied BEFORE the installers read BoltConfiguration to create BoltClient.
+        var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls(IdentityServerUrl);
-        // ClientName = "IdentityServer.Test" → SignalRService registers as SHA256("IdentityServer")
-        // This matches the generated wrapper's TargetClient
-        OverrideConfiguration(builder, "IdentityServer.Test", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
 
+        // Override configuration first — installers read config at registration time
+        OverrideConfiguration(builder, "IdentityServer", Guid.NewGuid().ToString());
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
+
+        // Register services that the installers normally provide, except WrapperInstaller
+        // (WrapperInstaller calls AddXFrameworkBoltClient which reads ClientGuid as Guid?,
+        // but the service ID is a SHA256 hex string — not a valid GUID).
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddDbContext<DbContext, AppDbContext>((sp, options) => options
+            .UseNpgsql(ConnectionString,
+                npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            .ConfigureWarnings(w => w.Ignore(
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.BoolWithDefaultWarning,
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
+        builder.Services.AddServerDataContext<AppDbContext>();
+
+        builder.Services.InstallStandardServices<AuthService>(builder.Configuration);
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
+
+        // Register BoltClient with the correct service ID (SHA256 of module name)
+        // so the hub can route wrapper requests to this instance.
+        builder.Services.AddBoltClient(bolt => bolt
+            .WithServer($"{BoltUrl}/bolt/ws")
+            .WithClientId(IdentityServerServiceId)
+            .WithClientName("IdentityServer"));
+
+        // Register DataContext handler so IdentityServer can serve __db_query__/__db_changes__ via Bolt
+        builder.Services.AddDataContextHandler(typeof(AuthService).Assembly);
 
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
@@ -158,6 +202,16 @@ public class IntegrationTestFixture
 
         // Register the IdentityServer service wrapper (generated — uses Bolt transport)
         builder.Services.AddIdentityServerWrapperServices();
+
+        // Register RemoteDataContext so IDataContext queries go through Bolt to IdentityServer
+        builder.Services.AddRemoteDataContext();
+
+        // RequestMetadata provides tenant context for remote queries
+        builder.Services.AddScoped(_ => new RequestMetadata
+        {
+            TenantId = TestTenantId,
+            RequestId = Guid.NewGuid()
+        });
 
         var app = builder.Build();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
@@ -208,8 +262,16 @@ public class IntegrationTestFixture
 
     private static async Task MigrateAndSeed()
     {
+        // Force-load module Domain.Shared assemblies so AppDbContext.OnModelCreating
+        // discovers their IEntityTypeConfiguration<T> registrations via AppDomain scan.
+        // The CLR lazy-loads assemblies; accessing a type forces immediate load.
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Wallets.Domain.Shared.Contracts.WalletType).TypeHandle);
+
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString)
+            .ConfigureWarnings(w => w.Ignore(
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         await using var db = new AppDbContext(options);
