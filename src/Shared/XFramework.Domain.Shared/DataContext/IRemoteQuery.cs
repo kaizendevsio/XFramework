@@ -31,7 +31,7 @@ public interface IRemoteQuery<T> where T : class
     Task<List<T>> ToListAsync(CancellationToken ct = default);
     Task<T?> FirstOrDefaultAsync(CancellationToken ct = default);
     Task<T?> SingleOrDefaultAsync(CancellationToken ct = default);
-    IAsyncEnumerable<T> ToAsyncEnumerable(CancellationToken ct = default);
+    IAsyncEnumerable<T> ToAsyncEnumerable(int chunkSize = 100, CancellationToken ct = default);
 
     // Terminal: scalar
     Task<int> CountAsync(CancellationToken ct = default);
