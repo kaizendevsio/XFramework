@@ -124,7 +124,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
         => throw new NotImplementedException(PendingMigrationMessage);
 
-    public async IAsyncEnumerable<T> ToAsyncEnumerable([EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<T> ToAsyncEnumerable(int chunkSize = 100, [EnumeratorCancellation] CancellationToken ct = default)
     {
         throw new NotImplementedException(PendingMigrationMessage);
         yield break; // Unreachable — satisfies compiler for IAsyncEnumerable

@@ -82,8 +82,8 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
     }
 
     // Streaming bypasses cache — results are yielded one by one
-    public IAsyncEnumerable<T> ToAsyncEnumerable(CancellationToken ct = default)
-        => _inner.ToAsyncEnumerable(ct);
+    public IAsyncEnumerable<T> ToAsyncEnumerable(int chunkSize = 100, CancellationToken ct = default)
+        => _inner.ToAsyncEnumerable(chunkSize, ct);
 
     public async Task<int> CountAsync(CancellationToken ct = default)
     {

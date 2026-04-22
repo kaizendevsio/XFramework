@@ -96,7 +96,7 @@ public class ServerQuery<T> : IRemoteQuery<T> where T : class
     public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
         => _queryable.SingleOrDefaultAsync(ct);
 
-    public async IAsyncEnumerable<T> ToAsyncEnumerable([EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<T> ToAsyncEnumerable(int chunkSize = 100, [EnumeratorCancellation] CancellationToken ct = default)
     {
         await foreach (var item in _queryable.AsAsyncEnumerable().WithCancellation(ct))
         {
