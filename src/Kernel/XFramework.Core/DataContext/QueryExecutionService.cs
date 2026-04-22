@@ -82,6 +82,40 @@ public sealed class QueryExecutionService(
                 if (!_entityTypes.TryGetValue(change.EntityTypeName, out var entityType))
                     return SerializeError($"Entity type '{change.EntityTypeName}' is not registered.");
 
+                // For Update operations, try FieldPatch first before deserializing as entity
+                if (change.Operation == ChangeOperation.Update)
+                {
+                    FieldPatch? patch = null;
+                    try
+                    {
+                        patch = MemoryPack.MemoryPackSerializer.Deserialize<FieldPatch>(
+                            (ReadOnlySpan<byte>)change.SerializedEntity);
+                    }
+                    catch { }
+
+                    if (patch is { EntityId.Length: > 0, Changes.Count: > 0 })
+                    {
+                        var pkValue = MemoryPack.MemoryPackSerializer.Deserialize<Guid>(
+                            (ReadOnlySpan<byte>)patch.EntityId);
+                        var existing = await dbContext.FindAsync(entityType, pkValue);
+                        if (existing is null)
+                            return SerializeError($"Entity '{change.EntityTypeName}' with PK '{pkValue}' not found.");
+
+                        foreach (var (propertyName, valueBytes) in patch.Changes)
+                        {
+                            var prop = entityType.GetProperty(propertyName);
+                            if (prop is null) continue;
+
+                            var value = MemoryPack.MemoryPackSerializer.Deserialize(
+                                prop.PropertyType, (ReadOnlySpan<byte>)valueBytes);
+                            prop.SetValue(existing, value);
+                        }
+
+                        continue;
+                    }
+                }
+
+                // Deserialize as full entity for Add, Remove, or Update fallback
                 var entity = MemoryPack.MemoryPackSerializer.Deserialize(entityType, (ReadOnlySpan<byte>)change.SerializedEntity);
                 if (entity is null)
                     return SerializeError($"Failed to deserialize entity of type '{change.EntityTypeName}'.");
