@@ -50,7 +50,8 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
             return new EntityRegistrationInfo
             {
                 ClassName = classSymbol.Name,
-                FullyQualifiedName = classSymbol.ToDisplayString()
+                FullyQualifiedName = classSymbol.ToDisplayString(),
+                AssemblyName = classSymbol.ContainingAssembly?.Name ?? ""
             };
         }
 
@@ -85,7 +86,8 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
                     allEntities.Add(new EntityRegistrationInfo
                     {
                         ClassName = type.Name,
-                        FullyQualifiedName = type.ToDisplayString()
+                        FullyQualifiedName = type.ToDisplayString(),
+                        AssemblyName = assembly.Name
                     });
                 }
             }
@@ -112,6 +114,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine("/// Auto-generated entity type registry for DataContext.");
         sb.AppendLine("/// Call GetDataContextEntityTypes() to get the allowlist for QueryExecutionService.");
+        sb.AppendLine("/// Call GetDataContextServiceWrapperMap() to get entity-to-service-wrapper routing.");
         sb.AppendLine("/// </summary>");
         sb.AppendLine("public static class DataContextEntityRegistrations");
         sb.AppendLine("{");
@@ -123,6 +126,42 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
             sb.AppendLine($"        [\"{entity.ClassName}\"] = typeof(global::{entity.FullyQualifiedName}),");
         }
 
+        sb.AppendLine("    };");
+        sb.AppendLine();
+
+        // Generate GetDataContextServiceWrapperMap() — maps entity names to their module's wrapper type name.
+        // The wrapper types are source-generated in Integration projects, so they may not be resolvable
+        // via typeof() at compile time. We emit string-based metadata names that the consumer resolves
+        // at runtime from loaded assemblies (e.g., via Type.GetType() or assembly scanning).
+        var wrapperMappings = new List<(string EntityName, string WrapperMetadataName)>();
+        foreach (var entity in validEntities)
+        {
+            if (string.IsNullOrEmpty(entity.AssemblyName))
+                continue;
+
+            var moduleName = entity.AssemblyName.Split('.')[0];
+            var wrapperMetadataName = $"{moduleName}.Integration.Drivers.I{moduleName}ServiceWrapper";
+
+            // Try to resolve from compilation first (covers pre-compiled referenced assemblies)
+            var wrapperSymbol = compilation.GetTypeByMetadataName(wrapperMetadataName);
+            if (wrapperSymbol != null)
+            {
+                wrapperMappings.Add((entity.ClassName, wrapperSymbol.ToDisplayString()));
+            }
+            else
+            {
+                // Wrapper is likely source-generated in the same or a peer compilation —
+                // emit the conventional name so the consumer can resolve at runtime
+                wrapperMappings.Add((entity.ClassName, wrapperMetadataName));
+            }
+        }
+
+        sb.AppendLine("    public static Dictionary<string, string> GetDataContextServiceWrapperMap() => new()");
+        sb.AppendLine("    {");
+        foreach (var (entityName, wrapperName) in wrapperMappings)
+        {
+            sb.AppendLine($"        [\"{entityName}\"] = \"{wrapperName}\",");
+        }
         sb.AppendLine("    };");
         sb.AppendLine("}");
 
@@ -145,5 +184,6 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
     {
         public string ClassName { get; set; } = "";
         public string FullyQualifiedName { get; set; } = "";
+        public string AssemblyName { get; set; } = "";
     }
 }
