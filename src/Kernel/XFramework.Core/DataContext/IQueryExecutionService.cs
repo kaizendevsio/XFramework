@@ -1,4 +1,4 @@
-namespace Bolt.Hub.Services;
+namespace XFramework.Core.DataContext;
 
 public interface IQueryExecutionService
 {

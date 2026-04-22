@@ -1,9 +1,10 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using XFramework.Core.DataContext;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using XFramework.Domain.Shared.DataContext;
 
-namespace Bolt.Hub.Services;
+namespace XFramework.Core.DataContext;
 
 public sealed class QueryExecutionService(
     IServiceProvider serviceProvider,

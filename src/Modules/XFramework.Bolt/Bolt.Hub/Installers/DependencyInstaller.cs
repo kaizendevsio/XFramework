@@ -1,4 +1,4 @@
-﻿using Bolt.Hub.Services;
+﻿using XFramework.Core.DataContext;
 using XFramework.Domain.Shared.Interfaces;
 
 namespace Bolt.Hub.Installers;
