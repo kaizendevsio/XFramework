@@ -1,29 +1,29 @@
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
-using XFramework.Integration.DataContext.ExpressionVisitor;
+using MemoryPack;
+using Microsoft.Extensions.DependencyInjection;
+using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
+using XFramework.Integration.DataContext.ExpressionVisitor;
 
 namespace XFramework.Integration.DataContext;
 
-/// <summary>
-/// Remote query implementation that proxies EF Core queries through the Bolt hub.
-/// DB proxy migration to the Bolt thin protocol is parked work (see Task 14).
-/// This class retains the QueryDescriptor building logic so CachingQuery can still
-/// inspect it for cache-key construction; execution methods throw NotImplementedException.
-/// </summary>
 public class RemoteQuery<T> : IRemoteQuery<T> where T : class
 {
     private readonly QueryDescriptor _descriptor;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly List<TrackedEntity> _trackedEntities;
+    private readonly RequestMetadata? _metadata;
 
-    private const string PendingMigrationMessage =
-        "DB proxy migration to Bolt thin protocol is pending — see DB proxy decentralization parked work (Task 14).";
-
-    public RemoteQuery()
+    public RemoteQuery(
+        IServiceProvider serviceProvider,
+        List<TrackedEntity> trackedEntities,
+        RequestMetadata? metadata)
     {
-        _descriptor = new QueryDescriptor
-        {
-            EntityTypeName = typeof(T).Name
-        };
+        _serviceProvider = serviceProvider;
+        _trackedEntities = trackedEntities;
+        _metadata = metadata;
+        _descriptor = new QueryDescriptor { EntityTypeName = typeof(T).Name };
     }
 
     internal QueryDescriptor Descriptor => _descriptor;
@@ -115,53 +115,192 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         return this;
     }
 
-    public Task<List<T>> ToListAsync(CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    // Terminal: materialization
 
-    public Task<T?> FirstOrDefaultAsync(CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
-
-    public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
-
-    public async IAsyncEnumerable<T> ToAsyncEnumerable(int chunkSize = 100, [EnumeratorCancellation] CancellationToken ct = default)
+    public async Task<List<T>> ToListAsync(CancellationToken ct = default)
     {
-        throw new NotImplementedException(PendingMigrationMessage);
-        yield break; // Unreachable — satisfies compiler for IAsyncEnumerable
+        _descriptor.Mode = QueryExecutionMode.ToList;
+        var resultBytes = await ExecuteQueryAsync(ct);
+        var result = MemoryPackSerializer.Deserialize<List<T>>(resultBytes);
+        if (result is not null)
+            foreach (var entity in result) TrackEntity(entity);
+        return result ?? [];
     }
 
-    public Task<int> CountAsync(CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    public async Task<T?> FirstOrDefaultAsync(CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.FirstOrDefault;
+        var resultBytes = await ExecuteQueryAsync(ct);
+        var result = MemoryPackSerializer.Deserialize<T?>(resultBytes);
+        if (result is not null) TrackEntity(result);
+        return result;
+    }
 
-    public Task<bool> AnyAsync(CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    public async Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.SingleOrDefault;
+        var resultBytes = await ExecuteQueryAsync(ct);
+        var result = MemoryPackSerializer.Deserialize<T?>(resultBytes);
+        if (result is not null) TrackEntity(result);
+        return result;
+    }
 
-    public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    // Terminal: streaming
 
-    public Task<bool> AllAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    public async IAsyncEnumerable<T> ToAsyncEnumerable(
+        int chunkSize = 100,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.Stream;
+        _descriptor.ChunkSize = chunkSize;
+        _descriptor.Metadata = _metadata;
 
-    public Task<TResult?> MinAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+        var wrapper = ResolveWrapper();
+        var descriptorBytes = MemoryPackSerializer.Serialize(_descriptor);
 
-    public Task<TResult?> MaxAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+        await foreach (var chunkBytes in wrapper.ExecuteQueryStreamAsync(descriptorBytes, ct))
+        {
+            var entityBytesList = MemoryPackSerializer.Deserialize<List<byte[]>>(chunkBytes);
+            if (entityBytesList is null) continue;
+            foreach (var entityBytes in entityBytesList)
+            {
+                var entity = MemoryPackSerializer.Deserialize<T>(entityBytes);
+                if (entity is not null)
+                {
+                    TrackEntity(entity);
+                    yield return entity;
+                }
+            }
+        }
+    }
 
-    public Task<T?> MinByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    // Terminal: scalar
 
-    public Task<T?> MaxByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    public async Task<int> CountAsync(CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.Count;
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<int>(resultBytes);
+    }
 
-    public Task<decimal> SumAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    public async Task<bool> AnyAsync(CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.Any;
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<bool>(resultBytes);
+    }
 
-    public Task<double> AverageAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.AnyWithPredicate;
+        _descriptor.PredicateFilters = QueryExpressionVisitor.Parse(predicate);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<bool>(resultBytes);
+    }
 
-    public Task<List<GroupResult<TKey, T>>> GroupByAsync<TKey>(
+    public async Task<bool> AllAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.All;
+        _descriptor.PredicateFilters = QueryExpressionVisitor.Parse(predicate);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<bool>(resultBytes);
+    }
+
+    // Terminal: aggregation
+
+    public async Task<TResult?> MinAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.Min;
+        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<TResult?>(resultBytes);
+    }
+
+    public async Task<TResult?> MaxAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.Max;
+        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<TResult?>(resultBytes);
+    }
+
+    public async Task<T?> MinByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.MinBy;
+        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(keySelector);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        var result = MemoryPackSerializer.Deserialize<T?>(resultBytes);
+        if (result is not null) TrackEntity(result);
+        return result;
+    }
+
+    public async Task<T?> MaxByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.MaxBy;
+        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(keySelector);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        var result = MemoryPackSerializer.Deserialize<T?>(resultBytes);
+        if (result is not null) TrackEntity(result);
+        return result;
+    }
+
+    public async Task<decimal> SumAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.Sum;
+        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<decimal>(resultBytes);
+    }
+
+    public async Task<double> AverageAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
+    {
+        _descriptor.Mode = QueryExecutionMode.Average;
+        _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<double>(resultBytes);
+    }
+
+    public async Task<List<GroupResult<TKey, T>>> GroupByAsync<TKey>(
         Expression<Func<T, TKey>> keySelector,
         CancellationToken ct = default)
-        => throw new NotImplementedException(PendingMigrationMessage);
+    {
+        _descriptor.Mode = QueryExecutionMode.GroupBy;
+        _descriptor.GroupByProperty = SortExpressionParser.GetPropertyName(keySelector);
+        var resultBytes = await ExecuteQueryAsync(ct);
+        return MemoryPackSerializer.Deserialize<List<GroupResult<TKey, T>>>(resultBytes) ?? [];
+    }
+
+    // Helpers
+
+    private async Task<byte[]> ExecuteQueryAsync(CancellationToken ct)
+    {
+        _descriptor.Metadata = _metadata;
+        var wrapper = ResolveWrapper();
+        var descriptorBytes = MemoryPackSerializer.Serialize(_descriptor);
+        return await wrapper.ExecuteQueryAsync(descriptorBytes, ct);
+    }
+
+    private IDataContextServiceWrapper ResolveWrapper()
+    {
+        var wrapperMap = RemoteDataContext.GetServiceWrapperMap();
+        if (!wrapperMap.TryGetValue(typeof(T).Name, out var wrapperTypeName))
+            throw new InvalidOperationException(
+                $"Entity '{typeof(T).Name}' is not mapped to any service wrapper.");
+        var wrapperType = RemoteDataContext.ResolveWrapperType(wrapperTypeName);
+        return (IDataContextServiceWrapper)_serviceProvider.GetRequiredService(wrapperType);
+    }
+
+    private void TrackEntity(T entity)
+    {
+        if (!RemoteDataContext.HasTracker<T>()) return;
+        var tracker = RemoteDataContext.GetTracker<T>();
+        var pk = tracker.GetPrimaryKey(entity);
+        var snapshot = tracker.Snapshot(entity);
+        _trackedEntities.Add(new TrackedEntity
+        {
+            EntityTypeName = typeof(T).Name,
+            PrimaryKey = pk,
+            Snapshot = snapshot
+        });
+    }
 }
