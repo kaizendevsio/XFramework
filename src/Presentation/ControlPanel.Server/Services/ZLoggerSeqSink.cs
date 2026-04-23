@@ -1,13 +1,11 @@
+using System.Buffers;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using ZLogger;
 
 namespace ControlPanel.Server.Services;
 
-/// <summary>
-/// ZLogger async batching processor that POSTs CLEF (Compact Log Event Format) to Seq's ingestion API.
-/// Non-blocking — buffers log entries and flushes in batches over HTTP.
-/// </summary>
 public static class ZLoggerSeqSink
 {
     public static void Register(ILoggingBuilder logging, string seqUrl, string? apiKey = null, LogLevel minimumLevel = LogLevel.Debug)
@@ -26,6 +24,7 @@ public static class ZLoggerSeqSink
     {
         private readonly HttpClient _httpClient;
         private readonly LogLevel _minimumLevel;
+        private static readonly MediaTypeHeaderValue ClefMediaType = new("application/vnd.serilog.clef");
 
         public SeqBatchProcessor(HttpClient httpClient, LogLevel minimumLevel)
         {
@@ -45,35 +44,60 @@ public static class ZLoggerSeqSink
         {
             try
             {
-                var content = new StringContent(clef);
-                content.Headers.ContentType = new MediaTypeHeaderValue("application/vnd.serilog.clef");
+                var content = new StringContent(clef, Encoding.UTF8);
+                content.Headers.ContentType = ClefMediaType;
                 await _httpClient.PostAsync("/api/events/raw?clef", content);
             }
             catch
             {
-                // Fire and forget — don't let Seq failures crash the app
+                // Fire and forget
             }
         }
 
+        private static readonly JsonSerializerOptions ParamJsonOptions = new()
+        {
+            WriteIndented = false,
+            MaxDepth = 4,
+            ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        };
+
         private static string FormatClef(IZLoggerEntry entry)
         {
-            var writer = new System.Buffers.ArrayBufferWriter<byte>();
-            var utf8Writer = new Utf8JsonWriter(writer);
-            utf8Writer.WriteStartObject();
-            utf8Writer.WriteString("@t", entry.LogInfo.Timestamp.Utc.ToString("O"));
-            utf8Writer.WriteString("@l", entry.LogInfo.LogLevel.ToString());
-            utf8Writer.WriteString("@mt", entry.ToString());
+            var buffer = new ArrayBufferWriter<byte>();
+            var w = new Utf8JsonWriter(buffer);
+            w.WriteStartObject();
+
+            w.WriteString("@t", entry.LogInfo.Timestamp.Utc.ToString("O"));
+            w.WriteString("@l", entry.LogInfo.LogLevel.ToString());
+
+            var rendered = entry.ToString();
+            w.WriteString("@mt", rendered);
 
             var category = entry.LogInfo.Category.ToString();
             if (!string.IsNullOrEmpty(category))
-                utf8Writer.WriteString("SourceContext", category);
+                w.WriteString("SourceContext", category);
 
             if (entry.LogInfo.EventId.Id != 0)
-                utf8Writer.WriteNumber("EventId", entry.LogInfo.EventId.Id);
+            {
+                w.WriteNumber("EventId", entry.LogInfo.EventId.Id);
+                if (!string.IsNullOrEmpty(entry.LogInfo.EventId.Name))
+                    w.WriteString("EventName", entry.LogInfo.EventId.Name);
+            }
 
-            utf8Writer.WriteEndObject();
-            utf8Writer.Flush();
-            return System.Text.Encoding.UTF8.GetString(writer.WrittenSpan);
+            // Write structured parameters as individual CLEF properties
+            try
+            {
+                entry.WriteJsonParameterKeyValues(w, ParamJsonOptions);
+            }
+            catch
+            {
+                // Some entries may not support parameter extraction
+            }
+
+            w.WriteEndObject();
+            w.Flush();
+            return Encoding.UTF8.GetString(buffer.WrittenSpan);
         }
 
         public ValueTask DisposeAsync()

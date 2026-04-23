@@ -22,9 +22,11 @@ builder.Logging.AddZLoggerConsole(options =>
     });
 });
 
-// Per-provider console filter: suppress noisy framework categories
+// Per-provider console filter: suppress framework noise + Bolt RPC (those go to Seq only)
 builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Microsoft", LogLevel.Warning);
 builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("System", LogLevel.Warning);
+builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("XFramework.Integration.Drivers.BoltDriver", LogLevel.None);
+builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt.Client", LogLevel.None);
 
 // Seq: Debug+ for everything — full Bolt RPC payloads, request/response bodies
 var seqUrl = builder.Configuration["Seq:Url"] ?? "http://100.75.11.49:5341";
