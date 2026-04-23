@@ -28,6 +28,9 @@ builder.Services.AddXFrameworkBoltClient(builder.Configuration);
 builder.Services.AddIdentityServerWrapperServices();
 builder.Services.AddWalletsWrapperServices();
 
+// IDataContext — universal query layer routed through service wrappers
+builder.Services.AddRemoteDataContext();
+
 // Tenant filter state (sidebar selection)
 builder.Services.AddScoped<ControlPanel.Server.Services.TenantFilterService>();
 
