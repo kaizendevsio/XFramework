@@ -35,7 +35,8 @@ public static class LoggingExtensions
         if (!string.IsNullOrEmpty(seqUrl))
         {
             var apiKey = configuration["Seq:ApiKey"];
-            ZLoggerSeqSink.Register(logging, seqUrl, apiKey, LogLevel.Debug);
+            var appName = configuration["BoltConfiguration:ClientName"] ?? "Unknown";
+            ZLoggerSeqSink.Register(logging, seqUrl, apiKey, LogLevel.Debug, appName);
         }
 
         return logging;

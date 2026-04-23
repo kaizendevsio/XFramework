@@ -16,7 +16,7 @@ namespace XFramework.Integration.Logging;
 /// </summary>
 public static partial class ZLoggerSeqSink
 {
-    public static void Register(ILoggingBuilder logging, string seqUrl, string? apiKey = null, LogLevel minimumLevel = LogLevel.Debug)
+    public static void Register(ILoggingBuilder logging, string seqUrl, string? apiKey = null, LogLevel minimumLevel = LogLevel.Debug, string? applicationName = null)
     {
         logging.AddZLoggerLogProcessor(options =>
         {
@@ -24,7 +24,7 @@ public static partial class ZLoggerSeqSink
             if (!string.IsNullOrEmpty(apiKey))
                 httpClient.DefaultRequestHeaders.Add("X-Seq-ApiKey", apiKey);
 
-            return new SeqBatchProcessor(httpClient, minimumLevel);
+            return new SeqBatchProcessor(httpClient, minimumLevel, applicationName);
         });
     }
 
@@ -32,6 +32,7 @@ public static partial class ZLoggerSeqSink
     {
         private readonly HttpClient _httpClient;
         private readonly LogLevel _minimumLevel;
+        private readonly string? _applicationName;
         private readonly Channel<string> _channel;
         private readonly Task _flushTask;
         private readonly CancellationTokenSource _cts = new();
@@ -43,10 +44,11 @@ public static partial class ZLoggerSeqSink
         [GeneratedRegex(@"(?:RequestBody|ResponseBody|Request|Response)=\{.*?\}(?=\s|$)", RegexOptions.Compiled)]
         private static partial Regex BodyJsonPattern();
 
-        public SeqBatchProcessor(HttpClient httpClient, LogLevel minimumLevel)
+        public SeqBatchProcessor(HttpClient httpClient, LogLevel minimumLevel, string? applicationName = null)
         {
             _httpClient = httpClient;
             _minimumLevel = minimumLevel;
+            _applicationName = applicationName;
             _channel = Channel.CreateBounded<string>(new BoundedChannelOptions(10_000)
             {
                 FullMode = BoundedChannelFullMode.DropOldest,
@@ -59,7 +61,7 @@ public static partial class ZLoggerSeqSink
         public void Post(IZLoggerEntry entry)
         {
             if (entry.LogInfo.LogLevel < _minimumLevel) return;
-            var clef = FormatClef(entry);
+            var clef = FormatClef(entry, _applicationName);
             _channel.Writer.TryWrite(clef);
         }
 
@@ -117,7 +119,7 @@ public static partial class ZLoggerSeqSink
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
         };
 
-        private static string FormatClef(IZLoggerEntry entry)
+        private static string FormatClef(IZLoggerEntry entry, string? applicationName)
         {
             // Extract structured params
             var paramBuffer = new ArrayBufferWriter<byte>(256);
@@ -147,6 +149,9 @@ public static partial class ZLoggerSeqSink
             var category = entry.LogInfo.Category.ToString();
             if (!string.IsNullOrEmpty(category))
                 w.WriteString("SourceContext", category);
+
+            if (!string.IsNullOrEmpty(applicationName))
+                w.WriteString("Application", applicationName);
 
             if (entry.LogInfo.EventId.Id != 0)
                 w.WriteNumber("EventId", entry.LogInfo.EventId.Id);
