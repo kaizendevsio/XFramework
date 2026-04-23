@@ -79,6 +79,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             using Microsoft.Extensions.Configuration;
             using Bolt.Client;
             using XFramework;
+            using System.Collections.Generic;
             using System.Linq.Expressions;
             using System;
             using System.Net;
@@ -167,45 +168,119 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
         sb.AppendLine("}");
 
         // ── CRUD service implementations ──
+        // Route through __db_query__ / __db_changes__ (same handlers as IDataContext).
+        // Uses BoltClient.InvokeAsync directly — zero-copy deserialization from response span.
         foreach (var model in models)
         {
             sb.AppendLine(
                 $$"""
-                  public record {{model}}CrudService : DriverBase, I{{model}}CrudService, IServiceWrapper
+                  public record {{model}}CrudService : I{{model}}CrudService, IServiceWrapper
                   {
-                      public {{model}}CrudService(IMessageBusWrapper messageBusDriver, IConfiguration configuration)
+                      private readonly BoltClient _boltClient;
+                      private readonly string _targetClient = "{{serviceId}}";
+
+                      public {{model}}CrudService(BoltClient boltClient)
                       {
-                           MessageBusDriver = messageBusDriver;
-                           Configuration = configuration;
-                           TargetClient = "{{serviceId}}";
+                          _boltClient = boltClient;
                       }
+
                       public async Task<CmdResponse<{{model}}>> Create({{model}} entity)
                       {
-                          var t = await SendVoidAsync<Create<{{model}}>, {{model}}>(new Create<{{model}}>(entity));
-                          return new CmdResponse<{{model}}> { HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError, Message = t?.Message, Response = t?.Response };
+                          var result = await ExecuteChange("{{model}}", ChangeOperation.Add, MemoryPack.MemoryPackSerializer.Serialize(entity));
+                          return new CmdResponse<{{model}}>
+                          {
+                              HttpStatusCode = result.IsSuccess ? HttpStatusCode.OK : (HttpStatusCode)result.StatusCode,
+                              Message = result.Message,
+                              Response = entity
+                          };
                       }
+
                       public async Task<CmdResponse<{{model}}>> Patch({{model}} entity)
                       {
-                          var t = await SendVoidAsync<Patch<{{model}}>, {{model}}>(new Patch<{{model}}>(entity));
-                          return new CmdResponse<{{model}}> { HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError, Message = t?.Message, Response = t?.Response };
+                          var result = await ExecuteChange("{{model}}", ChangeOperation.Update, MemoryPack.MemoryPackSerializer.Serialize(entity));
+                          return new CmdResponse<{{model}}>
+                          {
+                              HttpStatusCode = result.IsSuccess ? HttpStatusCode.OK : (HttpStatusCode)result.StatusCode,
+                              Message = result.Message,
+                              Response = entity
+                          };
                       }
+
                       public async Task<CmdResponse<{{model}}>> Replace({{model}} entity)
                       {
-                          var t = await SendVoidAsync<Replace<{{model}}>, {{model}}>(new Replace<{{model}}>(entity));
-                          return new CmdResponse<{{model}}> { HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError, Message = t?.Message, Response = t?.Response };
+                          var result = await ExecuteChange("{{model}}", ChangeOperation.Update, MemoryPack.MemoryPackSerializer.Serialize(entity));
+                          return new CmdResponse<{{model}}>
+                          {
+                              HttpStatusCode = result.IsSuccess ? HttpStatusCode.OK : (HttpStatusCode)result.StatusCode,
+                              Message = result.Message,
+                              Response = entity
+                          };
                       }
+
                       public async Task<CmdResponse> Delete({{model}} entity)
                       {
-                          var t = await SendVoidAsync(new Delete<{{model}}>(entity));
-                          return new CmdResponse { HttpStatusCode = t?.HttpStatusCode ?? HttpStatusCode.InternalServerError, Message = t?.Message };
+                          var result = await ExecuteChange("{{model}}", ChangeOperation.Remove, MemoryPack.MemoryPackSerializer.Serialize(entity));
+                          return new CmdResponse
+                          {
+                              HttpStatusCode = result.IsSuccess ? HttpStatusCode.OK : (HttpStatusCode)result.StatusCode,
+                              Message = result.Message
+                          };
                       }
+
                       public async Task<QueryResponse<PaginatedResult<{{model}}>>> GetList(int pageSize, int pageNumber, Guid? tenantId = null, bool noCache = true, int navigationDepth = 1, bool? includeNavigations = false, List<QueryFilter>? filter = null, List<string>? includes = null)
                       {
-                          return await SendAsync<GetList<{{model}}>, PaginatedResult<{{model}}>>(new GetList<{{model}}>(PageSize: pageSize, PageNumber: pageNumber, TenantId: tenantId, NoCache: noCache, IncludeNavigations: includeNavigations, NavigationDepth: navigationDepth, Filter: filter, Includes: includes));
+                          var descriptor = new QueryDescriptor
+                          {
+                              EntityTypeName = "{{model}}",
+                              Mode = QueryExecutionMode.ToList,
+                              Skip = (pageNumber - 1) * pageSize,
+                              Take = pageSize,
+                              NoCache = noCache,
+                              Includes = includes ?? new List<string>(),
+                              Filters = filter ?? new List<QueryFilter>(),
+                              Metadata = new RequestMetadata { TenantId = tenantId }
+                          };
+                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
+                          var items = data.IsEmpty ? new List<{{model}}>() : MemoryPack.MemoryPackSerializer.Deserialize<List<{{model}}>>(data.Span) ?? new List<{{model}}>();
+                          return new QueryResponse<PaginatedResult<{{model}}>>
+                          {
+                              HttpStatusCode = status,
+                              Response = new PaginatedResult<{{model}}>(items.Count, pageNumber, pageSize, items)
+                          };
                       }
+
                       public async Task<QueryResponse<{{model}}>> Get(Guid id, Guid? tenantId = null, bool noCache = true, int navigationDepth = 1, bool? includeNavigations = null, List<string>? includes = null)
                       {
-                          return await SendAsync<Get<{{model}}>, {{model}}>(new Get<{{model}}>(Id: id, TenantId: tenantId, NoCache: noCache, IncludeNavigations: includeNavigations, NavigationDepth: navigationDepth, Includes: includes));
+                          var descriptor = new QueryDescriptor
+                          {
+                              EntityTypeName = "{{model}}",
+                              Mode = QueryExecutionMode.FirstOrDefault,
+                              NoCache = noCache,
+                              Includes = includes ?? new List<string>(),
+                              Filters = new List<QueryFilter> { new() { PropertyName = "Id", Operation = global::XFramework.Domain.Shared.Enums.QueryFilterOperation.Equal, Value = id } },
+                              Metadata = new RequestMetadata { TenantId = tenantId }
+                          };
+                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
+                          var entity = data.IsEmpty ? default : MemoryPack.MemoryPackSerializer.Deserialize<{{model}}>(data.Span);
+                          return new QueryResponse<{{model}}>
+                          {
+                              HttpStatusCode = status,
+                              Response = entity
+                          };
+                      }
+
+                      private async Task<DataContextResult> ExecuteChange(string entityType, ChangeOperation op, byte[] serializedEntity)
+                      {
+                          var request = new SaveChangesRequest
+                          {
+                              Changes = new List<ChangeEntry>
+                              {
+                                  new() { EntityTypeName = entityType, Operation = op, SerializedEntity = serializedEntity }
+                              }
+                          };
+                          var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_changes__", MemoryPack.MemoryPackSerializer.Serialize(request));
+                          if (data.IsEmpty) return DataContextResult.Failure("Empty response", (int)status);
+                          return MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span) ?? DataContextResult.Failure("Deserialize failed");
                       }
                   }
                   """);
@@ -222,7 +297,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                          """);
         foreach (var model in models)
         {
-            sb.AppendLine($"        services.AddSingleton<I{model}CrudService, {model}CrudService>();");
+            sb.AppendLine($"        services.AddSingleton<I{model}CrudService>(sp => new {model}CrudService(sp.GetRequiredService<BoltClient>()));");
         }
         sb.AppendLine("    }");
         sb.AppendLine("}");
