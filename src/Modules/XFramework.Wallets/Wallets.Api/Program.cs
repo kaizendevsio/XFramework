@@ -10,8 +10,10 @@ using XFramework.Core.Extensions;
 using XFramework.Core.Health;
 using XFramework.Core.Middlewares;
 using XFramework.Core.RateLimiting;
+using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
+builder.Logging.AddXFrameworkLogging(builder.Configuration);
 
 builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Wallets.Api");
 builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
