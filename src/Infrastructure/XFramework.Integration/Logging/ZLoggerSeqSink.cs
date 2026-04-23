@@ -6,12 +6,12 @@ using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using ZLogger;
 
-namespace ControlPanel.Server.Services;
+namespace XFramework.Integration.Logging;
 
 /// <summary>
-/// High-performance ZLogger → Seq sink using Channel-based batching.
+/// High-performance ZLogger -> Seq sink using Channel-based batching.
 /// Accumulates CLEF events and flushes in batches (newline-delimited)
-/// via a single HTTP POST — same approach as Serilog.Sinks.Seq.
+/// via a single HTTP POST -- same approach as Serilog.Sinks.Seq.
 /// </summary>
 public static partial class ZLoggerSeqSink
 {
@@ -105,7 +105,7 @@ public static partial class ZLoggerSeqSink
                 content.Headers.ContentType = ClefMediaType;
                 await _httpClient.PostAsync("/api/events/raw?clef", content);
             }
-            catch { /* Seq down — drop batch, loop will retry next batch */ }
+            catch { /* Seq down -- drop batch, loop will retry next batch */ }
         }
 
         private static readonly JsonSerializerOptions ParamJsonOptions = new()
@@ -140,7 +140,7 @@ public static partial class ZLoggerSeqSink
 
             var rendered = entry.ToString();
             var cleanMessage = BodyJsonPattern().Replace(rendered, m =>
-                m.Value[..m.Value.IndexOf('=')] + "={…}");
+                m.Value[..m.Value.IndexOf('=')] + "={...}");
             w.WriteString("@mt", cleanMessage);
 
             var category = entry.LogInfo.Category.ToString();

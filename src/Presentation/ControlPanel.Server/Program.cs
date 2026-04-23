@@ -3,34 +3,11 @@ using XFramework.Integration.Extensions;
 using IdentityServer.Integration.Drivers;
 using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
-using ZLogger;
-using ControlPanel.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Logging — ZLogger console (lifecycle only) + Seq (everything including Bolt RPC payloads)
-builder.Logging.ClearProviders();
-builder.Logging.SetMinimumLevel(LogLevel.Debug);
-
-// Console: plain text, only startup/lifecycle — everything else goes to Seq only
-builder.Logging.AddZLoggerConsole(options =>
-{
-    options.UsePlainTextFormatter(formatter =>
-    {
-        formatter.SetPrefixFormatter($"[{0} {1}] ", (in MessageTemplate template, in LogInfo info) =>
-            template.Format(info.Timestamp.Local.ToString("HH:mm:ss"), info.LogLevel));
-    });
-});
-
-// Console filter: Warning+ baseline, suppress all Bolt/XFramework.Integration noise entirely
-builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>(level => level >= LogLevel.Warning);
-builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Microsoft.Hosting.Lifetime", LogLevel.Information);
-builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("XFramework.Integration", LogLevel.None);
-builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt", LogLevel.None);
-
-// Seq: Debug+ for everything — full Bolt RPC payloads, request/response bodies
-var seqUrl = builder.Configuration["Seq:Url"] ?? "http://100.75.11.49:5341";
-ZLoggerSeqSink.Register(builder.Logging, seqUrl, minimumLevel: LogLevel.Debug);
+builder.Logging.AddXFrameworkLogging(builder.Configuration);
 
 // Blazor Server
 builder.Services.AddRazorComponents()
