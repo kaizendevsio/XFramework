@@ -24,11 +24,10 @@ public static class LoggingExtensions
             });
         });
 
-        // Console filters: suppress noise
+        // Console filters: suppress framework noise, allow Bolt connection/RPC info
         logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>(level => level >= LogLevel.Warning);
         logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Microsoft.Hosting.Lifetime", LogLevel.Information);
-        logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("XFramework.Integration", LogLevel.None);
-        logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt", LogLevel.None);
+        logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt.Client", LogLevel.Information);
 
         // Seq: Debug+ for everything (if configured)
         var seqUrl = configuration["Seq:Url"];
