@@ -66,15 +66,17 @@ public sealed class BoltDriver : IMessageBusWrapper
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    private static readonly JsonElement EmptyObject = JsonDocument.Parse("{}").RootElement.Clone();
+
     private static JsonElement SafeSerializeToElement(object? obj)
     {
-        if (obj is null) return default;
+        if (obj is null) return EmptyObject;
         try
         {
             var json = JsonSerializer.SerializeToUtf8Bytes(obj, _jsonOpts);
             return JsonDocument.Parse(json).RootElement.Clone();
         }
-        catch { return JsonDocument.Parse("{}").RootElement.Clone(); }
+        catch { return EmptyObject; }
     }
 
     private static string FriendlyTypeName<T>()
@@ -93,19 +95,12 @@ public sealed class BoltDriver : IMessageBusWrapper
         var command = FriendlyTypeName<TRequest>();
         var sw = Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
-
-        _logger.LogDebug("Bolt RPC >> {Command} -> {Recipient} | PayloadSize={PayloadSize}B RequestBody={RequestBody}",
-            command, recipient, payload.Length, SafeSerializeToElement(request));
-
         var (status, _) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
         sw.Stop();
 
-        _logger.LogDebug("Bolt RPC << {Command} -> {Recipient} | Status={StatusCode} ({StatusInt}) Elapsed={Elapsed}ms",
-            command, recipient, status, (int)status, sw.ElapsedMilliseconds);
-
-        if ((int)status >= 400)
-            _logger.LogWarning("Bolt RPC FAIL {Command} -> {Recipient} | Status={StatusCode} Elapsed={Elapsed}ms RequestBody={RequestBody}",
-                command, recipient, status, sw.ElapsedMilliseconds, SafeSerializeToElement(request));
+        var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
+        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | Status={StatusCode} Elapsed={Elapsed}ms PayloadSize={PayloadSize}B RequestBody={RequestBody}",
+            command, recipient, (int)status, sw.ElapsedMilliseconds, payload.Length, SafeSerializeToElement(request));
 
         return new CmdResponse { HttpStatusCode = status, Message = status.ToString() };
     }
@@ -117,20 +112,13 @@ public sealed class BoltDriver : IMessageBusWrapper
         var command = FriendlyTypeName<TRequest>();
         var sw = Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
-
-        _logger.LogDebug("Bolt RPC >> {Command} -> {Recipient} | PayloadSize={PayloadSize}B RequestBody={RequestBody}",
-            command, recipient, payload.Length, SafeSerializeToElement(request));
-
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
         sw.Stop();
         var response = responsePayload.IsEmpty ? default : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
 
-        _logger.LogDebug("Bolt RPC << {Command} -> {Recipient} | Status={StatusCode} ({StatusInt}) Elapsed={Elapsed}ms ResponseSize={ResponseSize}B ResponseBody={ResponseBody}",
-            command, recipient, status, (int)status, sw.ElapsedMilliseconds, responsePayload.Length, SafeSerializeToElement(response));
-
-        if ((int)status >= 400)
-            _logger.LogWarning("Bolt RPC FAIL {Command} -> {Recipient} | Status={StatusCode} Elapsed={Elapsed}ms RequestBody={RequestBody}",
-                command, recipient, status, sw.ElapsedMilliseconds, SafeSerializeToElement(request));
+        var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
+        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | Status={StatusCode} Elapsed={Elapsed}ms PayloadSize={PayloadSize}B ResponseSize={ResponseSize}B RequestBody={RequestBody} ResponseBody={ResponseBody}",
+            command, recipient, (int)status, sw.ElapsedMilliseconds, payload.Length, responsePayload.Length, SafeSerializeToElement(request), SafeSerializeToElement(response));
 
         return new CmdResponse<TResponse> { HttpStatusCode = status, Message = status.ToString(), Response = response };
     }
@@ -142,20 +130,13 @@ public sealed class BoltDriver : IMessageBusWrapper
         var command = FriendlyTypeName<TRequest>();
         var sw = Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
-
-        _logger.LogDebug("Bolt RPC >> {Command} -> {Recipient} (query) | PayloadSize={PayloadSize}B RequestBody={RequestBody}",
-            command, recipient, payload.Length, SafeSerializeToElement(request));
-
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
         sw.Stop();
         var response = responsePayload.IsEmpty ? default : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
 
-        _logger.LogDebug("Bolt RPC << {Command} -> {Recipient} (query) | Status={StatusCode} ({StatusInt}) Elapsed={Elapsed}ms ResponseSize={ResponseSize}B ResponseBody={ResponseBody}",
-            command, recipient, status, (int)status, sw.ElapsedMilliseconds, responsePayload.Length, SafeSerializeToElement(response));
-
-        if ((int)status >= 400)
-            _logger.LogWarning("Bolt RPC FAIL {Command} -> {Recipient} (query) | Status={StatusCode} Elapsed={Elapsed}ms RequestBody={RequestBody}",
-                command, recipient, status, sw.ElapsedMilliseconds, SafeSerializeToElement(request));
+        var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
+        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} (query) | Status={StatusCode} Elapsed={Elapsed}ms PayloadSize={PayloadSize}B ResponseSize={ResponseSize}B RequestBody={RequestBody} ResponseBody={ResponseBody}",
+            command, recipient, (int)status, sw.ElapsedMilliseconds, payload.Length, responsePayload.Length, SafeSerializeToElement(request), SafeSerializeToElement(response));
 
         return new QueryResponse<TResponse> { HttpStatusCode = status, Message = status.ToString(), Response = response };
     }
