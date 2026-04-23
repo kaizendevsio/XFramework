@@ -12,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
-// Console: plain text, Warning+ only for framework noise, but show Debug for our code in dev
+// Console: plain text, only startup/lifecycle — everything else goes to Seq only
 builder.Logging.AddZLoggerConsole(options =>
 {
     options.UsePlainTextFormatter(formatter =>
@@ -22,11 +22,11 @@ builder.Logging.AddZLoggerConsole(options =>
     });
 });
 
-// Per-provider console filter: suppress framework noise + Bolt RPC (those go to Seq only)
-builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Microsoft", LogLevel.Warning);
-builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("System", LogLevel.Warning);
-builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("XFramework.Integration.Drivers.BoltDriver", LogLevel.None);
-builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt.Client", LogLevel.None);
+// Console filter: Warning+ baseline, suppress all Bolt/XFramework.Integration noise entirely
+builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>(level => level >= LogLevel.Warning);
+builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Microsoft.Hosting.Lifetime", LogLevel.Information);
+builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("XFramework.Integration", LogLevel.None);
+builder.Logging.AddFilter<ZLogger.Providers.ZLoggerConsoleLoggerProvider>("Bolt", LogLevel.None);
 
 // Seq: Debug+ for everything — full Bolt RPC payloads, request/response bodies
 var seqUrl = builder.Configuration["Seq:Url"] ?? "http://100.75.11.49:5341";
