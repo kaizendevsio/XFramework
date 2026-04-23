@@ -60,8 +60,14 @@ public sealed class BoltDriver : IMessageBusWrapper
     {
         EnrichMetadata(request);
         var commandName = typeof(TRequest).Name;
+        _logger.LogDebug("Bolt >> {Command} -> {Recipient}", commandName, recipient);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, _) = await _client.InvokeAsync(recipient, commandName, payload);
+        sw.Stop();
+        _logger.LogDebug("Bolt << {Command} -> {Recipient} = {Status} ({Elapsed}ms)", commandName, recipient, status, sw.ElapsedMilliseconds);
+        if ((int)status >= 400)
+            _logger.LogWarning("Bolt FAIL {Command} -> {Recipient} = {Status}", commandName, recipient, status);
         return new CmdResponse
         {
             HttpStatusCode = status,
@@ -74,11 +80,17 @@ public sealed class BoltDriver : IMessageBusWrapper
     {
         EnrichMetadata(request);
         var commandName = typeof(TRequest).Name;
+        _logger.LogDebug("Bolt >> {Command}<{Response}> -> {Recipient}", commandName, typeof(TResponse).Name, recipient);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, commandName, payload);
+        sw.Stop();
         var response = responsePayload.IsEmpty
             ? default
             : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
+        _logger.LogDebug("Bolt << {Command}<{Response}> -> {Recipient} = {Status} ({Elapsed}ms, {Size}B)", commandName, typeof(TResponse).Name, recipient, status, sw.ElapsedMilliseconds, responsePayload.Length);
+        if ((int)status >= 400)
+            _logger.LogWarning("Bolt FAIL {Command}<{Response}> -> {Recipient} = {Status}", commandName, typeof(TResponse).Name, recipient, status);
         return new CmdResponse<TResponse>
         {
             HttpStatusCode = status,
@@ -92,11 +104,17 @@ public sealed class BoltDriver : IMessageBusWrapper
     {
         EnrichMetadata(request);
         var commandName = typeof(TRequest).Name;
+        _logger.LogDebug("Bolt >> {Command} -> {Recipient} (query)", commandName, recipient);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, commandName, payload);
+        sw.Stop();
         var response = responsePayload.IsEmpty
             ? default
             : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
+        _logger.LogDebug("Bolt << {Command} -> {Recipient} = {Status} ({Elapsed}ms, {Size}B)", commandName, recipient, status, sw.ElapsedMilliseconds, responsePayload.Length);
+        if ((int)status >= 400)
+            _logger.LogWarning("Bolt FAIL {Command} -> {Recipient} = {Status}", commandName, recipient, status);
         return new QueryResponse<TResponse>
         {
             HttpStatusCode = status,
