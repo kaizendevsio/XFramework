@@ -39,12 +39,18 @@ public static class ServiceCollectionExtensions
         // before the connection is established so no incoming frames are dropped.
         services.AddHostedService<BoltHandlerRegistrationHostedService>();
 
+        // Client ID MUST be SHA256(ClientName) — the source-generated service wrappers
+        // use SHA256(moduleName) as TargetClient for routing. If the service registers
+        // with a different ID, the hub can't route requests to it (404).
+        var clientName = boltConfig.ClientName ?? "unknown";
+        var clientId = Security.Cryptography.ToSha256(clientName);
+
         services.AddBoltClient(builder =>
         {
             builder
                 .WithServer(boltConfig.ServerUrls[0])
-                .WithClientId(boltConfig.ClientGuid?.ToString() ?? Guid.NewGuid().ToString())
-                .WithClientName(boltConfig.ClientName ?? "unknown")
+                .WithClientId(clientId)
+                .WithClientName(clientName)
                 .WithTimeout(boltConfig.RpcTimeoutSeconds);
         });
 
