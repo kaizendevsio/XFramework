@@ -80,7 +80,6 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             using Bolt.Client;
             using XFramework;
             using System.Linq.Expressions;
-            using Serilog;
             using System;
             using System.Net;
             """);
@@ -218,7 +217,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                          {
                              public static void Add{{serviceName}}WrapperServices(this IServiceCollection services)
                              {
-                                 Serilog.Log.Information("Registering {{serviceName}}ServiceWrapper services");
+                                     // Service wrapper registration
                                  services.AddSingleton<I{{serviceName}}ServiceWrapper, {{serviceName}}ServiceWrapper>();
                          """);
         foreach (var model in models)
