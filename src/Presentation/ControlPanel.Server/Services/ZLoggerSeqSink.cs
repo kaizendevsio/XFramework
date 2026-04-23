@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.Json;
 using ZLogger;
 
 namespace ControlPanel.Server.Services;
@@ -7,7 +8,7 @@ namespace ControlPanel.Server.Services;
 /// ZLogger async batching processor that POSTs CLEF (Compact Log Event Format) to Seq's ingestion API.
 /// Non-blocking — buffers log entries and flushes in batches over HTTP.
 /// </summary>
-public sealed class ZLoggerSeqSink : IAsyncDisposable
+public static class ZLoggerSeqSink
 {
     public static void Register(ILoggingBuilder logging, string seqUrl, string? apiKey = null, LogLevel minimumLevel = LogLevel.Debug)
     {
@@ -63,8 +64,9 @@ public sealed class ZLoggerSeqSink : IAsyncDisposable
             utf8Writer.WriteString("@l", entry.LogInfo.LogLevel.ToString());
             utf8Writer.WriteString("@mt", entry.ToString());
 
-            if (entry.LogInfo.Category is { Length: > 0 })
-                utf8Writer.WriteString("SourceContext", entry.LogInfo.Category.ToString());
+            var category = entry.LogInfo.Category.ToString();
+            if (!string.IsNullOrEmpty(category))
+                utf8Writer.WriteString("SourceContext", category);
 
             if (entry.LogInfo.EventId.Id != 0)
                 utf8Writer.WriteNumber("EventId", entry.LogInfo.EventId.Id);

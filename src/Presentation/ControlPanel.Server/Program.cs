@@ -17,7 +17,7 @@ builder.Logging.AddZLoggerConsole(options =>
     {
         formatter.IncludeProperties = IncludeProperties.Timestamp | IncludeProperties.LogLevel | IncludeProperties.Message;
     });
-}, configureEnableAnsiEscape: false);
+});
 builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
 builder.Logging.AddFilter("System", LogLevel.Warning);
 builder.Logging.AddFilter("XFramework.Integration.Drivers.BoltDriver", LogLevel.None); // Console: suppress Bolt RPC noise
