@@ -27,10 +27,7 @@
         <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
         <PackageReference Include="Scrutor" />
         <PackageReference Include="Sentry.Extensions.Logging" />
-        <PackageReference Include="Serilog" />
-        <PackageReference Include="Serilog.Extensions.Logging" />
-        <PackageReference Include="Serilog.Sinks.Async" />
-        <PackageReference Include="Serilog.Sinks.Console" />
+        <!-- Serilog removed — ZLogger is now the logging provider -->
         <PackageReference Include="UnitsNet" />
         <PackageReference Include="Sentry" />
         <PackageReference Include="TypeSupport" />
