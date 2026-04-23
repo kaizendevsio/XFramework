@@ -128,5 +128,16 @@ services:
       bolt-hub:
         condition: service_healthy
 
+  # ── Seq (structured log aggregator) ──────────────────────────
+  seq:
+    image: datalust/seq:2025
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "${SEQ_EXPOSE_PORT:-5341}:80"
+    volumes:
+      - seqdata:/data
+
 volumes:
   pgdata:
+  seqdata:

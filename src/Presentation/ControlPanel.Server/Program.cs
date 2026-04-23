@@ -3,8 +3,28 @@ using XFramework.Integration.Extensions;
 using IdentityServer.Integration.Drivers;
 using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
+using ZLogger;
+using ControlPanel.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Logging — ZLogger: console for lifecycle only, Seq for everything
+builder.Logging.ClearProviders();
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
+builder.Logging.AddZLoggerConsole(options =>
+{
+    options.UseJsonFormatter(formatter =>
+    {
+        formatter.IncludeProperties = IncludeProperties.Timestamp | IncludeProperties.LogLevel | IncludeProperties.Message;
+    });
+}, configureEnableAnsiEscape: false);
+builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+builder.Logging.AddFilter("System", LogLevel.Warning);
+builder.Logging.AddFilter("XFramework.Integration.Drivers.BoltDriver", LogLevel.None); // Console: suppress Bolt RPC noise
+builder.Logging.AddFilter("Bolt.Client", LogLevel.None); // Console: suppress Bolt client noise
+
+var seqUrl = builder.Configuration["Seq:Url"] ?? "http://100.75.11.49:5341";
+ZLoggerSeqSink.Register(builder.Logging, seqUrl, minimumLevel: LogLevel.Debug);
 
 // Blazor Server
 builder.Services.AddRazorComponents()

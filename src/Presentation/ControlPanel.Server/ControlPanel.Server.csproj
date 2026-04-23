@@ -12,6 +12,8 @@
         <!-- BlueprintUI -->
         <PackageReference Include="BlazorBlueprint.Components" />
         <PackageReference Include="BlazorBlueprint.Icons.Lucide" />
+        <!-- Logging -->
+        <PackageReference Include="ZLogger" />
     </ItemGroup>
 
     <ItemGroup>
