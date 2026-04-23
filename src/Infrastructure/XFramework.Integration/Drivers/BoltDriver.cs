@@ -1,7 +1,4 @@
-using System.Diagnostics;
 using System.Net;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Bolt.Client;
 using Bolt.Domain.Shared.Contracts.Requests;
 using MemoryPack;
@@ -58,51 +55,12 @@ public sealed class BoltDriver : IMessageBusWrapper
 
     public Task StartClientEventListener(string topic) => Task.CompletedTask;
 
-    private static readonly JsonSerializerOptions _jsonOpts = new()
-    {
-        WriteIndented = false,
-        MaxDepth = 4,
-        ReferenceHandler = ReferenceHandler.IgnoreCycles,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
-    private static readonly JsonElement EmptyObject = JsonDocument.Parse("{}").RootElement.Clone();
-
-    private static JsonElement SafeSerializeToElement(object? obj)
-    {
-        if (obj is null) return EmptyObject;
-        try
-        {
-            var json = JsonSerializer.SerializeToUtf8Bytes(obj, _jsonOpts);
-            return JsonDocument.Parse(json).RootElement.Clone();
-        }
-        catch { return EmptyObject; }
-    }
-
-    private static string FriendlyTypeName<T>()
-    {
-        var type = typeof(T);
-        if (!type.IsGenericType) return type.Name;
-        var name = type.Name[..type.Name.IndexOf('`')];
-        var args = string.Join(", ", type.GetGenericArguments().Select(a => a.Name));
-        return $"{name}<{args}>";
-    }
-
     public async Task<CmdResponse> SendVoidAsync<TRequest>(TRequest request, string recipient)
         where TRequest : class, IHasRequestServer
     {
         EnrichMetadata(request);
-        var command = FriendlyTypeName<TRequest>();
-        var sw = Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, _) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
-        sw.Stop();
-
-        var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
-        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | {StatusCode} in {Elapsed}ms | Request={Request}",
-            command, recipient, (int)status, sw.ElapsedMilliseconds,
-            SafeSerializeToElement(new { Size = payload.Length, Body = SafeSerializeToElement(request) }));
-
         return new CmdResponse { HttpStatusCode = status, Message = status.ToString() };
     }
 
@@ -110,19 +68,9 @@ public sealed class BoltDriver : IMessageBusWrapper
         where TRequest : class, IHasRequestServer
     {
         EnrichMetadata(request);
-        var command = FriendlyTypeName<TRequest>();
-        var sw = Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
-        sw.Stop();
         var response = responsePayload.IsEmpty ? default : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
-
-        var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
-        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | {StatusCode} in {Elapsed}ms | Request={Request} Response={Response}",
-            command, recipient, (int)status, sw.ElapsedMilliseconds,
-            SafeSerializeToElement(new { Size = payload.Length, Body = SafeSerializeToElement(request) }),
-            SafeSerializeToElement(new { Size = responsePayload.Length, Body = SafeSerializeToElement(response) }));
-
         return new CmdResponse<TResponse> { HttpStatusCode = status, Message = status.ToString(), Response = response };
     }
 
@@ -130,19 +78,9 @@ public sealed class BoltDriver : IMessageBusWrapper
         where TRequest : class, IHasRequestServer
     {
         EnrichMetadata(request);
-        var command = FriendlyTypeName<TRequest>();
-        var sw = Stopwatch.StartNew();
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
-        sw.Stop();
         var response = responsePayload.IsEmpty ? default : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
-
-        var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
-        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} (query) | {StatusCode} in {Elapsed}ms | Request={Request} Response={Response}",
-            command, recipient, (int)status, sw.ElapsedMilliseconds,
-            SafeSerializeToElement(new { Size = payload.Length, Body = SafeSerializeToElement(request) }),
-            SafeSerializeToElement(new { Size = responsePayload.Length, Body = SafeSerializeToElement(response) }));
-
         return new QueryResponse<TResponse> { HttpStatusCode = status, Message = status.ToString(), Response = response };
     }
 

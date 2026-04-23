@@ -336,6 +336,8 @@ public sealed class BoltClient : IAsyncDisposable
         var rpcCall = PooledRpcCall.Rent();
         _pendingCalls[requestId] = rpcCall;
 
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
         try
         {
             var writer = RentedBufferWriter.GetThreadLocal();
@@ -362,7 +364,20 @@ public sealed class BoltClient : IAsyncDisposable
             using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
             rpcCall.RegisterTimeout(timeoutCts.Token);
             var response = await rpcCall.GetTask();
+            sw.Stop();
+
+            var level = (int)response.StatusCode >= 400 ? LogLevel.Warning : LogLevel.Debug;
+            _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | {StatusCode} in {Elapsed}ms | RequestSize={RequestSize}B ResponseSize={ResponseSize}B",
+                commandName, recipientId, (int)response.StatusCode, sw.ElapsedMilliseconds, payload.Length, response.Data.Length);
+
             return (response.StatusCode, response.Data);
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "Bolt RPC {Command} -> {Recipient} | FAILED in {Elapsed}ms | RequestSize={RequestSize}B",
+                commandName, recipientId, sw.ElapsedMilliseconds, payload.Length);
+            throw;
         }
         finally { _pendingCalls.TryRemove(requestId, out _); }
     }
