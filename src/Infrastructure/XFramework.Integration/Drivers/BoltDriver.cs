@@ -99,8 +99,9 @@ public sealed class BoltDriver : IMessageBusWrapper
         sw.Stop();
 
         var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
-        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | {Response.Status} in {Response.Elapsed}ms",
-            command, recipient, (int)status, sw.ElapsedMilliseconds);
+        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | {StatusCode} in {Elapsed}ms | Request={Request}",
+            command, recipient, (int)status, sw.ElapsedMilliseconds,
+            SafeSerializeToElement(new { Size = payload.Length, Body = SafeSerializeToElement(request) }));
 
         return new CmdResponse { HttpStatusCode = status, Message = status.ToString() };
     }
@@ -117,12 +118,10 @@ public sealed class BoltDriver : IMessageBusWrapper
         var response = responsePayload.IsEmpty ? default : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
 
         var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
-        _logger.Log(level,
-            "Bolt RPC {Command} -> {Recipient} | {Response.Status} in {Response.Elapsed}ms | Request={Request} Response={Response}",
-            command, recipient,
-            (int)status, sw.ElapsedMilliseconds,
+        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} | {StatusCode} in {Elapsed}ms | Request={Request} Response={Response}",
+            command, recipient, (int)status, sw.ElapsedMilliseconds,
             SafeSerializeToElement(new { Size = payload.Length, Body = SafeSerializeToElement(request) }),
-            SafeSerializeToElement(new { Status = (int)status, Elapsed = sw.ElapsedMilliseconds, Size = responsePayload.Length, Body = SafeSerializeToElement(response) }));
+            SafeSerializeToElement(new { Size = responsePayload.Length, Body = SafeSerializeToElement(response) }));
 
         return new CmdResponse<TResponse> { HttpStatusCode = status, Message = status.ToString(), Response = response };
     }
@@ -139,12 +138,10 @@ public sealed class BoltDriver : IMessageBusWrapper
         var response = responsePayload.IsEmpty ? default : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
 
         var level = (int)status >= 400 ? LogLevel.Warning : LogLevel.Debug;
-        _logger.Log(level,
-            "Bolt RPC {Command} -> {Recipient} (query) | {Response.Status} in {Response.Elapsed}ms | Request={Request} Response={Response}",
-            command, recipient,
-            (int)status, sw.ElapsedMilliseconds,
+        _logger.Log(level, "Bolt RPC {Command} -> {Recipient} (query) | {StatusCode} in {Elapsed}ms | Request={Request} Response={Response}",
+            command, recipient, (int)status, sw.ElapsedMilliseconds,
             SafeSerializeToElement(new { Size = payload.Length, Body = SafeSerializeToElement(request) }),
-            SafeSerializeToElement(new { Status = (int)status, Elapsed = sw.ElapsedMilliseconds, Size = responsePayload.Length, Body = SafeSerializeToElement(response) }));
+            SafeSerializeToElement(new { Size = responsePayload.Length, Body = SafeSerializeToElement(response) }));
 
         return new QueryResponse<TResponse> { HttpStatusCode = status, Message = status.ToString(), Response = response };
     }
