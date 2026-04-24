@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.Versioning;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using XFramework.Integration.Logging;
@@ -17,6 +19,7 @@ public static class LoggingExtensions
         // Console: plain text, Warning+ baseline
         logging.AddZLoggerConsole(options =>
         {
+            options.IncludeScopes = true;
             options.UsePlainTextFormatter(formatter =>
             {
                 formatter.SetPrefixFormatter($"[{0} {1}] ", (in MessageTemplate template, in LogInfo info) =>
@@ -35,7 +38,13 @@ public static class LoggingExtensions
         {
             var apiKey = configuration["Seq:ApiKey"];
             var appName = configuration["BoltConfiguration:ClientName"] ?? "Unknown";
-            ZLoggerSeqSink.Register(logging, seqUrl, apiKey, LogLevel.Debug, appName);
+            var globalProperties = new Dictionary<string, string>
+            {
+                ["Environment"] = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Unknown",
+                ["MachineName"] = Environment.MachineName,
+                ["RuntimeVersion"] = Assembly.GetEntryAssembly()?.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName ?? "Unknown"
+            };
+            ZLoggerSeqSink.Register(logging, seqUrl, apiKey, LogLevel.Debug, appName, globalProperties);
         }
 
         return logging;
