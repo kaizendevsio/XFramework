@@ -189,7 +189,7 @@ public class IntegrationTestFixture
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
-            ["Serilog:MinimumLevel:Default"] = "Warning",
+            ["Logging:LogLevel:Default"] = "Warning",
         });
 
         // Core services needed by service wrappers.
@@ -256,7 +256,7 @@ public class IntegrationTestFixture
             ["JwtOptions:Secret"] = "Mm1VFHaqZ7MoVJyZd1zrAKxTpsXbYG6RqSMKYG2cV7RBBUdmsm97HOfKyA7MZ1LUl77ZklJPJfnegohyHqJIoQ983fTKmJcY",
             ["JwtOptions:AccessTokenLifespan"] = "00:30:00",
             ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",
-            ["Serilog:MinimumLevel:Default"] = "Warning"
+            ["Logging:LogLevel:Default"] = "Warning"
         });
     }
 

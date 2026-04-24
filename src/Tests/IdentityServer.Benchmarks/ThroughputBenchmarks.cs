@@ -285,7 +285,7 @@ public class ThroughputBenchmarks
             ["JwtOptions:ValidAudience"] = IdentityServerUrl,
             ["JwtOptions:ValidIssuer"] = IdentityServerUrl,
             ["JwtOptions:Secret"] = "Mm1VFHaqZ7MoVJyZd1zrAKxTpsXbYG6RqSMKYG2cV7RBBUdmsm97HOfKyA7MZ1LUl77ZklJPJfnegohyHqJIoQ983fTKmJcY",
-            ["Serilog:MinimumLevel:Default"] = "Error"
+            ["Logging:LogLevel:Default"] = "Error"
         });
     }
 

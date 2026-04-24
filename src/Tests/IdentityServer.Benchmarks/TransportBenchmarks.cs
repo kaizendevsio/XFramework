@@ -386,7 +386,7 @@ public class TransportBenchmarks
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
-            ["Serilog:MinimumLevel:Default"] = "Error",
+            ["Logging:LogLevel:Default"] = "Error",
         });
 
         // NOTE(Task13): Test client uses thin-protocol BoltDriver. IdentityServer still uses
@@ -437,7 +437,7 @@ public class TransportBenchmarks
             ["JwtOptions:Secret"] = "Mm1VFHaqZ7MoVJyZd1zrAKxTpsXbYG6RqSMKYG2cV7RBBUdmsm97HOfKyA7MZ1LUl77ZklJPJfnegohyHqJIoQ983fTKmJcY",
             ["JwtOptions:AccessTokenLifespan"] = "00:30:00",
             ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",
-            ["Serilog:MinimumLevel:Default"] = "Error"
+            ["Logging:LogLevel:Default"] = "Error"
         });
     }
 

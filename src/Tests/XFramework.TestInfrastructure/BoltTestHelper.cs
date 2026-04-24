@@ -28,7 +28,7 @@ public static class BoltTestHelper
             ["BoltConfiguration:ClientGuid"] = "00000000-0000-0000-0000-000000000001",
             ["BoltConfiguration:ClientName"] = "Bolt.Test",
             ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
-            ["Serilog:MinimumLevel:Default"] = "Warning"
+            ["Logging:LogLevel:Default"] = "Warning"
         });
 
         var app = (WebApplication)builder.Build();
@@ -58,7 +58,7 @@ public static class BoltTestHelper
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{streamFlowUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
-            ["Serilog:MinimumLevel:Default"] = "Warning",
+            ["Logging:LogLevel:Default"] = "Warning",
         });
 
         // NOTE(Task13): Test client uses thin-protocol BoltDriver. Service apps still use
@@ -169,7 +169,7 @@ public static class BoltTestHelper
             ["JwtOptions:Secret"] = "Mm1VFHaqZ7MoVJyZd1zrAKxTpsXbYG6RqSMKYG2cV7RBBUdmsm97HOfKyA7MZ1LUl77ZklJPJfnegohyHqJIoQ983fTKmJcY",
             ["JwtOptions:AccessTokenLifespan"] = "00:30:00",
             ["JwtOptions:RefreshTokenLifespan"] = "00:30:00",
-            ["Serilog:MinimumLevel:Default"] = "Warning"
+            ["Logging:LogLevel:Default"] = "Warning"
         });
     }
 }

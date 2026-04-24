@@ -132,7 +132,7 @@ public class WalletsTestFixture
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
             ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
-            ["Serilog:MinimumLevel:Default"] = "Warning",
+            ["Logging:LogLevel:Default"] = "Warning",
         });
 
         // NOTE(Task13): Test client uses thin-protocol BoltDriver. Wallets service still uses
@@ -180,7 +180,7 @@ public class WalletsTestFixture
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
-            ["Serilog:MinimumLevel:Default"] = "Warning"
+            ["Logging:LogLevel:Default"] = "Warning"
         });
     }
 
