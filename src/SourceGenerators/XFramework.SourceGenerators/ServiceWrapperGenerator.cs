@@ -81,8 +81,11 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
             using XFramework;
             using System.Collections.Generic;
             using System.Linq.Expressions;
+            using System.Text.Json;
+            using System.Text.Json.Serialization;
             using System;
             using System.Net;
+            using Microsoft.Extensions.Logging;
             """);
 
         foreach (var ns in namespaces)
@@ -177,16 +180,32 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                   public record {{model}}CrudService : I{{model}}CrudService, IServiceWrapper
                   {
                       private readonly BoltClient _boltClient;
+                      private readonly ILogger _logger;
                       private readonly string _targetClient = "{{serviceId}}";
 
-                      public {{model}}CrudService(BoltClient boltClient)
+                      private static readonly JsonSerializerOptions _jsonOpts = new()
+                      {
+                          WriteIndented = false, MaxDepth = 4,
+                          ReferenceHandler = ReferenceHandler.IgnoreCycles,
+                          DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                      };
+
+                      private static JsonElement ToJson(object? obj)
+                      {
+                          if (obj is null) return default;
+                          try { return JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(obj, _jsonOpts)).RootElement.Clone(); }
+                          catch { return default; }
+                      }
+
+                      public {{model}}CrudService(BoltClient boltClient, ILoggerFactory loggerFactory)
                       {
                           _boltClient = boltClient;
+                          _logger = loggerFactory.CreateLogger("Bolt.Crud.{{model}}");
                       }
 
                       public async Task<CmdResponse<{{model}}>> Create({{model}} entity)
                       {
-                          var result = await ExecuteChange("{{model}}", ChangeOperation.Add, MemoryPack.MemoryPackSerializer.Serialize(entity));
+                          var result = await ExecuteChange("{{model}}", ChangeOperation.Add, MemoryPack.MemoryPackSerializer.Serialize(entity), entity);
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = result.IsSuccess ? HttpStatusCode.OK : (HttpStatusCode)result.StatusCode,
@@ -197,7 +216,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
                       public async Task<CmdResponse<{{model}}>> Patch({{model}} entity)
                       {
-                          var result = await ExecuteChange("{{model}}", ChangeOperation.Update, MemoryPack.MemoryPackSerializer.Serialize(entity));
+                          var result = await ExecuteChange("{{model}}", ChangeOperation.Update, MemoryPack.MemoryPackSerializer.Serialize(entity), entity);
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = result.IsSuccess ? HttpStatusCode.OK : (HttpStatusCode)result.StatusCode,
@@ -208,7 +227,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
                       public async Task<CmdResponse<{{model}}>> Replace({{model}} entity)
                       {
-                          var result = await ExecuteChange("{{model}}", ChangeOperation.Update, MemoryPack.MemoryPackSerializer.Serialize(entity));
+                          var result = await ExecuteChange("{{model}}", ChangeOperation.Update, MemoryPack.MemoryPackSerializer.Serialize(entity), entity);
                           return new CmdResponse<{{model}}>
                           {
                               HttpStatusCode = result.IsSuccess ? HttpStatusCode.OK : (HttpStatusCode)result.StatusCode,
@@ -219,7 +238,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
 
                       public async Task<CmdResponse> Delete({{model}} entity)
                       {
-                          var result = await ExecuteChange("{{model}}", ChangeOperation.Remove, MemoryPack.MemoryPackSerializer.Serialize(entity));
+                          var result = await ExecuteChange("{{model}}", ChangeOperation.Remove, MemoryPack.MemoryPackSerializer.Serialize(entity), entity);
                           return new CmdResponse
                           {
                               HttpStatusCode = result.IsSuccess ? HttpStatusCode.OK : (HttpStatusCode)result.StatusCode,
@@ -242,6 +261,10 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                           };
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
                           var items = data.IsEmpty ? new List<{{model}}>() : MemoryPack.MemoryPackSerializer.Deserialize<List<{{model}}>>(data.Span) ?? new List<{{model}}>();
+
+                          _logger.LogDebug("GetList<{{model}}> | {StatusCode} | Count={Count} Request={Request} Response={Response}",
+                              (int)status, items.Count, ToJson(descriptor), ToJson(new { Items = items.Count }));
+
                           return new QueryResponse<PaginatedResult<{{model}}>>
                           {
                               HttpStatusCode = status,
@@ -262,6 +285,10 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                           };
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
                           var entity = data.IsEmpty ? default : MemoryPack.MemoryPackSerializer.Deserialize<{{model}}>(data.Span);
+
+                          _logger.LogDebug("Get<{{model}}> | {StatusCode} | Found={Found} Request={Request} Response={Response}",
+                              (int)status, entity is not null, ToJson(descriptor), ToJson(entity));
+
                           return new QueryResponse<{{model}}>
                           {
                               HttpStatusCode = status,
@@ -269,7 +296,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                           };
                       }
 
-                      private async Task<DataContextResult> ExecuteChange(string entityType, ChangeOperation op, byte[] serializedEntity)
+                      private async Task<DataContextResult> ExecuteChange(string entityType, ChangeOperation op, byte[] serializedEntity, object? entityForLog = null)
                       {
                           var request = new SaveChangesRequest
                           {
@@ -279,8 +306,15 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               }
                           };
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_changes__", MemoryPack.MemoryPackSerializer.Serialize(request));
-                          if (data.IsEmpty) return DataContextResult.Failure("Empty response", (int)status);
-                          return MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span) ?? DataContextResult.Failure("Deserialize failed");
+                          var result = data.IsEmpty
+                              ? DataContextResult.Failure("Empty response", (int)status)
+                              : MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span) ?? DataContextResult.Failure("Deserialize failed");
+
+                          var level = result.IsSuccess ? LogLevel.Debug : LogLevel.Warning;
+                          _logger.Log(level, "{Operation}<{Entity}> | {StatusCode} | Success={Success} Request={Request}",
+                              op, entityType, result.StatusCode, result.IsSuccess, ToJson(entityForLog));
+
+                          return result;
                       }
                   }
                   """);
@@ -297,7 +331,7 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                          """);
         foreach (var model in models)
         {
-            sb.AppendLine($"        services.AddSingleton<I{model}CrudService>(sp => new {model}CrudService(sp.GetRequiredService<BoltClient>()));");
+            sb.AppendLine($"        services.AddSingleton<I{model}CrudService>(sp => new {model}CrudService(sp.GetRequiredService<BoltClient>(), sp.GetRequiredService<ILoggerFactory>()));");
         }
         sb.AppendLine("    }");
         sb.AppendLine("}");
