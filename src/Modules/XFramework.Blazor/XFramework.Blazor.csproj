@@ -17,7 +17,6 @@
         <PackageReference Include="Microsoft.AspNetCore.Components.Analyzers" />
         <PackageReference Include="MudBlazor" />
         <PackageReference Include="Reshiru.Blazor.IndexedDB.Framework" />
-        <PackageReference Include="Serilog.Sinks.BrowserHttp" />
         <PackageReference Include="TG.Blazor.IndexedDB" />
         <PackageReference Include="PPioli.FluentValidation.Blazor" />
         <PackageReference Include="BlazorDownloadFile" />

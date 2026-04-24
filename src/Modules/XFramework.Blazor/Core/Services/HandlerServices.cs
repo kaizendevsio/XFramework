@@ -1,4 +1,6 @@
-﻿namespace XFramework.Blazor.Core.Services;
+﻿using Microsoft.Extensions.Logging;
+
+namespace XFramework.Blazor.Core.Services;
 
 public record HandlerServices(
     IConfiguration Configuration,
@@ -12,5 +14,6 @@ public record HandlerServices(
     HttpClient BaseHttpClient,
     IJSRuntime JsRuntime,
     IMediator Mediator,
-    ISnackbar Snackbar
+    ISnackbar Snackbar,
+    ILoggerFactory LoggerFactory
     );

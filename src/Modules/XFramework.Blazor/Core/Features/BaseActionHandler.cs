@@ -1,5 +1,5 @@
 using FluentValidation.Results;
-using Serilog;
+using Microsoft.Extensions.Logging;
 using TypeSupport.Extensions;
 using XFramework.Blazor.Core.Features.Address;
 using XFramework.Blazor.Core.Features.Cache;
@@ -25,6 +25,7 @@ public class BaseStateActionHandler
     protected IMediator Mediator { get; set; }
     protected EndPointsModel EndPoints { get; set; }
     protected IStore Store { get; set; }
+    protected ILogger Logger { get; set; } = null!;
     public bool IsSilent { get; set; }
     
     protected ApplicationState ApplicationState => Store.GetState<ApplicationState>();
@@ -43,7 +44,7 @@ public class BaseStateActionHandler
         SweetAlertService.FireAsync("Error", message, SweetAlertIcon.Error);
 
         // Display error to the console
-        Log.Error("Error from response: {Message}", message); 
+        Logger.LogError("Error from response: {Message}", message);
 
         HandleFailureHooks(action);
         
@@ -71,7 +72,7 @@ public class BaseStateActionHandler
         }
 
         // Display error to the console
-        Log.Error("Error from response: {Message}", message); 
+        Logger.LogError("Error from response: {Message}", message);
 
         HandleFailureHooks(action);
         
@@ -114,7 +115,7 @@ public class BaseStateActionHandler
         }
 
         // Display error to the console
-        Log.Error("Error from response: {Message}", response.Message); 
+        Logger.LogError("Error from response: {Message}", response.Message);
         
         HandleFailureHooks(action);
         return true;
@@ -152,7 +153,7 @@ public class BaseStateActionHandler
         }
 
         // Display error to the console
-        Log.Error("Error from response: {Message}", response.Message); 
+        Logger.LogError("Error from response: {Message}", response.Message);
 
         HandleFailureHooks(action);
         return true;
@@ -190,7 +191,7 @@ public class BaseStateActionHandler
         }
 
         // Display error to the console
-        Log.Error("Error from response: {Message}", response.Message); 
+        Logger.LogError("Error from response: {Message}", response.Message);
 
         HandleFailureHooks(action);
         return true;
@@ -369,7 +370,7 @@ public class BaseStateActionHandler
             message: title,
             severity: Severity.Info
         );
-        Log.Information(title);
+        Logger.LogInformation("{Title}", title);
         await Mediator.Send(new ApplicationState.SetState() {IsBusy = isBusy});
     }
     public async Task ReportTaskCompleted()
@@ -402,6 +403,7 @@ public abstract class StateActionHandler<TAction> : BaseStateActionHandler, IReq
         Mediator = handlerServices.Mediator;
         Snackbar = handlerServices.Snackbar;
         Store = store;
+        Logger = handlerServices.LoggerFactory.CreateLogger(GetType());
     }
     public abstract Task Handle(TAction action, CancellationToken aCancellationToken);
 }
@@ -423,6 +425,7 @@ public abstract class EventHandler<TAction> : BaseStateActionHandler, INotificat
         JsRuntime = handlerServices.JsRuntime;
         Mediator = handlerServices.Mediator;
         Store = store;
+        Logger = handlerServices.LoggerFactory.CreateLogger(GetType());
     }
     public abstract Task Handle(TAction action, CancellationToken aCancellationToken);
 
@@ -446,6 +449,7 @@ public abstract class StateActionHandler<TAction, TResponse> : BaseStateActionHa
         Mediator = handlerServices.Mediator;
         Snackbar = handlerServices.Snackbar;
         Store = store;
+        Logger = handlerServices.LoggerFactory.CreateLogger(GetType());
     }
     public abstract Task<TResponse> Handle(TAction action, CancellationToken aCancellationToken);
 }

@@ -1,6 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Logging
 @using FluentValidation
-@using Serilog
 @typeparam TItem
 
 <Skeleton
@@ -44,6 +44,8 @@
 
 @code {
 
+    [Inject] private ILogger<XForm<TItem>> Logger { get; set; } = default!;
+
     private EditForm? EditForm { get; set; }
     private bool IsLoading { get; set; }
 
@@ -75,16 +77,16 @@
 
     protected async Task InternalSubmit()
     {
-        Log.Warning("On InternalSubmit..");
+        Logger.LogWarning("On InternalSubmit..");
         IsLoading = true;
         StateHasChanged();
 
         if (EditContext!.Validate())
         {
-            Log.Warning("EditContext is valid");
+            Logger.LogWarning("EditContext is valid");
             if (OnValidSubmit.HasDelegate)
             {
-                Log.Warning("OnValidSubmit has delegate");
+                Logger.LogWarning("OnValidSubmit has delegate");
                 await OnValidSubmit.InvokeAsync(EditContext)!;
             }
         }
