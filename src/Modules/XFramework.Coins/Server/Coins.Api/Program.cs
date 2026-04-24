@@ -2,8 +2,10 @@ using Coins.Api.Generated;
 using XFramework.Extensions;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
+using XFramework.Integration.Extensions;
 
 var builder = XApplication.Configure<Program>();
+builder.Logging.AddXFrameworkLogging(builder.Configuration);
 
 // Add OpenTelemetry if available
 try
