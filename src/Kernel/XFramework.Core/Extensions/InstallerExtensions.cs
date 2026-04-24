@@ -13,14 +13,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using XFramework.Core.Loggers;
 using XFramework.Core.Middlewares;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Integration.Abstractions;
 using XFramework.Integration.Extensions;
 using XFramework.Integration.Services;
-using Log = Serilog.Log;
 
 namespace XFramework.Core.Extensions;
 
@@ -90,19 +88,6 @@ public static class InstallerExtensions
         services.AddMemoryCache();
         services.AddAntiforgery();
 
-        var seqUrl = configuration["SEQ_URL"];
-        
-        var loggerConfiguration = new LoggerConfiguration()
-            .Enrich.FromLogContext() // This will ensure SourceContext is populated
-            .Enrich.With(new ApplicationEnricher()) // U
-            .WriteTo.Async(a => a.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} RequestId: {RequestId} => {Message:lj}{NewLine}{Exception}"))
-            .WriteTo.Async(a => a.Seq(string.IsNullOrEmpty(seqUrl) 
-                ? "http://localhost:5341"
-                : seqUrl));
-        
-        Log.Logger = loggerConfiguration.CreateLogger();
-        services.AddSingleton(Log.Logger);
-        
         XFrameworkExtensions.LoadMapsterDefaults();
     }
     

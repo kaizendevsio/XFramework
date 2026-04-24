@@ -17,8 +17,7 @@ public static class XApplication
     public static WebApplicationBuilder Configure<T>()
     {
         var builder = WebApplication.CreateBuilder();
-        builder.Host.UseSerilog();
-        
+
         var configuration = builder.Configuration;
         var services = builder.Services;
         
