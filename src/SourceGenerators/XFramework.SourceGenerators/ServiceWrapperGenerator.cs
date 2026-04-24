@@ -262,8 +262,10 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
                           var items = data.IsEmpty ? new List<{{model}}>() : MemoryPack.MemoryPackSerializer.Deserialize<List<{{model}}>>(data.Span) ?? new List<{{model}}>();
 
-                          _logger.LogDebug("GetList<{{model}}> | {StatusCode} | Count={Count} Request={Request} Response={Response}",
-                              (int)status, items.Count, ToJson(descriptor), ToJson(new { Items = items.Count }));
+                          _logger.LogDebug("GetList<{{model}}> | {StatusCode} in {Elapsed}ms | Request={Request} Response={Response}",
+                              (int)status, 0,
+                              ToJson(new { Size = descriptor.Take, Body = descriptor }),
+                              ToJson(new { Status = (int)status, Count = items.Count, Body = items }));
 
                           return new QueryResponse<PaginatedResult<{{model}}>>
                           {
@@ -286,8 +288,10 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_query__", MemoryPack.MemoryPackSerializer.Serialize(descriptor));
                           var entity = data.IsEmpty ? default : MemoryPack.MemoryPackSerializer.Deserialize<{{model}}>(data.Span);
 
-                          _logger.LogDebug("Get<{{model}}> | {StatusCode} | Found={Found} Request={Request} Response={Response}",
-                              (int)status, entity is not null, ToJson(descriptor), ToJson(entity));
+                          _logger.LogDebug("Get<{{model}}> | {StatusCode} | Request={Request} Response={Response}",
+                              (int)status,
+                              ToJson(new { Body = descriptor }),
+                              ToJson(new { Status = (int)status, Found = entity is not null, Body = entity }));
 
                           return new QueryResponse<{{model}}>
                           {
@@ -311,8 +315,10 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               : MemoryPack.MemoryPackSerializer.Deserialize<DataContextResult>(data.Span) ?? DataContextResult.Failure("Deserialize failed");
 
                           var level = result.IsSuccess ? LogLevel.Debug : LogLevel.Warning;
-                          _logger.Log(level, "{Operation}<{Entity}> | {StatusCode} | Success={Success} Request={Request}",
-                              op, entityType, result.StatusCode, result.IsSuccess, ToJson(entityForLog));
+                          _logger.Log(level, "{Operation}<{Entity}> | {StatusCode} | Request={Request} Response={Response}",
+                              op, entityType, result.StatusCode,
+                              ToJson(new { Body = entityForLog }),
+                              ToJson(new { Status = result.StatusCode, Success = result.IsSuccess, Message = result.Message }));
 
                           return result;
                       }
