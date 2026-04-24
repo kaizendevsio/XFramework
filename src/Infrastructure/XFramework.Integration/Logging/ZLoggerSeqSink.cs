@@ -16,7 +16,13 @@ namespace XFramework.Integration.Logging;
 /// </summary>
 public static partial class ZLoggerSeqSink
 {
-    public static void Register(ILoggingBuilder logging, string seqUrl, string? apiKey = null, LogLevel minimumLevel = LogLevel.Debug, string? applicationName = null)
+    public static void Register(
+        ILoggingBuilder logging,
+        string seqUrl,
+        string? apiKey = null,
+        LogLevel minimumLevel = LogLevel.Debug,
+        string? applicationName = null,
+        Dictionary<string, string>? globalProperties = null)
     {
         logging.AddZLoggerLogProcessor(options =>
         {
@@ -24,7 +30,7 @@ public static partial class ZLoggerSeqSink
             if (!string.IsNullOrEmpty(apiKey))
                 httpClient.DefaultRequestHeaders.Add("X-Seq-ApiKey", apiKey);
 
-            return new SeqBatchProcessor(httpClient, minimumLevel, applicationName);
+            return new SeqBatchProcessor(httpClient, minimumLevel, applicationName, globalProperties);
         });
     }
 
@@ -33,6 +39,7 @@ public static partial class ZLoggerSeqSink
         private readonly HttpClient _httpClient;
         private readonly LogLevel _minimumLevel;
         private readonly string? _applicationName;
+        private readonly Dictionary<string, string>? _globalProperties;
         private readonly Channel<string> _channel;
         private readonly Task _flushTask;
         private readonly CancellationTokenSource _cts = new();
@@ -44,11 +51,12 @@ public static partial class ZLoggerSeqSink
         [GeneratedRegex(@"(?:RequestBody|ResponseBody|Request|Response)=\{.*?\}(?=\s|$)", RegexOptions.Compiled)]
         private static partial Regex BodyJsonPattern();
 
-        public SeqBatchProcessor(HttpClient httpClient, LogLevel minimumLevel, string? applicationName = null)
+        public SeqBatchProcessor(HttpClient httpClient, LogLevel minimumLevel, string? applicationName = null, Dictionary<string, string>? globalProperties = null)
         {
             _httpClient = httpClient;
             _minimumLevel = minimumLevel;
             _applicationName = applicationName;
+            _globalProperties = globalProperties;
             _channel = Channel.CreateBounded<string>(new BoundedChannelOptions(10_000)
             {
                 FullMode = BoundedChannelFullMode.DropOldest,
@@ -61,7 +69,7 @@ public static partial class ZLoggerSeqSink
         public void Post(IZLoggerEntry entry)
         {
             if (entry.LogInfo.LogLevel < _minimumLevel) return;
-            var clef = FormatClef(entry, _applicationName);
+            var clef = FormatClef(entry, _applicationName, _globalProperties);
             _channel.Writer.TryWrite(clef);
         }
 
@@ -119,7 +127,7 @@ public static partial class ZLoggerSeqSink
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
         };
 
-        private static string FormatClef(IZLoggerEntry entry, string? applicationName)
+        private static string FormatClef(IZLoggerEntry entry, string? applicationName, Dictionary<string, string>? globalProperties)
         {
             // Extract structured params
             var paramBuffer = new ArrayBufferWriter<byte>(256);
@@ -156,6 +164,27 @@ public static partial class ZLoggerSeqSink
             if (entry.LogInfo.EventId.Id != 0)
                 w.WriteNumber("EventId", entry.LogInfo.EventId.Id);
 
+            // Global properties (lowest precedence -- scopes and params can override)
+            if (globalProperties is not null)
+            {
+                foreach (var kvp in globalProperties)
+                {
+                    if (kvp.Key == "Application") continue; // already written above
+                    w.WriteString(kvp.Key, kvp.Value);
+                }
+            }
+
+            // Scope properties (middle precedence -- params can override)
+            if (entry.LogInfo.ScopeState is { IsEmpty: false } scopeState)
+            {
+                foreach (var kvp in scopeState.Properties)
+                {
+                    if (kvp.Key == "{OriginalFormat}" || kvp.Value is null) continue;
+                    w.WriteString(kvp.Key, kvp.Value.ToString()!);
+                }
+            }
+
+            // Structured template parameters (highest precedence)
             if (paramProps.ValueKind == JsonValueKind.Object)
             {
                 foreach (var prop in paramProps.EnumerateObject())
