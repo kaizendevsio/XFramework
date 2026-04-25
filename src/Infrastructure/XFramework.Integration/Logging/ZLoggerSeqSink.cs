@@ -123,7 +123,7 @@ public static partial class ZLoggerSeqSink
                 content.Headers.ContentType = ClefMediaType;
                 await _httpClient.PostAsync("/api/events/raw?clef", content);
             }
-            catch { /* Seq down -- drop batch, loop will retry next batch */ }
+            catch { /* Seq down — drop batch, loop retries next batch */ }
         }
 
         private static readonly JsonSerializerOptions ParamJsonOptions = new()
