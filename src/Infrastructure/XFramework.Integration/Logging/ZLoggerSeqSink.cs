@@ -68,9 +68,16 @@ public static partial class ZLoggerSeqSink
 
         public void Post(IZLoggerEntry entry)
         {
-            if (entry.LogInfo.LogLevel < _minimumLevel) return;
-            var clef = FormatClef(entry, _applicationName, _globalProperties);
-            _channel.Writer.TryWrite(clef);
+            try
+            {
+                if (entry.LogInfo.LogLevel < _minimumLevel) return;
+                var clef = FormatClef(entry, _applicationName, _globalProperties);
+                _channel.Writer.TryWrite(clef);
+            }
+            catch
+            {
+                // FormatClef can throw on edge-case entries — drop rather than crash the provider
+            }
         }
 
         private async Task FlushLoopAsync()
