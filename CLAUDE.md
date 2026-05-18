@@ -10,6 +10,10 @@ XFramework is a .NET 10 / C# 14 modular enterprise framework using:
 - **Source Generators** — compile-time code generation for endpoints, StreamFlow handlers, and service wrappers
 - **Central Package Management** — all NuGet versions in `Directory.Packages.props`
 
+Documentation uses Compound Engineering paths:
+- `docs/solutions/` — searchable documented solutions, conventions, architecture patterns, tooling decisions, workflow issues, and best practices, organized by category with YAML frontmatter (`module`, `problem_type`, `component`, `severity`, `tags`). Relevant when implementing, debugging, or making decisions in documented areas.
+- `docs/plans/` — implementation plans and historical execution checklists. New plans should be created with `/ce-plan`.
+
 ### Module Structure
 ```
 src/Modules/XFramework.{Module}/
