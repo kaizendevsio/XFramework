@@ -39,8 +39,8 @@ Before beginning migration:
    - Generated code handles CRUD operations
 
 3. **Review Working Example**
-   - Study [`TestProduct.cs`](../../src/Modules/XFramework.Inventario/Inventario.Api/Entities/TestProduct.cs)
-   - Review [`TestProduct.Mappings.cs`](../../src/Modules/XFramework.Inventario/Inventario.Api/Entities/TestProduct.Mappings.cs)
+   - Study [`TestProduct.cs`](../../../src/Modules/XFramework.Inventario/Inventario.Api/Entities/TestProduct.cs)
+   - Review the request DTOs in the same file
 
 ## Migration Levels
 
@@ -692,7 +692,7 @@ If you encounter issues not covered in this guide:
 
 1. Review [VSA Entity Placement Strategy](../architecture-patterns/vsa-entity-placement-strategy.md) for architectural decisions
 2. Check [Auto-Discovery Guide](../tooling-decisions/generated-endpoint-auto-discovery.md) for discovery issues
-3. Examine working example: [`TestProduct.cs`](../../src/Modules/XFramework.Inventario/Inventario.Api/Entities/TestProduct.cs)
+3. Examine working example: [`TestProduct.cs`](../../../src/Modules/XFramework.Inventario/Inventario.Api/Entities/TestProduct.cs)
 4. Enable diagnostic logging and review build output
 5. Consult with Technical Architect
 

@@ -147,7 +147,7 @@ Update `appsettings.json` to include TraceId and SpanId in logs:
 
 ### Activity Sources
 
-XFramework provides domain-specific activity sources in [`ActivitySources.cs`](../../src/Kernel/XFramework.Core/Observability/ActivitySources.cs):
+XFramework provides domain-specific activity sources in [`ActivitySources.cs`](../../../src/Kernel/XFramework.Core/Observability/ActivitySources.cs):
 
 ```csharp
 public static class ActivitySources
@@ -249,7 +249,7 @@ public async Task<Result> IncrementBalanceAsync(IncrementWalletRequest request)
 
 ### Custom Metrics
 
-XFramework provides predefined metrics in [`XFrameworkMetrics.cs`](../../src/Kernel/XFramework.Core/Observability/XFrameworkMetrics.cs):
+XFramework provides predefined metrics in [`XFrameworkMetrics.cs`](../../../src/Kernel/XFramework.Core/Observability/XFrameworkMetrics.cs):
 
 #### Counters (Event Counts)
 
@@ -539,7 +539,7 @@ public class ProductService
 
 ## Related Documentation
 
-- [Structured Logging Standards](../standards/logging-standards.md)
-- [Correlation ID Middleware](../../src/Kernel/XFramework.Core/Middlewares/CorrelationIdMiddleware.cs)
-- [Activity Sources Implementation](../../src/Kernel/XFramework.Core/Observability/ActivitySources.cs)
-- [Metrics Implementation](../../src/Kernel/XFramework.Core/Observability/XFrameworkMetrics.cs)
+- [Structured Logging Standards](../conventions/logging-standards.md)
+- [Correlation ID Middleware](../../../src/Kernel/XFramework.Core/Middlewares/CorrelationIdMiddleware.cs)
+- [Activity Sources Implementation](../../../src/Kernel/XFramework.Core/Observability/ActivitySources.cs)
+- [Metrics Implementation](../../../src/Kernel/XFramework.Core/Observability/XFrameworkMetrics.cs)

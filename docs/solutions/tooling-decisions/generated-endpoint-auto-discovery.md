@@ -643,8 +643,8 @@ app.Run();
 ## Next Steps
 
 - [Migration Guide](../developer-experience/migration-to-auto-discovery.md) - Migrating existing code
-- [Attribute Usage Guide](./attribute-usage-guide.md) - Using `[GenerateEndpoints]`
-- [Troubleshooting](./troubleshooting.md) - Common issues and solutions
+- [Attribute Usage Guide](./generate-endpoints-attribute-usage.md) - Using `[GenerateEndpoints]`
+- [Troubleshooting](#troubleshooting) - Common issues and solutions
 
 ---
 
