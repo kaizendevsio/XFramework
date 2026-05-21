@@ -17,6 +17,8 @@ Use this skill when:
 ## References
 
 - `docs/solutions/conventions/xframework-best-practices.md`
+- `docs/solutions/architecture-patterns/xframework-agent-architecture-surface-map.md`
+- `docs/solutions/conventions/xframework-feature-surface-map.md`
 - Related files in `docs/solutions/`, found by module name, tags, and component.
 
 ## Scope

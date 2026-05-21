@@ -1,5 +1,6 @@
 ﻿# Payment Gateway System
-# Payment Gateway System
+
+> **Status:** Current module README. This file documents the Payments.Core abstractions at a high level; use source code and current `docs/solutions/` conventions for implementation authority.
 
 This module provides abstractions and implementations for various payment gateways with support for cash in (including callback-based flows) and cash out operations.
 

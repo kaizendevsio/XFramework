@@ -1,6 +1,6 @@
 ---
 title: "Migration to Auto-Discovery Guide"
-date: 2026-05-15
+date: 2026-05-21
 category: developer-experience
 module: XFramework.SourceGenerators
 problem_type: developer_experience
@@ -13,7 +13,7 @@ tags: [migration, auto-discovery, source-generators, registration]
 
 # Migration to Auto-Discovery Guide
 
-This guide provides step-by-step instructions for migrating from manual endpoint and service registration to the automatic discovery system.
+This guide provides step-by-step instructions for migrating manual endpoint mapping and eligible service registration to the current generated discovery system. Declaration mechanics live in [GenerateEndpoints Attribute Usage Guide](../tooling-decisions/generate-endpoints-attribute-usage.md); registration mechanics live in [Generated Endpoint Auto-Discovery and Registration](../tooling-decisions/generated-endpoint-auto-discovery.md).
 
 ## Table of Contents
 
@@ -59,12 +59,12 @@ using XFramework.Core.Extensions;
 
 var builder = XApplication.Configure<Program>();
 
-// Single call replaces all manual service registrations
+// Optional: single call replaces eligible generated service registrations
 builder.Services.AddGeneratedServices();
 
 var app = (WebApplication)builder.Build();
 
-// Single call replaces all manual endpoint mappings
+// Single call maps generated endpoint routes
 app.MapGeneratedEndpoints();
 
 app.Run();
@@ -72,11 +72,10 @@ app.Run();
 
 ### Migration Benefits
 
-- ✅ **90% less code** in Program.cs
-- ✅ **Zero maintenance** when adding new entities
-- ✅ **No forgotten registrations** - automatic when attribute is applied
-- ✅ **Consistent patterns** across all entities
-- ✅ **Faster onboarding** for new developers
+- **Less code** in `Program.cs`
+- **No forgotten generated endpoint mappings** when generated sources are present
+- **Consistent patterns** across entity-generated CRUD and attributed manual VSA endpoints
+- **Faster onboarding** for new developers
 
 ### Migration Risks
 
@@ -96,10 +95,12 @@ app.Run();
 
 Ensure you have:
 
-- ✅ XFramework.Core with auto-discovery extensions
-- ✅ All entities using `[GenerateEndpoints]` attribute
-- ✅ Source generators running successfully
-- ✅ Build succeeds without errors
+- XFramework.Core with auto-discovery extensions
+- Entity CRUD types use `[GenerateEndpoints]` where CRUD generation is desired
+- Manual VSA handlers use `[MapPost]`, `[MapGet]`, `[MapPut]`, `[MapPatch]`, or `[MapDelete]`
+- Bolt-callable handlers use `[BoltHandler]` and a first request parameter implementing `IBoltRequest<TRequest, TResponse>`
+- Source generators run successfully
+- Build succeeds without errors
 
 Check generator output:
 ```bash
@@ -166,7 +167,7 @@ Add the auto-discovery extension namespace to `Program.cs`:
 using XFramework.Core.Extensions;
 ```
 
-### Step 3: Replace Service Registrations
+### Step 3: Replace Eligible Service Registrations
 
 **Before:**
 ```csharp
@@ -178,7 +179,7 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 
 **After:**
 ```csharp
-// Replace all with single call
+// Replace eligible generated service registrations with a single call
 builder.Services.AddGeneratedServices();
 ```
 
@@ -214,7 +215,7 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.Decorate<IPaymentService, CachedPaymentService>();
 ```
 
-### Step 5: Replace Endpoint Mappings
+### Step 5: Replace Generated Endpoint Mappings
 
 **Before:**
 ```csharp
@@ -226,7 +227,7 @@ app.MapCustomerEndpoints();
 
 **After:**
 ```csharp
-// Replace all with single call
+// Replace generated endpoint mappings with a single call
 app.MapGeneratedEndpoints();
 ```
 
@@ -268,7 +269,7 @@ using XFramework.Core.Extensions;
 
 var builder = XApplication.Configure<Program>();
 
-// Auto-discover and register all generated services
+// Auto-discover and register eligible generated services
 builder.Services.AddGeneratedServices();
 
 // Add any manually excluded services
@@ -277,7 +278,7 @@ builder.Services.Decorate<IPaymentService, CachedPaymentService>();
 
 var app = (WebApplication)builder.Build();
 
-// Auto-discover and map all generated endpoints
+// Auto-discover and map generated endpoints
 app.MapGeneratedEndpoints();
 
 // Add any manually excluded endpoints
@@ -317,11 +318,11 @@ Look for auto-discovery log messages:
 3. Compare with pre-migration Swagger output
 
 **Checklist:**
-- ✅ All entity endpoints present
-- ✅ HTTP methods correct (GET, POST, PUT, DELETE)
-- ✅ Route paths correct
-- ✅ Authorization requirements shown
-- ✅ No duplicate endpoints
+- All generated entity and attributed manual endpoints are present
+- HTTP methods are correct (GET, POST, PUT, PATCH, DELETE)
+- Route paths are correct
+- Authorization requirements are shown where configured
+- No duplicate endpoints
 
 ### Step 3: Test Endpoints
 
@@ -632,6 +633,6 @@ If you encounter issues during migration:
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: 2025-11-20  
+**Version**: 1.0
+**Last Updated**: 2026-05-21
 **Phase**: 5.4 - Auto-Discovery & Registration

@@ -1,5 +1,8 @@
 # Phase 3: Feature-Centric VSA Migration Journal
 
+> **Status:** Historical migration journal. This file records VSA migration progress and decisions from that phase; it is not current implementation guidance.
+> **Current guidance:** Use `docs/solutions/conventions/xframework-vsa-agent-playbook.md`, `docs/solutions/conventions/xframework-best-practices.md`, and `docs/solutions/conventions/xframework-feature-surface-map.md` for active VSA work.
+
 > **Started:** 2025-11-26
 > **Status:** 🔄 In Progress
 > **Overall Target:** Migrate all modules to Feature-Centric Vertical Slice Architecture
@@ -654,5 +657,5 @@ Before marking any milestone complete:
 
 - [XFramework Development Roadmap](XFramework-Development-Roadmap.md)
 - [XFramework Improvement Plan](XFramework-Improvement-Plan.md)
-- [VSA Migration Guide](docs/migration/vsa-entity-migration-guide.md)
+- [VSA Migration Guide](docs/solutions/conventions/vsa-entity-migration-guide.md)
 - [Inventario Reference Implementation](src/Modules/XFramework.Inventario/Inventario.Api/Features/)

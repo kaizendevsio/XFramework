@@ -14,8 +14,8 @@ tags: [datacontext, remote-query, bolt, service-wrapper, source-generators]
 # DB Proxy Decentralization: Per-Service Data Context
 
 **Date:** 2026-04-22
-**Status:** Draft
-**Scope:** Move query execution from the centralized Bolt Hub into individual services, so each service owns its data. `IDataContext` works identically regardless of runtime environment (Blazor Server, WASM, MAUI, etc.) — the remote implementation calls the owning service through generated service wrappers.
+**Status:** Current architecture with historical design notes. The implemented code now has a functional `RemoteDataContext`, generated service-wrapper routing, and generated change-tracker support. Sections that say "new" or show proposed generator names should be read as design history unless they match current source.
+**Scope:** Route query execution and data-context saves through individual owning services, so each service owns its data. `IDataContext` works identically at the interface level regardless of runtime environment (Blazor Server, WASM, MAUI, etc.) because the remote implementation calls the owning service through generated service wrappers.
 
 ## Goal
 
@@ -155,7 +155,7 @@ public static class DataContextRouting
 }
 ```
 
-`RemoteDataContext` reads this map at construction (injected or static) to resolve the correct service wrapper per entity type.
+Current implementation note: `RemoteDataContext.GetServiceWrapperMap()` resolves source-generated `XFramework.Core.DataContext.DataContextEntityRegistrations.GetDataContextServiceWrapperMap()` at runtime. The map returns entity type name to service wrapper type name, and `RemoteDataContext.ResolveWrapperType()` resolves the wrapper type from loaded assemblies.
 
 ## Service Wrapper Extensions (Source Generator)
 
@@ -179,24 +179,21 @@ The implementation delegates to `SendAsync` / `SendVoidAsync` with well-known co
 - `__db_changes__` → `ExecuteChangesAsync`
 - `__db_query_stream__` → `ExecuteQueryStreamAsync` (uses BoltStream)
 
-## RemoteDataContext (Rewrite)
+## RemoteDataContext
 
-Currently: every method throws `NotImplementedException`.
-
-After: fully functional, routes through service wrappers.
+Current implementation routes queries and changes through generated service wrappers.
 
 ```csharp
 public class RemoteDataContext : IDataContext
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly IReadOnlyDictionary<string, string> _entityServiceMap;
     private readonly RequestMetadata _metadata;
     private readonly List<TrackedEntity> _trackedEntities = [];
     private readonly List<ChangeEntry> _pendingChanges = [];
 
     public IRemoteQuery<T> Query<T>() where T : class
     {
-        return new RemoteQuery<T>(_serviceProvider, _entityServiceMap, _metadata, _trackedEntities);
+        return new RemoteQuery<T>(_serviceProvider, _trackedEntities, _metadata);
     }
 
     public void Add<T>(T entity) where T : class
@@ -211,9 +208,8 @@ public class RemoteDataContext : IDataContext
 
     public void Update<T>(T entity) where T : class
     {
-        // Source-generated tracker computes field-level diff
+        // Source-generated tracker computes field-level diff when available.
         var tracker = ChangeTrackerRegistry.GetTracker<T>();
-        var snapshot = _trackedEntities.FindSnapshot(entity);
         var diff = tracker.Diff(entity, snapshot);
 
         _pendingChanges.Add(new ChangeEntry
@@ -240,7 +236,7 @@ public class RemoteDataContext : IDataContext
 
         // Validate all changes target one service
         var services = _pendingChanges
-            .Select(c => _entityServiceMap[c.EntityTypeName])
+            .Select(c => serviceWrapperMap[c.EntityTypeName])
             .Distinct()
             .ToList();
 
@@ -263,11 +259,9 @@ public class RemoteDataContext : IDataContext
 }
 ```
 
-## RemoteQuery (Terminal Methods Rewrite)
+## RemoteQuery
 
-Currently: builder methods work (build `QueryDescriptor`), all terminals throw.
-
-After: terminals call the service wrapper.
+Current terminal methods call the generated service wrapper instead of executing EF locally.
 
 ```csharp
 public class RemoteQuery<T> : IRemoteQuery<T> where T : class

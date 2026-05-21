@@ -1,5 +1,8 @@
 # XFramework Development Roadmap
 
+> **Status:** Historical roadmap snapshot. It records completed and planned modernization phases at the time it was written; it is not current implementation authority.
+> **Current guidance:** Use `docs/README.md` and `docs/solutions/README.md` first. Current implementation conventions live in `docs/solutions/conventions/xframework-best-practices.md` and related subsystem docs.
+
 > **Last Updated:** 2025-12-03
 > **Status:** ✅ Phase 4 Performance Optimization COMPLETE
 
@@ -64,8 +67,8 @@ This roadmap outlines the phased approach to modernizing the XFramework codebase
 - [x] Define logging standards documentation
 
 **Locations:**
-- [`src/Kernel/XFramework.Core/Loggers/LoggerExtensions.cs`](src/Kernel/XFramework.Core/Loggers/LoggerExtensions.cs)
-- [`docs/standards/logging-standards.md`](docs/standards/logging-standards.md)
+- Historical logger extension path: `src/Kernel/XFramework.Core/Loggers/LoggerExtensions.cs` (removed). Current logging guidance lives in [`docs/solutions/conventions/logging-standards.md`](docs/solutions/conventions/logging-standards.md) and current infrastructure code starts at [`src/Infrastructure/XFramework.Integration/Extensions/LoggingExtensions.cs`](src/Infrastructure/XFramework.Integration/Extensions/LoggingExtensions.cs).
+- [`docs/solutions/conventions/logging-standards.md`](docs/solutions/conventions/logging-standards.md)
 
 ### Source Generators
 - [x] Implement `EntityEndpointGenerator` for auto-generating REST endpoints
@@ -297,10 +300,10 @@ Features/
 - [ ] Delete commented-out source generator attributes after migration
 
 **Documentation Locations:**
-- [`docs/migration/vsa-entity-migration-guide.md`](docs/migration/vsa-entity-migration-guide.md)
-- [`docs/standards/logging-standards.md`](docs/standards/logging-standards.md)
-- [`docs/observability/opentelemetry-guide.md`](docs/observability/opentelemetry-guide.md)
-- [`docs/source-generators/`](docs/source-generators/)
+- [`docs/solutions/conventions/vsa-entity-migration-guide.md`](docs/solutions/conventions/vsa-entity-migration-guide.md)
+- [`docs/solutions/conventions/logging-standards.md`](docs/solutions/conventions/logging-standards.md)
+- [`docs/solutions/tooling-decisions/opentelemetry-integration-guide.md`](docs/solutions/tooling-decisions/opentelemetry-integration-guide.md)
+- [`docs/solutions/tooling-decisions/`](docs/solutions/tooling-decisions/)
 
 ---
 
@@ -402,8 +405,8 @@ When migrating a module, follow this pattern from [`src/Modules/XFramework.Inven
 ## References
 
 - [XFramework Improvement Plan](XFramework-Improvement-Plan.md)
-- [AI Development Guide](AI-DEVELOPMENT-GUIDE.md)
-- [VSA Migration Guide](docs/migration/vsa-entity-migration-guide.md)
-- [Logging Standards](docs/standards/logging-standards.md)
-- [OpenTelemetry Guide](docs/observability/opentelemetry-guide.md)
+- [AI Development Guide](docs/solutions/conventions/xframework-vsa-agent-playbook.md)
+- [VSA Migration Guide](docs/solutions/conventions/vsa-entity-migration-guide.md)
+- [Logging Standards](docs/solutions/conventions/logging-standards.md)
+- [OpenTelemetry Guide](docs/solutions/tooling-decisions/opentelemetry-integration-guide.md)
 - **Reference Implementation:** [`src/Modules/XFramework.Inventario/Inventario.Api/Features/Products/`](src/Modules/XFramework.Inventario/Inventario.Api/Features/Products/)

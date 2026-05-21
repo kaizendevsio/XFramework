@@ -1,6 +1,6 @@
 ---
 title: "Generated Endpoint Auto-Discovery and Registration"
-date: 2026-05-15
+date: 2026-05-21
 category: tooling-decisions
 module: XFramework.SourceGenerators
 problem_type: tooling_decision
@@ -13,7 +13,7 @@ tags: [source-generators, auto-discovery, registration, endpoints, services]
 
 # Auto-Discovery & Registration Guide
 
-This guide explains how to use the automatic discovery and registration system for generated endpoints and services in XFramework, eliminating the need for manual registration in `Program.cs`.
+This guide owns generated endpoint and service registration mechanics in XFramework: `MapGeneratedEndpoints()`, `MapEndpoint<TEndpoint>()`, `AddGeneratedServices()`, and discovery opt-outs. Entity declaration options live in [GenerateEndpoints Attribute Usage Guide](./generate-endpoints-attribute-usage.md). Cache key, invalidation, and runtime cache behavior live in [XFramework Caching Strategy](../best-practices/xframework-caching-strategy.md).
 
 ## Table of Contents
 
@@ -60,16 +60,16 @@ app.Run();
 
 ### The Solution
 
-With auto-discovery, a single call replaces all manual registrations:
+With auto-discovery, a single call maps generated endpoint routes:
 
 ```csharp
 // Program.cs - After
-var app = builder.Build();
-
-// Auto-discover and register ALL services
+// Auto-discover and register generated services where the module uses service discovery
 builder.Services.AddGeneratedServices();
 
-// Auto-discover and map ALL endpoints
+var app = builder.Build();
+
+// Auto-discover and map generated endpoints
 app.MapGeneratedEndpoints();
 
 app.Run();
@@ -77,7 +77,7 @@ app.Run();
 
 **Benefits:**
 - Zero manual registrations needed
-- Automatic when you add `[GenerateEndpoints]` attribute
+- Automatic when generated endpoint classes are present from `[GenerateEndpoints]` entities or `[Map*]` feature handlers
 - Clean, maintainable `Program.cs`
 - <100ms startup overhead
 - Opt-out available when needed
@@ -142,6 +142,13 @@ The `MapGeneratedEndpoints()` method:
 4. **Invokes Methods**: Calls each method via reflection to register endpoints
 5. **Caches Results**: Stores discovered types for subsequent calls
 
+Current module `Program.cs` files typically call `app.MapGeneratedEndpoints()` after middleware and health/documentation mapping. Some modules also keep explicit manual mappings for endpoints with custom parameter binding or custom `IResult` flows.
+
+Representative current modules:
+- `src/Modules/XFramework.IdentityServer/IdentityServer.Api/Program.cs`
+- `src/Modules/XFramework.Wallets/Wallets.Api/Program.cs`
+- `src/Modules/XFramework.Messaging/Messaging.Api/Program.cs`
+
 ### Basic Usage
 
 ```csharp
@@ -184,6 +191,10 @@ Auto-discovery finds classes matching these criteria:
 - Method returns `IEndpointRouteBuilder`
 - Not marked with `[ExcludeFromAutoDiscovery]`
 
+Generated sources that feed this discovery include:
+- `GeneratedEndpointRoutes.g.cs` from method-level `[MapPost]`, `[MapGet]`, `[MapPut]`, `[MapPatch]`, and `[MapDelete]` attributes in `BoltHandlerGenerator`
+- `{Entity}Endpoints.g.cs` from entity-level `[GenerateEndpoints]` in `EntityEndpointGenerator`
+
 ❌ **Excluded:**
 - Abstract classes
 - Interfaces
@@ -209,6 +220,8 @@ public static class ProductEndpoints
 ```
 
 ## Service Auto-Discovery
+
+Service discovery is available, but not every module relies on it for every service. Current modules commonly register custom services explicitly and use generated wrappers where cross-module integration needs them. Keep manual registrations when a service has custom lifetime, decorators, conditional setup, or module-specific initialization.
 
 ### How It Works
 
@@ -417,6 +430,8 @@ ServiceDiscoveryExtensions.ClearServiceCache();
 2. **Avoid Overly Broad Filters**: Narrows scan scope
 3. **Monitor Logs**: Check startup time in logs
 4. **Cache Warmup**: Discovery happens once at startup
+
+This section describes reflection-discovery caching only. Do not use it as guidance for entity response caching; use [XFramework Caching Strategy](../best-practices/xframework-caching-strategy.md) for cache semantics.
 
 ## Troubleshooting
 
@@ -634,8 +649,8 @@ var app = builder.Build();
 app.MapProductEndpoints(); // Old way
 app.MapOrderEndpoints();   // Old way
 
-// Add auto-discovery for new entities
-app.MapGeneratedEndpoints(); // New way
+// Add auto-discovery for generated endpoints
+app.MapGeneratedEndpoints(); // Current generated registration
 
 app.Run();
 ```
@@ -648,6 +663,6 @@ app.Run();
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: 2025-11-20  
+**Version**: 1.0
+**Last Updated**: 2026-05-21
 **Phase**: 5.4 - Auto-Discovery & Registration

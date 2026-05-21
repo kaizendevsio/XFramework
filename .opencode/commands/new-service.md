@@ -9,7 +9,7 @@ Create or refactor an XFramework service following VSA service-layer standards.
 
 Arguments: `$ARGUMENTS` should specify the module and service purpose, such as `Wallets WalletService` or `IdentityServer AuthService`.
 
-Use `docs/solutions/conventions/xframework-best-practices.md` sections 5, 6, 8, 9, and 10. Use `src/Modules/XFramework.Inventario/Inventario.Api/Services/ProductService.cs` as a reference if it exists.
+Use `docs/solutions/conventions/xframework-best-practices.md` sections 5, 6, 8, 9, and 10. For data access and caching details, use `docs/solutions/conventions/ef-core-data-access-patterns.md` and `docs/solutions/best-practices/xframework-caching-strategy.md`. Use `src/Modules/XFramework.Inventario/Inventario.Api/Services/ProductService.cs` as a reference if it exists.
 
 Rules:
 - Prefer primary constructors for DI.

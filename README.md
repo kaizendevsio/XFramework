@@ -135,20 +135,20 @@ src/Modules/XFramework.{Module}/
 - **.NET 10 / C# 14** with Vertical Slice Architecture (VSA)
 - **Bolt Protocol** — custom binary RPC + streaming over WebSocket
 - **MemoryPack** — zero-allocation binary serialization for payloads
-- **Source Generators** — compile-time code generation for endpoints, handlers, and service wrappers
+- **Source Generators** - compile-time code generation for endpoints, Bolt handlers, and service wrappers
 - **Entity Framework Core** with PostgreSQL
 - **FluentValidation** — auto-discovered validators
 - **Mapster** — compile-time object mapping
 - **Testcontainers** — integration tests with real PostgreSQL
 
-### Dual Transport
+### Generated Endpoint Registration
 
-Every endpoint supports two transports from a single method:
+Feature endpoints use source-generated registration from a single handler method:
 
 ```csharp
 public static class HealthCheckEndpoint
 {
-    [StreamFlowHandler]                              // Generates Bolt handler
+    [BoltHandler]                                    // Generates Bolt handler
     [MapPost("/api/health/check", Tags = ["Health"])] // Generates REST endpoint
     public static Task<Result<HealthCheckResponse>> Handle(
         HealthCheckRequest request, CancellationToken ct)
@@ -167,7 +167,7 @@ public static class HealthCheckEndpoint
 | **Messaging** | Message delivery, templates, contacts |
 | **Community** | Social features, connections, content |
 | **Inventario** | Product/inventory management |
-| **StreamFlow** | Bolt protocol hub + message routing |
+| **Bolt Hub** | Bolt protocol hub + message routing |
 
 ## Getting Started
 
@@ -176,6 +176,13 @@ git clone https://github.com/kaizendevsio/XFramework.git
 cd XFramework
 dotnet build XFramework.slnx
 ```
+
+## Documentation And Agent Guidance
+
+- Start with [`docs/README.md`](docs/README.md) for the repository documentation map.
+- Use [`docs/solutions/README.md`](docs/solutions/README.md) for the current solution knowledgebase.
+- For agent-oriented coding guidance, use [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md); they route to current VSA, Bolt, source-generator, data-access, caching, logging, and testing docs.
+- Historical root markdown and old plan files are project memory only unless a current `docs/solutions/` document points to them for context.
 
 ### Running Tests
 

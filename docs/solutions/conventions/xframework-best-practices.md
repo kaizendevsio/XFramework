@@ -1,6 +1,6 @@
 ---
 title: "XFramework Best Practices and Standards"
-date: 2026-03-12
+date: 2026-05-21
 category: conventions
 module: XFramework
 problem_type: convention
@@ -14,7 +14,7 @@ tags: [vsa, standards, conventions, endpoints, services, testing]
 # XFramework Best Practices & Standards
 
 > **Version:** 2.0
-> **Last Updated:** 2026-03-12
+> **Last Updated:** 2026-05-21
 > **Target:** .NET 10 / C# 14
 > **Architecture:** Feature-Centric Vertical Slice Architecture (VSA)
 > **Purpose:** Canonical reference for all code written in the XFramework codebase. Every new feature, refactor, and code review should be evaluated against this document.
@@ -186,7 +186,7 @@ global using FluentValidation;
 
 ### 3.3 .NET 10 Specific
 
-- **Use `Microsoft.Extensions.Caching.Hybrid.HybridCache`** — .NET 10 ships a built-in `HybridCache` that replaces the need for custom L1+L2 implementations. Evaluate migrating `HybridCacheService` to use the framework-provided one, which handles stampede protection, serialization, and tag-based invalidation natively.
+- **Know the current cache implementation** - XFramework currently uses the custom `HybridCacheService` for L1 memory + optional L2 Redis caching. .NET 10 also ships `Microsoft.Extensions.Caching.Hybrid.HybridCache`; evaluate it before future refactors, but do not document it as already adopted.
 - **Use built-in OpenAPI** — .NET 10 supports `Microsoft.AspNetCore.OpenApi` natively. Consider replacing Swashbuckle with the built-in OpenAPI document generation.
 - **Use `TypedResults`** consistently — .NET 10 Minimal APIs have full `TypedResults` support with improved OpenAPI metadata inference.
 - **EF Core 10** — Leverage compiled queries for hot paths, improved `ExecuteUpdateAsync` / `ExecuteDeleteAsync` for bulk operations, and improved LINQ translation.
@@ -198,30 +198,16 @@ global using FluentValidation;
 
 ### 4.1 Endpoint Structure
 
-Every endpoint follows this template:
+Most manual VSA endpoints use source-generator attributes. `BoltHandlerGenerator` emits the Minimal API adapter from `[MapPost]`, `[MapGet]`, `[MapPut]`, `[MapPatch]`, or `[MapDelete]`; it emits a Bolt `IBoltHandler` when `[BoltHandler]` is also present.
 
 ```csharp
 namespace Module.Api.Features.Entity.Create;
 
 public static class CreateEntityEndpoint
 {
-    public record Request
-    {
-        public required string Name { get; init; }
-    }
-
-    public static void MapCreateEntity(this IEndpointRouteBuilder app)
-    {
-        app.MapPost("/api/entities", Handle)
-            .WithName("CreateEntity")
-            .WithTags("Entities")
-            .WithDescription("Creates a new entity")
-            .Produces<EntityResponse>(StatusCodes.Status201Created)
-            .ProducesValidationProblem()
-            .ProducesProblem(StatusCodes.Status500InternalServerError);
-    }
-
-    private static async Task<Results<Created<EntityResponse>, ValidationProblem, ProblemHttpResult>> Handle(
+    [MapPost("/api/entities", Tags = ["Entities"], Summary = "Create entity")]
+    [BoltHandler]
+    public static async Task<Result<EntityResponse>> Handle(
         Request request,
         IValidator<Request> validator,
         EntityService service,
@@ -229,50 +215,45 @@ public static class CreateEntityEndpoint
     {
         var validation = await validator.ValidateAsync(request, ct);
         if (!validation.IsValid)
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return Result<EntityResponse>.Failure(validation.ToString());
 
-        var result = await service.CreateAsync(request, ct);
-
-        return result switch
-        {
-            { IsSuccess: true } => TypedResults.Created($"/api/entities/{result.Data!.Id}", EntityResponse.From(result.Data!)),
-            _ => TypedResults.Problem(detail: result.Message, statusCode: result.StatusCode)
-        };
+        return await service.CreateAsync(request, ct);
     }
 }
+
+public sealed record Request(string Name) : IBoltRequest<Request, Result<EntityResponse>>;
 ```
 
 ### 4.2 Endpoint Rules
 
 - **Always use `CancellationToken ct`** as the last parameter — honor client disconnection.
 - **Always validate before calling the service.** Validation is the endpoint's responsibility.
-- **Return `TypedResults`**, never `Results.` or anonymous objects — this enables OpenAPI schema generation.
-- **Use `Results<T1, T2, ...>` union return type** to declare all possible outcomes.
-- **Map service `Result<T>` to HTTP via pattern matching** — don't re-throw exceptions as HTTP responses.
+- **Return `Result<T>` from generated handlers.** The generated REST adapter converts successful and failed results to HTTP responses.
+- **Use `TypedResults` and `Results<T1, T2, ...>` only for manual endpoints that are not generated from `[Map*]` attributes.**
+- **Map service `Result<T>` to HTTP via pattern matching in manual endpoints.** Generated `[Map*]` handlers return `Result<T>` and let the generated adapter translate it.
 - **Keep handlers thin.** The handler validates, calls the service, maps the result. No business logic in endpoints.
 - **Use `WithDescription()` over `WithOpenApi()`** when you only need summary/description — simpler API.
 - **Use route constraints** for type safety: `/api/products/{id:guid}`, `/api/orders/{page:int}`.
 - **Pagination defaults:** page=1, pageSize=20, maxPageSize=100. These should be configurable per endpoint.
+- **Use `[BoltHandler]` only when the first parameter implements `IBoltRequest<TRequest, TResponse>`.** Without that contract the Bolt handler is not generated.
 
-### 4.3 Aggregator Pattern
+### 4.3 Registration Pattern
 
 ```csharp
-public static class ProductEndpoints
-{
-    public static IEndpointRouteBuilder MapProductEndpoints(this IEndpointRouteBuilder app)
-    {
-        app.MapCreateProduct();
-        app.MapGetProduct();
-        app.MapGetProductList();
-        app.MapUpdateProduct();
-        app.MapDeleteProduct();
-        return app;
-    }
-}
+// Program.cs in an API module
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+var app = (WebApplication)builder.Build();
+app.MapGeneratedEndpoints();
+
+// Keep explicit manual mappings when route/header binding or custom IResult output is required.
+GetWalletEndpoint.Map(app);
 ```
 
-- One aggregator per feature group, registered in `Program.cs` with a single call.
-- Aggregators **must not contain logic** — they are pure wiring.
+- `GeneratedEndpointRoutes.g.cs` is created from attributed feature handlers.
+- `EndpointDiscoveryExtensions.MapGeneratedEndpoints()` discovers generated endpoint classes whose names end with `Endpoints`.
+- Entity-generated CRUD endpoints are generated from `[GenerateEndpoints]`; manual VSA endpoints are generated from method-level `[Map*]` attributes.
+- See `docs/solutions/tooling-decisions/generated-endpoint-auto-discovery.md` for registration mechanics and `docs/solutions/tooling-decisions/generate-endpoints-attribute-usage.md` for entity-generated CRUD options.
 
 ---
 
@@ -401,15 +382,18 @@ public class CreateProductValidator : AbstractValidator<CreateProductRequest>
 
 ## 8. Data Access (EF Core)
 
+Detailed authority: [`ef-core-data-access-patterns.md`](ef-core-data-access-patterns.md). Keep this section as the short checklist; use the dedicated guide for `AppDbContext` discovery, module configuration placement, migrations, tests, and local/remote `IDataContext` behavior.
+
 ### 8.1 Global Defaults
 
-These are set in `XDbContext` and `DbInstaller.cs` and apply automatically:
+These are set in `XDbContext`, module `DbInstaller.cs` files, and `AuditInterceptor` and apply automatically:
 
-- `QueryTrackingBehavior.NoTracking` — all queries are read-only by default
-- `QuerySplittingBehavior.SplitQuery` — avoids cartesian explosion with joins
-- Global query filter: `ISoftDeletable` → excludes `IsDeleted == true`
-- Global query filter: `IHasTenantId` → filters by current tenant
-- `AuditInterceptor` → auto-populates `CreatedAt`, `ModifiedAt`, `DeletedAt`, `TenantId`
+- `QueryTrackingBehavior.NoTracking` - all queries are read-only by default
+- `QuerySplittingBehavior.SplitQuery` - avoids cartesian explosion with joins
+- Global query filter: `ISoftDeletable` -> excludes `IsDeleted == true`
+- Global query filter: `IHasTenantId` -> filters by current tenant
+- `AuditInterceptor` -> auto-populates `CreatedAt` and `ModifiedAt`
+- `XDbContext.OnBeforeSaveChanges()` -> handles soft-delete conversion, default values, and tenant validation
 
 ### 8.2 Query Rules
 
@@ -471,6 +455,8 @@ Tenant isolation is enforced at the DbContext level via global query filter on `
 
 ## 9. Caching
 
+Detailed authority: [`../best-practices/xframework-caching-strategy.md`](../best-practices/xframework-caching-strategy.md). Keep cache-key, invalidation, Redis, client-cache, and generated endpoint cache metadata details there.
+
 ### 9.1 Strategy
 
 The framework uses a hybrid caching approach:
@@ -499,6 +485,8 @@ The framework uses a hybrid caching approach:
 ---
 
 ## 10. Observability
+
+Current logging pipeline: ZLogger through `AddXFrameworkLogging()`, with optional Seq output. OpenTelemetry tracing and metrics are configured by `InstallOpenTelemetry()`. Historical Serilog references are migration context only.
 
 ### 10.1 Structured Logging
 
@@ -678,8 +666,8 @@ XApplication.Configure<Program>()
 ### 15.4 Serialization
 
 - Use `System.Text.Json` with cached `JsonSerializerOptions` (do not create new options per call)
-- Use `MemoryPack` for high-throughput internal serialization (SignalR, inter-service)
-- Use `MessagePack` for SignalR hub protocol
+- Use `MemoryPack` for high-throughput internal serialization with Bolt and inter-service payloads
+- Use Bolt for new module RPC/streaming; SignalR references are historical or comparative only
 
 ---
 
@@ -745,6 +733,6 @@ public record ProductResponse(Guid Id, string Name, decimal Price, string? Descr
 | Primary constructors over field injection | Less boilerplate, clearer dependencies, C# 14 idiomatic |
 | HybridCache (L1+L2) over single-tier | Latency optimization (in-process) + consistency (distributed) |
 | Global EF query filters over per-query | Eliminates entire class of bugs (forgotten tenant filter, forgotten soft-delete check) |
-| Serilog over built-in logging | Structured logging, sinks ecosystem, enrichers |
+| ZLogger over Serilog | Single Microsoft.Extensions.Logging pipeline, ZLogger console/Seq providers, scope support, and no competing logger factory |
 | PostgreSQL as primary DB | OSS, JSONB support, Npgsql performance, industry standard |
 | Central Package Management | Single source of truth for NuGet versions across monorepo |

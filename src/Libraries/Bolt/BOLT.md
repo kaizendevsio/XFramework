@@ -137,6 +137,27 @@ SignalR also collapses under high concurrent load (5,129 us at 64 concurrent vs 
 
 ## Features
 
+### XFramework Generated Handlers
+
+XFramework API modules normally expose Bolt-callable feature handlers through source generation rather than manual `RegisterHandler` calls. Put `[BoltHandler]` on a static VSA handler whose first parameter implements `IBoltRequest<TRequest, TResponse>`. If the same method also has `[MapPost]`, `[MapGet]`, `[MapPut]`, `[MapPatch]`, or `[MapDelete]`, `BoltHandlerGenerator` emits both the Bolt `IBoltHandler` and the Minimal API adapter. Module `Program.cs` maps generated REST routes with `app.MapGeneratedEndpoints()`; Bolt handler registration is discovered at startup by the XFramework integration hosted service.
+
+```csharp
+public sealed record AuthenticateIdentityRequest(string Email, string Password) :
+    IBoltRequest<AuthenticateIdentityRequest, Result<AuthenticateIdentityResponse>>;
+
+public static class AuthenticateEndpoint
+{
+    [MapPost("/api/auth/authenticate", Tags = ["Auth"])]
+    [BoltHandler]
+    public static Task<Result<AuthenticateIdentityResponse>> Handle(
+        AuthenticateIdentityRequest request,
+        IAuthService authService,
+        CancellationToken ct) => authService.AuthenticateAsync(request, ct);
+}
+```
+
+Use manual `BoltServer.RegisterHandler` only for low-level protocol tests, direct-mode samples, or infrastructure that is not a VSA feature.
+
 ### RPC (Request-Response)
 
 ```csharp

@@ -4,6 +4,8 @@
 
 Bolt Media extends the Bolt binary RPC protocol with real-time audio/video call support. Unlike WebRTC, Bolt handles media transport natively — no browser dependency, no STUN/TURN infrastructure, and full server-side access to media streams for recording, transcription, and AI processing.
 
+For standard XFramework module RPC, prefer the generated `[BoltHandler]` plus `IBoltRequest<TRequest, TResponse>` pattern documented in `BOLT.md`. Bolt Media is the specialized media-streaming layer, not the default pattern for CRUD or feature-command handlers.
+
 **Current status:** Phase 1-5 implemented, critical bugs fixed, 37 tests passing.
 
 ---
