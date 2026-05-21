@@ -53,8 +53,10 @@ status: current
 
 ## Current Vs Historical Guidance
 
-- Treat docs with current language, active frontmatter, or convention-focused titles as current guidance.
-- Treat migration plans, removal narratives, readiness notes, and dated troubleshooting writeups as historical unless they explicitly say they are current.
+- Treat only docs with `status: current` or `status: active`, docs named as current authority in "Authority And Status", or docs explicitly listed under "Current Orientation Maps" or "Current Subsystem Guidance", as current implementation guidance.
+- Treat docs with `status: historical`, `status: superseded`, or `status: deprecated` as context only; they must not override source code or current subsystem docs.
+- Treat docs without a status as historical unless they are explicitly indexed as current in this README.
+- Do not route agents from canonical orientation docs to historical StreamFlow/SignalR local-first sync as current guidance. Link it only as preserved design history, with current data-context guidance pointing to decentralized remote `IDataContext` and EF Core conventions.
 - Do not rewrite historical docs only to remove stale terminology; instead, label the status when needed and link to current guidance.
 - If docs and implementation disagree, current source code wins for factual behavior. Among docs, prefer the most specific current subsystem doc, then `docs/solutions/conventions/xframework-best-practices.md`.
 - Treat root files named `*Roadmap*`, `*Improvement-Plan*`, `*Journal*`, `*Completion*`, or `XFramework-Knowledge-Base.md` as historical or superseded unless their opening status notice says otherwise.
@@ -77,7 +79,7 @@ Required or expected fields:
 
 Optional status fields may be added when useful:
 
-- `status` - `current`, `active`, `historical`, `superseded`, or `deprecated`.
+- `status` - one of `current`, `active`, `historical`, `superseded`, or `deprecated`. Do not invent compound values such as `historical-proposed`; use `historical` plus `superseded_by` or an opening status note for nuance.
 - `superseded_by` - repo-relative path to the replacement guidance.
 
 Example:

@@ -1,7 +1,7 @@
 ---
 title: "XFramework Local-First Sync Architecture"
 date: 2026-03-13
-status: historical-proposed
+status: historical
 superseded_by: "docs/solutions/architecture-patterns/decentralized-remote-data-context.md"
 category: architecture-patterns
 module: XFramework.Blazor
@@ -15,11 +15,11 @@ tags: [local-first, sync, blazor, wasm, datacontext, streamflow]
 
 # XFramework Local-First Sync Architecture
 
-**Status:** Historical proposed design, not current implementation guidance
+**Status:** Historical StreamFlow/SignalR-era proposal, not current implementation guidance
 **Date:** 2026-03-13
-**Scope:** Unified Blazor Server + WASM developer experience via local-first data sync
+**Scope:** Historical unified Blazor Server + WASM local-first sync design
 
-This document preserves a StreamFlow/SignalR-era proposal. Current XFramework uses Bolt for module RPC/streaming and `IDataContext` remote routing through generated service wrappers. Use `docs/solutions/architecture-patterns/decentralized-remote-data-context.md` and `docs/solutions/conventions/ef-core-data-access-patterns.md` for current data-context guidance.
+This document is preserved for architecture history only. It describes a proposed local-first sync model built around StreamFlow/SignalR and local SQLite replicas. Current XFramework guidance is `docs/solutions/architecture-patterns/decentralized-remote-data-context.md` for remote `IDataContext` routing through generated service wrappers and `docs/solutions/conventions/ef-core-data-access-patterns.md` for EF Core/data-access conventions. Do not use the StreamFlow/SignalR sync design below as canonical agent guidance.
 
 ---
 

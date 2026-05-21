@@ -74,7 +74,7 @@ Organize code by **feature**, not by **technical layer**. Each feature is a self
 [Module].Api/
 ├── Features/
 │   └── [FeatureGroup]/
-│       ├── [FeatureGroup]Endpoints.cs    # Aggregator — maps all sub-endpoints
+│       ├── [FeatureGroup]Endpoints.cs    # Optional aggregator for fully manual mappings
 │       ├── Create/
 │       │   ├── Endpoint.cs               # Single static class, single handler
 │       │   └── CreateValidator.cs         # FluentValidation rules
@@ -105,12 +105,12 @@ Organize code by **feature**, not by **technical layer**. Each feature is a self
 |---------|-----------|---------|
 | Feature folder | PascalCase, action verb or noun | `Create/`, `GetList/`, `Transfer/` |
 | Endpoint class | `{Action}{Entity}Endpoint` | `CreateProductEndpoint` |
-| Endpoint method | `Map{Action}{Entity}` | `MapCreateProduct()` |
+| Generated handler method | `Handle` with `[Map*]` | `[MapPost] public static Task<Result<ProductResponse>> Handle(...)` |
 | Validator | `{Action}{Entity}Validator` | `CreateProductValidator` |
 | Response DTO | `{Entity}Response` | `ProductResponse` |
 | Request record | `{Action}{Entity}Request` | `CreateProductRequest` |
 | Service | `{Entity}Service` / `{Domain}Service` | `ProductService`, `WalletService` |
-| Aggregator | `{Entity}Endpoints` | `ProductEndpoints` |
+| Aggregator | `{Entity}Endpoints` only for fully manual mappings | `ProductEndpoints` |
 
 ### 2.3 File Rules
 
@@ -207,31 +207,27 @@ public static class CreateEntityEndpoint
 {
     [MapPost("/api/entities", Tags = ["Entities"], Summary = "Create entity")]
     [BoltHandler]
-    public static async Task<Result<EntityResponse>> Handle(
+    public static Task<Result<EntityResponse>> Handle(
         Request request,
-        IValidator<Request> validator,
         EntityService service,
-        CancellationToken ct)
-    {
-        var validation = await validator.ValidateAsync(request, ct);
-        if (!validation.IsValid)
-            return Result<EntityResponse>.Failure(validation.ToString());
-
-        return await service.CreateAsync(request, ct);
-    }
+        CancellationToken ct) =>
+        service.CreateAsync(request, ct);
 }
 
 public sealed record Request(string Name) : IBoltRequest<Request, Result<EntityResponse>>;
 ```
 
+For method-level `[Map*]` handlers, do not add `IValidator<TRequest>` to the handler signature. `BoltHandlerGenerator` detects a concrete `AbstractValidator<TRequest>` at compile time and the generated REST adapter injects `IValidator<TRequest>`, runs `ValidateAsync`, and returns `TypedResults.ValidationProblem(...)` before calling `Handle`.
+
 ### 4.2 Endpoint Rules
 
 - **Always use `CancellationToken ct`** as the last parameter — honor client disconnection.
-- **Always validate before calling the service.** Validation is the endpoint's responsibility.
+- **Generated `[Map*]` REST endpoints auto-validate.** Add a concrete `AbstractValidator<TRequest>` for the request type and register validators with assembly scanning; do not inject `IValidator<TRequest>` into the generated handler method.
+- **Manual validation is only for non-generated endpoints or custom flows.** If an endpoint is mapped manually because it needs custom binding or custom `IResult` output, inject `IValidator<TRequest>` there and return `TypedResults.ValidationProblem(...)` yourself.
 - **Return `Result<T>` from generated handlers.** The generated REST adapter converts successful and failed results to HTTP responses.
 - **Use `TypedResults` and `Results<T1, T2, ...>` only for manual endpoints that are not generated from `[Map*]` attributes.**
 - **Map service `Result<T>` to HTTP via pattern matching in manual endpoints.** Generated `[Map*]` handlers return `Result<T>` and let the generated adapter translate it.
-- **Keep handlers thin.** The handler validates, calls the service, maps the result. No business logic in endpoints.
+- **Keep handlers thin.** A generated handler receives the request and services, calls the service, and returns `Result<T>`. Business logic stays out of endpoints.
 - **Use `WithDescription()` over `WithOpenApi()`** when you only need summary/description — simpler API.
 - **Use route constraints** for type safety: `/api/products/{id:guid}`, `/api/orders/{page:int}`.
 - **Pagination defaults:** page=1, pageSize=20, maxPageSize=100. These should be configurable per endpoint.
@@ -253,6 +249,8 @@ GetWalletEndpoint.Map(app);
 - `GeneratedEndpointRoutes.g.cs` is created from attributed feature handlers.
 - `EndpointDiscoveryExtensions.MapGeneratedEndpoints()` discovers generated endpoint classes whose names end with `Endpoints`.
 - Entity-generated CRUD endpoints are generated from `[GenerateEndpoints]`; manual VSA endpoints are generated from method-level `[Map*]` attributes.
+- Do not manually call generated `Map{Action}{Entity}` methods from `Program.cs`; `GeneratedEndpointRoutes.g.cs` calls them from `MapGeneratedEndpoints()`.
+- Keep `{Entity}Endpoints` aggregator files only for explicit manual endpoint mappings that are not generated from `[Map*]` attributes.
 - See `docs/solutions/tooling-decisions/generated-endpoint-auto-discovery.md` for registration mechanics and `docs/solutions/tooling-decisions/generate-endpoints-attribute-usage.md` for entity-generated CRUD options.
 
 ---
@@ -283,7 +281,7 @@ public class ProductService(
 - **Use primary constructors** for dependency injection. No manual field assignment boilerplate.
 - **Every public method returns `Result<T>` or `Result`.** No raw exceptions crossing the boundary.
 - **Accept `CancellationToken ct`** on every async method and pass it through to EF, HTTP clients, etc.
-- **Services own business logic.** Validation is done at the endpoint; the service assumes input is valid.
+- **Services own business logic.** Request validation is done by generated adapters or manual endpoints; the service assumes input is valid.
 - **Services should not know about HTTP.** No `HttpContext`, `StatusCodes`, or `TypedResults` in services. They return domain-level results; the endpoint translates to HTTP.
 - **One service per feature domain**, not per entity. `WalletService` handles wallets, funds, transfers, and conversions. Don't create `FundsService`, `TransferService` separately unless the complexity warrants it.
 - **Use `ConfigureAwait(false)`** in library/service code if the service is in a shared library project. For ASP.NET API projects, this is not needed.
@@ -437,18 +435,19 @@ var response = await db.Products
 
 ### 8.4 Soft Delete
 
-Soft delete is handled automatically by `XDbContext.OnBeforeSaveChanges()`. When `EntityState.Deleted` is detected:
-- Sets `IsDeleted = true` and `DeletedAt = DateTime.UtcNow`
-- Changes state to `Modified` (no actual DELETE sent to the database)
-- Global query filter excludes soft-deleted records from all queries
+Soft delete is handled by `XDbContext.OnBeforeSaveChanges()`. Delete entities through EF/context behavior (`Remove` / `EntityState.Deleted`), then save changes. When `EntityState.Deleted` is detected:
 
-**Do not implement custom soft-delete logic in services.** Rely on the context behavior.
+- Sets `IsDeleted = true` and `DeletedAt = DateTime.UtcNow`
+- Changes state to `Modified` so no physical DELETE is sent
+- Global query filters exclude soft-deleted records from normal queries
+
+**Do not manually set `IsDeleted = true` in services.** Rely on the context behavior so `DeletedAt`, state conversion, and filters stay consistent.
 
 ### 8.5 Multi-Tenancy
 
 Tenant isolation is enforced at the DbContext level via global query filter on `IHasTenantId`. The current tenant is extracted from `HttpContext` claims.
 
-- **Always ensure TenantId is set** on new entities. The `AuditInterceptor` validates this.
+- **Always ensure TenantId is set** on new tenant-owned entities. `XDbContext.OnBeforeSaveChanges()` validates that `BaseModel.TenantId` is not null or `Guid.Empty`; `AuditInterceptor` does not set or validate tenant IDs.
 - **Never bypass tenant filters** in user-facing code. Only admin/system endpoints may use `.IgnoreQueryFilters()`.
 
 ---

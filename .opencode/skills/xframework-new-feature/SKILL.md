@@ -26,24 +26,24 @@ Use this skill when:
 ## Target Structure
 
 ```text
-[Module].Api/Features/[FeatureGroup]/
-|-- [Action]/
-|   |-- Endpoint.cs
-|   `-- [Action][Entity]Validator.cs
-`-- Shared/
-    `-- [Entity]Response.cs
+src/Modules/XFramework.[Module]/[Module].Api/
+`-- Features/
+    `-- [FeatureGroup]/
+        |-- [Action]/
+        |   |-- Endpoint.cs
+        |   `-- [Action][Entity]Validator.cs
+        `-- Shared/
+            `-- [Entity]Response.cs
 ```
 
 ## Rules
 
-- Use file-scoped namespaces.
-- Use static endpoint classes with `[Map*]` attributes and thin handlers.
-- Validate before service calls.
-- Return `Result<T>` from generated handlers; reserve `TypedResults` and union return types for fully manual endpoints.
-- Add `[BoltHandler]` only when the request implements `IBoltRequest<TRequest, TResponse>`.
-- Pass `CancellationToken ct` through.
-- Use response records with `From()` factories when appropriate.
-- Ensure the module maps generated endpoints with `app.MapGeneratedEndpoints()`.
+- Treat `docs/solutions/conventions/xframework-vsa-agent-playbook.md` as the canonical rule source.
+- Use generated Minimal API endpoint attributes for generator-discovered handlers.
+- Return `Result<T>` or `Result` from generated handlers.
+- Add validators only when validation is required; name them `[Action][Entity]Validator` and rely on generator auto-validation for generated `[Map*]` handlers.
+- Add `[BoltHandler]` only for `IBoltRequest<TRequest, TResponse>` contracts.
+- Confirm `app.MapGeneratedEndpoints()` exists in the module startup.
 
 ## Workflow
 

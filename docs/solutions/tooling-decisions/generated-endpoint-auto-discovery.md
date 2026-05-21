@@ -20,6 +20,7 @@ This guide owns generated endpoint and service registration mechanics in XFramew
 - [Overview](#overview)
 - [Quick Start](#quick-start)
 - [Endpoint Auto-Discovery](#endpoint-auto-discovery)
+- [Validator Auto-Detection](#validator-auto-detection)
 - [Service Auto-Discovery](#service-auto-discovery)
 - [Opt-Out Mechanism](#opt-out-mechanism)
 - [Performance Considerations](#performance-considerations)
@@ -180,6 +181,8 @@ Register a specific endpoint class manually:
 app.MapEndpoint<ProductEndpoints>();
 ```
 
+Use this for hand-written aggregator classes such as `ProductEndpoints`. Do not use it to call generated per-handler `Map{Action}{Entity}` methods; those are already wired through `GeneratedEndpointRoutes.MapGeneratedEndpoints()`.
+
 ### What Gets Discovered
 
 Auto-discovery finds classes matching these criteria:
@@ -191,9 +194,11 @@ Auto-discovery finds classes matching these criteria:
 - Method returns `IEndpointRouteBuilder`
 - Not marked with `[ExcludeFromAutoDiscovery]`
 
-Generated sources that feed this discovery include:
-- `GeneratedEndpointRoutes.g.cs` from method-level `[MapPost]`, `[MapGet]`, `[MapPut]`, `[MapPatch]`, and `[MapDelete]` attributes in `BoltHandlerGenerator`
-- `{Entity}Endpoints.g.cs` from entity-level `[GenerateEndpoints]` in `EntityEndpointGenerator`
+Generated endpoint registration surfaces include:
+- `GeneratedEndpointRoutes.g.cs` from method-level `[MapPost]`, `[MapGet]`, `[MapPut]`, `[MapPatch]`, and `[MapDelete]` attributes in `BoltHandlerGenerator`. It emits a `MapGeneratedEndpoints()` extension that calls generated per-handler `Map{Action}{Entity}` methods.
+- `{Entity}Endpoints.g.cs` from entity-level `[GenerateEndpoints]` in `EntityEndpointGenerator`. These generated endpoint classes are discoverable by `EndpointDiscoveryExtensions.MapGeneratedEndpoints()` because their names end with `Endpoints`.
+
+Application startup should call `app.MapGeneratedEndpoints()` once rather than calling generated `Map{Action}{Entity}` methods directly.
 
 ❌ **Excluded:**
 - Abstract classes
@@ -218,6 +223,12 @@ public static class ProductEndpoints
     }
 }
 ```
+
+## Validator Auto-Detection
+
+`BoltHandlerGenerator` checks whether the compilation contains a concrete validator derived from `AbstractValidator<TRequest>` for the handler's first parameter type. When one exists, the generated REST adapter adds an `IValidator<TRequest>` parameter, runs `ValidateAsync(request, ct)`, and returns `TypedResults.ValidationProblem(...)` before invoking the handler.
+
+Do not add `IValidator<TRequest>` to source-generated `[Map*]` handler signatures. Manual validator injection is reserved for endpoints that are not generated from `[Map*]` attributes, such as endpoints with custom binding or custom `IResult` response logic.
 
 ## Service Auto-Discovery
 

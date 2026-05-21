@@ -5,7 +5,7 @@ Prefer XFramework-specific guidance over generic .NET layered-architecture advic
 ## Current Architecture
 
 - Target .NET 10 and C# 14.
-- Organize API work by Vertical Slice Architecture under `Features/{Feature}/{Action}/Endpoint.cs`.
+- Organize API work by module-qualified Vertical Slice Architecture paths: `src/Modules/XFramework.[Module]/[Module].Api/Features/[FeatureGroup]/[Action]/Endpoint.cs`.
 - Use generated Minimal API registration with `app.MapGeneratedEndpoints()`.
 - Use Bolt for active RPC/streaming work with `[BoltHandler]` and `IBoltRequest`.
 - Use source generators for endpoint routes, Bolt handlers, service wrappers, entity endpoints/services, and data-context registration.

@@ -69,6 +69,8 @@ Tenant resolution is per query through a DbContext property. It checks authentic
 - Defaults `IsEnabled` and `IsDeleted` when unset.
 - Throws if a `BaseModel.TenantId` value is null or `Guid.Empty`.
 
+Services should delete through EF/context behavior (`Remove` / `EntityState.Deleted`) rather than setting `IsDeleted = true` manually, so the context can consistently set `DeletedAt` and convert the operation to a soft-delete update.
+
 `AuditInterceptor` only sets `CreatedAt` on added `IAuditable` entities and `ModifiedAt` on modified `IAuditable` entities. It does not set user IDs or tenant IDs.
 
 ## Query Rules

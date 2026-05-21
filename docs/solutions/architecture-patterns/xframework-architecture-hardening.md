@@ -6,12 +6,15 @@ module: XFramework
 problem_type: architecture_pattern
 component: development_workflow
 severity: critical
+status: historical
 applies_when:
   - "Reviewing production readiness across modules, generated endpoints, Bolt transport, caching, secrets, tests, and deployment"
 tags: [architecture, hardening, bolt, source-generators, secrets, caching]
 ---
 
 # XFramework Architecture Improvement Report
+
+**Status:** Historical point-in-time hardening review. Use this report as backlog/context, not as current architecture authority. For current implementation guidance, prefer current subsystem docs, especially `docs/solutions/conventions/xframework-best-practices.md`, `docs/solutions/architecture-patterns/xframework-agent-architecture-surface-map.md`, and the most specific current architecture/convention doc.
 
 Date: 2026-04-25
 

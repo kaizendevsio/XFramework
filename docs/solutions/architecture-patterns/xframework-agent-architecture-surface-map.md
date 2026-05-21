@@ -26,11 +26,12 @@ Use this map to answer "where should I look first?" It is intentionally navigati
 | Feature and module inventory | [Feature surface map](../conventions/xframework-feature-surface-map.md) |
 | Source-generated endpoints | [Generated endpoint auto-discovery](../tooling-decisions/generated-endpoint-auto-discovery.md) and [GenerateEndpoints attribute usage](../tooling-decisions/generate-endpoints-attribute-usage.md) |
 | Bolt transport | [Bolt unified transport layer](bolt-unified-transport-layer.md), [Bolt SignalR removal](bolt-signalr-removal.md), `src/Libraries/Bolt/BOLT.md`, `src/Libraries/Bolt/BOLT-MEDIA.md` |
-| Data-context and sync architecture | [Decentralized remote data context](decentralized-remote-data-context.md), [Local-first sync architecture](local-first-sync-architecture.md) |
+| Current data-context architecture | [Decentralized remote data context](decentralized-remote-data-context.md), [EF Core data access patterns](../conventions/ef-core-data-access-patterns.md) |
+| Historical local-first sync proposal | [Local-first sync architecture](local-first-sync-architecture.md) is preserved as StreamFlow/SignalR-era design history only; do not use it as current implementation guidance. |
 | Caching | [XFramework caching strategy](../best-practices/xframework-caching-strategy.md) |
 | Logging and observability | [Unified ZLogger logging pipeline](unified-zlogger-logging-pipeline.md), [Logging standards](../conventions/logging-standards.md), [OpenTelemetry integration guide](../tooling-decisions/opentelemetry-integration-guide.md) |
 | UI editing patterns | [Control panel editable UI patterns](../design-patterns/control-panel-editable-ui-patterns.md) |
-| Architecture risks and hardening | [Architecture hardening](xframework-architecture-hardening.md) |
+| Historical architecture risks and hardening | [Architecture hardening](xframework-architecture-hardening.md) is a point-in-time hardening review; use it as backlog/context, not current implementation authority. |
 
 ## Repository Shape
 
@@ -85,4 +86,4 @@ Use this map to answer "where should I look first?" It is intentionally navigati
 
 ## Orientation Checklist
 
-Before changing code, identify the layer from `XFramework.slnx`, open the matching representative source path above, then follow the most specific canonical doc. If a doc conflicts with current source, source wins; if a historical or migration doc conflicts with current conventions, use the current convention or subsystem doc.
+Before changing code, identify the layer from `XFramework.slnx`, open the matching representative source path above, then follow the most specific canonical doc. If a doc conflicts with current source, source wins; if a historical or migration doc conflicts with current conventions, use the current convention or subsystem doc. Do not route canonical agents to historical StreamFlow/SignalR local-first sync guidance; current data-context work starts with decentralized remote `IDataContext`, generated service wrappers, and EF Core conventions.
