@@ -9,7 +9,7 @@ Audit an XFramework module against the project standards.
 
 Arguments: `$ARGUMENTS` should specify the module name, such as `Inventario`, `Wallets`, or `IdentityServer`.
 
-Use `docs/solutions/conventions/xframework-best-practices.md` as the governing standard. Search `docs/solutions/` for related module, architecture, tooling, and workflow learnings before finalizing the audit.
+Use `docs/solutions/conventions/xframework-best-practices.md` as the governing standard. Start orientation from `docs/solutions/architecture-patterns/xframework-agent-architecture-surface-map.md` and `docs/solutions/conventions/xframework-feature-surface-map.md`, then search `docs/solutions/` for related module, architecture, tooling, and workflow learnings before finalizing the audit.
 
 Review the module's `.Api` project, including `Program.cs`, `Features/`, `Services/`, `Installers/`, `.csproj`, `GlobalUsings.cs`, and `Entities/` when present.
 

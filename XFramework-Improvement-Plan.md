@@ -1,5 +1,8 @@
 # 🚀 XFramework Improvement & Optimization Plan
 
+> **Status:** Superseded historical improvement plan. It is useful for understanding the original modernization intent, but it does not govern current implementation.
+> **Current guidance:** Use `docs/README.md`, `docs/solutions/README.md`, and current `docs/solutions/` convention and subsystem docs. Treat CQRS/MediatR, SignalR/StreamFlow, Serilog, or older framework-version references below as historical migration context unless a current solution doc says otherwise.
+
 ## Executive Summary
 
 This comprehensive plan outlines strategic improvements to transform XFramework into the **best .NET development platform** through architectural simplification, performance optimization, and modern best practices.

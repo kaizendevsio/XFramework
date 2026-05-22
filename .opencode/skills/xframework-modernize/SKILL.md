@@ -16,7 +16,8 @@ Use this skill when:
 
 ## References
 
-- `docs/solutions/conventions/xframework-best-practices.md`, sections 3 and 16.
+- `docs/solutions/conventions/xframework-best-practices.md`, sections 3 and 16, as the current .NET 10 / C# 14 convention source.
+- `docs/solutions/architecture-patterns/xframework-agent-architecture-surface-map.md` and `docs/solutions/conventions/xframework-feature-surface-map.md` when module structure is unclear.
 
 ## Priorities
 

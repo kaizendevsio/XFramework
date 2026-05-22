@@ -28,7 +28,7 @@ XFramework implements comprehensive observability using OpenTelemetry (OTel) for
 
 ### Integration with Structured Logging
 
-OpenTelemetry's TraceId and SpanId are automatically enriched into Serilog logs using `Serilog.Enrichers.Span`, enabling correlation between logs and traces.
+XFramework uses ZLogger through `AddXFrameworkLogging()` as the active logging pipeline. Correlation data flows through Microsoft.Extensions.Logging scopes, `CorrelationIdMiddleware`, and OpenTelemetry activities. Serilog guidance in older docs is historical and should not be used for new configuration.
 
 ## Installation
 
@@ -50,8 +50,7 @@ Each API module requires the following packages:
 <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.9.0" />
 <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
 
-<!-- Serilog Integration -->
-<PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0" />
+<!-- Logging uses ZLogger via XFramework.Integration; do not add Serilog packages for trace correlation. -->
 ```
 
 ### XFramework.Core Dependencies
@@ -123,25 +122,15 @@ var app = builder.Build();
 }
 ```
 
-### Serilog Configuration for Trace Correlation
+### ZLogger Configuration for Trace Correlation
 
-Update `appsettings.json` to include TraceId and SpanId in logs:
+Use the shared logging extension instead of per-service logger pipelines:
 
-```json
-{
-  "Serilog": {
-    "Enrich": ["FromLogContext", "WithMachineName", "WithThreadId", "WithSpan"],
-    "WriteTo": [
-      {
-        "Name": "Console",
-        "Args": {
-          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j} | TraceId:{TraceId} SpanId:{SpanId}{NewLine}{Exception}"
-        }
-      }
-    ]
-  }
-}
+```csharp
+builder.Logging.AddXFrameworkLogging(builder.Configuration);
 ```
+
+`AddXFrameworkLogging()` clears competing providers, adds ZLogger console output, and registers the custom Seq sink when `Seq:Url` is configured. `CorrelationIdMiddleware` uses logging scopes so correlation properties flow through the active Microsoft.Extensions.Logging pipeline.
 
 ## Custom Instrumentation
 
@@ -155,7 +144,7 @@ public static class ActivitySources
     public static readonly ActivitySource Product = new("XFramework.Product");
     public static readonly ActivitySource Wallet = new("XFramework.Wallet");
     public static readonly ActivitySource Auth = new("XFramework.Auth");
-    public static readonly ActivitySource StreamFlow = new("XFramework.StreamFlow");
+    public static readonly ActivitySource Bolt = new("XFramework.Bolt");
     public static readonly ActivitySource Sms = new("XFramework.Sms");
     public static readonly ActivitySource Messaging = new("XFramework.Messaging");
     public static readonly ActivitySource Community = new("XFramework.Community");
@@ -449,9 +438,10 @@ catch (Exception ex)
 
 ### Missing TraceId in Logs
 
-1. **Verify Serilog.Enrichers.Span**: Package must be installed
-2. **Check enrichers**: Ensure `"WithSpan"` is in Serilog configuration
-3. **Verify log template**: Must include `{TraceId}` and `{SpanId}` placeholders
+1. **Verify ZLogger pipeline**: Ensure `builder.Logging.AddXFrameworkLogging(builder.Configuration)` is called.
+2. **Check correlation middleware**: Ensure `app.UseCorrelationId()` is registered before middleware that logs request work.
+3. **Check active activity**: Trace IDs require an active OpenTelemetry activity/span for the operation.
+4. **Check Seq configuration**: Set `Seq:Url` when validating structured events in Seq.
 
 ### High Memory Usage
 

@@ -1,4 +1,8 @@
 # 📊 XFramework Improvement Plan Adherence Analysis
+
+> **Status:** Historical analysis journal. It reflects the codebase state on 2025-01-24 and should not be used as current implementation authority.
+> **Current guidance:** Use `docs/README.md`, `docs/solutions/README.md`, and current solution docs for active architecture, VSA, data access, transport, logging, and testing guidance.
+
 **Date**: 2025-01-24 11:40 SGT  
 **Analyst**: Roo Commander  
 **Scope**: Codebase analysis against XFramework-Improvement-Plan.md
@@ -432,8 +436,8 @@ When migration is complete, expect:
 ## 🔗 Related Documents
 - XFramework-Improvement-Plan.md (source specification)
 - XFramework-Development-Roadmap.md (updated tracking)
-- docs/source-generators/ (implementation guides)
-- docs/caching-strategy.md (caching documentation)
+- docs/solutions/tooling-decisions/ (implementation guides)
+- docs/solutions/best-practices/xframework-caching-strategy.md (caching documentation)
 
 ---
 

@@ -13,9 +13,11 @@ tags: [logging, structured-logging, loggermessage, event-id, correlation]
 
 # XFramework Logging Standards
 
+**Status:** Current standards for the ZLogger + Microsoft.Extensions.Logging pipeline. Serilog references in older migration documents are historical only.
+
 ## Overview
 
-XFramework uses **LoggerMessage source generators** for high-performance, zero-allocation structured logging. This document defines standards, conventions, and best practices for logging across all services.
+XFramework uses **LoggerMessage source generators** for high-performance, zero-allocation structured logging and **ZLogger** as the active provider pipeline for console and Seq output. This document defines standards, conventions, and best practices for logging across all services.
 
 ## Benefits of LoggerMessage Source Generators
 
@@ -197,7 +199,7 @@ public async Task<Result<AuthResponse>> AuthenticateAsync(AuthRequest request, C
 Every HTTP request automatically gets a correlation ID via `CorrelationIdMiddleware`. This ID is:
 
 - Generated automatically or extracted from `X-Correlation-ID` request header
-- Added to all log entries via Serilog's `LogContext`
+- Added to log entries through Microsoft.Extensions.Logging scopes
 - Returned in the `X-Correlation-ID` response header
 - Useful for tracing requests across services
 
@@ -270,41 +272,32 @@ private static string MaskEmail(string email)
 
 ```json
 {
-  "Serilog": {
-    "Using": ["Serilog.Sinks.Console"],
-    "MinimumLevel": {
+  "Logging": {
+    "LogLevel": {
       "Default": "Information",
-      "Override": {
-        "Microsoft": "Warning",
-        "Microsoft.EntityFrameworkCore": "Warning",
-        "System": "Warning",
-        "XFramework": "Information"
-      }
-    },
-    "WriteTo": [
-      {
-        "Name": "Console",
-        "Args": {
-          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] [{CorrelationId}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}"
-        }
-      }
-    ],
-    "Enrich": ["FromLogContext", "WithMachineName", "WithEnvironmentName"]
+      "Microsoft": "Warning",
+      "Microsoft.EntityFrameworkCore": "Warning",
+      "System": "Warning",
+      "XFramework": "Information"
+    }
+  },
+  "Seq": {
+    "Url": "http://localhost:5341"
   }
 }
 ```
+
+Services should call `builder.Logging.AddXFrameworkLogging(builder.Configuration)`. The extension clears competing providers, configures ZLogger console output, and sends CLEF events to Seq when `Seq:Url` is present.
 
 ### Environment-Specific Settings
 
 **Development** (`appsettings.Development.json`):
 ```json
 {
-  "Serilog": {
-    "MinimumLevel": {
+  "Logging": {
+    "LogLevel": {
       "Default": "Debug",
-      "Override": {
-        "XFramework": "Debug"
-      }
+      "XFramework": "Debug"
     }
   }
 }
@@ -313,12 +306,10 @@ private static string MaskEmail(string email)
 **Production** (`appsettings.json`):
 ```json
 {
-  "Serilog": {
-    "MinimumLevel": {
+  "Logging": {
+    "LogLevel": {
       "Default": "Warning",
-      "Override": {
-        "XFramework": "Information"
-      }
+      "XFramework": "Information"
     }
   }
 }
@@ -356,13 +347,13 @@ _logger.EntityCreating(entityType, entityId, tenantId);
 1. Check `MinimumLevel` in `appsettings.json`
 2. Verify namespace override settings
 3. Ensure `CorrelationIdMiddleware` is registered early in pipeline
-4. Check Serilog configuration is loaded
+4. Ensure `AddXFrameworkLogging()` is called and `Seq:Url` is set when expecting Seq events
 
 ### Missing Correlation IDs
 
 1. Verify `CorrelationIdMiddleware` is registered: `app.UseCorrelationId();`
 2. Ensure middleware is before other middleware that logs
-3. Check `LogContext` enricher is configured
+3. Check logging scopes are included by the active ZLogger providers
 
 ### Performance Issues
 
@@ -387,11 +378,11 @@ _logger.EntityCreating(entityType, entityId, tenantId);
 ## References
 
 - [Microsoft LoggerMessage Documentation](https://learn.microsoft.com/en-us/dotnet/core/extensions/logger-message-generator)
-- [Serilog Best Practices](https://github.com/serilog/serilog/wiki/Configuration-Basics)
+- [ZLogger](https://github.com/Cysharp/ZLogger)
 - [Structured Logging Guide](https://stackify.com/what-is-structured-logging-and-why-developers-need-it/)
 
 ---
 
-**Last Updated**: 2025-11-20  
-**Version**: 1.0  
+**Last Updated**: 2026-05-21
+**Version**: 1.1
 **Author**: XFramework Development Team

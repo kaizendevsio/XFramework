@@ -1,5 +1,9 @@
 # XFramework - Comprehensive Knowledge Base
 
+> **Status:** Superseded legacy knowledge-base snapshot. This file is retained for historical context only and must not be treated as the current source of truth.
+> **Current guidance:** Use `docs/README.md`, `docs/solutions/README.md`, `docs/solutions/conventions/xframework-best-practices.md`, `docs/solutions/architecture-patterns/xframework-agent-architecture-surface-map.md`, and `docs/solutions/conventions/xframework-feature-surface-map.md`.
+> **Stale terminology:** References below to .NET 9/C#13, CQRS/MediatR, SignalR/StreamFlow, or older logging assumptions are historical/superseded unless a current solution doc confirms them.
+
 ## Table of Contents
 1. [Project Overview](#project-overview)
 2. [Architecture & Design Patterns](#architecture--design-patterns)

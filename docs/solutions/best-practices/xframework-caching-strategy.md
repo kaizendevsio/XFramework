@@ -13,17 +13,31 @@ tags: [caching, performance, hybrid-cache, output-cache, invalidation]
 
 # XFramework Caching Strategy
 
+**Status:** Current cache guidance for XFramework. The repository currently uses the custom `HybridCacheService`, not the .NET built-in `HybridCache` abstraction.
+
 ## Overview
 
-XFramework implements a comprehensive multi-layer caching strategy to optimize performance and reduce database load. This document outlines when and how to use different caching mechanisms.
+XFramework uses several distinct cache surfaces. Choose the cache based on ownership and invalidation needs instead of treating all caching as one layer.
+
+## Current Cache Surfaces
+
+| Surface | Current implementation | Use for | Notes |
+|---------|------------------------|---------|-------|
+| Application cache | `src/Kernel/XFramework.Core/Services/Caching/HybridCacheService.cs` | Service-layer reads, expensive computations, reference data | Custom L1 memory + optional L2 distributed cache/Redis, graceful degradation, statistics, prefix invalidation |
+| Distributed cache / Redis | `IDistributedCache` plus `StackExchange.Redis` dependencies used by `HybridCacheService` | Shared L2 state across instances | Redis is optional at runtime; code must continue with memory-only cache when unavailable |
+| Remote data-context client cache | `src/Infrastructure/XFramework.Integration/DataContext/Cache/ClientCacheService.cs` and data-context cache decorators | Client-side `RemoteQuery<T>` terminal result caching | In-memory client cache serialized with MemoryPack and invalidated by prefix/clear operations |
+| Module-local caches | Module services or feature services | Module-specific hot data | Keep keys module-owned and document invalidation in the service |
+| Generated endpoint cache metadata | `[GenerateEndpoints]` and generated endpoint options | HTTP/generated endpoint cache declarations | Metadata describes endpoint caching; runtime cache semantics and invalidation rules belong in this document |
+
+Use `docs/solutions/conventions/ef-core-data-access-patterns.md` for EF Core query and migration guidance around cached data.
 
 ## Caching Layers
 
 ### 1. Output Caching (HTTP Response Cache)
 
-**What**: Caches complete HTTP responses (headers + body)  
-**Where**: ASP.NET Core middleware layer  
-**Technology**: .NET 9 Output Caching middleware  
+**What**: Caches complete HTTP responses (headers + body)
+**Where**: ASP.NET Core middleware layer
+**Technology**: ASP.NET Core output caching middleware on the current .NET 10 target
 **Storage**: In-memory or Redis (configurable)
 
 #### When to Use Output Caching
@@ -89,6 +103,8 @@ app.MapGet("/api/items", GetItems)
 
 #### Using HybridCacheService
 
+`HybridCacheService` is a project-owned service. It is not the framework-provided `Microsoft.Extensions.Caching.Hybrid.HybridCache` type.
+
 ```csharp
 public class ProductService
 {
@@ -130,6 +146,8 @@ public class ProductService
 ```
 
 ## Cache Invalidation Strategies
+
+Generated endpoint cache options can mark endpoint responses as cacheable, but writes still need explicit invalidation of affected application, HTTP, remote data-context, or module-local keys.
 
 ### Output Cache Invalidation
 
@@ -190,8 +208,8 @@ Compression is applied BEFORE output caching, so cached responses are already co
 ### Configuration (Phase 1.4 Implementation)
 
 **Implementation Files:**
-- Configuration: [`src/Kernel/XFramework.Core/Extensions/ResponseCompressionExtensions.cs`](../src/Kernel/XFramework.Core/Extensions/ResponseCompressionExtensions.cs)
-- Pipeline Integration: [`src/Kernel/XFramework.Core/Extensions/XApplication.cs`](../src/Kernel/XFramework.Core/Extensions/XApplication.cs)
+- Configuration: [`src/Kernel/XFramework.Core/Extensions/ResponseCompressionExtensions.cs`](../../../src/Kernel/XFramework.Core/Extensions/ResponseCompressionExtensions.cs)
+- Pipeline Integration: [`src/Kernel/XFramework.Core/Extensions/XApplication.cs`](../../../src/Kernel/XFramework.Core/Extensions/XApplication.cs)
 
 **Verified Settings (Phase 3.4 Verification - November 2025):**
 - ✅ **Brotli Provider**: Configured as primary with `CompressionLevel.Optimal`

@@ -1,6 +1,6 @@
 ---
 title: "GenerateEndpoints Attribute Usage Guide"
-date: 2026-05-15
+date: 2026-05-21
 category: tooling-decisions
 module: XFramework.SourceGenerators
 problem_type: tooling_decision
@@ -13,7 +13,7 @@ tags: [source-generators, generate-endpoints, crud, vsa, endpoints]
 
 # Attribute Usage Guide - GenerateEndpoints
 
-This guide documents the usage of the `GenerateEndpointsAttribute` and related types for entity-centric code generation in XFramework.
+This guide documents declaration mechanics for `GenerateEndpointsAttribute` and related types for entity-centric code generation in XFramework. Registration mechanics live in [Generated Endpoint Auto-Discovery and Registration](./generated-endpoint-auto-discovery.md). Cache key, invalidation, and runtime cache behavior live in [XFramework Caching Strategy](../best-practices/xframework-caching-strategy.md).
 
 ## Table of Contents
 
@@ -67,7 +67,7 @@ public partial class Product : BaseEntity
 - `IProductService` interface with CRUD methods
 - `ProductService` implementation
 - Minimal API endpoints: POST, GET, GET (list), PUT, DELETE at `/api/products`
-- Automatic caching for GET operations (5 minutes default)
+- Cache metadata for GET operations when `CacheDurationSeconds` is greater than zero
 - Authorization required by default
 
 ## Attribute Properties
@@ -152,16 +152,15 @@ public string[]? Roles { get; set; }
 
 ### CacheDurationSeconds (int)
 
-Cache duration for GET operations in seconds.
+Declaration value for generated GET and GetList cache metadata, in seconds. This guide only documents the attribute shape; cache key format, invalidation, and runtime behavior are owned by [XFramework Caching Strategy](../best-practices/xframework-caching-strategy.md).
 
 ```csharp
 public int CacheDurationSeconds { get; set; } = 300;
 ```
 
 - **Default**: 300 seconds (5 minutes)
-- **Range**: 0 to unlimited (0 disables caching)
+- **Range**: non-negative integer; 0 disables generated cache metadata
 - **Applies to**: GET and GetList operations only
-- **Invalidation**: Automatic on Create/Update/Delete
 
 **Common Values:**
 - `0`: No caching (frequently changing data)
@@ -171,15 +170,14 @@ public int CacheDurationSeconds { get; set; } = 300;
 
 ### CacheKeyPrefix (string?)
 
-Prefix for cache key generation.
+Optional declaration value for generated cache-key prefix metadata. Runtime key format and invalidation rules belong in [XFramework Caching Strategy](../best-practices/xframework-caching-strategy.md).
 
 ```csharp
 public string? CacheKeyPrefix { get; set; }
 ```
 
-- **Default**: `null` (uses entity name in lowercase)
-- **Format**: `{CacheKeyPrefix}:{EntityId}` for Get, `{CacheKeyPrefix}:list:{QueryHash}` for GetList
-- **Use**: Module scoping, multi-tenant scenarios
+- **Default**: `null` (generator uses the entity name in lowercase where it needs a prefix)
+- **Use**: Module scoping and other cache-policy metadata that caching guidance defines
 
 ## Usage Examples
 
@@ -209,14 +207,14 @@ public partial class Product : BaseEntity
 
 **Generated Endpoints:**
 - `POST /api/products` - Create (Admin, ProductManager)
-- `GET /api/products/{id}` - Get (Admin, ProductManager, cached 10 min)
-- `GET /api/products` - GetList (Admin, ProductManager, cached 10 min)
+- `GET /api/products/{id}` - Get (Admin, ProductManager, cache metadata: 600 seconds)
+- `GET /api/products` - GetList (Admin, ProductManager, cache metadata: 600 seconds)
 - `PUT /api/products/{id}` - Update (Admin, ProductManager)
 - `DELETE /api/products/{id}` - Delete (Admin, ProductManager)
 
 ### Example 2: Read-Only Lookup Data
 
-Public reference data with aggressive caching.
+Public reference data with a long cache metadata declaration.
 
 ```csharp
 [GenerateEndpoints(
@@ -236,8 +234,8 @@ public partial class Category : BaseEntity
 ```
 
 **Generated Endpoints:**
-- `GET /api/lookup/categories/{id}` - Get (public, cached 1 hour)
-- `GET /api/lookup/categories` - GetList (public, cached 1 hour)
+- `GET /api/lookup/categories/{id}` - Get (public, cache metadata: 3600 seconds)
+- `GET /api/lookup/categories` - GetList (public, cache metadata: 3600 seconds)
 
 **Use Case**: Reference data, lookup tables, categories, countries, etc.
 
@@ -346,7 +344,7 @@ public partial class Customer : BaseEntity
 }
 ```
 
-**Pattern**: Implement soft delete in service layer; no hard delete endpoint generated.
+**Pattern**: Prefer the framework soft-delete behavior described in current data-access guidance; no hard-delete endpoint is generated.
 
 ### Example 6: Selective Operations
 
@@ -469,10 +467,11 @@ public class Product : BaseEntity // Can't extend in generated code
 )]
 ```
 
-### 3. Caching Strategy
+### 3. Cache Metadata
 
 ```csharp
-// ✅ GOOD: Match cache duration to data volatility
+// GOOD: Match declared cache metadata to data volatility.
+// See ../best-practices/xframework-caching-strategy.md for runtime semantics.
 [GenerateEndpoints(
     CacheDurationSeconds = 3600  // Reference data: 1 hour
 )]
@@ -555,10 +554,8 @@ app.MapGeneratedEndpoints();  // Or equivalent registration call
 **Symptom**: Data not cached despite `CacheDurationSeconds > 0`.
 
 **Solution**:
-1. Verify caching is configured in dependency injection
-2. Check Redis connection if using distributed cache
-3. Ensure cache key prefix doesn't conflict
-4. Verify no explicit cache bypass in requests
+1. Verify the generated endpoint was emitted and mapped through `app.MapGeneratedEndpoints()`.
+2. Check [XFramework Caching Strategy](../best-practices/xframework-caching-strategy.md) for runtime cache configuration, key format, and invalidation behavior.
 
 ### Issue: Authorization Always Fails
 
@@ -580,6 +577,8 @@ The `[GenerateEndpoints]` attribute is the starting point of a fully automated p
 2. **Source Generation** → Generators create service and endpoint code
 3. **Auto-Discovery** → Extensions automatically register everything
 4. **Runtime** → Application runs with zero manual configuration
+
+For manual VSA endpoints, use method-level `[MapPost]`, `[MapGet]`, `[MapPut]`, `[MapPatch]`, or `[MapDelete]`. Add `[BoltHandler]` only when the request implements `IBoltRequest<TRequest, TResponse>`. This separate path is generated by `BoltHandlerGenerator`; entity CRUD generation is handled by `EntityEndpointGenerator` and `EntityServiceGenerator`.
 
 ### Auto-Discovery Behavior
 
@@ -693,5 +692,5 @@ After defining attributes:
 ---
 
 **Version**: 1.1
-**Last Updated**: 2025-11-20
+**Last Updated**: 2026-05-21
 **Phase**: 5.4 - Auto-Discovery & Registration (Updated)

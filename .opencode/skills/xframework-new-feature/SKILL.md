@@ -18,30 +18,32 @@ Use this skill when:
 
 - `docs/solutions/conventions/xframework-best-practices.md`
 - `docs/solutions/conventions/xframework-vsa-agent-playbook.md`
+- `docs/solutions/conventions/xframework-feature-surface-map.md`
+- `docs/solutions/tooling-decisions/generated-endpoint-auto-discovery.md`
+- `docs/solutions/tooling-decisions/generate-endpoints-attribute-usage.md`
 - `src/Modules/XFramework.Inventario/Inventario.Api/Features/Products/` when present.
 
 ## Target Structure
 
 ```text
-[Module].Api/Features/[FeatureGroup]/
-├── [FeatureGroup]Endpoints.cs
-├── [Action]/
-│   ├── Endpoint.cs
-│   └── [Action][Entity]Validator.cs
-└── Shared/
-    └── [Entity]Response.cs
+src/Modules/XFramework.[Module]/[Module].Api/
+`-- Features/
+    `-- [FeatureGroup]/
+        |-- [Action]/
+        |   |-- Endpoint.cs
+        |   `-- [Action][Entity]Validator.cs
+        `-- Shared/
+            `-- [Entity]Response.cs
 ```
 
 ## Rules
 
-- Use file-scoped namespaces.
-- Use static endpoint classes and thin handlers.
-- Validate before service calls.
-- Use `TypedResults` and union return types.
-- Pass `CancellationToken ct` through.
-- Map `Result<T>` to HTTP with pattern matching.
-- Use response records with `From()` factories when appropriate.
-- Keep aggregators as pure wiring.
+- Treat `docs/solutions/conventions/xframework-vsa-agent-playbook.md` as the canonical rule source.
+- Use generated Minimal API endpoint attributes for generator-discovered handlers.
+- Return `Result<T>` or `Result` from generated handlers.
+- Add validators only when validation is required; name them `[Action][Entity]Validator` and rely on generator auto-validation for generated `[Map*]` handlers.
+- Add `[BoltHandler]` only for `IBoltRequest<TRequest, TResponse>` contracts.
+- Confirm `app.MapGeneratedEndpoints()` exists in the module startup.
 
 ## Workflow
 
@@ -49,7 +51,7 @@ Use this skill when:
 2. Read nearby feature, service, validator, installer, and `Program.cs` files.
 3. Create the smallest feature structure needed for the requested operation.
 4. Add validator/service changes only when required.
-5. Register endpoint aggregation if needed.
+5. Confirm generated endpoint mapping exists in module startup.
 6. Run a build or narrow test when feasible.
 
 Report files added, registration points, and verification.

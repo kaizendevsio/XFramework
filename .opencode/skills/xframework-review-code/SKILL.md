@@ -17,18 +17,19 @@ Use this skill when:
 ## Workflow
 
 1. Read `docs/solutions/conventions/xframework-best-practices.md`.
-2. Search `docs/solutions/` for related module, component, or topic metadata.
-3. Identify changed or requested files. If no scope is given, review staged and unstaged changes.
-4. Review for correctness first, then maintainability, conventions, tests, performance, and security.
-5. Report findings first, ordered by severity with file/line references.
+2. Use the most specific current subsystem doc in `docs/solutions/`; start with `docs/solutions/architecture-patterns/xframework-agent-architecture-surface-map.md` and `docs/solutions/conventions/xframework-feature-surface-map.md` when scope is unclear.
+3. Search `docs/solutions/` for related module, component, or topic metadata.
+4. Identify changed or requested files. If no scope is given, review staged and unstaged changes.
+5. Review for correctness first, then maintainability, conventions, tests, performance, and security.
+6. Report findings first, ordered by severity with file/line references.
 
 ## Review Checklist
 
 - VSA feature organization and no cross-feature imports.
 - File-scoped namespaces, primary constructors, records for DTOs, required members, collection expressions, and pattern matching where appropriate.
-- Minimal API endpoint quality: `TypedResults`, union return types, validation before service calls, route constraints, cancellation tokens, and OpenAPI metadata.
+- Minimal API endpoint quality: generated `[Map*]` handlers return `Result<T>` or `Result`; `TypedResults` and union return types are for fully manual endpoints; validate before service calls, use route constraints, pass cancellation tokens, and provide OpenAPI metadata.
 - Service quality: `Result<T>` or `Result`, no HTTP awareness, structured logging, OpenTelemetry activity tags, cancellation propagation, and cache invalidation.
-- EF Core quality: `AsNoTracking`, projections for DTO reads, no N+1 queries, no `SaveChangesAsync` in loops, `AsSplitQuery` for multiple includes, and bulk update/delete APIs where appropriate.
+- EF Core quality: avoid unintended tracking, use projections for DTO reads, no N+1 queries, no `SaveChangesAsync` in loops, `AsSplitQuery` for multiple includes, and bulk update/delete APIs where appropriate.
 - Caching, validation, security, pagination, and performance rules from the standards doc.
 
 ## Output

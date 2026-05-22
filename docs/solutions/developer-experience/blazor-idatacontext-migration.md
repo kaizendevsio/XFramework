@@ -37,6 +37,12 @@ walletsServiceWrapper.TransferWallet(request)
 
 Generic entity CRUD/query work should use `IDataContext`.
 
+See also:
+
+- `docs/solutions/conventions/ef-core-data-access-patterns.md` for local EF and remote `IDataContext` behavior.
+- `docs/solutions/architecture-patterns/decentralized-remote-data-context.md` for generated remote service-wrapper routing.
+- `docs/solutions/best-practices/xframework-caching-strategy.md` for remote data-context client cache behavior.
+
 ## Migration Target
 
 Replace Blazor generated CRUD wrapper usage with `IDataContext`.

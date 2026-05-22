@@ -1,6 +1,6 @@
 ---
 title: "XFramework VSA Agent Playbook"
-date: 2026-05-15
+date: 2026-05-21
 category: conventions
 module: XFramework
 problem_type: convention
@@ -11,68 +11,75 @@ applies_when:
 tags: [ai-agents, vsa, migration, conventions, result-pattern, services]
 ---
 
-# 🤖 AI Development Guide - XFramework VSA Migration
+# AI Development Guide - XFramework VSA
 
-**Quick Reference for AI Agents working on XFramework refactoring**
-
----
-
-## 🎯 Mission
-
-Transform XFramework from **CQRS/MediatR** → **Vertical Slice Architecture (VSA)** with direct service calls.
-
-**Timeline**: 16 weeks | **Phases**: 7 | **Status**: Planning
+**Quick Reference for AI Agents working on current XFramework features**
 
 ---
 
-## 🚫 What to REMOVE
+## Current Mission
+
+Build and review XFramework features using **Vertical Slice Architecture (VSA)**, generated Minimal API registration, direct service calls, FluentValidation, and Bolt for internal RPC/streaming.
+
+**Status**: Current implementation guidance. Historical CQRS/MediatR migration notes are only useful when removing old code.
+
+---
+
+## Do Not Use For New Work
 
 ```csharp
-// ❌ DELETE these patterns
+// Delete these only when migrating historical code.
 - IRequestHandler<TRequest, TResponse>
 - IMediator / mediator.Send()
 - Create<T>, Get<T>, GetList<T> command/query wrappers
 - CreateHandler<T>, GetHandler<T>, etc. generic handlers
 - MediatR pipeline behaviors
 - All MediatR registrations in DI
+- StreamFlow or SignalR handlers for module RPC
 ```
 
 ---
 
-## ✅ What to CREATE
+## What to Create
 
 ```csharp
-// ✅ NEW: Direct service pattern
-public partial class ProductService
+// Manual VSA endpoint: static handler with generated REST/Bolt registration.
+public static class CreateProductEndpoint
 {
-    private readonly AppDbContext _db;
-    private readonly ILogger<ProductService> _logger;
-    
-    // Virtual for override in manual partial
-    public virtual async Task<Result<Product>> CreateAsync(
-        Product entity, Guid tenantId, CancellationToken ct = default)
-    {
-        entity.Id = entity.Id != Guid.Empty ? entity.Id : Guid.NewGuid();
-        entity.TenantId = tenantId;
-        // Audit via SaveChanges interceptor
-        
-        _db.Products.Add(entity);
-        await _db.SaveChangesAsync(ct);
-        return Result.Success(entity);
-    }
+    [MapPost("/api/products", Tags = ["Products"], Summary = "Create product")]
+    [BoltHandler]
+    public static Task<Result<ProductResponse>> Handle(
+        CreateProductRequest request,
+        ProductService service,
+        CancellationToken ct) =>
+        service.CreateAsync(request, ct);
 }
 
-// ✅ Endpoint: Direct injection (NO MediatR)
-app.MapPost("/products", async (
-    ProductService service, // Direct DI
-    Product model,
-    [FromQuery] Guid tenantId) =>
+// Request contract used by BoltHandlerGenerator to infer the Bolt response.
+public sealed record CreateProductRequest(string Name, decimal Price) :
+    IBoltRequest<CreateProductRequest, Result<ProductResponse>>;
+```
+
+If `CreateProductValidator : AbstractValidator<CreateProductRequest>` exists, the generated REST adapter injects and runs `IValidator<CreateProductRequest>` before `Handle`. Do not include `IValidator<CreateProductRequest>` in the `[Map*]` handler signature.
+
+```csharp
+// Program.cs: map generated endpoint routes once per API module.
+app.MapGeneratedEndpoints();
+
+// Manual endpoints are still explicit when generated binding is not enough.
+GetWalletEndpoint.Map(app);
+```
+
+```csharp
+// Entity-generated CRUD: opt in from the entity.
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.All,
+    RoutePrefix = "api/products")]
+public partial class Product : BaseEntity
 {
-    var result = await service.CreateAsync(model, tenantId);
-    return result.IsSuccess 
-        ? Results.Created($"/products/{result.Data.Id}", result.Data)
-        : Results.BadRequest(result.Message);
-});
+    public string Name { get; set; } = string.Empty;
+}
 ```
 
 ---
@@ -93,34 +100,27 @@ public record Result<T>
 }
 ```
 
-### 2. Service Layer (Generated + Manual)
+### 2. Service Layer (Manual Or Generated)
 ```csharp
-// File: ProductService.g.cs (GENERATED)
-public partial class ProductService
+public sealed class ProductService(AppDbContext db, ILogger<ProductService> logger)
 {
-    public virtual async Task<Result<Product>> CreateAsync(...) { }
-    public virtual async Task<Result<Product>> GetAsync(...) { }
-}
-
-// File: ProductService.cs (MANUAL - extends generated)
-public partial class ProductService
-{
-    // Override with custom logic
-    public override async Task<Result<Product>> CreateAsync(...)
+    public async Task<Result<ProductResponse>> CreateAsync(
+        CreateProductRequest request,
+        CancellationToken ct)
     {
-        // Custom validation
-        if (entity.Price <= 0) return Result.Failure("Invalid price");
-        
-        // Call base
-        return await base.CreateAsync(entity, tenantId, ct);
+        var product = new Product { Name = request.Name, Price = request.Price };
+        db.Products.Add(product);
+        await db.SaveChangesAsync(ct);
+
+        return Result<ProductResponse>.Success(ProductResponse.From(product));
     }
-    
-    // Add custom methods
-    public async Task<Result<Product>> CreateWithInventoryAsync(...) { }
 }
 ```
 
 ### 3. EF Core Defaults
+
+Detailed data-access authority: `docs/solutions/conventions/ef-core-data-access-patterns.md`. This playbook only summarizes the day-to-day rules.
+
 ```csharp
 // DbContext configuration
 public AppDbContext(DbContextOptions options) : base(options)
@@ -141,21 +141,25 @@ var product = await _db.Products
 
 ### 4. Audit Interceptor
 ```csharp
-// Handles CreatedAt, UpdatedAt, CreatedBy, UpdatedBy automatically
-public class AuditInterceptor : SaveChangesInterceptor
+// Handles audit timestamps only: CreatedAt on insert, ModifiedAt on update.
+// It does not populate user IDs or tenant IDs.
+public sealed class AuditInterceptor : SaveChangesInterceptor
 {
-    public override InterceptionResult<int> SavingChanges(...)
+    private void ApplyAuditFields(DbContext? context)
     {
-        foreach (var entry in eventData.Context.ChangeTracker.Entries<IAuditable>())
+        if (context is null)
+            return;
+
+        var now = DateTime.UtcNow;
+
+        foreach (var entry in context.ChangeTracker.Entries<IAuditable>())
         {
             if (entry.State == EntityState.Added)
-            {
-                entry.Entity.CreatedAt = DateTime.UtcNow;
-                entry.Entity.CreatedBy = _currentUser.UserId;
-            }
-            entry.Entity.UpdatedAt = DateTime.UtcNow;
+                entry.Entity.CreatedAt = now;
+
+            if (entry.State == EntityState.Modified)
+                entry.Entity.ModifiedAt = now;
         }
-        return base.SavingChanges(eventData, result);
     }
 }
 ```
@@ -164,73 +168,77 @@ public class AuditInterceptor : SaveChangesInterceptor
 
 ## 🔑 Critical Rules
 
-1. **No MediatR** - Direct service injection in endpoints
-2. **Virtual Methods** - All generated CRUD methods are `virtual` for override
-3. **Partial Classes** - Use partials to extend generated code
-4. **Result Pattern** - All service methods return `Result<T>`
-5. **AsNoTracking** - Default for all reads, explicit tracking for writes
-6. **Interceptors** - Audit fields handled automatically, don't set manually
-7. **Soft Delete** - Use `IsDeleted = true`, handled by global query filter
-8. **Tenant Isolation** - Always validate `tenantId`, handled by query filter
+1. **No MediatR for new work** - Direct service injection in endpoints
+2. **Use `[MapPost]`, `[MapGet]`, `[MapPut]`, `[MapPatch]`, or `[MapDelete]`** on generated manual endpoint handlers
+3. **Use `[BoltHandler]` plus `IBoltRequest<TRequest, TResponse>`** when the same handler is callable over Bolt
+4. **Do not inject `IValidator<TRequest>` into `[Map*]` handlers** - the REST adapter generated by `BoltHandlerGenerator` auto-detects `AbstractValidator<TRequest>` and validates before calling the handler
+5. **Use manual validator injection only for manually mapped endpoints or custom `IResult` flows**
+6. **Map generated routes with `app.MapGeneratedEndpoints()`** in module `Program.cs`; do not manually call generated `Map{Action}{Entity}` methods
+7. **Result Pattern** - All service methods return `Result<T>` or `Result`
+8. **AsNoTracking** - Default for reads, explicit tracking for writes
+9. **Audit timestamps** - `AuditInterceptor` sets `CreatedAt` and `ModifiedAt` only; set user IDs and tenant IDs explicitly where required
+10. **Soft Delete** - Delete entities through EF/context behavior (`Remove` / `EntityState.Deleted`) so `XDbContext.OnBeforeSaveChanges()` converts them to soft deletes; do not manually set `IsDeleted = true` in services
+11. **Tenant Isolation** - Always set valid `TenantId` on new tenant-owned entities and validate tenant behavior; query filtering is handled by `XDbContext` where available
 
 ---
 
 ## 📁 File Organization
 
 ```
-src/
-├── Features/                    # NEW: VSA features
-│   └── Products/
-│       ├── Create/
-│       │   ├── Endpoint.cs
-│       │   └── Validator.cs
-│       ├── Get/
-│       └── Update/
-├── Services/                    # Generated services
-│   ├── Generated/
-│   │   └── ProductService.g.cs  # Generated partial
-│   └── ProductService.cs        # Manual partial (custom logic)
-└── Endpoints/                   # Generated endpoints
-    └── Generated/
-        └── ProductEndpoints.g.cs
+src/Modules/XFramework.[Module]/[Module].Api/
+|-- Features/
+|   `-- Products/
+|       |-- Create/
+|       |   |-- Endpoint.cs
+|       |   `-- CreateProductValidator.cs
+|       |-- Get/
+|       `-- Update/
+|-- Services/
+|   `-- ProductService.cs
+|-- Generated/
+|   `-- GeneratedEndpointRoutes.g.cs
+`-- Program.cs
 ```
 
 ---
 
 ## 🔧 Common Tasks
 
-### Task: Migrate a Module to VSA
+### Task: Add A Manual VSA Endpoint
 
-1. **Delete CQRS**
-   ```bash
-   # Remove files
-   rm CreateHandler.cs GetHandler.cs PatchHandler.cs DeleteHandler.cs
-   rm Create.cs Get.cs GetList.cs Patch.cs Replace.cs Delete.cs
-   ```
-
-2. **Create Service**
+1. **Create or reuse the service**
    ```csharp
-   // ProductService.cs
-   public partial class ProductService
+   public sealed class ProductService(AppDbContext db)
    {
-       private readonly AppDbContext _db;
-       
-       public virtual async Task<Result<Product>> CreateAsync(...) { }
-       public virtual async Task<Result<Product>> GetAsync(...) { }
+       public Task<Result<ProductResponse>> CreateAsync(CreateProductRequest request, CancellationToken ct) { ... }
    }
    ```
 
-3. **Update Endpoints**
+2. **Add an endpoint handler**
    ```csharp
-   // Remove IMediator, inject service directly
-   app.MapPost("/products", async (ProductService service, ...) => { });
+   [MapPost("/api/products", Tags = ["Products"])]
+   [BoltHandler]
+   public static Task<Result<ProductResponse>> Handle(
+       CreateProductRequest request,
+       ProductService service,
+       CancellationToken ct) => service.CreateAsync(request, ct);
    ```
 
-4. **Remove MediatR DI**
+3. **Ensure registration exists once**
    ```csharp
-   // Delete: services.AddMediatR(...)
-   // Add: services.AddScoped<ProductService>();
+   builder.Services.AddScoped<ProductService>();
+   builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+   app.MapGeneratedEndpoints();
    ```
+
+### Task: Remove Historical CQRS/MediatR Code
+
+Use this only when a module still contains old handlers.
+
+1. Delete `IRequestHandler`, `IMediator`, and generic command/query wrappers.
+2. Replace `mediator.Send(...)` with direct service calls from the endpoint.
+3. Remove `services.AddMediatR(...)` registrations.
+4. Keep manual endpoint mappings only where generator attributes cannot represent the binding.
 
 ### Task: Add Custom Business Logic
 
@@ -277,57 +285,45 @@ private static readonly Func<AppDbContext, Guid, Task<Product?>> GetById =
 
 ---
 
-## 🎨 StreamFlow Channel Pattern
+## Bolt Handler Pattern
 
 ```csharp
-// Replace ConcurrentDictionary with Channels
-private readonly Channel<Message> _channel = Channel.CreateBounded<Message>(
-    new BoundedChannelOptions(10000)
-    {
-        FullMode = BoundedChannelFullMode.Wait // Backpressure
-    });
+// Domain.Shared request contract.
+public sealed record TransferWalletRequest(Guid FromWalletId, Guid ToWalletId, decimal Amount) :
+    IBoltRequest<TransferWalletRequest, Result<TransferWalletResponse>>;
 
-// Enqueue
-await _channel.Writer.WriteAsync(message, ct);
-
-// Dequeue (background service)
-await foreach (var msg in _channel.Reader.ReadAllAsync(ct))
+// API feature handler. BoltHandlerGenerator emits an IBoltHandler and a REST adapter.
+public static class TransferWalletEndpoint
 {
-    await ProcessAsync(msg);
+    [MapPost("/api/wallets/transfer", Tags = ["Wallets"])]
+    [BoltHandler]
+    public static Task<Result<TransferWalletResponse>> Handle(
+        TransferWalletRequest request,
+        IWalletService walletService,
+        CancellationToken ct) => walletService.TransferAsync(request, ct);
 }
 ```
 
 ---
 
-## 📊 Phase Checklist
-
-**Current Phase**: ___ of 7
-
-- [ ] Phase 1: Foundation (Weeks 1-2)
-- [ ] Phase 2: Core Refactoring - Inventario (Weeks 3-6)
-- [ ] Phase 3: Performance (Weeks 7-8)
-- [ ] Phase 4: Module Migration (Weeks 9-12)
-- [ ] Phase 5: Source Generators (Weeks 11-12)
-- [ ] Phase 6: Observability (Weeks 13-14)
-- [ ] Phase 7: Production (Weeks 15-16)
-
----
-
 ## 📚 Reference Files
 
-- **Detailed Plan**: `XFramework-Improvement-Plan.md`
-- **Full Roadmap**: `XFramework-Development-Roadmap.md`
-- **Current State**: See `src/Kernel/XFramework.Core/DataAccess/`
+- **Best Practices**: `docs/solutions/conventions/xframework-best-practices.md`
+- **Generated Endpoint Registration**: `docs/solutions/tooling-decisions/generated-endpoint-auto-discovery.md`
+- **GenerateEndpoints Attribute**: `docs/solutions/tooling-decisions/generate-endpoints-attribute-usage.md`
+- **EF Core Data Access**: `docs/solutions/conventions/ef-core-data-access-patterns.md`
+- **Caching Strategy**: `docs/solutions/best-practices/xframework-caching-strategy.md`
+- **Feature Map**: `docs/solutions/conventions/xframework-feature-surface-map.md`
 
 ---
 
 ## ⚠️ Before Starting ANY Task
 
-1. Check current phase in `XFramework-Development-Roadmap.md`
-2. Read the specific phase section
-3. Verify no blockers exist for the task
-4. Read related files to understand context
-5. Plan the approach before coding
+1. Read the existing module feature folder under `src/Modules/XFramework.[Module]/[Module].Api/Features/`.
+2. Check whether the feature should be manual VSA, entity-generated CRUD, or both.
+3. Inspect the module `Program.cs` for `app.MapGeneratedEndpoints()` and any explicit manual endpoint mappings.
+4. Check request contracts under `[Module].Domain.Shared/Contracts/Requests/` before adding Bolt requests.
+5. Read related tests to understand expected behavior.
 
 ---
 
@@ -345,39 +341,23 @@ await foreach (var msg in _channel.Reader.ReadAllAsync(ct))
    # All tests must pass before marking complete
    ```
 
-3. **Update Roadmap**
-   - Check off the completed task in `XFramework-Development-Roadmap.md`
-   - Add notes about decisions made or challenges encountered
-   - Update status if phase is complete
-
-4. **Update Documentation**
+3. **Update Documentation**
    - If pattern changed: Update this guide
    - If API changed: Update API docs
    - If behavior changed: Update user docs
 
-5. **Code Quality Check**
+4. **Code Quality Check**
    - Remove unused imports
    - Remove commented code
    - Ensure proper error handling exists
    - Verify logging is in place
 
-6. **Commit & Document**
-   ```bash
-   git add .
-   git commit -m "Phase X.Y: [Brief description]
-   
-   - Detailed change 1
-   - Detailed change 2
-   
-   Closes #issue-number"
-   ```
-
-7. **Performance Verification** (if applicable)
+5. **Performance Verification** (if applicable)
    - Run benchmarks if performance-critical
    - Verify memory usage hasn't increased significantly
    - Check database query times
 
-8. **Security Check** (if applicable)
+6. **Security Check** (if applicable)
    - Verify tenant isolation still works
    - Check authorization rules
    - Validate input sanitization
@@ -406,13 +386,13 @@ dotnet build /t:Rebuild
 
 ## 💡 Pro Tips
 
-- **Start Small**: Migrate Inventario module first (simplest)
+- **Start From Existing Modules**: IdentityServer, Wallets, Messaging, Community, and Inventario show current patterns
 - **Test Often**: Each service method needs tests
 - **Use Partials**: Never modify generated `.g.cs` files
 - **Log Everything**: Use ILogger, not Console.WriteLine
 - **Think VSA**: Feature folders group related code together
-- **No Shortcuts**: Complete refactor, not hybrid CQRS/VSA
+- **No New CQRS/MediatR**: If old patterns remain, treat them as migration targets
 
 ---
 
-**Last Updated**: 2025-01-19 | **Version**: 1.0
+**Last Updated**: 2026-05-21 | **Version**: 2.0

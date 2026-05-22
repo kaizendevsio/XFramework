@@ -13,6 +13,8 @@ tags: [zlogger, logging, seq, serilog, observability]
 
 # Unified ZLogger Migration — Design Spec
 
+**Status:** Current decision record. The migration described here has been applied in the active codebase: ZLogger through `AddXFrameworkLogging()` is the current logging pipeline, and Serilog references below are historical removal context.
+
 ## Problem
 
 XFramework services have two competing logging pipelines:

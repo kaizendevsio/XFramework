@@ -17,6 +17,8 @@ Use this skill when:
 ## References
 
 - `docs/solutions/conventions/xframework-best-practices.md`, sections 5, 6, 8, 9, and 10.
+- `docs/solutions/conventions/ef-core-data-access-patterns.md` when service work touches EF Core.
+- `docs/solutions/best-practices/xframework-caching-strategy.md` when service work touches caching.
 - `src/Modules/XFramework.Inventario/Inventario.Api/Services/ProductService.cs` when present.
 
 ## Rules

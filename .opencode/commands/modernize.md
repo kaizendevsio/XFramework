@@ -9,7 +9,7 @@ Modernize the specified XFramework files or module without changing behavior.
 
 Arguments: `$ARGUMENTS` should specify files, folders, or a module.
 
-Use `docs/solutions/conventions/xframework-best-practices.md` sections 3 and 16.
+Use `docs/solutions/conventions/xframework-best-practices.md` sections 3 and 16 as the current .NET 10 / C# 14 convention source. If module structure is unclear, orient with `docs/solutions/architecture-patterns/xframework-agent-architecture-surface-map.md` and `docs/solutions/conventions/xframework-feature-surface-map.md`.
 
 Prioritize:
 - Primary constructors for DI-heavy classes.
