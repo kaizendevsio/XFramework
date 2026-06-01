@@ -4,14 +4,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Bolt.Hub.Extensions;
 using Testcontainers.PostgreSql;
+using Wallets.Api.Events;
 using Wallets.Integration.Drivers;
+using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
+using XFramework.Domain.Interceptors;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Extensions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Extensions;
+using BatchDecrementEndpoint = Wallets.Api.Features.Batch.DecrementBatch.Endpoint;
+using BatchIncrementEndpoint = Wallets.Api.Features.Batch.IncrementBatch.Endpoint;
+using BatchTransferEndpoint = Wallets.Api.Features.Batch.TransferBatch.Endpoint;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
 namespace Wallets.IntegrationTests;
@@ -54,10 +60,10 @@ public class WalletsTestFixture
         await MigrateAndSeed();
 
         _streamFlowApp = StartBolt();
-        await WaitForHealth($"{BoltUrl}/health/live");
+        await WaitForHealth($"{BoltUrl}/health/live", _streamFlowTask);
 
         _walletsApp = StartWallets();
-        await WaitForHealth($"{WalletsUrl}/health/live");
+        await WaitForHealth($"{WalletsUrl}/health/live", _walletsTask);
 
         var cache = _walletsApp.Services.GetRequiredService<IMemoryCache>();
         cache.Set($"GetTenant-{TestTenantId}", new Contracts.Tenant
@@ -67,7 +73,7 @@ public class WalletsTestFixture
         });
 
         _testClientApp = StartTestClient();
-        await WaitForHealth($"{TestClientUrl}/health/live");
+        await WaitForHealth($"{TestClientUrl}/health/live", _testClientTask);
 
         await WaitForBoltClients();
     }
@@ -98,14 +104,35 @@ public class WalletsTestFixture
 
     private static WebApplication StartWallets()
     {
-        var builder = XApplication.Configure<Wallets.Api.Services.WalletOperationsService>();
+        // Build manually so test configuration is in place before installers/Bolt client registration read it.
+        var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls(WalletsUrl);
-        OverrideConfig(builder, "Wallets.Test", "4902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
+        OverrideConfig(builder, "Wallets", "4902761a-822d-4c6b-8e2d-323fd501bcd6");
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws";
 
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddScoped<AuditInterceptor>();
+        builder.Services.AddDbContext<DbContext, AppDbContext>((sp, options) => options
+            .UseNpgsql(ConnectionString,
+                npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            .ConfigureWarnings(w => w.Ignore(
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.BoolWithDefaultWarning,
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
+            .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
+        builder.Services.AddServerDataContext<AppDbContext>();
+
+        builder.Services.InstallStandardServices<Wallets.Api.Services.WalletOperationsService>(builder.Configuration);
+        builder.Services.AddTenantResolver();
+        builder.Services.AddSingleton<IWalletEventPublisher, WalletEventPublisher>();
+        builder.Services.AddScoped<Wallets.Api.Services.IWalletOperationsService, Wallets.Api.Services.WalletOperationsService>();
+        builder.Services.AddScoped<Wallets.Api.Services.IBatchWalletService, Wallets.Api.Services.BatchWalletService>();
         builder.Services.AddValidatorsFromAssemblyContaining<Wallets.Api.Services.IWalletOperationsService>();
+        builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
+        builder.Services.AddDataContextHandler(typeof(Wallets.Api.Services.WalletOperationsService).Assembly);
 
         var app = (WebApplication)builder.Build();
+        RegisterWalletsBoltHandlers(app);
         app.UseCorrelationId();
 
         // Map source-generated endpoints
@@ -114,11 +141,24 @@ public class WalletsTestFixture
         // Manual endpoints
         Wallets.Api.Features.Wallets.Get.GetWalletEndpoint.Map(app);
         Wallets.Api.Features.Wallets.GetByCredential.GetWalletsByCredentialEndpoint.Map(app);
+        BatchIncrementEndpoint.MapBatchIncrementEndpoint(app);
+        BatchDecrementEndpoint.MapBatchDecrementEndpoint(app);
+        BatchTransferEndpoint.MapBatchTransferEndpoint(app);
 
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
         _walletsTask = Task.Run(() => app.RunAsync());
         return app;
+    }
+
+    private static void RegisterWalletsBoltHandlers(WebApplication app)
+    {
+        var client = app.Services.GetRequiredService<BoltClient>();
+        var logger = app.Services.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Wallets.GeneratedBoltHandlers");
+        var scopeFactory = app.Services.GetRequiredService<IServiceScopeFactory>();
+
+        Wallets.Api.Generated.BoltHandlerRegistry.RegisterAll(client, logger, scopeFactory);
     }
 
     private static WebApplication StartTestClient()
@@ -140,7 +180,7 @@ public class WalletsTestFixture
         // updates the source generator to emit thin-protocol handlers.
         builder.Services.InstallStandardServices<WalletsTestFixture>(builder.Configuration);
         builder.Services.AddSingleton(new DeviceAgentProvider("WalletTest"));
-        builder.Services.AddXFrameworkBoltClient(builder.Configuration);
+        builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
         builder.Services.AddWalletsWrapperServices();
 
         var app = builder.Build();
@@ -152,24 +192,43 @@ public class WalletsTestFixture
 
     private static async Task WaitForBoltClients()
     {
+        var walletsClient = _walletsApp.Services.GetRequiredService<BoltClient>();
         var testClient = _testClientApp.Services.GetRequiredService<BoltClient>();
 
         // Handler registration is now automatic via BoltHandlerRegistrationHostedService
         // when AddXFrameworkBoltClient() is called in the service's startup.
         // Give the BoltClient time to connect and the hosted service to register handlers.
-        await Task.Delay(2000);
+        await ConnectBoltClient(walletsClient, "Wallets service");
+        await ConnectBoltClient(testClient, "Wallets test client");
+        await Task.Delay(1000);
 
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
-            if (testClient.IsConnected)
+            if (walletsClient.IsConnected && testClient.IsConnected)
             {
                 await Task.Delay(1000);
                 return;
             }
             await Task.Delay(250);
         }
-        throw new TimeoutException("Bolt test client failed to connect within 15s");
+        throw new TimeoutException("Wallets Bolt clients failed to connect within 15s");
+    }
+
+    private static async Task ConnectBoltClient(BoltClient client, string clientName)
+    {
+        if (client.IsConnected)
+            return;
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        try
+        {
+            await client.ConnectWithRetryAsync(cts.Token);
+        }
+        catch (OperationCanceledException ex)
+        {
+            throw new TimeoutException($"{clientName} Bolt client failed to connect within 15s", ex);
+        }
     }
 
     private static void OverrideConfig(WebApplicationBuilder builder, string clientName, string clientGuid)
@@ -186,8 +245,19 @@ public class WalletsTestFixture
 
     private static async Task MigrateAndSeed()
     {
+        // AppDbContext discovers mappings from already-loaded Domain.Shared assemblies.
+        // Force the module contracts used by this suite before constructing the context.
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Wallets.Domain.Shared.Contracts.WalletType).TypeHandle);
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Contracts.IdentityCredential).TypeHandle);
+
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString)
+            // The shared migration snapshot contains modules outside this test load graph.
+            // Match the migration runner behavior while still loading Wallets/Identity mappings above.
+            .ConfigureWarnings(w => w.Ignore(
+                Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         await using var db = new AppDbContext(options);
@@ -195,12 +265,22 @@ public class WalletsTestFixture
         await XFramework.TestInfrastructure.TestSeedData.SeedAll(db);
     }
 
-    private static async Task WaitForHealth(string url, int timeoutSeconds = 30)
+    private static async Task WaitForHealth(string url, Task? appTask = null, int timeoutSeconds = 30)
     {
         using var client = new HttpClient();
         var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
         while (DateTime.UtcNow < deadline)
         {
+            if (appTask is { IsFaulted: true })
+            {
+                throw new InvalidOperationException(
+                    $"Application crashed during startup: {appTask.Exception?.GetBaseException().Message}",
+                    appTask.Exception?.GetBaseException());
+            }
+
+            if (appTask is { IsCompleted: true })
+                throw new InvalidOperationException("Application stopped before the health endpoint became available.");
+
             try
             {
                 var response = await client.GetAsync(url);
@@ -209,6 +289,17 @@ public class WalletsTestFixture
             catch { }
             await Task.Delay(500);
         }
+
+        if (appTask is { IsFaulted: true })
+        {
+            throw new InvalidOperationException(
+                $"Application crashed during startup: {appTask.Exception?.GetBaseException().Message}",
+                appTask.Exception?.GetBaseException());
+        }
+
+        if (appTask is { IsCompleted: true })
+            throw new InvalidOperationException("Application stopped before the health endpoint became available.");
+
         throw new TimeoutException($"Service at {url} did not become healthy within {timeoutSeconds}s");
     }
 }

@@ -167,9 +167,9 @@ public sealed class AuthService : IAuthService
             if (request.RequireVerificationId)
             {
                 var verification = await _dataContext.Query<IdentityVerification>()
-                    .Where(i => i.VerificationType.Name == nameof(IdentityConstants.VerificationType.Sms))
+                    .Where(i => i.VerificationTypeId == IdentityConstants.VerificationType.Sms)
                     .Where(i => i.CredentialId == request.CreadentialId)
-                    .Where(i => i.Status == (int)GenericStatusType.Approved)
+                    .Where(i => i.Status == (short?)GenericStatusType.Approved)
                     .Where(i => i.Id == request.VerificationId)
                     .Where(i => i.StatusUpdatedOn >= DateTime.UtcNow.AddMinutes(-10))
                     .FirstOrDefaultAsync(ct);
@@ -230,9 +230,7 @@ public sealed class AuthService : IAuthService
             }
 
             // Verify password using BCrypt - SECURITY CRITICAL
-            var isPasswordValid = BCrypt.Net.BCrypt.Verify(
-                request.Password,
-                Encoding.ASCII.GetString(user.PasswordByte));
+            var isPasswordValid = VerifyPasswordHash(request.Password, user.PasswordByte);
 
             if (!isPasswordValid)
             {
@@ -310,7 +308,7 @@ public sealed class AuthService : IAuthService
 
                 _logger.MultipleFailedLogins(
                     request.UserName ?? string.Empty,
-                    request.Metadata.IpAddress,
+                    request.Metadata.IpAddress ?? string.Empty,
                     lockoutInfo.FailedAttempts);
 
                 return Result<AuthenticateIdentityResponse>.Failure(
@@ -332,7 +330,7 @@ public sealed class AuthService : IAuthService
                     info.LockoutEnd = DateTime.UtcNow.AddMinutes(LockoutDurationMinutes);
                     _logger.MultipleFailedLogins(
                         request.UserName ?? string.Empty,
-                        request.Metadata.IpAddress,
+                        request.Metadata.IpAddress ?? string.Empty,
                         info.FailedAttempts);
                 }
 
@@ -357,7 +355,7 @@ public sealed class AuthService : IAuthService
 
             // Check roles - SECURITY CRITICAL
             var roleList = await GetRoleList(credential, ct);
-            if (roleList is null || !roleList.Any(i => i.Type.Id == request.RoleId))
+            if (roleList is null || !roleList.Any(i => i.TypeId == request.RoleId))
             {
                 // Log unauthorized attempt - SECURITY CRITICAL
                 await CreateAuthorizationLog(
@@ -415,12 +413,12 @@ public sealed class AuthService : IAuthService
             var saveResult = await _dataContext.SaveChangesAsync(ct);
             if (!saveResult.IsSuccess)
             {
-                _logger.OperationFailed("Authenticate", "SaveChanges", credential.Id, saveResult.Message, null);
+                _logger.OperationFailed("Authenticate", "SaveChanges", credential.Id, saveResult.Message ?? string.Empty, null);
                 return Result<AuthenticateIdentityResponse>.Failure(
                     "Failed to persist authentication session", 500);
             }
 
-            _logger.UserAuthenticated(credential.Id, request.Metadata.IpAddress);
+            _logger.UserAuthenticated(credential.Id, request.Metadata.IpAddress ?? string.Empty);
 
             return Result<AuthenticateIdentityResponse>.Success(
                 new AuthenticateIdentityResponse
@@ -474,15 +472,21 @@ public sealed class AuthService : IAuthService
                     $"Credential with id {request.Model.CredentialId} does not exist");
             }
 
-            switch (verificationType.Name)
+            if (verificationType.DefaultExpiry is not { } defaultExpiryMinutes)
             {
-                case nameof(IdentityConstants.VerificationType.Sms):
+                return Result<IdentityVerification>.Failure(
+                    "Verification type does not have a default expiry", 409);
+            }
+
+            switch (verificationType.Id)
+            {
+                case var id when id == IdentityConstants.VerificationType.Sms:
                     var messageTemplate = await _dataContext.Query<RegistryConfiguration>()
                         .Where(i => i.TenantId == tenant.Id)
-                        .Where(i => i.Group.Name == "MessagingService_Otp")
+                        .Where(i => i.Group != null && i.Group.Name == "MessagingService_Otp")
                         .FirstOrDefaultAsync(ct);
 
-                    if (messageTemplate is null)
+                    if (string.IsNullOrEmpty(messageTemplate?.Value))
                     {
                         return Result<IdentityVerification>.Failure(
                             "Unable to send message: OTP message template could not be found", 409);
@@ -496,7 +500,7 @@ public sealed class AuthService : IAuthService
                     var phoneContact = await _dataContext.Query<IdentityContact>()
                         .Include(c => c.Type)
                         .Where(c => c.CredentialId == identityCredential.Id)
-                        .Where(c => c.Type.Name == "Phone")
+                        .Where(c => c.Type != null && c.Type.Name == "Phone")
                         .FirstOrDefaultAsync(ct);
 
                     var contact = phoneContact?.Value;
@@ -513,7 +517,7 @@ public sealed class AuthService : IAuthService
                         Status = (short?)GenericStatusType.Pending,
                         StatusUpdatedOn = DateTime.UtcNow,
                         Token = $"{otp}",
-                        Expiry = DateTime.UtcNow.AddMinutes((double)verificationType.DefaultExpiry),
+                        Expiry = DateTime.UtcNow.AddMinutes(defaultExpiryMinutes),
                         CredentialId = identityCredential.Id,
                         VerificationTypeId = verificationType.Id
                     };
@@ -540,13 +544,13 @@ public sealed class AuthService : IAuthService
 
                     return Result<IdentityVerification>.Success(verification);
 
-                case nameof(IdentityConstants.VerificationType.Email):
+                case var id when id == IdentityConstants.VerificationType.Email:
                     var emailMessageTemplate = await _dataContext.Query<RegistryConfiguration>()
                         .Where(i => i.TenantId == tenant.Id)
-                        .Where(i => i.Group.Name == "MessagingService_Otp")
+                        .Where(i => i.Group != null && i.Group.Name == "MessagingService_Otp")
                         .FirstOrDefaultAsync(ct);
 
-                    if (emailMessageTemplate is null)
+                    if (string.IsNullOrEmpty(emailMessageTemplate?.Value))
                     {
                         return Result<IdentityVerification>.Failure(
                             "Unable to send message: OTP message template could not be found", 409);
@@ -560,7 +564,7 @@ public sealed class AuthService : IAuthService
                     var emailContact = await _dataContext.Query<IdentityContact>()
                         .Include(c => c.Type)
                         .Where(c => c.CredentialId == identityCredential.Id)
-                        .Where(c => c.Type.Name == "Email")
+                        .Where(c => c.Type != null && c.Type.Name == "Email")
                         .FirstOrDefaultAsync(ct);
 
                     var emailAddress = emailContact?.Value;
@@ -577,7 +581,7 @@ public sealed class AuthService : IAuthService
                         Status = (short?)GenericStatusType.Pending,
                         StatusUpdatedOn = DateTime.UtcNow,
                         Token = $"{emailOtp}",
-                        Expiry = DateTime.UtcNow.AddMinutes((double)verificationType.DefaultExpiry),
+                        Expiry = DateTime.UtcNow.AddMinutes(defaultExpiryMinutes),
                         CredentialId = identityCredential.Id,
                         VerificationTypeId = verificationType.Id
                     };
@@ -624,14 +628,15 @@ public sealed class AuthService : IAuthService
         try
         {
             var verification = await _dataContext.Query<IdentityVerification>()
-                .Where(i => i.Status == (int?)GenericStatusType.Pending)
+                .Where(i => i.Status == (short?)GenericStatusType.Pending)
                 .Where(i => i.Token == request.Model.Token)
+                .Where(i => i.Expiry > DateTime.UtcNow)
                 .FirstOrDefaultAsync(ct);
 
             if (verification == null)
             {
                 return Result<IdentityVerification>.NotFound(
-                    $"Verification with token {request.Model.Token} does not exist");
+                    "Verification token is invalid or expired");
             }
 
             // Update verification status to Approved
@@ -830,6 +835,7 @@ public sealed class AuthService : IAuthService
         CancellationToken ct)
     {
         IdentityCredential? result;
+        var userName = request.UserName ?? string.Empty;
 
         reAuth:
         switch (authorizationType)
@@ -846,7 +852,13 @@ public sealed class AuthService : IAuthService
                         $"Unable to login: Tenant with id '{tenant.Id}' does not have 'DefaultAuthorizeBy' key in registry");
                 }
 
-                authorizationType = (AuthorizationType)int.Parse(getDefaults.Value);
+                if (!int.TryParse(getDefaults.Value, out var defaultAuthorizationType))
+                {
+                    throw new ArgumentException(
+                        $"Unable to login: Tenant with id '{tenant.Id}' has an invalid 'DefaultAuthorizeBy' value in registry");
+                }
+
+                authorizationType = (AuthorizationType)defaultAuthorizationType;
                 goto reAuth;
 
             case AuthorizationType.UsernameEmailPhone:
@@ -854,7 +866,7 @@ public sealed class AuthService : IAuthService
                 result = await _dataContext.Query<IdentityCredential>()
                     .Include(i => i.IdentityInfo)
                     .Include(i => i.IdentityRoles)
-                    .Where(i => i.TenantId == tenant.Id && i.UserName == request.UserName)
+                    .Where(i => i.TenantId == tenant.Id && i.UserName == userName)
                     .FirstOrDefaultAsync(ct);
 
                 // Try email if username not found
@@ -864,7 +876,8 @@ public sealed class AuthService : IAuthService
                         .Include(c => c.Type)
                         .Where(i =>
                             i.Credential.TenantId == tenant.Id &&
-                            i.Value == request.UserName &&
+                            i.Value == userName &&
+                            i.Type != null &&
                             i.Type.Name == nameof(GenericContactType.Email))
                         .FirstOrDefaultAsync(ct);
 
@@ -885,7 +898,8 @@ public sealed class AuthService : IAuthService
                         .Include(c => c.Type)
                         .Where(i =>
                             i.Credential.TenantId == tenant.Id &&
-                            i.Value == request.UserName.ValidatePhoneNumber(true) &&
+                            i.Value == userName.ValidatePhoneNumber(true) &&
+                            i.Type != null &&
                             i.Type.Name == nameof(GenericContactType.Phone))
                         .FirstOrDefaultAsync(ct);
 
@@ -904,17 +918,22 @@ public sealed class AuthService : IAuthService
                 result = await _dataContext.Query<IdentityCredential>()
                     .Include(i => i.IdentityInfo)
                     .Include(i => i.IdentityRoles)
-                    .Where(i => i.TenantId == tenant.Id && i.UserName == request.UserName)
+                    .Where(i => i.TenantId == tenant.Id && i.UserName == userName)
                     .FirstOrDefaultAsync(ct);
                 break;
 
             case AuthorizationType.Email:
-                request.UserName?.ValidateEmailAddress();
+                if (!string.IsNullOrEmpty(userName))
+                {
+                    userName.ValidateEmailAddress();
+                }
+
                 var emailContactForAuth = await _dataContext.Query<IdentityContact>()
                     .Include(c => c.Type)
                     .Where(i =>
                         i.Credential.TenantId == tenant.Id &&
-                        i.Value == request.UserName &&
+                        i.Value == userName &&
+                        i.Type != null &&
                         i.Type.Name == nameof(GenericContactType.Email))
                     .FirstOrDefaultAsync(ct);
 
@@ -932,7 +951,8 @@ public sealed class AuthService : IAuthService
                     .Include(c => c.Type)
                     .Where(i =>
                         i.Credential.TenantId == tenant.Id &&
-                        i.Value == request.UserName.ValidatePhoneNumber(true) &&
+                        i.Value == userName.ValidatePhoneNumber(true) &&
+                        i.Type != null &&
                         i.Type.Name == nameof(GenericContactType.Phone))
                     .FirstOrDefaultAsync(ct);
 
@@ -949,7 +969,7 @@ public sealed class AuthService : IAuthService
                 result = await _dataContext.Query<IdentityCredential>()
                     .Include(i => i.IdentityRoles)
                     .Include(i => i.IdentityInfo)
-                    .Where(i => i.UserName == request.UserName)
+                    .Where(i => i.UserName == userName)
                     .FirstOrDefaultAsync(ct);
                 break;
 
@@ -975,8 +995,18 @@ public sealed class AuthService : IAuthService
             return credential;
 
         // Verify password using BCrypt - SECURITY CRITICAL
-        var hashPassword = Encoding.ASCII.GetString(credential.PasswordByte);
-        return BCrypt.Net.BCrypt.Verify(request.Password, hashPassword) is false ? null : credential;
+        return VerifyPasswordHash(request.Password, credential.PasswordByte) ? credential : null;
+    }
+
+    private static bool VerifyPasswordHash(string? password, byte[]? passwordBytes)
+    {
+        if (string.IsNullOrEmpty(password) || passwordBytes is not { Length: > 0 })
+        {
+            return false;
+        }
+
+        var hashPassword = Encoding.ASCII.GetString(passwordBytes);
+        return BCrypt.Net.BCrypt.Verify(password, hashPassword);
     }
 
     /// <summary>
@@ -1001,10 +1031,10 @@ public sealed class AuthService : IAuthService
     private async Task CreateAuthorizationLog(
         Guid tenantId,
         Guid credentialId,
-        string ipAddress,
-        string loginSource,
-        string deviceName,
-        string deviceAgent,
+        string? ipAddress,
+        string? loginSource,
+        string? deviceName,
+        string? deviceAgent,
         AuthenticationState authStatus,
         Guid? sessionId)
     {
@@ -1197,6 +1227,14 @@ public sealed class AuthService : IAuthService
                 return Result<RefreshTokenResponse>.Failure("Invalid access token", 401);
             }
 
+            var credentialIdClaim = principal.FindFirstValue(ClaimTypes.Name);
+            if (!Guid.TryParse(credentialIdClaim, out var tokenCredentialId) ||
+                tokenCredentialId != session.CredentialId)
+            {
+                _logger.TokenValidationFailed(session.CredentialId, "Access token does not match session credential");
+                return Result<RefreshTokenResponse>.Failure("Invalid access token", 401);
+            }
+
             // Generate new token pair from existing claims
             var newToken = await _jwtService.GenerateToken(principal.Claims.ToList());
             newToken.SessionId = session.Id;
@@ -1251,7 +1289,7 @@ public sealed class AuthService : IAuthService
                     .Include(c => c.Type)
                     .Where(c => c.Credential.TenantId == tenant.Id)
                     .Where(c => c.Value == request.Email)
-                    .Where(c => c.Type.Name == nameof(GenericContactType.Email))
+                    .Where(c => c.Type != null && c.Type.Name == nameof(GenericContactType.Email))
                     .FirstOrDefaultAsync(ct);
 
                 if (emailContact != null)
@@ -1271,7 +1309,7 @@ public sealed class AuthService : IAuthService
                     .Include(c => c.Type)
                     .Where(c => c.Credential.TenantId == tenant.Id)
                     .Where(c => c.Value == request.Phone)
-                    .Where(c => c.Type.Name == nameof(GenericContactType.Phone))
+                    .Where(c => c.Type != null && c.Type.Name == nameof(GenericContactType.Phone))
                     .FirstOrDefaultAsync(ct);
 
                 if (phoneContact != null)
@@ -1323,7 +1361,7 @@ public sealed class AuthService : IAuthService
             // Get message template for password reset
             var messageTemplate = await _dataContext.Query<RegistryConfiguration>()
                 .Where(i => i.TenantId == tenant.Id)
-                .Where(i => i.Group.Name == "MessagingService_PasswordReset")
+                .Where(i => i.Group != null && i.Group.Name == "MessagingService_PasswordReset")
                 .FirstOrDefaultAsync(ct);
 
             var message = messageTemplate?.Value?.Replace("|Token|", resetToken)

@@ -61,10 +61,13 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
     private static void Execute(Compilation compilation, ImmutableArray<EntityRegistrationInfo?> entities, SourceProductionContext context)
     {
         var allEntities = new List<EntityRegistrationInfo>();
+        var currentModuleName = GetModuleName(compilation.AssemblyName ?? string.Empty);
 
         if (!entities.IsDefaultOrEmpty)
         {
-            allEntities.AddRange(entities.Where(e => e is not null).Select(e => e!));
+            allEntities.AddRange(entities
+                .Where(e => e is not null && ShouldIncludeEntity(e!.AssemblyName, currentModuleName))
+                .Select(e => e!));
         }
 
         // Discover from referenced assemblies
@@ -79,6 +82,9 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
             foreach (var type in GetAllTypes(assembly.GlobalNamespace))
             {
                 if (type.IsAbstract || type.TypeKind != TypeKind.Class)
+                    continue;
+
+                if (!ShouldIncludeEntity(assembly.Name, currentModuleName))
                     continue;
 
                 if (type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == coreAttr || a.AttributeClass?.ToDisplayString() == sharedAttr))
@@ -139,7 +145,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
             if (string.IsNullOrEmpty(entity.AssemblyName))
                 continue;
 
-            var moduleName = entity.AssemblyName.Split('.')[0];
+            var moduleName = GetOwningModuleName(entity.AssemblyName, currentModuleName);
             var wrapperMetadataName = $"{moduleName}.Integration.Drivers.I{moduleName}ServiceWrapper";
 
             // Try to resolve from compilation first (covers pre-compiled referenced assemblies)
@@ -166,6 +172,37 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         sb.AppendLine("}");
 
         context.AddSource("DataContextEntityRegistrations.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
+    }
+
+    private static string GetModuleName(string assemblyName)
+    {
+        if (string.IsNullOrWhiteSpace(assemblyName))
+            return string.Empty;
+
+        return assemblyName.Split('.')[0];
+    }
+
+    private static bool ShouldIncludeEntity(string assemblyName, string currentModuleName)
+    {
+        if (string.IsNullOrWhiteSpace(assemblyName) || string.IsNullOrWhiteSpace(currentModuleName))
+            return true;
+
+        if (assemblyName.StartsWith(currentModuleName, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return currentModuleName.Equals("IdentityServer", StringComparison.OrdinalIgnoreCase)
+               && assemblyName.StartsWith("XFramework.Domain.Shared", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetOwningModuleName(string entityAssemblyName, string currentModuleName)
+    {
+        if (currentModuleName.Equals("IdentityServer", StringComparison.OrdinalIgnoreCase)
+            && entityAssemblyName.StartsWith("XFramework.Domain.Shared", StringComparison.OrdinalIgnoreCase))
+        {
+            return "IdentityServer";
+        }
+
+        return GetModuleName(entityAssemblyName);
     }
 
     private static IEnumerable<INamedTypeSymbol> GetAllTypes(INamespaceSymbol ns)

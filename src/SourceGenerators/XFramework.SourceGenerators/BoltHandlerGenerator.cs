@@ -175,6 +175,7 @@ public class BoltHandlerGenerator : ISourceGenerator
         var diParams = new List<(string TypeFullName, string Name, bool IsValidator)>();
         var hasCancellationToken = false;
         var requestTypeFullName = ToGlobalQualified(requestType.ToDisplayString());
+        var queryParameters = CollectQueryParameters(requestType);
 
         for (int i = 1; i < methodSymbol.Parameters.Length; i++)
         {
@@ -224,6 +225,7 @@ public class BoltHandlerGenerator : ISourceGenerator
             ResultDataTypeFullName = resultDataType != null ? ToGlobalQualified(resultDataType.ToDisplayString()) : null,
             IsGenericResult = isGenericResult,
             DiParameters = diParams,
+            QueryParameters = queryParameters,
             HasCancellationToken = hasCancellationToken,
             Namespace = containingClass.ContainingNamespace.ToDisplayString(),
             HasBoltHandler = hasBolt,
@@ -235,6 +237,57 @@ public class BoltHandlerGenerator : ISourceGenerator
             ExcludeFromOpenApi = excludeFromOpenApi,
             ValidatorTypeFullName = hasValidator ? validatorInterface : null
         };
+    }
+
+    private static List<QueryParameterInfo> CollectQueryParameters(ITypeSymbol requestType)
+    {
+        var parameters = new List<QueryParameterInfo>();
+        if (!(requestType is INamedTypeSymbol namedType))
+            return parameters;
+
+        foreach (var property in namedType.GetMembers().OfType<IPropertySymbol>())
+        {
+            if (property.DeclaredAccessibility != Accessibility.Public ||
+                property.IsStatic ||
+                property.IsIndexer ||
+                property.SetMethod is null)
+            {
+                continue;
+            }
+
+            var parameterType = ToGlobalQualified(property.Type.ToDisplayString());
+            var assignWhenHasValue = false;
+
+            if (property.Type.IsValueType && !IsNullableValueType(property.Type))
+            {
+                parameterType += "?";
+                assignWhenHasValue = true;
+            }
+
+            parameters.Add(new QueryParameterInfo
+            {
+                PropertyName = property.Name,
+                ParameterName = ToParameterName(property.Name),
+                ParameterTypeFullName = parameterType,
+                AssignWhenHasValue = assignWhenHasValue
+            });
+        }
+
+        return parameters;
+    }
+
+    private static bool IsNullableValueType(ITypeSymbol type)
+    {
+        return type is INamedTypeSymbol namedType &&
+               namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
+    }
+
+    private static string ToParameterName(string propertyName)
+    {
+        if (string.IsNullOrEmpty(propertyName))
+            return propertyName;
+
+        return char.ToLowerInvariant(propertyName[0]) + propertyName.Substring(1);
     }
 
     private static string[] ParseStringArray(string value)
@@ -385,6 +438,28 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
 }}";
     }
 
+    private static string GenerateQueryRequestInitialization(HandlerInfo h)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"        var request = new {h.RequestTypeFullName}();");
+
+        foreach (var queryParameter in h.QueryParameters)
+        {
+            if (queryParameter.AssignWhenHasValue)
+            {
+                builder.AppendLine(
+                    $"        if ({queryParameter.ParameterName}.HasValue) request.{queryParameter.PropertyName} = {queryParameter.ParameterName}.Value;");
+            }
+            else
+            {
+                builder.AppendLine(
+                    $"        request.{queryParameter.PropertyName} = {queryParameter.ParameterName};");
+            }
+        }
+
+        return builder.ToString();
+    }
+
     #endregion
 
     #region REST Endpoint Generation
@@ -401,47 +476,57 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
             _ => "MapPost"
         };
 
-        // Build the endpoint chain (.WithTags, .WithOpenApi, .ExcludeFromDescription)
+        // Build the endpoint chain (.WithTags, .WithSummary, .WithDescription, .ExcludeFromDescription)
         var chain = new StringBuilder();
         if (h.Tags?.Length > 0)
-            chain.AppendLine($"            .WithTags({string.Join(", ", h.Tags.Select(t => $"\"{t}\""))})");
-        if (h.Summary != null || h.Description != null)
-        {
-            chain.AppendLine("            .WithOpenApi(op =>");
-            chain.AppendLine("            {");
-            if (h.Summary != null)
-                chain.AppendLine($"                op.Summary = \"{h.Summary}\";");
-            if (h.Description != null)
-                chain.AppendLine($"                op.Description = \"{h.Description}\";");
-            chain.AppendLine("                return op;");
-            chain.AppendLine("            })");
-        }
+            chain.AppendLine($"            .WithTags({string.Join(", ", h.Tags.Select(ToCSharpStringLiteral))})");
+        if (h.Summary != null)
+            chain.AppendLine($"            .WithSummary({ToCSharpStringLiteral(h.Summary)})");
+        if (h.Description != null)
+            chain.AppendLine($"            .WithDescription({ToCSharpStringLiteral(h.Description)})");
         if (h.ExcludeFromOpenApi)
             chain.AppendLine("            .ExcludeFromDescription()");
 
         // Build REST handler parameters
         var restParams = new StringBuilder();
         var callArgs = new StringBuilder("request");
+        var requestInitialization = "";
 
-        // Request parameter — GET/DELETE use [AsParameters] for query binding, POST/PUT/PATCH use body
+        // GET/DELETE bind explicit query parameters to avoid inherited complex properties.
+        void AppendRestParameter(string parameter)
+        {
+            if (restParams.Length > 0)
+                restParams.Append(", ");
+            restParams.Append(parameter);
+        }
+
         var isBodylessMethod = httpMapMethod is "MapGet" or "MapDelete";
-        var paramAttribute = isBodylessMethod ? "[AsParameters] " : "";
-        restParams.Append($"{paramAttribute}{h.RequestTypeFullName} request");
+        if (isBodylessMethod)
+        {
+            foreach (var queryParameter in h.QueryParameters)
+                AppendRestParameter($"{queryParameter.ParameterTypeFullName} {queryParameter.ParameterName}");
+
+            requestInitialization = GenerateQueryRequestInitialization(h);
+        }
+        else
+        {
+            AppendRestParameter($"{h.RequestTypeFullName} request");
+        }
 
         // DI service parameters
         foreach (var (typeFullName, name, _) in h.DiParameters)
         {
-            restParams.Append($", {typeFullName} @{name}");
+            AppendRestParameter($"{typeFullName} @{name}");
             callArgs.Append($", @{name}");
         }
 
         // Validator parameter (auto-detected)
         var hasValidator = h.ValidatorTypeFullName != null;
         if (hasValidator)
-            restParams.Append($", {h.ValidatorTypeFullName} validator");
+            AppendRestParameter($"{h.ValidatorTypeFullName} validator");
 
         // CancellationToken
-        restParams.Append(", CancellationToken ct");
+        AppendRestParameter("CancellationToken ct");
         if (h.HasCancellationToken)
             callArgs.Append(", ct");
 
@@ -520,7 +605,8 @@ public static class {h.ClassName}_RestEndpoint
     }}
 
     private static async Task<{resultTypes}> RestHandle({restParams})
-    {{{validationBlock}
+    {{
+{requestInitialization}{validationBlock}
         var result = await {h.ClassFullName}.{h.MethodName}({callArgs});
 
         if (!result.IsSuccess)
@@ -613,6 +699,33 @@ public static class GeneratedEndpointRoutes
 
     #endregion
 
+    private static string ToCSharpStringLiteral(string value)
+    {
+        var builder = new StringBuilder(value.Length + 2);
+        builder.Append('"');
+
+        foreach (var c in value)
+        {
+            builder.Append(c switch
+            {
+                '\\' => @"\\",
+                '"' => "\\\"",
+                '\0' => @"\0",
+                '\a' => @"\a",
+                '\b' => @"\b",
+                '\f' => @"\f",
+                '\n' => @"\n",
+                '\r' => @"\r",
+                '\t' => @"\t",
+                '\v' => @"\v",
+                _ => c.ToString()
+            });
+        }
+
+        builder.Append('"');
+        return builder.ToString();
+    }
+
     #region Types
 
     private class HandlerInfo
@@ -626,6 +739,7 @@ public static class GeneratedEndpointRoutes
         public string? ResultDataTypeFullName { get; set; }
         public bool IsGenericResult { get; set; }
         public List<(string TypeFullName, string Name, bool IsValidator)> DiParameters { get; set; } = new();
+        public List<QueryParameterInfo> QueryParameters { get; set; } = new();
         public bool HasCancellationToken { get; set; }
         public string Namespace { get; set; } = "";
 
@@ -642,6 +756,14 @@ public static class GeneratedEndpointRoutes
 
         // Validation
         public string? ValidatorTypeFullName { get; set; }
+    }
+
+    private class QueryParameterInfo
+    {
+        public string PropertyName { get; set; } = "";
+        public string ParameterName { get; set; } = "";
+        public string ParameterTypeFullName { get; set; } = "";
+        public bool AssignWhenHasValue { get; set; }
     }
 
     #endregion

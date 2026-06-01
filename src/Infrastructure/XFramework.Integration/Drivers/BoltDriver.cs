@@ -60,8 +60,8 @@ public sealed class BoltDriver : IMessageBusWrapper
     {
         EnrichMetadata(request);
         var payload = MemoryPackSerializer.Serialize(request);
-        var (status, _) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
-        return new CmdResponse { HttpStatusCode = status, Message = status.ToString() };
+        var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
+        return DeserializeCmdResponse(status, responsePayload);
     }
 
     public async Task<CmdResponse<TResponse>> SendVoidAsync<TRequest, TResponse>(TRequest request, string recipient)
@@ -70,8 +70,7 @@ public sealed class BoltDriver : IMessageBusWrapper
         EnrichMetadata(request);
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
-        var response = responsePayload.IsEmpty ? default : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
-        return new CmdResponse<TResponse> { HttpStatusCode = status, Message = status.ToString(), Response = response };
+        return DeserializeCmdResponse<TResponse>(status, responsePayload);
     }
 
     public async Task<QueryResponse<TResponse>> SendAsync<TRequest, TResponse>(TRequest request, string recipient)
@@ -80,8 +79,7 @@ public sealed class BoltDriver : IMessageBusWrapper
         EnrichMetadata(request);
         var payload = MemoryPackSerializer.Serialize(request);
         var (status, responsePayload) = await _client.InvokeAsync(recipient, typeof(TRequest).Name, payload);
-        var response = responsePayload.IsEmpty ? default : MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
-        return new QueryResponse<TResponse> { HttpStatusCode = status, Message = status.ToString(), Response = response };
+        return DeserializeQueryResponse<TResponse>(status, responsePayload);
     }
 
     public async Task PublishAsync<TModel>(string eventName, string topic, TModel? data)
@@ -157,5 +155,78 @@ public sealed class BoltDriver : IMessageBusWrapper
             request.Metadata.Name = _config.ClientName ?? string.Empty;
         if (request.Metadata.TenantId == null && _config.ClientGuid.HasValue)
             request.Metadata.TenantId = _config.ClientGuid.Value;
+    }
+
+    private static CmdResponse DeserializeCmdResponse(HttpStatusCode status, ReadOnlyMemory<byte> responsePayload)
+    {
+        if (!responsePayload.IsEmpty)
+        {
+            try
+            {
+                var wrapped = MemoryPackSerializer.Deserialize<CmdResponse>(responsePayload.Span);
+                if (wrapped is not null)
+                    return wrapped;
+            }
+            catch (MemoryPackSerializationException)
+            {
+                // Older handlers returned no command envelope payload.
+            }
+        }
+
+        return new CmdResponse { HttpStatusCode = status, Message = status.ToString() };
+    }
+
+    private static CmdResponse<TResponse> DeserializeCmdResponse<TResponse>(
+        HttpStatusCode status,
+        ReadOnlyMemory<byte> responsePayload)
+    {
+        if (responsePayload.IsEmpty)
+            return new CmdResponse<TResponse> { HttpStatusCode = status, Message = status.ToString() };
+
+        try
+        {
+            var wrapped = MemoryPackSerializer.Deserialize<CmdResponse<TResponse>>(responsePayload.Span);
+            if (wrapped is not null)
+                return wrapped;
+        }
+        catch (MemoryPackSerializationException)
+        {
+            // Fall back for legacy handlers that serialized only TResponse.
+        }
+
+        var response = MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
+        return new CmdResponse<TResponse>
+        {
+            HttpStatusCode = status,
+            Message = status.ToString(),
+            Response = response
+        };
+    }
+
+    private static QueryResponse<TResponse> DeserializeQueryResponse<TResponse>(
+        HttpStatusCode status,
+        ReadOnlyMemory<byte> responsePayload)
+    {
+        if (responsePayload.IsEmpty)
+            return new QueryResponse<TResponse> { HttpStatusCode = status, Message = status.ToString() };
+
+        try
+        {
+            var wrapped = MemoryPackSerializer.Deserialize<QueryResponse<TResponse>>(responsePayload.Span);
+            if (wrapped is not null)
+                return wrapped;
+        }
+        catch (MemoryPackSerializationException)
+        {
+            // Fall back for legacy handlers that serialized only TResponse.
+        }
+
+        var response = MemoryPackSerializer.Deserialize<TResponse>(responsePayload.Span);
+        return new QueryResponse<TResponse>
+        {
+            HttpStatusCode = status,
+            Message = status.ToString(),
+            Response = response
+        };
     }
 }

@@ -139,19 +139,42 @@ public class RemoteDataContext(
     {
         if (_wrapperMap is not null) return _wrapperMap;
 
-        var registrationType = AppDomain.CurrentDomain.GetAssemblies()
+        var registrationTypes = AppDomain.CurrentDomain.GetAssemblies()
             .Select(a => a.GetType("XFramework.Core.DataContext.DataContextEntityRegistrations"))
-            .FirstOrDefault(t => t is not null);
+            .Where(t => t is not null)
+            .Cast<Type>()
+            .ToList();
 
-        if (registrationType is null)
+        if (registrationTypes.Count == 0)
             throw new InvalidOperationException(
                 "DataContextEntityRegistrations not found. Ensure the source generator has run and the assembly is loaded.");
 
-        var method = registrationType.GetMethod("GetDataContextServiceWrapperMap",
-            BindingFlags.Public | BindingFlags.Static)
-            ?? throw new InvalidOperationException("GetDataContextServiceWrapperMap method not found.");
+        var mergedMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var registrationType in registrationTypes)
+        {
+            var method = registrationType.GetMethod("GetDataContextServiceWrapperMap",
+                BindingFlags.Public | BindingFlags.Static);
+            if (method is null) continue;
 
-        _wrapperMap = (Dictionary<string, string>)method.Invoke(null, null)!;
+            if (method.Invoke(null, null) is not Dictionary<string, string> map) continue;
+
+            foreach (var (entityName, wrapperTypeName) in map)
+            {
+                if (mergedMap.TryGetValue(entityName, out var existing)
+                    && !string.Equals(existing, wrapperTypeName, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Entity '{entityName}' is mapped to multiple service wrappers: '{existing}' and '{wrapperTypeName}'.");
+                }
+
+                mergedMap[entityName] = wrapperTypeName;
+            }
+        }
+
+        if (mergedMap.Count == 0)
+            throw new InvalidOperationException("GetDataContextServiceWrapperMap returned no entity mappings.");
+
+        _wrapperMap = mergedMap;
         return _wrapperMap;
     }
 

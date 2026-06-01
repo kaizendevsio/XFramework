@@ -9,10 +9,10 @@ namespace XFramework.Inventario.Api.Entities;
 [GenerateEndpoints(
     Type = EndpointType.Both,
     Actions = EndpointActions.All,
-    RoutePrefix = "api/products",
+    RoutePrefix = "api/productentities",
     RequireAuthorization = true,
     CacheDurationSeconds = 300,
-    CacheKeyPrefix = "products"
+    CacheKeyPrefix = "productentities"
 )]
 public partial class ProductEntity
 {

@@ -11,4 +11,5 @@ public partial record GetCommunityIdentityRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid Id { get; set; }
+    public Guid? RequestingIdentityId { get; set; }
 }

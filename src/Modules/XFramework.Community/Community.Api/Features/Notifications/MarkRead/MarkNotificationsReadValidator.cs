@@ -7,6 +7,9 @@ public sealed class MarkNotificationsReadValidator : AbstractValidator<MarkNotif
 {
     public MarkNotificationsReadValidator()
     {
+        RuleFor(x => x.RequestingIdentityId)
+            .NotEmpty().WithMessage("Requesting Identity ID is required");
+
         RuleFor(x => x.NotificationIds)
             .NotEmpty().WithMessage("At least one notification ID is required");
 

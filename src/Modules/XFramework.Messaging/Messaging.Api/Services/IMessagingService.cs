@@ -10,6 +10,11 @@ public interface IMessagingService
     /// Creates and sends a direct message (SMS/Email/etc)
     /// </summary>
     Task<Result<CmdResponse>> CreateDirectMessageAsync(CreateDirectMessageRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates and sends a verification message.
+    /// </summary>
+    Task<Result<CmdResponse>> CreateVerificationMessageAsync(CreateVerificationMessageRequest request, CancellationToken ct = default);
     
     /// <summary>
     /// Updates a direct message status and delivery timestamps

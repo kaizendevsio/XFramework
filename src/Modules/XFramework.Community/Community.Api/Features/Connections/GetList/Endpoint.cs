@@ -4,6 +4,7 @@ namespace Community.Api.Features.Connections.GetList;
 
 public static class GetConnectionListEndpoint
 {
+    [BoltHandler]
     [MapGet("/api/community/connections", Tags = ["Community Connections"],
         Summary = "Get a list of connections for an identity",
         Description = "Retrieves connections for a community identity filtered by connection type",

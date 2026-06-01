@@ -1160,12 +1160,12 @@
         }
     }
 
-    private async Task PersistAndClose<T>(Func<Task<CmdResponse<T>?>> action)
+    private async Task PersistAndClose<T>(Func<Task<CmdResponse<T>>> action)
     {
         var result = await action();
-        if (result?.IsSuccess != true)
+        if (!result.IsSuccess)
         {
-            ToastService.Show($"Error: {result?.Message}");
+            ToastService.Show($"Error: {result.Message}");
             return;
         }
 

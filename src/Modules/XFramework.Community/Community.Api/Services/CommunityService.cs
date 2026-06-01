@@ -62,14 +62,31 @@ public sealed class CommunityService : ICommunityService
             var storageFileTypes = await _dataContext.Query<StorageFileType>().ToListAsync(cancellationToken);
 
             var pngType = storageFileTypes.FirstOrDefault(i => i.Id == CommunityStorageFileTypes.Png);
+            var profilePhotoType = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.ProfilePhoto);
+            var coverPhotoType = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.CoverPhoto);
+
+            if (pngType is null || profilePhotoType is null || coverPhotoType is null)
+            {
+                _logger.LogError(
+                    "Required community identity file seed data is missing. PngTypeFound={PngTypeFound}, ProfilePhotoTypeFound={ProfilePhotoTypeFound}, CoverPhotoTypeFound={CoverPhotoTypeFound}",
+                    pngType is not null,
+                    profilePhotoType is not null,
+                    coverPhotoType is not null);
+
+                return Result<CmdResponse>.Failure("Required community identity file seed data is missing", 500);
+            }
+
+            var fallbackHandleName = credential.IdentityInfo is null
+                ? "Community User"
+                : $"{credential.IdentityInfo.FirstName} {credential.IdentityInfo.LastName}".Trim();
 
             // Create community identity entity
             var entity = new CommunityIdentity
             {
                 Credential = credential,
-                HandleName = string.IsNullOrEmpty(request.HandleName)
-                    ? $"{credential.IdentityInfo.FirstName} {credential.IdentityInfo.LastName}"
-                    : request.HandleName,
+                HandleName = string.IsNullOrWhiteSpace(request.HandleName)
+                    ? fallbackHandleName
+                    : request.HandleName.Trim(),
                 Tagline = request.Tagline,
                 Alias = request.Alias,
                 Status = (int)CommunityIdentityStatus.Active,
@@ -80,7 +97,7 @@ public sealed class CommunityService : ICommunityService
                     // Profile Photo
                     new()
                     {
-                        Type = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.ProfilePhoto),
+                        Type = profilePhotoType,
                         Storage = new()
                         {
                             ContentPath = "",
@@ -90,7 +107,7 @@ public sealed class CommunityService : ICommunityService
                     // Cover Photo
                     new()
                     {
-                        Type = identityFileTypes.FirstOrDefault(i => i.Id == CommunityIdentityFileTypes.CoverPhoto),
+                        Type = coverPhotoType,
                         Storage = new()
                         {
                             ContentPath = "",
@@ -254,6 +271,12 @@ public sealed class CommunityService : ICommunityService
         {
             if (request.RequestingIdentityId != request.IdentityId)
                 return Result<CmdResponse>.Forbidden("You can only update your own identity files");
+
+            var storageFileExists = await _dataContext.Query<StorageFile>()
+                .AnyAsync(f => f.Id == request.StorageFileId, cancellationToken);
+
+            if (!storageFileExists)
+                return Result<CmdResponse>.NotFound($"Storage file with Id {request.StorageFileId} does not exist");
 
             var file = await _dataContext.Query<CommunityIdentityFile>()
                 .Where(f => f.Id == request.FileId && f.IdentityId == request.IdentityId && !f.IsDeleted)

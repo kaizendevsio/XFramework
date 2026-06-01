@@ -72,13 +72,9 @@ public static class Endpoint
         app.MapPost("/api/wallets/batch/increment", HandleAsync)
             .WithName("BatchIncrementWallets")
             .WithTags("Wallets", "Batch")
-            .WithOpenApi(operation => 
-            {
-                operation.Summary = "Batch increment wallet balances";
-                operation.Description = "Processes multiple wallet increments in a single optimized transaction. " +
-                    "Performance: 20-50x faster than individual operations. Can process 1000 increments in ~200-500ms.";
-                return operation;
-            })
+            .WithSummary("Batch increment wallet balances")
+            .WithDescription("Processes multiple wallet increments in a single optimized transaction. " +
+                "Performance: 20-50x faster than individual operations. Can process 1000 increments in ~200-500ms.")
             .Produces<BatchOperationResult>(StatusCodes.Status200OK)
             .Produces<BatchOperationResult>(StatusCodes.Status207MultiStatus)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)

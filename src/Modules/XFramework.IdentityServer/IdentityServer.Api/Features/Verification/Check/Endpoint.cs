@@ -1,3 +1,4 @@
+using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using XFramework.Integration.Attributes;
 
@@ -16,5 +17,17 @@ public static class CheckVerificationEndpoint
         CancellationToken ct)
     {
         return await authService.CheckVerificationAsync(request, ct);
+    }
+}
+
+public class CheckVerificationRequestValidator : AbstractValidator<CheckVerificationRequest>
+{
+    public CheckVerificationRequestValidator()
+    {
+        RuleFor(x => x.CredentialId)
+            .NotEmpty().WithMessage("Credential ID is required");
+
+        RuleFor(x => x.VerificationTypeId)
+            .NotEmpty().WithMessage("Verification Type ID is required");
     }
 }

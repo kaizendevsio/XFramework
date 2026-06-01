@@ -31,14 +31,17 @@ public sealed class NotificationService : INotificationService
                 return Result<CmdResponse>.Failure("At least one notification ID is required", 400);
             }
 
+            var notificationIds = request.NotificationIds.Distinct().ToList();
+
             var notifications = await _dataContext.Query<CommunityNotification>()
-                .Where(n => request.NotificationIds.Contains(n.Id))
+                .Where(n => notificationIds.Contains(n.Id))
+                .Where(n => n.RecipientIdentityId == request.RequestingIdentityId)
                 .Where(n => !n.IsDeleted)
                 .ToListAsync(cancellationToken);
 
-            if (notifications.Count == 0)
+            if (notifications.Count != notificationIds.Count)
             {
-                return Result<CmdResponse>.NotFound("No notifications found for the provided IDs");
+                return Result<CmdResponse>.NotFound("One or more notifications were not found");
             }
 
             foreach (var notification in notifications)
@@ -72,6 +75,11 @@ public sealed class NotificationService : INotificationService
     {
         try
         {
+            if (request.RequestingIdentityId != request.IdentityId)
+            {
+                return Result<GetNotificationsResponse>.Forbidden("You can only retrieve your own notifications");
+            }
+
             // Validate identity exists
             var identity = await _dataContext.Query<CommunityIdentity>()
                 .Where(i => i.Id == request.IdentityId)

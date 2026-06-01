@@ -3,6 +3,7 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
 
         <IsPackable>false</IsPackable>
@@ -20,13 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Messaging.Integration\Messaging.Integration.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="XFramework.Integration">
-        <HintPath>..\..\..\XFramework\Server\XFramework.Integration\bin\Debug\net6.0\XFramework.Integration.dll</HintPath>
-      </Reference>
+      <ProjectReference Include="..\Messaging.Api\Messaging.Api.csproj" />
     </ItemGroup>
 
 </Project>

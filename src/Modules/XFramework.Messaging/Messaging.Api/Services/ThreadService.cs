@@ -23,6 +23,24 @@ public sealed class ThreadService(
         {
             var tenant = await tenantService.GetTenant(request.Metadata.TenantId);
 
+            var allMemberIds = request.InitialMemberCredentialIds.Distinct().ToList();
+
+            var threadTypeExists = await dataContext.Query<MessageThreadType>()
+                .Where(t => t.Id == request.TypeId)
+                .Where(t => !t.IsDeleted && t.IsEnabled)
+                .AnyAsync(ct);
+
+            if (!threadTypeExists)
+                return Result<CreateThreadResponse>.NotFound("Thread type not found");
+
+            var existingMembers = await dataContext.Query<IdentityCredential>()
+                .Where(c => allMemberIds.Contains(c.Id))
+                .Where(c => !c.IsDeleted && c.IsEnabled)
+                .ToListAsync(ct);
+
+            if (existingMembers.Count != allMemberIds.Count)
+                return Result<CreateThreadResponse>.NotFound("One or more initial member credentials were not found");
+
             var thread = new MessageThread
             {
                 Id = Guid.NewGuid(),
@@ -37,8 +55,8 @@ public sealed class ThreadService(
 
             dataContext.Add(thread);
 
-            // Add the creator (first credential in the list) as a member
-            var allMemberIds = request.InitialMemberCredentialIds.Distinct().ToList();
+            var defaultGroup = CreateDefaultThreadMemberGroup(thread.Id, tenant.Id);
+            dataContext.Add(defaultGroup);
 
             foreach (var credentialId in allMemberIds)
             {
@@ -48,6 +66,7 @@ public sealed class ThreadService(
                     TenantId = tenant.Id,
                     MessageThreadId = thread.Id,
                     CredentialId = credentialId,
+                    GroupId = defaultGroup.Id,
                     Alias = string.Empty,
                     Emoji = string.Empty,
                     Description = string.Empty,
@@ -158,6 +177,9 @@ public sealed class ThreadService(
     {
         try
         {
+            if (request.RequesterCredentialId == Guid.Empty)
+                return Result<GetThreadResponse>.Failure("Requester credential ID is required");
+
             var thread = await dataContext.Query<MessageThread>()
                 .Where(t => t.Id == request.Id)
                 .Where(t => !t.IsDeleted)
@@ -167,6 +189,15 @@ public sealed class ThreadService(
             {
                 return Result<GetThreadResponse>.NotFound("Thread not found");
             }
+
+            var requesterMember = await dataContext.Query<MessageThreadMember>()
+                .Where(m => m.MessageThreadId == thread.Id)
+                .Where(m => m.CredentialId == request.RequesterCredentialId)
+                .Where(m => !m.IsDeleted && m.IsEnabled)
+                .FirstOrDefaultAsync(ct);
+
+            if (requesterMember is null)
+                return Result<GetThreadResponse>.Failure("Requester is not a member of this thread", 403);
 
             var members = await dataContext.Query<MessageThreadMember>()
                 .Where(m => m.MessageThreadId == thread.Id)
@@ -282,12 +313,25 @@ public sealed class ThreadService(
                 return Result<CmdResponse>.Conflict("Credential is already a member of this thread");
             }
 
+            var group = await dataContext.Query<MessageThreadMemberGroup>()
+                .Where(g => g.MessageThreadId == request.ThreadId)
+                .Where(g => !g.IsDeleted && g.IsEnabled)
+                .OrderBy(g => g.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (group is null)
+            {
+                group = CreateDefaultThreadMemberGroup(request.ThreadId, tenant.Id);
+                dataContext.Add(group);
+            }
+
             var member = new MessageThreadMember
             {
                 Id = Guid.NewGuid(),
                 TenantId = tenant.Id,
                 MessageThreadId = request.ThreadId,
                 CredentialId = request.CredentialId,
+                GroupId = group.Id,
                 Alias = string.Empty,
                 Emoji = string.Empty,
                 Description = string.Empty,
@@ -463,10 +507,14 @@ public sealed class ThreadService(
                 {
                     dataContext.Add(new MessageDelivery
                     {
+                        Id = Guid.NewGuid(),
+                        TenantId = requesterMember.TenantId,
                         MessageThreadMemberId = requesterMember.Id,
                         MessageId = msgId,
                         TypeId = MessageDeliveryTypes.Delivered,
-                        IsEnabled = true
+                        IsEnabled = true,
+                        CreatedAt = DateTime.UtcNow,
+                        ConcurrencyStamp = Guid.NewGuid()
                     });
                 }
                 await dataContext.SaveChangesAsync(ct);
@@ -622,9 +670,13 @@ public sealed class ThreadService(
 
             var file = new MessageFile
             {
+                Id = Guid.NewGuid(),
+                TenantId = message.TenantId,
                 MessageId = request.MessageId,
                 StorageId = request.StorageFileId,
-                IsEnabled = true
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
             };
 
             dataContext.Add(file);
@@ -709,7 +761,7 @@ public sealed class ThreadService(
             if (message is null)
                 return Result<CmdResponse>.NotFound("Message not found");
 
-            // Check for duplicate reaction of the same type by this member's credential (via TenantId matching)
+            // Check for duplicate reaction of the same type by this thread member.
             var duplicateExists = await dataContext.Query<MessageReaction>()
                 .Where(r => r.MessageId == request.MessageId)
                 .Where(r => r.TypeId == request.TypeId)
@@ -722,10 +774,14 @@ public sealed class ThreadService(
 
             var reaction = new MessageReaction
             {
+                Id = Guid.NewGuid(),
+                TenantId = message.TenantId,
                 MessageId = request.MessageId,
                 TypeId = request.TypeId,
                 MessageThreadMemberId = member.Id,
-                IsEnabled = true
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                ConcurrencyStamp = Guid.NewGuid()
             };
 
             dataContext.Add(reaction);
@@ -811,16 +867,28 @@ public sealed class ThreadService(
             if (member is null)
                 return Result<CmdResponse>.Failure("Requester is not a member of this thread", 403);
 
+            var requestedMessageIds = request.MessageIds.Distinct().ToList();
+            var threadMessages = await dataContext.Query<Message>()
+                .Where(m => m.MessageThreadId == request.ThreadId)
+                .Where(m => requestedMessageIds.Contains(m.Id))
+                .Where(m => !m.IsDeleted)
+                .ToListAsync(ct);
+
+            if (threadMessages.Count != requestedMessageIds.Count)
+                return Result<CmdResponse>.NotFound("One or more messages were not found in this thread");
+
             var existingDeliveries = await dataContext.Query<MessageDelivery>()
                 .Where(d => d.MessageThreadMemberId == member.Id)
-                .Where(d => request.MessageIds.Contains(d.MessageId))
+                .Where(d => requestedMessageIds.Contains(d.MessageId))
                 .Where(d => !d.IsDeleted)
                 .ToListAsync(ct);
 
-            var existingByMessage = existingDeliveries.ToDictionary(d => d.MessageId);
+            var existingByMessage = existingDeliveries
+                .GroupBy(d => d.MessageId)
+                .ToDictionary(g => g.Key, g => g.First());
             var markedCount = 0;
 
-            foreach (var messageId in request.MessageIds)
+            foreach (var messageId in requestedMessageIds)
             {
                 if (existingByMessage.TryGetValue(messageId, out var delivery))
                 {
@@ -836,10 +904,14 @@ public sealed class ThreadService(
                 {
                     dataContext.Add(new MessageDelivery
                     {
+                        Id = Guid.NewGuid(),
+                        TenantId = member.TenantId,
                         MessageThreadMemberId = member.Id,
                         MessageId = messageId,
                         TypeId = MessageDeliveryTypes.Read,
-                        IsEnabled = true
+                        IsEnabled = true,
+                        CreatedAt = DateTime.UtcNow,
+                        ConcurrencyStamp = Guid.NewGuid()
                     });
                     markedCount++;
                 }
@@ -859,4 +931,19 @@ public sealed class ThreadService(
             return Result<CmdResponse>.Failure($"Error marking messages as read: {ex.Message}");
         }
     }
+
+    private static MessageThreadMemberGroup CreateDefaultThreadMemberGroup(Guid threadId, Guid tenantId) => new()
+    {
+        Id = Guid.NewGuid(),
+        TenantId = tenantId,
+        MessageThreadId = threadId,
+        Alias = "Default",
+        Emoji = string.Empty,
+        Description = string.Empty,
+        Status = 1,
+        SystemReferenceId = Guid.Empty,
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow,
+        ConcurrencyStamp = Guid.NewGuid()
+    };
 }

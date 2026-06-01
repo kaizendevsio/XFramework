@@ -4,6 +4,7 @@ namespace Community.Api.Features.CommunityIdentities.Update;
 
 public static class UpdateCommunityIdentityEndpoint
 {
+    [BoltHandler]
     [MapPatch("/api/community/identities/{id:guid}", Tags = ["Community Identities"],
         Summary = "Update an existing community identity",
         Description = "Updates a community identity by ID",

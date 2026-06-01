@@ -9,8 +9,18 @@ using System.Text;
 
 public class SamplePaymentProvider : IPaymentGatewayProvider
 {
+    private static readonly Guid SampleGatewayId = Guid.Parse("2ab0a82e-4c3b-4ed4-9e8b-1e9b71918a6d");
+
     public string Name => "Sample Payment Provider";
-    public PaymentGateway? Provider { get; set; }
+    public PaymentGateway Provider { get; } = new()
+    {
+        Id = SampleGatewayId,
+        Name = "Sample Payment Provider",
+        Description = "Development sample payment provider",
+        IsEnabled = true,
+        CreatedAt = DateTime.UtcNow
+    };
+
     public bool IsAvailable => true;
     public bool SupportsCashInCallback => true;
     
@@ -92,7 +102,7 @@ public class SamplePaymentProvider : IPaymentGatewayProvider
     public async Task<PaymentResponse> ProcessCashInCallbackAsync(PaymentCallbackPayload payload, CancellationToken cancellationToken = default)
     {
         // Validate the callback payload
-        if (string.IsNullOrEmpty(payload.ReferenceNumber) || payload.Amount <= 0)
+        if (string.IsNullOrEmpty(payload.ReferenceNumber) || payload.Amount is null or <= 0)
         {
             return new PaymentResponse 
             { 
@@ -100,6 +110,8 @@ public class SamplePaymentProvider : IPaymentGatewayProvider
                 Message = "Invalid callback payload"
             };
         }
+
+        var callbackAmount = payload.Amount.Value;
         
         // Check if this is a pending transaction
         if (!_pendingCashIns.TryGetValue(payload.ReferenceNumber, out var originalRequest))
@@ -112,13 +124,13 @@ public class SamplePaymentProvider : IPaymentGatewayProvider
         }
         
         // Verify amount matches
-        if (payload.Amount != originalRequest.Amount)
+        if (callbackAmount != originalRequest.Amount)
         {
             return new PaymentResponse 
             { 
                 Success = false, 
-                Message = $"Amount mismatch. Expected: {originalRequest.Amount}, Received: {payload.Amount}",
-                Amount = payload.Amount.Value
+                Message = $"Amount mismatch. Expected: {originalRequest.Amount}, Received: {callbackAmount}",
+                Amount = callbackAmount
             };
         }
         
@@ -141,8 +153,8 @@ public class SamplePaymentProvider : IPaymentGatewayProvider
             Success = true,
             ReferenceId = payload.ReferenceNumber,
             Message = "Cash in successful via callback",
-            Amount = payload.Amount.Value,
-            Fee = CalculateFee(payload.Amount.Value, true),
+            Amount = callbackAmount,
+            Fee = CalculateFee(callbackAmount, true),
             TransactionDate = payload.TransactionDate ?? DateTimeOffset.UtcNow,
             ProviderResponseCode = "00",
             ProviderResponseMessage = "Approved",
@@ -179,8 +191,10 @@ public class SamplePaymentProvider : IPaymentGatewayProvider
     
     public string GenerateCashInCallbackUrl(string baseUrl, string merchantId, string referenceNumber)
     {
-        // Create a URL that the payment provider will call when the payment is complete
-        return $"{baseUrl.TrimEnd('/')}/api/payments/callback/sample-provider?ref={referenceNumber}&merchant={merchantId}";
+        var escapedReference = Uri.EscapeDataString(referenceNumber);
+        var escapedMerchantId = Uri.EscapeDataString(merchantId);
+
+        return $"{baseUrl.TrimEnd('/')}/api/payments/callback/sample-provider?ref={escapedReference}&merchant={escapedMerchantId}";
     }
     
     public async Task<PaymentResponse> ProcessCashOutAsync(CreateCashoutRequest request, CancellationToken cancellationToken = default)
@@ -197,7 +211,7 @@ public class SamplePaymentProvider : IPaymentGatewayProvider
         }
         
         // Check merchant balance
-        string merchantId = request.MerchantId;
+        var merchantId = request.MerchantId;
         if (!string.IsNullOrEmpty(merchantId) && 
             _merchantBalances.TryGetValue(merchantId, out var balance) && 
             balance < request.Amount)

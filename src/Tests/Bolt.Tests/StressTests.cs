@@ -193,7 +193,7 @@ public class RpcStressTests
         var sender = CreateClient("stream_sender", "StreamSender");
         var receiver = CreateClient("stream_receiver", "StreamReceiver");
 
-        var receivedChunks = new ConcurrentBag<byte[]>();
+        var receivedChunks = new List<byte[]>();
         var streamDone = new TaskCompletionSource();
 
         receiver.RegisterStreamHandler("upload", async (stream) =>
@@ -231,6 +231,40 @@ public class RpcStressTests
 
         reassembled.Count.Should().Be(fullData.Length);
         reassembled.ToArray().Should().Equal(fullData);
+
+        await sender.DisposeAsync();
+        await receiver.DisposeAsync();
+    }
+
+    [Test]
+    public async Task Streaming_BidirectionalEcho_RoutesReplyToInitiator()
+    {
+        var sender = CreateClient("stream_echo_sender", "StreamEchoSender");
+        var receiver = CreateClient("stream_echo_receiver", "StreamEchoReceiver");
+
+        receiver.RegisterStreamHandler("echo", async (stream) =>
+        {
+            await foreach (var chunk in stream.ReadAllAsync())
+            {
+                await stream.SendAsync(chunk);
+                await stream.CloseAsync();
+                break;
+            }
+        });
+
+        await sender.ConnectAsync();
+        await receiver.ConnectAsync();
+
+        await using var echoStream = await sender.OpenStreamAsync("stream_echo_receiver", "echo");
+        var payload = "reply-to-initiator"u8.ToArray();
+
+        await echoStream.SendAsync(payload);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var (hasData, data) = await echoStream.ReadAsync(cts.Token);
+
+        hasData.Should().BeTrue();
+        data.ToArray().Should().Equal(payload);
 
         await sender.DisposeAsync();
         await receiver.DisposeAsync();

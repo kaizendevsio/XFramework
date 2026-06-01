@@ -1,9 +1,6 @@
 ﻿@page "/"
-@using Coins.Domain.BusinessObjects
 @using System.Text.Json
 @using Coins.Web.Models
-@using Mapster
-@using XFramework.Domain.Generic.BusinessObjects
 @inject HttpClient Http
 
 <h1>Bulk Bitcoin Sender</h1>
@@ -124,14 +121,22 @@
   private async Task SendBtc()
   {
     Status = "Processing..";
-    var result = await Http.PostAsJsonAsync("Blockchain/Send",TransactionList.Adapt<List<BtcTransactionBO>>());
+    var request = TransactionList
+      .Select(transaction => new
+      {
+        transaction.Id,
+        transaction.BtcAddress,
+        transaction.BtcAmount
+      })
+      .ToList();
+
+    var result = await Http.PostAsJsonAsync("Blockchain/Send", request);
     var resObject = JsonSerializer.Deserialize<ResponseVm>(await result.Content.ReadAsStringAsync(), new JsonSerializerOptions(){PropertyNameCaseInsensitive = true});
 
-    Console.WriteLine($"{resObject.HttpStatusCode} : {resObject.Message}");
+    Console.WriteLine($"{resObject?.HttpStatusCode} : {resObject?.Message}");
     
-    Status = resObject.Message;
-    var tmp = TransactionList.Adapt<List<TransactionVM>>();
-    await JsRuntime.InvokeVoidAsync("saveTxs", JsonSerializer.Serialize(tmp));
+    Status = resObject?.Message ?? result.ReasonPhrase ?? "Request completed";
+    await JsRuntime.InvokeVoidAsync("saveTxs", JsonSerializer.Serialize(TransactionList));
   }
 
   private async Task ImportCsv()

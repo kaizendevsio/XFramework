@@ -11,13 +11,19 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
 {
     private ManualResetValueTaskSourceCore<BoltRpcResponse> _core;
     private CancellationTokenRegistration _ctr;
+    private int _completed;
 
     private static readonly ObjectPool<PooledRpcCall> Pool =
         new DefaultObjectPool<PooledRpcCall>(new Policy(), 256);
 
     public short Version => _core.Version;
 
-    public static PooledRpcCall Rent() => Pool.Get();
+    public static PooledRpcCall Rent()
+    {
+        var call = Pool.Get();
+        call.ResetForRent();
+        return call;
+    }
 
     public ValueTask<BoltRpcResponse> GetTask()
         => new(this, _core.Version);
@@ -29,16 +35,26 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
             _ctr = ct.Register(static state =>
             {
                 var self = (PooledRpcCall)state!;
-                self._core.SetException(new TimeoutException("RPC call timed out"));
+                self.SetException(new TimeoutException("RPC call timed out"));
             }, this);
         }
     }
 
     public void SetResult(BoltRpcResponse result)
-        => _core.SetResult(result);
+    {
+        if (Interlocked.Exchange(ref _completed, 1) != 0)
+            return;
+
+        _core.SetResult(result);
+    }
 
     public void SetException(Exception ex)
-        => _core.SetException(ex);
+    {
+        if (Interlocked.Exchange(ref _completed, 1) != 0)
+            return;
+
+        _core.SetException(ex);
+    }
 
     BoltRpcResponse IValueTaskSource<BoltRpcResponse>.GetResult(short token)
     {
@@ -50,7 +66,6 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
         {
             _ctr.Dispose();
             _ctr = default;
-            _core.Reset();
             Pool.Return(this);
         }
     }
@@ -67,5 +82,11 @@ public sealed class PooledRpcCall : IValueTaskSource<BoltRpcResponse>
     {
         public PooledRpcCall Create() => new();
         public bool Return(PooledRpcCall obj) => true;
+    }
+
+    private void ResetForRent()
+    {
+        _core.Reset();
+        _completed = 0;
     }
 }

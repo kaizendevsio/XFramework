@@ -1,6 +1,11 @@
 namespace Community.Domain.Shared.Contracts.Requests;
 
-public record CreateCommunityIdentityRequest : RequestBase
+using TResponse = CmdResponse;
+
+[MemoryPackable]
+public partial record CreateCommunityIdentityRequest : RequestBase,
+    ICommand<TResponse>,
+    IBoltRequest<CreateCommunityIdentityRequest, TResponse>
 {
     public Guid CredentialId { get; set; }
     public Guid CommunityIdentityTypeId { get; set; }

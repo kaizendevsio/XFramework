@@ -53,41 +53,65 @@ public class VerificationTests : IntegrationTestBase
 
         var response = await HttpClient.PatchAsync($"/api/verifications/{token}", null);
 
-        if (response.IsSuccessStatusCode)
-        {
-            await using var db = CreateDbContext();
-            var verification = await db.Set<IdentityVerification>()
-                .Where(v => v.CredentialId == credential.Id && v.Token == token)
-                .FirstOrDefaultAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            verification.Should().NotBeNull();
-            verification!.Status.Should().Be((short)GenericStatusType.Approved);
-        }
+        await using var db = CreateDbContext();
+        var verification = await db.Set<IdentityVerification>()
+            .Where(v => v.CredentialId == credential.Id && v.Token == token)
+            .FirstOrDefaultAsync();
+
+        verification.Should().NotBeNull();
+        verification!.Status.Should().Be((short)GenericStatusType.Approved);
     }
 
     [Test]
-    public async Task Http_ConfirmVerification_WithInvalidToken_ReturnsBadRequestOr404()
+    public async Task Http_ConfirmVerification_WithInvalidToken_Returns404()
     {
         var response = await HttpClient.PatchAsync("/api/verifications/invalid_token_999", null);
 
-        // Endpoint may return 400 (validation) or 404 (not found) depending on implementation
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Test]
+    public async Task Http_ConfirmVerification_WithExpiredToken_Returns404()
+    {
+        var credential = await SeedCredentialWithContact();
+        var token = "expired_http_" + Guid.NewGuid().ToString("N")[..6];
+        await SeedPendingVerification(credential.Id, token, DateTime.UtcNow.AddMinutes(-1));
+
+        var response = await HttpClient.PatchAsync($"/api/verifications/{token}", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await using var db = CreateDbContext();
+        var verification = await db.Set<IdentityVerification>()
+            .Where(v => v.CredentialId == credential.Id && v.Token == token)
+            .FirstOrDefaultAsync();
+
+        verification.Should().NotBeNull();
+        verification!.Status.Should().Be((short)GenericStatusType.Pending);
     }
 
     [Test]
     public async Task Http_CheckVerification_WithPendingVerification_ReturnsStatus()
     {
         var credential = await SeedCredentialWithContact();
+        var verificationType = await GetSmsVerificationType();
         await SeedPendingVerification(credential.Id, "check_http_" + Guid.NewGuid().ToString("N")[..6]);
 
-        var response = await HttpClient.GetAsync(
-            $"/api/verifications/check?credentialId={credential.Id}");
+        var response = await HttpClient.PostAsJsonAsync(
+            "/api/verifications/check",
+            new CheckVerificationRequest
+            {
+                CredentialId = credential.Id,
+                VerificationTypeId = verificationType.Id,
+                Metadata = CreateMetadata()
+            });
 
-        if (response.IsSuccessStatusCode)
-        {
-            var content = await response.Content.ReadAsStringAsync();
-            content.Should().NotBeNullOrEmpty();
-        }
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().NotBeNullOrEmpty();
     }
 
     #endregion
@@ -213,7 +237,10 @@ public class VerificationTests : IntegrationTestBase
         return (await db.Set<IdentityVerificationType>().FirstOrDefaultAsync(v => v.Name == "Sms"))!;
     }
 
-    private async Task SeedPendingVerification(Guid credentialId, string token)
+    private async Task SeedPendingVerification(
+        Guid credentialId,
+        string token,
+        DateTime? expiry = null)
     {
         await using var db = CreateDbContext();
 
@@ -228,7 +255,7 @@ public class VerificationTests : IntegrationTestBase
             Token = token,
             Status = (short)GenericStatusType.Pending,
             StatusUpdatedOn = DateTimeOffset.UtcNow,
-            Expiry = DateTime.UtcNow.AddMinutes(10),
+            Expiry = expiry ?? DateTime.UtcNow.AddMinutes(10),
             TenantId = IntegrationTestFixture.TestTenantId
         });
         await db.SaveChangesAsync();
