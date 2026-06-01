@@ -7,14 +7,13 @@ using XFramework.Core.Patterns;
 using XFramework.Core.Services;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
-using XFramework.Integration.Services.Helpers;
 using XFramework.Core.Loggers;
+using XFramework.Integration.Services.Helpers;
 
 namespace Messaging.Api.Services;
 
 public sealed class MessagingService(
     IDataContext dataContext,
-    IHelperService helperService,
     ITenantResolver tenantService,
     ISmsGatewayServiceWrapper smsGatewayServiceWrapper,
     ILogger<MessagingService> logger

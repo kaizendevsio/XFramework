@@ -212,6 +212,11 @@ public sealed class WalletOperationsService : IWalletOperationsService
                     }
 
                     wallet = createResult.Data;
+                    if (wallet is null)
+                    {
+                        _logger.OperationFailed("AutoCreateWallet", "Wallet", Guid.Empty, "Wallet creation returned no wallet during increment");
+                        return Result.Failure("Error creating wallet", 500);
+                    }
                 }
                 else
                 {
@@ -239,7 +244,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             // Store previous balances
             var previousBalance = wallet.Balance;
-            var previousTotalBalance = wallet.TotalBalance.Value;
+            var previousTotalBalance = wallet.TotalBalance ?? 0;
             var previousCreditOnHoldBalance = wallet.CreditOnHoldBalance;
             var previousDebitOnHoldBalance = wallet.DebitOnHoldBalance;
             var netCredit = request.TotalAmount - request.TotalFee;
@@ -391,7 +396,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             // Store previous balances
             var previousBalance = wallet.Balance;
-            var previousTotalBalance = wallet.TotalBalance.Value;
+            var previousTotalBalance = wallet.TotalBalance ?? 0;
             var previousDebitOnHoldBalance = wallet.DebitOnHoldBalance;
             var previousCreditOnHoldBalance = wallet.CreditOnHoldBalance;
 
@@ -557,6 +562,11 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 }
 
                 recipientWallet = createResult.Data;
+                if (recipientWallet is null)
+                {
+                    _logger.OperationFailed("AutoCreateRecipientWallet", "Wallet", Guid.Empty, "Recipient wallet creation returned no wallet during transfer");
+                    return Result.Failure("Recipient wallet not found and could not be created", 404);
+                }
             }
 
             // Check for self-transfer
@@ -677,12 +687,12 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             // Store previous balances
             var previousSenderBalance = senderWallet.Balance;
-            var previousSenderTotalBalance = senderWallet.TotalBalance;
+            var previousSenderTotalBalance = senderWallet.TotalBalance ?? 0;
             var previousSenderDebitOnHoldBalance = senderWallet.DebitOnHoldBalance;
             var previousSenderCreditOnHoldBalance = senderWallet.CreditOnHoldBalance;
 
             var previousRecipientBalance = recipientWallet.Balance;
-            var previousRecipientTotalBalance = recipientWallet.TotalBalance;
+            var previousRecipientTotalBalance = recipientWallet.TotalBalance ?? 0;
             var previousRecipientDebitOnHoldBalance = recipientWallet.DebitOnHoldBalance;
             var previousRecipientCreditOnHoldBalance = recipientWallet.CreditOnHoldBalance;
 
@@ -713,7 +723,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 Amount = request.TotalAmount,
                 TransactionFee = transferDeductionType is TransferDeductionType.DeductFromSender ? request.TotalFee : 0,
                 PreviousBalance = previousSenderBalance,
-                PreviousTotalBalance = previousSenderTotalBalance.Value,
+                PreviousTotalBalance = previousSenderTotalBalance,
                 PreviousDebitOnHoldBalance = previousSenderDebitOnHoldBalance,
                 PreviousCreditOnHoldBalance = previousSenderCreditOnHoldBalance,
                 RunningBalance = senderWallet.Balance,
@@ -737,7 +747,7 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 Amount = request.TotalAmount,
                 TransactionFee = transferDeductionType is TransferDeductionType.DeductFromRecipient ? request.TotalFee : 0,
                 PreviousBalance = previousRecipientBalance,
-                PreviousTotalBalance = previousRecipientTotalBalance.Value,
+                PreviousTotalBalance = previousRecipientTotalBalance,
                 PreviousDebitOnHoldBalance = previousRecipientDebitOnHoldBalance,
                 PreviousCreditOnHoldBalance = previousRecipientCreditOnHoldBalance,
                 RunningBalance = recipientWallet.Balance,
@@ -883,6 +893,11 @@ public sealed class WalletOperationsService : IWalletOperationsService
                 }
 
                 targetWallet = createResult.Data;
+                if (targetWallet is null)
+                {
+                    _logger.OperationFailed("AutoCreateTargetWallet", "Wallet", Guid.Empty, "Target wallet creation returned no wallet during conversion");
+                    return Result.Failure("Target wallet could not be created", 500);
+                }
             }
 
             // Calculate deduction amounts
@@ -960,12 +975,12 @@ public sealed class WalletOperationsService : IWalletOperationsService
 
             // Store previous balances
             var previousSourceBalance = sourceWallet.Balance;
-            var previousSourceTotalBalance = sourceWallet.TotalBalance.Value;
+            var previousSourceTotalBalance = sourceWallet.TotalBalance ?? 0;
             var previousSourceCreditOnHoldBalance = sourceWallet.CreditOnHoldBalance;
             var previousSourceDebitOnHoldBalance = sourceWallet.DebitOnHoldBalance;
 
             var previousTargetBalance = targetWallet.Balance;
-            var previousTargetTotalBalance = targetWallet.TotalBalance.Value;
+            var previousTargetTotalBalance = targetWallet.TotalBalance ?? 0;
             var previousTargetCreditOnHoldBalance = targetWallet.CreditOnHoldBalance;
             var previousTargetDebitOnHoldBalance = targetWallet.DebitOnHoldBalance;
 

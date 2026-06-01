@@ -72,14 +72,10 @@ public static class Endpoint
         app.MapPost("/api/wallets/batch/transfer", HandleAsync)
             .WithName("BatchTransferWallets")
             .WithTags("Wallets", "Batch")
-            .WithOpenApi(operation => 
-            {
-                operation.Summary = "Batch transfer between wallets";
-                operation.Description = "Processes multiple wallet transfers in a single optimized transaction. " +
-                    "Each transfer creates debit and credit transactions. Validates balances and wallet existence. " +
-                    "Performance: 20-50x faster than individual operations.";
-                return operation;
-            })
+            .WithSummary("Batch transfer between wallets")
+            .WithDescription("Processes multiple wallet transfers in a single optimized transaction. " +
+                "Each transfer creates debit and credit transactions. Validates balances and wallet existence. " +
+                "Performance: 20-50x faster than individual operations.")
             .Produces<BatchOperationResult>(StatusCodes.Status200OK)
             .Produces<BatchOperationResult>(StatusCodes.Status207MultiStatus)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)

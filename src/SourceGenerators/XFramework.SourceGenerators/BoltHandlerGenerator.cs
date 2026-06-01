@@ -401,21 +401,14 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
             _ => "MapPost"
         };
 
-        // Build the endpoint chain (.WithTags, .WithOpenApi, .ExcludeFromDescription)
+        // Build the endpoint chain (.WithTags, .WithSummary, .WithDescription, .ExcludeFromDescription)
         var chain = new StringBuilder();
         if (h.Tags?.Length > 0)
-            chain.AppendLine($"            .WithTags({string.Join(", ", h.Tags.Select(t => $"\"{t}\""))})");
-        if (h.Summary != null || h.Description != null)
-        {
-            chain.AppendLine("            .WithOpenApi(op =>");
-            chain.AppendLine("            {");
-            if (h.Summary != null)
-                chain.AppendLine($"                op.Summary = \"{h.Summary}\";");
-            if (h.Description != null)
-                chain.AppendLine($"                op.Description = \"{h.Description}\";");
-            chain.AppendLine("                return op;");
-            chain.AppendLine("            })");
-        }
+            chain.AppendLine($"            .WithTags({string.Join(", ", h.Tags.Select(ToCSharpStringLiteral))})");
+        if (h.Summary != null)
+            chain.AppendLine($"            .WithSummary({ToCSharpStringLiteral(h.Summary)})");
+        if (h.Description != null)
+            chain.AppendLine($"            .WithDescription({ToCSharpStringLiteral(h.Description)})");
         if (h.ExcludeFromOpenApi)
             chain.AppendLine("            .ExcludeFromDescription()");
 
@@ -612,6 +605,33 @@ public static class GeneratedEndpointRoutes
     }
 
     #endregion
+
+    private static string ToCSharpStringLiteral(string value)
+    {
+        var builder = new StringBuilder(value.Length + 2);
+        builder.Append('"');
+
+        foreach (var c in value)
+        {
+            builder.Append(c switch
+            {
+                '\\' => @"\\",
+                '"' => "\\\"",
+                '\0' => @"\0",
+                '\a' => @"\a",
+                '\b' => @"\b",
+                '\f' => @"\f",
+                '\n' => @"\n",
+                '\r' => @"\r",
+                '\t' => @"\t",
+                '\v' => @"\v",
+                _ => c.ToString()
+            });
+        }
+
+        builder.Append('"');
+        return builder.ToString();
+    }
 
     #region Types
 
