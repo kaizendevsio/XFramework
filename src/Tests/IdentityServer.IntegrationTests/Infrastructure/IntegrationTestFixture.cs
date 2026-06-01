@@ -4,8 +4,10 @@ using IdentityServer.Api.Features.Verification.Confirm;
 using IdentityServer.Api.Generated;
 using IdentityServer.Api.Services;
 using IdentityServer.Integration.Drivers;
+using Messaging.Integration.Drivers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.Text.Json.Serialization;
 using Bolt.Hub.Extensions;
 using Testcontainers.PostgreSql;
 using XFramework.Core.DataContext;
@@ -15,8 +17,6 @@ using XFramework.Domain.Contexts;
 using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Extensions;
-using XFramework.Integration.Security;
-using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Extensions;
 using Contracts = IdentityServer.Domain.Shared.Contracts;
 
@@ -121,13 +121,6 @@ public class IntegrationTestFixture
         return app;
     }
 
-    /// <summary>
-    /// The generated wrapper TargetClient = SHA256("IdentityServer").
-    /// The BoltClient must register with this same ID so the hub routes requests correctly.
-    /// </summary>
-    private static readonly string IdentityServerServiceId =
-        XFramework.Integration.Security.Cryptography.ToSha256("IdentityServer");
-
     private static WebApplication StartIdentityServer()
     {
         // Build manually (instead of XApplication.Configure<AuthService>()) so that config
@@ -152,21 +145,21 @@ public class IntegrationTestFixture
                 Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
         builder.Services.AddServerDataContext<AppDbContext>();
 
+        builder.Services.InstallJwt(builder.Configuration);
         builder.Services.InstallStandardServices<AuthService>(builder.Configuration);
+        builder.Services.ConfigureHttpJsonOptions(options =>
+            options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
+        builder.Services.AddTenantResolver();
+        builder.Services.AddMessagingWrapperServices();
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
-
-        // Register BoltClient with the correct service ID (SHA256 of module name)
-        // so the hub can route wrapper requests to this instance.
-        builder.Services.AddBoltClient(bolt => bolt
-            .WithServer($"{BoltUrl}/bolt/ws")
-            .WithClientId(IdentityServerServiceId)
-            .WithClientName("IdentityServer"));
+        builder.Services.AddXFrameworkBoltClient(builder.Configuration);
 
         // Register DataContext handler so IdentityServer can serve __db_query__/__db_changes__ via Bolt
         builder.Services.AddDataContextHandler(typeof(AuthService).Assembly);
 
         var app = (WebApplication)builder.Build();
+        RegisterIdentityServerBoltHandlers(app);
         app.UseCorrelationId();
         app.MapGeneratedEndpoints();
         app.MapConfirmVerificationEndpoint();
@@ -174,6 +167,16 @@ public class IntegrationTestFixture
 
         _identityServerTask = Task.Run(() => app.RunAsync());
         return app;
+    }
+
+    private static void RegisterIdentityServerBoltHandlers(WebApplication app)
+    {
+        var client = app.Services.GetRequiredService<BoltClient>();
+        var logger = app.Services.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("IdentityServer.GeneratedBoltHandlers");
+        var scopeFactory = app.Services.GetRequiredService<IServiceScopeFactory>();
+
+        IdentityServer.Api.Generated.BoltHandlerRegistry.RegisterAll(client, logger, scopeFactory);
     }
 
     /// <summary>

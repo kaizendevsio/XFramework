@@ -24,7 +24,10 @@ public static class ServiceCollectionExtensions
     /// Usage:
     ///   builder.Services.AddXFrameworkBoltClient(builder.Configuration);
     /// </summary>
-    public static IServiceCollection AddXFrameworkBoltClient(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddXFrameworkBoltClient(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool autoConnect = true)
     {
         services.Configure<BoltConfiguration>(configuration.GetSection("BoltConfiguration"));
 
@@ -52,6 +55,9 @@ public static class ServiceCollectionExtensions
                 .WithClientId(clientId)
                 .WithClientName(clientName)
                 .WithTimeout(boltConfig.RpcTimeoutSeconds);
+
+            if (!autoConnect)
+                builder.DisableAutoConnect();
         });
 
         services.AddSingleton<IMessageBusWrapper, BoltDriver>();

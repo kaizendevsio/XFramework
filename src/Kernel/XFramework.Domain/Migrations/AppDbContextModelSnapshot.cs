@@ -1225,6 +1225,9 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("CredentialID");
 
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
