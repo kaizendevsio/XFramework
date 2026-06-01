@@ -4,6 +4,7 @@ namespace Community.Api.Features.CommunityIdentities.Create;
 
 public static class CreateCommunityIdentityEndpoint
 {
+    [BoltHandler]
     [MapPost("/api/community/identities", Tags = ["Community Identities"],
         Summary = "Create a new community identity",
         Description = "Creates a new community identity for a credential",

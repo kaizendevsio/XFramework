@@ -7,20 +7,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Mapster" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
         <PackageReference Include="System.Net.Http.Json" />
-        
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="Coins.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\Server\Coins.Domain\bin\Debug\net5.0\Coins.Domain.dll</HintPath>
-      </Reference>
-      <Reference Include="XFramework.Domain.Generic, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\..\..\..\..\XFramework\Server\XFramework.Domain.Generic\bin\Debug\net5.0\XFramework.Domain.Generic.dll</HintPath>
-      </Reference>
     </ItemGroup>
 
 </Project>

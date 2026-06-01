@@ -1,4 +1,5 @@
 using System.Net;
+using Messaging.Domain.Shared;
 using Messaging.Domain.Shared.Contracts.Requests.Create;
 using Messaging.Domain.Shared.Contracts.Requests.Update;
 using SmsGateway.Integration.Drivers;
@@ -87,6 +88,42 @@ public sealed class MessagingService(
         {
             logger.MessagingCreateDirectError(request.Recipient, ex);
             return Result<CmdResponse>.Failure($"Error creating direct message: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<CmdResponse>> CreateVerificationMessageAsync(CreateVerificationMessageRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            MessageTransportType? transportType = request.ContactType switch
+            {
+                GenericContactType.Phone => MessageTransportType.Sms,
+                GenericContactType.Email => MessageTransportType.Email,
+                _ => null
+            };
+
+            if (transportType is null)
+                return Result<CmdResponse>.Failure($"Verification contact type {request.ContactType} not supported");
+
+            if (transportType.Value != MessageTransportType.Sms)
+            {
+                logger.MessagingTransportNotImplemented(transportType.Value.ToString());
+                return Result<CmdResponse>.Failure($"Verification transport type {transportType.Value} not implemented", 501);
+            }
+
+            return await CreateDirectMessageAsync(new CreateDirectMessageRequest
+            {
+                Metadata = request.Metadata,
+                MessageTransportType = transportType.Value,
+                Recipient = request.Contact!,
+                Message = request.VerificationToken!,
+                Intent = MessageIntents.Verification
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.MessagingCreateDirectError(request.Contact ?? string.Empty, ex);
+            return Result<CmdResponse>.Failure($"Error creating verification message: {ex.Message}");
         }
     }
 

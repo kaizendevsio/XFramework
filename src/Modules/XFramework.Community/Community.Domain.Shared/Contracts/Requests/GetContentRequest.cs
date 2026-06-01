@@ -11,4 +11,5 @@ public partial record GetContentRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid Id { get; set; }
+    public Guid? RequestingIdentityId { get; set; }
 }

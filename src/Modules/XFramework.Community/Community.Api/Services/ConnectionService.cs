@@ -100,14 +100,16 @@ public sealed class ConnectionService : IConnectionService
 
             _logger.CommunityConnectionCreated(entity.Id, request.SourceIdentityId, request.TargetIdentityId);
 
-            // Create a follow notification for the target identity
-            await _notificationService.CreateNotificationAsync(
-                request.TargetIdentityId,
-                request.SourceIdentityId,
-                Community.Domain.Shared.Enums.NotificationType.Follow,
-                entity.Id,
-                $"{sourceIdentity.HandleName ?? "Someone"} started following you",
-                cancellationToken);
+            if (request.TypeId == Community.Domain.Shared.CommunityConnectionTypes.Follow)
+            {
+                await _notificationService.CreateNotificationAsync(
+                    request.TargetIdentityId,
+                    request.SourceIdentityId,
+                    Community.Domain.Shared.Enums.NotificationType.Follow,
+                    entity.Id,
+                    $"{sourceIdentity.HandleName ?? "Someone"} started following you",
+                    cancellationToken);
+            }
 
             return Result<CmdResponse>.Success(new CmdResponse
             {

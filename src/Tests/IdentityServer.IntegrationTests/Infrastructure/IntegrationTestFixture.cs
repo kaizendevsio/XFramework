@@ -1,5 +1,6 @@
 using Bolt.Client;
 using FluentValidation;
+using IdentityServer.Api.Features.Verification.Confirm;
 using IdentityServer.Api.Generated;
 using IdentityServer.Api.Services;
 using IdentityServer.Integration.Drivers;
@@ -168,6 +169,7 @@ public class IntegrationTestFixture
         var app = (WebApplication)builder.Build();
         app.UseCorrelationId();
         app.MapGeneratedEndpoints();
+        app.MapConfirmVerificationEndpoint();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
 
         _identityServerTask = Task.Run(() => app.RunAsync());

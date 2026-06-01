@@ -14,7 +14,9 @@ public sealed class MarkMessagesReadValidator : AbstractValidator<MarkMessagesRe
             .NotEmpty().WithMessage("Requester Credential ID is required");
 
         RuleFor(x => x.MessageIds)
-            .NotEmpty().WithMessage("At least one message ID is required");
+            .NotEmpty().WithMessage("At least one message ID is required")
+            .Must(ids => ids.Distinct().Count() == ids.Count)
+            .WithMessage("Message IDs must be unique");
 
         RuleForEach(x => x.MessageIds)
             .NotEmpty().WithMessage("Message ID cannot be empty");

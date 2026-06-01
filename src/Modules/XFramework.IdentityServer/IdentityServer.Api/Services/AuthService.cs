@@ -167,9 +167,9 @@ public sealed class AuthService : IAuthService
             if (request.RequireVerificationId)
             {
                 var verification = await _dataContext.Query<IdentityVerification>()
-                    .Where(i => i.VerificationType.Name == nameof(IdentityConstants.VerificationType.Sms))
+                    .Where(i => i.VerificationTypeId == IdentityConstants.VerificationType.Sms)
                     .Where(i => i.CredentialId == request.CreadentialId)
-                    .Where(i => i.Status == (int)GenericStatusType.Approved)
+                    .Where(i => i.Status == (short?)GenericStatusType.Approved)
                     .Where(i => i.Id == request.VerificationId)
                     .Where(i => i.StatusUpdatedOn >= DateTime.UtcNow.AddMinutes(-10))
                     .FirstOrDefaultAsync(ct);
@@ -474,9 +474,9 @@ public sealed class AuthService : IAuthService
                     $"Credential with id {request.Model.CredentialId} does not exist");
             }
 
-            switch (verificationType.Name)
+            switch (verificationType.Id)
             {
-                case nameof(IdentityConstants.VerificationType.Sms):
+                case var id when id == IdentityConstants.VerificationType.Sms:
                     var messageTemplate = await _dataContext.Query<RegistryConfiguration>()
                         .Where(i => i.TenantId == tenant.Id)
                         .Where(i => i.Group.Name == "MessagingService_Otp")
@@ -540,7 +540,7 @@ public sealed class AuthService : IAuthService
 
                     return Result<IdentityVerification>.Success(verification);
 
-                case nameof(IdentityConstants.VerificationType.Email):
+                case var id when id == IdentityConstants.VerificationType.Email:
                     var emailMessageTemplate = await _dataContext.Query<RegistryConfiguration>()
                         .Where(i => i.TenantId == tenant.Id)
                         .Where(i => i.Group.Name == "MessagingService_Otp")
@@ -624,14 +624,15 @@ public sealed class AuthService : IAuthService
         try
         {
             var verification = await _dataContext.Query<IdentityVerification>()
-                .Where(i => i.Status == (int?)GenericStatusType.Pending)
+                .Where(i => i.Status == (short?)GenericStatusType.Pending)
                 .Where(i => i.Token == request.Model.Token)
+                .Where(i => i.Expiry > DateTime.UtcNow)
                 .FirstOrDefaultAsync(ct);
 
             if (verification == null)
             {
                 return Result<IdentityVerification>.NotFound(
-                    $"Verification with token {request.Model.Token} does not exist");
+                    "Verification token is invalid or expired");
             }
 
             // Update verification status to Approved
@@ -1194,6 +1195,14 @@ public sealed class AuthService : IAuthService
             catch
             {
                 _logger.TokenValidationFailed(session.CredentialId, "Invalid access token");
+                return Result<RefreshTokenResponse>.Failure("Invalid access token", 401);
+            }
+
+            var credentialIdClaim = principal.FindFirstValue(ClaimTypes.Name);
+            if (!Guid.TryParse(credentialIdClaim, out var tokenCredentialId) ||
+                tokenCredentialId != session.CredentialId)
+            {
+                _logger.TokenValidationFailed(session.CredentialId, "Access token does not match session credential");
                 return Result<RefreshTokenResponse>.Failure("Invalid access token", 401);
             }
 

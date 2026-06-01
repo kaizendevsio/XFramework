@@ -40,10 +40,20 @@ public sealed class ContentService : IContentService
                 return Result<CmdResponse>.NotFound($"Community identity with Id {request.IdentityId} does not exist");
             }
 
+            var contentTypeExists = await _dataContext.Query<CommunityContentType>()
+                .AnyAsync(t => t.Id == request.TypeId, cancellationToken);
+
+            if (!contentTypeExists)
+            {
+                _logger.EntityNotFound("CommunityContentType", request.TypeId);
+                return Result<CmdResponse>.NotFound($"Content type with Id {request.TypeId} does not exist");
+            }
+
             // If ParentContentId provided, validate parent content exists
+            CommunityContent? parentContent = null;
             if (request.ParentContentId.HasValue)
             {
-                var parentContent = await _dataContext.Query<CommunityContent>()
+                parentContent = await _dataContext.Query<CommunityContent>()
                     .Where(c => c.Id == request.ParentContentId.Value && !c.IsDeleted)
                     .FirstOrDefaultAsync(cancellationToken);
 
@@ -51,6 +61,14 @@ public sealed class ContentService : IContentService
                 {
                     _logger.EntityNotFound("CommunityContent", request.ParentContentId.Value);
                     return Result<CmdResponse>.NotFound($"Parent content with Id {request.ParentContentId.Value} does not exist");
+                }
+
+                if (await _connectionService.IsBlockedAsync(
+                        request.IdentityId,
+                        parentContent.SocialMediaIdentityId,
+                        cancellationToken))
+                {
+                    return Result<CmdResponse>.Forbidden("Cannot comment because a block exists between you and the content author");
                 }
             }
 
@@ -60,6 +78,7 @@ public sealed class ContentService : IContentService
                 Text = request.Text,
                 TypeId = request.TypeId,
                 SocialMediaIdentityId = request.IdentityId,
+                CommunityGroupId = parentContent?.CommunityGroupId ?? request.IdentityId,
                 ParentContentId = request.ParentContentId,
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
@@ -69,13 +88,9 @@ public sealed class ContentService : IContentService
             await _dataContext.SaveChangesAsync(cancellationToken);
 
             // If it's a comment, create a notification for the content author
-            if (request.ParentContentId.HasValue)
+            if (parentContent is not null)
             {
-                var parentContent = await _dataContext.Query<CommunityContent>()
-                    .Where(c => c.Id == request.ParentContentId.Value)
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                if (parentContent != null && parentContent.SocialMediaIdentityId != request.IdentityId)
+                if (parentContent.SocialMediaIdentityId != request.IdentityId)
                 {
                     var notification = new CommunityNotification
                     {
@@ -124,6 +139,17 @@ public sealed class ContentService : IContentService
             if (content == null)
             {
                 _logger.EntityNotFound("CommunityContent", request.Id);
+                return Result<GetContentResponse>.NotFound($"Content with Id {request.Id} does not exist");
+            }
+
+            if (request.RequestingIdentityId is { } requestingIdentityId
+                && requestingIdentityId != Guid.Empty
+                && requestingIdentityId != content.SocialMediaIdentityId
+                && await _connectionService.IsBlockedAsync(
+                    requestingIdentityId,
+                    content.SocialMediaIdentityId,
+                    cancellationToken))
+            {
                 return Result<GetContentResponse>.NotFound($"Content with Id {request.Id} does not exist");
             }
 
@@ -285,6 +311,15 @@ public sealed class ContentService : IContentService
                 return Result<CmdResponse>.NotFound($"Community identity with Id {request.IdentityId} does not exist");
             }
 
+            var reactionTypeExists = await _dataContext.Query<CommunityContentReactionType>()
+                .AnyAsync(t => t.Id == request.TypeId, cancellationToken);
+
+            if (!reactionTypeExists)
+            {
+                _logger.EntityNotFound("CommunityContentReactionType", request.TypeId);
+                return Result<CmdResponse>.NotFound($"Reaction type with Id {request.TypeId} does not exist");
+            }
+
             // Block check
             if (await _connectionService.IsBlockedAsync(request.IdentityId, content.SocialMediaIdentityId, cancellationToken))
                 return Result<CmdResponse>.Forbidden("Cannot react — a block exists between you and the content author");
@@ -409,6 +444,14 @@ public sealed class ContentService : IContentService
             if (identity == null)
             {
                 _logger.CommunityIdentityNotFound(request.Id);
+                return Result<GetCommunityIdentityResponse>.NotFound($"Community identity with Id {request.Id} does not exist");
+            }
+
+            if (request.RequestingIdentityId is { } requestingIdentityId
+                && requestingIdentityId != Guid.Empty
+                && requestingIdentityId != request.Id
+                && await _connectionService.IsBlockedAsync(requestingIdentityId, request.Id, cancellationToken))
+            {
                 return Result<GetCommunityIdentityResponse>.NotFound($"Community identity with Id {request.Id} does not exist");
             }
 
@@ -542,6 +585,12 @@ public sealed class ContentService : IContentService
 
             if (content.SocialMediaIdentityId != request.RequestingIdentityId)
                 return Result<CmdResponse>.Forbidden("You do not have permission to attach files to this content");
+
+            var storageFileExists = await _dataContext.Query<StorageFile>()
+                .AnyAsync(f => f.Id == request.StorageFileId, cancellationToken);
+
+            if (!storageFileExists)
+                return Result<CmdResponse>.NotFound($"Storage file with Id {request.StorageFileId} does not exist");
 
             var entity = new CommunityContentFile
             {

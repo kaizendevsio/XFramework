@@ -24,6 +24,7 @@ public class MessageDirectConfiguration : IEntityTypeConfiguration<MessageDirect
             .HasDefaultValueSql("true");
         entity.Property(e => e.Message).HasColumnType("character varying");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
+        entity.Property(e => e.ReceivedAt).HasColumnName("RecievedAt");
         entity.Property(e => e.Subject).HasColumnType("character varying");
 
         entity.HasOne(d => d.ParentMessage).WithMany(p => p.InverseParentMessage)

@@ -10,7 +10,7 @@ public static class GetThreadEndpoint
     [BoltHandler]
     [MapGet("/api/threads/{id:guid}", Tags = ["Threads"],
         Summary = "Get a thread by ID",
-        Description = "Returns a thread with its members list.",
+        Description = "Returns a thread with its members list when the requester is a member.",
         ExcludeFromOpenApi = true)]
     public static async Task<Result<GetThreadResponse>> Handle(
         GetThreadRequest request,

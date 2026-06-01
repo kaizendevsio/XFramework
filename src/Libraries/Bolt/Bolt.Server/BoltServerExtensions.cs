@@ -45,9 +45,9 @@ public static class BoltServerExtensions
 
             BoltServer server;
             if (durableStore is not null && durableOptions is not null)
-                server = new BoltServer(logger, durableStore, durableOptions);
+                server = new BoltServer(logger, options, durableStore, durableOptions);
             else
-                server = new BoltServer(logger);
+                server = new BoltServer(logger, options);
 
             foreach (var processor in options.MediaProcessors)
                 server.RegisterMediaProcessor(processor);

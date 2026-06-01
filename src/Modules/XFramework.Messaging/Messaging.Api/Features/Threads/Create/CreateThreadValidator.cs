@@ -11,6 +11,9 @@ public sealed class CreateThreadValidator : AbstractValidator<CreateThreadReques
             .NotEmpty().WithMessage("Thread name is required")
             .MaximumLength(200).WithMessage("Thread name cannot exceed 200 characters");
 
+        RuleFor(x => x.TypeId)
+            .NotEmpty().WithMessage("Thread type ID is required");
+
         RuleFor(x => x.InitialMemberCredentialIds)
             .NotEmpty().WithMessage("At least one member is required")
             .Must(ids => ids.Count > 0).WithMessage("At least one member credential ID is required");

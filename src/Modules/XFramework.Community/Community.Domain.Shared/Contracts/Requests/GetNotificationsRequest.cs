@@ -8,6 +8,7 @@ public partial record GetNotificationsRequest : RequestBase,
     IBoltRequest<GetNotificationsRequest, QueryResponse<GetNotificationsResponse>>
 {
     public Guid IdentityId { get; set; }
+    public Guid RequestingIdentityId { get; set; }
     public bool? IsRead { get; set; }
     public int PageIndex { get; set; }
     public int PageSize { get; set; } = 20;

@@ -1,11 +1,11 @@
-﻿namespace Payments.Core.Services;
+namespace Payments.Core.Services;
 
-using Domain.Shared.Contracts.Requests.Create;
 using Domain.Shared.Contracts;
+using Domain.Shared.Contracts.Requests.Create;
 
 public class PaymentGatewayService
 {
-    private readonly Dictionary<PaymentGateway, IPaymentGatewayProvider> _providers;
+    private readonly IReadOnlyList<IPaymentGatewayProvider> _providers;
     private readonly ILogger<PaymentGatewayService> _logger;
     private readonly string _baseCallbackUrl;
 
@@ -14,30 +14,27 @@ public class PaymentGatewayService
         ILogger<PaymentGatewayService> logger,
         string baseCallbackUrl = "https://api.yourdomain.com")
     {
-        _providers = providers.ToDictionary(p => p.Provider, p => p);
+        _providers = providers.ToList();
         _logger = logger;
         _baseCallbackUrl = baseCallbackUrl;
     }
 
-    public async Task<PaymentResponse> ProcessCashInAsync(CreateCashInRequest request, CancellationToken cancellationToken = default)
+    public async Task<PaymentResponse> ProcessCashInAsync(
+        CreateCashInRequest request,
+        CancellationToken cancellationToken = default)
     {
-        if (!_providers.TryGetValue(request.PaymentGateway, out var provider))
+        var provider = FindProvider(request.PaymentGateway);
+        if (provider is null)
         {
-            _logger.LogError("Payment gateway provider {Provider} not found", request.PaymentGateway);
-            return new PaymentResponse 
-            { 
-                Success = false, 
-                Message = $"Payment gateway provider {request.PaymentGateway} not found",
-                Amount = request.Amount
-            };
+            return ProviderNotFound(request.PaymentGateway, request.Amount);
         }
 
         if (!provider.IsAvailable)
-        {   
+        {
             _logger.LogWarning("Payment gateway provider {Provider} is not available", provider.Name);
-            return new PaymentResponse 
-            { 
-                Success = false, 
+            return new PaymentResponse
+            {
+                Success = false,
                 Message = $"Payment gateway provider {provider.Name} is not available",
                 Amount = request.Amount
             };
@@ -45,49 +42,42 @@ public class PaymentGatewayService
 
         try
         {
-            // Make sure we have a reference number
-            request.ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber) 
-                ? $"REF-{Guid.NewGuid():N}" 
+            request.ReferenceNumber = string.IsNullOrEmpty(request.ReferenceNumber)
+                ? $"REF-{Guid.NewGuid():N}"
                 : request.ReferenceNumber;
-            
-            // Process the cash in request
+
             var response = await provider.ProcessCashInAsync(request, cancellationToken);
-            
-            // If the provider supports callbacks, include callback information in the response
+
             if (provider.SupportsCashInCallback)
             {
-                // Use the reference ID from the response or fall back to the request reference number
                 var referenceId = response.ReferenceId ?? request.ReferenceNumber;
-                
-                // Generate the callback URL that the payment provider will call when payment is complete
                 var callbackUrl = provider.GenerateCashInCallbackUrl(
-                    _baseCallbackUrl, 
-                    request.MerchantId, 
+                    _baseCallbackUrl,
+                    request.MerchantId ?? string.Empty,
                     referenceId);
-                
-                // Add the callback URL to the response
+
                 var originalResponse = response.ProviderResponse;
-                response.ProviderResponse = JsonSerializer.Serialize(new { 
+                response.ProviderResponse = JsonSerializer.Serialize(new
+                {
                     OriginalResponse = originalResponse,
                     CallbackUrl = callbackUrl
                 });
-                
+
                 _logger.LogInformation(
-                    "Generated callback URL for provider {Provider}, reference {Reference}: {CallbackUrl}",
+                    "Generated callback URL for provider {Provider}, reference {Reference}",
                     provider.Name,
-                    referenceId,
-                    callbackUrl);
+                    referenceId);
             }
-            
+
             return response;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing cash in with provider {Provider}", provider.Name);
-            return new PaymentResponse 
-            { 
-                Success = false, 
-                Message = $"Error processing payment: {ex.Message}",
+            return new PaymentResponse
+            {
+                Success = false,
+                Message = "Error processing payment",
                 Amount = request.Amount
             };
         }
@@ -98,50 +88,42 @@ public class PaymentGatewayService
         PaymentCallbackPayload payload,
         CancellationToken cancellationToken = default)
     {
-        if (!_providers.TryGetValue(paymentGateway, out var provider))
+        var provider = FindProvider(paymentGateway);
+        if (provider is null)
         {
-            _logger.LogError("Payment gateway provider {Provider} not found for callback processing", paymentGateway);
-            return new PaymentResponse 
-            { 
-                Success = false, 
-                Message = $"Payment gateway provider {paymentGateway} not found"
-            };
+            return ProviderNotFound(paymentGateway);
         }
 
         if (!provider.SupportsCashInCallback)
         {
             _logger.LogError("Provider {Provider} does not support cash in callbacks", provider.Name);
-            return new PaymentResponse 
-            { 
-                Success = false, 
+            return new PaymentResponse
+            {
+                Success = false,
                 Message = $"Provider {provider.Name} does not support cash in callbacks"
             };
         }
 
         try
         {
-            // Log the callback receipt
             _logger.LogInformation(
                 "Received callback for provider {Provider}, reference {Reference}",
                 provider.Name,
                 payload.ReferenceNumber);
-                
-            // Verify the callback is authentic
+
             var isAuthentic = await provider.VerifyCallbackAuthenticityAsync(payload, cancellationToken);
             if (!isAuthentic)
             {
                 _logger.LogWarning("Received unauthentic callback for provider {Provider}", provider.Name);
-                return new PaymentResponse 
-                { 
-                    Success = false, 
+                return new PaymentResponse
+                {
+                    Success = false,
                     Message = "Callback verification failed"
                 };
             }
 
-            // Process the callback
             var response = await provider.ProcessCashInCallbackAsync(payload, cancellationToken);
-            
-            // Log the result
+
             if (response.Success)
             {
                 _logger.LogInformation(
@@ -157,39 +139,36 @@ public class PaymentGatewayService
                     payload.ReferenceNumber,
                     response.Message);
             }
-            
+
             return response;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing cash in callback with provider {Provider}", provider.Name);
-            return new PaymentResponse 
-            { 
-                Success = false, 
-                Message = $"Error processing callback: {ex.Message}"
+            return new PaymentResponse
+            {
+                Success = false,
+                Message = "Error processing callback"
             };
         }
     }
 
-    public async Task<PaymentResponse> ProcessCashOutAsync(CreateCashoutRequest request, CancellationToken cancellationToken = default)
+    public async Task<PaymentResponse> ProcessCashOutAsync(
+        CreateCashoutRequest request,
+        CancellationToken cancellationToken = default)
     {
-        if (!_providers.TryGetValue(request.PaymentGateway, out var provider))
+        var provider = FindProvider(request.PaymentGateway);
+        if (provider is null)
         {
-            _logger.LogError("Payment gateway provider {Provider} not found", request.PaymentGateway);
-            return new PaymentResponse 
-            { 
-                Success = false, 
-                Message = $"Payment gateway provider {request.PaymentGateway} not found",
-                Amount = request.Amount
-            };
+            return ProviderNotFound(request.PaymentGateway, request.Amount);
         }
 
         if (!provider.IsAvailable)
         {
             _logger.LogWarning("Payment gateway provider {Provider} is not available", provider.Name);
-            return new PaymentResponse 
-            { 
-                Success = false, 
+            return new PaymentResponse
+            {
+                Success = false,
                 Message = $"Payment gateway provider {provider.Name} is not available",
                 Amount = request.Amount
             };
@@ -197,34 +176,32 @@ public class PaymentGatewayService
 
         try
         {
-            // Check the balance before processing cash out
-            var balance = await provider.GetBalanceAsync(request.PaymentGateway, cancellationToken);
+            var balance = await provider.GetBalanceAsync(request.PaymentGateway!, cancellationToken);
             if (balance < request.Amount)
             {
                 _logger.LogWarning(
-                    "Insufficient balance for cash out with provider {Provider}. Available: {Balance}, Requested: {Amount}", 
+                    "Insufficient balance for cash out with provider {Provider}. Available: {Balance}, Requested: {Amount}",
                     provider.Name,
                     balance,
                     request.Amount);
-                    
-                return new PaymentResponse 
-                { 
-                    Success = false, 
+
+                return new PaymentResponse
+                {
+                    Success = false,
                     Message = $"Insufficient balance. Available: {balance}, Requested: {request.Amount}",
                     Amount = request.Amount
                 };
             }
 
-            // Process the cash out
             return await provider.ProcessCashOutAsync(request, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing cash out with provider {Provider}", provider.Name);
-            return new PaymentResponse 
-            { 
-                Success = false, 
-                Message = $"Error processing cash out: {ex.Message}",
+            return new PaymentResponse
+            {
+                Success = false,
+                Message = "Error processing cash out",
                 Amount = request.Amount
             };
         }
@@ -232,9 +209,10 @@ public class PaymentGatewayService
 
     public async Task<decimal> GetBalanceAsync(PaymentGateway paymentGateway, CancellationToken cancellationToken = default)
     {
-        if (!_providers.TryGetValue(paymentGateway, out var provider))
+        var provider = FindProvider(paymentGateway);
+        if (provider is null)
         {
-            _logger.LogError("Payment gateway provider {Provider} not found", paymentGateway);
+            _logger.LogWarning("Payment gateway provider {Provider} not found", GetGatewayLabel(paymentGateway));
             return 0;
         }
 
@@ -251,16 +229,72 @@ public class PaymentGatewayService
 
     public IReadOnlyList<IPaymentGatewayProvider> GetAvailableProviders()
     {
-        return _providers.Values.Where(p => p.IsAvailable).ToList();
+        return _providers.Where(p => p.IsAvailable).ToList();
     }
-    
-    public IPaymentGatewayProvider GetProvider(PaymentGateway paymentGateway)
+
+    public IPaymentGatewayProvider? GetProvider(PaymentGateway paymentGateway)
     {
-        if (_providers.TryGetValue(paymentGateway, out var provider))
+        var provider = FindProvider(paymentGateway);
+        if (provider is null)
         {
-            return provider;
+            _logger.LogWarning("Payment gateway provider {Provider} not found", GetGatewayLabel(paymentGateway));
         }
-        
-        throw new KeyNotFoundException($"Payment gateway provider {paymentGateway} not found");
+
+        return provider;
+    }
+
+    private IPaymentGatewayProvider? FindProvider(PaymentGateway? paymentGateway)
+    {
+        if (paymentGateway is null)
+        {
+            return null;
+        }
+
+        if (paymentGateway.Id != Guid.Empty)
+        {
+            var providerById = _providers.FirstOrDefault(p => p.Provider.Id == paymentGateway.Id);
+            if (providerById is not null)
+            {
+                return providerById;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(paymentGateway.Name))
+        {
+            return _providers.FirstOrDefault(p =>
+                string.Equals(p.Provider.Name, paymentGateway.Name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return null;
+    }
+
+    private PaymentResponse ProviderNotFound(PaymentGateway? paymentGateway, decimal amount = 0)
+    {
+        var label = GetGatewayLabel(paymentGateway);
+        _logger.LogWarning("Payment gateway provider {Provider} not found", label);
+
+        return new PaymentResponse
+        {
+            Success = false,
+            Message = $"Payment gateway provider {label} not found",
+            Amount = amount
+        };
+    }
+
+    private static string GetGatewayLabel(PaymentGateway? paymentGateway)
+    {
+        if (paymentGateway is null)
+        {
+            return "not specified";
+        }
+
+        if (!string.IsNullOrWhiteSpace(paymentGateway.Name))
+        {
+            return paymentGateway.Name;
+        }
+
+        return paymentGateway.Id == Guid.Empty
+            ? "not specified"
+            : paymentGateway.Id.ToString();
     }
 }

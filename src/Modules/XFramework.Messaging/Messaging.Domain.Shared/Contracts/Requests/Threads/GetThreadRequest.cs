@@ -9,4 +9,5 @@ public partial record GetThreadRequest : RequestBase,
     IBoltRequest<TRequest, TResponse>
 {
     public Guid Id { get; set; }
+    public Guid RequesterCredentialId { get; set; }
 }

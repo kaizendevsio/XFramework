@@ -29,13 +29,13 @@ public sealed class BoltClient : IAsyncDisposable
     private readonly BoltTransportNegotiator _negotiator;
 
     private readonly List<BoltConnection> _connections = [];
+    private readonly object _connectionsLock = new();
     private volatile bool _isRegistered;
     private volatile bool _disposed;
 
     private readonly ConcurrentDictionary<Guid, PooledRpcCall> _pendingCalls = new();
     private readonly ConcurrentDictionary<int, Func<ReadOnlyMemory<byte>, Guid, Task<(HttpStatusCode, ReadOnlyMemory<byte>)>>> _handlers = new();
     private readonly ConcurrentDictionary<string, int> _hashCache = new();
-    private readonly ConcurrentQueue<byte[]> _offlineQueue = new();
     private readonly ConcurrentDictionary<Guid, BoltStream> _activeStreams = new();
     private readonly ConcurrentDictionary<int, Func<BoltStream, Task>> _streamHandlers = new();
     private TimeSpan _rpcTimeout;
@@ -59,7 +59,14 @@ public sealed class BoltClient : IAsyncDisposable
     /// <summary>Get the current primary connection for sending frames.</summary>
     public BoltConnection GetPrimaryConnection() => GetConnection();
 
-    public bool IsConnected => _connections.Count > 0 && _isRegistered;
+    public bool IsConnected
+    {
+        get
+        {
+            lock (_connectionsLock)
+                return _connections.Count > 0 && _isRegistered;
+        }
+    }
 
     public BoltClient(Uri serverUri, string clientId, string clientName, BoltClientOptions config, ILogger logger)
     {
@@ -85,12 +92,12 @@ public sealed class BoltClient : IAsyncDisposable
         for (int i = 0; i < minConns; i++)
         {
             var conn = await CreateConnectionAsync(ct);
-            _connections.Add(conn);
+            lock (_connectionsLock)
+                _connections.Add(conn);
         }
         _isRegistered = true;
         _logger.LogInformation("Bolt client connected: {ClientId} ({ClientName}), {Count} connection(s)",
-            _clientId, _clientName, _connections.Count);
-        await DrainOfflineQueueAsync(ct);
+            _clientId, _clientName, ConnectionCount);
     }
 
     /// <summary>
@@ -289,11 +296,32 @@ public sealed class BoltClient : IAsyncDisposable
 
     private async Task ScaleUpAsync()
     {
-        if (_connections.Count >= _config.MaxConnections) return;
+        lock (_connectionsLock)
+        {
+            if (_connections.Count >= _config.MaxConnections)
+                return;
+        }
+
         try
         {
             var conn = await CreateConnectionAsync(CancellationToken.None);
-            _connections.Add(conn);
+            var added = false;
+            lock (_connectionsLock)
+            {
+                if (!_disposed && _connections.Count < _config.MaxConnections)
+                {
+                    _connections.Add(conn);
+                    added = true;
+                }
+            }
+
+            if (!added)
+            {
+                conn.CompleteSendChannel();
+                conn.ReceiveCts?.Cancel();
+                try { await conn.Transport.DisposeAsync(); } catch { }
+                conn.ReceiveCts?.Dispose();
+            }
         }
         catch (Exception ex) { _logger.LogWarning(ex, "Failed to scale up connection pool"); }
     }
@@ -314,8 +342,8 @@ public sealed class BoltClient : IAsyncDisposable
                 var delay = TimeSpan.FromMilliseconds(Math.Min(baseDelay.TotalMilliseconds * Math.Pow(2, attempt), maxDelay.TotalMilliseconds));
                 var jitter = TimeSpan.FromMilliseconds(random.Next(0, (int)(delay.TotalMilliseconds * 0.3)));
                 await Task.Delay(delay + jitter, ct);
-                foreach (var c in _connections) { c.CompleteSendChannel(); c.ReceiveCts?.Cancel(); try { await c.Transport.DisposeAsync(); } catch { } }
-                _connections.Clear();
+                var connections = ClearConnections();
+                foreach (var c in connections) { c.CompleteSendChannel(); c.ReceiveCts?.Cancel(); try { await c.Transport.DisposeAsync(); } catch { } }
             }
         }
         throw new InvalidOperationException($"Failed to connect after {maxRetries} attempts");
@@ -326,6 +354,9 @@ public sealed class BoltClient : IAsyncDisposable
     public async Task<(HttpStatusCode StatusCode, ReadOnlyMemory<byte> Data)> InvokeAsync(
         string recipientId, string commandName, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
+        if (!IsConnected)
+            throw new InvalidOperationException("Not connected");
+
         // Auto-stream large payloads transparently
         if (payload.Length > _config.LargePayloadThreshold)
             return await InvokeLargeAsync(recipientId, commandName, payload, ct);
@@ -333,6 +364,7 @@ public sealed class BoltClient : IAsyncDisposable
         var requestId = Guid.NewGuid();
         var recipientHash = _hashCache.GetOrAdd(recipientId, BoltCodec.Fnv1aHash);
         var commandHash = _hashCache.GetOrAdd(commandName, BoltCodec.Fnv1aHash);
+        var conn = GetConnection();
         var rpcCall = PooledRpcCall.Rent();
         _pendingCalls[requestId] = rpcCall;
 
@@ -343,23 +375,13 @@ public sealed class BoltClient : IAsyncDisposable
             var writer = RentedBufferWriter.GetThreadLocal();
             BoltCodec.WriteRequest(writer, requestId, recipientHash, _senderHash, commandHash, payload.Span);
 
-            if (!IsConnected)
+            // Proactive scale-up: if the least-loaded connection is still saturated, open a new one before sending
+            if (conn.PendingSends > _config.ScaleUpThreshold && ConnectionCount < _config.MaxConnections)
             {
-                _offlineQueue.Enqueue(writer.WrittenSpan.ToArray());
-                rpcCall.SetException(new InvalidOperationException("Not connected"));
+                _ = ScaleUpAsync(); // Start opening new connection in background
             }
-            else
-            {
-                var conn = GetConnection();
 
-                // Proactive scale-up: if the least-loaded connection is still saturated, open a new one before sending
-                if (conn.PendingSends > _config.ScaleUpThreshold && _connections.Count < _config.MaxConnections)
-                {
-                    _ = ScaleUpAsync(); // Start opening new connection in background
-                }
-
-                await conn.SendAsync(writer.WrittenMemory, ct);
-            }
+            await conn.SendAsync(writer.WrittenMemory, ct);
 
             using var timeoutCts = new CancellationTokenSource(_rpcTimeout);
             rpcCall.RegisterTimeout(timeoutCts.Token);
@@ -697,22 +719,26 @@ public sealed class BoltClient : IAsyncDisposable
 
     private BoltConnection GetConnection()
     {
-        var count = _connections.Count;
-        if (count == 1) return _connections[0];
-
-        // Pick the connection with the fewest pending sends
-        var best = _connections[0];
-        var bestPending = best.PendingSends;
-        for (int i = 1; i < count; i++)
+        lock (_connectionsLock)
         {
-            var pending = _connections[i].PendingSends;
-            if (pending < bestPending)
+            var count = _connections.Count;
+            if (count == 0) throw new InvalidOperationException("Not connected");
+            if (count == 1) return _connections[0];
+
+            // Pick the connection with the fewest pending sends
+            var best = _connections[0];
+            var bestPending = best.PendingSends;
+            for (int i = 1; i < count; i++)
             {
-                best = _connections[i];
-                bestPending = pending;
+                var pending = _connections[i].PendingSends;
+                if (pending < bestPending)
+                {
+                    best = _connections[i];
+                    bestPending = pending;
+                }
             }
+            return best;
         }
-        return best;
     }
 
     private async Task ReceiveLoopAsync(BoltConnection conn, CancellationToken ct)
@@ -789,7 +815,7 @@ public sealed class BoltClient : IAsyncDisposable
                         HandleStreamOpen(conn, data, ct);
                         break;
                     case FrameType.StreamData:
-                        HandleStreamData(data);
+                        await HandleStreamDataAsync(frameBytes.AsMemory(0, totalLength), ct);
                         break;
                     case FrameType.StreamClose:
                         HandleStreamClose(data);
@@ -815,8 +841,8 @@ public sealed class BoltClient : IAsyncDisposable
             if (largeBuffer != null) ArrayPool<byte>.Shared.Return(largeBuffer);
             if (!_disposed)
             {
-                _connections.Remove(conn);
-                if (_connections.Count == 0)
+                var noConnections = RemoveConnection(conn);
+                if (noConnections)
                 {
                     _isRegistered = false;
                     foreach (var (id, _) in _pendingCalls)
@@ -878,14 +904,15 @@ public sealed class BoltClient : IAsyncDisposable
         }
     }
 
-    private void HandleStreamData(ReadOnlySpan<byte> data)
+    private async ValueTask HandleStreamDataAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
     {
-        if (!BoltCodec.TryReadStreamData(data, out var streamId, out var payloadOffset, out var payloadLength, out _)) return;
+        var span = data.Span;
+        if (!BoltCodec.TryReadStreamData(span, out var streamId, out var payloadOffset, out var payloadLength, out _)) return;
         if (_activeStreams.TryGetValue(streamId, out var stream))
         {
             var owner = new PooledMemoryOwner(payloadLength);
-            data.Slice(payloadOffset, payloadLength).CopyTo(owner.WritableSpan);
-            stream.EnqueueInbound(owner.Memory);
+            span.Slice(payloadOffset, payloadLength).CopyTo(owner.WritableSpan);
+            await stream.EnqueueInboundAsync(owner.Memory, ct);
         }
     }
 
@@ -983,17 +1010,6 @@ public sealed class BoltClient : IAsyncDisposable
         }
     }
 
-    private async Task DrainOfflineQueueAsync(CancellationToken ct)
-    {
-        var drained = 0;
-        while (_offlineQueue.TryDequeue(out var frame))
-        {
-            await GetConnection().SendAsync(frame, ct);
-            drained++;
-        }
-        if (drained > 0) _logger.LogInformation("Drained {Count} offline messages", drained);
-    }
-
     private async Task ReconnectAsync()
     {
         _logger.LogInformation("Attempting reconnection...");
@@ -1038,7 +1054,8 @@ public sealed class BoltClient : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
-        foreach (var conn in _connections)
+        var connections = ClearConnections();
+        foreach (var conn in connections)
         {
             conn.CompleteSendChannel();
             conn.ReceiveCts?.Cancel();
@@ -1050,7 +1067,35 @@ public sealed class BoltClient : IAsyncDisposable
             try { await conn.Transport.DisposeAsync(); } catch { }
             conn.ReceiveCts?.Dispose();
         }
-        _connections.Clear();
+        _isRegistered = false;
+    }
+
+    private int ConnectionCount
+    {
+        get
+        {
+            lock (_connectionsLock)
+                return _connections.Count;
+        }
+    }
+
+    private bool RemoveConnection(BoltConnection conn)
+    {
+        lock (_connectionsLock)
+        {
+            _connections.Remove(conn);
+            return _connections.Count == 0;
+        }
+    }
+
+    private BoltConnection[] ClearConnections()
+    {
+        lock (_connectionsLock)
+        {
+            var connections = _connections.ToArray();
+            _connections.Clear();
+            return connections;
+        }
     }
 
     private sealed class TransientSubscription

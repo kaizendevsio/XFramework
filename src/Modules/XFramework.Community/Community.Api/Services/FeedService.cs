@@ -43,6 +43,7 @@ public sealed class FeedService : IFeedService
             // Get followed connections to extract target identity IDs
             var followedConnections = await _dataContext.Query<CommunityConnection>()
                 .Where(c => c.SourceSocialMediaIdentityId == request.IdentityId)
+                .Where(c => c.TypeId == Community.Domain.Shared.CommunityConnectionTypes.Follow)
                 .Where(c => !c.IsDeleted)
                 .Where(c => c.IsEnabled)
                 .ToListAsync(cancellationToken);

@@ -1,6 +1,6 @@
 ﻿namespace Payments.Domain.Shared.Contracts.Requests.Create;
 
-using TRequest = CreateCashInRequest;
+using TRequest = CreateCashoutRequest;
 using TResponse = CmdResponse;
 
 [MemoryPackable]

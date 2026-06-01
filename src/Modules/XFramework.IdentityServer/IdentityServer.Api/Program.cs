@@ -1,4 +1,5 @@
 using FluentValidation;
+using IdentityServer.Api.Features.Verification.Confirm;
 using IdentityServer.Api.Generated;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
@@ -50,5 +51,6 @@ app.MapApiDocumentation();
 
 // Map feature endpoints (source-generated from [MapPost/Get/...] attributes)
 app.MapGeneratedEndpoints();
+app.MapConfirmVerificationEndpoint();
 
 app.Run();

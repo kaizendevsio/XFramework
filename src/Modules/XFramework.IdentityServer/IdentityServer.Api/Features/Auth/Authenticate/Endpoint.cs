@@ -1,3 +1,4 @@
+using FluentValidation;
 using IdentityServer.Domain.Shared.Contracts.Responses;
 using XFramework.Integration.Attributes;
 
@@ -16,5 +17,23 @@ public static class AuthenticateEndpoint
         CancellationToken ct)
     {
         return await authService.AuthenticateAsync(request, ct);
+    }
+}
+
+public class AuthenticateIdentityRequestValidator : AbstractValidator<AuthenticateIdentityRequest>
+{
+    public AuthenticateIdentityRequestValidator()
+    {
+        RuleFor(x => x.RoleId)
+            .NotEmpty().WithMessage("Role ID is required");
+
+        RuleFor(x => x.AuthorizationType)
+            .IsInEnum().WithMessage("Authorization type is invalid");
+
+        RuleFor(x => x.UserName)
+            .NotEmpty().WithMessage("Username is required");
+
+        RuleFor(x => x.Password)
+            .NotEmpty().WithMessage("Password is required");
     }
 }

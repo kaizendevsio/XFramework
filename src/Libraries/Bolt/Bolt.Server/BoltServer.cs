@@ -44,7 +44,7 @@ public sealed class BoltServer : IDisposable
     private readonly CancellationTokenSource _mediaTapCts = new();
 
     private readonly Timer _cleanupTimer;
-    private const int InvocationTimeoutMs = 30_000;
+    private readonly int _invocationTimeoutMs;
 
     // Pub/sub state — transient (live fan-out only)
     private readonly ConcurrentDictionary<int, ConcurrentDictionary<BoltHubConnection, byte>> _liveSubscribersByTopic = new();
@@ -58,9 +58,16 @@ public sealed class BoltServer : IDisposable
     private readonly Bolt.Server.Durable.DurableQueueOptions? _durableOptions;
 
     public BoltServer(ILogger<BoltServer> logger)
+        : this(logger, new BoltServerOptions())
+    {
+    }
+
+    public BoltServer(ILogger<BoltServer> logger, BoltServerOptions options)
     {
         _logger = logger;
-        _cleanupTimer = new Timer(CleanupStaleInvocations, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        _invocationTimeoutMs = Math.Max(1, options.InvocationTimeoutMs);
+        var cleanupInterval = TimeSpan.FromSeconds(Math.Max(1, options.CleanupIntervalSeconds));
+        _cleanupTimer = new Timer(CleanupStaleInvocations, null, cleanupInterval, cleanupInterval);
         _mediaTapChannel = Channel.CreateBounded<(Guid, Guid, byte[], uint, uint)>(
             new BoundedChannelOptions(10_000)
             {
@@ -74,7 +81,16 @@ public sealed class BoltServer : IDisposable
         ILogger<BoltServer> logger,
         Bolt.Server.Durable.IDurableQueueStore durableStore,
         Microsoft.Extensions.Options.IOptions<Bolt.Server.Durable.DurableQueueOptions> durableOptions)
-        : this(logger)
+        : this(logger, new BoltServerOptions(), durableStore, durableOptions)
+    {
+    }
+
+    public BoltServer(
+        ILogger<BoltServer> logger,
+        BoltServerOptions options,
+        Bolt.Server.Durable.IDurableQueueStore durableStore,
+        Microsoft.Extensions.Options.IOptions<Bolt.Server.Durable.DurableQueueOptions> durableOptions)
+        : this(logger, options)
     {
         _durableStore = durableStore;
         _durableOptions = durableOptions.Value;
@@ -203,13 +219,13 @@ public sealed class BoltServer : IDisposable
                 break;
             case FrameType.StreamOpen:
                 HandleStreamOpen(connection, buffer, length);
-                await RouteStreamFrameAsync(buffer, length, ct);
+                await RouteStreamFrameAsync(connection, buffer, length, ct);
                 break;
             case FrameType.StreamData:
-                await RouteStreamFrameAsync(buffer, length, ct);
+                await RouteStreamFrameAsync(connection, buffer, length, ct);
                 break;
             case FrameType.StreamClose:
-                await RouteStreamFrameAsync(buffer, length, ct);
+                await RouteStreamFrameAsync(connection, buffer, length, ct);
                 CleanupStream(buffer);
                 break;
 
@@ -388,7 +404,7 @@ public sealed class BoltServer : IDisposable
     /// Route a stream frame (Data or Close) to the correct peer.
     /// If the sender is the stream's Sender, forward to Recipient and vice versa.
     /// </summary>
-    private async Task RouteStreamFrameAsync(byte[] buffer, int length, CancellationToken ct)
+    private async Task RouteStreamFrameAsync(BoltHubConnection sender, byte[] buffer, int length, CancellationToken ct)
     {
         if (length < 17) return; // Need at least 1 byte type + 16 bytes streamId
 
@@ -403,7 +419,16 @@ public sealed class BoltServer : IDisposable
         // forward to both peers (the one that sent it will ignore its own frame in its receive loop)
         // Actually, we route based on the stream open: sender→recipient for data, recipient→sender for data back
         // For simplicity, forward to recipient (sender initiated the stream)
-        await peers.Recipient.SendAsync(buffer.AsMemory(0, length), ct);
+        BoltHubConnection? recipient = null;
+        if (peers.Sender.StreamId == sender.StreamId)
+            recipient = peers.Recipient;
+        else if (peers.Recipient.StreamId == sender.StreamId)
+            recipient = peers.Sender;
+
+        if (recipient is not { IsAlive: true })
+            return;
+
+        await recipient.SendAsync(buffer.AsMemory(0, length), ct);
     }
 
     private void CleanupStream(byte[] buffer)
@@ -1242,7 +1267,7 @@ public sealed class BoltServer : IDisposable
         var now = Environment.TickCount64;
         foreach (var (requestId, pending) in _pendingInvocations)
         {
-            if (now - pending.Timestamp > InvocationTimeoutMs)
+            if (now - pending.Timestamp > _invocationTimeoutMs)
             {
                 if (_pendingInvocations.TryRemove(requestId, out _))
                     _logger.LogDebug("Cleaned up stale invocation {RequestId}", requestId);

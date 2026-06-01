@@ -60,6 +60,18 @@ public sealed class BoltStream : IAsyncDisposable
     }
 
     /// <summary>
+    /// Send raw bytes on this stream.
+    /// </summary>
+    public ValueTask SendAsync(Memory<byte> data, CancellationToken ct = default)
+        => SendAsync((ReadOnlyMemory<byte>)data, ct);
+
+    /// <summary>
+    /// Send raw bytes on this stream.
+    /// </summary>
+    public ValueTask SendAsync(byte[] data, CancellationToken ct = default)
+        => SendAsync((ReadOnlyMemory<byte>)data, ct);
+
+    /// <summary>
     /// Read all incoming raw byte chunks. Completes when remote closes the stream.
     /// </summary>
     public IAsyncEnumerable<ReadOnlyMemory<byte>> ReadAllAsync(CancellationToken ct = default)
@@ -148,10 +160,8 @@ public sealed class BoltStream : IAsyncDisposable
         _inboundChannel.Writer.TryComplete();
     }
 
-    internal bool EnqueueInbound(ReadOnlyMemory<byte> data)
-    {
-        return _inboundChannel.Writer.TryWrite(data);
-    }
+    internal ValueTask EnqueueInboundAsync(ReadOnlyMemory<byte> data, CancellationToken ct)
+        => _inboundChannel.Writer.WriteAsync(data, ct);
 
     internal void MarkClosed(HttpStatusCode statusCode)
     {
