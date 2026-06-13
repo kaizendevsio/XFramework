@@ -16,6 +16,20 @@ public class HttpClientHelper : IHttpClient
         HttpClient = httpClient;
         JsonSerializerOptions = new();
     }
+
+    private static Uri BuildUriWithQueryString(string url, Dictionary<string, string>? queryParams, decimal version)
+    {
+        queryParams ??= new();
+        queryParams["api-version"] = version.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        var queryString = string.Join(
+            "&",
+            queryParams.Select(queryParam =>
+                $"{Uri.EscapeDataString(queryParam.Key)}={Uri.EscapeDataString(queryParam.Value)}"));
+
+        var separator = url.Contains('?') ? "&" : "?";
+        return new($"{url}{separator}{queryString}", UriKind.RelativeOrAbsolute);
+    }
         
     public async Task<QueryResponse<TResponse>> GetJsonAsync<TResponse>(string url, bool useAuthentication = true, decimal version = 2.0m)
     {
@@ -389,25 +403,53 @@ public class HttpClientHelper : IHttpClient
 
     public async Task<QueryResponse<TResponse>> DeleteAsync<TResponse>(string url, Dictionary<string, string> queryParams, bool useAuthentication = true, decimal version = 2.0m)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var request = new HttpRequestMessage
+            {
+                Method = new("DELETE"),
+                RequestUri = BuildUriWithQueryString(url, queryParams, version),
+            };
+
+            request.Headers.Add("Accept", "*/*");
+            if (useAuthentication)
+            {
+                request.Headers.Authorization = new("Bearer", Authentication.AccessToken);
+            }
+
+            var response = await HttpClient.SendAsync(request);
+            var responseMessage = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"{response.StatusCode}; {response.ReasonPhrase}");
+            }
+
+            var responseModel = response.IsSuccessStatusCode && !string.IsNullOrWhiteSpace(responseMessage)
+                ? JsonSerializer.Deserialize<TResponse>(responseMessage, JsonSerializerOptions)
+                : default;
+
+            return new()
+            {
+                HttpStatusCode = response.StatusCode,
+                Message = responseMessage,
+                Response = responseModel
+            };
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
     }
 
     public async Task<CmdResponse> DeleteAsync(string url, Dictionary<string, string> queryParams, bool useAuthentication = true, decimal version = 2.0m)
     {
         try
         {
-            var stringBuilder = new StringBuilder();
-            
-            queryParams.TryAdd("api-version", version.ToString());
-            foreach (var queryParam in queryParams)
-            {
-                stringBuilder.Append($"&{queryParam.Key}={queryParam.Value}");
-            }
-            var queryString = stringBuilder.ToString().Substring(1);
             var request = new HttpRequestMessage
             {
                 Method = new("DELETE"),
-                RequestUri = new($"{url}?{queryString}"),
+                RequestUri = BuildUriWithQueryString(url, queryParams, version),
             };
         
             request.Headers.Add("Accept", "*/*");

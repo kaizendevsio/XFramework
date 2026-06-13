@@ -18,10 +18,14 @@ public interface ITenantResolver
 
 /// <summary>
 /// Implementation of ITenantResolver with memory caching.
-/// TODO: Re-implement tenant service wrapper when IdentityServer.Api exposes tenant endpoints.
+/// Tenant lookup is parked until IdentityServer.Api exposes a tenant lookup contract.
 /// </summary>
 public sealed class TenantResolver(IMemoryCache cache) : ITenantResolver
 {
+    private const string UnsupportedTenantLookupMessage =
+        "Tenant lookup is not supported by the default TenantResolver. " +
+        "Configure a concrete ITenantResolver once IdentityServer.Api exposes a tenant endpoint or service wrapper.";
+
     /// <inheritdoc />
     public Task<Tenant> GetTenant(Guid? id)
     {
@@ -31,11 +35,7 @@ public sealed class TenantResolver(IMemoryCache cache) : ITenantResolver
         {
             return Task.FromResult(entity);
         }
-        
-        // TODO: Implement actual tenant retrieval from IdentityServer.Api
-        // For now, throw an exception indicating the service needs to be configured
-        throw new InvalidOperationException(
-            $"Tenant service is not fully configured. Cannot retrieve tenant with id '{id}'. " +
-            "Please configure a tenant service wrapper or direct API access.");
+
+        throw new NotSupportedException($"{UnsupportedTenantLookupMessage} Tenant id: '{id}'.");
     }
 }

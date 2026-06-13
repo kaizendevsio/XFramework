@@ -297,13 +297,12 @@ public class BaseStateActionHandler
     
     public async Task Persist<TState>(TState state)
     {
-        var statePersistenceFromAppSettings = Configuration.GetValue<string>("Application:Persistence:State:Driver");
-        var persistStateBy = (PersistStateBy)Enum.Parse(typeof(PersistStateBy), statePersistenceFromAppSettings);
+        var persistStateBy = StateHelper.GetPersistStateBy(Configuration);
         
         switch (persistStateBy)
         {
             case PersistStateBy.NotSpecified:
-                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+                throw StateHelper.UnsupportedPersistenceMode(persistStateBy);
             case PersistStateBy.LocalStorage:
                 await LocalStorageService.SetItemAsync(state.GetType().Name, state);
                 break;
@@ -354,11 +353,9 @@ public class BaseStateActionHandler
                 #endregion
                 break;
             case PersistStateBy.CloudStore:
-                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
             case PersistStateBy.GoogleDrive:
-                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
             case PersistStateBy.OneDrive:
-                throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+                throw StateHelper.UnsupportedPersistenceMode(persistStateBy);
             default:
                 throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null);
         }

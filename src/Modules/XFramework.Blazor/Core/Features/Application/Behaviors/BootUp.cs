@@ -11,7 +11,12 @@ public partial class ApplicationState
         
         public override async Task Handle(BootUp action, CancellationToken aCancellationToken)
         {
-            throw new NotImplementedException();
+            if (CurrentState.StateRestored)
+                return;
+
+            await Mediator.Send(new RestoreStates(), aCancellationToken);
+            await Mediator.Send(new SetState { StateRestored = true, IsBusy = false }, aCancellationToken);
+            await Mediator.Publish(new StateRestoredEvent(), aCancellationToken);
         }
     }
 }
