@@ -55,7 +55,6 @@
   </Folder>
   <Folder Name="/Presentation/">
     <Project Path="src\Modules\XFramework.Blazor\XFramework.Blazor.csproj" />
-    <Project Path="src\Presentation\ControlPanel\ControlPanel.csproj" />
     <Project Path="src\Presentation\ControlPanel.Server\ControlPanel.Server.csproj" />
     <Project Path="src\Presentation\Fluid\Fluid.csproj" />
     <Project Path="src\Presentation\Gateway\Gateway.csproj" />
