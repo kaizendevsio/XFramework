@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
@@ -30,6 +31,14 @@ public sealed class HybridCacheService : ICacheService, IDisposable
     private long _totalGets;
     private long _hits;
     private long _misses;
+
+    public HybridCacheService(
+        IMemoryCache memoryCache,
+        IOptions<CacheOptions> options,
+        ILogger<HybridCacheService> logger)
+        : this(memoryCache, null, null, options, logger)
+    {
+    }
 
     public HybridCacheService(
         IMemoryCache memoryCache,
@@ -238,7 +247,7 @@ public sealed class HybridCacheService : ICacheService, IDisposable
     /// <remarks>
     /// Uses per-key locking to prevent cache stampede (thundering herd).
     /// Only one caller per key will execute the factory; others wait for the result.
-    /// Factory exceptions are NOT swallowed — they propagate to the caller.
+    /// Factory exceptions are returned as failures to preserve Result-based error handling.
     /// </remarks>
     public async Task<Result<T>> GetOrSetAsync<T>(
         string key,
@@ -250,13 +259,17 @@ public sealed class HybridCacheService : ICacheService, IDisposable
         if (string.IsNullOrWhiteSpace(key))
             return Result<T>.Failure("Cache key cannot be null or empty", 400);
 
-        ArgumentNullException.ThrowIfNull(factory);
+        if (factory is null)
+            return Result<T>.Failure("Factory function cannot be null", 400);
 
         // Try cache first (no lock needed for reads)
         var getResult = await GetAsync<T>(key, cancellationToken);
 
         if (getResult is { IsSuccess: true, Data: not null })
             return Result<T>.Success(getResult.Data);
+
+        if (!getResult.IsSuccess && !_options.EnableGracefulDegradation)
+            return Result<T>.Failure(getResult.Message ?? "Cache retrieval failed", getResult.StatusCode);
 
         // Cache miss — acquire per-key lock to prevent stampede
         var keyLock = _keyLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
@@ -270,9 +283,25 @@ public sealed class HybridCacheService : ICacheService, IDisposable
             if (getResult is { IsSuccess: true, Data: not null })
                 return Result<T>.Success(getResult.Data);
 
-            // Execute factory — exceptions propagate to caller
+            if (!getResult.IsSuccess && !_options.EnableGracefulDegradation)
+                return Result<T>.Failure(getResult.Message ?? "Cache retrieval failed", getResult.StatusCode);
+
+            // Execute factory
             _logger.LogTrace("Cache miss, executing factory for key: {Key}", key);
-            var value = await factory(cancellationToken);
+            T value;
+            try
+            {
+                value = await factory(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetOrSet factory failed for key: {Key}", key);
+                return Result<T>.Failure($"GetOrSet operation failed: {ex.Message}", 500);
+            }
 
             // Set in cache (fire-and-forget is OK — cache failures don't break the operation)
             var setResult = await SetAsync(key, value, absoluteExpiration, slidingExpiration, cancellationToken);
@@ -422,7 +451,32 @@ public sealed class HybridCacheService : ICacheService, IDisposable
         if (slideExp.HasValue)
             cacheOptions.SlidingExpiration = slideExp;
 
+        if (_options.MemoryCacheSizeLimitMb.HasValue)
+            cacheOptions.Size = EstimateCacheEntrySize(value);
+
         _memoryCache.Set(key, value, cacheOptions);
+    }
+
+    private long EstimateCacheEntrySize<T>(T? value)
+    {
+        if (value is null)
+            return 1;
+
+        if (value is string stringValue)
+            return Math.Max(Encoding.UTF8.GetByteCount(stringValue), 1);
+
+        if (value is byte[] byteArray)
+            return Math.Max(byteArray.LongLength, 1);
+
+        try
+        {
+            return Math.Max(JsonSerializer.SerializeToUtf8Bytes(value, _jsonOptions).LongLength, 1);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Unable to estimate memory cache entry size; using minimum size");
+            return 1;
+        }
     }
 
     private DistributedCacheEntryOptions CreateDistributedCacheOptions(

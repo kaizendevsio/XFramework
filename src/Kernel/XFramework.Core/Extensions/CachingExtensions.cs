@@ -128,7 +128,9 @@ public static class CachingExtensions
                 services.AddStackExchangeRedisCache(redisOptions =>
                 {
                     redisOptions.Configuration = cacheOptions.RedisConnectionString;
-                    redisOptions.InstanceName = cacheOptions.RedisInstanceName;
+                    // HybridCacheService applies CacheOptions.RedisInstanceName itself so
+                    // direct Redis operations and IDistributedCache operations share one keyspace.
+                    redisOptions.InstanceName = string.Empty;
                 });
             }
             catch (Exception ex)
