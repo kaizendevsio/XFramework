@@ -17,6 +17,12 @@ namespace XFramework.TestInfrastructure;
 /// </summary>
 public static class BoltTestHelper
 {
+    private static string BuildBoltServerUrl(string boltBaseUrl) => new UriBuilder(boltBaseUrl)
+    {
+        Scheme = Uri.UriSchemeWs,
+        Path = "bolt/ws"
+    }.Uri.ToString();
+
     public static WebApplication StartBoltHub(string url, string connectionString)
     {
         var builder = XApplication.Configure<Bolt.Hub.Installers.BoltInstaller>();
@@ -56,7 +62,7 @@ public static class BoltTestHelper
         {
             ["BoltConfiguration:ClientName"] = clientName,
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
-            ["BoltConfiguration:ServerUrls:0"] = $"{streamFlowUrl}/bolt/ws",
+            ["BoltConfiguration:ServerUrls:0"] = BuildBoltServerUrl(streamFlowUrl),
             ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
             ["Logging:LogLevel:Default"] = "Warning",
         });
@@ -162,7 +168,7 @@ public static class BoltTestHelper
             ["ConnectionStrings:DefaultDatabaseConnection"] = connectionString,
             ["BoltConfiguration:ClientGuid"] = clientGuid,
             ["BoltConfiguration:ClientName"] = clientName,
-            ["BoltConfiguration:ServerUrls:0"] = $"{streamFlowUrl}/stream-flow/queue",
+            ["BoltConfiguration:ServerUrls:0"] = BuildBoltServerUrl(streamFlowUrl),
             ["Tenant:DefaultId"] = TestConstants.TenantId.ToString(),
             ["JwtOptions:ValidAudience"] = "http://localhost",
             ["JwtOptions:ValidIssuer"] = "http://localhost",

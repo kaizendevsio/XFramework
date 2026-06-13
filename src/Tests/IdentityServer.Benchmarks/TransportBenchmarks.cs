@@ -61,6 +61,11 @@ public class TransportBenchmarks
     private const string BoltUrl = "http://localhost:19000";
     private const string IdentityServerUrl = "http://localhost:19261";
     private const string TestClientUrl = "http://localhost:19262";
+    private static string BoltServerUrl => new UriBuilder(BoltUrl)
+    {
+        Scheme = Uri.UriSchemeWs,
+        Path = "bolt/ws"
+    }.Uri.ToString();
     private static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
 
     private HealthCheckRequest _request = null!;
@@ -361,7 +366,7 @@ public class TransportBenchmarks
         var builder = XApplication.Configure<AuthService>();
         builder.WebHost.UseUrls(IdentityServerUrl);
         OverrideConfig(builder, "IdentityServer.Bench", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        builder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
+        builder.Configuration["BoltConfiguration:ServerUrls:0"] = BoltServerUrl;
 
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
@@ -384,7 +389,7 @@ public class TransportBenchmarks
         {
             ["BoltConfiguration:ClientName"] = "BenchClient",
             ["BoltConfiguration:ClientGuid"] = Guid.NewGuid().ToString(),
-            ["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/bolt/ws",
+            ["BoltConfiguration:ServerUrls:0"] = BoltServerUrl,
             ["Tenant:DefaultId"] = TestTenantId.ToString(),
             ["Logging:LogLevel:Default"] = "Error",
         });
