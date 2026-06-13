@@ -38,7 +38,7 @@
 </div>
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<Session> _sessions = [];
@@ -54,8 +54,15 @@
         _loading = true;
         try
         {
-            var response = await IdentityWrapper.Session.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
-            _sessions = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+            var query = DataContext.Query<Session>();
+            if (TenantFilter.SelectedTenantId is { } tenantId)
+            {
+                query = query.Where(x => x.TenantId == tenantId);
+            }
+
+            _sessions = (await query.Take(100).ToListAsync())
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList();
         }
         catch (Exception ex)
         {

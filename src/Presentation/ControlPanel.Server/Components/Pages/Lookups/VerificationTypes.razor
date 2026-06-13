@@ -1,4 +1,5 @@
 @page "/lookups/verification-types"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Verification Types - Control Panel</PageTitle>
 
@@ -25,7 +26,7 @@
 </div>
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
 
     private List<IdentityVerificationType> _items = [];
     private bool _loading = true;
@@ -35,8 +36,10 @@
         _loading = true;
         try
         {
-            var response = await IdentityWrapper.IdentityVerificationType.GetList(100, 1);
-            _items = response?.Response?.Items?.ToList() ?? [];
+            _items = await DataContext.Query<IdentityVerificationType>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
         }
         finally
         {

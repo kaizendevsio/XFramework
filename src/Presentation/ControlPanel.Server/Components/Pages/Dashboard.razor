@@ -1,4 +1,5 @@
 @page "/"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Dashboard - Control Panel</PageTitle>
 
@@ -67,8 +68,7 @@ else
 }
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
-    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
 
     private bool _loading = true;
@@ -83,17 +83,17 @@ else
         _loading = true;
         try
         {
-            var usersTask = IdentityWrapper.IdentityInformation.GetList(1, 1);
-            var sessionsTask = IdentityWrapper.Session.GetList(1, 1);
-            var walletsTask = WalletsWrapper.Wallet.GetList(1, 1);
-            var tenantsTask = IdentityWrapper.Tenant.GetList(1, 1);
+            var usersTask = DataContext.Query<IdentityInformation>().NoCache().CountAsync();
+            var sessionsTask = DataContext.Query<Session>().NoCache().CountAsync();
+            var walletsTask = DataContext.Query<Wallet>().NoCache().CountAsync();
+            var tenantsTask = DataContext.Query<Tenant>().NoCache().CountAsync();
 
             await Task.WhenAll(usersTask, sessionsTask, walletsTask, tenantsTask);
 
-            _userCount = usersTask.Result?.Response?.TotalItems ?? 0;
-            _sessionCount = sessionsTask.Result?.Response?.TotalItems ?? 0;
-            _walletCount = walletsTask.Result?.Response?.TotalItems ?? 0;
-            _tenantCount = tenantsTask.Result?.Response?.TotalItems ?? 0;
+            _userCount = usersTask.Result;
+            _sessionCount = sessionsTask.Result;
+            _walletCount = walletsTask.Result;
+            _tenantCount = tenantsTask.Result;
         }
         catch (Exception ex)
         {

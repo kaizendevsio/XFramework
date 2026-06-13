@@ -1,4 +1,5 @@
 @page "/lookups/configuration-groups"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Configuration Groups - Control Panel</PageTitle>
 
@@ -24,7 +25,7 @@
 </div>
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
 
     private List<RegistryConfigurationGroup> _items = [];
     private bool _loading = true;
@@ -34,8 +35,10 @@
         _loading = true;
         try
         {
-            var response = await IdentityWrapper.RegistryConfigurationGroup.GetList(100, 1);
-            _items = response?.Response?.Items?.ToList() ?? [];
+            _items = await DataContext.Query<RegistryConfigurationGroup>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
         }
         finally
         {

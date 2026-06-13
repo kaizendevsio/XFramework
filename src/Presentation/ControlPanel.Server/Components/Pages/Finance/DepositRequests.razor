@@ -1,4 +1,5 @@
 @page "/finance/deposit-requests"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Deposit Requests - Control Panel</PageTitle>
 
@@ -33,7 +34,7 @@
 </div>
 
 @code {
-    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<DepositRequest> _items = [];
@@ -49,15 +50,13 @@
         _loading = true;
         try
         {
-            var result = await WalletsWrapper.DepositRequest.GetList(
-                pageSize: 100,
-                pageNumber: 1,
-                tenantId: TenantFilter.SelectedTenantId,
-                includeNavigations: true);
-            if (result?.IsSuccess == true)
+            var query = DataContext.Query<DepositRequest>();
+            if (TenantFilter.SelectedTenantId is Guid tenantId)
             {
-                _items = result.Response?.Items.ToList() ?? [];
+                query = query.Where(x => x.TenantId == tenantId);
             }
+
+            _items = await query.Take(100).ToListAsync();
         }
         finally
         {

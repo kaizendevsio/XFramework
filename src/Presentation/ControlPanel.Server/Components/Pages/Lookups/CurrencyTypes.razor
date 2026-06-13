@@ -1,4 +1,5 @@
 @page "/lookups/currency-types"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Currency Types - Control Panel</PageTitle>
 
@@ -26,7 +27,7 @@
 </div>
 
 @code {
-    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
 
     private List<global::Wallets.Domain.Shared.Contracts.CurrencyType> _items = [];
     private bool _loading = true;
@@ -36,8 +37,10 @@
         _loading = true;
         try
         {
-            var response = await WalletsWrapper.CurrencyType.GetList(100, 1);
-            _items = response?.Response?.Items?.ToList() ?? [];
+            _items = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.CurrencyType>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
         }
         finally
         {

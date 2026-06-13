@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @using ControlPanel.Server.Services
+@using XFramework.Domain.Shared.DataContext
 
 <div class="flex min-h-screen bg-background text-foreground">
     @* Fixed left sidebar — always visible *@
@@ -81,7 +82,7 @@
 <BbPortalHost />
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
@@ -109,8 +110,12 @@
         if (!firstRender) return;
         try
         {
-            var response = await IdentityWrapper.Tenant.GetList(100, 1);
-            _tenants = response?.Response?.Items?.Where(t => !t.IsDeleted).OrderBy(t => t.Name).ToList() ?? [];
+            _tenants = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>()
+                .NoCache()
+                .Where(t => !t.IsDeleted)
+                .OrderBy(t => t.Name)
+                .Take(100)
+                .ToListAsync();
             StateHasChanged();
         }
         catch { /* Tenant loading is non-critical */ }
