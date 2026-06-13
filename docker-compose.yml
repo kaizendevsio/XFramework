@@ -9,6 +9,8 @@
 x-common-env: &common-env
   ASPNETCORE_URLS: http://+:8080
   ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Docker}
+  DefaultDatabaseConnection: Host=${DB_HOST:-postgres};Port=${DB_PORT:-5432};Database=${DB_NAME:-XFramework};Username=${DB_USER:-dbAdmin};Password=${DB_PASSWORD:?Set DB_PASSWORD in .env}
+  JwtOptions__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
 
 services:
 
@@ -18,7 +20,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-XFramework}
       POSTGRES_USER: ${DB_USER:-dbAdmin}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-4*5WD-K8%f*NqmPY}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     ports:
       - "${DB_EXPOSE_PORT:-5432}:5432"
     volumes:
@@ -38,7 +40,7 @@ services:
         PROJECT_PATH: src/Tools/XFramework.MigrationRunner/XFramework.MigrationRunner.csproj
     entrypoint: ["dotnet", "XFramework.MigrationRunner.dll"]
     environment:
-      DefaultDatabaseConnection: Host=${DB_HOST:-postgres};Port=${DB_PORT:-5432};Database=${DB_NAME:-XFramework};Username=${DB_USER:-dbAdmin};Password=${DB_PASSWORD:-4*5WD-K8%f*NqmPY}
+      DefaultDatabaseConnection: Host=${DB_HOST:-postgres};Port=${DB_PORT:-5432};Database=${DB_NAME:-XFramework};Username=${DB_USER:-dbAdmin};Password=${DB_PASSWORD:?Set DB_PASSWORD in .env}
     depends_on:
       postgres:
         condition: service_healthy

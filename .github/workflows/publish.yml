@@ -43,7 +43,6 @@ jobs:
 
       - name: Test (unit tests only)
         run: dotnet test src/Tests/XFramework.Core.Tests/ -c Release --no-build
-        continue-on-error: true
 
       - name: Pack
         run: |
@@ -52,16 +51,20 @@ jobs:
             -p:XFrameworkVersion=${{ steps.version.outputs.xframework_version }} \
             -p:BoltVersion=${{ steps.version.outputs.bolt_version }} \
             -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg \
-            --no-restore || true
-          # Pack individually for projects that fail in solution-wide pack
-          echo "Packages created:"
-          ls -1 nupkgs/*.nupkg 2>/dev/null | wc -l
+            --no-restore
+
+          package_count=$(find nupkgs -maxdepth 1 -name '*.nupkg' | wc -l)
+          echo "Packages created: $package_count"
+          if [ "$package_count" -eq 0 ]; then
+            echo "No NuGet packages were produced."
+            exit 1
+          fi
 
       - name: Publish to NuGet
         run: |
           for pkg in nupkgs/*.nupkg; do
             echo "Publishing $pkg..."
-            dotnet nuget push "$pkg" -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate || true
+            dotnet nuget push "$pkg" -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
           done
 
       - name: Upload packages as artifacts
