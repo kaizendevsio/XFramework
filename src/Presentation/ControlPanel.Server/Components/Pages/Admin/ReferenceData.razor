@@ -1,4 +1,5 @@
 @page "/admin/reference-data"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Reference Data - Control Panel</PageTitle>
 
@@ -516,8 +517,7 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
-    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private bool _loading = true;
@@ -548,7 +548,6 @@
     // Delete state
     private string _deleteName = "";
     private object? _deleteTarget;
-    private string _deleteEntityType = "";
 
     // Data lists
     private List<IdentityRoleType> _roleTypes = [];
@@ -593,31 +592,16 @@
 
     private async Task LoadAllData()
     {
-        var roleTypesTask = IdentityWrapper.IdentityRoleType.GetList(100, 1);
-        var roleTypeGroupsTask = IdentityWrapper.IdentityRoleTypeGroup.GetList(100, 1);
-        var contactTypesTask = IdentityWrapper.IdentityContactType.GetList(100, 1);
-        var contactGroupsTask = IdentityWrapper.IdentityContactGroup.GetList(100, 1);
-        var addressTypesTask = IdentityWrapper.IdentityAddressType.GetList(100, 1);
-        var verificationTypesTask = IdentityWrapper.IdentityVerificationType.GetList(100, 1);
-        var sessionTypesTask = IdentityWrapper.SessionType.GetList(100, 1);
-        var walletTypesTask = WalletsWrapper.WalletType.GetList(100, 1);
-        var currencyTypesTask = WalletsWrapper.CurrencyType.GetList(100, 1);
-        var exchangeRatesTask = WalletsWrapper.ExchangeRate.GetList(100, 1);
-
-        await Task.WhenAll(roleTypesTask, roleTypeGroupsTask, contactTypesTask, contactGroupsTask,
-            addressTypesTask, verificationTypesTask, sessionTypesTask, walletTypesTask,
-            currencyTypesTask, exchangeRatesTask);
-
-        _roleTypes = roleTypesTask.Result?.Response?.Items?.ToList() ?? [];
-        _roleTypeGroups = roleTypeGroupsTask.Result?.Response?.Items?.ToList() ?? [];
-        _contactTypes = contactTypesTask.Result?.Response?.Items?.ToList() ?? [];
-        _contactGroups = contactGroupsTask.Result?.Response?.Items?.ToList() ?? [];
-        _addressTypes = addressTypesTask.Result?.Response?.Items?.ToList() ?? [];
-        _verificationTypes = verificationTypesTask.Result?.Response?.Items?.ToList() ?? [];
-        _sessionTypes = sessionTypesTask.Result?.Response?.Items?.ToList() ?? [];
-        _walletTypes = walletTypesTask.Result?.Response?.Items?.ToList() ?? [];
-        _currencyTypes = currencyTypesTask.Result?.Response?.Items?.ToList() ?? [];
-        _exchangeRates = exchangeRatesTask.Result?.Response?.Items?.ToList() ?? [];
+        _roleTypes = await LoadList<IdentityRoleType>();
+        _roleTypeGroups = await LoadList<IdentityRoleTypeGroup>();
+        _contactTypes = await LoadList<IdentityContactType>();
+        _contactGroups = await LoadList<IdentityContactGroup>();
+        _addressTypes = await LoadList<IdentityAddressType>();
+        _verificationTypes = await LoadList<IdentityVerificationType>();
+        _sessionTypes = await LoadList<SessionType>();
+        _walletTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.WalletType>();
+        _currencyTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.CurrencyType>();
+        _exchangeRates = await LoadList<ExchangeRate>();
     }
 
     private async Task ReloadActiveTab()
@@ -627,49 +611,45 @@
             switch (_activeTab)
             {
                 case "role-types":
-                    var rt = await IdentityWrapper.IdentityRoleType.GetList(100, 1);
-                    _roleTypes = rt?.Response?.Items?.ToList() ?? [];
+                    _roleTypes = await LoadList<IdentityRoleType>();
                     break;
                 case "role-type-groups":
-                    var rtg = await IdentityWrapper.IdentityRoleTypeGroup.GetList(100, 1);
-                    _roleTypeGroups = rtg?.Response?.Items?.ToList() ?? [];
+                    _roleTypeGroups = await LoadList<IdentityRoleTypeGroup>();
                     break;
                 case "contact-types":
-                    var ct = await IdentityWrapper.IdentityContactType.GetList(100, 1);
-                    _contactTypes = ct?.Response?.Items?.ToList() ?? [];
+                    _contactTypes = await LoadList<IdentityContactType>();
                     break;
                 case "contact-groups":
-                    var cg = await IdentityWrapper.IdentityContactGroup.GetList(100, 1);
-                    _contactGroups = cg?.Response?.Items?.ToList() ?? [];
+                    _contactGroups = await LoadList<IdentityContactGroup>();
                     break;
                 case "address-types":
-                    var at = await IdentityWrapper.IdentityAddressType.GetList(100, 1);
-                    _addressTypes = at?.Response?.Items?.ToList() ?? [];
+                    _addressTypes = await LoadList<IdentityAddressType>();
                     break;
                 case "verification-types":
-                    var vt = await IdentityWrapper.IdentityVerificationType.GetList(100, 1);
-                    _verificationTypes = vt?.Response?.Items?.ToList() ?? [];
+                    _verificationTypes = await LoadList<IdentityVerificationType>();
                     break;
                 case "session-types":
-                    var st = await IdentityWrapper.SessionType.GetList(100, 1);
-                    _sessionTypes = st?.Response?.Items?.ToList() ?? [];
+                    _sessionTypes = await LoadList<SessionType>();
                     break;
                 case "wallet-types":
-                    var wt = await WalletsWrapper.WalletType.GetList(100, 1);
-                    _walletTypes = wt?.Response?.Items?.ToList() ?? [];
+                    _walletTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.WalletType>();
                     break;
                 case "currency-types":
-                    var crt = await WalletsWrapper.CurrencyType.GetList(100, 1);
-                    _currencyTypes = crt?.Response?.Items?.ToList() ?? [];
+                    _currencyTypes = await LoadList<global::Wallets.Domain.Shared.Contracts.CurrencyType>();
                     break;
                 case "exchange-rates":
-                    var er = await WalletsWrapper.ExchangeRate.GetList(100, 1);
-                    _exchangeRates = er?.Response?.Items?.ToList() ?? [];
+                    _exchangeRates = await LoadList<ExchangeRate>();
                     break;
             }
         }
         catch { /* reload failure is non-critical */ }
     }
+
+    private async Task<List<T>> LoadList<T>(int take = 100) where T : class =>
+        await DataContext.Query<T>()
+            .NoCache()
+            .Take(take)
+            .ToListAsync();
 
     // ── Add / Edit Helpers ──
 
@@ -760,7 +740,6 @@
     {
         _deleteTarget = target;
         _deleteName = displayName;
-        _deleteEntityType = target.GetType().Name;
         _deleteDialogOpen = true;
     }
 
@@ -768,26 +747,31 @@
     {
         if (_deleteTarget is null) return;
 
-        CmdResponse? result = _deleteEntityType switch
+        DataContextResult? result = _deleteTarget switch
         {
-            "IdentityRoleType" => await IdentityWrapper.IdentityRoleType.Delete((IdentityRoleType)_deleteTarget),
-            "IdentityRoleTypeGroup" => await IdentityWrapper.IdentityRoleTypeGroup.Delete((IdentityRoleTypeGroup)_deleteTarget),
-            "IdentityContactType" => await IdentityWrapper.IdentityContactType.Delete((IdentityContactType)_deleteTarget),
-            "IdentityContactGroup" => await IdentityWrapper.IdentityContactGroup.Delete((IdentityContactGroup)_deleteTarget),
-            "IdentityAddressType" => await IdentityWrapper.IdentityAddressType.Delete((IdentityAddressType)_deleteTarget),
-            "IdentityVerificationType" => await IdentityWrapper.IdentityVerificationType.Delete((IdentityVerificationType)_deleteTarget),
-            "SessionType" => await IdentityWrapper.SessionType.Delete((SessionType)_deleteTarget),
-            "WalletType" => await WalletsWrapper.WalletType.Delete((global::Wallets.Domain.Shared.Contracts.WalletType)_deleteTarget),
-            "CurrencyType" => await WalletsWrapper.CurrencyType.Delete((global::Wallets.Domain.Shared.Contracts.CurrencyType)_deleteTarget),
-            "ExchangeRate" => await WalletsWrapper.ExchangeRate.Delete((ExchangeRate)_deleteTarget),
+            IdentityRoleType entity => await RemoveEntity(entity),
+            IdentityRoleTypeGroup entity => await RemoveEntity(entity),
+            IdentityContactType entity => await RemoveEntity(entity),
+            IdentityContactGroup entity => await RemoveEntity(entity),
+            IdentityAddressType entity => await RemoveEntity(entity),
+            IdentityVerificationType entity => await RemoveEntity(entity),
+            SessionType entity => await RemoveEntity(entity),
+            global::Wallets.Domain.Shared.Contracts.WalletType entity => await RemoveEntity(entity),
+            global::Wallets.Domain.Shared.Contracts.CurrencyType entity => await RemoveEntity(entity),
+            ExchangeRate entity => await RemoveEntity(entity),
             _ => null
         };
         ToastService.Show(result?.IsSuccess == true ? $"{TabDisplayName} deleted." : $"Error: {result?.Message}");
         _deleteDialogOpen = false;
         _deleteTarget = null;
         _deleteName = "";
-        _deleteEntityType = "";
         await ReloadActiveTab();
+    }
+
+    private async Task<DataContextResult> RemoveEntity<T>(T entity) where T : class
+    {
+        DataContext.Remove(entity);
+        return await DataContext.SaveChangesAsync();
     }
 
     // ── Save (Create / Update) ──
@@ -846,7 +830,7 @@
                 SystemReferenceId = ParseSystemRef(),
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityRoleType.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -859,7 +843,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityRoleType.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -877,7 +861,7 @@
                 SystemReferenceId = ParseSystemRef(),
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityRoleTypeGroup.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -890,7 +874,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityRoleTypeGroup.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -907,7 +891,7 @@
                 SystemReferenceId = ParseSystemRef(),
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityContactType.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -919,7 +903,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityContactType.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -936,7 +920,7 @@
                 SystemReferenceId = ParseSystemRef(),
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityContactGroup.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -948,7 +932,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityContactGroup.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -965,7 +949,7 @@
                 SystemReferenceId = ParseSystemRef(),
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityAddressType.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -977,7 +961,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityAddressType.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -996,7 +980,7 @@
                 SystemReferenceId = ParseSystemRef(),
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityVerificationType.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -1010,7 +994,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => IdentityWrapper.IdentityVerificationType.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -1027,7 +1011,7 @@
                 SystemReferenceId = ParseSystemRef(),
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => IdentityWrapper.SessionType.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -1039,7 +1023,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => IdentityWrapper.SessionType.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -1063,7 +1047,7 @@
                 MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => WalletsWrapper.WalletType.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -1078,7 +1062,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => WalletsWrapper.WalletType.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -1096,7 +1080,7 @@
                 Description = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => WalletsWrapper.CurrencyType.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -1109,7 +1093,7 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => WalletsWrapper.CurrencyType.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
@@ -1140,7 +1124,7 @@
                 ExpiryDate = DateTime.TryParse(_formExpiry, out var exp) ? exp : null,
                 ModifiedAt = DateTime.UtcNow
             };
-            await PersistAndClose(() => WalletsWrapper.ExchangeRate.Patch(entity));
+            await PersistAndClose(entity);
         }
         else
         {
@@ -1156,13 +1140,22 @@
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
-            await PersistAndClose(() => WalletsWrapper.ExchangeRate.Create(entity));
+            await PersistAndClose(entity);
         }
     }
 
-    private async Task PersistAndClose<T>(Func<Task<CmdResponse<T>>> action)
+    private async Task PersistAndClose<T>(T entity) where T : class
     {
-        var result = await action();
+        if (_isEditing)
+        {
+            DataContext.Update(entity);
+        }
+        else
+        {
+            DataContext.Add(entity);
+        }
+
+        var result = await DataContext.SaveChangesAsync();
         if (!result.IsSuccess)
         {
             ToastService.Show($"Error: {result.Message}");

@@ -1,4 +1,5 @@
 @page "/lookups/session-types"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Session Types - Control Panel</PageTitle>
 
@@ -23,7 +24,7 @@
 </div>
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
 
     private List<SessionType> _items = [];
     private bool _loading = true;
@@ -33,8 +34,10 @@
         _loading = true;
         try
         {
-            var response = await IdentityWrapper.SessionType.GetList(100, 1);
-            _items = response?.Response?.Items?.ToList() ?? [];
+            _items = await DataContext.Query<SessionType>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
         }
         finally
         {

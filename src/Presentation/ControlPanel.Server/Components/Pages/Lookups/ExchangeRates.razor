@@ -1,4 +1,5 @@
 @page "/lookups/exchange-rates"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Exchange Rates - Control Panel</PageTitle>
 
@@ -27,7 +28,7 @@
 </div>
 
 @code {
-    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
 
     private List<ExchangeRate> _items = [];
     private bool _loading = true;
@@ -37,8 +38,10 @@
         _loading = true;
         try
         {
-            var response = await WalletsWrapper.ExchangeRate.GetList(100, 1);
-            _items = response?.Response?.Items?.ToList() ?? [];
+            _items = await DataContext.Query<ExchangeRate>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
         }
         finally
         {

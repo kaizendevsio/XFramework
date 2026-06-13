@@ -92,7 +92,7 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
@@ -112,8 +112,15 @@
         try
         {
             await LoadData();
-            var roleTypeResponse = await IdentityWrapper.IdentityRoleType.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
-            _roleTypes = roleTypeResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
+            var roleTypeQuery = DataContext.Query<IdentityRoleType>();
+            if (TenantFilter.SelectedTenantId is { } tenantId)
+            {
+                roleTypeQuery = roleTypeQuery.Where(x => x.TenantId == tenantId);
+            }
+
+            _roleTypes = (await roleTypeQuery.Take(100).ToListAsync())
+                .OrderBy(x => x.Name)
+                .ToList();
         }
         catch { /* query may fail */ }
         finally
@@ -126,8 +133,16 @@
     {
         try
         {
-            var response = await IdentityWrapper.IdentityRole.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId, includeNavigations: true);
-            _roles = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+            var query = DataContext.Query<IdentityRole>()
+                .Include(x => x.Type);
+            if (TenantFilter.SelectedTenantId is { } tenantId)
+            {
+                query = query.Where(x => x.TenantId == tenantId);
+            }
+
+            _roles = (await query.Take(100).ToListAsync())
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList();
         }
         catch { /* query may fail */ }
     }
@@ -162,11 +177,13 @@
                 CredentialId = credentialId,
                 TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null,
                 RoleExpiration = DateTime.TryParse(_formExpiration, out var exp) ? exp : DateTime.UtcNow.AddYears(1),
+                TenantId = TenantFilter.SelectedTenantId ?? Guid.Empty,
                 CreatedAt = DateTime.UtcNow
             };
 
-            var result = await IdentityWrapper.IdentityRole.Create(role);
-            ToastService.Show(result?.IsSuccess == true ? "Role created." : $"Error: {result?.Message}");
+            DataContext.Add(role);
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess ? "Role created." : $"Error: {result.Message}");
             _dialogOpen = false;
             await LoadData();
         }
@@ -184,8 +201,9 @@
             {
                 _deletingRole.IsDeleted = true;
                 _deletingRole.IsEnabled = false;
-                var result = await IdentityWrapper.IdentityRole.Patch(_deletingRole);
-                ToastService.Show(result?.IsSuccess == true ? "Role deleted." : $"Error: {result?.Message}");
+                DataContext.Update(_deletingRole);
+                var result = await DataContext.SaveChangesAsync();
+                ToastService.Show(result.IsSuccess ? "Role deleted." : $"Error: {result.Message}");
             }
             catch (Exception ex)
             {

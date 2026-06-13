@@ -1,4 +1,5 @@
 @page "/lookups/wallet-types"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Wallet Types - Control Panel</PageTitle>
 
@@ -28,7 +29,7 @@
 </div>
 
 @code {
-    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
 
     private List<global::Wallets.Domain.Shared.Contracts.WalletType> _items = [];
     private bool _loading = true;
@@ -38,8 +39,10 @@
         _loading = true;
         try
         {
-            var response = await WalletsWrapper.WalletType.GetList(100, 1);
-            _items = response?.Response?.Items?.ToList() ?? [];
+            _items = await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
         }
         finally
         {

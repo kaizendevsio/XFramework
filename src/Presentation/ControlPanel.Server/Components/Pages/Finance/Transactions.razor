@@ -1,4 +1,5 @@
 @page "/finance/transactions"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Transactions - Control Panel</PageTitle>
 
@@ -51,7 +52,7 @@
 </div>
 
 @code {
-    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ControlPanel.Server.Services.TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<WalletTransaction> _items = [];
@@ -67,15 +68,13 @@
         _loading = true;
         try
         {
-            var result = await WalletsWrapper.WalletTransaction.GetList(
-                pageSize: 100,
-                pageNumber: 1,
-                tenantId: TenantFilter.SelectedTenantId,
-                includeNavigations: true);
-            if (result?.IsSuccess == true)
+            var query = DataContext.Query<WalletTransaction>();
+            if (TenantFilter.SelectedTenantId is Guid tenantId)
             {
-                _items = result.Response?.Items.ToList() ?? [];
+                query = query.Where(x => x.TenantId == tenantId);
             }
+
+            _items = await query.Take(100).ToListAsync();
         }
         finally
         {

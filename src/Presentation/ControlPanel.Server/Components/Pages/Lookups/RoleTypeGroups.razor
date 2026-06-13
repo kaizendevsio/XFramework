@@ -1,4 +1,5 @@
 @page "/lookups/role-type-groups"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Role Type Groups - Control Panel</PageTitle>
 
@@ -24,7 +25,7 @@
 </div>
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
 
     private List<IdentityRoleTypeGroup> _items = [];
     private bool _loading = true;
@@ -34,8 +35,10 @@
         _loading = true;
         try
         {
-            var response = await IdentityWrapper.IdentityRoleTypeGroup.GetList(100, 1);
-            _items = response?.Response?.Items?.ToList() ?? [];
+            _items = await DataContext.Query<IdentityRoleTypeGroup>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
         }
         finally
         {

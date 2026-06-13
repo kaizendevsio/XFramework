@@ -1,4 +1,5 @@
 @page "/lookups/configurations"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Configurations - Control Panel</PageTitle>
 
@@ -80,7 +81,7 @@
                      OnConfirm="@DeleteConfiguration" />
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private List<RegistryConfiguration> _items = [];
@@ -106,8 +107,10 @@
         _loading = true;
         try
         {
-            var response = await IdentityWrapper.RegistryConfiguration.GetList(100, 1);
-            _items = response?.Response?.Items?.ToList() ?? [];
+            _items = await DataContext.Query<RegistryConfiguration>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
         }
         finally
         {
@@ -158,12 +161,7 @@
                 GroupId = Guid.TryParse(_formGroupId, out var gid) ? gid : _editTarget.GroupId,
                 ModifiedAt = DateTime.UtcNow
             };
-            var result = await IdentityWrapper.RegistryConfiguration.Patch(entity);
-            if (result?.IsSuccess != true)
-            {
-                ToastService.Show($"Error: {result?.Message}");
-                return;
-            }
+            DataContext.Update(entity);
         }
         else
         {
@@ -176,12 +174,14 @@
                 GroupId = Guid.TryParse(_formGroupId, out var gid) ? gid : Guid.Empty,
                 CreatedAt = DateTime.UtcNow
             };
-            var result = await IdentityWrapper.RegistryConfiguration.Create(config);
-            if (result?.IsSuccess != true)
-            {
-                ToastService.Show($"Error: {result?.Message}");
-                return;
-            }
+            DataContext.Add(config);
+        }
+
+        var result = await DataContext.SaveChangesAsync();
+        if (!result.IsSuccess)
+        {
+            ToastService.Show($"Error: {result.Message}");
+            return;
         }
 
         _showFormDialog = false;
@@ -192,8 +192,9 @@
     {
         if (_deleteTarget is not null)
         {
-            var result = await IdentityWrapper.RegistryConfiguration.Delete(_deleteTarget);
-            ToastService.Show(result?.IsSuccess == true ? "Configuration deleted." : $"Error: {result?.Message}");
+            DataContext.Remove(_deleteTarget);
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess ? "Configuration deleted." : $"Error: {result.Message}");
             _showDeleteDialog = false;
             _deleteTarget = null;
             await LoadData();

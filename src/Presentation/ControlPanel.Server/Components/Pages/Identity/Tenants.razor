@@ -167,7 +167,7 @@
                      OnConfirm="@ConfirmDeleteTenant" />
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
@@ -196,11 +196,12 @@
         _loading = true;
         try
         {
-            var response = await IdentityWrapper.Tenant.GetList(100, 1);
-            _tenants = response?.Response?.Items?
+            _tenants = (await DataContext.Query<Tenant>()
+                    .Take(100)
+                    .ToListAsync())
                 .Where(x => !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
-                .ToList() ?? [];
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -252,15 +253,16 @@
                 IsEnabled = true
             };
 
-            var result = await IdentityWrapper.Tenant.Create(tenant);
+            DataContext.Add(tenant);
+            var result = await DataContext.SaveChangesAsync();
 
-            if (result?.IsSuccess == true)
+            if (result.IsSuccess)
             {
                 ToastService.Show("Tenant created successfully.");
             }
             else
             {
-                ToastService.Show($"Failed to create tenant: {result?.Message}");
+                ToastService.Show($"Failed to create tenant: {result.Message}");
             }
 
             _tenantDialogOpen = false;
@@ -290,8 +292,9 @@
 
         try
         {
-            var getResponse = await IdentityWrapper.Tenant.Get(_deletingTenant.Id);
-            var fresh = getResponse?.Response;
+            var fresh = await DataContext.Query<Tenant>()
+                .Where(x => x.Id == _deletingTenant.Id)
+                .FirstOrDefaultAsync();
 
             if (fresh is null)
             {
@@ -305,15 +308,16 @@
             fresh.DeletedAt = DateTime.UtcNow;
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            var result = await IdentityWrapper.Tenant.Patch(fresh);
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
 
-            if (result?.IsSuccess == true)
+            if (result.IsSuccess)
             {
                 ToastService.Show("Tenant deleted.");
             }
             else
             {
-                ToastService.Show($"Failed to delete tenant: {result?.Message}");
+                ToastService.Show($"Failed to delete tenant: {result.Message}");
             }
 
             _deleteDialogOpen = false;

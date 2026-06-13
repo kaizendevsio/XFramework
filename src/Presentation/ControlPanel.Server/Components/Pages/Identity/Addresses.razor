@@ -101,7 +101,7 @@
                      OnConfirm="@ConfirmDelete" />
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
@@ -137,8 +137,15 @@
     {
         try
         {
-            var response = await IdentityWrapper.IdentityAddress.GetList(100, 1, tenantId: TenantFilter.SelectedTenantId);
-            _addresses = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+            var query = DataContext.Query<IdentityAddress>();
+            if (TenantFilter.SelectedTenantId is { } tenantId)
+            {
+                query = query.Where(x => x.TenantId == tenantId);
+            }
+
+            _addresses = (await query.Take(100).ToListAsync())
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList();
         }
         catch { /* query may fail */ }
     }
@@ -186,8 +193,9 @@
         {
             if (_isEditing)
             {
-                var getResponse = await IdentityWrapper.IdentityAddress.Get(_editingId);
-                var addr = getResponse?.Response;
+                var addr = await DataContext.Query<IdentityAddress>()
+                    .Where(x => x.Id == _editingId)
+                    .FirstOrDefaultAsync();
 
                 if (addr is not null)
                 {
@@ -198,8 +206,9 @@
                     addr.Subdivision = _formSubdivision;
                     addr.ConsolidatedName = _formConsolidatedName;
                     addr.ModifiedAt = DateTime.UtcNow;
-                    var result = await IdentityWrapper.IdentityAddress.Patch(addr);
-                    ToastService.Show(result?.IsSuccess == true ? "Address updated." : $"Error: {result?.Message}");
+                    DataContext.Update(addr);
+                    var result = await DataContext.SaveChangesAsync();
+                    ToastService.Show(result.IsSuccess ? "Address updated." : $"Error: {result.Message}");
                 }
             }
             else
@@ -207,6 +216,7 @@
                 var addr = new IdentityAddress
                 {
                     Id = Guid.NewGuid(),
+                    TenantId = TenantFilter.SelectedTenantId ?? Guid.Empty,
                     IdentityInfoId = identityInfoId,
                     UnitNumber = _formUnitNumber,
                     Street = _formStreet,
@@ -215,8 +225,9 @@
                     ConsolidatedName = _formConsolidatedName,
                     CreatedAt = DateTime.UtcNow
                 };
-                var result = await IdentityWrapper.IdentityAddress.Create(addr);
-                ToastService.Show(result?.IsSuccess == true ? "Address created." : $"Error: {result?.Message}");
+                DataContext.Add(addr);
+                var result = await DataContext.SaveChangesAsync();
+                ToastService.Show(result.IsSuccess ? "Address created." : $"Error: {result.Message}");
             }
         }
         catch (Exception ex)
@@ -236,8 +247,9 @@
             {
                 _deletingAddress.IsDeleted = true;
                 _deletingAddress.IsEnabled = false;
-                var result = await IdentityWrapper.IdentityAddress.Patch(_deletingAddress);
-                ToastService.Show(result?.IsSuccess == true ? "Address deleted." : $"Error: {result?.Message}");
+                DataContext.Update(_deletingAddress);
+                var result = await DataContext.SaveChangesAsync();
+                ToastService.Show(result.IsSuccess ? "Address deleted." : $"Error: {result.Message}");
             }
             catch (Exception ex)
             {

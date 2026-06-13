@@ -1,4 +1,5 @@
 @page "/lookups/address-hierarchy"
+@using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Address Hierarchy - Control Panel</PageTitle>
 
@@ -97,7 +98,7 @@ else
 }
 
 @code {
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
+    [Inject] private IDataContext DataContext { get; set; } = default!;
 
     private List<AddressCountry> _countries = [];
     private List<AddressRegion> _regions = [];
@@ -111,20 +112,30 @@ else
         _loading = true;
         try
         {
-            var countriesResponse = await IdentityWrapper.AddressCountry.GetList(500, 1);
-            _countries = countriesResponse?.Response?.Items?.ToList() ?? [];
+            _countries = await DataContext.Query<AddressCountry>()
+                .NoCache()
+                .Take(500)
+                .ToListAsync();
 
-            var regionsResponse = await IdentityWrapper.AddressRegion.GetList(100, 1);
-            _regions = regionsResponse?.Response?.Items?.ToList() ?? [];
+            _regions = await DataContext.Query<AddressRegion>()
+                .NoCache()
+                .Take(100)
+                .ToListAsync();
 
-            var provincesResponse = await IdentityWrapper.AddressProvince.GetList(200, 1);
-            _provinces = provincesResponse?.Response?.Items?.ToList() ?? [];
+            _provinces = await DataContext.Query<AddressProvince>()
+                .NoCache()
+                .Take(200)
+                .ToListAsync();
 
-            var citiesResponse = await IdentityWrapper.AddressCity.GetList(500, 1);
-            _cities = citiesResponse?.Response?.Items?.ToList() ?? [];
+            _cities = await DataContext.Query<AddressCity>()
+                .NoCache()
+                .Take(500)
+                .ToListAsync();
 
-            var barangaysResponse = await IdentityWrapper.AddressBarangay.GetList(500, 1);
-            _barangays = barangaysResponse?.Response?.Items?.ToList() ?? [];
+            _barangays = await DataContext.Query<AddressBarangay>()
+                .NoCache()
+                .Take(500)
+                .ToListAsync();
         }
         finally
         {

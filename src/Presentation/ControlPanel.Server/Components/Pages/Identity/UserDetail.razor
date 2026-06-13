@@ -635,8 +635,7 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    [Inject] private IIdentityServerServiceWrapper IdentityWrapper { get; set; } = default!;
-    [Inject] private IWalletsServiceWrapper WalletsWrapper { get; set; } = default!;
+    [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
@@ -707,8 +706,9 @@ else
         _loading = true;
         try
         {
-            var response = await IdentityWrapper.IdentityInformation.Get(Id);
-            _user = response?.Response;
+            _user = await DataContext.Query<IdentityInformation>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
 
             if (_user is null) return;
 
@@ -736,11 +736,12 @@ else
     {
         try
         {
-            var response = await IdentityWrapper.IdentityCredential.GetList(100, 1, filter:
-            [
-                new() { PropertyName = nameof(IdentityCredential.IdentityInfoId), Operation = QueryFilterOperation.Equal, Value = Id }
-            ]);
-            _credentials = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+            _credentials = (await DataContext.Query<IdentityCredential>()
+                    .Where(x => x.IdentityInfoId == Id)
+                    .Take(100)
+                    .ToListAsync())
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList();
         }
         catch { _credentials = []; }
     }
@@ -753,11 +754,12 @@ else
             _roles = [];
             foreach (var credId in credentialIds)
             {
-                var response = await IdentityWrapper.IdentityRole.GetList(100, 1, includeNavigations: true, filter:
-                [
-                    new() { PropertyName = nameof(IdentityRole.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
-                ]);
-                _roles.AddRange(response?.Response?.Items ?? []);
+                var roles = await DataContext.Query<IdentityRole>()
+                    .Where(x => x.CredentialId == credId)
+                    .Include(x => x.Type)
+                    .Take(100)
+                    .ToListAsync();
+                _roles.AddRange(roles);
             }
             _roles = _roles.OrderByDescending(x => x.CreatedAt).ToList();
         }
@@ -772,11 +774,12 @@ else
             _contacts = [];
             foreach (var credId in credentialIds)
             {
-                var response = await IdentityWrapper.IdentityContact.GetList(100, 1, includeNavigations: true, filter:
-                [
-                    new() { PropertyName = nameof(IdentityContact.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
-                ]);
-                _contacts.AddRange(response?.Response?.Items ?? []);
+                var contacts = await DataContext.Query<IdentityContact>()
+                    .Where(x => x.CredentialId == credId)
+                    .Include(x => x.Type)
+                    .Take(100)
+                    .ToListAsync();
+                _contacts.AddRange(contacts);
             }
             _contacts = _contacts.OrderByDescending(x => x.CreatedAt).ToList();
         }
@@ -787,11 +790,12 @@ else
     {
         try
         {
-            var response = await IdentityWrapper.IdentityAddress.GetList(100, 1, filter:
-            [
-                new() { PropertyName = nameof(IdentityAddress.IdentityInfoId), Operation = QueryFilterOperation.Equal, Value = Id }
-            ]);
-            _addresses = response?.Response?.Items?.OrderByDescending(x => x.CreatedAt).ToList() ?? [];
+            _addresses = (await DataContext.Query<IdentityAddress>()
+                    .Where(x => x.IdentityInfoId == Id)
+                    .Take(100)
+                    .ToListAsync())
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList();
         }
         catch { _addresses = []; }
     }
@@ -804,11 +808,11 @@ else
             _sessions = [];
             foreach (var credId in credentialIds)
             {
-                var response = await IdentityWrapper.Session.GetList(100, 1, filter:
-                [
-                    new() { PropertyName = nameof(Session.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
-                ]);
-                _sessions.AddRange(response?.Response?.Items ?? []);
+                var sessions = await DataContext.Query<Session>()
+                    .Where(x => x.CredentialId == credId)
+                    .Take(100)
+                    .ToListAsync();
+                _sessions.AddRange(sessions);
             }
             _sessions = _sessions.OrderByDescending(x => x.CreatedAt).ToList();
         }
@@ -823,11 +827,11 @@ else
             _authLogs = [];
             foreach (var credId in credentialIds)
             {
-                var response = await IdentityWrapper.AuthorizationLog.GetList(100, 1, filter:
-                [
-                    new() { PropertyName = nameof(AuthorizationLog.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
-                ]);
-                _authLogs.AddRange(response?.Response?.Items ?? []);
+                var authLogs = await DataContext.Query<AuthorizationLog>()
+                    .Where(x => x.CredentialId == credId)
+                    .Take(100)
+                    .ToListAsync();
+                _authLogs.AddRange(authLogs);
             }
             _authLogs = _authLogs.OrderByDescending(x => x.CreatedAt).ToList();
         }
@@ -842,11 +846,11 @@ else
             _wallets = [];
             foreach (var credId in credentialIds)
             {
-                var response = await WalletsWrapper.Wallet.GetList(100, 1, filter:
-                [
-                    new() { PropertyName = nameof(Wallet.CredentialId), Operation = QueryFilterOperation.Equal, Value = credId }
-                ]);
-                _wallets.AddRange(response?.Response?.Items ?? []);
+                var wallets = await DataContext.Query<Wallet>()
+                    .Where(x => x.CredentialId == credId)
+                    .Take(100)
+                    .ToListAsync();
+                _wallets.AddRange(wallets);
             }
             _wallets = _wallets.OrderByDescending(x => x.CreatedAt).ToList();
         }
@@ -857,11 +861,17 @@ else
     {
         try
         {
-            var roleTypeResponse = await IdentityWrapper.IdentityRoleType.GetList(100, 1);
-            _roleTypes = roleTypeResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
+            _roleTypes = (await DataContext.Query<IdentityRoleType>()
+                    .Take(100)
+                    .ToListAsync())
+                .OrderBy(x => x.Name)
+                .ToList();
 
-            var contactTypeResponse = await IdentityWrapper.IdentityContactType.GetList(100, 1);
-            _contactTypes = contactTypeResponse?.Response?.Items?.OrderBy(x => x.Name).ToList() ?? [];
+            _contactTypes = (await DataContext.Query<IdentityContactType>()
+                    .Take(100)
+                    .ToListAsync())
+                .OrderBy(x => x.Name)
+                .ToList();
         }
         catch { /* lookups may fail */ }
     }
@@ -889,8 +899,9 @@ else
         _saving = true;
         try
         {
-            var getResponse = await IdentityWrapper.IdentityInformation.Get(Id);
-            var fresh = getResponse?.Response;
+            var fresh = await DataContext.Query<IdentityInformation>()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
 
             if (fresh is null)
             {
@@ -909,9 +920,10 @@ else
             fresh.IsVerified = _editIsVerified == "true";
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            var result = await IdentityWrapper.IdentityInformation.Patch(fresh);
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
 
-            if (result?.IsSuccess == true)
+            if (result.IsSuccess)
             {
                 ToastService.Show("User updated successfully.");
                 _user = fresh;
@@ -920,7 +932,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result?.Message}");
+                ToastService.Show($"Error: {result.Message}");
             }
         }
         catch (Exception ex)
@@ -974,9 +986,10 @@ else
                 CreatedAt = DateTime.UtcNow
             };
 
-            var result = await IdentityWrapper.IdentityCredential.Create(credential);
+            DataContext.Add(credential);
+            var result = await DataContext.SaveChangesAsync();
 
-            if (result?.IsSuccess == true)
+            if (result.IsSuccess)
             {
                 ToastService.Show("Credential created.");
                 _createCredDialogOpen = false;
@@ -984,7 +997,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result?.Message}");
+                ToastService.Show($"Error: {result.Message}");
             }
         }
         catch (Exception ex)
@@ -1036,9 +1049,10 @@ else
                 CreatedAt = DateTime.UtcNow
             };
 
-            var result = await IdentityWrapper.IdentityRole.Create(role);
+            DataContext.Add(role);
+            var result = await DataContext.SaveChangesAsync();
 
-            if (result?.IsSuccess == true)
+            if (result.IsSuccess)
             {
                 ToastService.Show("Role assigned.");
                 _assignRoleDialogOpen = false;
@@ -1046,7 +1060,7 @@ else
             }
             else
             {
-                ToastService.Show($"Error: {result?.Message}");
+                ToastService.Show($"Error: {result.Message}");
             }
         }
         catch (Exception ex)
@@ -1073,15 +1087,16 @@ else
         {
             _removingRole.IsDeleted = true;
             _removingRole.IsEnabled = false;
-            var result = await IdentityWrapper.IdentityRole.Patch(_removingRole);
+            DataContext.Update(_removingRole);
+            var result = await DataContext.SaveChangesAsync();
 
-            if (result?.IsSuccess == true)
+            if (result.IsSuccess)
             {
                 ToastService.Show("Role removed.");
             }
             else
             {
-                ToastService.Show($"Error: {result?.Message}");
+                ToastService.Show($"Error: {result.Message}");
             }
         }
         catch (Exception ex)
@@ -1139,8 +1154,9 @@ else
         {
             if (_editingContact is not null)
             {
-                var getResponse = await IdentityWrapper.IdentityContact.Get(_editingContact.Id);
-                var fresh = getResponse?.Response;
+                var fresh = await DataContext.Query<IdentityContact>()
+                    .Where(x => x.Id == _editingContact.Id)
+                    .FirstOrDefaultAsync();
 
                 if (fresh is not null)
                 {
@@ -1149,8 +1165,9 @@ else
                     fresh.TypeId = Guid.TryParse(_contactForm.TypeId, out var tid) ? tid : null;
                     fresh.ModifiedAt = DateTime.UtcNow;
 
-                    var result = await IdentityWrapper.IdentityContact.Patch(fresh);
-                    ToastService.Show(result?.IsSuccess == true ? "Contact updated." : $"Error: {result?.Message}");
+                    DataContext.Update(fresh);
+                    var result = await DataContext.SaveChangesAsync();
+                    ToastService.Show(result.IsSuccess ? "Contact updated." : $"Error: {result.Message}");
                 }
             }
             else
@@ -1166,8 +1183,9 @@ else
                     CreatedAt = DateTime.UtcNow
                 };
 
-                var result = await IdentityWrapper.IdentityContact.Create(contact);
-                ToastService.Show(result?.IsSuccess == true ? "Contact created." : $"Error: {result?.Message}");
+                DataContext.Add(contact);
+                var result = await DataContext.SaveChangesAsync();
+                ToastService.Show(result.IsSuccess ? "Contact created." : $"Error: {result.Message}");
             }
 
             _contactDialogOpen = false;
@@ -1189,8 +1207,9 @@ else
         {
             contact.IsDeleted = true;
             contact.IsEnabled = false;
-            var result = await IdentityWrapper.IdentityContact.Patch(contact);
-            ToastService.Show(result?.IsSuccess == true ? "Contact deleted." : $"Error: {result?.Message}");
+            DataContext.Update(contact);
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess ? "Contact deleted." : $"Error: {result.Message}");
             await LoadContacts();
         }
         catch (Exception ex)
@@ -1230,8 +1249,9 @@ else
         {
             if (_editingAddress is not null)
             {
-                var getResponse = await IdentityWrapper.IdentityAddress.Get(_editingAddress.Id);
-                var fresh = getResponse?.Response;
+                var fresh = await DataContext.Query<IdentityAddress>()
+                    .Where(x => x.Id == _editingAddress.Id)
+                    .FirstOrDefaultAsync();
 
                 if (fresh is not null)
                 {
@@ -1243,8 +1263,9 @@ else
                     fresh.DefaultAddress = _addressForm.IsDefault == "true";
                     fresh.ModifiedAt = DateTime.UtcNow;
 
-                    var result = await IdentityWrapper.IdentityAddress.Patch(fresh);
-                    ToastService.Show(result?.IsSuccess == true ? "Address updated." : $"Error: {result?.Message}");
+                    DataContext.Update(fresh);
+                    var result = await DataContext.SaveChangesAsync();
+                    ToastService.Show(result.IsSuccess ? "Address updated." : $"Error: {result.Message}");
                 }
             }
             else
@@ -1264,8 +1285,9 @@ else
                     CreatedAt = DateTime.UtcNow
                 };
 
-                var result = await IdentityWrapper.IdentityAddress.Create(address);
-                ToastService.Show(result?.IsSuccess == true ? "Address created." : $"Error: {result?.Message}");
+                DataContext.Add(address);
+                var result = await DataContext.SaveChangesAsync();
+                ToastService.Show(result.IsSuccess ? "Address created." : $"Error: {result.Message}");
             }
 
             _addressDialogOpen = false;
@@ -1287,8 +1309,9 @@ else
         {
             address.IsDeleted = true;
             address.IsEnabled = false;
-            var result = await IdentityWrapper.IdentityAddress.Patch(address);
-            ToastService.Show(result?.IsSuccess == true ? "Address deleted." : $"Error: {result?.Message}");
+            DataContext.Update(address);
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess ? "Address deleted." : $"Error: {result.Message}");
             await LoadAddresses();
         }
         catch (Exception ex)
@@ -1303,8 +1326,9 @@ else
     {
         try
         {
-            var getResponse = await IdentityWrapper.Session.Get(session.Id);
-            var fresh = getResponse?.Response;
+            var fresh = await DataContext.Query<Session>()
+                .Where(x => x.Id == session.Id)
+                .FirstOrDefaultAsync();
 
             if (fresh is null)
             {
@@ -1315,16 +1339,17 @@ else
             fresh.Status = CurrentSessionState.Inactive;
             fresh.ModifiedAt = DateTime.UtcNow;
 
-            var result = await IdentityWrapper.Session.Patch(fresh);
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
 
-            if (result?.IsSuccess == true)
+            if (result.IsSuccess)
             {
                 ToastService.Show("Session terminated.");
                 await LoadSessions();
             }
             else
             {
-                ToastService.Show($"Error: {result?.Message}");
+                ToastService.Show($"Error: {result.Message}");
             }
         }
         catch (Exception ex)
