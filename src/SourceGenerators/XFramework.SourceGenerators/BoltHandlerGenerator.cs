@@ -176,6 +176,7 @@ public class BoltHandlerGenerator : ISourceGenerator
         var hasCancellationToken = false;
         var requestTypeFullName = ToGlobalQualified(requestType.ToDisplayString());
         var queryParameters = CollectQueryParameters(requestType);
+        var constructorBoundProperties = CollectConstructorBoundProperties(requestType, queryParameters);
 
         for (int i = 1; i < methodSymbol.Parameters.Length; i++)
         {
@@ -226,6 +227,7 @@ public class BoltHandlerGenerator : ISourceGenerator
             IsGenericResult = isGenericResult,
             DiParameters = diParams,
             QueryParameters = queryParameters,
+            ConstructorBoundProperties = constructorBoundProperties,
             HasCancellationToken = hasCancellationToken,
             Namespace = containingClass.ContainingNamespace.ToDisplayString(),
             HasBoltHandler = hasBolt,
@@ -269,11 +271,73 @@ public class BoltHandlerGenerator : ISourceGenerator
                 PropertyName = property.Name,
                 ParameterName = ToParameterName(property.Name),
                 ParameterTypeFullName = parameterType,
-                AssignWhenHasValue = assignWhenHasValue
+                AssignWhenHasValue = assignWhenHasValue,
+                IsInitOnly = property.SetMethod?.IsInitOnly == true,
+                DefaultValueExpression = GetDefaultValueExpression(property)
             });
         }
 
         return parameters;
+    }
+
+    private static List<string> CollectConstructorBoundProperties(
+        ITypeSymbol requestType,
+        IReadOnlyCollection<QueryParameterInfo> queryParameters)
+    {
+        if (requestType is not INamedTypeSymbol namedType || queryParameters.Count == 0)
+            return new List<string>();
+
+        var queryParametersByName = queryParameters.ToDictionary(
+            static p => p.PropertyName,
+            static p => p.PropertyName,
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var constructor in namedType.InstanceConstructors
+                     .Where(static c => c.DeclaredAccessibility == Accessibility.Public && c.Parameters.Length > 0)
+                     .OrderByDescending(static c => c.Parameters.Length))
+        {
+            var boundProperties = new List<string>();
+            var canBindConstructor = true;
+
+            foreach (var parameter in constructor.Parameters)
+            {
+                if (!queryParametersByName.TryGetValue(parameter.Name, out var propertyName))
+                {
+                    canBindConstructor = false;
+                    break;
+                }
+
+                var queryParameter = queryParameters.First(p =>
+                    string.Equals(p.PropertyName, propertyName, StringComparison.OrdinalIgnoreCase));
+                var parameterType = ToGlobalQualified(parameter.Type.ToDisplayString());
+                if (queryParameter.AssignWhenHasValue)
+                    parameterType += "?";
+
+                if (!string.Equals(parameterType, queryParameter.ParameterTypeFullName, StringComparison.Ordinal))
+                {
+                    canBindConstructor = false;
+                    break;
+                }
+
+                boundProperties.Add(queryParameter.PropertyName);
+            }
+
+            if (canBindConstructor)
+                return boundProperties;
+        }
+
+        return new List<string>();
+    }
+
+    private static string? GetDefaultValueExpression(IPropertySymbol property)
+    {
+        foreach (var syntaxReference in property.DeclaringSyntaxReferences)
+        {
+            if (syntaxReference.GetSyntax() is PropertyDeclarationSyntax { Initializer: { } initializer })
+                return initializer.Value.NormalizeWhitespace().ToFullString();
+        }
+
+        return null;
     }
 
     private static bool IsNullableValueType(ITypeSymbol type)
@@ -441,6 +505,45 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
     private static string GenerateQueryRequestInitialization(HandlerInfo h)
     {
         var builder = new StringBuilder();
+        var constructorBoundProperties = new HashSet<string>(
+            h.ConstructorBoundProperties,
+            StringComparer.OrdinalIgnoreCase);
+        var requiresInitializer = h.QueryParameters.Any(static p => p.IsInitOnly) ||
+                                  constructorBoundProperties.Count > 0;
+
+        if (requiresInitializer)
+        {
+            var constructorArguments = h.ConstructorBoundProperties
+                .Select(propertyName => h.QueryParameters.First(p =>
+                    string.Equals(p.PropertyName, propertyName, StringComparison.OrdinalIgnoreCase)))
+                .Select(ToQueryValueExpression)
+                .ToList();
+            var initializerParameters = h.QueryParameters
+                .Where(p => !constructorBoundProperties.Contains(p.PropertyName))
+                .ToList();
+            var constructorCall = constructorArguments.Count == 0
+                ? "()"
+                : $"({string.Join(", ", constructorArguments)})";
+
+            if (initializerParameters.Count == 0)
+            {
+                builder.AppendLine($"        var request = new {h.RequestTypeFullName}{constructorCall};");
+            }
+            else
+            {
+                builder.AppendLine($"        var request = new {h.RequestTypeFullName}{constructorCall}");
+                builder.AppendLine("        {");
+                foreach (var queryParameter in initializerParameters)
+                {
+                    builder.AppendLine(
+                        $"            {queryParameter.PropertyName} = {ToQueryValueExpression(queryParameter)},");
+                }
+                builder.AppendLine("        };");
+            }
+
+            return builder.ToString();
+        }
+
         builder.AppendLine($"        var request = new {h.RequestTypeFullName}();");
 
         foreach (var queryParameter in h.QueryParameters)
@@ -458,6 +561,16 @@ public sealed class {h.ClassName}_{h.MethodName}_BoltHandler : IBoltHandler
         }
 
         return builder.ToString();
+    }
+
+    private static string ToQueryValueExpression(QueryParameterInfo queryParameter)
+    {
+        if (!queryParameter.AssignWhenHasValue)
+            return queryParameter.ParameterName;
+
+        return queryParameter.DefaultValueExpression != null
+            ? $"{queryParameter.ParameterName}.GetValueOrDefault({queryParameter.DefaultValueExpression})"
+            : $"{queryParameter.ParameterName}.GetValueOrDefault()";
     }
 
     #endregion
@@ -740,6 +853,7 @@ public static class GeneratedEndpointRoutes
         public bool IsGenericResult { get; set; }
         public List<(string TypeFullName, string Name, bool IsValidator)> DiParameters { get; set; } = new();
         public List<QueryParameterInfo> QueryParameters { get; set; } = new();
+        public List<string> ConstructorBoundProperties { get; set; } = new();
         public bool HasCancellationToken { get; set; }
         public string Namespace { get; set; } = "";
 
@@ -764,6 +878,8 @@ public static class GeneratedEndpointRoutes
         public string ParameterName { get; set; } = "";
         public string ParameterTypeFullName { get; set; } = "";
         public bool AssignWhenHasValue { get; set; }
+        public bool IsInitOnly { get; set; }
+        public string? DefaultValueExpression { get; set; }
     }
 
     #endregion
