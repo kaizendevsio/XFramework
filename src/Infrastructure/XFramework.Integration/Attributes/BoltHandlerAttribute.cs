@@ -2,8 +2,8 @@ namespace XFramework.Integration.Attributes;
 
 /// <summary>
 /// Marks a static method as a Bolt handler in addition to being a REST endpoint handler.
-/// The source generator scans for this attribute and generates the SignalR registration code
-/// that routes incoming Bolt messages to this method.
+/// The source generator scans for this attribute and generates the IBoltHandler adapter
+/// that routes incoming Bolt thin-protocol messages to this method.
 ///
 /// The decorated method must:
 ///   - Be static

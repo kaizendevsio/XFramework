@@ -14,7 +14,7 @@ using IdentityServer.Integration.Drivers;
 using MemoryPack;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Bolt.Domain.Shared.Protocol;
+using Bolt.Protocol;
 using Bolt.Hub.Extensions;
 using Testcontainers.PostgreSql;
 using XFramework.Core.Extensions;
@@ -217,8 +217,8 @@ public class TransportBenchmarks
 
         // Compute hashes for routing
         var identityServerServiceId = "3902761a822d4c6b8e2d323fd501bcd6"; // SHA256 of "IdentityServer" — same as SignalR registration
-        _identityServerServiceHash = BoltHubCodec.Fnv1aHash(identityServerServiceId);
-        _healthCheckCommandHash = BoltHubCodec.Fnv1aHash(typeof(HealthCheckRequest).GetTypeFullName());
+        _identityServerServiceHash = BoltCodec.Fnv1aHash(identityServerServiceId);
+        _healthCheckCommandHash = BoltCodec.Fnv1aHash(typeof(HealthCheckRequest).GetTypeFullName());
 
         // Start "IdentityServer" thin client — handles incoming requests
         _thinServiceClient = new BoltClient(
