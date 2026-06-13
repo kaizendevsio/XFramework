@@ -7,13 +7,17 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using NUnit.Framework;
 using StackExchange.Redis;
+using XFramework.Core.Extensions;
 using XFramework.Core.Services.Caching;
 
 namespace XFramework.Core.Tests.Services.Caching;
@@ -32,6 +36,15 @@ public class HybridCacheServiceTests
     private Mock<IOptions<CacheOptions>> _optionsMock = null!;
     private CacheOptions _cacheOptions = null!;
     private HybridCacheService _service = null!;
+
+    private sealed record CachePayload(int Id, string Name);
+
+    private sealed record L2OnlyPayload(string Data);
+
+    private string PrefixedKey(string key) =>
+        string.IsNullOrEmpty(_cacheOptions.RedisInstanceName)
+            ? key
+            : $"{_cacheOptions.RedisInstanceName}{key}";
 
     [SetUp]
     public void Setup()
@@ -79,6 +92,55 @@ public class HybridCacheServiceTests
         );
     }
 
+    #region Registration Tests
+
+    [Test]
+    public void AddMemoryCaching_ShouldResolveHybridCacheServiceWithoutRedisServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddMemoryCaching();
+
+        using var provider = services.BuildServiceProvider();
+
+        // Act
+        var cacheService = provider.GetRequiredService<ICacheService>();
+
+        // Assert
+        cacheService.Should().BeOfType<HybridCacheService>();
+    }
+
+    [Test]
+    public void AddHybridCaching_ShouldLetHybridCacheServiceOwnRedisKeyPrefix()
+    {
+        // Arrange
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Caching:RedisConnectionString"] = "localhost:6379",
+                ["Caching:RedisInstanceName"] = "XFramework:"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        // Act
+        services.AddHybridCaching(configuration);
+
+        using var provider = services.BuildServiceProvider();
+
+        // Assert
+        var cacheOptions = provider.GetRequiredService<IOptions<CacheOptions>>().Value;
+        cacheOptions.RedisInstanceName.Should().Be("XFramework:");
+
+        var redisOptions = provider.GetRequiredService<IOptions<RedisCacheOptions>>().Value;
+        redisOptions.InstanceName.Should().BeNullOrEmpty();
+    }
+
+    #endregion
+
     #region GetAsync Tests
 
     [Test]
@@ -87,11 +149,12 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var expectedValue = "cached-value";
-        object cacheValue = expectedValue;
+        object? cacheValue = expectedValue;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out cacheValue))
+            .Setup(x => x.TryGetValue(cacheKey, out cacheValue))
             .Returns(true);
 
         // Act
@@ -100,27 +163,27 @@ public class HybridCacheServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().Be(expectedValue);
-        _memoryCacheMock.Verify(x => x.TryGetValue(key, out cacheValue), Times.Once);
+        _memoryCacheMock.Verify(x => x.TryGetValue(cacheKey, out cacheValue), Times.Once);
         _distributedCacheMock.Verify(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Test]
-    [Ignore("JsonSerializer.Deserialize<object> returns JsonElement instead of anonymous type. Requires test redesign.")]
     public async Task GetAsync_L2CacheHit_ShouldReturnValueFromRedisAndPopulateL1()
     {
         // Arrange
         CreateService();
         var key = "test-key";
-        var expectedValue = new { Id = 1, Name = "Test" };
+        var cacheKey = PrefixedKey(key);
+        var expectedValue = new CachePayload(1, "Test");
         var jsonValue = JsonSerializer.Serialize(expectedValue);
         object? nullCacheValue = null;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out nullCacheValue))
+            .Setup(x => x.TryGetValue(cacheKey, out nullCacheValue))
             .Returns(false);
 
         _distributedCacheMock
-            .Setup(x => x.GetAsync(key, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Encoding.UTF8.GetBytes(jsonValue));
 
         var cacheEntry = new Mock<ICacheEntry>();
@@ -129,17 +192,17 @@ public class HybridCacheServiceTests
         cacheEntry.SetupProperty(x => x.SlidingExpiration);
 
         _memoryCacheMock
-            .Setup(x => x.CreateEntry(key))
+            .Setup(x => x.CreateEntry(cacheKey))
             .Returns(cacheEntry.Object);
 
         // Act
-        var result = await _service.GetAsync<object>(key);
+        var result = await _service.GetAsync<CachePayload>(key);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().BeEquivalentTo(expectedValue);
-        _distributedCacheMock.Verify(x => x.GetAsync(key, It.IsAny<CancellationToken>()), Times.Once);
-        _memoryCacheMock.Verify(x => x.CreateEntry(key), Times.Once);
+        _distributedCacheMock.Verify(x => x.GetAsync(cacheKey, It.IsAny<CancellationToken>()), Times.Once);
+        _memoryCacheMock.Verify(x => x.CreateEntry(cacheKey), Times.Once);
     }
 
     [Test]
@@ -148,14 +211,15 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "missing-key";
+        var cacheKey = PrefixedKey(key);
         object? nullCacheValue = null;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out nullCacheValue))
+            .Setup(x => x.TryGetValue(cacheKey, out nullCacheValue))
             .Returns(false);
 
         _distributedCacheMock
-            .Setup(x => x.GetAsync(key, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[]?)null);
 
         // Act
@@ -206,12 +270,14 @@ public class HybridCacheServiceTests
     public async Task GetAsync_ExceptionThrown_ShouldReturnFailure()
     {
         // Arrange
+        _cacheOptions.EnableGracefulDegradation = false;
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var exceptionMessage = "Cache error";
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out It.Ref<object?>.IsAny))
+            .Setup(x => x.TryGetValue(cacheKey, out It.Ref<object?>.IsAny))
             .Throws(new Exception(exceptionMessage));
 
         // Act
@@ -225,25 +291,48 @@ public class HybridCacheServiceTests
     }
 
     [Test]
+    public async Task GetAsync_ExceptionThrown_WithGracefulDegradation_ShouldReturnDefault()
+    {
+        // Arrange
+        CreateService();
+        var key = "test-key";
+        var cacheKey = PrefixedKey(key);
+
+        _memoryCacheMock
+            .Setup(x => x.TryGetValue(cacheKey, out It.Ref<object?>.IsAny))
+            .Throws(new Exception("Cache error"));
+
+        // Act
+        var result = await _service.GetAsync<string>(key);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Data.Should().BeNull();
+        result.Message.Should().Be("Cache retrieval failed, returning default");
+    }
+
+    [Test]
     public async Task GetAsync_WithStatisticsEnabled_ShouldTrackHitsAndMisses()
     {
         // Arrange
         CreateService();
         var key1 = "hit-key";
         var key2 = "miss-key";
+        var cacheKey1 = PrefixedKey(key1);
+        var cacheKey2 = PrefixedKey(key2);
         object? hitValue = "value";
         object? missValue = null;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key1, out hitValue))
+            .Setup(x => x.TryGetValue(cacheKey1, out hitValue))
             .Returns(true);
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key2, out missValue))
+            .Setup(x => x.TryGetValue(cacheKey2, out missValue))
             .Returns(false);
 
         _distributedCacheMock
-            .Setup(x => x.GetAsync(key2, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(cacheKey2, It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[]?)null);
 
         // Act
@@ -271,6 +360,7 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var value = "test-value";
 
         var cacheEntry = new Mock<ICacheEntry>();
@@ -279,7 +369,7 @@ public class HybridCacheServiceTests
         cacheEntry.SetupProperty(x => x.SlidingExpiration);
 
         _memoryCacheMock
-            .Setup(x => x.CreateEntry(key))
+            .Setup(x => x.CreateEntry(cacheKey))
             .Returns(cacheEntry.Object);
 
         // Act
@@ -287,9 +377,9 @@ public class HybridCacheServiceTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        _memoryCacheMock.Verify(x => x.CreateEntry(key), Times.Once);
+        _memoryCacheMock.Verify(x => x.CreateEntry(cacheKey), Times.Once);
         _distributedCacheMock.Verify(
-            x => x.SetAsync(key, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()),
+            x => x.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()),
             Times.Once
         );
     }
@@ -300,6 +390,7 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var value = "test-value";
         var absoluteExpiration = TimeSpan.FromMinutes(30);
 
@@ -309,12 +400,12 @@ public class HybridCacheServiceTests
         cacheEntry.SetupProperty(x => x.SlidingExpiration);
 
         _memoryCacheMock
-            .Setup(x => x.CreateEntry(key))
+            .Setup(x => x.CreateEntry(cacheKey))
             .Returns(cacheEntry.Object);
 
         DistributedCacheEntryOptions? capturedOptions = null;
         _distributedCacheMock
-            .Setup(x => x.SetAsync(key, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
             .Callback<string, byte[], DistributedCacheEntryOptions, CancellationToken>((_, _, opts, _) => capturedOptions = opts)
             .Returns(Task.CompletedTask);
 
@@ -334,6 +425,7 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var value = "test-value";
         var slidingExpiration = TimeSpan.FromMinutes(10);
 
@@ -343,12 +435,12 @@ public class HybridCacheServiceTests
         cacheEntry.SetupProperty(x => x.SlidingExpiration);
 
         _memoryCacheMock
-            .Setup(x => x.CreateEntry(key))
+            .Setup(x => x.CreateEntry(cacheKey))
             .Returns(cacheEntry.Object);
 
         DistributedCacheEntryOptions? capturedOptions = null;
         _distributedCacheMock
-            .Setup(x => x.SetAsync(key, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
             .Callback<string, byte[], DistributedCacheEntryOptions, CancellationToken>((_, _, opts, _) => capturedOptions = opts)
             .Returns(Task.CompletedTask);
 
@@ -407,6 +499,7 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var value = "test-value";
 
         var cacheEntry = new Mock<ICacheEntry>();
@@ -415,11 +508,11 @@ public class HybridCacheServiceTests
         cacheEntry.SetupProperty(x => x.SlidingExpiration);
 
         _memoryCacheMock
-            .Setup(x => x.CreateEntry(key))
+            .Setup(x => x.CreateEntry(cacheKey))
             .Returns(cacheEntry.Object);
 
         _distributedCacheMock
-            .Setup(x => x.SetAsync(key, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Redis unavailable"));
 
         // Act
@@ -428,7 +521,34 @@ public class HybridCacheServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Message.Should().Contain("L1 only");
-        _memoryCacheMock.Verify(x => x.CreateEntry(key), Times.Once);
+        _memoryCacheMock.Verify(x => x.CreateEntry(cacheKey), Times.Once);
+    }
+
+    [Test]
+    public async Task SetAsync_WithMemorySizeLimit_ShouldSetSizedEntry()
+    {
+        // Arrange
+        _cacheOptions.EnableL2Cache = false;
+        _cacheOptions.MemoryCacheSizeLimitMb = 1;
+
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions
+        {
+            SizeLimit = 1024 * 1024
+        });
+
+        var service = new HybridCacheService(
+            memoryCache,
+            _optionsMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        var result = await service.SetAsync("size-limited-key", "value");
+        var getResult = await service.GetAsync<string>("size-limited-key");
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        getResult.IsSuccess.Should().BeTrue();
+        getResult.Data.Should().Be("value");
     }
 
     #endregion
@@ -441,6 +561,7 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
 
         // Act
         var result = await _service.RemoveAsync(key);
@@ -448,8 +569,8 @@ public class HybridCacheServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Message.Should().Be("Cache entry removed successfully");
-        _memoryCacheMock.Verify(x => x.Remove(key), Times.Once);
-        _distributedCacheMock.Verify(x => x.RemoveAsync(key, It.IsAny<CancellationToken>()), Times.Once);
+        _memoryCacheMock.Verify(x => x.Remove(cacheKey), Times.Once);
+        _distributedCacheMock.Verify(x => x.RemoveAsync(cacheKey, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [TestCase(null)]
@@ -475,9 +596,10 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
 
         _distributedCacheMock
-            .Setup(x => x.RemoveAsync(key, It.IsAny<CancellationToken>()))
+            .Setup(x => x.RemoveAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Redis unavailable"));
 
         // Act
@@ -486,7 +608,7 @@ public class HybridCacheServiceTests
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.StatusCode.Should().Be(500);
-        _memoryCacheMock.Verify(x => x.Remove(key), Times.Once);
+        _memoryCacheMock.Verify(x => x.Remove(cacheKey), Times.Once);
     }
 
     #endregion
@@ -499,10 +621,11 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         object? value = "cached-value";
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out value))
+            .Setup(x => x.TryGetValue(cacheKey, out value))
             .Returns(true);
 
         // Act
@@ -511,7 +634,7 @@ public class HybridCacheServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().BeTrue();
-        _memoryCacheMock.Verify(x => x.TryGetValue(key, out value), Times.Once);
+        _memoryCacheMock.Verify(x => x.TryGetValue(cacheKey, out value), Times.Once);
     }
 
     [Test]
@@ -520,15 +643,16 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         object? nullValue = null;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out nullValue))
+            .Setup(x => x.TryGetValue(cacheKey, out nullValue))
             .Returns(false);
 
         var mockDatabase = new Mock<IDatabase>();
         mockDatabase
-            .Setup(x => x.KeyExistsAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+            .Setup(x => x.KeyExistsAsync((RedisKey)cacheKey, It.IsAny<CommandFlags>()))
             .ReturnsAsync(true);
 
         _redisConnectionMock
@@ -541,6 +665,7 @@ public class HybridCacheServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().BeTrue();
+        mockDatabase.Verify(x => x.KeyExistsAsync((RedisKey)cacheKey, It.IsAny<CommandFlags>()), Times.Once);
     }
 
     [Test]
@@ -549,15 +674,16 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "missing-key";
+        var cacheKey = PrefixedKey(key);
         object? nullValue = null;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out nullValue))
+            .Setup(x => x.TryGetValue(cacheKey, out nullValue))
             .Returns(false);
 
         var mockDatabase = new Mock<IDatabase>();
         mockDatabase
-            .Setup(x => x.KeyExistsAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+            .Setup(x => x.KeyExistsAsync((RedisKey)cacheKey, It.IsAny<CommandFlags>()))
             .ReturnsAsync(false);
 
         _redisConnectionMock
@@ -570,6 +696,7 @@ public class HybridCacheServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().BeFalse();
+        mockDatabase.Verify(x => x.KeyExistsAsync((RedisKey)cacheKey, It.IsAny<CommandFlags>()), Times.Once);
     }
 
     [TestCase(null)]
@@ -599,12 +726,13 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var cachedValue = "cached-value";
         object? cacheValue = cachedValue;
         var factoryExecuted = false;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out cacheValue))
+            .Setup(x => x.TryGetValue(cacheKey, out cacheValue))
             .Returns(true);
 
         // Act
@@ -629,16 +757,17 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var factoryValue = "factory-value";
         object? nullValue = null;
         var factoryExecuted = false;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out nullValue))
+            .Setup(x => x.TryGetValue(cacheKey, out nullValue))
             .Returns(false);
 
         _distributedCacheMock
-            .Setup(x => x.GetAsync(key, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[]?)null);
 
         var cacheEntry = new Mock<ICacheEntry>();
@@ -647,7 +776,7 @@ public class HybridCacheServiceTests
         cacheEntry.SetupProperty(x => x.SlidingExpiration);
 
         _memoryCacheMock
-            .Setup(x => x.CreateEntry(key))
+            .Setup(x => x.CreateEntry(cacheKey))
             .Returns(cacheEntry.Object);
 
         // Act
@@ -664,9 +793,9 @@ public class HybridCacheServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().Be(factoryValue);
         factoryExecuted.Should().BeTrue();
-        _memoryCacheMock.Verify(x => x.CreateEntry(key), Times.Once);
+        _memoryCacheMock.Verify(x => x.CreateEntry(cacheKey), Times.Once);
         _distributedCacheMock.Verify(
-            x => x.SetAsync(key, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()),
+            x => x.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()),
             Times.Once
         );
     }
@@ -677,15 +806,16 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var exceptionMessage = "Factory failed";
         object? nullValue = null;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out nullValue))
+            .Setup(x => x.TryGetValue(cacheKey, out nullValue))
             .Returns(false);
 
         _distributedCacheMock
-            .Setup(x => x.GetAsync(key, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[]?)null);
 
         // Act
@@ -743,7 +873,10 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var prefix = "user:";
-        var matchingKeys = new[] { "user:1", "user:2", "user:3" }.Select(k => (RedisKey)k);
+        var cachePattern = $"{PrefixedKey(prefix)}*";
+        var matchingKeys = new[] { "user:1", "user:2", "user:3" }
+            .Select(k => (RedisKey)PrefixedKey(k))
+            .ToArray();
 
         var mockServer = new Mock<IServer>();
         mockServer
@@ -752,8 +885,8 @@ public class HybridCacheServiceTests
 
         var mockDatabase = new Mock<IDatabase>();
         mockDatabase
-            .Setup(x => x.KeyDeleteAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(true);
+            .Setup(x => x.KeyDeleteAsync(It.IsAny<RedisKey[]>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(matchingKeys.Length);
 
         var endPoints = new EndPoint[] { new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 6379) };
         _redisConnectionMock
@@ -775,7 +908,21 @@ public class HybridCacheServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().Be(3);
         result.Message.Should().Contain("Removed 3 entries");
-        mockDatabase.Verify(x => x.KeyDeleteAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()), Times.Exactly(3));
+        mockServer.Verify(
+            x => x.Keys(
+                It.IsAny<int>(),
+                It.Is<RedisValue>(value => value.ToString() == cachePattern),
+                It.IsAny<int>(),
+                It.IsAny<long>(),
+                It.IsAny<int>(),
+                It.IsAny<CommandFlags>()),
+            Times.Once);
+        mockDatabase.Verify(
+            x => x.KeyDeleteAsync(
+                It.Is<RedisKey[]>(keys => keys.SequenceEqual(matchingKeys)),
+                It.IsAny<CommandFlags>()),
+            Times.Once);
+        mockDatabase.Verify(x => x.KeyDeleteAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()), Times.Never);
     }
 
     [Test]
@@ -784,6 +931,7 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var prefix = "nonexistent:";
+        var cachePattern = $"{PrefixedKey(prefix)}*";
         var emptyKeys = Enumerable.Empty<RedisKey>();
 
         var mockServer = new Mock<IServer>();
@@ -812,6 +960,16 @@ public class HybridCacheServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Data.Should().Be(0);
+        mockServer.Verify(
+            x => x.Keys(
+                It.IsAny<int>(),
+                It.Is<RedisValue>(value => value.ToString() == cachePattern),
+                It.IsAny<int>(),
+                It.IsAny<long>(),
+                It.IsAny<int>(),
+                It.IsAny<CommandFlags>()),
+            Times.Once);
+        mockDatabase.Verify(x => x.KeyDeleteAsync(It.IsAny<RedisKey[]>(), It.IsAny<CommandFlags>()), Times.Never);
         mockDatabase.Verify(x => x.KeyDeleteAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()), Times.Never);
     }
 
@@ -860,21 +1018,24 @@ public class HybridCacheServiceTests
     {
         // Arrange
         CreateService();
+        var hitKey1 = PrefixedKey("hit1");
+        var hitKey2 = PrefixedKey("hit2");
+        var missKey1 = PrefixedKey("miss1");
         object? hitValue = "value";
         object? missValue = null;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue("hit1", out hitValue))
+            .Setup(x => x.TryGetValue(hitKey1, out hitValue))
             .Returns(true);
         _memoryCacheMock
-            .Setup(x => x.TryGetValue("hit2", out hitValue))
+            .Setup(x => x.TryGetValue(hitKey2, out hitValue))
             .Returns(true);
         _memoryCacheMock
-            .Setup(x => x.TryGetValue("miss1", out missValue))
+            .Setup(x => x.TryGetValue(missKey1, out missValue))
             .Returns(false);
 
         _distributedCacheMock
-            .Setup(x => x.GetAsync("miss1", It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(missKey1, It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[]?)null);
 
         // Act
@@ -912,22 +1073,31 @@ public class HybridCacheServiceTests
     #region ClearAllAsync Tests
 
     [Test]
-    public async Task ClearAllAsync_ShouldFlushRedisAndResetStatistics()
+    public async Task ClearAllAsync_ShouldRemovePrefixedRedisKeysAndResetStatistics()
     {
         // Arrange
         CreateService();
+        var cacheKey = PrefixedKey("key");
+        var matchingKeys = new[] { "one", "two" }
+            .Select(k => (RedisKey)PrefixedKey(k))
+            .ToArray();
         
         // Add some statistics first
         object? hitValue = "value";
         _memoryCacheMock
-            .Setup(x => x.TryGetValue("key", out hitValue))
+            .Setup(x => x.TryGetValue(cacheKey, out hitValue))
             .Returns(true);
         await _service.GetAsync<string>("key");
 
         var mockServer = new Mock<IServer>();
         mockServer
-            .Setup(x => x.FlushDatabaseAsync(It.IsAny<int>(), It.IsAny<CommandFlags>()))
-            .Returns(Task.CompletedTask);
+            .Setup(x => x.Keys(It.IsAny<int>(), It.IsAny<RedisValue>(), It.IsAny<int>(), It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CommandFlags>()))
+            .Returns(matchingKeys);
+
+        var mockDatabase = new Mock<IDatabase>();
+        mockDatabase
+            .Setup(x => x.KeyDeleteAsync(It.IsAny<RedisKey[]>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(matchingKeys.Length);
 
         var endPoints = new EndPoint[] { new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 6379) };
         _redisConnectionMock
@@ -938,13 +1108,31 @@ public class HybridCacheServiceTests
             .Setup(x => x.GetServer(It.IsAny<EndPoint>(), It.IsAny<object>()))
             .Returns(mockServer.Object);
 
+        _redisConnectionMock
+            .Setup(x => x.GetDatabase(It.IsAny<int>(), It.IsAny<object>()))
+            .Returns(mockDatabase.Object);
+
         // Act
         var result = await _service.ClearAllAsync();
 
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Message.Should().Be("Cache cleared successfully");
-        mockServer.Verify(x => x.FlushDatabaseAsync(It.IsAny<int>(), It.IsAny<CommandFlags>()), Times.Once);
+        mockServer.Verify(
+            x => x.Keys(
+                It.IsAny<int>(),
+                It.Is<RedisValue>(value => value.ToString() == $"{_cacheOptions.RedisInstanceName}*"),
+                It.IsAny<int>(),
+                It.IsAny<long>(),
+                It.IsAny<int>(),
+                It.IsAny<CommandFlags>()),
+            Times.Once);
+        mockDatabase.Verify(
+            x => x.KeyDeleteAsync(
+                It.Is<RedisKey[]>(keys => keys.SequenceEqual(matchingKeys)),
+                It.IsAny<CommandFlags>()),
+            Times.Once);
+        mockServer.Verify(x => x.FlushDatabaseAsync(It.IsAny<int>(), It.IsAny<CommandFlags>()), Times.Never);
 
         // Verify statistics were reset
         var stats = _service.GetStatistics();
@@ -977,6 +1165,7 @@ public class HybridCacheServiceTests
         // Arrange
         CreateService();
         var key = "complex-key";
+        var cacheKey = PrefixedKey(key);
         var complexObject = new
         {
             Id = 123,
@@ -994,11 +1183,11 @@ public class HybridCacheServiceTests
         object? nullValue = null;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out nullValue))
+            .Setup(x => x.TryGetValue(cacheKey, out nullValue))
             .Returns(false);
 
         _distributedCacheMock
-            .Setup(x => x.GetAsync(key, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Encoding.UTF8.GetBytes(jsonValue));
 
         var cacheEntry = new Mock<ICacheEntry>();
@@ -1007,7 +1196,7 @@ public class HybridCacheServiceTests
         cacheEntry.SetupProperty(x => x.SlidingExpiration);
 
         _memoryCacheMock
-            .Setup(x => x.CreateEntry(key))
+            .Setup(x => x.CreateEntry(cacheKey))
             .Returns(cacheEntry.Object);
 
         // Act
@@ -1029,11 +1218,12 @@ public class HybridCacheServiceTests
         _cacheOptions.EnableL2Cache = false;
         CreateService();
         var key = "test-key";
+        var cacheKey = PrefixedKey(key);
         var value = "test-value";
         object? cacheValue = value;
 
         _memoryCacheMock
-            .Setup(x => x.TryGetValue(key, out cacheValue))
+            .Setup(x => x.TryGetValue(cacheKey, out cacheValue))
             .Returns(true);
 
         // Act
@@ -1046,22 +1236,22 @@ public class HybridCacheServiceTests
     }
 
     [Test]
-    [Ignore("JsonSerializer.Deserialize<object> returns JsonElement instead of anonymous type. Requires test redesign.")]
     public async Task HybridCache_L2OnlyMode_ShouldWorkCorrectly()
     {
         // Arrange
         _cacheOptions.EnableL1Cache = false;
         CreateService();
         var key = "test-key";
-        var value = new { Data = "test" };
+        var cacheKey = PrefixedKey(key);
+        var value = new L2OnlyPayload("test");
         var jsonValue = JsonSerializer.Serialize(value);
 
         _distributedCacheMock
-            .Setup(x => x.GetAsync(key, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Encoding.UTF8.GetBytes(jsonValue));
 
         // Act
-        var result = await _service.GetAsync<object>(key);
+        var result = await _service.GetAsync<L2OnlyPayload>(key);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
