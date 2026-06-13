@@ -12,35 +12,25 @@ public class RecordsDriver : ILoggerWrapper
         MessageBusWrapper = messageBusWrapper;
     }
         
-    public async Task<Guid?> NewLog(string title, string message, Guid? guid = null, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
+    public Task<Guid?> NewLog(string title, string message, Guid? guid = null, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
     {
         guid ??= Guid.NewGuid();
-            
-        /*await MessageBusWrapper.Push(new BoltMessage()
-        {
-            BoltHubService = new BoltHubServiceBO()
-            {
-                Name = "RecordsService"
-            },
-            MethodName = "NewLog",
-            Data = ""
-        });*/
-        return guid;
+
+        return Task.FromResult(guid);
     }
 
     public Task<Guid?> NewLog(string name, string message, string initiator, RequestMetadata requestMetadata, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
     {
-        throw new NotImplementedException();
+        return Task.FromResult<Guid?>(Guid.NewGuid());
     }
 
-    public async Task<Guid?> NewAuthorizationLog(AuthenticationState authenticationState, Guid cuid)
+    public Task<Guid?> NewAuthorizationLog(AuthenticationState authenticationState, Guid cuid)
     {
-        //throw new NotImplementedException();
-        return new();
+        return Task.FromResult<Guid?>(cuid);
     }
 
-    public async Task UpdateLog(Guid guid, string title, string message, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
+    public Task UpdateLog(Guid guid, string title, string message, LogType logType = LogType.ApplicationServiceLog, GenericPriorityType priorityType = GenericPriorityType.Information)
     {
-        //throw new NotImplementedException();
+        return Task.CompletedTask;
     }
 }

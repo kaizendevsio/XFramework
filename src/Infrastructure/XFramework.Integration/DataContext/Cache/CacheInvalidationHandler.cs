@@ -5,9 +5,9 @@ namespace XFramework.Integration.DataContext.Cache;
 
 /// <summary>
 /// Handles server-push cache invalidation notifications from the Bolt hub.
-/// Migration to Bolt thin protocol push notifications is parked work (see Task 14).
+/// Bolt push invalidation is parked until a hub notification contract exists.
 /// </summary>
-public class CacheInvalidationHandler
+public sealed class CacheInvalidationHandler : IDisposable
 {
     private readonly IClientCacheService _cache;
     private readonly ILogger<CacheInvalidationHandler> _logger;
@@ -19,8 +19,24 @@ public class CacheInvalidationHandler
         _cache = cache;
         _logger = logger;
 
-        // TODO (Task 14): Subscribe to Bolt thin-protocol push notifications for cache invalidation.
-        // The previous SignalR-based subscription has been removed.
+        _logger.LogDebug("Remote data-context server-push cache invalidation is disabled; use manual invalidation APIs.");
+    }
+
+    public bool ServerPushInvalidationEnabled => false;
+
+    public Task InvalidatePrefixAsync(string prefix, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(prefix))
+            throw new ArgumentException("Cache invalidation prefix is required.", nameof(prefix));
+
+        _logger.LogDebug("Invalidating remote data-context client cache entries with prefix {Prefix}", prefix);
+        return _cache.RemoveByPrefixAsync(prefix, ct);
+    }
+
+    public Task ClearAllAsync(CancellationToken ct = default)
+    {
+        _logger.LogDebug("Clearing all remote data-context client cache entries");
+        return _cache.ClearAllAsync(ct);
     }
 
     public void Dispose()

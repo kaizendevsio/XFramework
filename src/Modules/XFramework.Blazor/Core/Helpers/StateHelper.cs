@@ -5,6 +5,24 @@ namespace XFramework.Blazor.Core.Helpers;
 
 public static class StateHelper
 {
+    public static PersistStateBy GetPersistStateBy(IConfiguration configuration)
+    {
+        var configuredMode = configuration.GetValue<string>("Application:Persistence:State:Driver");
+        if (string.IsNullOrWhiteSpace(configuredMode))
+            return PersistStateBy.SessionStorage;
+
+        return Enum.TryParse<PersistStateBy>(configuredMode, ignoreCase: true, out var persistStateBy)
+            ? persistStateBy
+            : throw new InvalidOperationException(
+                $"Unknown state persistence mode '{configuredMode}'. " +
+                $"Supported modes: {PersistStateBy.LocalStorage}, {PersistStateBy.SessionStorage}, {PersistStateBy.IndexDb}.");
+    }
+
+    public static NotSupportedException UnsupportedPersistenceMode(PersistStateBy persistStateBy) =>
+        new(
+            $"State persistence mode '{persistStateBy}' is not supported by XFramework.Blazor. " +
+            $"Supported modes: {PersistStateBy.LocalStorage}, {PersistStateBy.SessionStorage}, {PersistStateBy.IndexDb}.");
+
     public static void SetProperties<TAction, TState>(TAction action, TState state)
     {
         if (action is null) return;
@@ -83,7 +101,7 @@ public static class StateHelper
     switch (persistStateBy)
     {
         case PersistStateBy.NotSpecified:
-            throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            throw UnsupportedPersistenceMode(persistStateBy);
         case PersistStateBy.LocalStorage:
             s = await localStorageService.GetItemAsStringAsync(stateType.Name, CancellationToken.None);
             break;
@@ -95,11 +113,9 @@ public static class StateHelper
             s = stateCache.FirstOrDefault(i => i.Key == stateType.Name)?.Value;
             break;
         case PersistStateBy.CloudStore:
-            throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
         case PersistStateBy.GoogleDrive:
-            throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
         case PersistStateBy.OneDrive:
-            throw new NotImplementedException($"State persistence by '{nameof(persistStateBy)}' is not yet implemented");
+            throw UnsupportedPersistenceMode(persistStateBy);
         default:
             throw new ArgumentOutOfRangeException(nameof(persistStateBy), persistStateBy, null);
     }

@@ -15,17 +15,17 @@ public partial class ApplicationState
         {
             try
             { 
-                var statePersistenceFromAppSettings = Configuration.GetValue<string>("Application:Persistence:State:Driver");
-                var persistStateBy = (PersistStateBy)Enum.Parse(typeof(PersistStateBy), statePersistenceFromAppSettings);
+                var persistStateBy = StateHelper.GetPersistStateBy(Configuration);
 
                 if (persistStateBy is PersistStateBy.IndexDb)
                 {
                     await IndexedDbService.InitializeDb();
                 }
-                var tasks = new Task[3];
-                
-                tasks[1] = StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new SessionState.SetState() , SessionState, persistStateBy);
-                tasks[2] = StateHelper.RestoreState(Mediator, IndexedDbService ,SessionStorageService, LocalStorageService,new WalletState.SetState() , WalletState, persistStateBy);
+                var tasks = new[]
+                {
+                    StateHelper.RestoreState(Mediator, IndexedDbService, SessionStorageService, LocalStorageService, new SessionState.SetState(), SessionState, persistStateBy),
+                    StateHelper.RestoreState(Mediator, IndexedDbService, SessionStorageService, LocalStorageService, new WalletState.SetState(), WalletState, persistStateBy)
+                };
 
                 await Task.WhenAll(tasks);
             }
