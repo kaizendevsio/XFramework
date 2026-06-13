@@ -54,6 +54,11 @@ public class ThroughputBenchmarks
     private const string BoltUrl = "http://localhost:19400";
     private const string IdentityServerUrl = "http://localhost:19461";
     private const string TestClientUrl = "http://localhost:19462";
+    private static string BoltServerUrl => new UriBuilder(BoltUrl)
+    {
+        Scheme = Uri.UriSchemeWs,
+        Path = "bolt/ws"
+    }.Uri.ToString();
     private static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
 
     private const int BatchSize = 100;
@@ -98,7 +103,7 @@ public class ThroughputBenchmarks
         var idBuilder = XApplication.Configure<AuthService>();
         idBuilder.WebHost.UseUrls(IdentityServerUrl);
         OverrideConfig(idBuilder, "IdentityServer.TpBench", "3902761a-822d-4c6b-8e2d-323fd501bcd6");
-        idBuilder.Configuration["BoltConfiguration:ServerUrls:0"] = $"{BoltUrl}/stream-flow/queue";
+        idBuilder.Configuration["BoltConfiguration:ServerUrls:0"] = BoltServerUrl;
         idBuilder.Services.AddScoped<IAuthService, AuthService>();
         idBuilder.Services.AddValidatorsFromAssemblyContaining<AuthService>();
         _identityServerApp = (WebApplication)idBuilder.Build();

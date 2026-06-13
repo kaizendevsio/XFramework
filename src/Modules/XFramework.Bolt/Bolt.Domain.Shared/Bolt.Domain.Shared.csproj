@@ -6,7 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <PackageId>XFramework.Bolt.Domain.Shared</PackageId>
         <Version>$(XFrameworkVersion)</Version>
-        <Description>XFramework Bolt domain types — BoltMessage, IBoltRequest, and RPC contracts.</Description>
+        <Description>XFramework Bolt domain types - IBoltRequest and RPC contracts.</Description>
     </PropertyGroup>
 
     <ItemGroup>
