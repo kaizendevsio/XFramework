@@ -12,8 +12,22 @@ else if (_wallet is null)
 {
     <BbTypographyMuted>Wallet not found.</BbTypographyMuted>
 }
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => NavigationManager.NavigateTo("/finance/wallets"))">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Wallets
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Wallet Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to All Tenants or the wallet's tenant to view this record.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
 else
 {
+    <FadeInContent>
     <div class="space-y-6">
         @* Header *@
         <div class="flex items-center gap-4">
@@ -144,7 +158,7 @@ else
                         <BbTabsTrigger Value="adjust-balance">Adjust Balance</BbTabsTrigger>
                     </BbTabsList>
 
-                    <BbTabsContent Value="add-funds">
+                    <BbTabsContent Value="add-funds" Class="xf-fade-in">
                         <div class="grid gap-4 py-4 md:grid-cols-3">
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_addFundsAmount"
@@ -170,7 +184,7 @@ else
                         </BbButton>
                     </BbTabsContent>
 
-                    <BbTabsContent Value="withdraw-funds">
+                    <BbTabsContent Value="withdraw-funds" Class="xf-fade-in">
                         <div class="grid gap-4 py-4 md:grid-cols-3">
                             <BbFormFieldInput TValue="string"
                                               @bind-Value="_withdrawAmount"
@@ -196,7 +210,7 @@ else
                         </BbButton>
                     </BbTabsContent>
 
-                    <BbTabsContent Value="adjust-balance">
+                    <BbTabsContent Value="adjust-balance" Class="xf-fade-in">
                         <BbAlert Variant="AlertVariant.Warning" class="mb-4">
                             <BbAlertTitle>Warning</BbAlertTitle>
                             <BbAlertDescription>
@@ -351,6 +365,7 @@ else
             </BbCardContent>
         </BbCard>
     </div>
+    </FadeInContent>
 }
 
 @* Close Wallet Confirmation Dialog *@
@@ -382,12 +397,14 @@ else
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private Wallet? _wallet;
     private List<WalletTransaction> _transactions = [];
     private bool _loading = true;
     private bool _isProcessing;
     private bool _showCloseDialog;
+    private bool _outsideTenantContext;
 
     // Add Funds form
     private string _addFundsAmount = "";
@@ -409,7 +426,10 @@ else
         try
         {
             await LoadWallet();
-            await LoadTransactions();
+            if (_wallet is not null && !_outsideTenantContext)
+            {
+                await LoadTransactions();
+            }
         }
         catch (Exception ex)
         {
@@ -423,10 +443,14 @@ else
 
     private async Task LoadWallet()
     {
+        _outsideTenantContext = false;
         _wallet = await DataContext.Query<Wallet>()
             .Include(x => x.WalletType)
             .Where(x => x.Id == Id)
             .FirstOrDefaultAsync();
+        _outsideTenantContext = _wallet is not null
+            && TenantFilter.SelectedTenantId is Guid tenantId
+            && tenantId != _wallet.TenantId;
     }
 
     private async Task LoadTransactions()

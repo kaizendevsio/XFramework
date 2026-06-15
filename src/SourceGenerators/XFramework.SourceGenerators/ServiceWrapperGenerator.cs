@@ -132,6 +132,9 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                             {
                                 if (string.IsNullOrEmpty(TargetClient)) Initialize();
                                 var (status, data) = await boltClient.InvokeAsync(TargetClient, "__db_query__", queryDescriptorBytes, ct);
+                                if ((int)status < 200 || (int)status >= 300)
+                                    throw new System.InvalidOperationException($"DataContext query request failed with status {(int)status} ({status}).");
+
                                 return data.ToArray();
                             }
 
@@ -139,6 +142,12 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                             {
                                 if (string.IsNullOrEmpty(TargetClient)) Initialize();
                                 var (status, data) = await boltClient.InvokeAsync(TargetClient, "__db_changes__", saveChangesRequestBytes, ct);
+                                if ((int)status < 200 || (int)status >= 300)
+                                {
+                                    var failure = DataContextResult.Failure($"DataContext change request failed with status {(int)status} ({status}).", (int)status);
+                                    return MemoryPack.MemoryPackSerializer.Serialize(failure);
+                                }
+
                                 return data.ToArray();
                             }
 

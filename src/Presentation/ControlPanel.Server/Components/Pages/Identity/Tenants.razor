@@ -23,6 +23,7 @@
     }
     else
     {
+    <FadeInContent>
     <BbCard>
         <BbCardHeader>
             <BbCardTitle>Tenants</BbCardTitle>
@@ -98,6 +99,7 @@
             </BbDataGrid>
         </BbCardContent>
     </BbCard>
+    </FadeInContent>
     }
 </div>
 
@@ -123,14 +125,14 @@
                                   @bind-Value="_tenantForm.VersionString"
                                   Label="Version"
                                   Placeholder="1.0" />
-                <BbFormFieldNativeSelect TValue="string"
-                                         @bind-Value="_tenantForm.StatusString"
-                                         Label="Status">
-                    <option value="0">Pending</option>
-                    <option value="1">Active</option>
-                    <option value="2">Suspended</option>
-                    <option value="3">Inactive</option>
-                </BbFormFieldNativeSelect>
+                <BbFormFieldSelect TValue="string"
+                                   @bind-Value="_tenantForm.StatusString"
+                                   Label="Status">
+                    <BbSelectItem Value="0">Pending</BbSelectItem>
+                    <BbSelectItem Value="1">Active</BbSelectItem>
+                    <BbSelectItem Value="2">Suspended</BbSelectItem>
+                    <BbSelectItem Value="3">Inactive</BbSelectItem>
+                </BbFormFieldSelect>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <BbFormFieldInput TValue="string"
@@ -170,6 +172,7 @@
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     // -- Tenant list state --
     private List<Tenant> _tenants = [];
@@ -196,12 +199,12 @@
         _loading = true;
         try
         {
-            _tenants = (await DataContext.Query<Tenant>()
-                    .Take(100)
-                    .ToListAsync())
+            _tenants = await DataContext.Query<Tenant>()
+                .NoCache()
                 .Where(x => !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
-                .ToList();
+                .Take(100)
+                .ToListAsync();
         }
         catch (Exception ex)
         {
@@ -258,15 +261,26 @@
 
             if (result.IsSuccess)
             {
+                var createdTenant = await DataContext.Query<Tenant>()
+                    .NoCache()
+                    .Where(x => x.Id == tenantId)
+                    .FirstOrDefaultAsync();
+
+                if (createdTenant is null || createdTenant.IsDeleted)
+                {
+                    ToastService.Show("Tenant save completed, but the tenant could not be reloaded.");
+                    return;
+                }
+
                 ToastService.Show("Tenant created successfully.");
+                _tenantDialogOpen = false;
+                await LoadTenants();
+                TenantFilter.NotifyTenantsChanged();
             }
             else
             {
                 ToastService.Show($"Failed to create tenant: {result.Message}");
             }
-
-            _tenantDialogOpen = false;
-            await LoadTenants();
         }
         catch (Exception ex)
         {
@@ -314,6 +328,7 @@
             if (result.IsSuccess)
             {
                 ToastService.Show("Tenant deleted.");
+                TenantFilter.NotifyTenantsChanged();
             }
             else
             {

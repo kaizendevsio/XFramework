@@ -10,6 +10,7 @@
 }
 else
 {
+<FadeInContent>
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div>
@@ -80,9 +81,9 @@ else
                             @(item.AccountNumber ?? "N/A")
                         </ChildContent>
                     </BbDataGridTemplateColumn>
-                    <BbDataGridTemplateColumn Title="Credential ID" Sortable="true">
+                    <BbDataGridTemplateColumn Title="User / Credential" Sortable="true">
                         <ChildContent Context="item">
-                            <span class="font-mono text-xs">@item.CredentialId.ToString()[..8]...</span>
+                            <span class="text-sm">@GetCredentialDisplay(item.CredentialId)</span>
                         </ChildContent>
                     </BbDataGridTemplateColumn>
                     <BbDataGridTemplateColumn Title="Wallet Type">
@@ -149,6 +150,7 @@ else
         </BbCardContent>
     </BbCard>
 </div>
+</FadeInContent>
 }
 
 @* Create Wallet Dialog *@
@@ -159,11 +161,15 @@ else
             <BbDialogDescription>Create a new wallet account for a user credential.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_newCredentialId"
-                              Label="Credential ID"
-                              Placeholder="Enter credential GUID"
-                              Required="true" />
+            <BbFormFieldCombobox TValue="string"
+                                  @bind-Value="_newCredentialId"
+                                  Options="@_credentialOptions"
+                                  Label="User / Credential"
+                                  Placeholder="Select a user"
+                                  SearchPlaceholder="Search users or credentials..."
+                                  EmptyMessage="No users found."
+                                  MatchTriggerWidth="true"
+                                  Required="true" />
             <BbFormFieldSelect TValue="string"
                                @bind-Value="_newWalletTypeId"
                                Label="Wallet Type"
@@ -205,6 +211,9 @@ else
 
     private List<Wallet> _items = [];
     private List<global::Wallets.Domain.Shared.Contracts.WalletType> _walletTypes = [];
+    private List<SelectOption<string>> _credentialOptions = [];
+    private Dictionary<Guid, string> _credentialLabels = [];
+    private Dictionary<Guid, Guid> _credentialTenantIds = [];
     private bool _loading = true;
     private bool _showCreateDialog;
     private bool _isSaving;
@@ -227,7 +236,9 @@ else
         try
         {
             await LoadData();
+            await LoadCredentialOptions();
             _walletTypes = (await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
+                    .NoCache()
                     .Take(100)
                     .ToListAsync())
                 .OrderBy(x => x.Name)
@@ -246,6 +257,7 @@ else
     private async Task LoadData()
     {
         var query = DataContext.Query<Wallet>()
+            .NoCache()
             .Include(x => x.WalletType);
 
         if (TenantFilter.SelectedTenantId is Guid tenantId)
@@ -259,6 +271,29 @@ else
         _totalBalance = _items.Sum(x => x.Balance);
         _activeWallets = _items.Count(x => x.Status == WalletStatus.Active);
         _frozenWallets = _items.Count(x => x.Status == WalletStatus.Frozen);
+    }
+
+    private async Task LoadCredentialOptions()
+    {
+        var query = DataContext.Query<IdentityCredential>()
+            .NoCache()
+            .Include(x => x.IdentityInfo)
+            .Where(x => !x.IsDeleted);
+
+        if (TenantFilter.SelectedTenantId is Guid tenantId)
+        {
+            query = query.Where(x => x.TenantId == tenantId);
+        }
+
+        var credentials = (await query.Take(250).ToListAsync())
+            .OrderBy(GetCredentialSortText)
+            .ToList();
+
+        _credentialOptions = credentials
+            .Select(x => new SelectOption<string>(x.Id.ToString(), BuildCredentialLabel(x)))
+            .ToList();
+        _credentialLabels = credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
+        _credentialTenantIds = credentials.ToDictionary(x => x.Id, x => x.TenantId);
     }
 
     private string GetStatusKey(WalletStatus status) => status switch
@@ -283,7 +318,13 @@ else
     {
         if (!Guid.TryParse(_newCredentialId, out var credentialId))
         {
-            ToastService.Show("Invalid Credential ID. Please enter a valid GUID.");
+            ToastService.Show("Select a user or credential.");
+            return;
+        }
+
+        if (!_credentialTenantIds.TryGetValue(credentialId, out var walletTenantId))
+        {
+            ToastService.Show("Selected credential was not found. Refresh and try again.");
             return;
         }
 
@@ -295,12 +336,6 @@ else
         _isSaving = true;
         try
         {
-            // Get credential's TenantId
-            var credential = await DataContext.Query<IdentityCredential>()
-                .Where(x => x.Id == credentialId)
-                .FirstOrDefaultAsync();
-            var walletTenantId = credential?.TenantId ?? Guid.Empty;
-
             var wallet = new Wallet
             {
                 Id = Guid.NewGuid(),
@@ -322,6 +357,7 @@ else
                 ToastService.Show("Wallet created successfully.");
                 _showCreateDialog = false;
                 await LoadData();
+                await LoadCredentialOptions();
             }
             else
             {
@@ -381,5 +417,38 @@ else
         {
             ToastService.Show($"Error updating wallet: {ex.Message}");
         }
+    }
+
+    private string GetCredentialDisplay(Guid credentialId) =>
+        _credentialLabels.TryGetValue(credentialId, out var label)
+            ? label
+            : $"{credentialId.ToString()[..8]}...";
+
+    private static string GetCredentialSortText(IdentityCredential credential) =>
+        credential.IdentityInfo?.FullName
+        ?? credential.IdentityInfo?.IdentityName
+        ?? credential.UserName
+        ?? credential.UserAlias
+        ?? credential.Id.ToString();
+
+    private static string BuildCredentialLabel(IdentityCredential credential)
+    {
+        var displayName = credential.IdentityInfo?.FullName;
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = credential.IdentityInfo?.IdentityName;
+        }
+
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = credential.UserName ?? credential.UserAlias ?? "Unnamed user";
+        }
+
+        var credentialName = credential.UserName ?? credential.UserAlias;
+        var suffix = string.IsNullOrWhiteSpace(credentialName)
+            ? credential.Id.ToString()[..8]
+            : $"{credentialName} - {credential.Id.ToString()[..8]}";
+
+        return $"{displayName} ({suffix})";
     }
 }

@@ -20,9 +20,14 @@
     }
     else
     {
+    <FadeInContent>
     <BbDataGrid Items="@_roles">
         <Columns>
-            <BbDataGridPropertyColumn Property="@(x => x.CredentialId)" Title="Credential ID" Sortable="true" />
+            <BbDataGridTemplateColumn Title="User / Credential" Sortable="true">
+                <ChildContent Context="item">
+                    <span class="text-sm">@GetCredentialDisplay(item.CredentialId)</span>
+                </ChildContent>
+            </BbDataGridTemplateColumn>
             <BbDataGridTemplateColumn Title="Role Type">
                 <ChildContent Context="item">
                     @(item.Type?.Name ?? item.TypeId?.ToString() ?? "N/A")
@@ -40,6 +45,7 @@
             </BbDataGridTemplateColumn>
         </Columns>
     </BbDataGrid>
+    </FadeInContent>
     }
 </div>
 
@@ -50,11 +56,15 @@
             <BbDialogDescription>Assign a role to a credential.</BbDialogDescription>
         </BbDialogHeader>
         <div class="grid gap-4 py-4">
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_formCredentialId"
-                              Label="Credential ID"
-                              Placeholder="Enter credential GUID"
-                              Required="true" />
+            <BbFormFieldCombobox TValue="string"
+                                  @bind-Value="_formCredentialId"
+                                  Options="@_credentialOptions"
+                                  Label="User / Credential"
+                                  Placeholder="Select a user"
+                                  SearchPlaceholder="Search users or credentials..."
+                                  EmptyMessage="No users found."
+                                  MatchTriggerWidth="true"
+                                  Required="true" />
             @if (_roleTypes.Count == 0)
             {
                 <div>
@@ -64,16 +74,15 @@
             }
             else
             {
-                <BbFormFieldNativeSelect TValue="string"
-                                         @bind-Value="_formTypeId"
-                                         Label="Role Type"
-                                         Placeholder="Select role type">
-                    <option value="">Select role type</option>
+                <BbFormFieldSelect TValue="string"
+                                   @bind-Value="_formTypeId"
+                                   Label="Role Type"
+                                   Placeholder="Select role type">
                     @foreach (var rt in _roleTypes)
                     {
-                        <option value="@rt.Id">@rt.Name (Level @rt.RoleLevel)</option>
+                        <BbSelectItem Value="@rt.Id.ToString()">@rt.Name (Level @rt.RoleLevel)</BbSelectItem>
                     }
-                </BbFormFieldNativeSelect>
+                </BbFormFieldSelect>
             }
             <BbFormFieldInput TValue="string"
                               @bind-Value="_formExpiration"
@@ -98,6 +107,9 @@
 
     private List<IdentityRole> _roles = [];
     private List<IdentityRoleType> _roleTypes = [];
+    private List<SelectOption<string>> _credentialOptions = [];
+    private Dictionary<Guid, string> _credentialLabels = [];
+    private Dictionary<Guid, Guid> _credentialTenantIds = [];
     private bool _loading = true;
     private bool _dialogOpen;
     private bool _deleteDialogOpen;
@@ -112,15 +124,8 @@
         try
         {
             await LoadData();
-            var roleTypeQuery = DataContext.Query<IdentityRoleType>();
-            if (TenantFilter.SelectedTenantId is { } tenantId)
-            {
-                roleTypeQuery = roleTypeQuery.Where(x => x.TenantId == tenantId);
-            }
-
-            _roleTypes = (await roleTypeQuery.Take(100).ToListAsync())
-                .OrderBy(x => x.Name)
-                .ToList();
+            await LoadCredentialOptions();
+            await LoadRoleTypes();
         }
         catch { /* query may fail */ }
         finally
@@ -134,6 +139,7 @@
         try
         {
             var query = DataContext.Query<IdentityRole>()
+                .NoCache()
                 .Include(x => x.Type);
             if (TenantFilter.SelectedTenantId is { } tenantId)
             {
@@ -145,6 +151,43 @@
                 .ToList();
         }
         catch { /* query may fail */ }
+    }
+
+    private async Task LoadRoleTypes()
+    {
+        var roleTypeQuery = DataContext.Query<IdentityRoleType>()
+            .NoCache();
+        if (TenantFilter.SelectedTenantId is { } tenantId)
+        {
+            roleTypeQuery = roleTypeQuery.Where(x => x.TenantId == tenantId);
+        }
+
+        _roleTypes = (await roleTypeQuery.Take(100).ToListAsync())
+            .OrderBy(x => x.Name)
+            .ToList();
+    }
+
+    private async Task LoadCredentialOptions()
+    {
+        var query = DataContext.Query<IdentityCredential>()
+            .NoCache()
+            .Include(x => x.IdentityInfo)
+            .Where(x => !x.IsDeleted);
+
+        if (TenantFilter.SelectedTenantId is { } tenantId)
+        {
+            query = query.Where(x => x.TenantId == tenantId);
+        }
+
+        var credentials = (await query.Take(250).ToListAsync())
+            .OrderBy(GetCredentialSortText)
+            .ToList();
+
+        _credentialOptions = credentials
+            .Select(x => new SelectOption<string>(x.Id.ToString(), BuildCredentialLabel(x)))
+            .ToList();
+        _credentialLabels = credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
+        _credentialTenantIds = credentials.ToDictionary(x => x.Id, x => x.TenantId);
     }
 
     private void OpenAddDialog()
@@ -165,7 +208,13 @@
     {
         if (!Guid.TryParse(_formCredentialId, out var credentialId))
         {
-            ToastService.Show("Invalid Credential ID.");
+            ToastService.Show("Select a user or credential.");
+            return;
+        }
+
+        if (!_credentialTenantIds.TryGetValue(credentialId, out var roleTenantId))
+        {
+            ToastService.Show("Selected credential was not found. Refresh and try again.");
             return;
         }
 
@@ -177,7 +226,7 @@
                 CredentialId = credentialId,
                 TypeId = Guid.TryParse(_formTypeId, out var typeId) ? typeId : null,
                 RoleExpiration = DateTime.TryParse(_formExpiration, out var exp) ? exp : DateTime.UtcNow.AddYears(1),
-                TenantId = TenantFilter.SelectedTenantId ?? Guid.Empty,
+                TenantId = roleTenantId,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -186,6 +235,7 @@
             ToastService.Show(result.IsSuccess ? "Role created." : $"Error: {result.Message}");
             _dialogOpen = false;
             await LoadData();
+            await LoadCredentialOptions();
         }
         catch (Exception ex)
         {
@@ -216,5 +266,38 @@
                 await LoadData();
             }
         }
+    }
+
+    private string GetCredentialDisplay(Guid credentialId) =>
+        _credentialLabels.TryGetValue(credentialId, out var label)
+            ? label
+            : $"{credentialId.ToString()[..8]}...";
+
+    private static string GetCredentialSortText(IdentityCredential credential) =>
+        credential.IdentityInfo?.FullName
+        ?? credential.IdentityInfo?.IdentityName
+        ?? credential.UserName
+        ?? credential.UserAlias
+        ?? credential.Id.ToString();
+
+    private static string BuildCredentialLabel(IdentityCredential credential)
+    {
+        var displayName = credential.IdentityInfo?.FullName;
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = credential.IdentityInfo?.IdentityName;
+        }
+
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = credential.UserName ?? credential.UserAlias ?? "Unnamed user";
+        }
+
+        var credentialName = credential.UserName ?? credential.UserAlias;
+        var suffix = string.IsNullOrWhiteSpace(credentialName)
+            ? credential.Id.ToString()[..8]
+            : $"{credentialName} - {credential.Id.ToString()[..8]}";
+
+        return $"{displayName} ({suffix})";
     }
 }
