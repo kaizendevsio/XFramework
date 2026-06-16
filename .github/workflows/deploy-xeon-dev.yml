@@ -1,0 +1,101 @@
+name: Deploy Xeon Dev
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xeon-dev-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to xeon-dev
+    runs-on: [self-hosted, Linux, xeon-dev-deploy]
+    timeout-minutes: 60
+    env:
+      COMPOSE_FILE_PATH: docker-compose.yml
+      XFRAMEWORK_ENV_FILE: /opt/xframework/xeon-dev.env
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify runner and Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Runner host: $(hostname)"
+          uname -a
+          docker --version
+          docker compose version
+          curl --version
+
+          test -r "$XFRAMEWORK_ENV_FILE"
+          test -S /var/run/docker.sock
+          docker info --format 'Docker daemon: {{.Name}} {{.ServerVersion}}'
+
+      - name: Validate compose
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" config
+
+      - name: Deploy stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" up --build -d
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps
+
+      - name: Wait for readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          checks=(
+            "bolt-hub=http://localhost:7000/health/ready"
+            "identityserver=http://localhost:8261/health/ready"
+            "messaging=http://localhost:5148/health/ready"
+            "smsgateway=http://localhost:5274/health/ready"
+            "wallets=http://localhost:9696/health/ready"
+          )
+
+          for check in "${checks[@]}"; do
+            name="${check%%=*}"
+            url="${check#*=}"
+            body="/tmp/xframework-${name}-health.json"
+            echo "Waiting for ${name}: ${url}"
+
+            ready=0
+            for attempt in {1..60}; do
+              status="$(curl -fsS -o "$body" -w "%{http_code}" "$url" || true)"
+              if [ "$status" = "200" ]; then
+                ready=1
+                break
+              fi
+
+              echo "${name} not ready yet; attempt ${attempt}/60 returned ${status:-no response}"
+              sleep 5
+            done
+
+            if [ "$ready" -ne 1 ]; then
+              echo "::error::${name} failed readiness check at ${url}"
+              cat "$body" || true
+              exit 1
+            fi
+          done
+
+      - name: Deployment diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps || true
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 migrate bolt-hub identityserver messaging smsgateway wallets || true
