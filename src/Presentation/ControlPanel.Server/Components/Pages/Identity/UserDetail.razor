@@ -20,8 +20,22 @@ else if (_user is null)
         </BbAlert>
     </div>
 }
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/identity/users"))">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Users
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>User Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to All Tenants or the user's tenant to view this record.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
 else
 {
+    <FadeInContent>
     <div class="space-y-6">
         <!-- Header -->
         <div class="flex items-center justify-between">
@@ -61,7 +75,7 @@ else
             </BbTabsList>
 
             <!-- User Info Tab -->
-            <BbTabsContent Value="info">
+            <BbTabsContent Value="info" Class="xf-fade-in">
                 <EditableForm @ref="_editableForm" TModel="IdentityInformation" Model="_user"
                               OnSave="SaveUserEdit" OnDiscard="DiscardUserEdit"
                               Saving="_saving" Title="User Information">
@@ -92,7 +106,7 @@ else
             </BbTabsContent>
 
             <!-- Credentials Tab -->
-            <BbTabsContent Value="credentials">
+            <BbTabsContent Value="credentials" Class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -135,7 +149,7 @@ else
             </BbTabsContent>
 
             <!-- Roles Tab -->
-            <BbTabsContent Value="roles">
+            <BbTabsContent Value="roles" Class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -197,7 +211,7 @@ else
             </BbTabsContent>
 
             <!-- Contacts Tab -->
-            <BbTabsContent Value="contacts">
+            <BbTabsContent Value="contacts" Class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -247,7 +261,7 @@ else
             </BbTabsContent>
 
             <!-- Addresses Tab -->
-            <BbTabsContent Value="addresses">
+            <BbTabsContent Value="addresses" Class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -294,7 +308,7 @@ else
             </BbTabsContent>
 
             <!-- Sessions Tab -->
-            <BbTabsContent Value="sessions">
+            <BbTabsContent Value="sessions" Class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <BbCardTitle>Sessions</BbCardTitle>
@@ -359,7 +373,7 @@ else
             </BbTabsContent>
 
             <!-- Auth Logs Tab -->
-            <BbTabsContent Value="auth-logs">
+            <BbTabsContent Value="auth-logs" Class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <BbCardTitle>Authorization Logs</BbCardTitle>
@@ -393,7 +407,7 @@ else
             </BbTabsContent>
 
             <!-- Wallets Tab -->
-            <BbTabsContent Value="wallets">
+            <BbTabsContent Value="wallets" Class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <BbCardTitle>Wallets</BbCardTitle>
@@ -457,6 +471,7 @@ else
             </BbTabsContent>
         </BbTabs>
     </div>
+    </FadeInContent>
 }
 
 <!-- Create Credential Dialog -->
@@ -638,6 +653,7 @@ else
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     // Main data
     private IdentityInformation? _user;
@@ -656,6 +672,7 @@ else
     // State
     private bool _loading = true;
     private bool _saving;
+    private bool _outsideTenantContext;
 
     // Editable form
     private EditableForm<IdentityInformation>? _editableForm;
@@ -706,11 +723,18 @@ else
         _loading = true;
         try
         {
+            _outsideTenantContext = false;
             _user = await DataContext.Query<IdentityInformation>()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
             if (_user is null) return;
+            _outsideTenantContext = TenantFilter.SelectedTenantId is Guid tenantId && tenantId != _user.TenantId;
+            if (_outsideTenantContext)
+            {
+                ClearChildData();
+                return;
+            }
 
             SyncEditFields();
             await LoadCredentials();
@@ -730,6 +754,17 @@ else
         {
             _loading = false;
         }
+    }
+
+    private void ClearChildData()
+    {
+        _credentials = [];
+        _roles = [];
+        _contacts = [];
+        _addresses = [];
+        _sessions = [];
+        _authLogs = [];
+        _wallets = [];
     }
 
     private async Task LoadCredentials()

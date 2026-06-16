@@ -10,6 +10,7 @@ public class TenantFilterService
     public string? SelectedTenantName { get; private set; }
 
     public event Action? OnChanged;
+    public event Action? OnTenantsChanged;
 
     public void SetTenant(Guid? tenantId, string? tenantName)
     {
@@ -24,4 +25,6 @@ public class TenantFilterService
         SelectedTenantName = null;
         OnChanged?.Invoke();
     }
+
+    public void NotifyTenantsChanged() => OnTenantsChanged?.Invoke();
 }

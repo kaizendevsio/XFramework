@@ -15,22 +15,42 @@
     }
     else
     {
-    <BbTabs DefaultValue="role-types" OnValueChange="@(v => _activeTab = v ?? "role-types")">
-        <BbTabsList>
-            <BbTabsTrigger Value="role-types">Role Types</BbTabsTrigger>
-            <BbTabsTrigger Value="role-type-groups">Role Groups</BbTabsTrigger>
-            <BbTabsTrigger Value="contact-types">Contact Types</BbTabsTrigger>
-            <BbTabsTrigger Value="contact-groups">Contact Groups</BbTabsTrigger>
-            <BbTabsTrigger Value="address-types">Address Types</BbTabsTrigger>
-            <BbTabsTrigger Value="verification-types">Verification Types</BbTabsTrigger>
-            <BbTabsTrigger Value="session-types">Session Types</BbTabsTrigger>
-            <BbTabsTrigger Value="wallet-types">Wallet Types</BbTabsTrigger>
-            <BbTabsTrigger Value="currency-types">Currency Types</BbTabsTrigger>
-            <BbTabsTrigger Value="exchange-rates">Exchange Rates</BbTabsTrigger>
-        </BbTabsList>
+    <FadeInContent>
+    <BbTabs DefaultValue="role-types"
+            Orientation="BlazorBlueprint.Primitives.Tabs.TabsOrientation.Vertical"
+            OnValueChange="@OnReferenceCategoryChanged"
+            Class="reference-data-layout">
+        <div class="reference-data-sidebar">
+            <BbFormFieldInput TValue="string"
+                              @bind-Value="_categorySearch"
+                              Label="Categories"
+                              Placeholder="Search reference data" />
+            <BbTabsList Class="reference-data-nav" Responsive="false">
+                @foreach (var group in VisibleCategoryGroups)
+                {
+                    <div class="reference-data-group">@group.Key</div>
+                    @foreach (var category in group)
+                    {
+                        <BbTabsTrigger Value="@category.Value"
+                                       Label="@category.Label"
+                                       Class="reference-data-trigger">
+                            @category.Label
+                        </BbTabsTrigger>
+                    }
+                }
+            </BbTabsList>
+        </div>
+
+        <div class="reference-data-content">
+        @if (_activeTabLoading)
+        {
+            <CenteredSpinner />
+        }
+        else
+        {
 
         @* ── Role Types ── *@
-        <BbTabsContent Value="role-types">
+        <BbTabsContent Value="role-types" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Role Types</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -62,7 +82,7 @@
         </BbTabsContent>
 
         @* ── Role Type Groups ── *@
-        <BbTabsContent Value="role-type-groups">
+        <BbTabsContent Value="role-type-groups" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Role Groups</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -94,7 +114,7 @@
         </BbTabsContent>
 
         @* ── Contact Types ── *@
-        <BbTabsContent Value="contact-types">
+        <BbTabsContent Value="contact-types" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Contact Types</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -125,7 +145,7 @@
         </BbTabsContent>
 
         @* ── Contact Groups ── *@
-        <BbTabsContent Value="contact-groups">
+        <BbTabsContent Value="contact-groups" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Contact Groups</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -156,7 +176,7 @@
         </BbTabsContent>
 
         @* ── Address Types ── *@
-        <BbTabsContent Value="address-types">
+        <BbTabsContent Value="address-types" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Address Types</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -187,7 +207,7 @@
         </BbTabsContent>
 
         @* ── Verification Types ── *@
-        <BbTabsContent Value="verification-types">
+        <BbTabsContent Value="verification-types" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Verification Types</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -220,7 +240,7 @@
         </BbTabsContent>
 
         @* ── Session Types ── *@
-        <BbTabsContent Value="session-types">
+        <BbTabsContent Value="session-types" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Session Types</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -251,7 +271,7 @@
         </BbTabsContent>
 
         @* ── Wallet Types ── *@
-        <BbTabsContent Value="wallet-types">
+        <BbTabsContent Value="wallet-types" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Wallet Types</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -285,7 +305,7 @@
         </BbTabsContent>
 
         @* ── Currency Types ── *@
-        <BbTabsContent Value="currency-types">
+        <BbTabsContent Value="currency-types" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Currency Types</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -317,7 +337,7 @@
         </BbTabsContent>
 
         @* ── Exchange Rates ── *@
-        <BbTabsContent Value="exchange-rates">
+        <BbTabsContent Value="exchange-rates" Class="xf-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <BbTypographyH3>Exchange Rates</BbTypographyH3>
                 <BbButton OnClick="@(() => OpenAddDialog())">
@@ -350,7 +370,10 @@
                 </Columns>
             </BbDataGrid>
         </BbTabsContent>
+        }
+        </div>
     </BbTabs>
+    </FadeInContent>
     }
 </div>
 
@@ -525,6 +548,30 @@
     private bool _deleteDialogOpen;
     private bool _isEditing;
     private string _activeTab = "role-types";
+    private bool _activeTabLoading;
+    private string _categorySearch = "";
+    private readonly HashSet<string> _loadedTabs = [];
+
+    private static readonly List<ReferenceCategory> _referenceCategories =
+    [
+        new("role-types", "Role Types", "Identity"),
+        new("role-type-groups", "Role Groups", "Identity"),
+        new("contact-types", "Contact Types", "Profile Data"),
+        new("contact-groups", "Contact Groups", "Profile Data"),
+        new("address-types", "Address Types", "Profile Data"),
+        new("verification-types", "Verification Types", "Security"),
+        new("session-types", "Session Types", "Security"),
+        new("wallet-types", "Wallet Types", "Finance"),
+        new("currency-types", "Currency Types", "Finance"),
+        new("exchange-rates", "Exchange Rates", "Finance")
+    ];
+
+    private IEnumerable<IGrouping<string, ReferenceCategory>> VisibleCategoryGroups =>
+        _referenceCategories
+            .Where(x => string.IsNullOrWhiteSpace(_categorySearch)
+                        || x.Label.Contains(_categorySearch, StringComparison.OrdinalIgnoreCase)
+                        || x.Group.Contains(_categorySearch, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(x => x.Group);
 
     // Generic form fields
     private Guid _editingId;
@@ -576,17 +623,45 @@
         _ => "Record"
     };
 
+    private sealed record ReferenceCategory(string Value, string Label, string Group);
+
     protected override async Task OnInitializedAsync()
     {
         _loading = true;
         try
         {
-            await LoadAllData();
+            await ReloadActiveTab();
         }
         catch { /* Non-critical - empty tabs are fine */ }
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task OnReferenceCategoryChanged(string? value)
+    {
+        var nextTab = string.IsNullOrWhiteSpace(value) ? "role-types" : value;
+        if (_activeTab == nextTab)
+        {
+            return;
+        }
+
+        _activeTab = nextTab;
+        if (_loadedTabs.Contains(_activeTab))
+        {
+            return;
+        }
+
+        _activeTabLoading = true;
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            await ReloadActiveTab();
+        }
+        finally
+        {
+            _activeTabLoading = false;
         }
     }
 
@@ -641,6 +716,8 @@
                     _exchangeRates = await LoadList<ExchangeRate>();
                     break;
             }
+
+            _loadedTabs.Add(_activeTab);
         }
         catch { /* reload failure is non-critical */ }
     }

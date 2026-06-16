@@ -6,6 +6,19 @@
 {
     <CenteredSpinner />
 }
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo("/identity/tenants"))">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Tenants
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Tenant Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to All Tenants or this tenant to view its details.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
 else if (_tenant is null)
 {
     <div class="space-y-4">
@@ -21,6 +34,7 @@ else if (_tenant is null)
 }
 else
 {
+    <FadeInContent>
     <div class="space-y-6">
 
         @* -- Header -- *@
@@ -55,7 +69,7 @@ else
                 <BbTabsTrigger Value="roletypes">Role Types (@_detailRoleTypes.Count)</BbTabsTrigger>
             </BbTabsList>
 
-            <BbTabsContent Value="summary">
+            <BbTabsContent Value="summary" Class="xf-fade-in">
                 <EditableForm @ref="_editableForm" TModel="Tenant" Model="_tenant"
                               OnSave="SaveTenant" OnDiscard="DiscardTenantEdit"
                               Saving="_saving" Title="Tenant Summary">
@@ -90,7 +104,7 @@ else
                 </EditableForm>
             </BbTabsContent>
 
-            <BbTabsContent Value="users">
+            <BbTabsContent Value="users" Class="xf-fade-in">
                 <BbCard>
                     <BbCardContent>
                         @if (_detailUsers.Count == 0)
@@ -119,7 +133,7 @@ else
                 </BbCard>
             </BbTabsContent>
 
-            <BbTabsContent Value="configurations">
+            <BbTabsContent Value="configurations" Class="xf-fade-in">
                 <BbCard>
                     <BbCardHeader>
                         <div class="flex items-center justify-between">
@@ -175,7 +189,7 @@ else
                 </BbCard>
             </BbTabsContent>
 
-            <BbTabsContent Value="roletypes">
+            <BbTabsContent Value="roletypes" Class="xf-fade-in">
                 <BbCard>
                     <BbCardContent>
                         @if (_detailRoleTypes.Count == 0)
@@ -212,6 +226,7 @@ else
             </BbTabsContent>
         </BbTabs>
     </div>
+    </FadeInContent>
 }
 
 @* -- Add / Edit Configuration Dialog -- *@
@@ -261,10 +276,12 @@ else
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private Tenant? _tenant;
     private bool _loading;
     private bool _saving;
+    private bool _outsideTenantContext;
     private EditableForm<Tenant>? _editableForm;
 
     // -- Editable fields --
@@ -305,6 +322,16 @@ else
         _loading = true;
         try
         {
+            _outsideTenantContext = TenantFilter.SelectedTenantId is Guid tenantId && tenantId != Id;
+            if (_outsideTenantContext)
+            {
+                _tenant = null;
+                _detailUsers = [];
+                _detailConfigs = [];
+                _detailRoleTypes = [];
+                return;
+            }
+
             _tenant = await DataContext.Query<Tenant>()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();

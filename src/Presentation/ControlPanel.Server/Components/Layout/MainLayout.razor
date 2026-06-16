@@ -1,10 +1,11 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @using ControlPanel.Server.Services
 @using XFramework.Domain.Shared.DataContext
 
 <div class="flex min-h-screen bg-background text-foreground">
     @* Fixed left sidebar — always visible *@
-    <aside class="w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground">
+    <aside class="app-sidebar w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground">
         <div class="flex flex-col h-full">
             @* Header *@
             <div class="flex items-center gap-2 px-4 h-14 border-b border-sidebar-border">
@@ -20,15 +21,15 @@
             @* Tenant selector *@
             <div class="px-3 py-2 border-b border-sidebar-border">
                 <label class="text-[10px] text-muted-foreground uppercase tracking-wider">Active Tenant</label>
-                <select class="w-full mt-1 text-xs rounded-md border border-sidebar-border bg-sidebar px-2 py-1.5 text-sidebar-foreground"
-                        @bind="_selectedTenantId"
-                        @bind:after="OnTenantChanged">
-                    <option value="">All Tenants</option>
-                    @foreach (var t in _tenants)
-                    {
-                        <option value="@t.Id">@t.Name</option>
-                    }
-                </select>
+                <BbCombobox TValue="string"
+                             Value="@_selectedTenantId"
+                             ValueChanged="@OnTenantSelectionChanged"
+                             Options="@TenantOptions"
+                             Placeholder="All Tenants"
+                             SearchPlaceholder="Search tenants..."
+                             EmptyMessage="No tenants found."
+                             Class="mt-1"
+                             MatchTriggerWidth="true" />
             </div>
 
             @* Scrollable nav *@
@@ -71,8 +72,10 @@
                 <BbThemeSwitcher />
             </div>
         </header>
-        <main class="flex-1 p-6 overflow-y-auto">
-            @Body
+        <main class="app-main flex-1 min-w-0 p-6 overflow-y-auto">
+            <FadeInContent @key="_contentRenderKey">
+                @Body
+            </FadeInContent>
         </main>
     </div>
 </div>
@@ -87,8 +90,16 @@
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
-    private string _selectedTenantId = "";
+    private const string AllTenantsValue = "__all_tenants__";
+    private string _selectedTenantId = AllTenantsValue;
+    private int _contentRenderKey;
     private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
+
+    private List<SelectOption<string>> TenantOptions =>
+    [
+        new(AllTenantsValue, "All Tenants"),
+        .. _tenants.Select(t => new SelectOption<string>(t.Id.ToString(), t.Name ?? t.Id.ToString()[..8]))
+    ];
 
     private List<string> GetBreadcrumbs()
     {
@@ -102,12 +113,19 @@
 
     protected override void OnInitialized()
     {
-        Nav.LocationChanged += (_, _) => InvokeAsync(StateHasChanged);
+        Nav.LocationChanged += OnLocationChanged;
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        TenantFilter.OnTenantsChanged += OnTenantsChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        await LoadTenants();
+    }
+
+    private async Task LoadTenants()
+    {
         try
         {
             _tenants = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>()
@@ -116,13 +134,25 @@
                 .OrderBy(t => t.Name)
                 .Take(100)
                 .ToListAsync();
+
+            if (TenantFilter.SelectedTenantId is Guid selectedTenantId)
+            {
+                _selectedTenantId = selectedTenantId.ToString();
+            }
+            else
+            {
+                _selectedTenantId = AllTenantsValue;
+            }
+
             StateHasChanged();
         }
         catch { /* Tenant loading is non-critical */ }
     }
 
-    private void OnTenantChanged()
+    private void OnTenantSelectionChanged(string? value)
     {
+        _selectedTenantId = string.IsNullOrWhiteSpace(value) ? AllTenantsValue : value;
+
         if (Guid.TryParse(_selectedTenantId, out var tenantId))
         {
             var name = _tenants.FirstOrDefault(t => t.Id == tenantId)?.Name ?? "";
@@ -132,5 +162,29 @@
         {
             TenantFilter.Clear();
         }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _contentRenderKey++;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _contentRenderKey++;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTenantsChanged()
+    {
+        _ = InvokeAsync(LoadTenants);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+        TenantFilter.OnTenantsChanged -= OnTenantsChanged;
     }
 }
