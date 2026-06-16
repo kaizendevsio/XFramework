@@ -84,6 +84,12 @@ services:
     depends_on:
       bolt-hub:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
 
   # ── Messaging Server ────────────────────────────────────────
   messaging:
@@ -99,6 +105,12 @@ services:
     depends_on:
       bolt-hub:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
 
   # ── SMS Gateway ─────────────────────────────────────────────
   smsgateway:
@@ -114,6 +126,12 @@ services:
     depends_on:
       bolt-hub:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
 
   # ── Wallets Server ──────────────────────────────────────────
   wallets:
@@ -129,6 +147,12 @@ services:
     depends_on:
       bolt-hub:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
 
   # ── Seq (structured log aggregator) ──────────────────────────
   seq:
