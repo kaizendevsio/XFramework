@@ -1,4 +1,5 @@
 using FluentValidation;
+using IdentityServer.Domain.Shared.Contracts;
 using Notifications.Api.Generated;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
@@ -23,6 +24,8 @@ var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
+app.UseTenantModuleFeatureGate(options =>
+    options.RequireFeature(TenantModuleFeatureKeys.Notifications, "/api/notifications"));
 app.EnsureDatabase<AppDbContext>();
 
 app.MapXFrameworkHealthChecks("Notifications");

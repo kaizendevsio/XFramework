@@ -12,6 +12,7 @@ public sealed class ServicesInstaller : IInstaller
         IHostEnvironment hostEnvironment)
     {
         services.AddTenantResolver();
+        services.AddTenantModuleFeatures();
         services.AddScoped<NotificationService>();
     }
 }
