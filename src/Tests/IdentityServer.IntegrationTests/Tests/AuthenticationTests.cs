@@ -289,6 +289,31 @@ public class AuthenticationTests : IntegrationTestBase
         LogTiming("Bolt", elapsed);
     }
 
+    [Test]
+    public async Task Bolt_Authenticate_WithLongIpAddress_PersistsAuthorizationLog()
+    {
+        var username = UniqueUsername();
+        var password = "ValidPassword123!";
+        var credential = await SeedCredentialWithRole(username, password);
+        var request = CreateAuthRequest(username, password);
+        request.Metadata.IpAddress = "2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+
+        var (result, elapsed) = await TimedBoltCall(request);
+
+        result.Should().NotBeNull();
+        result!.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var db = CreateDbContext();
+        var log = await db.Set<AuthorizationLog>()
+            .Where(l => l.CredentialId == credential.Id)
+            .OrderByDescending(l => l.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        log.Should().NotBeNull();
+        log!.Ipaddress.Should().Be(request.Metadata.IpAddress);
+        LogTiming("Bolt", elapsed);
+    }
+
     #endregion
 
     #region Helpers

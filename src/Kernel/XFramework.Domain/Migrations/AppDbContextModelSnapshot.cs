@@ -955,8 +955,8 @@ namespace XFramework.Domain.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.Property<string>("Ipaddress")
-                        .HasMaxLength(18)
-                        .HasColumnType("character varying(18)")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("IPAddress");
 
                     b.Property<bool>("IsDeleted")

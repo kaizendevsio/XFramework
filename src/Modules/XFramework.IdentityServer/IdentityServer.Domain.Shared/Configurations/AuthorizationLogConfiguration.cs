@@ -22,7 +22,7 @@ public class AuthorizationLogConfiguration : IEntityTypeConfiguration<Authorizat
         entity.Property(e => e.DeviceName).HasMaxLength(50);
 
         entity.Property(e => e.Ipaddress)
-            .HasMaxLength(18)
+            .HasMaxLength(64)
             .HasColumnName("IPAddress");
         entity.Property(e => e.LoginSource).HasMaxLength(50);
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
