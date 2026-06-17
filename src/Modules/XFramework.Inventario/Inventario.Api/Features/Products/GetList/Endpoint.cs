@@ -8,8 +8,7 @@ public static class GetProductsListEndpoint
 {
     [MapGet("/api/products", Tags = ["Products"],
         Summary = "Get a paginated list of products",
-        Description = "Retrieves products with optional filtering by search term, category, and availability",
-        ExcludeFromOpenApi = true)]
+        Description = "Retrieves products with optional filtering by search term, category, and availability")]
     public static async Task<Result<PaginatedProductResponse>> Handle(
         GetProductsRequest request,
         ProductService productService,

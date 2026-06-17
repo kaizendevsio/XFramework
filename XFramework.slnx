@@ -69,6 +69,7 @@
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="src\Tests\ControlPanel.E2ETests\ControlPanel.E2ETests.csproj" />
+    <Project Path="src\Tests\Inventario.Api.Tests\Inventario.Api.Tests.csproj" />
     <Project Path="src\Tests\XFramework.Core.Tests\XFramework.Core.Tests.csproj" />
     <Project Path="src\Tests\XFramework.SourceGenerators.Tests\XFramework.SourceGenerators.Tests.csproj" />
     <Project Path="src\Tests\XFramework.TestInfrastructure\XFramework.TestInfrastructure.csproj" />

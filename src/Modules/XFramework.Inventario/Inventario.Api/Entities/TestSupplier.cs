@@ -1,19 +1,9 @@
-using XFramework.Core.Attributes;
-
 namespace XFramework.Inventario.Api.Entities;
 
 /// <summary>
 /// Test supplier entity to demonstrate the EntityServiceGenerator with more fields.
 /// Suppliers provide products to the inventory system.
 /// </summary>
-[GenerateEndpoints(
-    Type = EndpointType.Both,
-    Actions = EndpointActions.All,
-    RoutePrefix = "api/testsuppliers",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 600,
-    CacheKeyPrefix = "testsuppliers"
-)]
 public partial class TestSupplier
 {
     public Guid Id { get; set; }

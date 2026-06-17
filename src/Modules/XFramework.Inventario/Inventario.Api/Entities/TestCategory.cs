@@ -1,19 +1,9 @@
-using XFramework.Core.Attributes;
-
 namespace XFramework.Inventario.Api.Entities;
 
 /// <summary>
 /// Test category entity to demonstrate the EntityServiceGenerator.
 /// Categories can be used to organize products.
 /// </summary>
-[GenerateEndpoints(
-    Type = EndpointType.Both,
-    Actions = EndpointActions.All,
-    RoutePrefix = "api/testcategories",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 600,
-    CacheKeyPrefix = "testcategories"
-)]
 public partial class TestCategory
 {
     public Guid Id { get; set; }

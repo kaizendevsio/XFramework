@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Http;
 using XFramework.Core.Loggers;
 using XFramework.Core.Observability;
 using XFramework.Core.Patterns;
 using XFramework.Core.Services.Caching;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
+using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Inventario.Api.Services;
 
@@ -16,15 +18,18 @@ public class ProductService
     private readonly IDataContext _dataContext;
     private readonly ICacheService _cacheService;
     private readonly ILogger<ProductService> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public ProductService(
         IDataContext dataContext,
         ICacheService cacheService,
-        ILogger<ProductService> logger)
+        ILogger<ProductService> logger,
+        IHttpContextAccessor httpContextAccessor)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
     }
 
     /// <summary>
@@ -32,23 +37,40 @@ public class ProductService
     /// </summary>
     public async Task<Result<Product>> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
     {
+        var tenantResult = GetCurrentTenantId();
+        if (!tenantResult.IsSuccess)
+            return Result<Product>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var tenantId = tenantResult.Data;
+
         using var activity = ActivitySources.Product.StartActivity("Product.Create");
         activity?.SetTag("product.name", request.Name);
         activity?.SetTag("product.price", request.Price);
         activity?.SetTag("product.category_id", request.CategoryId);
+        activity?.SetTag("tenant.id", tenantId);
 
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
+            var categoryExists = await _dataContext.Query<ProductCategory>()
+                .AnyAsync(c => c.Id == request.CategoryId && c.TenantId == tenantId, ct);
+            if (!categoryExists)
+            {
+                _logger.EntityNotFound("ProductCategory", request.CategoryId);
+                return Result<Product>.NotFound("Product category not found");
+            }
+
             var productId = Guid.NewGuid();
             activity?.SetTag("product.id", productId);
 
-            _logger.EntityCreating("Product", productId, null);
+            _logger.EntityCreating("Product", productId, tenantId);
 
             var product = new Product
             {
                 Id = productId,
+                TenantId = tenantId,
+                IsEnabled = true,
                 Name = request.Name,
                 Description = request.Description,
                 Price = request.Price,
@@ -62,10 +84,32 @@ public class ProductService
             };
 
             _dataContext.Add(product);
-            await _dataContext.SaveChangesAsync(ct);
+
+            if (request.StockQuantity > 0)
+            {
+                _dataContext.Add(new InventoryMovement
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    IsEnabled = true,
+                    ProductId = productId,
+                    MovementType = InventoryMovementType.OpeningBalance,
+                    QuantityDelta = request.StockQuantity,
+                    QuantityBefore = 0,
+                    QuantityAfter = request.StockQuantity,
+                    MovementDate = DateTime.UtcNow,
+                    ReferenceType = nameof(Product),
+                    ReferenceId = productId,
+                    Reason = "Initial product stock"
+                });
+            }
+
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<Product>.Failure(saveResult.Message ?? "Product save failed", saveResult.StatusCode);
 
             // Cache the newly created product
-            var cacheKey = $"products:{product.Id}";
+            var cacheKey = BuildProductCacheKey(tenantId, product.Id);
             await _cacheService.SetAsync(cacheKey, product,
                 absoluteExpiration: TimeSpan.FromMinutes(10),
                 cancellationToken: ct);
@@ -106,9 +150,15 @@ public class ProductService
     /// </summary>
     public async Task<Result<Product>> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
+        var tenantResult = GetCurrentTenantId();
+        if (!tenantResult.IsSuccess)
+            return Result<Product>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var tenantId = tenantResult.Data;
+
         try
         {
-            var cacheKey = $"products:{id}";
+            var cacheKey = BuildProductCacheKey(tenantId, id);
 
             // Try cache first
             var cached = await _cacheService.GetAsync<Product>(cacheKey, ct);
@@ -122,7 +172,7 @@ public class ProductService
 
             var product = await _dataContext.Query<Product>()
                 .Include(p => p.Category)
-                .Where(p => p.Id == id && !p.IsDeleted)
+                .Where(p => p.Id == id && p.TenantId == tenantId && !p.IsDeleted)
                 .FirstOrDefaultAsync(ct);
 
             if (product == null)
@@ -154,13 +204,19 @@ public class ProductService
         GetProductsRequest request,
         CancellationToken ct = default)
     {
+        var tenantResult = GetCurrentTenantId();
+        if (!tenantResult.IsSuccess)
+            return Result<PaginatedList<Product>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var tenantId = tenantResult.Data;
+
         try
         {
             _logger.EntityListing("Product", request.Page, request.PageSize);
 
             var query = _dataContext.Query<Product>()
                 .Include(p => p.Category)
-                .Where(p => !p.IsDeleted);
+                .Where(p => p.TenantId == tenantId && !p.IsDeleted);
 
             // Apply search filter
             if (!string.IsNullOrWhiteSpace(request.Search))
@@ -219,12 +275,18 @@ public class ProductService
     /// </summary>
     public async Task<Result<Product>> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct = default)
     {
+        var tenantResult = GetCurrentTenantId();
+        if (!tenantResult.IsSuccess)
+            return Result<Product>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var tenantId = tenantResult.Data;
+
         try
         {
             _logger.EntityUpdating("Product", id);
 
             var product = await _dataContext.Query<Product>()
-                .Where(p => p.Id == id && !p.IsDeleted)
+                .Where(p => p.Id == id && p.TenantId == tenantId && !p.IsDeleted)
                 .FirstOrDefaultAsync(ct);
 
             if (product == null)
@@ -233,11 +295,18 @@ public class ProductService
                 return Result<Product>.NotFound($"Product with ID {id} not found");
             }
 
+            var categoryExists = await _dataContext.Query<ProductCategory>()
+                .AnyAsync(c => c.Id == request.CategoryId && c.TenantId == tenantId, ct);
+            if (!categoryExists)
+            {
+                _logger.EntityNotFound("ProductCategory", request.CategoryId);
+                return Result<Product>.NotFound("Product category not found");
+            }
+
             // Update properties
             product.Name = request.Name;
             product.Description = request.Description;
             product.Price = request.Price;
-            product.StockQuantity = request.StockQuantity;
             product.CategoryId = request.CategoryId;
             product.SKU = request.SKU;
             product.Brand = request.Brand;
@@ -247,14 +316,16 @@ public class ProductService
 
             // Attach as Modified and save
             _dataContext.Update(product);
-            await _dataContext.SaveChangesAsync(ct);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<Product>.Failure(saveResult.Message ?? "Product update failed", saveResult.StatusCode);
 
             // Invalidate cache
-            var cacheKey = $"products:{id}";
+            var cacheKey = BuildProductCacheKey(tenantId, id);
             await _cacheService.RemoveAsync(cacheKey, ct);
             _logger.CacheInvalidated(cacheKey);
-            await _cacheService.RemoveByPrefixAsync("products:list:", ct);
-            _logger.CacheCleared("products:list:*");
+            await _cacheService.RemoveByPrefixAsync(BuildProductListCachePrefix(tenantId), ct);
+            _logger.CacheCleared($"products:list:{tenantId}:*");
 
             _logger.EntityUpdated("Product", id);
             return Result<Product>.Success(product, "Product updated successfully");
@@ -271,12 +342,18 @@ public class ProductService
     /// </summary>
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        var tenantResult = GetCurrentTenantId();
+        if (!tenantResult.IsSuccess)
+            return Result.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var tenantId = tenantResult.Data;
+
         try
         {
             _logger.EntityDeleting("Product", id);
 
             var product = await _dataContext.Query<Product>()
-                .Where(p => p.Id == id && !p.IsDeleted)
+                .Where(p => p.Id == id && p.TenantId == tenantId && !p.IsDeleted)
                 .FirstOrDefaultAsync(ct);
 
             if (product == null)
@@ -287,14 +364,16 @@ public class ProductService
 
             // Soft delete (XDbContext handles IsDeleted flag and DeletedAt timestamp)
             _dataContext.Remove(product);
-            await _dataContext.SaveChangesAsync(ct);
+            var saveResult = await _dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result.Failure(saveResult.Message ?? "Product delete failed", saveResult.StatusCode);
 
             // Invalidate cache
-            var cacheKey = $"products:{id}";
+            var cacheKey = BuildProductCacheKey(tenantId, id);
             await _cacheService.RemoveAsync(cacheKey, ct);
             _logger.CacheInvalidated(cacheKey);
-            await _cacheService.RemoveByPrefixAsync("products:list:", ct);
-            _logger.CacheCleared("products:list:*");
+            await _cacheService.RemoveByPrefixAsync(BuildProductListCachePrefix(tenantId), ct);
+            _logger.CacheCleared($"products:list:{tenantId}:*");
 
             _logger.EntityDeleted("Product", id);
             return Result.Success("Product deleted successfully");
@@ -305,6 +384,28 @@ public class ProductService
             return Result.Failure("An error occurred deleting the product", 500);
         }
     }
+
+    private Result<Guid> GetCurrentTenantId()
+    {
+        var user = _httpContextAccessor.HttpContext?.User;
+        if (user?.Identity?.IsAuthenticated != true)
+            return Result<Guid>.Unauthorized("Authentication is required for product catalog operations");
+
+        var tenantIdClaim = user.FindFirst("tenantId")?.Value
+            ?? user.FindFirst("TenantId")?.Value
+            ?? user.FindFirst("tid")?.Value;
+
+        if (Guid.TryParse(tenantIdClaim, out var tenantId) && tenantId != Guid.Empty)
+            return Result<Guid>.Success(tenantId);
+
+        return Result<Guid>.Forbidden("Authenticated user does not have a valid tenant context");
+    }
+
+    private static string BuildProductCacheKey(Guid tenantId, Guid productId) =>
+        $"products:{tenantId}:{productId}";
+
+    private static string BuildProductListCachePrefix(Guid tenantId) =>
+        $"products:list:{tenantId}:";
 }
 
 /// <summary>
@@ -332,7 +433,6 @@ public record UpdateProductRequest
     public required string Name { get; init; }
     public string? Description { get; init; }
     public decimal Price { get; init; }
-    public int StockQuantity { get; init; }
     public Guid CategoryId { get; init; }
     public string? SKU { get; init; }
     public string? Brand { get; init; }

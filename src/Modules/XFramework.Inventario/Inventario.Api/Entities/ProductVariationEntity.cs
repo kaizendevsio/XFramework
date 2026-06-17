@@ -1,19 +1,9 @@
-using XFramework.Core.Attributes;
-
 namespace XFramework.Inventario.Api.Entities;
 
 /// <summary>
 /// VSA wrapper entity for ProductVariation domain model.
 /// Implements the VSA Wrapper Entity Pattern (ADR-003).
 /// </summary>
-[GenerateEndpoints(
-    Type = EndpointType.Both,
-    Actions = EndpointActions.All,
-    RoutePrefix = "api/productvariations",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "productvariations"
-)]
 public partial class ProductVariationEntity
 {
     public Guid Id { get; set; }

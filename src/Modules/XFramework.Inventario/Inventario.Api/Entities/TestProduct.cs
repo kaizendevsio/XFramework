@@ -1,19 +1,9 @@
-using XFramework.Core.Attributes;
-
 namespace XFramework.Inventario.Api.Entities;
 
 /// <summary>
 /// Test entity to verify the EntityServiceGenerator works correctly.
 /// This entity has all CRUD operations enabled.
 /// </summary>
-[GenerateEndpoints(
-    Type = EndpointType.Both,
-    Actions = EndpointActions.All,
-    RoutePrefix = "api/testproducts",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 600,
-    CacheKeyPrefix = "testproducts"
-)]
 public partial class TestProduct
 {
     public Guid Id { get; set; }
