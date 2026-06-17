@@ -4,6 +4,7 @@
 #   Production:           podman-compose --env-file .env.production up --build
 #
 # Service config lives in appsettings.Docker.json per service.
+# ControlPanel uses appsettings.dev.json for the xeon-dev admin surface.
 # Only secrets and infra overrides go in env vars / .env files.
 
 x-common-env: &common-env
@@ -184,10 +185,7 @@ services:
         PROJECT_PATH: src/Presentation/ControlPanel.Server/ControlPanel.Server.csproj
     environment:
       <<: *common-env
-      ControlPanel__BootstrapAdmin__Password: ${ControlPanel__BootstrapAdmin__Password:-}
-      ControlPanel__BootstrapAdmin__UserName: ${ControlPanel__BootstrapAdmin__UserName:-superadmin}
-      ControlPanel__BootstrapAdmin__TenantName: ${ControlPanel__BootstrapAdmin__TenantName:-XFramework Admin}
-      ControlPanel__BootstrapAdmin__DisplayName: ${ControlPanel__BootstrapAdmin__DisplayName:-Super Admin}
+      ASPNETCORE_ENVIRONMENT: ${CONTROLPANEL_ASPNETCORE_ENVIRONMENT:-dev}
     ports:
       - "${CONTROLPANEL_EXPOSE_PORT:-5000}:8080"
     depends_on:
