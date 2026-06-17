@@ -11,16 +11,16 @@ namespace Community.Api.Services;
 public sealed class CommunityService : ICommunityService
 {
     private readonly IDataContext _dataContext;
-    private readonly ITenantResolver _tenantService;
+    private readonly ICommunityRequestContext _requestContext;
     private readonly ILogger<CommunityService> _logger;
 
     public CommunityService(
         IDataContext dataContext,
-        ITenantResolver tenantService,
+        ICommunityRequestContext requestContext,
         ILogger<CommunityService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
-        _tenantService = tenantService ?? throw new ArgumentNullException(nameof(tenantService));
+        _requestContext = requestContext ?? throw new ArgumentNullException(nameof(requestContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -31,23 +31,39 @@ public sealed class CommunityService : ICommunityService
     {
         try
         {
-            var tenant = await _tenantService.GetTenant(request.Metadata.TenantId);
+            var requesterResult = await _requestContext.GetRequiredAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.CredentialId, requester.CredentialId))
+                return Result<CmdResponse>.Forbidden("Credential ID does not match authenticated user");
+
+            var existingIdentity = await _dataContext.Query<CommunityIdentity>()
+                .Where(i => i.CredentialId == requester.CredentialId)
+                .Where(i => i.TenantId == requester.TenantId)
+                .Where(i => !i.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existingIdentity is not null)
+                return Result<CmdResponse>.Conflict("Authenticated credential already has a community identity");
 
             // Fetch credential with identity info
             var credential = await _dataContext.Query<IdentityCredential>()
-                .Where(i => i.TenantId == tenant.Id)
+                .Where(i => i.TenantId == requester.TenantId)
                 .Include(i => i.IdentityInfo)
-                .Where(i => i.Id == request.CredentialId)
+                .Where(i => i.Id == requester.CredentialId)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (credential == null)
             {
-                _logger.CommunityCredentialNotFound(request.CredentialId);
-                return Result<CmdResponse>.NotFound($"Credential with Id {request.CredentialId} does not exist");
+                _logger.CommunityCredentialNotFound(requester.CredentialId);
+                return Result<CmdResponse>.NotFound($"Credential with Id {requester.CredentialId} does not exist");
             }
 
             // Fetch community identity type
             var communityIdentityType = await _dataContext.Query<CommunityIdentityType>()
+                .Where(i => i.TenantId == requester.TenantId)
                 .Where(i => i.Id == request.CommunityIdentityTypeId)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -83,6 +99,8 @@ public sealed class CommunityService : ICommunityService
             // Create community identity entity
             var entity = new CommunityIdentity
             {
+                TenantId = requester.TenantId,
+                CredentialId = requester.CredentialId,
                 Credential = credential,
                 HandleName = string.IsNullOrWhiteSpace(request.HandleName)
                     ? fallbackHandleName
@@ -97,9 +115,11 @@ public sealed class CommunityService : ICommunityService
                     // Profile Photo
                     new()
                     {
+                        TenantId = requester.TenantId,
                         Type = profilePhotoType,
                         Storage = new()
                         {
+                            TenantId = requester.TenantId,
                             ContentPath = "",
                             Type = pngType
                         }
@@ -107,9 +127,11 @@ public sealed class CommunityService : ICommunityService
                     // Cover Photo
                     new()
                     {
+                        TenantId = requester.TenantId,
                         Type = coverPhotoType,
                         Storage = new()
                         {
+                            TenantId = requester.TenantId,
                             ContentPath = "",
                             Type = pngType
                         }
@@ -118,9 +140,11 @@ public sealed class CommunityService : ICommunityService
             };
 
             _dataContext.Add(entity);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "CreateCommunityIdentity") is { } saveFailure)
+                return saveFailure;
 
-            _logger.CommunityIdentityCreated(request.CredentialId);
+            _logger.CommunityIdentityCreated(requester.CredentialId);
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -130,7 +154,7 @@ public sealed class CommunityService : ICommunityService
         }
         catch (Exception ex)
         {
-            _logger.CommunityIdentityCreationError(request.CredentialId, ex);
+            _logger.CommunityIdentityCreationError(request.CredentialId == Guid.Empty ? Guid.Empty : request.CredentialId, ex);
             return Result<CmdResponse>.Failure("An error occurred while creating community identity", 500);
         }
     }
@@ -142,8 +166,20 @@ public sealed class CommunityService : ICommunityService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (requester.IdentityId != request.Id)
+                return Result<CmdResponse>.Forbidden("You can only update your own community identity");
+
+            if (CommunitySecurity.IsSpoofed(request.CredentialId, requester.CredentialId))
+                return Result<CmdResponse>.Forbidden("Credential ID does not match authenticated user");
+
             // Fetch existing community identity
             var communityIdentity = await _dataContext.Query<CommunityIdentity>()
+                .Where(i => i.TenantId == requester.TenantId)
                 .Where(i => i.Id == request.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -153,29 +189,11 @@ public sealed class CommunityService : ICommunityService
                 return Result<CmdResponse>.NotFound($"Community identity with id {request.Id} does not exist");
             }
 
-            // Map request to entity using Mapster
-            communityIdentity = request.Adapt(communityIdentity);
-
-            // Update credential if provided
-            if (request.CredentialId != Guid.Empty)
-            {
-                var credential = await _dataContext.Query<IdentityCredential>()
-                    .Where(i => i.Id == request.CredentialId)
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                if (credential == null)
-                {
-                    _logger.CommunityCredentialNotFound(request.CredentialId);
-                    return Result<CmdResponse>.NotFound($"Credential with id {request.CredentialId} does not exist");
-                }
-
-                communityIdentity.Credential = credential;
-            }
-
             // Update community identity type if provided
             if (request.CommunityIdentityTypeId != Guid.Empty)
             {
                 var communityIdentityType = await _dataContext.Query<CommunityIdentityType>()
+                    .Where(i => i.TenantId == requester.TenantId)
                     .Where(i => i.Id == request.CommunityIdentityTypeId)
                     .FirstOrDefaultAsync(cancellationToken);
 
@@ -189,7 +207,9 @@ public sealed class CommunityService : ICommunityService
             }
 
             _dataContext.Update(communityIdentity);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "UpdateCommunityIdentity") is { } saveFailure)
+                return saveFailure;
 
             _logger.CommunityIdentityUpdated(request.Id);
 
@@ -213,8 +233,21 @@ public sealed class CommunityService : ICommunityService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, List<CommunityConnection>>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            var requestedIdentityId = request.CommunityIdentityId == Guid.Empty
+                ? requester.IdentityId
+                : request.CommunityIdentityId;
+
+            if (requestedIdentityId != requester.IdentityId)
+                return Result<List<CommunityConnection>>.Forbidden("You can only retrieve your own connections");
+
             // Fetch connection type
             var connectionType = await _dataContext.Query<CommunityConnectionType>()
+                .Where(i => i.TenantId == requester.TenantId)
                 .Where(i => i.Id == request.ConnectionTypeId)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -226,19 +259,21 @@ public sealed class CommunityService : ICommunityService
 
             // Fetch community identity
             var communityIdentity = await _dataContext.Query<CommunityIdentity>()
-                .Where(i => i.Id == request.CommunityIdentityId)
+                .Where(i => i.TenantId == requester.TenantId)
+                .Where(i => i.Id == requestedIdentityId)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (communityIdentity == null)
             {
-                _logger.CommunityIdentityNotFound(request.CommunityIdentityId);
-                return Result<List<CommunityConnection>>.NotFound($"Community identity with id {request.CommunityIdentityId} does not exist");
+                _logger.CommunityIdentityNotFound(requestedIdentityId);
+                return Result<List<CommunityConnection>>.NotFound($"Community identity with id {requestedIdentityId} does not exist");
             }
 
             // Fetch connection list
             var connectionList = await _dataContext.Query<CommunityConnection>()
                 .Include(i => i.SourceSocialMediaIdentity)
                 .Include(i => i.TargetSocialMediaIdentity)
+                .Where(i => i.TenantId == requester.TenantId)
                 .Where(i => i.TypeId == connectionType.Id)
                 .Where(i => i.SourceSocialMediaIdentityId == communityIdentity.Id ||
                            i.TargetSocialMediaIdentityId == communityIdentity.Id)
@@ -247,11 +282,11 @@ public sealed class CommunityService : ICommunityService
 
             if (!connectionList.Any())
             {
-                _logger.CommunityNoConnectionsFound(request.CommunityIdentityId);
+                _logger.CommunityNoConnectionsFound(requestedIdentityId);
                 return Result<List<CommunityConnection>>.Success([]);
             }
 
-            _logger.CommunityConnectionsRetrieved(connectionList.Count, request.CommunityIdentityId);
+            _logger.CommunityConnectionsRetrieved(connectionList.Count, requestedIdentityId);
 
             return Result<List<CommunityConnection>>.Success(connectionList);
         }
@@ -269,17 +304,27 @@ public sealed class CommunityService : ICommunityService
     {
         try
         {
-            if (request.RequestingIdentityId != request.IdentityId)
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.IdentityId, requester.IdentityId)
+                || CommunitySecurity.IsSpoofed(request.RequestingIdentityId, requester.IdentityId))
+            {
                 return Result<CmdResponse>.Forbidden("You can only update your own identity files");
+            }
 
             var storageFileExists = await _dataContext.Query<StorageFile>()
+                .Where(f => f.TenantId == requester.TenantId)
                 .AnyAsync(f => f.Id == request.StorageFileId, cancellationToken);
 
             if (!storageFileExists)
                 return Result<CmdResponse>.NotFound($"Storage file with Id {request.StorageFileId} does not exist");
 
             var file = await _dataContext.Query<CommunityIdentityFile>()
-                .Where(f => f.Id == request.FileId && f.IdentityId == request.IdentityId && !f.IsDeleted)
+                .Where(f => f.TenantId == requester.TenantId)
+                .Where(f => f.Id == request.FileId && f.IdentityId == requester.IdentityId && !f.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (file == null)
@@ -289,7 +334,9 @@ public sealed class CommunityService : ICommunityService
             file.ModifiedAt = DateTime.UtcNow;
 
             _dataContext.Update(file);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "UpdateIdentityFile") is { } saveFailure)
+                return saveFailure;
 
             return Result<CmdResponse>.Success(new CmdResponse
             {

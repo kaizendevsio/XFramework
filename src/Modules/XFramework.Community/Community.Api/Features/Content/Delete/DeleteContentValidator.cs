@@ -6,8 +6,5 @@ public sealed class DeleteContentValidator : AbstractValidator<DeleteContentRequ
     {
         RuleFor(x => x.Id)
             .NotEmpty().WithMessage("Content ID is required");
-
-        RuleFor(x => x.RequesterId)
-            .NotEmpty().WithMessage("Requester ID is required");
     }
 }

@@ -10,15 +10,18 @@ public sealed class ConnectionService : IConnectionService
 {
     private readonly IDataContext _dataContext;
     private readonly INotificationService _notificationService;
+    private readonly ICommunityRequestContext _requestContext;
     private readonly ILogger<ConnectionService> _logger;
 
     public ConnectionService(
         IDataContext dataContext,
         INotificationService notificationService,
+        ICommunityRequestContext requestContext,
         ILogger<ConnectionService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        _requestContext = requestContext ?? throw new ArgumentNullException(nameof(requestContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -29,29 +32,39 @@ public sealed class ConnectionService : IConnectionService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.SourceIdentityId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Source identity ID does not match authenticated user");
+
             // Prevent self-connections
-            if (request.SourceIdentityId == request.TargetIdentityId)
+            if (requester.IdentityId == request.TargetIdentityId)
             {
                 return Result<CmdResponse>.Failure("Cannot create a connection to yourself", 400);
             }
 
             // Check if either party has blocked the other
-            if (await IsBlockedAsync(request.SourceIdentityId, request.TargetIdentityId, cancellationToken))
-                return Result<CmdResponse>.Forbidden("Cannot create connection — a block exists between these identities");
+            if (await IsBlockedAsync(requester.IdentityId, request.TargetIdentityId, cancellationToken))
+                return Result<CmdResponse>.Forbidden("Cannot create connection because a block exists between these identities");
 
             // Validate source identity exists
             var sourceIdentity = await _dataContext.Query<CommunityIdentity>()
-                .Where(i => i.Id == request.SourceIdentityId)
+                .Where(i => i.TenantId == requester.TenantId)
+                .Where(i => i.Id == requester.IdentityId)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (sourceIdentity == null)
             {
-                _logger.CommunityIdentityNotFound(request.SourceIdentityId);
-                return Result<CmdResponse>.NotFound($"Source identity with Id {request.SourceIdentityId} does not exist");
+                _logger.CommunityIdentityNotFound(requester.IdentityId);
+                return Result<CmdResponse>.NotFound($"Source identity with Id {requester.IdentityId} does not exist");
             }
 
             // Validate target identity exists
             var targetIdentity = await _dataContext.Query<CommunityIdentity>()
+                .Where(i => i.TenantId == requester.TenantId)
                 .Where(i => i.Id == request.TargetIdentityId)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -63,6 +76,7 @@ public sealed class ConnectionService : IConnectionService
 
             // Validate connection type exists
             var connectionType = await _dataContext.Query<CommunityConnectionType>()
+                .Where(i => i.TenantId == requester.TenantId)
                 .Where(i => i.Id == request.TypeId)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -74,7 +88,8 @@ public sealed class ConnectionService : IConnectionService
 
             // Check for duplicate connections (same source + target + type)
             var existingConnection = await _dataContext.Query<CommunityConnection>()
-                .Where(i => i.SourceSocialMediaIdentityId == request.SourceIdentityId)
+                .Where(i => i.TenantId == requester.TenantId)
+                .Where(i => i.SourceSocialMediaIdentityId == requester.IdentityId)
                 .Where(i => i.TargetSocialMediaIdentityId == request.TargetIdentityId)
                 .Where(i => i.TypeId == request.TypeId)
                 .Where(i => !i.IsDeleted)
@@ -88,7 +103,8 @@ public sealed class ConnectionService : IConnectionService
             // Create the connection
             var entity = new CommunityConnection
             {
-                SourceSocialMediaIdentityId = request.SourceIdentityId,
+                TenantId = requester.TenantId,
+                SourceSocialMediaIdentityId = requester.IdentityId,
                 TargetSocialMediaIdentityId = request.TargetIdentityId,
                 TypeId = request.TypeId,
                 IsEnabled = true,
@@ -96,19 +112,25 @@ public sealed class ConnectionService : IConnectionService
             };
 
             _dataContext.Add(entity);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "CreateConnection") is { } saveFailure)
+                return saveFailure;
 
-            _logger.CommunityConnectionCreated(entity.Id, request.SourceIdentityId, request.TargetIdentityId);
+            _logger.CommunityConnectionCreated(entity.Id, requester.IdentityId, request.TargetIdentityId);
 
             if (request.TypeId == Community.Domain.Shared.CommunityConnectionTypes.Follow)
             {
-                await _notificationService.CreateNotificationAsync(
+                var notificationResult = await _notificationService.CreateNotificationAsync(
+                    requester.TenantId,
                     request.TargetIdentityId,
-                    request.SourceIdentityId,
+                    requester.IdentityId,
                     Community.Domain.Shared.Enums.NotificationType.Follow,
                     entity.Id,
                     $"{sourceIdentity.HandleName ?? "Someone"} started following you",
                     cancellationToken);
+
+                if (!notificationResult.IsSuccess)
+                    return notificationResult;
             }
 
             return Result<CmdResponse>.Success(new CmdResponse
@@ -131,8 +153,17 @@ public sealed class ConnectionService : IConnectionService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.RequestingIdentityId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Requesting identity ID does not match authenticated user");
+
             // Find the connection
             var connection = await _dataContext.Query<CommunityConnection>()
+                .Where(i => i.TenantId == requester.TenantId)
                 .Where(i => i.Id == request.Id)
                 .Where(i => !i.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -143,7 +174,7 @@ public sealed class ConnectionService : IConnectionService
             }
 
             // Validate the requester owns the connection (is the source)
-            if (connection.SourceSocialMediaIdentityId != request.RequestingIdentityId)
+            if (connection.SourceSocialMediaIdentityId != requester.IdentityId)
             {
                 return Result<CmdResponse>.Forbidden("You can only delete your own connections");
             }
@@ -154,7 +185,9 @@ public sealed class ConnectionService : IConnectionService
             connection.IsEnabled = false;
 
             _dataContext.Update(connection);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "DeleteConnection") is { } saveFailure)
+                return saveFailure;
 
             _logger.CommunityConnectionDeleted(request.Id);
 

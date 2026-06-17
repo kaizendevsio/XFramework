@@ -21,7 +21,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 // Register DataContext handler for entity query/mutation via Bolt
 builder.Services.AddDataContextHandler(typeof(Program).Assembly);
 
-// Rate limiting — global 100/min per IP
+// Rate limiting: global 100/min per IP
 builder.Services.AddXFrameworkRateLimiting();
 
 var app = (WebApplication)builder.Build();
@@ -32,6 +32,8 @@ app.EnsureDatabase<AppDbContext>();
 app.MapXFrameworkHealthChecks("Community");
 
 // Map feature endpoints (source-generated from [MapPost/Get/...] attributes)
-app.MapGeneratedEndpoints();
+// through an authorized route group so manual Community routes are not anonymous.
+var authorizedCommunityRoutes = app.MapGroup("").RequireAuthorization();
+authorizedCommunityRoutes.MapGeneratedEndpoints();
 
 app.Run();

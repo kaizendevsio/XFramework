@@ -13,7 +13,5 @@ public sealed class CreateContentReactionValidator : AbstractValidator<CreateCon
         RuleFor(x => x.TypeId)
             .NotEmpty().WithMessage("Reaction type ID is required");
 
-        RuleFor(x => x.IdentityId)
-            .NotEmpty().WithMessage("Identity ID is required");
     }
 }

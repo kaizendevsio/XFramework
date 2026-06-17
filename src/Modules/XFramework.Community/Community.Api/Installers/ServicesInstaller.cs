@@ -11,6 +11,7 @@ public sealed class ServicesInstaller : IInstaller
         services.AddTenantResolver();
         
         // Register Community Services (VSA Architecture)
+        services.AddScoped<ICommunityRequestContext, CommunityRequestContext>();
         services.AddScoped<ICommunityService, CommunityService>();
         services.AddScoped<IContentService, ContentService>();
         services.AddScoped<IConnectionService, ConnectionService>();
