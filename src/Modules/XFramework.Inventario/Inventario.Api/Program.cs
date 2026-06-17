@@ -1,4 +1,5 @@
 using FluentValidation;
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
 using XFramework.Core.DataContext;
@@ -38,6 +39,8 @@ var app = (WebApplication)builder.Build();
 
 // Add correlation ID middleware early in the pipeline for request tracing
 app.UseCorrelationId();
+app.UseTenantModuleFeatureGate(options =>
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api"));
 
 app.EnsureDatabase<DbContext>();
 

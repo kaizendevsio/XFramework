@@ -150,6 +150,7 @@ public class IntegrationTestFixture
         builder.Services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
         builder.Services.AddTenantResolver();
+        builder.Services.AddTenantModuleFeatures();
         builder.Services.AddMessagingWrapperServices();
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddValidatorsFromAssemblyContaining<AuthService>();

@@ -65,6 +65,7 @@ else
             <BbTabsList>
                 <BbTabsTrigger Value="summary">Tenant Summary</BbTabsTrigger>
                 <BbTabsTrigger Value="users">Users (@_detailUsers.Count)</BbTabsTrigger>
+                <BbTabsTrigger Value="modules">Modules (@(_moduleFeatureRows.Count(x => x.IsEnabled)))</BbTabsTrigger>
                 <BbTabsTrigger Value="configurations">Configurations (@_detailConfigs.Count)</BbTabsTrigger>
                 <BbTabsTrigger Value="roletypes">Role Types (@_detailRoleTypes.Count)</BbTabsTrigger>
             </BbTabsList>
@@ -129,6 +130,66 @@ else
                                 </Columns>
                             </BbDataGrid>
                         }
+                    </BbCardContent>
+                </BbCard>
+            </BbTabsContent>
+
+            <BbTabsContent Value="modules" Class="xf-fade-in">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Tenant Modules</BbCardTitle>
+                        <BbCardDescription>@(_moduleFeatureRows.Count(x => x.IsEnabled)) enabled module(s)</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_moduleFeatureRows" ShowPagination="false">
+                            <Columns>
+                                <BbDataGridTemplateColumn Title="Module">
+                                    <ChildContent Context="row">
+                                        <div class="flex items-center gap-3">
+                                            <LucideIcon Name="@row.Definition.IconName" class="h-4 w-4 text-muted-foreground" />
+                                            <div>
+                                                <div class="font-medium">@row.Definition.DisplayName</div>
+                                                <div class="text-xs text-muted-foreground">@row.Key</div>
+                                            </div>
+                                        </div>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Description">
+                                    <ChildContent Context="row">
+                                        <span class="text-sm text-muted-foreground">@row.Definition.Description</span>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Status">
+                                    <ChildContent Context="row">
+                                        <StatusBadge Text="@(row.IsEnabled ? "Enabled" : "Disabled")"
+                                                     Status="@(row.IsEnabled ? "active" : "inactive")" />
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Updated">
+                                    <ChildContent Context="row">
+                                        @(row.Feature?.ModifiedAt?.ToString("g") ?? row.Feature?.CreatedAt.ToString("g") ?? "Never")
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="row">
+                                        <BbButton Variant="@(row.IsEnabled ? ButtonVariant.Outline : ButtonVariant.Default)"
+                                                  Size="ButtonSize.Small"
+                                                  OnClick="@(() => ToggleModuleFeature(row))"
+                                                  Disabled="@(_savingModuleFeatureKey == row.Key)">
+                                            @if (_savingModuleFeatureKey == row.Key)
+                                            {
+                                                <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                                            }
+                                            else
+                                            {
+                                                <LucideIcon Name="@(row.IsEnabled ? "power-off" : "power")" class="mr-2 h-4 w-4" />
+                                            }
+                                            @(row.IsEnabled ? "Disable" : "Enable")
+                                        </BbButton>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
                     </BbCardContent>
                 </BbCard>
             </BbTabsContent>
@@ -305,6 +366,9 @@ else
     private List<IdentityInformation> _detailUsers = [];
     private List<RegistryConfiguration> _detailConfigs = [];
     private List<IdentityRoleType> _detailRoleTypes = [];
+    private List<TenantModuleFeature> _detailModuleFeatures = [];
+    private List<TenantModuleFeatureRow> _moduleFeatureRows = [];
+    private string? _savingModuleFeatureKey;
 
     // -- Config dialog --
     private bool _configDialogOpen;
@@ -329,6 +393,8 @@ else
                 _detailUsers = [];
                 _detailConfigs = [];
                 _detailRoleTypes = [];
+                _detailModuleFeatures = [];
+                _moduleFeatureRows = [];
                 return;
             }
 
@@ -383,6 +449,17 @@ else
                     .ToListAsync())
                 .OrderBy(x => x.Name)
                 .ToList();
+
+            _detailModuleFeatures = (await DataContext.Query<TenantModuleFeature>()
+                    .NoCache()
+                    .Where(x => x.TenantId == Id)
+                    .Take(100)
+                    .ToListAsync())
+                .OrderBy(x => x.ModuleKey)
+                .ThenBy(x => x.SubFeatureKey)
+                .ToList();
+
+            BuildModuleFeatureRows();
 
             _configGroups = (await DataContext.Query<RegistryConfigurationGroup>()
                     .Take(100)
@@ -446,6 +523,74 @@ else
     private static string GetStatusText(short? status) => status switch { 0 => "Pending", 1 => "Active", 2 => "Suspended", 3 => "Inactive", _ => "Unknown" };
     private static string GetStatusKey(short? status) => status switch { 0 => "pending", 1 => "active", 2 => "suspended", 3 => "inactive", _ => "inactive" };
 
+    private void BuildModuleFeatureRows()
+    {
+        _moduleFeatureRows = TenantModuleFeatureKeys.All
+            .Select(definition =>
+            {
+                var feature = _detailModuleFeatures.FirstOrDefault(item =>
+                    string.Equals(item.Key, definition.Key, StringComparison.OrdinalIgnoreCase));
+
+                return new TenantModuleFeatureRow(definition, feature);
+            })
+            .ToList();
+    }
+
+    private async Task ToggleModuleFeature(TenantModuleFeatureRow row)
+    {
+        _savingModuleFeatureKey = row.Key;
+        try
+        {
+            var (moduleKey, subFeatureKey) =
+                TenantModuleFeatureKeys.Normalize(row.Definition.ModuleKey, row.Definition.SubFeatureKey);
+
+            var feature = row.Feature is null
+                ? null
+                : await DataContext.Query<TenantModuleFeature>()
+                    .NoCache()
+                    .Where(x => x.Id == row.Feature.Id)
+                    .FirstOrDefaultAsync();
+
+            if (feature is null)
+            {
+                feature = new TenantModuleFeature
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = Id,
+                    ModuleKey = moduleKey,
+                    SubFeatureKey = subFeatureKey,
+                    DisplayName = row.Definition.DisplayName,
+                    Description = row.Definition.Description,
+                    CreatedAt = DateTime.UtcNow,
+                    IsEnabled = true
+                };
+
+                DataContext.Add(feature);
+            }
+            else
+            {
+                feature.ModuleKey = moduleKey;
+                feature.SubFeatureKey = subFeatureKey;
+                feature.DisplayName = row.Definition.DisplayName;
+                feature.Description = row.Definition.Description;
+                feature.IsEnabled = !feature.IsEnabled;
+                feature.ModifiedAt = DateTime.UtcNow;
+
+                DataContext.Update(feature);
+            }
+
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess
+                ? $"{row.Definition.DisplayName} {(feature.IsEnabled ? "enabled" : "disabled")}."
+                : $"Failed: {result.Message}");
+
+            if (result.IsSuccess)
+                await LoadDetailData();
+        }
+        catch (Exception ex) { ToastService.Show($"Error: {ex.Message}"); }
+        finally { _savingModuleFeatureKey = null; }
+    }
+
     // -- Configuration CRUD --
     private void OpenAddConfigDialog() { _isEditingConfig = false; _configForm = new(); _configDialogOpen = true; }
     private void OpenEditConfigDialog(RegistryConfiguration c) { _isEditingConfig = true; _editingConfigId = c.Id; _configForm = new() { Key = c.Key, Value = c.Value, Unit = c.Unit, GroupIdString = c.GroupId.ToString() }; _configDialogOpen = true; }
@@ -506,5 +651,13 @@ else
         public string? Value { get; set; }
         public string? Unit { get; set; }
         public string GroupIdString { get; set; } = "";
+    }
+
+    private sealed class TenantModuleFeatureRow(TenantModuleFeatureDefinition definition, TenantModuleFeature? feature)
+    {
+        public TenantModuleFeatureDefinition Definition { get; } = definition;
+        public TenantModuleFeature? Feature { get; } = feature;
+        public string Key => Definition.Key;
+        public bool IsEnabled => Feature?.IsEnabled == true;
     }
 }

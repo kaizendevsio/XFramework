@@ -1,4 +1,5 @@
 using FluentValidation;
+using IdentityServer.Domain.Shared.Contracts;
 using Messaging.Api.Generated;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -30,6 +31,11 @@ var app = (WebApplication)builder.Build();
 // Add correlation ID middleware early in the pipeline
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
+app.UseTenantModuleFeatureGate(options =>
+{
+    options.RequireFeature(TenantModuleFeatureKeys.MessagingChat, "/api/threads");
+    options.RequireFeature(TenantModuleFeatureKeys.MessagingChat, "/api/messages");
+});
 
 // Database migration
 app.EnsureDatabase<AppDbContext>();

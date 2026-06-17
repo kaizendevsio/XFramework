@@ -11,6 +11,7 @@ public sealed class ServicesInstaller : IInstaller
         // Register SmsGateway service wrapper
         services.AddSingleton<ISmsGatewayServiceWrapper, SmsGatewayServiceWrapper>();
         services.AddTenantResolver();
+        services.AddTenantModuleFeatures();
 
         // Register MessagingService
         services.AddScoped<IMessagingService, MessagingService>();

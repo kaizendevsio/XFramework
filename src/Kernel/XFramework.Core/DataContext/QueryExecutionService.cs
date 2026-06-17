@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Core.DataContext;
@@ -95,6 +97,7 @@ public sealed class QueryExecutionService(
         {
             using var scope = serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
+            var changedTenantModuleFeatures = new List<(Guid TenantId, string ModuleKey, string SubFeatureKey)>();
 
             foreach (var change in request.Changes)
             {
@@ -130,6 +133,14 @@ public sealed class QueryExecutionService(
                             prop.SetValue(existing, value);
                         }
 
+                        if (existing is TenantModuleFeature patchedFeature)
+                        {
+                            changedTenantModuleFeatures.Add((
+                                patchedFeature.TenantId,
+                                patchedFeature.ModuleKey,
+                                patchedFeature.SubFeatureKey));
+                        }
+
                         continue;
                     }
                 }
@@ -151,9 +162,18 @@ public sealed class QueryExecutionService(
                         dbContext.Remove(entity);
                         break;
                 }
+
+                if (entity is TenantModuleFeature feature)
+                {
+                    changedTenantModuleFeatures.Add((
+                        feature.TenantId,
+                        feature.ModuleKey,
+                        feature.SubFeatureKey));
+                }
             }
 
             await dbContext.SaveChangesAsync(ct);
+            InvalidateTenantModuleFeatureCache(scope.ServiceProvider, changedTenantModuleFeatures);
 
             var result = DataContextResult.Success();
             return MemoryPack.MemoryPackSerializer.Serialize(result);
@@ -163,6 +183,20 @@ public sealed class QueryExecutionService(
             logger.LogError(ex, "Failed to execute changes");
             var result = DataContextResult.Failure(ex.InnerException?.Message ?? ex.Message);
             return MemoryPack.MemoryPackSerializer.Serialize(result);
+        }
+    }
+
+    private static void InvalidateTenantModuleFeatureCache(
+        IServiceProvider scopedServices,
+        IEnumerable<(Guid TenantId, string ModuleKey, string SubFeatureKey)> changedFeatures)
+    {
+        var featureService = scopedServices.GetService<ITenantModuleFeatureService>();
+        if (featureService is null)
+            return;
+
+        foreach (var feature in changedFeatures.Distinct())
+        {
+            featureService.Invalidate(feature.TenantId, feature.ModuleKey, feature.SubFeatureKey);
         }
     }
 

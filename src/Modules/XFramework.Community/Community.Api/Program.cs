@@ -1,4 +1,5 @@
 using Community.Api.Generated;
+using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Core.DataContext;
 using XFramework.Core.Extensions;
 using XFramework.Core.Health;
@@ -28,6 +29,21 @@ var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
+app.UseTenantModuleFeatureGate(options =>
+{
+    options.RequireFeature(TenantModuleFeatureKeys.Notifications, "/api/community/notifications");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-identities");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-identity-types");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-identity-files");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-identity-file-types");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-content");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-content-types");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-content-files");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-content-reactions");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-content-reaction-types");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-connection-types");
+});
 app.EnsureDatabase<AppDbContext>();
 app.MapXFrameworkHealthChecks("Community");
 

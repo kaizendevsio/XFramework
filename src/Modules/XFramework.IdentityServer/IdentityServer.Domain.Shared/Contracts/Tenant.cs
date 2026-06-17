@@ -50,6 +50,10 @@ public partial class Tenant : BaseModel
     public virtual ICollection<RegistryConfiguration> RegistryConfigurations { get; set; } =
         new List<RegistryConfiguration>();
 
+    [MemoryPackOrder(11)]
+    public virtual ICollection<TenantModuleFeature> TenantModuleFeatures { get; set; } =
+        new List<TenantModuleFeature>();
+
 }
 
 public class GetTenantListRequest

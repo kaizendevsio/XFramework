@@ -2406,6 +2406,72 @@ namespace XFramework.Domain.Migrations
                     b.ToTable("Application", "Application");
                 });
 
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.TenantModuleFeature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("false");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValueSql("true");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ModuleKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("SubFeatureKey")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying")
+                        .HasDefaultValue("");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("tenantmodulefeature_pk");
+
+                    b.HasIndex("TenantId", "ModuleKey", "SubFeatureKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_TenantModuleFeature_Tenant_Module_SubFeature");
+
+                    b.ToTable("TenantModuleFeature", "Identity");
+                });
+
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.Message", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5964,6 +6030,19 @@ namespace XFramework.Domain.Migrations
                     b.Navigation("IdentityRoleTypes");
 
                     b.Navigation("RegistryConfigurations");
+
+                    b.Navigation("TenantModuleFeatures");
+                });
+
+            modelBuilder.Entity("IdentityServer.Domain.Shared.Contracts.TenantModuleFeature", b =>
+                {
+                    b.HasOne("IdentityServer.Domain.Shared.Contracts.Tenant", "Tenant")
+                        .WithMany("TenantModuleFeatures")
+                        .HasForeignKey("TenantId")
+                        .IsRequired()
+                        .HasConstraintName("tenantmodulefeature_application_tenantid_fk");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("Messaging.Domain.Shared.Contracts.Message", b =>
