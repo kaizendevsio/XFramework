@@ -843,6 +843,7 @@ public sealed class AuthService : IAuthService
             case AuthorizationType.Default:
                 // Get default authorization type from registry
                 var getDefaults = await _dataContext.Query<RegistryConfiguration>()
+                    .IgnoreQueryFilters()
                     .Where(i => i.TenantId == tenant.Id && i.Key == "DefaultAuthorizeBy")
                     .FirstOrDefaultAsync(ct);
 
@@ -864,6 +865,7 @@ public sealed class AuthService : IAuthService
             case AuthorizationType.UsernameEmailPhone:
                 // Try username first
                 result = await _dataContext.Query<IdentityCredential>()
+                    .IgnoreQueryFilters()
                     .Include(i => i.IdentityInfo)
                     .Include(i => i.IdentityRoles)
                     .Where(i => i.TenantId == tenant.Id && i.UserName == userName)
@@ -873,6 +875,7 @@ public sealed class AuthService : IAuthService
                 if (result is null)
                 {
                     var emailContact = await _dataContext.Query<IdentityContact>()
+                        .IgnoreQueryFilters()
                         .Include(c => c.Type)
                         .Where(i =>
                             i.Credential.TenantId == tenant.Id &&
@@ -884,6 +887,7 @@ public sealed class AuthService : IAuthService
                     if (emailContact != null)
                     {
                         result = await _dataContext.Query<IdentityCredential>()
+                            .IgnoreQueryFilters()
                             .Include(i => i.IdentityInfo)
                             .Include(i => i.IdentityRoles)
                             .Where(i => i.Id == emailContact.CredentialId)
@@ -895,6 +899,7 @@ public sealed class AuthService : IAuthService
                 if (result is null)
                 {
                     var phoneContact = await _dataContext.Query<IdentityContact>()
+                        .IgnoreQueryFilters()
                         .Include(c => c.Type)
                         .Where(i =>
                             i.Credential.TenantId == tenant.Id &&
@@ -906,6 +911,7 @@ public sealed class AuthService : IAuthService
                     if (phoneContact != null)
                     {
                         result = await _dataContext.Query<IdentityCredential>()
+                            .IgnoreQueryFilters()
                             .Include(i => i.IdentityInfo)
                             .Include(i => i.IdentityRoles)
                             .Where(i => i.Id == phoneContact.CredentialId)
@@ -916,6 +922,7 @@ public sealed class AuthService : IAuthService
 
             case AuthorizationType.Username:
                 result = await _dataContext.Query<IdentityCredential>()
+                    .IgnoreQueryFilters()
                     .Include(i => i.IdentityInfo)
                     .Include(i => i.IdentityRoles)
                     .Where(i => i.TenantId == tenant.Id && i.UserName == userName)
@@ -929,6 +936,7 @@ public sealed class AuthService : IAuthService
                 }
 
                 var emailContactForAuth = await _dataContext.Query<IdentityContact>()
+                    .IgnoreQueryFilters()
                     .Include(c => c.Type)
                     .Where(i =>
                         i.Credential.TenantId == tenant.Id &&
@@ -939,6 +947,7 @@ public sealed class AuthService : IAuthService
 
                 result = emailContactForAuth != null
                     ? await _dataContext.Query<IdentityCredential>()
+                        .IgnoreQueryFilters()
                         .Include(i => i.IdentityInfo)
                         .Include(i => i.IdentityRoles)
                         .Where(i => i.Id == emailContactForAuth.CredentialId)
@@ -948,6 +957,7 @@ public sealed class AuthService : IAuthService
 
             case AuthorizationType.Phone:
                 var phoneContactForAuth = await _dataContext.Query<IdentityContact>()
+                    .IgnoreQueryFilters()
                     .Include(c => c.Type)
                     .Where(i =>
                         i.Credential.TenantId == tenant.Id &&
@@ -958,6 +968,7 @@ public sealed class AuthService : IAuthService
 
                 result = phoneContactForAuth != null
                     ? await _dataContext.Query<IdentityCredential>()
+                        .IgnoreQueryFilters()
                         .Include(i => i.IdentityInfo)
                         .Include(i => i.IdentityRoles)
                         .Where(i => i.Id == phoneContactForAuth.CredentialId)
@@ -967,6 +978,7 @@ public sealed class AuthService : IAuthService
 
             case AuthorizationType.Token:
                 result = await _dataContext.Query<IdentityCredential>()
+                    .IgnoreQueryFilters()
                     .Include(i => i.IdentityRoles)
                     .Include(i => i.IdentityInfo)
                     .Where(i => i.UserName == userName)
@@ -1017,6 +1029,7 @@ public sealed class AuthService : IAuthService
         CancellationToken ct)
     {
         var roleList = await _dataContext.Query<IdentityRole>()
+            .IgnoreQueryFilters()
             .Include(i => i.Type)
             .Where(i => i.CredentialId == credential.Id)
             .ToListAsync(ct);
@@ -1096,6 +1109,7 @@ public sealed class AuthService : IAuthService
             if (sessionTypeId is null || sessionTypeId == Guid.Empty)
             {
                 var userSessionType = await _dataContext.Query<SessionType>()
+                    .IgnoreQueryFilters()
                     .Where(i => i.TenantId == tenantId)
                     .Where(i => i.SystemReferenceId == IdentityConstants.SessionType.User)
                     .Where(i => i.Name == "User")
@@ -1113,6 +1127,7 @@ public sealed class AuthService : IAuthService
             if (sessionTypeId is null)
             {
                 var serviceSessionType = await _dataContext.Query<SessionType>()
+                    .IgnoreQueryFilters()
                     .Where(i => i.TenantId == tenantId)
                     .Where(i => i.SystemReferenceId == IdentityConstants.SessionType.Service)
                     .Where(i => i.Name == "Service")
