@@ -1,5 +1,6 @@
 using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.Extensions.Caching.Memory;
+using XFramework.Domain.Shared.DataContext;
 
 namespace XFramework.Core.Services;
 
@@ -18,24 +19,35 @@ public interface ITenantResolver
 
 /// <summary>
 /// Implementation of ITenantResolver with memory caching.
-/// Tenant lookup is parked until IdentityServer.Api exposes a tenant lookup contract.
 /// </summary>
-public sealed class TenantResolver(IMemoryCache cache) : ITenantResolver
+public sealed class TenantResolver(
+    IDataContext dataContext,
+    IMemoryCache cache) : ITenantResolver
 {
-    private const string UnsupportedTenantLookupMessage =
-        "Tenant lookup is not supported by the default TenantResolver. " +
-        "Configure a concrete ITenantResolver once IdentityServer.Api exposes a tenant endpoint or service wrapper.";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(15);
 
     /// <inheritdoc />
-    public Task<Tenant> GetTenant(Guid? id)
+    public async Task<Tenant> GetTenant(Guid? id)
     {
         if (id is null || id == Guid.Empty) throw new ArgumentNullException(nameof(id));
 
-        if (cache.TryGetValue($"GetTenant-{id}", out Tenant? entity) && entity is not null)
+        var cacheKey = $"GetTenant-{id}";
+        if (cache.TryGetValue(cacheKey, out Tenant? entity) && entity is not null)
         {
-            return Task.FromResult(entity);
+            return entity;
         }
 
-        throw new NotSupportedException($"{UnsupportedTenantLookupMessage} Tenant id: '{id}'.");
+        var tenant = await dataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .Where(i => i.Id == id)
+            .FirstOrDefaultAsync();
+
+        if (tenant is null)
+        {
+            throw new InvalidOperationException($"Tenant '{id}' could not be found.");
+        }
+
+        cache.Set(cacheKey, tenant, CacheDuration);
+        return tenant;
     }
 }
