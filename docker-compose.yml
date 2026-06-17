@@ -154,6 +154,31 @@ services:
       retries: 15
       start_period: 15s
 
+  # ── Control Panel ───────────────────────────────────────────
+  controlpanel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Presentation/ControlPanel.Server/ControlPanel.Server.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${CONTROLPANEL_EXPOSE_PORT:-5000}:8080"
+    depends_on:
+      bolt-hub:
+        condition: service_healthy
+      identityserver:
+        condition: service_healthy
+      wallets:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
   # ── Seq (structured log aggregator) ──────────────────────────
   seq:
     image: datalust/seq:2025
