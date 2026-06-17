@@ -1,0 +1,34 @@
+using FluentValidation;
+using Notifications.Api.Generated;
+using XFramework.Core.DataContext;
+using XFramework.Core.Extensions;
+using XFramework.Core.Health;
+using XFramework.Core.Middlewares;
+using XFramework.Core.RateLimiting;
+using XFramework.Integration.Extensions;
+
+var builder = XApplication.Configure<Program>();
+builder.Logging.AddXFrameworkLogging(builder.Configuration);
+
+builder.Services.InstallOpenTelemetry(builder.Configuration, "XFramework.Notifications.Api");
+builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
+    builder.Configuration,
+    "Notifications");
+
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+builder.Services.AddDataContextHandler(typeof(Program).Assembly);
+builder.Services.AddXFrameworkRateLimiting();
+
+var app = (WebApplication)builder.Build();
+
+app.UseCorrelationId();
+app.UseXFrameworkRateLimiting();
+app.EnsureDatabase<AppDbContext>();
+
+app.MapXFrameworkHealthChecks("Notifications");
+app.MapGeneratedEndpoints();
+app.MapApiDocumentation();
+
+app.Run();
+
+public partial class Program;
