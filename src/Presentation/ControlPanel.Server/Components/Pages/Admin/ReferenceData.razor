@@ -1,4 +1,5 @@
 @page "/admin/reference-data"
+@using XFramework.Domain.Shared.Contracts.Base
 @using XFramework.Domain.Shared.DataContext
 
 <PageTitle>Reference Data - Control Panel</PageTitle>
@@ -21,24 +22,35 @@
             OnValueChange="@OnReferenceCategoryChanged"
             Class="reference-data-layout">
         <div class="reference-data-sidebar">
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_categorySearch"
-                              Label="Categories"
-                              Placeholder="Search reference data" />
-            <BbTabsList Class="reference-data-nav" Responsive="false">
+            <div class="space-y-2">
+                <BbLabel For="reference-category-search">Categories</BbLabel>
+                <input id="reference-category-search"
+                       class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                       value="@_categorySearch"
+                       @oninput="OnCategorySearchInput"
+                       placeholder="Search reference data" />
+            </div>
+            <nav class="reference-data-nav" aria-label="Reference data categories">
                 @foreach (var group in VisibleCategoryGroups)
                 {
-                    <div class="reference-data-group">@group.Key</div>
-                    @foreach (var category in group)
-                    {
-                        <BbTabsTrigger Value="@category.Value"
-                                       Label="@category.Label"
-                                       Class="reference-data-trigger">
-                            @category.Label
-                        </BbTabsTrigger>
-                    }
+                    <section class="reference-data-group-section" aria-labelledby="@($"reference-data-group-{group.Key.Replace(" ", "-").ToLowerInvariant()}")">
+                        <div id="@($"reference-data-group-{group.Key.Replace(" ", "-").ToLowerInvariant()}")"
+                             class="reference-data-group-label">
+                            @group.Key
+                        </div>
+                        <BbTabsList Class="reference-data-group-list" Responsive="false">
+                            @foreach (var category in group)
+                            {
+                                <BbTabsTrigger Value="@category.Value"
+                                               Label="@category.Label"
+                                               Class="reference-data-trigger">
+                                    @category.Label
+                                </BbTabsTrigger>
+                            }
+                        </BbTabsList>
+                    </section>
                 }
-            </BbTabsList>
+            </nav>
         </div>
 
         <div class="reference-data-content">
@@ -67,7 +79,7 @@
                         <ChildContent Context="item">
                             <div class="flex items-center gap-2">
                                 <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name ?? "", "", "", (item.RoleLevel ?? 0).ToString(), item.SystemReferenceId.ToString()))">
+                                          OnClick="@(() => OpenEditDialog(item.Id, item.Name ?? "", "", "", (item.RoleLevel ?? 0).ToString(), item.SystemReferenceId.ToString(), groupId: item.GroupId.ToString()))">
                                     Edit
                                 </BbButton>
                                 <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
@@ -397,6 +409,26 @@
                                       @bind-Value="_formLevel"
                                       Label="Level"
                                       Placeholder="Numeric role level (e.g. 1)" />
+                    @if (_roleTypeGroups.Count == 0)
+                    {
+                        <div>
+                            <BbLabel>Group</BbLabel>
+                            <p class="text-sm text-muted-foreground">Create a role group before adding role types.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <BbFormFieldSelect TValue="string"
+                                           @bind-Value="_formGroupId"
+                                           Label="Group"
+                                           Placeholder="Select role group"
+                                           Required="true">
+                            @foreach (var group in _roleTypeGroups)
+                            {
+                                <BbSelectItem Value="@group.Id.ToString()">@group.Name</BbSelectItem>
+                            }
+                        </BbFormFieldSelect>
+                    }
                     <BbFormFieldInput TValue="string"
                                       @bind-Value="_formSystemRef"
                                       Label="System Reference ID"
@@ -541,6 +573,7 @@
 
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
 
     private bool _loading = true;
@@ -573,12 +606,18 @@
                         || x.Group.Contains(_categorySearch, StringComparison.OrdinalIgnoreCase))
             .GroupBy(x => x.Group);
 
+    private void OnCategorySearchInput(ChangeEventArgs args)
+    {
+        _categorySearch = args.Value?.ToString() ?? "";
+    }
+
     // Generic form fields
     private Guid _editingId;
     private string _formName = "";
     private string _formDescription = "";
     private string _formCode = "";
     private string _formLevel = "";
+    private string _formGroupId = "";
     private string _formSystemRef = "";
     private string _formPriority = "";
     private string _formDefaultExpiry = "";
@@ -722,9 +761,12 @@
         catch { /* reload failure is non-critical */ }
     }
 
-    private async Task<List<T>> LoadList<T>(int take = 100) where T : class =>
+    private async Task<List<T>> LoadList<T>(int take = 100) where T : BaseModel =>
         await DataContext.Query<T>()
+            .IgnoreQueryFilters()
             .NoCache()
+            .Where(x => !x.IsDeleted)
+            .OrderByDescending(x => x.CreatedAt)
             .Take(take)
             .ToListAsync();
 
@@ -737,6 +779,7 @@
         _formDescription = "";
         _formCode = "";
         _formLevel = "";
+        _formGroupId = "";
         _formSystemRef = "";
         _formPriority = "";
         _formDefaultExpiry = "";
@@ -755,10 +798,14 @@
     {
         _isEditing = false;
         ResetFormFields();
+        if (_activeTab == "role-types" && _roleTypeGroups.Count == 1)
+        {
+            _formGroupId = _roleTypeGroups[0].Id.ToString();
+        }
         _dialogOpen = true;
     }
 
-    private void OpenEditDialog(Guid id, string name, string description, string code, string level, string systemRef, string defaultExpiry = "", string priority = "")
+    private void OpenEditDialog(Guid id, string name, string description, string code, string level, string systemRef, string defaultExpiry = "", string priority = "", string groupId = "")
     {
         _isEditing = true;
         ResetFormFields();
@@ -767,6 +814,7 @@
         _formDescription = description;
         _formCode = code;
         _formLevel = level;
+        _formGroupId = groupId;
         _formSystemRef = systemRef;
         _formDefaultExpiry = defaultExpiry;
         _formPriority = priority;
@@ -845,7 +893,7 @@
         await ReloadActiveTab();
     }
 
-    private async Task<DataContextResult> RemoveEntity<T>(T entity) where T : class
+    private async Task<DataContextResult> RemoveEntity<T>(T entity) where T : BaseModel
     {
         DataContext.Remove(entity);
         return await DataContext.SaveChangesAsync();
@@ -895,15 +943,23 @@
 
     private async Task SaveRoleType()
     {
-        if (string.IsNullOrWhiteSpace(_formName)) { ToastService.Show("Name is required."); return; }
+        var name = _formName.Trim();
+        if (string.IsNullOrWhiteSpace(name)) { ToastService.Show("Name is required."); return; }
+
+        if (!Guid.TryParse(_formGroupId, out var groupId) || groupId == Guid.Empty)
+        {
+            ToastService.Show("Role group is required.");
+            return;
+        }
 
         if (_isEditing)
         {
             var entity = new IdentityRoleType
             {
                 Id = _editingId,
-                Name = _formName,
+                Name = name,
                 RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : null,
+                GroupId = groupId,
                 SystemReferenceId = ParseSystemRef(),
                 ModifiedAt = DateTime.UtcNow
             };
@@ -914,8 +970,9 @@
             var entity = new IdentityRoleType
             {
                 Id = Guid.NewGuid(),
-                Name = _formName,
+                Name = name,
                 RoleLevel = short.TryParse(_formLevel, out var lv) ? lv : null,
+                GroupId = groupId,
                 SystemReferenceId = ParseSystemRef(),
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
@@ -1106,9 +1163,31 @@
 
     private async Task SaveWalletType()
     {
-        if (string.IsNullOrWhiteSpace(_formName) || string.IsNullOrWhiteSpace(_formCode))
+        var code = _formCode.Trim();
+        var name = _formName.Trim();
+        var description = _formDescription.Trim();
+
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code))
         {
             ToastService.Show("Code and Name are required.");
+            return;
+        }
+
+        if (code.Length > 9)
+        {
+            ToastService.Show("Wallet type code must be 9 characters or fewer.");
+            return;
+        }
+
+        if (name.Length > 20)
+        {
+            ToastService.Show("Wallet type name must be 20 characters or fewer.");
+            return;
+        }
+
+        if (description.Length > 500)
+        {
+            ToastService.Show("Wallet type description must be 500 characters or fewer.");
             return;
         }
 
@@ -1117,9 +1196,9 @@
             var entity = new global::Wallets.Domain.Shared.Contracts.WalletType
             {
                 Id = _editingId,
-                Code = _formCode,
-                Name = _formName,
-                Desc = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
+                Code = code,
+                Name = name,
+                Desc = string.IsNullOrWhiteSpace(description) ? null : description,
                 MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null,
                 MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
                 ModifiedAt = DateTime.UtcNow
@@ -1131,9 +1210,9 @@
             var entity = new global::Wallets.Domain.Shared.Contracts.WalletType
             {
                 Id = Guid.NewGuid(),
-                Code = _formCode,
-                Name = _formName,
-                Desc = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription,
+                Code = code,
+                Name = name,
+                Desc = string.IsNullOrWhiteSpace(description) ? null : description,
                 MinTransferRule = decimal.TryParse(_formMinTransfer, out var minT) ? minT : null,
                 MaxTransferRule = decimal.TryParse(_formMaxTransfer, out var maxT) ? maxT : null,
                 CreatedAt = DateTime.UtcNow,
@@ -1223,6 +1302,11 @@
 
     private async Task PersistAndClose<T>(T entity) where T : class
     {
+        if (!await PrepareEntityForPersistence(entity))
+        {
+            return;
+        }
+
         if (_isEditing)
         {
             DataContext.Update(entity);
@@ -1242,5 +1326,51 @@
         ToastService.Show(_isEditing ? $"{TabDisplayName} updated." : $"{TabDisplayName} created.");
         _dialogOpen = false;
         await ReloadActiveTab();
+    }
+
+    private async Task<bool> PrepareEntityForPersistence<T>(T entity) where T : class
+    {
+        if (entity is not BaseModel model)
+        {
+            return true;
+        }
+
+        var tenantId = await ResolveReferenceTenantId();
+        if (tenantId is null)
+        {
+            ToastService.Show("Create or select a tenant before adding reference data.");
+            return false;
+        }
+
+        model.TenantId = tenantId.Value;
+        if (model.ConcurrencyStamp == Guid.Empty)
+        {
+            model.ConcurrencyStamp = Guid.NewGuid();
+        }
+
+        if (entity is IHasSystemReferenceId systemReference && systemReference.SystemReferenceId == Guid.Empty)
+        {
+            systemReference.SystemReferenceId = ParseSystemRef();
+        }
+
+        return true;
+    }
+
+    private async Task<Guid?> ResolveReferenceTenantId()
+    {
+        if (TenantFilter.SelectedTenantId is Guid selectedTenantId)
+        {
+            return selectedTenantId;
+        }
+
+        var tenant = await DataContext.Query<Tenant>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Take(1)
+            .FirstOrDefaultAsync();
+
+        return tenant?.Id;
     }
 }

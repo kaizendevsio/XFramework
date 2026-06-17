@@ -1,6 +1,8 @@
 @page "/finance/wallets/{Id:guid}"
+@using System.Globalization
 @using global::Wallets.Domain.Shared.Enums
 @using XFramework.Domain.Shared.DataContext
+@implements IDisposable
 
 <PageTitle>Wallet Detail - Control Panel</PageTitle>
 
@@ -15,7 +17,7 @@ else if (_wallet is null)
 else if (_outsideTenantContext)
 {
     <div class="space-y-4">
-        <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => NavigationManager.NavigateTo("/finance/wallets"))">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@GoBack">
             <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
             Back to Wallets
         </BbButton>
@@ -32,7 +34,7 @@ else
         @* Header *@
         <div class="flex items-center gap-4">
             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                      OnClick="@(() => NavigationManager.NavigateTo("/finance/wallets"))">
+                      OnClick="@GoBack">
                 <LucideIcon Name="arrow-left" class="h-4 w-4" />
             </BbButton>
             <div class="flex-1">
@@ -61,7 +63,7 @@ else
                 @if (_wallet.Status != WalletStatus.Closed)
                 {
                     <BbButton Variant="ButtonVariant.Destructive" OnClick="@(() => _showCloseDialog = true)">
-                        <LucideIcon Name="x-circle" class="mr-2 h-4 w-4" />
+                        <LucideIcon Name="x" class="mr-2 h-4 w-4" />
                         Close Wallet
                     </BbButton>
                 }
@@ -332,36 +334,90 @@ else
         @* Wallet Rules *@
         <BbCard>
             <BbCardHeader>
-                <BbCardTitle>Wallet Rules</BbCardTitle>
-                <BbCardDescription>Transfer and balance rules configured for this wallet</BbCardDescription>
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <BbCardTitle>Wallet Rules</BbCardTitle>
+                        <BbCardDescription>Transfer and balance rules configured for this wallet</BbCardDescription>
+                    </div>
+                    @if (!_editingRules)
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="@StartEditRules">
+                            <LucideIcon Name="settings" class="mr-2 h-4 w-4" />
+                            Edit Rules
+                        </BbButton>
+                    }
+                </div>
             </BbCardHeader>
             <BbCardContent>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Min Transfer Rule</BbTypographyMuted>
-                        <BbTypographyLarge>
-                            @(_wallet.MinTransferRule?.ToString("N2") ?? "Not set")
-                        </BbTypographyLarge>
+                @if (_editingRules)
+                {
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_rulesMinTransfer"
+                                              Label="Min Transfer Rule"
+                                              Placeholder="No minimum" />
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_rulesMaxTransfer"
+                                              Label="Max Transfer Rule"
+                                              Placeholder="No maximum" />
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_rulesBondBalance"
+                                              Label="Bond Balance Rule"
+                                              Placeholder="Not set" />
+                            <BbFormFieldInput TValue="string"
+                                              @bind-Value="_rulesMaintainingBalance"
+                                              Label="Maintaining Balance Rule"
+                                              Placeholder="Not set" />
+                        </div>
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@CancelEditRules" Disabled="@_savingRules">
+                                <LucideIcon Name="x" class="mr-2 h-4 w-4" />
+                                Cancel
+                            </BbButton>
+                            <BbButton OnClick="@SaveRules" Disabled="@_savingRules">
+                                @if (_savingRules)
+                                {
+                                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                                }
+                                else
+                                {
+                                    <LucideIcon Name="save" class="mr-2 h-4 w-4" />
+                                }
+                                Save Rules
+                            </BbButton>
+                        </div>
                     </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Max Transfer Rule</BbTypographyMuted>
-                        <BbTypographyLarge>
-                            @(_wallet.MaxTransferRule?.ToString("N2") ?? "Not set")
-                        </BbTypographyLarge>
+                }
+                else
+                {
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Min Transfer Rule</BbTypographyMuted>
+                            <BbTypographyLarge>
+                                @(_wallet.MinTransferRule?.ToString("N2") ?? "Not set")
+                            </BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Max Transfer Rule</BbTypographyMuted>
+                            <BbTypographyLarge>
+                                @(_wallet.MaxTransferRule?.ToString("N2") ?? "Not set")
+                            </BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Bond Balance Rule</BbTypographyMuted>
+                            <BbTypographyLarge>
+                                @(_wallet.BondBalanceRule?.ToString("N2") ?? "Not set")
+                            </BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Maintaining Balance Rule</BbTypographyMuted>
+                            <BbTypographyLarge>
+                                @(_wallet.MaintainingBalanceRule?.ToString("N2") ?? "Not set")
+                            </BbTypographyLarge>
+                        </div>
                     </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Bond Balance Rule</BbTypographyMuted>
-                        <BbTypographyLarge>
-                            @(_wallet.BondBalanceRule?.ToString("N2") ?? "Not set")
-                        </BbTypographyLarge>
-                    </div>
-                    <div class="space-y-1">
-                        <BbTypographyMuted>Maintaining Balance Rule</BbTypographyMuted>
-                        <BbTypographyLarge>
-                            @(_wallet.MaintainingBalanceRule?.ToString("N2") ?? "Not set")
-                        </BbTypographyLarge>
-                    </div>
-                </div>
+                }
             </BbCardContent>
         </BbCard>
     </div>
@@ -398,6 +454,8 @@ else
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] private NavigationHistoryService NavigationHistory { get; set; } = default!;
 
     private Wallet? _wallet;
     private List<WalletTransaction> _transactions = [];
@@ -419,12 +477,45 @@ else
     // Adjust Balance form
     private string _adjustBalance = "";
     private string _adjustRemarks = "";
+    private Guid? _loadedId;
+    private bool _editingRules;
+    private bool _savingRules;
+    private string _rulesMinTransfer = "";
+    private string _rulesMaxTransfer = "";
+    private string _rulesBondBalance = "";
+    private string _rulesMaintainingBalance = "";
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id)
+        {
+            return;
+        }
+
+        _loadedId = Id;
+        await ReloadWalletDetail();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await ReloadWalletDetail();
+            StateHasChanged();
+        });
+    }
+
+    private async Task ReloadWalletDetail()
     {
         _loading = true;
         try
         {
+            _transactions = [];
             await LoadWallet();
             if (_wallet is not null && !_outsideTenantContext)
             {
@@ -445,6 +536,8 @@ else
     {
         _outsideTenantContext = false;
         _wallet = await DataContext.Query<Wallet>()
+            .IgnoreQueryFilters()
+            .NoCache()
             .Include(x => x.WalletType)
             .Where(x => x.Id == Id)
             .FirstOrDefaultAsync();
@@ -456,7 +549,10 @@ else
     private async Task LoadTransactions()
     {
         _transactions = await DataContext.Query<WalletTransaction>()
+            .IgnoreQueryFilters()
+            .NoCache()
             .Where(x => x.WalletId == Id)
+            .OrderByDescending(x => x.CreatedAt)
             .Take(100)
             .ToListAsync();
     }
@@ -469,6 +565,138 @@ else
         WalletStatus.Closed => "closed",
         _ => "inactive"
     };
+
+    private async Task GoBack()
+    {
+        if (!NavigationHistory.CanGoBack)
+        {
+            NavigationManager.NavigateTo("/finance/wallets");
+            return;
+        }
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("history.back");
+        }
+        catch (JSException)
+        {
+            NavigationManager.NavigateTo(NavigationHistory.PreviousUri ?? "/finance/wallets", replace: true);
+        }
+        catch (InvalidOperationException)
+        {
+            NavigationManager.NavigateTo(NavigationHistory.PreviousUri ?? "/finance/wallets", replace: true);
+        }
+    }
+
+    private void StartEditRules()
+    {
+        if (_wallet is null)
+        {
+            return;
+        }
+
+        _rulesMinTransfer = FormatRuleInput(_wallet.MinTransferRule);
+        _rulesMaxTransfer = FormatRuleInput(_wallet.MaxTransferRule);
+        _rulesBondBalance = FormatRuleInput(_wallet.BondBalanceRule);
+        _rulesMaintainingBalance = FormatRuleInput(_wallet.MaintainingBalanceRule);
+        _editingRules = true;
+    }
+
+    private void CancelEditRules()
+    {
+        _editingRules = false;
+    }
+
+    private async Task SaveRules()
+    {
+        if (!TryParseRule(_rulesMinTransfer, "Min transfer rule", out var minTransfer, out var error)
+            || !TryParseRule(_rulesMaxTransfer, "Max transfer rule", out var maxTransfer, out error)
+            || !TryParseRule(_rulesBondBalance, "Bond balance rule", out var bondBalance, out error)
+            || !TryParseRule(_rulesMaintainingBalance, "Maintaining balance rule", out var maintainingBalance, out error))
+        {
+            ToastService.Show(error);
+            return;
+        }
+
+        if (minTransfer is not null && maxTransfer is not null && minTransfer > maxTransfer)
+        {
+            ToastService.Show("Min transfer rule cannot be greater than max transfer rule.");
+            return;
+        }
+
+        _savingRules = true;
+        try
+        {
+            var fresh = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null)
+            {
+                ToastService.Show("Wallet not found.");
+                return;
+            }
+
+            fresh.MinTransferRule = minTransfer;
+            fresh.MaxTransferRule = maxTransfer;
+            fresh.BondBalanceRule = bondBalance;
+            fresh.MaintainingBalanceRule = maintainingBalance;
+            fresh.ModifiedAt = DateTime.UtcNow;
+
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Wallet rules updated.");
+                _editingRules = false;
+                await LoadWallet();
+            }
+            else
+            {
+                ToastService.Show($"Failed to update wallet rules: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error updating wallet rules: {ex.Message}");
+        }
+        finally
+        {
+            _savingRules = false;
+        }
+    }
+
+    private static string FormatRuleInput(decimal? value) =>
+        value?.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
+
+    private static bool TryParseRule(string value, string label, out decimal? parsed, out string error)
+    {
+        parsed = null;
+        error = "";
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var rule)
+            && !decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out rule))
+        {
+            error = $"{label} must be a valid number.";
+            return false;
+        }
+
+        if (rule < 0)
+        {
+            error = $"{label} cannot be negative.";
+            return false;
+        }
+
+        parsed = rule;
+        return true;
+    }
 
     private async Task AddFunds()
     {
@@ -483,6 +711,8 @@ else
         {
             // Fetch fresh wallet state
             var fresh = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -559,6 +789,8 @@ else
         {
             // Fetch fresh wallet state
             var fresh = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -641,6 +873,8 @@ else
         {
             // Fetch fresh wallet state
             var fresh = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -710,6 +944,8 @@ else
         try
         {
             var fresh = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -751,6 +987,8 @@ else
         try
         {
             var fresh = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -792,6 +1030,8 @@ else
         try
         {
             var fresh = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -828,5 +1068,10 @@ else
         {
             ToastService.Show($"Error closing wallet: {ex.Message}");
         }
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
 }

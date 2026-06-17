@@ -206,24 +206,34 @@
         try
         {
             var userQuery = DataContext.Query<IdentityInformation>();
+            userQuery = userQuery
+                .IgnoreQueryFilters()
+                .NoCache();
             if (TenantFilter.SelectedTenantId is { } tenantId)
             {
                 userQuery = userQuery.Where(x => x.TenantId == tenantId);
             }
 
-            _users = (await userQuery.Take(100).ToListAsync())
+            _users = await userQuery
                 .OrderByDescending(x => x.CreatedAt)
-                .ToList();
+                .Take(100)
+                .ToListAsync();
 
             // Load credentials to map usernames
             _credentialUsernames.Clear();
             var credentialQuery = DataContext.Query<IdentityCredential>();
+            credentialQuery = credentialQuery
+                .IgnoreQueryFilters()
+                .NoCache();
             if (TenantFilter.SelectedTenantId is { } credentialTenantId)
             {
                 credentialQuery = credentialQuery.Where(x => x.TenantId == credentialTenantId);
             }
 
-            var credentials = await credentialQuery.Take(500).ToListAsync();
+            var credentials = await credentialQuery
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
             foreach (var user in _users)
             {
                 var cred = credentials.FirstOrDefault(c => c.IdentityInfoId == user.Id);
@@ -261,13 +271,24 @@
         _saving = true;
         try
         {
-            // Get the first available tenant for the new user
-            var tenant = await DataContext.Query<Tenant>()
-                .Take(1)
-                .FirstOrDefaultAsync();
+            // Get the selected tenant, or the first available tenant when viewing all tenants.
+            var tenantQuery = DataContext.Query<Tenant>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(t => !t.IsDeleted)
+                .OrderBy(t => t.Name);
+
+            if (TenantFilter.SelectedTenantId is { } selectedTenantId)
+            {
+                tenantQuery = tenantQuery.Where(t => t.Id == selectedTenantId);
+            }
+
+            var tenant = await tenantQuery.Take(1).FirstOrDefaultAsync();
             if (tenant is null)
             {
-                ToastService.Show("No tenants exist. Create a tenant first.");
+                ToastService.Show(TenantFilter.SelectedTenantId is null
+                    ? "No tenants exist. Create a tenant first."
+                    : "Selected tenant was not found. Refresh tenants and try again.");
                 _saving = false;
                 return;
             }
@@ -317,6 +338,8 @@
         try
         {
             var fresh = await DataContext.Query<IdentityInformation>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == user.Id)
                 .FirstOrDefaultAsync();
 
@@ -360,6 +383,8 @@
         try
         {
             var fresh = await DataContext.Query<IdentityInformation>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == _deletingUser.Id)
                 .FirstOrDefaultAsync();
 

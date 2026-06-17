@@ -18,20 +18,6 @@
                 </div>
             </div>
 
-            @* Tenant selector *@
-            <div class="px-3 py-2 border-b border-sidebar-border">
-                <label class="text-[10px] text-muted-foreground uppercase tracking-wider">Active Tenant</label>
-                <BbCombobox TValue="string"
-                             Value="@_selectedTenantId"
-                             ValueChanged="@OnTenantSelectionChanged"
-                             Options="@TenantOptions"
-                             Placeholder="All Tenants"
-                             SearchPlaceholder="Search tenants..."
-                             EmptyMessage="No tenants found."
-                             Class="mt-1"
-                             MatchTriggerWidth="true" />
-            </div>
-
             @* Scrollable nav *@
             <nav class="flex-1 overflow-y-auto p-3">
                 <NavMenu />
@@ -70,6 +56,49 @@
             <div class="flex items-center gap-2">
                 <BbDarkModeToggle Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" />
                 <BbThemeSwitcher />
+                <details class="profile-menu">
+                    <summary class="profile-trigger" aria-label="Open profile menu">
+                        <span class="profile-avatar">@_userInitials</span>
+                        <span class="profile-trigger-text">
+                            <span class="profile-name">@_displayName</span>
+                            <span class="profile-tenant">@ActiveTenantLabel</span>
+                        </span>
+                        <LucideIcon Name="chevron-down" class="h-4 w-4 text-muted-foreground" />
+                    </summary>
+                    <div class="profile-menu-panel">
+                        <div class="profile-menu-user">
+                            <span class="profile-avatar profile-avatar-large">@_userInitials</span>
+                            <div class="min-w-0">
+                                <div class="profile-menu-name">@_displayName</div>
+                                <div class="profile-menu-username">@_userName</div>
+                            </div>
+                        </div>
+
+                        <div class="profile-menu-section">
+                            <label class="profile-menu-label">Active Tenant</label>
+                            <BbCombobox TValue="string"
+                                         Value="@_selectedTenantId"
+                                         ValueChanged="@OnTenantSelectionChanged"
+                                         Options="@TenantOptions"
+                                         Placeholder="All Tenants"
+                                         SearchPlaceholder="Search tenants..."
+                                         EmptyMessage="No tenants found."
+                                         Class="tenant-filter-combobox profile-tenant-combobox"
+                                         MatchTriggerWidth="true" />
+                        </div>
+
+                        <div class="profile-menu-actions">
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@ManageTenants" Class="profile-menu-button">
+                                <LucideIcon Name="building-2" class="mr-2 h-4 w-4" />
+                                Manage Tenants
+                            </BbButton>
+                            <BbButton Variant="ButtonVariant.Ghost" OnClick="@Logout" Class="profile-menu-button">
+                                <LucideIcon Name="log-out" class="mr-2 h-4 w-4" />
+                                Sign Out
+                            </BbButton>
+                        </div>
+                    </div>
+                </details>
             </div>
         </header>
         <main class="app-main flex-1 min-w-0 p-6 overflow-y-auto">
@@ -88,12 +117,18 @@
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private NavigationHistoryService NavigationHistory { get; set; } = default!;
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private List<IdentityServer.Domain.Shared.Contracts.Tenant> _tenants = [];
     private const string AllTenantsValue = "__all_tenants__";
     private string _selectedTenantId = AllTenantsValue;
     private int _contentRenderKey;
+    private string _displayName = "Administrator";
+    private string _userName = "";
+    private string _userInitials = "A";
     private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
+    private string ActiveTenantLabel => string.IsNullOrWhiteSpace(_selectedTenantName) ? "All Tenants" : _selectedTenantName;
 
     private List<SelectOption<string>> TenantOptions =>
     [
@@ -118,6 +153,27 @@
         TenantFilter.OnTenantsChanged += OnTenantsChanged;
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        _userName = user.Identity.Name ?? "";
+        _displayName = user.FindFirst(ControlPanelAuthClaims.DisplayName)?.Value
+            ?? user.Identity.Name
+            ?? "Administrator";
+        _userInitials = BuildInitials(_displayName);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
@@ -129,6 +185,7 @@
         try
         {
             _tenants = await DataContext.Query<IdentityServer.Domain.Shared.Contracts.Tenant>()
+                .IgnoreQueryFilters()
                 .NoCache()
                 .Where(t => !t.IsDeleted)
                 .OrderBy(t => t.Name)
@@ -162,6 +219,28 @@
         {
             TenantFilter.Clear();
         }
+    }
+
+    private void ManageTenants()
+    {
+        Nav.NavigateTo("/identity/tenants");
+    }
+
+    private void Logout()
+    {
+        Nav.NavigateTo("/auth/logout", forceLoad: true);
+    }
+
+    private static string BuildInitials(string displayName)
+    {
+        var parts = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            return "A";
+        }
+
+        var initials = string.Concat(parts.Take(2).Select(x => char.ToUpperInvariant(x[0])));
+        return string.IsNullOrWhiteSpace(initials) ? "A" : initials;
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)

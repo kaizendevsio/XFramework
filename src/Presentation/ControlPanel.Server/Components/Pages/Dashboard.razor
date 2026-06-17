@@ -1,5 +1,6 @@
 @page "/"
 @using XFramework.Domain.Shared.DataContext
+@implements IDisposable
 
 <PageTitle>Dashboard - Control Panel</PageTitle>
 
@@ -70,6 +71,7 @@ else
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private ILogger<Dashboard> Logger { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
 
     private bool _loading = true;
     private long _userCount;
@@ -80,20 +82,58 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadStats();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadStats();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadStats()
+    {
         _loading = true;
+        _error = null;
         try
         {
-            var usersTask = DataContext.Query<IdentityInformation>().NoCache().CountAsync();
-            var sessionsTask = DataContext.Query<Session>().NoCache().CountAsync();
-            var walletsTask = DataContext.Query<Wallet>().NoCache().CountAsync();
-            var tenantsTask = DataContext.Query<Tenant>().NoCache().CountAsync();
+            var usersQuery = DataContext.Query<IdentityInformation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => !x.IsDeleted);
 
-            await Task.WhenAll(usersTask, sessionsTask, walletsTask, tenantsTask);
+            var sessionsQuery = DataContext.Query<Session>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => !x.IsDeleted);
 
-            _userCount = usersTask.Result;
-            _sessionCount = sessionsTask.Result;
-            _walletCount = walletsTask.Result;
-            _tenantCount = tenantsTask.Result;
+            var walletsQuery = DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => !x.IsDeleted);
+
+            var tenantsQuery = DataContext.Query<Tenant>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => !x.IsDeleted);
+
+            if (TenantFilter.SelectedTenantId is Guid tenantId)
+            {
+                usersQuery = usersQuery.Where(x => x.TenantId == tenantId);
+                sessionsQuery = sessionsQuery.Where(x => x.TenantId == tenantId);
+                walletsQuery = walletsQuery.Where(x => x.TenantId == tenantId);
+                tenantsQuery = tenantsQuery.Where(x => x.Id == tenantId);
+            }
+
+            _userCount = await usersQuery.CountAsync();
+            var sessions = await sessionsQuery.ToListAsync();
+            _sessionCount = sessions.LongCount(x => x.Status == CurrentSessionState.Active);
+            _walletCount = await walletsQuery.CountAsync();
+            _tenantCount = await tenantsQuery.CountAsync();
         }
         catch (Exception ex)
         {
@@ -104,5 +144,10 @@ else
         {
             _loading = false;
         }
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
 }

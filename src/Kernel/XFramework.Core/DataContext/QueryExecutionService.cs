@@ -42,9 +42,6 @@ public sealed class QueryExecutionService(
 
             // MemoryPackSerializer.Serialize(object?) uses the object formatter which fails
             // for runtime-typed results. Use the actual result type for correct serialization.
-            if (result is null)
-                return [];
-
             var resultType = GetResultType(descriptor.Mode, entityType);
             return MemoryPack.MemoryPackSerializer.Serialize(resultType, result);
         }

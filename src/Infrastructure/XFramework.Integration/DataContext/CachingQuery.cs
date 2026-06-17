@@ -30,6 +30,7 @@ public class CachingQuery<T> : IRemoteQuery<T> where T : class
     public IRemoteQuery<T> Distinct() { _inner.Distinct(); return this; }
     public IRemoteQuery<T> DistinctBy<TKey>(Expression<Func<T, TKey>> keySelector) { _inner.DistinctBy(keySelector); return this; }
     public IRemoteQuery<T> NoCache() { _noCache = true; _inner.NoCache(); return this; }
+    public IRemoteQuery<T> IgnoreQueryFilters() { _inner.IgnoreQueryFilters(); return this; }
 
     public async Task<List<T>> ToListAsync(CancellationToken ct = default)
     {

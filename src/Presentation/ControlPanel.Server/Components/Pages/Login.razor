@@ -1,0 +1,63 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@layout LoginLayout
+
+<PageTitle>Sign in - Control Panel</PageTitle>
+
+<section class="login-card">
+    <div class="login-brand">
+        <div class="login-logo">X</div>
+        <div>
+            <h1>Control Panel</h1>
+            <p>XFramework Admin</p>
+        </div>
+    </div>
+
+    <div class="login-heading">
+        <h2>Sign in</h2>
+        <p>Use your ControlPanel administrator credential.</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="login-error" role="alert">@Error</div>
+    }
+
+    <form method="post" action="/auth/login" class="login-form">
+        <input type="hidden" name="returnUrl" value="@SafeReturnUrl" />
+
+        <label>
+            <span>Username</span>
+            <input name="username" autocomplete="username" required autofocus />
+        </label>
+
+        <label>
+            <span>Password</span>
+            <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+
+        <label class="login-remember">
+            <input name="rememberMe" type="checkbox" value="true" />
+            <span>Keep me signed in</span>
+        </label>
+
+        <button type="submit">Sign in</button>
+    </form>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private string SafeReturnUrl => IsSafeReturnUrl(ReturnUrl) ? ReturnUrl! : "/";
+
+    private static bool IsSafeReturnUrl(string? returnUrl) =>
+        !string.IsNullOrWhiteSpace(returnUrl) &&
+        returnUrl.StartsWith('/') &&
+        !returnUrl.StartsWith("//") &&
+        !returnUrl.StartsWith('\\');
+}
+

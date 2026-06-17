@@ -200,6 +200,7 @@
         try
         {
             _tenants = await DataContext.Query<Tenant>()
+                .IgnoreQueryFilters()
                 .NoCache()
                 .Where(x => !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
@@ -257,29 +258,12 @@
             };
 
             DataContext.Add(tenant);
-            foreach (var definition in TenantModuleFeatureKeys.All)
-            {
-                var (moduleKey, subFeatureKey) =
-                    TenantModuleFeatureKeys.Normalize(definition.ModuleKey, definition.SubFeatureKey);
-
-                DataContext.Add(new TenantModuleFeature
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = tenantId,
-                    ModuleKey = moduleKey,
-                    SubFeatureKey = subFeatureKey,
-                    DisplayName = definition.DisplayName,
-                    Description = definition.Description,
-                    CreatedAt = DateTime.UtcNow,
-                    IsEnabled = true
-                });
-            }
-
             var result = await DataContext.SaveChangesAsync();
 
             if (result.IsSuccess)
             {
                 var createdTenant = await DataContext.Query<Tenant>()
+                    .IgnoreQueryFilters()
                     .NoCache()
                     .Where(x => x.Id == tenantId)
                     .FirstOrDefaultAsync();
@@ -325,6 +309,7 @@
         try
         {
             var fresh = await DataContext.Query<Tenant>()
+                .IgnoreQueryFilters()
                 .Where(x => x.Id == _deletingTenant.Id)
                 .FirstOrDefaultAsync();
 

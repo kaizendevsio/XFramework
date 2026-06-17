@@ -1,4 +1,5 @@
 @typeparam TModel
+@implements IDisposable
 
 <BbCard>
     <BbCardHeader>
@@ -48,6 +49,11 @@
     public bool IsEditing => _context.IsEditing;
     public bool IsDirty => _context.IsDirty;
 
+    protected override void OnInitialized()
+    {
+        _context.Changed += OnContextChanged;
+    }
+
     private void EnterEditMode()
     {
         _context.IsEditing = true;
@@ -69,5 +75,15 @@
     {
         _context.Reset();
         await OnDiscard.InvokeAsync();
+    }
+
+    private void OnContextChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _context.Changed -= OnContextChanged;
     }
 }

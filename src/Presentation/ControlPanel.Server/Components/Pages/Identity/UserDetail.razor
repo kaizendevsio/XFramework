@@ -1,5 +1,6 @@
 @page "/identity/users/{Id:guid}"
 @using global::Wallets.Domain.Shared.Enums
+@implements IDisposable
 
 <PageTitle>User Detail - Control Panel</PageTitle>
 
@@ -97,8 +98,7 @@ else
                                        Options="_civilStatusOptions"
                                        DisplayValue="@(_user.CivilStatus?.ToString() ?? "N/A")" />
                         <EditableField Label="Verified" @bind-Value="_editIsVerified"
-                                       FieldType="EditableFieldType.Select"
-                                       Options="_verifiedOptions"
+                                       FieldType="EditableFieldType.Switch"
                                        DisplayValue="@(_user.IsVerified ? "Verified" : "Unverified")" />
                         <EditableField Label="Created" DisplayValue="@_user.CreatedAt.ToString("g")" ReadOnly="true" />
                     </div>
@@ -184,10 +184,11 @@ else
                                 <BbDataGridTemplateColumn Title="Expiration" Sortable="true">
                                     <ChildContent Context="role">
                                         @{
-                                            var isExpired = role.RoleExpiration < DateTime.UtcNow;
+                                            var hasNoExpiration = IsRoleExpirationUnlimited(role.RoleExpiration);
+                                            var isExpired = !hasNoExpiration && role.RoleExpiration < DateTime.UtcNow;
                                         }
                                         <span class="@(isExpired ? "text-destructive" : "")">
-                                            @role.RoleExpiration.ToString("g")
+                                            @(hasNoExpiration ? "No expiration" : role.RoleExpiration.ToLocalTime().ToString("g"))
                                             @if (isExpired)
                                             {
                                                 <span class="ml-1 text-xs">(expired)</span>
@@ -524,25 +525,20 @@ else
             <BbFormFieldSelect TValue="string"
                                @bind-Value="_roleForm.CredentialId"
                                Label="Credential"
-                               Placeholder="Select credential">
-                @foreach (var cred in _credentials)
-                {
-                    <BbSelectItem Value="@cred.Id.ToString()">@(cred.UserName ?? cred.Id.ToString()[..8])</BbSelectItem>
-                }
-            </BbFormFieldSelect>
+                               Placeholder="Select credential"
+                               Options="@CredentialOptions" />
             <BbFormFieldSelect TValue="string"
                                @bind-Value="_roleForm.RoleTypeId"
                                Label="Role Type"
-                               Placeholder="Select role type">
-                @foreach (var rt in _roleTypes)
-                {
-                    <BbSelectItem Value="@rt.Id.ToString()">@(rt.Name ?? rt.Id.ToString()[..8]) (Level: @(rt.RoleLevel?.ToString() ?? "N/A"))</BbSelectItem>
-                }
-            </BbFormFieldSelect>
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_roleForm.ExpirationString"
-                              Label="Expiration Date"
-                              Placeholder="YYYY-MM-DD (blank = 1 year from now)" />
+                               Placeholder="Select role type"
+                               Options="@RoleTypeOptions" />
+            <div class="xf-form-field">
+                <BbLabel>Expiration Date</BbLabel>
+                <input type="datetime-local"
+                       class="xf-datetime-input"
+                       value="@_roleForm.ExpirationString"
+                       @oninput="@((ChangeEventArgs e) => _roleForm.ExpirationString = e.Value?.ToString() ?? string.Empty)" />
+            </div>
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _assignRoleDialogOpen = false)">Cancel</BbButton>
@@ -570,21 +566,13 @@ else
             <BbFormFieldSelect TValue="string"
                                @bind-Value="_contactForm.CredentialId"
                                Label="Credential"
-                               Placeholder="Select credential">
-                @foreach (var cred in _credentials)
-                {
-                    <BbSelectItem Value="@cred.Id.ToString()">@(cred.UserName ?? cred.Id.ToString()[..8])</BbSelectItem>
-                }
-            </BbFormFieldSelect>
+                               Placeholder="Select credential"
+                               Options="@CredentialOptions" />
             <BbFormFieldSelect TValue="string"
                                @bind-Value="_contactForm.TypeId"
                                Label="Contact Type"
-                               Placeholder="Select type">
-                @foreach (var ct in _contactTypes)
-                {
-                    <BbSelectItem Value="@ct.Id.ToString()">@(ct.Name ?? ct.Id.ToString()[..8])</BbSelectItem>
-                }
-            </BbFormFieldSelect>
+                               Placeholder="Select type"
+                               Options="@ContactTypeOptions" />
             <BbFormFieldInput TValue="string"
                               @bind-Value="_contactForm.Value"
                               Label="Value"
@@ -630,13 +618,9 @@ else
                               @bind-Value="_addressForm.ConsolidatedName"
                               Label="Full Address (Consolidated)"
                               Placeholder="Complete address line" />
-            <BbFormFieldSelect TValue="string"
-                               @bind-Value="_addressForm.IsDefault"
-                               Label="Default Address"
-                               Placeholder="Set as default?">
-                <BbSelectItem Value="true">Yes</BbSelectItem>
-                <BbSelectItem Value="false">No</BbSelectItem>
-            </BbFormFieldSelect>
+            <BbFormFieldSwitch Checked="@_addressForm.IsDefault"
+                               CheckedChanged="@((bool value) => _addressForm.IsDefault = value)"
+                               Label="Default Address" />
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _addressDialogOpen = false)">Cancel</BbButton>
@@ -673,6 +657,7 @@ else
     private bool _loading = true;
     private bool _saving;
     private bool _outsideTenantContext;
+    private Guid? _loadedId;
 
     // Editable form
     private EditableForm<IdentityInformation>? _editableForm;
@@ -689,7 +674,13 @@ else
     // Select options
     private List<SelectOption<string>> _genderOptions = Enum.GetValues<Gender>().Select(g => new SelectOption<string>(g.ToString(), g.ToString())).ToList();
     private List<SelectOption<string>> _civilStatusOptions = Enum.GetValues<CivilStatus>().Select(cs => new SelectOption<string>(cs.ToString(), cs.ToString())).ToList();
-    private static readonly List<SelectOption<string>> _verifiedOptions = [new("true", "Verified"), new("false", "Unverified")];
+    private List<SelectOption<string>> CredentialOptions =>
+        _credentials.Select(x => new SelectOption<string>(x.Id.ToString(), GetCredentialLabel(x))).ToList();
+    private List<SelectOption<string>> RoleTypeOptions =>
+        _roleTypes.Select(x => new SelectOption<string>(x.Id.ToString(), GetRoleTypeLabel(x))).ToList();
+    private List<SelectOption<string>> ContactTypeOptions =>
+        _contactTypes.Select(x => new SelectOption<string>(x.Id.ToString(), GetContactTypeLabel(x))).ToList();
+    private static readonly DateTime NoRoleExpirationUtc = new(9999, 12, 31, 23, 59, 59, DateTimeKind.Utc);
 
     // Create Credential dialog
     private bool _createCredDialogOpen;
@@ -713,9 +704,29 @@ else
     private IdentityAddress? _editingAddress;
     private AddressForm _addressForm = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id)
+        {
+            return;
+        }
+
+        _loadedId = Id;
         await ReloadAllData();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await ReloadAllData();
+            StateHasChanged();
+        });
     }
 
     private async Task ReloadAllData()
@@ -725,10 +736,16 @@ else
         {
             _outsideTenantContext = false;
             _user = await DataContext.Query<IdentityInformation>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
-            if (_user is null) return;
+            if (_user is null)
+            {
+                ClearChildData();
+                return;
+            }
             _outsideTenantContext = TenantFilter.SelectedTenantId is Guid tenantId && tenantId != _user.TenantId;
             if (_outsideTenantContext)
             {
@@ -772,10 +789,12 @@ else
         try
         {
             _credentials = (await DataContext.Query<IdentityCredential>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.IdentityInfoId == Id)
+                    .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync())
-                .OrderByDescending(x => x.CreatedAt)
                 .ToList();
         }
         catch { _credentials = []; }
@@ -790,8 +809,11 @@ else
             foreach (var credId in credentialIds)
             {
                 var roles = await DataContext.Query<IdentityRole>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.CredentialId == credId)
                     .Include(x => x.Type)
+                    .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync();
                 _roles.AddRange(roles);
@@ -810,8 +832,11 @@ else
             foreach (var credId in credentialIds)
             {
                 var contacts = await DataContext.Query<IdentityContact>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.CredentialId == credId)
                     .Include(x => x.Type)
+                    .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync();
                 _contacts.AddRange(contacts);
@@ -826,10 +851,12 @@ else
         try
         {
             _addresses = (await DataContext.Query<IdentityAddress>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.IdentityInfoId == Id)
+                    .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync())
-                .OrderByDescending(x => x.CreatedAt)
                 .ToList();
         }
         catch { _addresses = []; }
@@ -844,7 +871,10 @@ else
             foreach (var credId in credentialIds)
             {
                 var sessions = await DataContext.Query<Session>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.CredentialId == credId)
+                    .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync();
                 _sessions.AddRange(sessions);
@@ -863,7 +893,10 @@ else
             foreach (var credId in credentialIds)
             {
                 var authLogs = await DataContext.Query<AuthorizationLog>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.CredentialId == credId)
+                    .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync();
                 _authLogs.AddRange(authLogs);
@@ -882,7 +915,10 @@ else
             foreach (var credId in credentialIds)
             {
                 var wallets = await DataContext.Query<Wallet>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.CredentialId == credId)
+                    .OrderByDescending(x => x.CreatedAt)
                     .Take(100)
                     .ToListAsync();
                 _wallets.AddRange(wallets);
@@ -897,15 +933,19 @@ else
         try
         {
             _roleTypes = (await DataContext.Query<IdentityRoleType>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .OrderBy(x => x.Name)
                     .Take(100)
                     .ToListAsync())
-                .OrderBy(x => x.Name)
                 .ToList();
 
             _contactTypes = (await DataContext.Query<IdentityContactType>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .OrderBy(x => x.Name)
                     .Take(100)
                     .ToListAsync())
-                .OrderBy(x => x.Name)
                 .ToList();
         }
         catch { /* lookups may fail */ }
@@ -935,6 +975,8 @@ else
         try
         {
             var fresh = await DataContext.Query<IdentityInformation>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == Id)
                 .FirstOrDefaultAsync();
 
@@ -1069,9 +1111,11 @@ else
         _saving = true;
         try
         {
-            var expiration = DateTime.TryParse(_roleForm.ExpirationString, out var exp)
-                ? exp
-                : DateTime.UtcNow.AddYears(1);
+            if (!TryResolveRoleExpiration(_roleForm.ExpirationString, out var expiration))
+            {
+                ToastService.Show("Choose a valid expiration date and time.");
+                return;
+            }
 
             var role = new IdentityRole
             {
@@ -1190,6 +1234,8 @@ else
             if (_editingContact is not null)
             {
                 var fresh = await DataContext.Query<IdentityContact>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.Id == _editingContact.Id)
                     .FirstOrDefaultAsync();
 
@@ -1272,7 +1318,7 @@ else
             Building = address.Building,
             Subdivision = address.Subdivision,
             ConsolidatedName = address.ConsolidatedName,
-            IsDefault = (address.DefaultAddress == true).ToString().ToLower()
+            IsDefault = address.DefaultAddress == true
         };
         _addressDialogOpen = true;
     }
@@ -1285,6 +1331,8 @@ else
             if (_editingAddress is not null)
             {
                 var fresh = await DataContext.Query<IdentityAddress>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
                     .Where(x => x.Id == _editingAddress.Id)
                     .FirstOrDefaultAsync();
 
@@ -1295,7 +1343,7 @@ else
                     fresh.Building = _addressForm.Building;
                     fresh.Subdivision = _addressForm.Subdivision;
                     fresh.ConsolidatedName = _addressForm.ConsolidatedName;
-                    fresh.DefaultAddress = _addressForm.IsDefault == "true";
+                    fresh.DefaultAddress = _addressForm.IsDefault;
                     fresh.ModifiedAt = DateTime.UtcNow;
 
                     DataContext.Update(fresh);
@@ -1315,7 +1363,7 @@ else
                     Building = _addressForm.Building,
                     Subdivision = _addressForm.Subdivision,
                     ConsolidatedName = _addressForm.ConsolidatedName,
-                    DefaultAddress = _addressForm.IsDefault == "true",
+                    DefaultAddress = _addressForm.IsDefault,
                     IsEnabled = true,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -1362,6 +1410,8 @@ else
         try
         {
             var fresh = await DataContext.Query<Session>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == session.Id)
                 .FirstOrDefaultAsync();
 
@@ -1395,6 +1445,65 @@ else
 
     // ─── Form Models ──────────────────────────────────────────────────
 
+    private static string GetCredentialLabel(IdentityCredential credential)
+    {
+        if (!string.IsNullOrWhiteSpace(credential.UserName))
+        {
+            return credential.UserName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(credential.UserAlias))
+        {
+            return credential.UserAlias;
+        }
+
+        return credential.Id.ToString()[..8];
+    }
+
+    private static string GetRoleTypeLabel(IdentityRoleType roleType)
+    {
+        var name = string.IsNullOrWhiteSpace(roleType.Name)
+            ? roleType.Id.ToString()[..8]
+            : roleType.Name;
+
+        return $"{name} (Level: {roleType.RoleLevel?.ToString() ?? "N/A"})";
+    }
+
+    private static string GetContactTypeLabel(IdentityContactType contactType) =>
+        string.IsNullOrWhiteSpace(contactType.Name)
+            ? contactType.Id.ToString()[..8]
+            : contactType.Name;
+
+    private static bool TryResolveRoleExpiration(string? value, out DateTime expiration)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            expiration = NoRoleExpirationUtc;
+            return true;
+        }
+
+        if (!DateTime.TryParse(
+                value,
+                System.Globalization.CultureInfo.CurrentCulture,
+                System.Globalization.DateTimeStyles.AssumeLocal,
+                out var parsed))
+        {
+            expiration = default;
+            return false;
+        }
+
+        expiration = parsed.Kind switch
+        {
+            DateTimeKind.Utc => parsed,
+            DateTimeKind.Local => parsed.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(parsed, DateTimeKind.Local).ToUniversalTime()
+        };
+        return true;
+    }
+
+    private static bool IsRoleExpirationUnlimited(DateTime expiration) =>
+        expiration >= NoRoleExpirationUtc.AddDays(-1);
+
     private class CredentialForm
     {
         public string? UserName { get; set; }
@@ -1424,6 +1533,11 @@ else
         public string? Building { get; set; }
         public string? Subdivision { get; set; }
         public string? ConsolidatedName { get; set; }
-        public string IsDefault { get; set; } = "false";
+        public bool IsDefault { get; set; }
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
     }
 }

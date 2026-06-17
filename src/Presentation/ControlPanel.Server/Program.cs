@@ -1,12 +1,15 @@
-using System.Text.Json;
 using BlazorBlueprint.Components;
+using System.Security.Claims;
+using System.Text.Json;
+using ControlPanel.Server.Extensions;
 using ControlPanel.Server.Health;
+using ControlPanel.Server.Services;
+using XFramework.Integration.Extensions;
 using IdentityServer.Integration.Drivers;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Wallets.Integration.Drivers;
 using XFramework.Domain.Shared.BusinessObjects;
-using XFramework.Integration.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +19,23 @@ builder.Logging.AddXFrameworkLogging(builder.Configuration);
 // Blazor Server
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddCascadingAuthenticationState();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddAuthentication(ControlPanelAuthDefaults.AuthenticationScheme)
+    .AddCookie(ControlPanelAuthDefaults.AuthenticationScheme, options =>
+    {
+        options.Cookie.Name = "XFramework.ControlPanel";
+        options.LoginPath = "/login";
+        options.LogoutPath = "/auth/logout";
+        options.AccessDeniedPath = "/login";
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromHours(12);
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    });
+builder.Services.AddAuthorization();
 
 // BlueprintUI
 builder.Services.AddBlazorBlueprintComponents(configureTheme: options =>
@@ -46,10 +66,30 @@ builder.Services.AddIdentityServerWrapperServices();
 builder.Services.AddWalletsWrapperServices();
 
 // IDataContext — universal query layer routed through service wrappers
+builder.Services.AddScoped(sp =>
+{
+    var httpContext = sp.GetRequiredService<IHttpContextAccessor>().HttpContext;
+    var user = httpContext?.User;
+
+    return new RequestMetadata
+    {
+        TenantId = TryGetGuidClaim(user, ControlPanelAuthClaims.TenantId),
+        SessionId = TryGetGuidClaim(user, ControlPanelAuthClaims.SessionId),
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel",
+        DeviceName = Environment.MachineName,
+        DeviceAgent = httpContext?.Request.Headers.UserAgent.ToString(),
+        IpAddress = httpContext?.Connection.RemoteIpAddress?.ToString()
+    };
+});
 builder.Services.AddRemoteDataContext();
 
 // Tenant filter state (sidebar selection)
-builder.Services.AddScoped<ControlPanel.Server.Services.TenantFilterService>();
+builder.Services.AddScoped<TenantFilterService>();
+builder.Services.AddScoped<NavigationHistoryService>();
+builder.Services.AddScoped<ControlPanelAuthService>();
+builder.Services.AddScoped<ControlPanelBootstrapSeeder>();
+builder.Services.AddHostedService<ControlPanelBootstrapHostedService>();
 
 var app = builder.Build();
 
@@ -61,6 +101,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAntiforgery();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
@@ -98,6 +140,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 });
 
 app.MapStaticAssets();
+app.MapControlPanelAuthEndpoints();
 app.MapRazorComponents<ControlPanel.Server.Components.App>()
     .AddInteractiveServerRenderMode();
 
@@ -132,4 +175,15 @@ static async Task WriteHealthResponse(HttpContext context, HealthReport report)
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 WriteIndented = true
             }));
+}
+
+static Guid? TryGetGuidClaim(ClaimsPrincipal? user, string claimType)
+{
+    if (user?.Identity?.IsAuthenticated != true)
+    {
+        return null;
+    }
+
+    var value = user.FindFirst(claimType)?.Value;
+    return Guid.TryParse(value, out var id) ? id : null;
 }

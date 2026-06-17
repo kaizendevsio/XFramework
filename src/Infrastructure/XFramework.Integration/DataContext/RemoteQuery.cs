@@ -10,10 +10,13 @@ namespace XFramework.Integration.DataContext;
 
 public class RemoteQuery<T> : IRemoteQuery<T> where T : class
 {
+    private const string IgnoreQueryFiltersMetadataFlag = "xframework.ignoreQueryFilters";
+
     private readonly QueryDescriptor _descriptor;
     private readonly IServiceProvider _serviceProvider;
     private readonly List<TrackedEntity> _trackedEntities;
     private readonly RequestMetadata? _metadata;
+    private bool _ignoreQueryFilters;
 
     public RemoteQuery(
         IServiceProvider serviceProvider,
@@ -115,13 +118,20 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         return this;
     }
 
+    public IRemoteQuery<T> IgnoreQueryFilters()
+    {
+        _ignoreQueryFilters = true;
+        _descriptor.Metadata = BuildQueryMetadata();
+        return this;
+    }
+
     // Terminal: materialization
 
     public async Task<List<T>> ToListAsync(CancellationToken ct = default)
     {
         _descriptor.Mode = QueryExecutionMode.ToList;
         var resultBytes = await ExecuteQueryAsync(ct);
-        var result = MemoryPackSerializer.Deserialize<List<T>>(resultBytes);
+        var result = DeserializeOptionalQueryResult<List<T>>(resultBytes, _descriptor.Mode);
         if (result is not null)
             foreach (var entity in result) TrackEntity(entity);
         return result ?? [];
@@ -131,7 +141,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     {
         _descriptor.Mode = QueryExecutionMode.FirstOrDefault;
         var resultBytes = await ExecuteQueryAsync(ct);
-        var result = MemoryPackSerializer.Deserialize<T?>(resultBytes);
+        var result = DeserializeOptionalQueryResult<T>(resultBytes, _descriptor.Mode);
         if (result is not null) TrackEntity(result);
         return result;
     }
@@ -140,7 +150,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     {
         _descriptor.Mode = QueryExecutionMode.SingleOrDefault;
         var resultBytes = await ExecuteQueryAsync(ct);
-        var result = MemoryPackSerializer.Deserialize<T?>(resultBytes);
+        var result = DeserializeOptionalQueryResult<T>(resultBytes, _descriptor.Mode);
         if (result is not null) TrackEntity(result);
         return result;
     }
@@ -153,7 +163,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     {
         _descriptor.Mode = QueryExecutionMode.Stream;
         _descriptor.ChunkSize = chunkSize;
-        _descriptor.Metadata = _metadata;
+        _descriptor.Metadata = BuildQueryMetadata();
 
         var wrapper = ResolveWrapper();
         var descriptorBytes = MemoryPackSerializer.Serialize(_descriptor);
@@ -180,14 +190,14 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
     {
         _descriptor.Mode = QueryExecutionMode.Count;
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<int>(resultBytes);
+        return DeserializeRequiredQueryResult<int>(resultBytes, _descriptor.Mode);
     }
 
     public async Task<bool> AnyAsync(CancellationToken ct = default)
     {
         _descriptor.Mode = QueryExecutionMode.Any;
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<bool>(resultBytes);
+        return DeserializeRequiredQueryResult<bool>(resultBytes, _descriptor.Mode);
     }
 
     public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
@@ -195,7 +205,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.AnyWithPredicate;
         _descriptor.PredicateFilters = QueryExpressionVisitor.Parse(predicate);
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<bool>(resultBytes);
+        return DeserializeRequiredQueryResult<bool>(resultBytes, _descriptor.Mode);
     }
 
     public async Task<bool> AllAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
@@ -203,7 +213,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.All;
         _descriptor.PredicateFilters = QueryExpressionVisitor.Parse(predicate);
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<bool>(resultBytes);
+        return DeserializeRequiredQueryResult<bool>(resultBytes, _descriptor.Mode);
     }
 
     // Terminal: aggregation
@@ -213,7 +223,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.Min;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<TResult?>(resultBytes);
+        return DeserializeOptionalQueryResult<TResult>(resultBytes, _descriptor.Mode);
     }
 
     public async Task<TResult?> MaxAsync<TResult>(Expression<Func<T, TResult>> selector, CancellationToken ct = default)
@@ -221,7 +231,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.Max;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<TResult?>(resultBytes);
+        return DeserializeOptionalQueryResult<TResult>(resultBytes, _descriptor.Mode);
     }
 
     public async Task<T?> MinByAsync<TKey>(Expression<Func<T, TKey>> keySelector, CancellationToken ct = default)
@@ -229,7 +239,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.MinBy;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(keySelector);
         var resultBytes = await ExecuteQueryAsync(ct);
-        var result = MemoryPackSerializer.Deserialize<T?>(resultBytes);
+        var result = DeserializeOptionalQueryResult<T>(resultBytes, _descriptor.Mode);
         if (result is not null) TrackEntity(result);
         return result;
     }
@@ -239,7 +249,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.MaxBy;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(keySelector);
         var resultBytes = await ExecuteQueryAsync(ct);
-        var result = MemoryPackSerializer.Deserialize<T?>(resultBytes);
+        var result = DeserializeOptionalQueryResult<T>(resultBytes, _descriptor.Mode);
         if (result is not null) TrackEntity(result);
         return result;
     }
@@ -249,7 +259,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.Sum;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<decimal>(resultBytes);
+        return DeserializeRequiredQueryResult<decimal>(resultBytes, _descriptor.Mode);
     }
 
     public async Task<double> AverageAsync(Expression<Func<T, decimal>> selector, CancellationToken ct = default)
@@ -257,7 +267,7 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.Average;
         _descriptor.AggregateProperty = SortExpressionParser.GetPropertyName(selector);
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<double>(resultBytes);
+        return DeserializeRequiredQueryResult<double>(resultBytes, _descriptor.Mode);
     }
 
     public async Task<List<GroupResult<TKey, T>>> GroupByAsync<TKey>(
@@ -267,17 +277,75 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         _descriptor.Mode = QueryExecutionMode.GroupBy;
         _descriptor.GroupByProperty = SortExpressionParser.GetPropertyName(keySelector);
         var resultBytes = await ExecuteQueryAsync(ct);
-        return MemoryPackSerializer.Deserialize<List<GroupResult<TKey, T>>>(resultBytes) ?? [];
+        return DeserializeOptionalQueryResult<List<GroupResult<TKey, T>>>(resultBytes, _descriptor.Mode) ?? [];
     }
 
     // Helpers
 
     private async Task<byte[]> ExecuteQueryAsync(CancellationToken ct)
     {
-        _descriptor.Metadata = _metadata;
+        _descriptor.Metadata = BuildQueryMetadata();
         var wrapper = ResolveWrapper();
         var descriptorBytes = MemoryPackSerializer.Serialize(_descriptor);
         return await wrapper.ExecuteQueryAsync(descriptorBytes, ct);
+    }
+
+    private RequestMetadata? BuildQueryMetadata()
+    {
+        if (!_ignoreQueryFilters)
+            return _metadata;
+
+        var metadata = _metadata is null
+            ? new RequestMetadata()
+            : new RequestMetadata
+            {
+                SessionId = _metadata.SessionId,
+                TenantId = _metadata.TenantId,
+                Name = _metadata.Name,
+                DeviceName = _metadata.DeviceName,
+                DeviceAgent = _metadata.DeviceAgent,
+                IpAddress = _metadata.IpAddress,
+                RequestId = _metadata.RequestId
+            };
+
+        metadata.DeviceAgent = string.IsNullOrWhiteSpace(metadata.DeviceAgent)
+            ? IgnoreQueryFiltersMetadataFlag
+            : $"{metadata.DeviceAgent};{IgnoreQueryFiltersMetadataFlag}";
+
+        return metadata;
+    }
+
+    private static TQueryResult? DeserializeOptionalQueryResult<TQueryResult>(
+        byte[] resultBytes,
+        QueryExecutionMode mode)
+    {
+        if (resultBytes.Length == 0)
+        {
+            throw new InvalidOperationException(
+                $"Remote data context query '{mode}' returned an empty response. " +
+                "Verify the target service is connected and the DataContext Bolt handler is registered.");
+        }
+
+        try
+        {
+            return MemoryPackSerializer.Deserialize<TQueryResult>(resultBytes);
+        }
+        catch (MemoryPackSerializationException ex)
+        {
+            throw new InvalidOperationException(
+                $"Remote data context query '{mode}' returned an invalid response: {ex.Message}", ex);
+        }
+    }
+
+    private static TQueryResult DeserializeRequiredQueryResult<TQueryResult>(
+        byte[] resultBytes,
+        QueryExecutionMode mode)
+    {
+        var result = DeserializeOptionalQueryResult<TQueryResult>(resultBytes, mode);
+        return result is null
+            ? throw new InvalidOperationException(
+                $"Remote data context query '{mode}' returned null for a required result.")
+            : result;
     }
 
     private IDataContextServiceWrapper ResolveWrapper()
