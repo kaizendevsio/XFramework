@@ -10,9 +10,6 @@ public sealed class MarkMessagesReadValidator : AbstractValidator<MarkMessagesRe
         RuleFor(x => x.ThreadId)
             .NotEmpty().WithMessage("Thread ID is required");
 
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester Credential ID is required");
-
         RuleFor(x => x.MessageIds)
             .NotEmpty().WithMessage("At least one message ID is required")
             .Must(ids => ids.Distinct().Count() == ids.Count)

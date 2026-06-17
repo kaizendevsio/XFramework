@@ -12,8 +12,5 @@ public sealed class DeleteThreadMessageValidator : AbstractValidator<DeleteThrea
 
         RuleFor(x => x.MessageId)
             .NotEmpty().WithMessage("Message ID is required");
-
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester Credential ID is required");
     }
 }

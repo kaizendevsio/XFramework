@@ -22,6 +22,14 @@ public class MessageThreadMemberRoleConfiguration : IEntityTypeConfiguration<Mes
             .HasDefaultValueSql("true");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
+        entity.HasIndex(e => new { e.MessageThreadMemberId, e.RoleId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("UX_MessageThreadMemberRole_Member_Role_Active");
+
+        entity.HasIndex(e => e.RoleId)
+            .HasDatabaseName("IX_MessageThreadMemberRole_RoleId");
+
         entity.HasOne(d => d.MessageThreadMember).WithMany()
             .HasForeignKey(d => d.MessageThreadMemberId)
             .OnDelete(DeleteBehavior.ClientSetNull)

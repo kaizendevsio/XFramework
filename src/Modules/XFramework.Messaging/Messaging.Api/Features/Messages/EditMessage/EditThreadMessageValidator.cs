@@ -13,9 +13,6 @@ public sealed class EditThreadMessageValidator : AbstractValidator<EditThreadMes
         RuleFor(x => x.MessageId)
             .NotEmpty().WithMessage("Message ID is required");
 
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester Credential ID is required");
-
         RuleFor(x => x.Text)
             .NotEmpty().WithMessage("Text is required")
             .MaximumLength(5000).WithMessage("Text cannot exceed 5000 characters");

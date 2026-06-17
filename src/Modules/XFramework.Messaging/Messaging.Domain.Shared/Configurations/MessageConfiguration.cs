@@ -23,6 +23,12 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.Text).HasColumnType("character varying");
 
+        entity.HasIndex(e => new { e.MessageThreadId, e.CreatedAt, e.Id })
+            .HasDatabaseName("IX_Message_Thread_CreatedAt_Id");
+
+        entity.HasIndex(e => new { e.MessageThreadMemberId, e.CreatedAt })
+            .HasDatabaseName("IX_Message_Member_CreatedAt");
+
         entity.HasOne(d => d.MessageThread).WithMany(p => p.Messages)
             .HasForeignKey(d => d.MessageThreadId)
             .OnDelete(DeleteBehavior.ClientSetNull)

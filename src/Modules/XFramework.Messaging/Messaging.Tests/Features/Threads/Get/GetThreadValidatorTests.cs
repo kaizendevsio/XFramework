@@ -22,7 +22,7 @@ public sealed class GetThreadValidatorTests
     }
 
     [Test]
-    public void Validate_MissingRequesterCredentialId_ReturnsInvalidResult()
+    public void Validate_MissingRequesterCredentialId_ReturnsValidResult()
     {
         var validator = new GetThreadValidator();
         var request = new GetThreadRequest
@@ -33,7 +33,6 @@ public sealed class GetThreadValidatorTests
 
         var result = validator.Validate(request);
 
-        Assert.That(result.IsValid, Is.False);
-        Assert.That(result.Errors.Any(e => e.PropertyName == nameof(GetThreadRequest.RequesterCredentialId)), Is.True);
+        Assert.That(result.IsValid, Is.True);
     }
 }

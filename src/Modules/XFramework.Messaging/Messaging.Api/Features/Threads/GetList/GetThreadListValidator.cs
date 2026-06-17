@@ -7,9 +7,6 @@ public sealed class GetThreadListValidator : AbstractValidator<GetThreadListRequ
 {
     public GetThreadListValidator()
     {
-        RuleFor(x => x.CredentialId)
-            .NotEmpty().WithMessage("Credential ID is required");
-
         RuleFor(x => x.PageSize)
             .InclusiveBetween(1, 100).WithMessage("Page size must be between 1 and 100");
 

@@ -18,6 +18,7 @@ builder.Services.AddXFrameworkHealthChecks<AppDbContext>(
 // Register services
 builder.Services.AddScoped<IMessagingService, MessagingService>();
 builder.Services.AddScoped<IThreadService, ThreadService>();
+builder.Services.AddScoped<IMessagingRequestContextResolver, MessagingRequestContextResolver>();
 
 // Register validators from this assembly
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -39,6 +40,7 @@ app.MapXFrameworkHealthChecks("Messaging");
 app.MapApiDocumentation();
 
 // Map feature endpoints (source-generated from [MapPost/Patch/...] attributes)
-app.MapGeneratedEndpoints();
+var securedMessagingEndpoints = app.MapGroup(string.Empty).RequireAuthorization();
+securedMessagingEndpoints.MapGeneratedEndpoints();
 
 app.Run();

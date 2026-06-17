@@ -15,8 +15,5 @@ public sealed class CreateMessageReactionValidator : AbstractValidator<CreateMes
 
         RuleFor(x => x.TypeId)
             .NotEmpty().WithMessage("Reaction Type ID is required");
-
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester Credential ID is required");
     }
 }

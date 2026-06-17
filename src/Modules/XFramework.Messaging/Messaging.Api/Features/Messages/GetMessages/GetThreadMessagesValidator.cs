@@ -10,9 +10,6 @@ public sealed class GetThreadMessagesValidator : AbstractValidator<GetThreadMess
         RuleFor(x => x.ThreadId)
             .NotEmpty().WithMessage("Thread ID is required");
 
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester credential ID is required");
-
         RuleFor(x => x.PageSize)
             .InclusiveBetween(1, 100).WithMessage("Page size must be between 1 and 100");
 

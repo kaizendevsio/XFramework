@@ -21,6 +21,14 @@ public class MessageReactionConfiguration : IEntityTypeConfiguration<MessageReac
             .HasDefaultValueSql("true");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
+        entity.HasIndex(e => new { e.MessageId, e.TypeId, e.MessageThreadMemberId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("UX_MessageReaction_Message_Type_Member_Active");
+
+        entity.HasIndex(e => new { e.MessageThreadMemberId, e.MessageId })
+            .HasDatabaseName("IX_MessageReaction_Member_Message");
+
         entity.HasOne(d => d.Type).WithMany(p => p.MessageReactions)
             .HasForeignKey(d => d.TypeId)
             .OnDelete(DeleteBehavior.ClientSetNull)

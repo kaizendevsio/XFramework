@@ -17,5 +17,6 @@ public sealed class ServicesInstaller : IInstaller
 
         // Register ThreadService
         services.AddScoped<IThreadService, ThreadService>();
+        services.AddScoped<IMessagingRequestContextResolver, MessagingRequestContextResolver>();
     }
 }
