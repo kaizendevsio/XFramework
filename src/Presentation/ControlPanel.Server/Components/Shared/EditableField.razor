@@ -8,16 +8,19 @@
             <BbFormFieldInput TValue="string"
                               Value="@Value"
                               ValueChanged="OnValueChanged"
+                              UpdateTiming="UpdateTiming.Immediate"
                               Label="@Label"
                               Placeholder="@Placeholder"
                               Required="@Required" />
             break;
 
         case EditableFieldType.Textarea:
-            <BbFormFieldTextarea @bind-Value="Value"
-                                Label="@Label"
-                                Placeholder="@Placeholder"
-                                Required="@Required" />
+            <BbFormFieldTextarea Value="@Value"
+                                 ValueChanged="OnValueChanged"
+                                 UpdateTiming="UpdateTiming.Immediate"
+                                 Label="@Label"
+                                 Placeholder="@Placeholder"
+                                 Required="@Required" />
             break;
 
         case EditableFieldType.Select:
@@ -35,13 +38,15 @@
                 <BbFormFieldInput TValue="string"
                                   Value="@Value"
                                   ValueChanged="OnValueChanged"
+                                  UpdateTiming="UpdateTiming.Immediate"
                                   Label="@Label"
                                   Placeholder="@Placeholder" />
             }
             break;
 
         case EditableFieldType.Switch:
-            <BbFormFieldSwitch @bind-Checked="_switchValue"
+            <BbFormFieldSwitch Checked="@CurrentSwitchValue"
+                               CheckedChanged="OnSwitchChanged"
                                Label="@Label" />
             break;
     }
@@ -77,17 +82,20 @@ else
 
     private string _fieldId = Guid.NewGuid().ToString();
     private string? _originalValue;
-    private bool _switchValue;
+    private bool _hasOriginalValue;
+    private bool CurrentSwitchValue => bool.TryParse(Value, out var value) && value;
 
     protected override void OnParametersSet()
     {
-        if (_context is { IsEditing: true } && _originalValue is null)
+        if (_context is { IsEditing: true } && !_hasOriginalValue)
         {
             _originalValue = Value;
+            _hasOriginalValue = true;
         }
         else if (_context is { IsEditing: false })
         {
             _originalValue = null;
+            _hasOriginalValue = false;
         }
     }
 
@@ -103,5 +111,10 @@ else
             else
                 _context.MarkFieldClean(_fieldId);
         }
+    }
+
+    private async Task OnSwitchChanged(bool newValue)
+    {
+        await OnValueChanged(newValue.ToString().ToLowerInvariant());
     }
 }

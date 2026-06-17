@@ -4,6 +4,8 @@
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Sections
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @using Microsoft.JSInterop
@@ -22,3 +24,5 @@
 @using IdentityServer.Integration.Drivers
 @using global::Wallets.Domain.Shared.Contracts
 @using global::Wallets.Integration.Drivers
+
+@attribute [Authorize]

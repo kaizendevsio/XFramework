@@ -87,6 +87,12 @@ public class ServerQuery<T> : IRemoteQuery<T> where T : class
         return this;
     }
 
+    public IRemoteQuery<T> IgnoreQueryFilters()
+    {
+        _queryable = _queryable.IgnoreQueryFilters();
+        return this;
+    }
+
     public Task<List<T>> ToListAsync(CancellationToken ct = default)
         => _queryable.ToListAsync(ct);
 

@@ -27,6 +27,9 @@ public interface IRemoteQuery<T> where T : class
     // Caching control
     IRemoteQuery<T> NoCache();
 
+    // Admin/system query behavior
+    IRemoteQuery<T> IgnoreQueryFilters();
+
     // Terminal: materialization
     Task<List<T>> ToListAsync(CancellationToken ct = default);
     Task<T?> FirstOrDefaultAsync(CancellationToken ct = default);

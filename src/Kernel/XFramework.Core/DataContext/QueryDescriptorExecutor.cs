@@ -7,6 +7,8 @@ namespace XFramework.Core.DataContext;
 
 public static class QueryDescriptorExecutor
 {
+    private const string IgnoreQueryFiltersMetadataFlag = "xframework.ignoreQueryFilters";
+
     public static async Task<object?> ExecuteAsync(
         DbContext dbContext,
         Type entityType,
@@ -78,6 +80,11 @@ public static class QueryDescriptorExecutor
     {
         IQueryable<T> queryable = dbContext.Set<T>().AsNoTracking();
 
+        if (ShouldIgnoreQueryFilters(descriptor))
+        {
+            queryable = queryable.IgnoreQueryFilters();
+        }
+
         // Apply filters
         if (descriptor.Filters.Count > 0)
         {
@@ -119,6 +126,11 @@ public static class QueryDescriptorExecutor
 
         return queryable;
     }
+
+    private static bool ShouldIgnoreQueryFilters(QueryDescriptor descriptor)
+        => descriptor.Metadata?.DeviceAgent?
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Contains(IgnoreQueryFiltersMetadataFlag, StringComparer.Ordinal) == true;
 
     private static IQueryable<T> ApplyFilters<T>(IQueryable<T> queryable, List<QueryFilter> filters) where T : class
     {

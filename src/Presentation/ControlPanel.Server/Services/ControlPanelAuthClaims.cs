@@ -1,0 +1,12 @@
+namespace ControlPanel.Server.Services;
+
+public static class ControlPanelAuthClaims
+{
+    public const string IdentityId = "identityId";
+    public const string CredentialId = "credentialId";
+    public const string TenantId = "tenantId";
+    public const string RoleTypeId = "roleTypeId";
+    public const string SessionId = "sessionId";
+    public const string DisplayName = "displayName";
+}
+

@@ -174,17 +174,11 @@ else
                                @bind-Value="_newWalletTypeId"
                                Label="Wallet Type"
                                Placeholder="Select wallet type">
-                <BbSelectItem Value="@("none")">None</BbSelectItem>
                 @foreach (var wt in _walletTypes)
                 {
                     <BbSelectItem Value="@wt.Id.ToString()">@(wt.Name) (@(wt.Code))</BbSelectItem>
                 }
             </BbFormFieldSelect>
-            <BbFormFieldInput TValue="string"
-                              @bind-Value="_newAccountNumber"
-                              Label="Account Number"
-                              Placeholder="Leave blank for auto-generation"
-                              HelperText="Optional — auto-generated if left blank" />
             <BbFormFieldInput TValue="string"
                               @bind-Value="_newInitialBalance"
                               Label="Initial Balance"
@@ -227,7 +221,6 @@ else
     // Create form
     private string _newCredentialId = "";
     private string _newWalletTypeId = "";
-    private string _newAccountNumber = "";
     private string _newInitialBalance = "0";
 
     protected override async Task OnInitializedAsync()
@@ -238,10 +231,12 @@ else
             await LoadData();
             await LoadCredentialOptions();
             _walletTypes = (await DataContext.Query<global::Wallets.Domain.Shared.Contracts.WalletType>()
+                    .IgnoreQueryFilters()
                     .NoCache()
+                    .Where(x => !x.IsDeleted)
+                    .OrderBy(x => x.Name)
                     .Take(100)
                     .ToListAsync())
-                .OrderBy(x => x.Name)
                 .ToList();
         }
         catch (Exception ex)
@@ -257,6 +252,7 @@ else
     private async Task LoadData()
     {
         var query = DataContext.Query<Wallet>()
+            .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.WalletType);
 
@@ -276,6 +272,7 @@ else
     private async Task LoadCredentialOptions()
     {
         var query = DataContext.Query<IdentityCredential>()
+            .IgnoreQueryFilters()
             .NoCache()
             .Include(x => x.IdentityInfo)
             .Where(x => !x.IsDeleted);
@@ -309,7 +306,6 @@ else
     {
         _newCredentialId = "";
         _newWalletTypeId = "";
-        _newAccountNumber = "";
         _newInitialBalance = "0";
         _showCreateDialog = true;
     }
@@ -333,6 +329,19 @@ else
             initialBalance = 0;
         }
 
+        if (!Guid.TryParse(_newWalletTypeId, out var walletTypeId))
+        {
+            ToastService.Show("Select a wallet type.");
+            return;
+        }
+
+        var walletType = _walletTypes.FirstOrDefault(x => x.Id == walletTypeId);
+        if (walletType is null)
+        {
+            ToastService.Show("Selected wallet type was not found. Refresh and try again.");
+            return;
+        }
+
         _isSaving = true;
         try
         {
@@ -341,9 +350,16 @@ else
                 Id = Guid.NewGuid(),
                 TenantId = walletTenantId,
                 CredentialId = credentialId,
-                WalletTypeId = _newWalletTypeId != "none" && Guid.TryParse(_newWalletTypeId, out var walletTypeId) ? walletTypeId : null,
-                AccountNumber = string.IsNullOrWhiteSpace(_newAccountNumber) ? null : _newAccountNumber.Trim(),
+                WalletTypeId = walletType.Id,
+                AccountNumber = await GenerateUniqueAccountNumber(),
                 Balance = initialBalance,
+                TransferableBalance = initialBalance,
+                DebitOnHoldBalance = 0,
+                CreditOnHoldBalance = 0,
+                BondBalanceRule = walletType.BondBalanceRule,
+                MaintainingBalanceRule = walletType.MaintainingBalanceRule,
+                MinTransferRule = walletType.MinTransferRule,
+                MaxTransferRule = walletType.MaxTransferRule,
                 Status = WalletStatus.Active,
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
@@ -374,6 +390,38 @@ else
         }
     }
 
+    private async Task<string> GenerateUniqueAccountNumber()
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var accountNumber = GenerateAccountNumber();
+            var exists = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .AnyAsync(x => x.AccountNumber == accountNumber);
+
+            if (!exists)
+            {
+                return accountNumber;
+            }
+        }
+
+        throw new InvalidOperationException("Unable to generate a unique account number. Try again.");
+    }
+
+    private static string GenerateAccountNumber()
+    {
+        Span<char> digits = stackalloc char[12];
+        digits[0] = (char)('1' + System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 9));
+
+        for (var i = 1; i < digits.Length; i++)
+        {
+            digits[i] = (char)('0' + System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 10));
+        }
+
+        return new string(digits);
+    }
+
     private async Task ToggleFreeze(Wallet wallet)
     {
         if (wallet.Status is not (WalletStatus.Active or WalletStatus.Frozen)) return;
@@ -381,6 +429,8 @@ else
         try
         {
             var fresh = await DataContext.Query<Wallet>()
+                .IgnoreQueryFilters()
+                .NoCache()
                 .Where(x => x.Id == wallet.Id)
                 .FirstOrDefaultAsync();
 

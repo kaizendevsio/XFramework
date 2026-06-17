@@ -1,0 +1,11 @@
+@inject NavigationManager Navigation
+
+@code {
+    protected override void OnInitialized()
+    {
+        var current = new Uri(Navigation.Uri).PathAndQuery;
+        var returnUrl = Uri.EscapeDataString(string.IsNullOrWhiteSpace(current) ? "/" : current);
+        Navigation.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: true);
+    }
+}
+

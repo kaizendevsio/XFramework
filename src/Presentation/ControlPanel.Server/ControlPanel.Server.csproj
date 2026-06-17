@@ -12,6 +12,7 @@
         <!-- BlueprintUI -->
         <PackageReference Include="BlazorBlueprint.Components" />
         <PackageReference Include="BlazorBlueprint.Icons.Lucide" />
+        <PackageReference Include="BCrypt.Net-Next" />
         <!-- ZLogger logging is provided transitively via XFramework.Integration -->
     </ItemGroup>
 
