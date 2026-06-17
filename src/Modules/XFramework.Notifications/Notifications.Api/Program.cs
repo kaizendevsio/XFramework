@@ -26,7 +26,8 @@ app.UseXFrameworkRateLimiting();
 app.EnsureDatabase<AppDbContext>();
 
 app.MapXFrameworkHealthChecks("Notifications");
-app.MapGeneratedEndpoints();
+var securedNotificationEndpoints = app.MapGroup(string.Empty).RequireAuthorization();
+securedNotificationEndpoints.MapGeneratedEndpoints();
 app.MapApiDocumentation();
 
 app.Run();
