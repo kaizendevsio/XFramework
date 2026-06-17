@@ -8,8 +8,7 @@ public static class CreateProductEndpoint
 {
     [MapPost("/api/products", Tags = ["Products"],
         Summary = "Create a new product",
-        Description = "Creates a new product in the inventory system",
-        ExcludeFromOpenApi = true)]
+        Description = "Creates a new product in the inventory system")]
     public static async Task<Result<ProductResponse>> Handle(
         CreateProductRequest request,
         ProductService productService,

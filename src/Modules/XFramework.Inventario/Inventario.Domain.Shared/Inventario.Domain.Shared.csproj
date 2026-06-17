@@ -12,10 +12,13 @@
 
     <ItemGroup>
         <Folder Include="BusinessObjects\" />
-        <Folder Include="Contracts\" />
-        <Folder Include="Enums\" />
         <Folder Include="Extensions\" />
         <Folder Include="Interfaces\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     </ItemGroup>
 
     <ItemGroup>

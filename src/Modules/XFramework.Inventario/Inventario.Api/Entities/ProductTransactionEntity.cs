@@ -1,19 +1,9 @@
-using XFramework.Core.Attributes;
-
 namespace XFramework.Inventario.Api.Entities;
 
 /// <summary>
 /// VSA wrapper entity for ProductTransaction domain model.
 /// Implements the VSA Wrapper Entity Pattern (ADR-003).
 /// </summary>
-[GenerateEndpoints(
-    Type = EndpointType.Both,
-    Actions = EndpointActions.All,
-    RoutePrefix = "api/producttransactions",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "producttransactions"
-)]
 public partial class ProductTransactionEntity
 {
     public Guid Id { get; set; }

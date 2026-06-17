@@ -8,8 +8,7 @@ public static class GetProductEndpoint
 {
     [MapGet("/api/products/{id:guid}", Tags = ["Products"],
         Summary = "Get a product by ID",
-        Description = "Retrieves a single product by its unique identifier",
-        ExcludeFromOpenApi = true)]
+        Description = "Retrieves a single product by its unique identifier")]
     public static async Task<Result<ProductResponse>> Handle(
         GetProductByIdRequest request,
         ProductService productService,

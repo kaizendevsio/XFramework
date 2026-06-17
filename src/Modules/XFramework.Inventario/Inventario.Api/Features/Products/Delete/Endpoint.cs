@@ -8,8 +8,7 @@ public static class DeleteProductEndpoint
 {
     [MapDelete("/api/products/{id:guid}", Tags = ["Products"],
         Summary = "Delete a product",
-        Description = "Soft deletes a product from the inventory",
-        ExcludeFromOpenApi = true)]
+        Description = "Soft deletes a product from the inventory")]
     public static async Task<Result> Handle(
         DeleteProductByIdRequest request,
         ProductService productService,

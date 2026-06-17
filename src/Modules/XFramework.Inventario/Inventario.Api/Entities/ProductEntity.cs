@@ -1,19 +1,9 @@
-using XFramework.Core.Attributes;
-
 namespace XFramework.Inventario.Api.Entities;
 
 /// <summary>
 /// VSA wrapper entity for Product domain model.
 /// Implements the VSA Wrapper Entity Pattern (ADR-003).
 /// </summary>
-[GenerateEndpoints(
-    Type = EndpointType.Both,
-    Actions = EndpointActions.All,
-    RoutePrefix = "api/productentities",
-    RequireAuthorization = true,
-    CacheDurationSeconds = 300,
-    CacheKeyPrefix = "productentities"
-)]
 public partial class ProductEntity
 {
     public Guid Id { get; set; }
