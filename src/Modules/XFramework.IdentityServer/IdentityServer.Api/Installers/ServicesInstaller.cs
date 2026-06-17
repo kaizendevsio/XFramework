@@ -9,6 +9,7 @@ public class ServicesInstaller : IInstaller
     {
         services.AddMessagingWrapperServices();
         services.AddTenantResolver();
+        services.AddTenantModuleFeatures();
 
         // Register AuthService for VSA pattern
         services.AddScoped<IAuthService, AuthService>();

@@ -14,6 +14,7 @@ public static class TestSeedData
     public static async Task SeedAll(AppDbContext db)
     {
         await SeedTenant(db);
+        await SeedTenantModuleFeatures(db);
         await SeedIdentityRoles(db);
         await SeedRegistryConfig(db);
         await SeedVerificationTypes(db);
@@ -57,6 +58,39 @@ public static class TestSeedData
                 Name = "User",
                 GroupId = TestConstants.RoleGroupId,
                 TenantId = TestConstants.TenantId
+            });
+        }
+    }
+
+    private static async Task SeedTenantModuleFeatures(AppDbContext db)
+    {
+        foreach (var definition in IdentityContracts.TenantModuleFeatureKeys.All)
+        {
+            var (moduleKey, subFeatureKey) =
+                IdentityContracts.TenantModuleFeatureKeys.Normalize(
+                    definition.ModuleKey,
+                    definition.SubFeatureKey);
+
+            var exists = await db.Set<IdentityContracts.TenantModuleFeature>()
+                .IgnoreQueryFilters()
+                .AnyAsync(feature =>
+                    feature.TenantId == TestConstants.TenantId &&
+                    feature.ModuleKey == moduleKey &&
+                    feature.SubFeatureKey == subFeatureKey);
+
+            if (exists)
+                continue;
+
+            db.Set<IdentityContracts.TenantModuleFeature>().Add(new IdentityContracts.TenantModuleFeature
+            {
+                Id = Guid.NewGuid(),
+                TenantId = TestConstants.TenantId,
+                ModuleKey = moduleKey,
+                SubFeatureKey = subFeatureKey,
+                DisplayName = definition.DisplayName,
+                Description = definition.Description,
+                CreatedAt = DateTime.UtcNow,
+                IsEnabled = true
             });
         }
     }

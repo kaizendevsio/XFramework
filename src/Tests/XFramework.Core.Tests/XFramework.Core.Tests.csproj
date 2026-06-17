@@ -17,6 +17,7 @@
         <PackageReference Include="Moq" />
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     </ItemGroup>
 
     <ItemGroup>

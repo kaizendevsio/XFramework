@@ -257,6 +257,24 @@
             };
 
             DataContext.Add(tenant);
+            foreach (var definition in TenantModuleFeatureKeys.All)
+            {
+                var (moduleKey, subFeatureKey) =
+                    TenantModuleFeatureKeys.Normalize(definition.ModuleKey, definition.SubFeatureKey);
+
+                DataContext.Add(new TenantModuleFeature
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    ModuleKey = moduleKey,
+                    SubFeatureKey = subFeatureKey,
+                    DisplayName = definition.DisplayName,
+                    Description = definition.Description,
+                    CreatedAt = DateTime.UtcNow,
+                    IsEnabled = true
+                });
+            }
+
             var result = await DataContext.SaveChangesAsync();
 
             if (result.IsSuccess)

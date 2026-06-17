@@ -10,6 +10,7 @@ public class ServicesInstaller : IInstaller
     public virtual void InstallServices<TApp>(IServiceCollection services, IConfiguration configuration, IHostEnvironment hostEnvironment)
     {
         services.AddTenantResolver();
+        services.AddTenantModuleFeatures();
 
         // Register wallet event publisher (singleton — owns the in-memory event buffer)
         services.AddSingleton<IWalletEventPublisher, WalletEventPublisher>();

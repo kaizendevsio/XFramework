@@ -12,6 +12,7 @@ public class ServicesInstaller : IInstaller
     {
         services.AddMessagingWrapperServices();
         services.AddTenantResolver();
+        services.AddTenantModuleFeatures();
 
         // Register ProductService
         services.AddScoped<ProductService>();

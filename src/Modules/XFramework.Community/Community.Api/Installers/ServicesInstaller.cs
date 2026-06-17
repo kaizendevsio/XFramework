@@ -9,6 +9,7 @@ public sealed class ServicesInstaller : IInstaller
     {
         /*services.AddSingleton<ICachingService, CachingService>();*/
         services.AddTenantResolver();
+        services.AddTenantModuleFeatures();
         
         // Register Community Services (VSA Architecture)
         services.AddScoped<ICommunityService, CommunityService>();

@@ -1,4 +1,5 @@
 using FluentValidation;
+using IdentityServer.Domain.Shared.Contracts;
 using Wallets.Api.Features.Batch.DecrementBatch;
 using Wallets.Api.Features.Batch.IncrementBatch;
 using Wallets.Api.Features.Batch.TransferBatch;
@@ -41,6 +42,19 @@ var app = (WebApplication)builder.Build();
 
 app.UseCorrelationId();
 app.UseXFrameworkRateLimiting();
+app.UseTenantModuleFeatureGate(options =>
+{
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/wallets");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/wallet-types");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/wallet-transfers");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/wallet-transactions");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/wallet-transaction-line-items");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/wallet-addresses");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/deposit-requests");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/withdrawal-requests");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/exchange-rates");
+    options.RequireFeature(TenantModuleFeatureKeys.Wallets, "/api/currencies");
+});
 app.EnsureDatabase<AppDbContext>();
 // Bolt handlers are now source-generated from [BoltHandler] on endpoint methods.
 // Generated IBoltHandler implementations are auto-registered by
