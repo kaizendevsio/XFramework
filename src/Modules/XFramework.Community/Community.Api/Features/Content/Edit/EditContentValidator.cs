@@ -7,9 +7,6 @@ public sealed class EditContentValidator : AbstractValidator<EditContentRequest>
         RuleFor(x => x.ContentId)
             .NotEmpty().WithMessage("Content ID is required");
 
-        RuleFor(x => x.RequestingIdentityId)
-            .NotEmpty().WithMessage("Requesting Identity ID is required");
-
         RuleFor(x => x.Text)
             .MaximumLength(5000).WithMessage("Text cannot exceed 5000 characters")
             .When(x => x.Text is not null);

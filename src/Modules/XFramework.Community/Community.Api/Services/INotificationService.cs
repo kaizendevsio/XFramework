@@ -22,7 +22,8 @@ public interface INotificationService
     /// <summary>
     /// Creates a notification (internal helper, not exposed as an endpoint).
     /// </summary>
-    Task CreateNotificationAsync(
+    Task<Result<CmdResponse>> CreateNotificationAsync(
+        Guid tenantId,
         Guid recipientIdentityId,
         Guid actorIdentityId,
         Community.Domain.Shared.Enums.NotificationType type,

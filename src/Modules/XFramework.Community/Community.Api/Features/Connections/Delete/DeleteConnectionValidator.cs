@@ -9,8 +9,5 @@ public sealed class DeleteConnectionValidator : AbstractValidator<DeleteConnecti
     {
         RuleFor(x => x.Id)
             .NotEmpty().WithMessage("Connection ID is required");
-
-        RuleFor(x => x.RequestingIdentityId)
-            .NotEmpty().WithMessage("Requesting Identity ID is required");
     }
 }

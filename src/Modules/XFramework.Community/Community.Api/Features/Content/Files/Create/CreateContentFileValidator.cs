@@ -8,7 +8,5 @@ public sealed class CreateContentFileValidator : AbstractValidator<CreateContent
             .NotEmpty().WithMessage("Content ID is required");
         RuleFor(x => x.StorageFileId)
             .NotEmpty().WithMessage("Storage File ID is required");
-        RuleFor(x => x.RequestingIdentityId)
-            .NotEmpty().WithMessage("Requesting Identity ID is required");
     }
 }

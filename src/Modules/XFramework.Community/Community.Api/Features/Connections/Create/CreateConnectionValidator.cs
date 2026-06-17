@@ -7,9 +7,6 @@ public sealed class CreateConnectionValidator : AbstractValidator<CreateConnecti
 {
     public CreateConnectionValidator()
     {
-        RuleFor(x => x.SourceIdentityId)
-            .NotEmpty().WithMessage("Source Identity ID is required");
-
         RuleFor(x => x.TargetIdentityId)
             .NotEmpty().WithMessage("Target Identity ID is required");
 
@@ -18,6 +15,7 @@ public sealed class CreateConnectionValidator : AbstractValidator<CreateConnecti
 
         RuleFor(x => x.SourceIdentityId)
             .NotEqual(x => x.TargetIdentityId)
-            .WithMessage("Cannot create a connection to yourself");
+            .WithMessage("Cannot create a connection to yourself")
+            .When(x => x.SourceIdentityId != Guid.Empty);
     }
 }

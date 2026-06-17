@@ -7,9 +7,6 @@ public sealed class CreateCommunityIdentityValidator : AbstractValidator<CreateC
 {
     public CreateCommunityIdentityValidator()
     {
-        RuleFor(x => x.CredentialId)
-            .NotEmpty().WithMessage("Credential ID is required");
-
         RuleFor(x => x.CommunityIdentityTypeId)
             .NotEmpty().WithMessage("Community Identity Type ID is required");
 

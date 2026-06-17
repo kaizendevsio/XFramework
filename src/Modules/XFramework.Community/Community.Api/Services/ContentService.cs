@@ -10,15 +10,18 @@ public sealed class ContentService : IContentService
 {
     private readonly IDataContext _dataContext;
     private readonly IConnectionService _connectionService;
+    private readonly ICommunityRequestContext _requestContext;
     private readonly ILogger<ContentService> _logger;
 
     public ContentService(
         IDataContext dataContext,
         IConnectionService connectionService,
+        ICommunityRequestContext requestContext,
         ILogger<ContentService> logger)
     {
         _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         _connectionService = connectionService ?? throw new ArgumentNullException(nameof(connectionService));
+        _requestContext = requestContext ?? throw new ArgumentNullException(nameof(requestContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -29,18 +32,28 @@ public sealed class ContentService : IContentService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.IdentityId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Identity ID does not match authenticated user");
+
             // Validate identity exists
             var identity = await _dataContext.Query<CommunityIdentity>()
-                .Where(i => i.Id == request.IdentityId && !i.IsDeleted)
+                .Where(i => i.TenantId == requester.TenantId)
+                .Where(i => i.Id == requester.IdentityId && !i.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (identity == null)
             {
-                _logger.CommunityIdentityNotFound(request.IdentityId);
-                return Result<CmdResponse>.NotFound($"Community identity with Id {request.IdentityId} does not exist");
+                _logger.CommunityIdentityNotFound(requester.IdentityId);
+                return Result<CmdResponse>.NotFound($"Community identity with Id {requester.IdentityId} does not exist");
             }
 
             var contentTypeExists = await _dataContext.Query<CommunityContentType>()
+                .Where(t => t.TenantId == requester.TenantId)
                 .AnyAsync(t => t.Id == request.TypeId, cancellationToken);
 
             if (!contentTypeExists)
@@ -54,6 +67,7 @@ public sealed class ContentService : IContentService
             if (request.ParentContentId.HasValue)
             {
                 parentContent = await _dataContext.Query<CommunityContent>()
+                    .Where(c => c.TenantId == requester.TenantId)
                     .Where(c => c.Id == request.ParentContentId.Value && !c.IsDeleted)
                     .FirstOrDefaultAsync(cancellationToken);
 
@@ -64,7 +78,7 @@ public sealed class ContentService : IContentService
                 }
 
                 if (await _connectionService.IsBlockedAsync(
-                        request.IdentityId,
+                        requester.IdentityId,
                         parentContent.SocialMediaIdentityId,
                         cancellationToken))
                 {
@@ -75,27 +89,31 @@ public sealed class ContentService : IContentService
             // Create content record
             var entity = new CommunityContent
             {
+                TenantId = requester.TenantId,
                 Text = request.Text,
                 TypeId = request.TypeId,
-                SocialMediaIdentityId = request.IdentityId,
-                CommunityGroupId = parentContent?.CommunityGroupId ?? request.IdentityId,
+                SocialMediaIdentityId = requester.IdentityId,
+                CommunityGroupId = parentContent?.CommunityGroupId ?? requester.IdentityId,
                 ParentContentId = request.ParentContentId,
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
 
             _dataContext.Add(entity);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "CreateContent") is { } saveFailure)
+                return saveFailure;
 
             // If it's a comment, create a notification for the content author
             if (parentContent is not null)
             {
-                if (parentContent.SocialMediaIdentityId != request.IdentityId)
+                if (parentContent.SocialMediaIdentityId != requester.IdentityId)
                 {
                     var notification = new CommunityNotification
                     {
+                        TenantId = requester.TenantId,
                         RecipientIdentityId = parentContent.SocialMediaIdentityId,
-                        ActorIdentityId = request.IdentityId,
+                        ActorIdentityId = requester.IdentityId,
                         ContentId = entity.Id,
                         Type = "Comment",
                         Message = "commented on your post",
@@ -105,7 +123,9 @@ public sealed class ContentService : IContentService
                     };
 
                     _dataContext.Add(notification);
-                    await _dataContext.SaveChangesAsync(cancellationToken);
+                    var notificationSaveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+                    if (CommunitySecurity.SaveFailure(notificationSaveResult, "CreateCommentNotification") is { } notificationSaveFailure)
+                        return notificationSaveFailure;
                 }
             }
 
@@ -195,7 +215,16 @@ public sealed class ContentService : IContentService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.RequesterId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Requester ID does not match authenticated user");
+
             var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.TenantId == requester.TenantId)
                 .Where(c => c.Id == request.Id && !c.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -206,9 +235,9 @@ public sealed class ContentService : IContentService
             }
 
             // Validate requester owns the content
-            if (content.SocialMediaIdentityId != request.RequesterId)
+            if (content.SocialMediaIdentityId != requester.IdentityId)
             {
-                _logger.BusinessRuleViolation("DeleteContent", $"Identity {request.RequesterId} does not own content {request.Id}");
+                _logger.BusinessRuleViolation("DeleteContent", $"Identity {requester.IdentityId} does not own content {request.Id}");
                 return Result<CmdResponse>.Forbidden("You do not have permission to delete this content");
             }
 
@@ -216,7 +245,9 @@ public sealed class ContentService : IContentService
             content.IsDeleted = true;
             content.DeletedAt = DateTime.UtcNow;
             _dataContext.Update(content);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "DeleteContent") is { } saveFailure)
+                return saveFailure;
 
             _logger.EntityDeleted("CommunityContent", request.Id);
 
@@ -240,7 +271,16 @@ public sealed class ContentService : IContentService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.RequestingIdentityId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Requesting identity ID does not match authenticated user");
+
             var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.TenantId == requester.TenantId)
                 .Where(c => c.Id == request.ContentId && !c.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -250,9 +290,9 @@ public sealed class ContentService : IContentService
                 return Result<CmdResponse>.NotFound($"Content with Id {request.ContentId} does not exist");
             }
 
-            if (content.SocialMediaIdentityId != request.RequestingIdentityId)
+            if (content.SocialMediaIdentityId != requester.IdentityId)
             {
-                _logger.BusinessRuleViolation("EditContent", $"Identity {request.RequestingIdentityId} does not own content {request.ContentId}");
+                _logger.BusinessRuleViolation("EditContent", $"Identity {requester.IdentityId} does not own content {request.ContentId}");
                 return Result<CmdResponse>.Forbidden("You do not have permission to edit this content");
             }
 
@@ -265,7 +305,9 @@ public sealed class ContentService : IContentService
             content.ModifiedAt = DateTime.UtcNow;
 
             _dataContext.Update(content);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "EditContent") is { } saveFailure)
+                return saveFailure;
 
             _logger.EntityUpdated("CommunityContent", request.ContentId);
 
@@ -289,8 +331,17 @@ public sealed class ContentService : IContentService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.IdentityId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Identity ID does not match authenticated user");
+
             // Validate content exists
             var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.TenantId == requester.TenantId)
                 .Where(c => c.Id == request.ContentId && !c.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -302,16 +353,18 @@ public sealed class ContentService : IContentService
 
             // Validate identity exists
             var identity = await _dataContext.Query<CommunityIdentity>()
-                .Where(i => i.Id == request.IdentityId && !i.IsDeleted)
+                .Where(i => i.TenantId == requester.TenantId)
+                .Where(i => i.Id == requester.IdentityId && !i.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (identity == null)
             {
-                _logger.CommunityIdentityNotFound(request.IdentityId);
-                return Result<CmdResponse>.NotFound($"Community identity with Id {request.IdentityId} does not exist");
+                _logger.CommunityIdentityNotFound(requester.IdentityId);
+                return Result<CmdResponse>.NotFound($"Community identity with Id {requester.IdentityId} does not exist");
             }
 
             var reactionTypeExists = await _dataContext.Query<CommunityContentReactionType>()
+                .Where(t => t.TenantId == requester.TenantId)
                 .AnyAsync(t => t.Id == request.TypeId, cancellationToken);
 
             if (!reactionTypeExists)
@@ -321,43 +374,48 @@ public sealed class ContentService : IContentService
             }
 
             // Block check
-            if (await _connectionService.IsBlockedAsync(request.IdentityId, content.SocialMediaIdentityId, cancellationToken))
-                return Result<CmdResponse>.Forbidden("Cannot react — a block exists between you and the content author");
+            if (await _connectionService.IsBlockedAsync(requester.IdentityId, content.SocialMediaIdentityId, cancellationToken))
+                return Result<CmdResponse>.Forbidden("Cannot react because a block exists between you and the content author");
 
             // Prevent duplicate (same identity + same type on same content)
             var existingReaction = await _dataContext.Query<CommunityContentReaction>()
+                .Where(r => r.TenantId == requester.TenantId)
                 .Where(r => r.ContentId == request.ContentId
-                         && r.SocialMediaIdentityId == request.IdentityId
+                         && r.SocialMediaIdentityId == requester.IdentityId
                          && r.TypeId == request.TypeId
                          && !r.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (existingReaction != null)
             {
-                _logger.BusinessRuleViolation("CreateContentReaction", $"Duplicate reaction: identity {request.IdentityId} already reacted with type {request.TypeId} on content {request.ContentId}");
+                _logger.BusinessRuleViolation("CreateContentReaction", $"Duplicate reaction: identity {requester.IdentityId} already reacted with type {request.TypeId} on content {request.ContentId}");
                 return Result<CmdResponse>.Conflict("You have already reacted with this type on this content");
             }
 
             // Create reaction
             var entity = new CommunityContentReaction
             {
+                TenantId = requester.TenantId,
                 ContentId = request.ContentId,
                 TypeId = request.TypeId,
-                SocialMediaIdentityId = request.IdentityId,
+                SocialMediaIdentityId = requester.IdentityId,
                 CreatedAt = DateTime.UtcNow,
                 IsEnabled = true
             };
 
             _dataContext.Add(entity);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "CreateContentReaction") is { } saveFailure)
+                return saveFailure;
 
             // Create notification for content author (if not reacting to own content)
-            if (content.SocialMediaIdentityId != request.IdentityId)
+            if (content.SocialMediaIdentityId != requester.IdentityId)
             {
                 var notification = new CommunityNotification
                 {
+                    TenantId = requester.TenantId,
                     RecipientIdentityId = content.SocialMediaIdentityId,
-                    ActorIdentityId = request.IdentityId,
+                    ActorIdentityId = requester.IdentityId,
                     ContentId = content.Id,
                     Type = "Reaction",
                     Message = "reacted to your post",
@@ -367,7 +425,9 @@ public sealed class ContentService : IContentService
                 };
 
                 _dataContext.Add(notification);
-                await _dataContext.SaveChangesAsync(cancellationToken);
+                var notificationSaveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+                if (CommunitySecurity.SaveFailure(notificationSaveResult, "CreateReactionNotification") is { } notificationSaveFailure)
+                    return notificationSaveFailure;
             }
 
             _logger.EntityCreated("CommunityContentReaction", entity.Id);
@@ -392,7 +452,16 @@ public sealed class ContentService : IContentService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.RequesterId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Requester ID does not match authenticated user");
+
             var reaction = await _dataContext.Query<CommunityContentReaction>()
+                .Where(r => r.TenantId == requester.TenantId)
                 .Where(r => r.Id == request.ReactionId && r.ContentId == request.ContentId && !r.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -403,9 +472,9 @@ public sealed class ContentService : IContentService
             }
 
             // Validate requester owns the reaction
-            if (reaction.SocialMediaIdentityId != request.RequesterId)
+            if (reaction.SocialMediaIdentityId != requester.IdentityId)
             {
-                _logger.BusinessRuleViolation("DeleteContentReaction", $"Identity {request.RequesterId} does not own reaction {request.ReactionId}");
+                _logger.BusinessRuleViolation("DeleteContentReaction", $"Identity {requester.IdentityId} does not own reaction {request.ReactionId}");
                 return Result<CmdResponse>.Forbidden("You do not have permission to delete this reaction");
             }
 
@@ -413,7 +482,9 @@ public sealed class ContentService : IContentService
             reaction.IsDeleted = true;
             reaction.DeletedAt = DateTime.UtcNow;
             _dataContext.Update(reaction);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "DeleteContentReaction") is { } saveFailure)
+                return saveFailure;
 
             _logger.EntityDeleted("CommunityContentReaction", request.ReactionId);
 
@@ -576,17 +647,27 @@ public sealed class ContentService : IContentService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.RequestingIdentityId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Requesting identity ID does not match authenticated user");
+
             var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.TenantId == requester.TenantId)
                 .Where(c => c.Id == request.ContentId && !c.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (content == null)
                 return Result<CmdResponse>.NotFound($"Content with Id {request.ContentId} does not exist");
 
-            if (content.SocialMediaIdentityId != request.RequestingIdentityId)
+            if (content.SocialMediaIdentityId != requester.IdentityId)
                 return Result<CmdResponse>.Forbidden("You do not have permission to attach files to this content");
 
             var storageFileExists = await _dataContext.Query<StorageFile>()
+                .Where(f => f.TenantId == requester.TenantId)
                 .AnyAsync(f => f.Id == request.StorageFileId, cancellationToken);
 
             if (!storageFileExists)
@@ -594,6 +675,7 @@ public sealed class ContentService : IContentService
 
             var entity = new CommunityContentFile
             {
+                TenantId = requester.TenantId,
                 ContentId = request.ContentId,
                 StorageId = request.StorageFileId,
                 CreatedAt = DateTime.UtcNow,
@@ -601,7 +683,9 @@ public sealed class ContentService : IContentService
             };
 
             _dataContext.Add(entity);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "CreateContentFile") is { } saveFailure)
+                return saveFailure;
 
             return Result<CmdResponse>.Success(new CmdResponse
             {
@@ -658,17 +742,27 @@ public sealed class ContentService : IContentService
     {
         try
         {
+            var requesterResult = await _requestContext.GetRequiredIdentityAsync(request.Metadata, cancellationToken);
+            if (!requesterResult.IsSuccess)
+                return CommunitySecurity.ToFailure<CommunityRequester, CmdResponse>(requesterResult);
+
+            var requester = requesterResult.Data!;
+            if (CommunitySecurity.IsSpoofed(request.RequestingIdentityId, requester.IdentityId))
+                return Result<CmdResponse>.Forbidden("Requesting identity ID does not match authenticated user");
+
             var content = await _dataContext.Query<CommunityContent>()
+                .Where(c => c.TenantId == requester.TenantId)
                 .Where(c => c.Id == request.ContentId && !c.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (content == null)
                 return Result<CmdResponse>.NotFound($"Content with Id {request.ContentId} does not exist");
 
-            if (content.SocialMediaIdentityId != request.RequestingIdentityId)
+            if (content.SocialMediaIdentityId != requester.IdentityId)
                 return Result<CmdResponse>.Forbidden("You do not have permission to remove files from this content");
 
             var file = await _dataContext.Query<CommunityContentFile>()
+                .Where(f => f.TenantId == requester.TenantId)
                 .Where(f => f.Id == request.FileId && f.ContentId == request.ContentId && !f.IsDeleted)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -678,7 +772,9 @@ public sealed class ContentService : IContentService
             file.IsDeleted = true;
             file.DeletedAt = DateTime.UtcNow;
             _dataContext.Update(file);
-            await _dataContext.SaveChangesAsync(cancellationToken);
+            var saveResult = await _dataContext.SaveChangesAsync(cancellationToken);
+            if (CommunitySecurity.SaveFailure(saveResult, "DeleteContentFile") is { } saveFailure)
+                return saveFailure;
 
             return Result<CmdResponse>.Success(new CmdResponse
             {

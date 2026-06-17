@@ -8,7 +8,5 @@ public sealed class DeleteContentFileValidator : AbstractValidator<DeleteContent
             .NotEmpty().WithMessage("Content ID is required");
         RuleFor(x => x.FileId)
             .NotEmpty().WithMessage("File ID is required");
-        RuleFor(x => x.RequestingIdentityId)
-            .NotEmpty().WithMessage("Requesting Identity ID is required");
     }
 }
