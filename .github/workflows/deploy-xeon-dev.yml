@@ -66,6 +66,7 @@ jobs:
             "messaging=http://localhost:5148/health/ready"
             "smsgateway=http://localhost:5274/health/ready"
             "wallets=http://localhost:9696/health/ready"
+            "controlpanel=http://localhost:5000/health/ready"
           )
 
           for check in "${checks[@]}"; do
@@ -98,4 +99,4 @@ jobs:
         shell: bash
         run: |
           docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps || true
-          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 migrate bolt-hub identityserver messaging smsgateway wallets || true
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 migrate bolt-hub identityserver messaging smsgateway wallets controlpanel || true
