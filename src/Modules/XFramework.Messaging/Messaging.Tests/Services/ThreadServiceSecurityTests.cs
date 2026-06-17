@@ -47,6 +47,36 @@ public sealed class ThreadServiceSecurityTests
     }
 
     [Test]
+    public async Task CreateThreadMessageAsync_CrossTenantThreadId_ReturnsNotFound()
+    {
+        var threadTenantId = Guid.NewGuid();
+        var callerTenantId = Guid.NewGuid();
+        var threadId = Guid.NewGuid();
+        var callerCredentialId = Guid.NewGuid();
+
+        var dataContext = new InMemoryDataContext();
+        dataContext.Seed(
+            Thread(threadId, threadTenantId),
+            Member(Guid.NewGuid(), threadId, callerCredentialId, threadTenantId));
+
+        var service = CreateService(dataContext);
+        var request = new CreateThreadMessageRequest
+        {
+            ThreadId = threadId,
+            SenderCredentialId = callerCredentialId,
+            Text = "cross tenant attempt",
+            Metadata = Metadata(callerCredentialId, callerTenantId)
+        };
+
+        var result = await service.CreateThreadMessageAsync(request);
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.StatusCode, Is.EqualTo(404));
+        Assert.That(dataContext.Set<Message>(), Is.Empty);
+        Assert.That(dataContext.Set<MessageOutboxEvent>(), Is.Empty);
+    }
+
+    [Test]
     public async Task AddThreadMemberAsync_ExplicitRolesWithoutAdmin_ReturnsForbidden()
     {
         var tenantId = Guid.NewGuid();
