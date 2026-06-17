@@ -25,6 +25,14 @@ public class MessageThreadMemberConfiguration : IEntityTypeConfiguration<Message
             .HasDefaultValueSql("true");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
+        entity.HasIndex(e => new { e.MessageThreadId, e.CredentialId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("UX_MessageThreadMember_Thread_Credential_Active");
+
+        entity.HasIndex(e => new { e.CredentialId, e.MessageThreadId })
+            .HasDatabaseName("IX_MessageThreadMember_Credential_Thread");
+
         entity.HasOne(d => d.Group).WithMany()
             .HasForeignKey(d => d.GroupId)
             .OnDelete(DeleteBehavior.ClientSetNull)

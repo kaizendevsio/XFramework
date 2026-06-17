@@ -22,6 +22,14 @@ public class MessageDeliveryConfiguration : IEntityTypeConfiguration<MessageDeli
             .HasDefaultValueSql("true");
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
 
+        entity.HasIndex(e => new { e.MessageThreadMemberId, e.MessageId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("UX_MessageDelivery_Member_Message_Active");
+
+        entity.HasIndex(e => new { e.MessageId, e.TypeId })
+            .HasDatabaseName("IX_MessageDelivery_Message_Type");
+
         entity.HasOne(d => d.Type).WithMany(p => p.MessageDeliveries)
             .HasForeignKey(d => d.TypeId)
             .OnDelete(DeleteBehavior.ClientSetNull)

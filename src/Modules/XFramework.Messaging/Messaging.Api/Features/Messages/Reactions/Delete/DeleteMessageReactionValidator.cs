@@ -9,8 +9,5 @@ public sealed class DeleteMessageReactionValidator : AbstractValidator<DeleteMes
     {
         RuleFor(x => x.ReactionId)
             .NotEmpty().WithMessage("Reaction ID is required");
-
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester Credential ID is required");
     }
 }

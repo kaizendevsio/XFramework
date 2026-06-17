@@ -12,8 +12,5 @@ public sealed class GetMessageFilesValidator : AbstractValidator<GetMessageFiles
 
         RuleFor(x => x.MessageId)
             .NotEmpty().WithMessage("Message ID is required");
-
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester Credential ID is required");
     }
 }

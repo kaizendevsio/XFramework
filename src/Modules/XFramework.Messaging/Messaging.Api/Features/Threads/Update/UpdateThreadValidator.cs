@@ -10,9 +10,6 @@ public sealed class UpdateThreadValidator : AbstractValidator<UpdateThreadReques
         RuleFor(x => x.ThreadId)
             .NotEmpty().WithMessage("Thread ID is required");
 
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester Credential ID is required");
-
         RuleFor(x => x.Name)
             .MaximumLength(200).WithMessage("Name cannot exceed 200 characters")
             .When(x => x.Name is not null);

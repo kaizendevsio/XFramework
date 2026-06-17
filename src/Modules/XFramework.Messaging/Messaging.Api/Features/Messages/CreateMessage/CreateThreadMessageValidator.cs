@@ -10,9 +10,6 @@ public sealed class CreateThreadMessageValidator : AbstractValidator<CreateThrea
         RuleFor(x => x.ThreadId)
             .NotEmpty().WithMessage("Thread ID is required");
 
-        RuleFor(x => x.SenderCredentialId)
-            .NotEmpty().WithMessage("Sender credential ID is required");
-
         RuleFor(x => x.Text)
             .NotEmpty().WithMessage("Message text is required")
             .MaximumLength(5000).WithMessage("Message text cannot exceed 5000 characters");

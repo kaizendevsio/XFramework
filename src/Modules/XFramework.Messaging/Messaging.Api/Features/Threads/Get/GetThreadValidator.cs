@@ -9,8 +9,5 @@ public sealed class GetThreadValidator : AbstractValidator<GetThreadRequest>
     {
         RuleFor(x => x.Id)
             .NotEmpty().WithMessage("Thread ID is required");
-
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester credential ID is required");
     }
 }

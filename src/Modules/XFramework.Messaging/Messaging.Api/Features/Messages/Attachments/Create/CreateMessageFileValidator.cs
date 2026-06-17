@@ -15,8 +15,5 @@ public sealed class CreateMessageFileValidator : AbstractValidator<CreateMessage
 
         RuleFor(x => x.StorageFileId)
             .NotEmpty().WithMessage("Storage File ID is required");
-
-        RuleFor(x => x.RequesterCredentialId)
-            .NotEmpty().WithMessage("Requester Credential ID is required");
     }
 }

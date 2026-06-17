@@ -6,6 +6,7 @@ public partial class RequestMetadata
 {
     public Guid? SessionId { get; set; }
     public Guid? TenantId { get; set; }
+    public Guid? CredentialId { get; set; }
     public string? Name { get; set; }
     public string? DeviceName { get; set; }
     public string? DeviceAgent { get; set; }

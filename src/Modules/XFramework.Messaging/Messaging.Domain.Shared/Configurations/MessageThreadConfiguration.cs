@@ -24,6 +24,9 @@ public class MessageThreadConfiguration : IEntityTypeConfiguration<MessageThread
         entity.Property(e => e.ModifiedAt).HasDefaultValueSql("now()");
         entity.Property(e => e.Name).HasColumnType("character varying");
 
+        entity.HasIndex(e => new { e.TenantId, e.CreatedAt })
+            .HasDatabaseName("IX_MessageThread_Tenant_CreatedAt");
+
         entity.HasOne(d => d.Type).WithMany(p => p.MessageThreads)
             .HasForeignKey(d => d.TypeId)
             .OnDelete(DeleteBehavior.ClientSetNull)
