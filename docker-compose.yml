@@ -112,6 +112,27 @@ services:
       retries: 15
       start_period: 15s
 
+  # ── Notifications Server ────────────────────────────────────
+  notifications:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.Notifications/Notifications.Api/Notifications.Api.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${NOTIFICATIONS_EXPOSE_PORT:-5166}:8080"
+    depends_on:
+      bolt-hub:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
   # ── SMS Gateway ─────────────────────────────────────────────
   smsgateway:
     build:
