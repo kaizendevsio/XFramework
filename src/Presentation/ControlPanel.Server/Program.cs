@@ -76,10 +76,12 @@ builder.Services.AddScoped(sp =>
 {
     var httpContext = sp.GetRequiredService<IHttpContextAccessor>().HttpContext;
     var user = httpContext?.User;
+    var tenantFilter = sp.GetRequiredService<TenantFilterService>();
+    var loginTenantId = TryGetGuidClaim(user, ControlPanelAuthClaims.TenantId);
 
-    return new RequestMetadata
+    var metadata = new RequestMetadata
     {
-        TenantId = TryGetGuidClaim(user, ControlPanelAuthClaims.TenantId),
+        TenantId = tenantFilter.SelectedTenantId ?? loginTenantId,
         SessionId = TryGetGuidClaim(user, ControlPanelAuthClaims.SessionId),
         RequestId = Guid.NewGuid(),
         Name = "ControlPanel",
@@ -87,6 +89,14 @@ builder.Services.AddScoped(sp =>
         DeviceAgent = httpContext?.Request.Headers.UserAgent.ToString(),
         IpAddress = httpContext?.Connection.RemoteIpAddress?.ToString()
     };
+
+    tenantFilter.OnChanged += () =>
+    {
+        metadata.TenantId = tenantFilter.SelectedTenantId ?? loginTenantId;
+        metadata.RequestId = Guid.NewGuid();
+    };
+
+    return metadata;
 });
 builder.Services.AddRemoteDataContext();
 
