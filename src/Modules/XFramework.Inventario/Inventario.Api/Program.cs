@@ -38,7 +38,14 @@ var app = (WebApplication)builder.Build();
 // Add correlation ID middleware early in the pipeline for request tracing
 app.UseCorrelationId();
 app.UseTenantModuleFeatureGate(options =>
-    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api"));
+{
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/warehouses", "warehousing");
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/locations", "warehousing");
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/balances", "stock_balances");
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/movements", "movements");
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/post", "movements");
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api");
+});
 
 app.EnsureDatabase<DbContext>();
 

@@ -39,9 +39,25 @@
             <NavLink href="/inventario/categories" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
                 <LucideIcon Name="folders" class="h-4 w-4" /> Categories
             </NavLink>
-            <NavLink href="/inventario/transactions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
-                <LucideIcon Name="arrow-left-right" class="h-4 w-4" /> Transactions
-            </NavLink>
+            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing"))
+            {
+                <NavLink href="/inventario/warehouses" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="warehouse" class="h-4 w-4" /> Warehouses
+                </NavLink>
+            }
+            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances")
+                 || ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements"))
+            {
+                <NavLink href="/inventario/stock" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="boxes" class="h-4 w-4" /> Stock
+                </NavLink>
+            }
+            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "transactions"))
+            {
+                <NavLink href="/inventario/transactions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="arrow-left-right" class="h-4 w-4" /> Transactions
+                </NavLink>
+            }
             <NavLink href="/inventario/settings" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
                 <LucideIcon Name="settings" class="h-4 w-4" /> Settings
             </NavLink>
