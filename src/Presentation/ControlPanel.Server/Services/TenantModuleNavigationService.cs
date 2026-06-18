@@ -49,8 +49,12 @@ public sealed class TenantModuleNavigationService(
 
     private async Task LoadAsync(CancellationToken ct = default)
     {
+        if (_loading)
+        {
+            return;
+        }
+
         _loading = true;
-        OnChanged?.Invoke();
 
         try
         {
