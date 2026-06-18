@@ -29,6 +29,7 @@
   <Folder Name="/Services/Inventario/">
     <Project Path="src\Modules\XFramework.Inventario\Inventario.Api\Inventario.Api.csproj" />
     <Project Path="src\Modules\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
+    <Project Path="src\Modules\XFramework.Inventario\Inventario.Integration\Inventario.Integration.csproj" />
   </Folder>
   <Folder Name="/Services/Messaging/">
     <Project Path="src\Modules\XFramework.Messaging\Messaging.Api\Messaging.Api.csproj" />

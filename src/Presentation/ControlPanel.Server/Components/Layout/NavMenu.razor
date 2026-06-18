@@ -1,3 +1,6 @@
+@implements IDisposable
+@inject TenantModuleNavigationService ModuleNavigation
+
 @* Dashboard *@
 <div class="space-y-1">
     <NavLink href="/" Match="NavLinkMatch.All"
@@ -24,6 +27,28 @@
     </div>
 </div>
 
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario))
+{
+    @* Inventario *@
+    <div class="mt-4">
+        <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Inventario</p>
+        <div class="space-y-0.5">
+            <NavLink href="/inventario/products" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="package" class="h-4 w-4" /> Products
+            </NavLink>
+            <NavLink href="/inventario/categories" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="folders" class="h-4 w-4" /> Categories
+            </NavLink>
+            <NavLink href="/inventario/transactions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="arrow-left-right" class="h-4 w-4" /> Transactions
+            </NavLink>
+            <NavLink href="/inventario/settings" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="settings" class="h-4 w-4" /> Settings
+            </NavLink>
+        </div>
+    </div>
+}
+
 @* Finance *@
 <div class="mt-4">
     <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Finance</p>
@@ -33,6 +58,25 @@
         </NavLink>
     </div>
 </div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        ModuleNavigation.Initialize();
+        ModuleNavigation.OnChanged += OnModuleNavigationChanged;
+        await ModuleNavigation.EnsureLoadedAsync();
+    }
+
+    private void OnModuleNavigationChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ModuleNavigation.OnChanged -= OnModuleNavigationChanged;
+    }
+}
 
 @* System *@
 <div class="mt-4">

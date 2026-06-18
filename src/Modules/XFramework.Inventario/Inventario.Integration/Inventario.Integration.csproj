@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>XFramework.Inventario.Integration</PackageId>
+        <Version>$(XFrameworkVersion)</Version>
+        <Description>XFramework Inventario service wrapper for ControlPanel and cross-module Bolt RPC calls.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\SourceGenerators\XFramework.SourceGenerators\XFramework.SourceGenerators.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />
+        <ProjectReference Include="..\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
+    </ItemGroup>
+
+</Project>
