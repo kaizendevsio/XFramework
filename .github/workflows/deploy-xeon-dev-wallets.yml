@@ -1,0 +1,20 @@
+name: Deploy Xeon Dev - Wallets
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - src/Modules/XFramework.Wallets/Wallets.Api/**
+      - src/Modules/XFramework.Wallets/Wallets.Domain.Shared/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-xeon-dev-service.yml
+    with:
+      service: wallets
+      health_url: http://localhost:9696/health/ready
+      diagnostics_services: bolt-hub wallets
