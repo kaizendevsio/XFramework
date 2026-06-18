@@ -16,6 +16,17 @@ public sealed class StockPostingService(
 {
     public async Task<Result<StockPostingResponse>> PostAsync(
         PostStockMovementRequest request,
+        CancellationToken ct = default) =>
+        await PostCoreAsync(request, saveChanges: true, ct);
+
+    internal async Task<Result<StockPostingResponse>> StageAsync(
+        PostStockMovementRequest request,
+        CancellationToken ct = default) =>
+        await PostCoreAsync(request, saveChanges: false, ct);
+
+    private async Task<Result<StockPostingResponse>> PostCoreAsync(
+        PostStockMovementRequest request,
+        bool saveChanges,
         CancellationToken ct = default)
     {
         var tenantResult = GetCurrentTenantId(request);
@@ -30,7 +41,7 @@ public sealed class StockPostingService(
             return Result<StockPostingResponse>.Failure("Quantity must be positive for this movement type.", 400);
 
         if (request.MovementType == InventoryMovementType.Transfer)
-            return await PostTransferAsync(tenantId, request, ct);
+            return await PostTransferAsync(tenantId, request, saveChanges, ct);
 
         var product = await GetProduct(tenantId, request.ProductId, ct);
         if (product is null)
@@ -54,9 +65,12 @@ public sealed class StockPostingService(
         AddMovement(tenantId, request, balance.Id, delta == 0 ? reservedDelta : delta, before, afterOnHand);
         await UpdateProductSnapshot(tenantId, product, request.ProductId, delta, ct);
 
-        var saveResult = await dataContext.SaveChangesAsync(ct);
-        if (!saveResult.IsSuccess)
-            return Result<StockPostingResponse>.Failure(saveResult.Message ?? "Stock posting failed.", saveResult.StatusCode);
+        if (saveChanges)
+        {
+            var saveResult = await dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<StockPostingResponse>.Failure(saveResult.Message ?? "Stock posting failed.", saveResult.StatusCode);
+        }
 
         return Result<StockPostingResponse>.Success(new StockPostingResponse(
             balance.Id,
@@ -117,6 +131,7 @@ public sealed class StockPostingService(
     private async Task<Result<StockPostingResponse>> PostTransferAsync(
         Guid tenantId,
         PostStockMovementRequest request,
+        bool saveChanges,
         CancellationToken ct)
     {
         if (request.DestinationWarehouseId is not { } destinationWarehouseId ||
@@ -158,9 +173,12 @@ public sealed class StockPostingService(
 
         await UpdateProductSnapshot(tenantId, product, request.ProductId, 0, ct);
 
-        var saveResult = await dataContext.SaveChangesAsync(ct);
-        if (!saveResult.IsSuccess)
-            return Result<StockPostingResponse>.Failure(saveResult.Message ?? "Stock transfer failed.", saveResult.StatusCode);
+        if (saveChanges)
+        {
+            var saveResult = await dataContext.SaveChangesAsync(ct);
+            if (!saveResult.IsSuccess)
+                return Result<StockPostingResponse>.Failure(saveResult.Message ?? "Stock transfer failed.", saveResult.StatusCode);
+        }
 
         return Result<StockPostingResponse>.Success(new StockPostingResponse(
             destination.Id,
