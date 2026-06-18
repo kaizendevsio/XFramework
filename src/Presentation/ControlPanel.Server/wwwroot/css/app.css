@@ -285,6 +285,15 @@
     position: relative;
 }
 
+.profile-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    border: 0;
+    background: transparent;
+    cursor: default;
+}
+
 .profile-trigger {
     display: flex;
     align-items: center;
@@ -356,6 +365,9 @@
 }
 
 .profile-menu-panel {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
     z-index: 60;
     display: flex;
     width: min(22rem, calc(100vw - 2rem));
