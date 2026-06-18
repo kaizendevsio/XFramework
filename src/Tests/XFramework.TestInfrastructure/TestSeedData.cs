@@ -90,7 +90,7 @@ public static class TestSeedData
                 DisplayName = definition.DisplayName,
                 Description = definition.Description,
                 CreatedAt = DateTime.UtcNow,
-                IsEnabled = true
+                IsEnabled = definition.DefaultEnabled
             });
         }
     }

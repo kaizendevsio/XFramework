@@ -5,7 +5,8 @@ public sealed record TenantModuleFeatureDefinition(
     string SubFeatureKey,
     string DisplayName,
     string Description,
-    string IconName)
+    string IconName,
+    bool DefaultEnabled = true)
 {
     public string Key => TenantModuleFeatureKeys.Combine(ModuleKey, SubFeatureKey);
 }

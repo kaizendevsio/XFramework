@@ -4,6 +4,20 @@ public static class TenantModuleFeatureKeys
 {
     public const string Wallets = "wallets";
     public const string Inventario = "inventario";
+    public const string InventarioCatalog = "inventario.catalog";
+    public const string InventarioVariations = "inventario.variations";
+    public const string InventarioTransactions = "inventario.transactions";
+    public const string InventarioLowStockAlerts = "inventario.low_stock_alerts";
+    public const string InventarioWarehousing = "inventario.warehousing";
+    public const string InventarioStockBalances = "inventario.stock_balances";
+    public const string InventarioMovements = "inventario.movements";
+    public const string InventarioReservations = "inventario.reservations";
+    public const string InventarioFulfillment = "inventario.fulfillment";
+    public const string InventarioPurchasing = "inventario.purchasing";
+    public const string InventarioTraceability = "inventario.traceability";
+    public const string InventarioPlanning = "inventario.planning";
+    public const string InventarioReporting = "inventario.reporting";
+    public const string InventarioNegativeStock = "inventario.negative_stock";
     public const string Messaging = "messaging";
     public const string MessagingChat = "messaging.chat";
     public const string MessagingAudioVideo = "messaging.audio_video";
@@ -11,6 +25,20 @@ public static class TenantModuleFeatureKeys
     public const string Payments = "payments";
     public const string Notifications = "notifications";
 
+    public const string CatalogSubFeature = "catalog";
+    public const string VariationsSubFeature = "variations";
+    public const string TransactionsSubFeature = "transactions";
+    public const string LowStockAlertsSubFeature = "low_stock_alerts";
+    public const string WarehousingSubFeature = "warehousing";
+    public const string StockBalancesSubFeature = "stock_balances";
+    public const string MovementsSubFeature = "movements";
+    public const string ReservationsSubFeature = "reservations";
+    public const string FulfillmentSubFeature = "fulfillment";
+    public const string PurchasingSubFeature = "purchasing";
+    public const string TraceabilitySubFeature = "traceability";
+    public const string PlanningSubFeature = "planning";
+    public const string ReportingSubFeature = "reporting";
+    public const string NegativeStockSubFeature = "negative_stock";
     public const string ChatSubFeature = "chat";
     public const string AudioVideoSubFeature = "audio_video";
 
@@ -18,6 +46,20 @@ public static class TenantModuleFeatureKeys
     [
         new(Wallets, string.Empty, "Wallets", "Wallet accounts, balances, transfers, deposits, and withdrawals.", "wallet"),
         new(Inventario, string.Empty, "Inventario", "Product catalog and inventory operations.", "boxes"),
+        new(Inventario, CatalogSubFeature, "Catalog", "Products, categories, SKUs, and catalog attributes.", "package"),
+        new(Inventario, VariationsSubFeature, "Variations", "Product options, variants, and variation-specific stock.", "git-branch"),
+        new(Inventario, TransactionsSubFeature, "Transactions", "Inventory receipts, adjustments, transfers, and issue records.", "arrow-left-right"),
+        new(Inventario, LowStockAlertsSubFeature, "Low Stock Alerts", "Low stock thresholds, alert review, and replenishment signals.", "bell"),
+        new(Inventario, WarehousingSubFeature, "Warehousing", "Warehouse, location, bin, and storage-area workflows.", "warehouse", false),
+        new(Inventario, StockBalancesSubFeature, "Stock Balances", "Stock-on-hand, available, allocated, and reserved balance views.", "scale", false),
+        new(Inventario, MovementsSubFeature, "Movements", "Physical stock movement tracking between locations and states.", "move", false),
+        new(Inventario, ReservationsSubFeature, "Reservations", "Stock reservations, holds, and allocation commitments.", "bookmark-check", false),
+        new(Inventario, FulfillmentSubFeature, "Fulfillment", "Pick, pack, ship, and order fulfillment operations.", "truck", false),
+        new(Inventario, PurchasingSubFeature, "Purchasing", "Purchase orders, receiving, and supplier replenishment workflows.", "shopping-cart", false),
+        new(Inventario, TraceabilitySubFeature, "Traceability", "Lot, serial, batch, and inventory lineage tracking.", "scan-line", false),
+        new(Inventario, PlanningSubFeature, "Planning", "Demand planning, reorder planning, and replenishment forecasting.", "calendar-clock", false),
+        new(Inventario, ReportingSubFeature, "Reporting", "Inventory analytics, valuation, audit, and operational reports.", "bar-chart-3", false),
+        new(Inventario, NegativeStockSubFeature, "Negative Stock", "Controls for allowing or blocking negative stock positions.", "minus-circle", false),
         new(Messaging, ChatSubFeature, "Messaging Chat", "Threads, direct messages, reactions, and attachments.", "message-circle"),
         new(Messaging, AudioVideoSubFeature, "Messaging Audio/Video", "Audio and video communication features.", "video"),
         new(Community, string.Empty, "Community", "Community identities, content, feed, and connections.", "users"),
