@@ -28,7 +28,9 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         entity.Ignore(e => e.Reviews);
 
         entity.HasIndex(e => new { e.TenantId, e.CategoryId });
-        entity.HasIndex(e => new { e.TenantId, e.SKU });
+        entity.HasIndex(e => new { e.TenantId, e.SKU })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false AND \"SKU\" IS NOT NULL AND \"SKU\" <> ''");
 
         entity.HasOne(e => e.Category)
             .WithMany(e => e.Products)

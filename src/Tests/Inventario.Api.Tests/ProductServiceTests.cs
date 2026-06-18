@@ -130,6 +130,88 @@ public sealed class ProductServiceTests
     }
 
     [Test]
+    public async Task CreateAsync_DuplicateSkuInTenant_ReturnsConflict()
+    {
+        var tenantId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var dataContext = new FakeDataContext();
+        dataContext.Set<ProductCategory>().Add(new ProductCategory
+        {
+            Id = categoryId,
+            TenantId = tenantId,
+            Name = "Parts"
+        });
+        dataContext.Set<Product>().Add(new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            CategoryId = categoryId,
+            Name = "Existing",
+            SKU = "SKU-001"
+        });
+
+        var service = CreateService(dataContext, new FakeCacheService(), tenantId);
+
+        var result = await service.CreateAsync(new CreateProductRequest
+        {
+            Name = "Duplicate",
+            Price = 10m,
+            CategoryId = categoryId,
+            SKU = "SKU-001"
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(409);
+        dataContext.Added.OfType<Product>().Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task UpdateAsync_DuplicateSkuInTenant_ReturnsConflict()
+    {
+        var tenantId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            CategoryId = categoryId,
+            Name = "Editable",
+            SKU = "SKU-002"
+        };
+
+        var dataContext = new FakeDataContext();
+        dataContext.Set<ProductCategory>().Add(new ProductCategory
+        {
+            Id = categoryId,
+            TenantId = tenantId,
+            Name = "Parts"
+        });
+        dataContext.Set<Product>().Add(product);
+        dataContext.Set<Product>().Add(new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            CategoryId = categoryId,
+            Name = "Existing",
+            SKU = "SKU-001"
+        });
+
+        var service = CreateService(dataContext, new FakeCacheService(), tenantId);
+
+        var result = await service.UpdateAsync(product.Id, new UpdateProductRequest
+        {
+            Name = "Editable",
+            Price = 10m,
+            CategoryId = categoryId,
+            SKU = "SKU-001"
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.StatusCode.Should().Be(409);
+        dataContext.Updated.Should().BeEmpty();
+    }
+
+    [Test]
     public void ModelConfiguration_StockBalanceAndReservation_DefinesConcurrencyAndBalanceUniqueness()
     {
         using var db = CreateModelOnlyDbContext(Guid.NewGuid());
@@ -156,6 +238,28 @@ public sealed class ProductServiceTests
         reservation.Should().NotBeNull();
         reservation!.FindProperty(nameof(Reservation.ConcurrencyStamp))!
             .IsConcurrencyToken.Should().BeTrue();
+
+        var product = db.Model.FindEntityType(typeof(Product));
+        product.Should().NotBeNull();
+        var uniqueSkuIndex = product!.GetIndexes()
+            .SingleOrDefault(index => index.IsUnique &&
+                index.Properties.Select(p => p.Name).SequenceEqual([
+                    nameof(Product.TenantId),
+                    nameof(Product.SKU)
+                ]));
+        uniqueSkuIndex.Should().NotBeNull();
+        uniqueSkuIndex!.GetFilter().Should().Be("\"IsDeleted\" = false AND \"SKU\" IS NOT NULL AND \"SKU\" <> ''");
+
+        var category = db.Model.FindEntityType(typeof(ProductCategory));
+        category.Should().NotBeNull();
+        var uniqueCategoryNameIndex = category!.GetIndexes()
+            .SingleOrDefault(index => index.IsUnique &&
+                index.Properties.Select(p => p.Name).SequenceEqual([
+                    nameof(ProductCategory.TenantId),
+                    nameof(ProductCategory.Name)
+                ]));
+        uniqueCategoryNameIndex.Should().NotBeNull();
+        uniqueCategoryNameIndex!.GetFilter().Should().Be("\"IsDeleted\" = false");
     }
 
     private static ProductService CreateService(
