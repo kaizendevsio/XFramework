@@ -50,6 +50,7 @@ status: current
 - [Unified ZLogger logging pipeline](architecture-patterns/unified-zlogger-logging-pipeline.md) - current logging decision record and historical Serilog removal context.
 - [Decentralized remote data context](architecture-patterns/decentralized-remote-data-context.md) - remote `IDataContext` architecture over generated service wrappers.
 - [Blazor IDataContext migration](developer-experience/blazor-idatacontext-migration.md) - migrating Blazor generated CRUD wrapper calls to `IDataContext`.
+- [BlazorBlueprint ControlPanel agent guide](tooling-decisions/blazor-blueprint-controlpanel-agent-guide.md) - BlazorBlueprint setup, overlay/trigger rules, docs lookup, and visual browser verification for ControlPanel UI work.
 
 ## Current Vs Historical Guidance
 
