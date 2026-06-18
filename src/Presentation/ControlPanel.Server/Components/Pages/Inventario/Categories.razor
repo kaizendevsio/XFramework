@@ -1,0 +1,277 @@
+@page "/inventario/categories"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Inventario Categories - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <BbTypographyH3>Product Categories</BbTypographyH3>
+                    <BbTypographyMuted>Manage catalog categories for the selected tenant.</BbTypographyMuted>
+                </div>
+                <BbButton OnClick="@OpenCreateDialog">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Create Category
+                </BbButton>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Categories</BbCardTitle>
+                    <BbCardDescription>@_categories.Count category(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_categories" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Description)" Title="Description" />
+                            <BbDataGridTemplateColumn Title="Products">
+                                <ChildContent Context="item">@GetProductCount(item.Id)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <div class="flex items-center gap-1">
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  OnClick="@(() => OpenEditDialog(item))">
+                                            <LucideIcon Name="pencil" class="h-4 w-4" />
+                                        </BbButton>
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  OnClick="@(() => OpenDeleteDialog(item))">
+                                            <LucideIcon Name="trash-2" class="h-4 w-4" />
+                                        </BbButton>
+                                    </div>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+<BbDialog Open="@_dialogOpen" OpenChanged="@(v => _dialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(_editingCategory is null ? "Create Category" : "Edit Category")</BbDialogTitle>
+            <BbDialogDescription>Categories organize products in this tenant.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <BbFormFieldInput TValue="string" @bind-Value="_name" Label="Name" Required="true" />
+            <BbFormFieldInput TValue="string" @bind-Value="_description" Label="Description" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _dialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveCategory" Disabled="@_saving">@(_editingCategory is null ? "Create" : "Save")</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<ConfirmDeleteDialog Open="@_deleteDialogOpen"
+                     OpenChanged="@(v => _deleteDialogOpen = v)"
+                     Message="@($"Delete category \"{_deletingCategory?.Name}\"? Products using this category will not be changed.")"
+                     OnConfirm="@DeleteCategory" />
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+
+    private List<ProductCategory> _categories = [];
+    private Dictionary<Guid, int> _productCounts = [];
+    private bool _loading = true;
+    private bool _saving;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private bool _dialogOpen;
+    private bool _deleteDialogOpen;
+    private ProductCategory? _editingCategory;
+    private ProductCategory? _deletingCategory;
+    private string _name = "";
+    private string _description = "";
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
+            _categories = [];
+            _productCounts = [];
+            if (!_hasTenant || !_moduleEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _categories = await DataContext.Query<ProductCategory>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(200)
+                .ToListAsync();
+
+            var products = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .Take(1000)
+                .ToListAsync();
+            _productCounts = products.GroupBy(x => x.CategoryId).ToDictionary(x => x.Key, x => x.Count());
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load categories: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private int GetProductCount(Guid categoryId) =>
+        _productCounts.TryGetValue(categoryId, out var count) ? count : 0;
+
+    private void OpenCreateDialog()
+    {
+        _editingCategory = null;
+        _name = "";
+        _description = "";
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(ProductCategory category)
+    {
+        _editingCategory = category;
+        _name = category.Name ?? "";
+        _description = category.Description ?? "";
+        _dialogOpen = true;
+    }
+
+    private void OpenDeleteDialog(ProductCategory category)
+    {
+        _deletingCategory = category;
+        _deleteDialogOpen = true;
+    }
+
+    private async Task SaveCategory()
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            ToastService.Show("Category name is required.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            if (_editingCategory is null)
+            {
+                DataContext.Add(new ProductCategory
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    Name = _name.Trim(),
+                    Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+                    CreatedAt = DateTime.UtcNow,
+                    IsEnabled = true
+                });
+            }
+            else
+            {
+                var fresh = await DataContext.Query<ProductCategory>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.Id == _editingCategory.Id && x.TenantId == tenantId)
+                    .FirstOrDefaultAsync();
+                if (fresh is null)
+                {
+                    ToastService.Show("Category not found.");
+                    return;
+                }
+
+                fresh.Name = _name.Trim();
+                fresh.Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim();
+                fresh.ModifiedAt = DateTime.UtcNow;
+                DataContext.Update(fresh);
+            }
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show(_editingCategory is null ? "Category created." : "Category updated.");
+                _dialogOpen = false;
+                await Reload();
+            }
+            else
+            {
+                ToastService.Show($"Failed to save category: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error saving category: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteCategory()
+    {
+        if (_deletingCategory is null) return;
+        try
+        {
+            _deletingCategory.IsDeleted = true;
+            _deletingCategory.IsEnabled = false;
+            _deletingCategory.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(_deletingCategory);
+            var result = await DataContext.SaveChangesAsync();
+            ToastService.Show(result.IsSuccess ? "Category deleted." : $"Failed: {result.Message}");
+            _deleteDialogOpen = false;
+            _deletingCategory = null;
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error deleting category: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+}

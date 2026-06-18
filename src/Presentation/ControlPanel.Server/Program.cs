@@ -6,6 +6,7 @@ using ControlPanel.Server.Health;
 using ControlPanel.Server.Services;
 using XFramework.Integration.Extensions;
 using IdentityServer.Integration.Drivers;
+using Inventario.Integration.Drivers;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Wallets.Integration.Drivers;
@@ -63,6 +64,7 @@ builder.Services.AddHealthChecks()
 
 // Service wrappers — auto-generated CRUD + custom operations for each microservice
 builder.Services.AddIdentityServerWrapperServices();
+builder.Services.AddInventarioWrapperServices();
 builder.Services.AddWalletsWrapperServices();
 
 // IDataContext — universal query layer routed through service wrappers
@@ -86,6 +88,7 @@ builder.Services.AddRemoteDataContext();
 
 // Tenant filter state (sidebar selection)
 builder.Services.AddScoped<TenantFilterService>();
+builder.Services.AddScoped<TenantModuleNavigationService>();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddScoped<ControlPanelAuthService>();
 builder.Services.AddScoped<ControlPanelBootstrapSeeder>();

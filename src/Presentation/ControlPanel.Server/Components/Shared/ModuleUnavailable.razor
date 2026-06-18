@@ -1,0 +1,17 @@
+<BbAlert Variant="AlertVariant.Warning">
+    <BbAlertTitle>@Title</BbAlertTitle>
+    <BbAlertDescription>@Message</BbAlertDescription>
+</BbAlert>
+
+@code {
+    [Parameter] public string ModuleName { get; set; } = "Module";
+    [Parameter] public bool RequiresTenant { get; set; }
+
+    private string Title => RequiresTenant
+        ? "Select a tenant"
+        : $"{ModuleName} disabled";
+
+    private string Message => RequiresTenant
+        ? "Select a specific active tenant from the profile menu to manage tenant module pages."
+        : $"{ModuleName} is not enabled for the selected tenant. Enable it from the tenant Modules page first.";
+}

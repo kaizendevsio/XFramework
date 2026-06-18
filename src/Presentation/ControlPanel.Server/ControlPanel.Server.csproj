@@ -19,9 +19,11 @@
     <ItemGroup>
         <!-- Domain.Shared for entity types -->
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
         <!-- Service wrappers (Bolt CRUD + custom operations) -->
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
+        <ProjectReference Include="..\..\Modules\XFramework.Inventario\Inventario.Integration\Inventario.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Integration\Wallets.Integration.csproj" />
         <!-- Bolt client infrastructure (BoltClient, BoltDriver, IMessageBusWrapper) -->
         <ProjectReference Include="..\..\Infrastructure\XFramework.Integration\XFramework.Integration.csproj" />

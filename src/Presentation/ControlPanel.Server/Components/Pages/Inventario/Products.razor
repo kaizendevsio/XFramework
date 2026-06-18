@@ -1,0 +1,432 @@
+@page "/inventario/products"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Inventario Products - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_moduleEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Products</BbTypographyH3>
+                    <BbTypographyMuted>Manage the selected tenant's product catalog and stock snapshot.</BbTypographyMuted>
+                </div>
+                <BbButton OnClick="@OpenCreateDialog">
+                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                    Create Product
+                </BbButton>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Total Products</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_products.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Available</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_products.Count(x => x.IsAvailable)</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Low Stock</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_products.Count(x => x.StockQuantity <= _lowStockThreshold)</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Categories</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_categories.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <BbCardTitle>Product Catalog</BbCardTitle>
+                            <BbCardDescription>@_filteredProducts.Count product(s) shown</BbCardDescription>
+                        </div>
+                        <div class="flex flex-col gap-2 md:w-[28rem] md:flex-row">
+                            <BbInput @bind-Value="_search" Placeholder="Search products..." @oninput="OnSearchChanged" />
+                            <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                                <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                                Refresh
+                            </BbButton>
+                        </div>
+                    </div>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_filteredProducts" ShowPagination="true" InitialPageSize="20"
+                                OnRowClick="@((Product item) => Navigation.NavigateTo($"/inventario/products/{item.Id}"))"
+                                Class="cursor-pointer">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="SKU">
+                                <ChildContent Context="item">
+                                    <span class="font-mono text-xs">@(item.SKU ?? "N/A")</span>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Category">
+                                <ChildContent Context="item">@GetCategoryName(item.CategoryId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Price" Sortable="true">
+                                <ChildContent Context="item">@item.Price.ToString("N2")</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Stock" Sortable="true">
+                                <ChildContent Context="item">
+                                    <span class="@(item.StockQuantity <= _lowStockThreshold ? "font-semibold text-yellow-600" : "")">
+                                        @item.StockQuantity
+                                    </span>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Status">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsAvailable ? "Available" : "Unavailable")"
+                                                 Status="@(item.IsAvailable ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <div class="flex items-center gap-1">
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/products/{item.Id}"))">
+                                            <LucideIcon Name="eye" class="h-4 w-4" />
+                                        </BbButton>
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  OnClick="@(() => OpenEditDialog(item))">
+                                            <LucideIcon Name="pencil" class="h-4 w-4" />
+                                        </BbButton>
+                                    </div>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+<BbDialog Open="@_productDialogOpen" OpenChanged="@(v => _productDialogOpen = v)">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(_editingProduct is null ? "Create Product" : "Edit Product")</BbDialogTitle>
+            <BbDialogDescription>Catalog data belongs to the selected tenant.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <BbFormFieldInput TValue="string" @bind-Value="_form.Name" Label="Name" Required="true" />
+            <BbFormFieldInput TValue="string" @bind-Value="_form.Sku" Label="SKU" />
+            <BbFormFieldSelect TValue="string" @bind-Value="_form.CategoryId" Label="Category" Placeholder="Select category">
+                @foreach (var category in _categories)
+                {
+                    <BbSelectItem Value="@category.Id.ToString()">@(category.Name ?? category.Id.ToString()[..8])</BbSelectItem>
+                }
+            </BbFormFieldSelect>
+            <div class="grid gap-4 md:grid-cols-3">
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Price" Label="Price" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.StockQuantity" Label="Stock Quantity" />
+                <BbFormFieldInput TValue="string" @bind-Value="_form.Brand" Label="Brand" />
+            </div>
+            <BbFormFieldInput TValue="string" @bind-Value="_form.Description" Label="Description" />
+            <BbFormFieldSwitch Checked="@_form.IsAvailable"
+                               CheckedChanged="@((bool value) => _form.IsAvailable = value)"
+                               Label="Available" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _productDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@SaveProduct" Disabled="@_saving">
+                @(_editingProduct is null ? "Create" : "Save")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+
+    private readonly ProductForm _form = new();
+    private List<Product> _products = [];
+    private List<Product> _filteredProducts = [];
+    private List<ProductCategory> _categories = [];
+    private bool _loading = true;
+    private bool _saving;
+    private bool _hasTenant;
+    private bool _moduleEnabled;
+    private bool _productDialogOpen;
+    private Product? _editingProduct;
+    private string _search = "";
+    private int _lowStockThreshold = 5;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+    }
+
+    private void OnTenantChanged()
+    {
+        _ = InvokeAsync(Reload);
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _moduleEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario);
+            _products = [];
+            _categories = [];
+
+            if (!_hasTenant || !_moduleEnabled)
+            {
+                ApplySearch();
+                return;
+            }
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _categories = await DataContext.Query<ProductCategory>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(200)
+                .ToListAsync();
+
+            _products = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(250)
+                .ToListAsync();
+
+            await LoadSettings();
+            ApplySearch();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load products: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadSettings()
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId) return;
+        var key = "Settings:Inventario:LowStockThreshold";
+        var config = await DataContext.Query<RegistryConfiguration>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId && x.Key == key && !x.IsDeleted)
+            .FirstOrDefaultAsync();
+        if (int.TryParse(config?.Value, out var threshold) && threshold >= 0)
+        {
+            _lowStockThreshold = threshold;
+        }
+    }
+
+    private void OnSearchChanged(ChangeEventArgs args)
+    {
+        _search = args.Value?.ToString() ?? "";
+        ApplySearch();
+    }
+
+    private void ApplySearch()
+    {
+        var search = _search.Trim();
+        _filteredProducts = string.IsNullOrWhiteSpace(search)
+            ? _products
+            : _products.Where(x =>
+                    (x.Name?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (x.SKU?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (x.Brand?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || GetCategoryName(x.CategoryId).Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+    }
+
+    private string GetCategoryName(Guid categoryId) =>
+        _categories.FirstOrDefault(x => x.Id == categoryId)?.Name ?? "Uncategorized";
+
+    private void OpenCreateDialog()
+    {
+        _editingProduct = null;
+        _form.Reset();
+        _form.IsAvailable = true;
+        _form.CategoryId = _categories.FirstOrDefault()?.Id.ToString() ?? "";
+        _productDialogOpen = true;
+    }
+
+    private void OpenEditDialog(Product product)
+    {
+        _editingProduct = product;
+        _form.Name = product.Name ?? "";
+        _form.Sku = product.SKU ?? "";
+        _form.CategoryId = product.CategoryId.ToString();
+        _form.Price = product.Price.ToString("0.##");
+        _form.StockQuantity = product.StockQuantity.ToString();
+        _form.Brand = product.Brand ?? "";
+        _form.Description = product.Description ?? "";
+        _form.IsAvailable = product.IsAvailable;
+        _productDialogOpen = true;
+    }
+
+    private async Task SaveProduct()
+    {
+        if (TenantFilter.SelectedTenantId is not Guid tenantId)
+        {
+            ToastService.Show("Select a tenant before saving products.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_form.Name))
+        {
+            ToastService.Show("Product name is required.");
+            return;
+        }
+
+        if (!Guid.TryParse(_form.CategoryId, out var categoryId))
+        {
+            ToastService.Show("Select a category.");
+            return;
+        }
+
+        if (!decimal.TryParse(_form.Price, out var price) || price < 0)
+        {
+            ToastService.Show("Price must be a non-negative number.");
+            return;
+        }
+
+        if (!int.TryParse(_form.StockQuantity, out var quantity) || quantity < 0)
+        {
+            ToastService.Show("Stock quantity must be a non-negative whole number.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            if (_editingProduct is null)
+            {
+                DataContext.Add(new Product
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    Name = _form.Name.Trim(),
+                    SKU = NullIfEmpty(_form.Sku),
+                    CategoryId = categoryId,
+                    Price = price,
+                    StockQuantity = quantity,
+                    Brand = NullIfEmpty(_form.Brand),
+                    Description = NullIfEmpty(_form.Description),
+                    IsAvailable = _form.IsAvailable,
+                    CreatedAt = DateTime.UtcNow,
+                    IsEnabled = true
+                });
+            }
+            else
+            {
+                var fresh = await DataContext.Query<Product>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.Id == _editingProduct.Id && x.TenantId == tenantId)
+                    .FirstOrDefaultAsync();
+                if (fresh is null)
+                {
+                    ToastService.Show("Product not found.");
+                    return;
+                }
+
+                fresh.Name = _form.Name.Trim();
+                fresh.SKU = NullIfEmpty(_form.Sku);
+                fresh.CategoryId = categoryId;
+                fresh.Price = price;
+                fresh.StockQuantity = quantity;
+                fresh.Brand = NullIfEmpty(_form.Brand);
+                fresh.Description = NullIfEmpty(_form.Description);
+                fresh.IsAvailable = _form.IsAvailable;
+                fresh.ModifiedAt = DateTime.UtcNow;
+                DataContext.Update(fresh);
+            }
+
+            var result = await DataContext.SaveChangesAsync();
+            if (result.IsSuccess)
+            {
+                ToastService.Show(_editingProduct is null ? "Product created." : "Product updated.");
+                _productDialogOpen = false;
+                await Reload();
+            }
+            else
+            {
+                ToastService.Show($"Failed to save product: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error saving product: {ex.Message}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class ProductForm
+    {
+        public string Name { get; set; } = "";
+        public string Sku { get; set; } = "";
+        public string CategoryId { get; set; } = "";
+        public string Price { get; set; } = "0";
+        public string StockQuantity { get; set; } = "0";
+        public string Brand { get; set; } = "";
+        public string Description { get; set; } = "";
+        public bool IsAvailable { get; set; } = true;
+
+        public void Reset()
+        {
+            Name = "";
+            Sku = "";
+            CategoryId = "";
+            Price = "0";
+            StockQuantity = "0";
+            Brand = "";
+            Description = "";
+            IsAvailable = true;
+        }
+    }
+}
