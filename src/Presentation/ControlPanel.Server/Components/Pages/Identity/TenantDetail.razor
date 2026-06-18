@@ -126,9 +126,9 @@ else
                         else
                         {
                             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                @foreach (var row in _moduleFeatureRows)
+                                @foreach (var row in _rootModuleFeatureRows)
                                 {
-                                    <div class="rounded-lg border bg-card p-4 shadow-sm">
+                                    <div class="@GetModuleFeatureCardClass(row)">
                                         <div class="flex items-start justify-between gap-3">
                                             <div class="flex min-w-0 gap-3">
                                                 <div class="tenant-module-icon">
@@ -152,6 +152,48 @@ else
                                                                Disabled="@(_savingModuleFeatureIds.Contains(row.Id))"
                                                                Label="Module enabled" />
                                         </div>
+                                        @if (IsInventarioRootFeature(row) && _inventarioSubFeatureRows.Count > 0)
+                                        {
+                                            <div class="mt-4 border-t pt-4">
+                                                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                                    <div>
+                                                        <div class="text-sm font-semibold">Inventario sub-features</div>
+                                                        <div class="text-xs text-muted-foreground">The root Inventario toggle remains the parent access gate.</div>
+                                                    </div>
+                                                    <StatusBadge Text="@($"{_inventarioSubFeatureRows.Count(child => child.IsEnabled)} enabled")" Status="active" />
+                                                </div>
+                                                <div class="grid gap-2 lg:grid-cols-2">
+                                                    @foreach (var childRow in _inventarioSubFeatureRows)
+                                                    {
+                                                        <div class="rounded-md border bg-muted/30 p-3">
+                                                            <div class="flex items-start justify-between gap-3">
+                                                                <div class="flex min-w-0 gap-3">
+                                                                    <div class="tenant-module-icon h-10 w-10 flex-[0_0_2.5rem]">
+                                                                        <LucideIcon Name="@childRow.Icon" class="h-4 w-4" />
+                                                                    </div>
+                                                                    <div class="min-w-0">
+                                                                        <div class="flex flex-wrap items-center gap-2">
+                                                                            <div class="font-medium">@childRow.DisplayName</div>
+                                                                            <StatusBadge Text="@GetModuleFeatureCoverageText(childRow)" Status="@GetModuleFeatureCoverageStatus(childRow)" />
+                                                                        </div>
+                                                                        <div class="mt-1 text-sm text-muted-foreground">@childRow.Description</div>
+                                                                        <div class="mt-2 font-mono text-xs text-muted-foreground">@childRow.Key</div>
+                                                                    </div>
+                                                                </div>
+                                                                <StatusBadge Text="@(childRow.IsEnabled ? "Enabled" : "Disabled")"
+                                                                             Status="@(childRow.IsEnabled ? "active" : "inactive")" />
+                                                            </div>
+                                                            <div class="mt-3 border-t pt-3">
+                                                                <BbFormFieldSwitch Checked="@childRow.IsEnabled"
+                                                                                   CheckedChanged="@((bool enabled) => ToggleModuleFeature(childRow, enabled))"
+                                                                                   Disabled="@(_savingModuleFeatureIds.Contains(childRow.Id))"
+                                                                                   Label="Feature enabled" />
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
                                     </div>
                                 }
                             </div>
@@ -367,6 +409,8 @@ else
     private List<IdentityRoleType> _detailRoleTypes = [];
     private List<TenantModuleFeature> _detailModuleFeatures = [];
     private List<ModuleFeatureRow> _moduleFeatureRows = [];
+    private List<ModuleFeatureRow> _rootModuleFeatureRows = [];
+    private List<ModuleFeatureRow> _inventarioSubFeatureRows = [];
     private HashSet<Guid> _savingModuleFeatureIds = [];
     private bool _moduleFeaturesLoading;
     private string CurrentSection => NormalizeSection(Section);
@@ -450,6 +494,8 @@ else
         _detailRoleTypes = [];
         _detailModuleFeatures = [];
         _moduleFeatureRows = [];
+        _rootModuleFeatureRows = [];
+        _inventarioSubFeatureRows = [];
     }
 
     private void SyncEditFields()
@@ -541,7 +587,7 @@ else
                         SubFeatureKey = definition.SubFeatureKey,
                         DisplayName = definition.DisplayName,
                         Description = definition.Description,
-                        IsEnabled = true,
+                        IsEnabled = definition.DefaultEnabled,
                         CreatedAt = DateTime.UtcNow
                     });
                 }
@@ -579,6 +625,7 @@ else
                         feature?.IsEnabled ?? false);
                 })
                 .ToList();
+            ApplyModuleFeatureGrouping();
         }
         catch (Exception ex)
         {
@@ -588,6 +635,17 @@ else
         {
             _moduleFeaturesLoading = false;
         }
+    }
+
+    private void ApplyModuleFeatureGrouping()
+    {
+        _inventarioSubFeatureRows = _moduleFeatureRows
+            .Where(IsInventarioSubFeature)
+            .ToList();
+
+        _rootModuleFeatureRows = _moduleFeatureRows
+            .Where(row => !IsInventarioSubFeature(row))
+            .ToList();
     }
 
     private async Task ToggleModuleFeature(ModuleFeatureRow row, bool enabled)
@@ -710,9 +768,23 @@ else
         {
             TenantModuleFeatureKeys.Wallets or
             TenantModuleFeatureKeys.Inventario or
+            TenantModuleFeatureKeys.InventarioCatalog or
+            TenantModuleFeatureKeys.InventarioVariations or
+            TenantModuleFeatureKeys.InventarioTransactions or
+            TenantModuleFeatureKeys.InventarioLowStockAlerts or
+            TenantModuleFeatureKeys.InventarioWarehousing or
+            TenantModuleFeatureKeys.InventarioStockBalances or
+            TenantModuleFeatureKeys.InventarioMovements or
+            TenantModuleFeatureKeys.InventarioReservations or
             TenantModuleFeatureKeys.MessagingChat or
             TenantModuleFeatureKeys.Community or
             TenantModuleFeatureKeys.Notifications => "API gated",
+            TenantModuleFeatureKeys.InventarioFulfillment or
+            TenantModuleFeatureKeys.InventarioPurchasing or
+            TenantModuleFeatureKeys.InventarioTraceability or
+            TenantModuleFeatureKeys.InventarioPlanning or
+            TenantModuleFeatureKeys.InventarioReporting or
+            TenantModuleFeatureKeys.InventarioNegativeStock or
             TenantModuleFeatureKeys.MessagingAudioVideo => "Planned flag",
             TenantModuleFeatureKeys.Payments => "No API yet",
             _ => "Stored"
@@ -723,13 +795,40 @@ else
         {
             TenantModuleFeatureKeys.Wallets or
             TenantModuleFeatureKeys.Inventario or
+            TenantModuleFeatureKeys.InventarioCatalog or
+            TenantModuleFeatureKeys.InventarioVariations or
+            TenantModuleFeatureKeys.InventarioTransactions or
+            TenantModuleFeatureKeys.InventarioLowStockAlerts or
+            TenantModuleFeatureKeys.InventarioWarehousing or
+            TenantModuleFeatureKeys.InventarioStockBalances or
+            TenantModuleFeatureKeys.InventarioMovements or
+            TenantModuleFeatureKeys.InventarioReservations or
             TenantModuleFeatureKeys.MessagingChat or
             TenantModuleFeatureKeys.Community or
             TenantModuleFeatureKeys.Notifications => "active",
+            TenantModuleFeatureKeys.InventarioFulfillment or
+            TenantModuleFeatureKeys.InventarioPurchasing or
+            TenantModuleFeatureKeys.InventarioTraceability or
+            TenantModuleFeatureKeys.InventarioPlanning or
+            TenantModuleFeatureKeys.InventarioReporting or
+            TenantModuleFeatureKeys.InventarioNegativeStock or
             TenantModuleFeatureKeys.MessagingAudioVideo => "pending",
             TenantModuleFeatureKeys.Payments => "inactive",
             _ => "inactive"
         };
+
+    private static bool IsInventarioRootFeature(ModuleFeatureRow row) =>
+        string.Equals(row.ModuleKey, TenantModuleFeatureKeys.Inventario, StringComparison.OrdinalIgnoreCase) &&
+        string.IsNullOrWhiteSpace(row.SubFeatureKey);
+
+    private static bool IsInventarioSubFeature(ModuleFeatureRow row) =>
+        string.Equals(row.ModuleKey, TenantModuleFeatureKeys.Inventario, StringComparison.OrdinalIgnoreCase) &&
+        !string.IsNullOrWhiteSpace(row.SubFeatureKey);
+
+    private static string GetModuleFeatureCardClass(ModuleFeatureRow row) =>
+        IsInventarioRootFeature(row)
+            ? "rounded-lg border bg-card p-4 shadow-sm md:col-span-2 xl:col-span-3"
+            : "rounded-lg border bg-card p-4 shadow-sm";
 
     private static string NormalizeSection(string? section)
     {
