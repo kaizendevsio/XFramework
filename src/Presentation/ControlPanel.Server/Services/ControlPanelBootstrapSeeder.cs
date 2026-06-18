@@ -1,6 +1,7 @@
 using System.Text;
 using IdentityServer.Domain.Shared;
 using IdentityServer.Domain.Shared.Contracts;
+using XFramework.Domain.Shared.BusinessObjects;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Domain.Shared.Enums;
 
@@ -8,12 +9,16 @@ namespace ControlPanel.Server.Services;
 
 public sealed class ControlPanelBootstrapSeeder(
     IDataContext dataContext,
+    RequestMetadata requestMetadata,
     ILogger<ControlPanelBootstrapSeeder> logger)
 {
     public async Task SeedAsync(ControlPanelAuthOptions options, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var tenant = await EnsureTenant(options, now, ct);
+
+        requestMetadata.TenantId = tenant.Id;
+
         var roleGroup = await EnsureRoleGroup(tenant.Id, now, ct);
         var roleType = await EnsureRoleType(tenant.Id, roleGroup.Id, now, ct);
         await EnsureSessionType(tenant.Id, now, ct);
