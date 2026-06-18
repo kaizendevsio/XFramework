@@ -61,12 +61,12 @@ public sealed class TenantModuleFeatureGateMiddleware(
 
     private static Guid? ResolveTenantId(HttpContext context, IConfiguration configuration)
     {
-        foreach (var claimName in new[] { "tenantId", "TenantId", "tid" })
-        {
-            var claimValue = context.User.FindFirst(claimName)?.Value;
-            if (Guid.TryParse(claimValue, out var claimTenantId))
-                return claimTenantId;
-        }
+        var claimTenantId = ResolveTenantIdFromClaims(context);
+        if (claimTenantId is not null)
+            return claimTenantId;
+
+        if (context.User.Identity?.IsAuthenticated == true)
+            return null;
 
         foreach (var headerName in new[] { "X-Tenant-Id", "X-TenantId", "tenantId", "TenantId" })
         {
@@ -89,6 +89,18 @@ public sealed class TenantModuleFeatureGateMiddleware(
         return Guid.TryParse(configuration["Tenant:DefaultId"], out var defaultTenantId)
             ? defaultTenantId
             : null;
+    }
+
+    private static Guid? ResolveTenantIdFromClaims(HttpContext context)
+    {
+        foreach (var claimName in new[] { "tenantId", "TenantId", "tid" })
+        {
+            var claimValue = context.User.FindFirst(claimName)?.Value;
+            if (Guid.TryParse(claimValue, out var claimTenantId))
+                return claimTenantId;
+        }
+
+        return null;
     }
 
     private static async Task WriteResult(HttpContext context, Result result)

@@ -316,7 +316,8 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               Changes = new List<ChangeEntry>
                               {
                                   new() { EntityTypeName = entityType, Operation = op, SerializedEntity = serializedEntity }
-                              }
+                              },
+                              Metadata = BuildRequestMetadata(entityForLog)
                           };
                           var (status, data) = await _boltClient.InvokeAsync(_targetClient, "__db_changes__", MemoryPack.MemoryPackSerializer.Serialize(request));
                           var result = data.IsEmpty
@@ -330,6 +331,17 @@ public class ServiceWrapperGenerator : IIncrementalGenerator
                               ToJson(new { Status = result.StatusCode, Success = result.IsSuccess, Message = result.Message }));
 
                           return result;
+                      }
+
+                      private static RequestMetadata? BuildRequestMetadata(object? entityForLog)
+                      {
+                          var tenantIdProperty = entityForLog?.GetType().GetProperty("TenantId");
+                          if (tenantIdProperty?.GetValue(entityForLog) is Guid tenantId && tenantId != Guid.Empty)
+                          {
+                              return new RequestMetadata { TenantId = tenantId };
+                          }
+
+                          return null;
                       }
                   }
                   """);

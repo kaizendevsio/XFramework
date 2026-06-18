@@ -23,8 +23,9 @@ public static class DataContextHandlerExtensions
                     BindingFlags.Public | BindingFlags.Static);
                 if (method?.Invoke(null, null) is Dictionary<string, Type> entityTypes)
                 {
+                    var mutableEntities = GetMutableEntityNames(registrationType);
                     foreach (var (name, type) in entityTypes)
-                        queryService.RegisterEntity(type, name);
+                        queryService.RegisterEntity(type, name, mutableEntities?.Contains(name) ?? true);
                 }
             }
 
@@ -34,6 +35,18 @@ public static class DataContextHandlerExtensions
         services.AddHostedService<DataContextBoltHandlerRegistration>();
 
         return services;
+    }
+
+    private static HashSet<string>? GetMutableEntityNames(Type registrationType)
+    {
+        var method = registrationType.GetMethod(
+            "GetDataContextMutableEntityTypes",
+            BindingFlags.Public | BindingFlags.Static);
+
+        if (method?.Invoke(null, null) is HashSet<string> mutableEntityNames)
+            return mutableEntityNames;
+
+        return null;
     }
 
     private sealed class DataContextBoltHandlerRegistration(
