@@ -10,6 +10,8 @@ public partial record GetCommunityConnectionListRequest : RequestBase,
     IQuery<TResponse>,
     IBoltRequest<TRequest, TResponse>
 {
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
     public Guid ConnectionTypeId { get; set; }
     public Guid CommunityIdentityId { get; set; }
     public int Limit { get; set; } = 20;

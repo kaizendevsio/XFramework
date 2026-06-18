@@ -1,0 +1,328 @@
+@page "/community/notifications"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Community Notifications - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_access.HasTenant)
+{
+    <BbAlert>
+        <BbAlertTitle>Select a Tenant</BbAlertTitle>
+        <BbAlertDescription>Choose a tenant in the sidebar to review Community notifications.</BbAlertDescription>
+    </BbAlert>
+}
+else if (!_access.CanUseCommunity)
+{
+    <BbAlert Variant="AlertVariant.Warning">
+        <BbAlertTitle>Community Module Disabled</BbAlertTitle>
+        <BbAlertDescription>Enable the Community module for this tenant before reviewing notifications.</BbAlertDescription>
+    </BbAlert>
+}
+else if (!_access.CanUseNotifications)
+{
+    <BbAlert Variant="AlertVariant.Warning">
+        <BbAlertTitle>Notifications Module Disabled</BbAlertTitle>
+        <BbAlertDescription>Enable the Notifications module for this tenant before reviewing Community notifications.</BbAlertDescription>
+    </BbAlert>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Community Notifications</BbTypographyH3>
+                    <BbTypographyMuted>@_access.TenantName - notification delivery and read-state overview</BbTypographyMuted>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Total</BbCardTitle><BbCardDescription>Loaded notifications</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_items.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Unread</BbCardTitle><BbCardDescription>Recipient has not read</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_unreadCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Read</BbCardTitle><BbCardDescription>Recipient read state</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_readCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Disabled</BbCardTitle><BbCardDescription>Moderated records</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_disabledCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <BbCardTitle>Notifications</BbCardTitle>
+                            <BbCardDescription>@FilteredItems.Count notification(s)</BbCardDescription>
+                        </div>
+                        <div class="grid w-full gap-2 md:w-auto md:grid-cols-[18rem_12rem_12rem]">
+                            <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search" Placeholder="Message or identity" />
+                            <BbFormFieldSelect TValue="string" @bind-Value="_readFilter" Label="Read State">
+                                <BbSelectItem Value="@("all")">All</BbSelectItem>
+                                <BbSelectItem Value="@("unread")">Unread</BbSelectItem>
+                                <BbSelectItem Value="@("read")">Read</BbSelectItem>
+                            </BbFormFieldSelect>
+                            <BbFormFieldSelect TValue="string" @bind-Value="_enabledFilter" Label="Status">
+                                <BbSelectItem Value="@("all")">All</BbSelectItem>
+                                <BbSelectItem Value="@("enabled")">Enabled</BbSelectItem>
+                                <BbSelectItem Value="@("disabled")">Disabled</BbSelectItem>
+                            </BbFormFieldSelect>
+                        </div>
+                    </div>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@FilteredItems" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Recipient">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost"
+                                              OnClick="@(() => Navigation.NavigateTo($"/community/identities/{item.RecipientIdentityId}"))">
+                                        @GetIdentityLabel(item.RecipientIdentityId)
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Actor">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost"
+                                              OnClick="@(() => Navigation.NavigateTo($"/community/identities/{item.ActorIdentityId}"))">
+                                        @GetIdentityLabel(item.ActorIdentityId)
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Type">
+                                <ChildContent Context="item">@(item.Type ?? "N/A")</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Message">
+                                <ChildContent Context="item">@Truncate(item.Message, 96)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Read">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsRead ? "Read" : "Unread")"
+                                                 Status="@(item.IsRead ? "active" : "pending")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Enabled">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsEnabled ? "Enabled" : "Disabled")"
+                                                 Status="@(item.IsEnabled ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <div class="flex items-center gap-1">
+                                        @if (item.ContentId is Guid contentId)
+                                        {
+                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                      OnClick="@(() => Navigation.NavigateTo($"/community/content/{contentId}"))">
+                                                <LucideIcon Name="file-text" class="h-4 w-4" />
+                                            </BbButton>
+                                        }
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  OnClick="@(() => ToggleEnabled(item))">
+                                            <LucideIcon Name="@(item.IsEnabled ? "ban" : "check")" class="h-4 w-4" />
+                                        </BbButton>
+                                    </div>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private CommunityControlPanelAccessService AccessService { get; set; } = default!;
+
+    private CommunityControlPanelAccessState _access = new(null, null, false, null);
+    private List<CommunityNotification> _items = [];
+    private Dictionary<Guid, string> _identityLabels = [];
+    private bool _loading = true;
+    private string _search = "";
+    private string _readFilter = "all";
+    private string _enabledFilter = "all";
+    private int _unreadCount;
+    private int _readCount;
+    private int _disabledCount;
+
+    private List<CommunityNotification> FilteredItems
+    {
+        get
+        {
+            var items = _items.AsEnumerable();
+
+            if (_readFilter == "read")
+            {
+                items = items.Where(x => x.IsRead);
+            }
+            else if (_readFilter == "unread")
+            {
+                items = items.Where(x => !x.IsRead);
+            }
+
+            if (_enabledFilter == "enabled")
+            {
+                items = items.Where(x => x.IsEnabled);
+            }
+            else if (_enabledFilter == "disabled")
+            {
+                items = items.Where(x => !x.IsEnabled);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var search = _search.Trim();
+                items = items.Where(x =>
+                    Contains(x.Message, search) ||
+                    Contains(x.Type, search) ||
+                    Contains(GetIdentityLabel(x.RecipientIdentityId), search) ||
+                    Contains(GetIdentityLabel(x.ActorIdentityId), search));
+            }
+
+            return items.ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _access = await AccessService.GetStateAsync(includeNotifications: true);
+            _items = [];
+            _identityLabels = [];
+
+            if (!_access.CanUseNotifications || _access.TenantId is not Guid tenantId)
+            {
+                return;
+            }
+
+            _items = await DataContext.Query<CommunityNotification>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            var identities = await DataContext.Query<CommunityIdentity>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Take(500)
+                .ToListAsync();
+            _identityLabels = identities.ToDictionary(x => x.Id, BuildIdentityLabel);
+
+            _unreadCount = _items.Count(x => !x.IsRead);
+            _readCount = _items.Count(x => x.IsRead);
+            _disabledCount = _items.Count(x => !x.IsEnabled);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load Community notifications: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ToggleEnabled(CommunityNotification item)
+    {
+        try
+        {
+            var fresh = await DataContext.Query<CommunityNotification>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == item.Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null || fresh.TenantId != _access.TenantId)
+            {
+                ToastService.Show("Notification was not found in the selected tenant.");
+                return;
+            }
+
+            fresh.IsEnabled = !fresh.IsEnabled;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
+
+            if (result.IsSuccess)
+            {
+                ToastService.Show(fresh.IsEnabled ? "Notification enabled." : "Notification disabled.");
+                await LoadData();
+            }
+            else
+            {
+                ToastService.Show($"Failed to update notification: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error updating notification: {ex.Message}");
+        }
+    }
+
+    private string GetIdentityLabel(Guid identityId) =>
+        _identityLabels.TryGetValue(identityId, out var label)
+            ? label
+            : $"{identityId.ToString()[..8]}...";
+
+    private static string BuildIdentityLabel(CommunityIdentity identity) =>
+        identity.HandleName ?? identity.Alias ?? $"{identity.Id.ToString()[..8]}...";
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "N/A";
+        }
+
+        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
+    }
+
+    private static bool Contains(string? value, string search) =>
+        value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true;
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+}

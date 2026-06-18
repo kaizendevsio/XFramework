@@ -1,0 +1,304 @@
+@page "/community/connections"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Community Connections - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_access.HasTenant)
+{
+    <BbAlert>
+        <BbAlertTitle>Select a Tenant</BbAlertTitle>
+        <BbAlertDescription>Choose a tenant in the sidebar to review Community connections.</BbAlertDescription>
+    </BbAlert>
+}
+else if (!_access.CanUseCommunity)
+{
+    <BbAlert Variant="AlertVariant.Warning">
+        <BbAlertTitle>Community Module Disabled</BbAlertTitle>
+        <BbAlertDescription>Enable the Community module for this tenant before reviewing connections.</BbAlertDescription>
+    </BbAlert>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Community Connections</BbTypographyH3>
+                    <BbTypographyMuted>@_access.TenantName - relationship moderation overview</BbTypographyMuted>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Total</BbCardTitle><BbCardDescription>Loaded connections</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_items.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Enabled</BbCardTitle><BbCardDescription>Active relationships</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_enabledCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Disabled</BbCardTitle><BbCardDescription>Moderated relationships</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_disabledCount</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Types</BbCardTitle><BbCardDescription>Connection categories</BbCardDescription></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_typeNames.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <BbCardTitle>Connections</BbCardTitle>
+                            <BbCardDescription>@FilteredItems.Count connection(s)</BbCardDescription>
+                        </div>
+                        <div class="grid w-full gap-2 md:w-auto md:grid-cols-[18rem_14rem_12rem]">
+                            <BbFormFieldInput TValue="string" @bind-Value="_search" Label="Search" Placeholder="Source or target identity" />
+                            <BbFormFieldSelect TValue="string" @bind-Value="_typeFilter" Label="Type">
+                                <BbSelectItem Value="@("all")">All types</BbSelectItem>
+                                @foreach (var type in _typeNames.OrderBy(x => x.Value))
+                                {
+                                    <BbSelectItem Value="@type.Key.ToString()">@type.Value</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
+                            <BbFormFieldSelect TValue="string" @bind-Value="_enabledFilter" Label="Status">
+                                <BbSelectItem Value="@("all")">All</BbSelectItem>
+                                <BbSelectItem Value="@("enabled")">Enabled</BbSelectItem>
+                                <BbSelectItem Value="@("disabled")">Disabled</BbSelectItem>
+                            </BbFormFieldSelect>
+                        </div>
+                    </div>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@FilteredItems" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Source">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost"
+                                              OnClick="@(() => Navigation.NavigateTo($"/community/identities/{item.SourceSocialMediaIdentityId}"))">
+                                        @GetIdentityLabel(item.SourceSocialMediaIdentityId)
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Target">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost"
+                                              OnClick="@(() => Navigation.NavigateTo($"/community/identities/{item.TargetSocialMediaIdentityId}"))">
+                                        @GetIdentityLabel(item.TargetSocialMediaIdentityId)
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Type">
+                                <ChildContent Context="item">@(item.Type?.Name ?? GetTypeName(item.TypeId))</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Enabled">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsEnabled ? "Enabled" : "Disabled")"
+                                                 Status="@(item.IsEnabled ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                              OnClick="@(() => ToggleEnabled(item))">
+                                        <LucideIcon Name="@(item.IsEnabled ? "ban" : "check")" class="h-4 w-4" />
+                                    </BbButton>
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private CommunityControlPanelAccessService AccessService { get; set; } = default!;
+
+    private CommunityControlPanelAccessState _access = new(null, null, false, null);
+    private List<CommunityConnection> _items = [];
+    private Dictionary<Guid, string> _identityLabels = [];
+    private Dictionary<Guid, string> _typeNames = [];
+    private bool _loading = true;
+    private string _search = "";
+    private string _typeFilter = "all";
+    private string _enabledFilter = "all";
+    private int _enabledCount;
+    private int _disabledCount;
+
+    private List<CommunityConnection> FilteredItems
+    {
+        get
+        {
+            var items = _items.AsEnumerable();
+
+            if (Guid.TryParse(_typeFilter, out var typeId))
+            {
+                items = items.Where(x => x.TypeId == typeId);
+            }
+
+            if (_enabledFilter == "enabled")
+            {
+                items = items.Where(x => x.IsEnabled);
+            }
+            else if (_enabledFilter == "disabled")
+            {
+                items = items.Where(x => !x.IsEnabled);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var search = _search.Trim();
+                items = items.Where(x =>
+                    Contains(GetIdentityLabel(x.SourceSocialMediaIdentityId), search) ||
+                    Contains(GetIdentityLabel(x.TargetSocialMediaIdentityId), search));
+            }
+
+            return items.ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _access = await AccessService.GetStateAsync();
+            _items = [];
+            _identityLabels = [];
+            _typeNames = [];
+
+            if (!_access.CanUseCommunity || _access.TenantId is not Guid tenantId)
+            {
+                return;
+            }
+
+            _items = await DataContext.Query<CommunityConnection>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.TenantId == tenantId)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            var identities = await DataContext.Query<CommunityIdentity>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .Take(500)
+                .ToListAsync();
+            _identityLabels = identities.ToDictionary(x => x.Id, BuildIdentityLabel);
+
+            var types = await DataContext.Query<CommunityConnectionType>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId)
+                .OrderBy(x => x.Name)
+                .Take(100)
+                .ToListAsync();
+            _typeNames = types.ToDictionary(x => x.Id, x => x.Name);
+
+            _enabledCount = _items.Count(x => x.IsEnabled);
+            _disabledCount = _items.Count(x => !x.IsEnabled);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load Community connections: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ToggleEnabled(CommunityConnection item)
+    {
+        try
+        {
+            var fresh = await DataContext.Query<CommunityConnection>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == item.Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null || fresh.TenantId != _access.TenantId)
+            {
+                ToastService.Show("Connection was not found in the selected tenant.");
+                return;
+            }
+
+            fresh.IsEnabled = !fresh.IsEnabled;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
+
+            if (result.IsSuccess)
+            {
+                ToastService.Show(fresh.IsEnabled ? "Connection enabled." : "Connection disabled.");
+                await LoadData();
+            }
+            else
+            {
+                ToastService.Show($"Failed to update connection: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error updating connection: {ex.Message}");
+        }
+    }
+
+    private string GetIdentityLabel(Guid identityId) =>
+        _identityLabels.TryGetValue(identityId, out var label)
+            ? label
+            : $"{identityId.ToString()[..8]}...";
+
+    private string GetTypeName(Guid typeId) =>
+        _typeNames.TryGetValue(typeId, out var name)
+            ? name
+            : $"{typeId.ToString()[..8]}...";
+
+    private static string BuildIdentityLabel(CommunityIdentity identity) =>
+        identity.HandleName ?? identity.Alias ?? $"{identity.Id.ToString()[..8]}...";
+
+    private static bool Contains(string? value, string search) =>
+        value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true;
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+}

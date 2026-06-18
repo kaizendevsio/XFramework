@@ -1,6 +1,16 @@
+using XFramework.Domain.Shared.Attributes;
+
 namespace Community.Domain.Shared.Contracts;
 
 [MemoryPackable(GenerateType.CircularReference)]
+[GenerateEndpoints(
+    Type = EndpointType.Both,
+    Actions = EndpointActions.ReadOnly,
+    RoutePrefix = "api/community-notifications",
+    RequireAuthorization = true,
+    CacheDurationSeconds = 300,
+    CacheKeyPrefix = "community-notifications"
+)]
 public partial class CommunityNotification : BaseModel
 {
     [MemoryPackOrder(0)]
@@ -29,4 +39,14 @@ public partial class CommunityNotification : BaseModel
 
     [MemoryPackOrder(8)]
     public virtual CommunityContent? Content { get; set; }
+}
+
+public class GetCommunityNotificationListRequest
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public Guid? RecipientIdentityId { get; set; }
+    public Guid? ActorIdentityId { get; set; }
+    public bool? IsRead { get; set; }
+    public string? Type { get; set; }
 }

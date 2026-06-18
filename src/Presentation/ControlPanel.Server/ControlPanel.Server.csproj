@@ -18,11 +18,13 @@
 
     <ItemGroup>
         <!-- Domain.Shared for entity types -->
+        <ProjectReference Include="..\..\Modules\XFramework.Community\Community.Domain.Shared\Community.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Domain.Shared\IdentityServer.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Inventario\Inventario.Domain.Shared\Inventario.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Messaging\Messaging.Domain.Shared\Messaging.Domain.Shared.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Wallets\Wallets.Domain.Shared\Wallets.Domain.Shared.csproj" />
         <!-- Service wrappers (Bolt CRUD + custom operations) -->
+        <ProjectReference Include="..\..\Modules\XFramework.Community\Community.Integration\Community.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.IdentityServer\IdentityServer.Integration\IdentityServer.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Inventario\Inventario.Integration\Inventario.Integration.csproj" />
         <ProjectReference Include="..\..\Modules\XFramework.Messaging\Messaging.Integration\Messaging.Integration.csproj" />

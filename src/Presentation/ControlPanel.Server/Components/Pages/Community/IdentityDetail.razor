@@ -1,0 +1,584 @@
+@page "/community/identities/{Id:guid}"
+@using XFramework.Domain.Shared.DataContext
+@implements IDisposable
+
+<PageTitle>Community Identity Detail - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_access.HasTenant)
+{
+    <BbAlert>
+        <BbAlertTitle>Select a Tenant</BbAlertTitle>
+        <BbAlertDescription>Choose a tenant in the sidebar to review this Community identity.</BbAlertDescription>
+    </BbAlert>
+}
+else if (!_access.CanUseCommunity)
+{
+    <BbAlert Variant="AlertVariant.Warning">
+        <BbAlertTitle>Community Module Disabled</BbAlertTitle>
+        <BbAlertDescription>Enable the Community module for this tenant before reviewing identities.</BbAlertDescription>
+    </BbAlert>
+}
+else if (_identity is null)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@GoBack">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Identities
+        </BbButton>
+        <BbAlert Variant="AlertVariant.Danger">
+            <BbAlertTitle>Identity Not Found</BbAlertTitle>
+            <BbAlertDescription>No Community identity was found for the selected tenant.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else if (_outsideTenantContext)
+{
+    <div class="space-y-4">
+        <BbButton Variant="ButtonVariant.Ghost" OnClick="@GoBack">
+            <LucideIcon Name="arrow-left" class="mr-2 h-4 w-4" />
+            Back to Identities
+        </BbButton>
+        <BbAlert>
+            <BbAlertTitle>Identity Outside Active Tenant</BbAlertTitle>
+            <BbAlertDescription>Switch to the identity's tenant to view this record.</BbAlertDescription>
+        </BbAlert>
+    </div>
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div class="flex items-center gap-4">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="@GoBack">
+                        <LucideIcon Name="arrow-left" class="h-4 w-4" />
+                    </BbButton>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <BbTypographyH3>@(_identity.HandleName ?? _identity.Alias ?? "Unnamed identity")</BbTypographyH3>
+                            <StatusBadge Text="@GetIdentityStatusText(_identity.Status)" Status="@GetIdentityStatusKey(_identity.Status)" />
+                            <StatusBadge Text="@(_identity.IsEnabled ? "Enabled" : "Disabled")"
+                                         Status="@(_identity.IsEnabled ? "active" : "inactive")" />
+                        </div>
+                        <BbTypographyMuted>ID: @_identity.Id - Credential: @GetCredentialLabel(_identity.CredentialId)</BbTypographyMuted>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@LoadData">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ToggleEnabled">
+                        <LucideIcon Name="@(_identity.IsEnabled ? "ban" : "check")" class="mr-2 h-4 w-4" />
+                        @(_identity.IsEnabled ? "Disable" : "Enable")
+                    </BbButton>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Content</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_content.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Followers</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_followers</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Following</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_following</BbTypographyH2></BbCardContent>
+                </BbCard>
+                <BbCard>
+                    <BbCardHeader><BbCardTitle>Reactions</BbCardTitle></BbCardHeader>
+                    <BbCardContent><BbTypographyH2>@_reactions.Count</BbTypographyH2></BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Identity Summary</BbCardTitle>
+                    <BbCardDescription>Read-only owner data with admin moderation controls</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Handle</BbTypographyMuted>
+                            <BbTypographyLarge>@(_identity.HandleName ?? "N/A")</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Alias</BbTypographyMuted>
+                            <BbTypographyLarge>@(_identity.Alias ?? "N/A")</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Type</BbTypographyMuted>
+                            <BbTypographyLarge>@(_identity.Type?.Name ?? GetTypeName(_identity.TypeId))</BbTypographyLarge>
+                        </div>
+                        <div class="space-y-1 md:col-span-2">
+                            <BbTypographyMuted>Tagline</BbTypographyMuted>
+                            <BbTypographyP>@(_identity.Tagline ?? "N/A")</BbTypographyP>
+                        </div>
+                        <div class="space-y-1">
+                            <BbTypographyMuted>Last Active</BbTypographyMuted>
+                            <BbTypographyLarge>@FormatDate(_identity.LastActive)</BbTypographyLarge>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 grid gap-3 md:grid-cols-[16rem_auto] md:items-end">
+                        <BbFormFieldSelect TValue="string" @bind-Value="_statusEdit" Label="Moderation Status">
+                            @foreach (var status in Enum.GetValues<CommunityIdentityStatus>())
+                            {
+                                var statusValue = ((int)status).ToString();
+                                <BbSelectItem Value="@statusValue">@status.ToString()</BbSelectItem>
+                            }
+                        </BbFormFieldSelect>
+                        <div>
+                            <BbButton OnClick="@SaveStatus" Disabled="@_savingStatus">
+                                @if (_savingStatus)
+                                {
+                                    <LucideIcon Name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                                }
+                                Save Status
+                            </BbButton>
+                        </div>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <BbTabs DefaultValue="content">
+                <BbTabsList>
+                    <BbTabsTrigger Value="content">Content (@_content.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="connections">Connections (@_connections.Count)</BbTabsTrigger>
+                    <BbTabsTrigger Value="reactions">Reactions (@_reactions.Count)</BbTabsTrigger>
+                </BbTabsList>
+
+                <BbTabsContent Value="content" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader><BbCardTitle>Recent Content</BbCardTitle></BbCardHeader>
+                        <BbCardContent>
+                            <BbDataGrid Items="@_content" ShowPagination="true" InitialPageSize="10"
+                                        OnRowClick="@((CommunityContent item) => Navigation.NavigateTo($"/community/content/{item.Id}"))"
+                                        Class="cursor-pointer">
+                                <Columns>
+                                    <BbDataGridTemplateColumn Title="Title">
+                                        <ChildContent Context="item">@(item.Title ?? Truncate(item.Text, 60))</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Type">
+                                        <ChildContent Context="item">@(item.Type?.Name ?? GetContentTypeName(item.TypeId))</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Enabled">
+                                        <ChildContent Context="item">
+                                            <StatusBadge Text="@(item.IsEnabled ? "Enabled" : "Hidden")"
+                                                         Status="@(item.IsEnabled ? "active" : "inactive")" />
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="connections" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader><BbCardTitle>Recent Connections</BbCardTitle></BbCardHeader>
+                        <BbCardContent>
+                            <BbDataGrid Items="@_connections" ShowPagination="true" InitialPageSize="10">
+                                <Columns>
+                                    <BbDataGridTemplateColumn Title="Source">
+                                        <ChildContent Context="item">@GetIdentityLabel(item.SourceSocialMediaIdentityId)</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Target">
+                                        <ChildContent Context="item">@GetIdentityLabel(item.TargetSocialMediaIdentityId)</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Type">
+                                        <ChildContent Context="item">@(item.Type?.Name ?? GetConnectionTypeName(item.TypeId))</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+
+                <BbTabsContent Value="reactions" Class="xf-fade-in">
+                    <BbCard>
+                        <BbCardHeader><BbCardTitle>Recent Reactions</BbCardTitle></BbCardHeader>
+                        <BbCardContent>
+                            <BbDataGrid Items="@_reactions" ShowPagination="true" InitialPageSize="10">
+                                <Columns>
+                                    <BbDataGridTemplateColumn Title="Content">
+                                        <ChildContent Context="item">
+                                            <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => Navigation.NavigateTo($"/community/content/{item.ContentId}"))">
+                                                @item.ContentId.ToString()[..8]...
+                                            </BbButton>
+                                        </ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridTemplateColumn Title="Type">
+                                        <ChildContent Context="item">@(item.Type?.Name ?? item.TypeId.ToString()[..8])</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                    <BbDataGridPropertyColumn Property="@(x => x.CreatedAt)" Title="Created" Sortable="true" />
+                                </Columns>
+                            </BbDataGrid>
+                        </BbCardContent>
+                    </BbCard>
+                </BbTabsContent>
+            </BbTabs>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private CommunityControlPanelAccessService AccessService { get; set; } = default!;
+
+    private CommunityControlPanelAccessState _access = new(null, null, false, null);
+    private CommunityIdentity? _identity;
+    private List<CommunityContent> _content = [];
+    private List<CommunityConnection> _connections = [];
+    private List<CommunityContentReaction> _reactions = [];
+    private Dictionary<Guid, string> _identityLabels = [];
+    private Dictionary<Guid, string> _credentialLabels = [];
+    private Dictionary<Guid, string> _typeNames = [];
+    private Dictionary<Guid, string> _contentTypeNames = [];
+    private Dictionary<Guid, string> _connectionTypeNames = [];
+    private bool _loading = true;
+    private bool _outsideTenantContext;
+    private bool _savingStatus;
+    private string _statusEdit = "";
+    private int _followers;
+    private int _following;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TenantFilter.OnChanged += OnTenantFilterChanged;
+        await LoadData();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_loading)
+        {
+            await LoadData();
+        }
+    }
+
+    private void OnTenantFilterChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _access = await AccessService.GetStateAsync();
+            ClearData();
+
+            if (!_access.CanUseCommunity || _access.TenantId is not Guid tenantId)
+            {
+                return;
+            }
+
+            _identity = await DataContext.Query<CommunityIdentity>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            _outsideTenantContext = _identity is not null && _identity.TenantId != tenantId;
+            if (_identity is null || _outsideTenantContext)
+            {
+                return;
+            }
+
+            _statusEdit = _identity.Status.ToString();
+
+            await LoadLookups(tenantId);
+
+            _content = await DataContext.Query<CommunityContent>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.TenantId == tenantId && x.SocialMediaIdentityId == Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            var outgoingConnections = await DataContext.Query<CommunityConnection>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.TenantId == tenantId && x.SourceSocialMediaIdentityId == Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            var incomingConnections = await DataContext.Query<CommunityConnection>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.TenantId == tenantId && x.TargetSocialMediaIdentityId == Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            _connections = outgoingConnections
+                .Concat(incomingConnections)
+                .GroupBy(x => x.Id)
+                .Select(x => x.First())
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToList();
+
+            _reactions = await DataContext.Query<CommunityContentReaction>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Include(x => x.Type)
+                .Where(x => x.TenantId == tenantId && x.SocialMediaIdentityId == Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(100)
+                .ToListAsync();
+
+            _followers = _connections.Count(x => x.TargetSocialMediaIdentityId == Id);
+            _following = _connections.Count(x => x.SourceSocialMediaIdentityId == Id);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load Community identity: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadLookups(Guid tenantId)
+    {
+        var identities = await DataContext.Query<CommunityIdentity>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .OrderBy(x => x.HandleName)
+            .Take(500)
+            .ToListAsync();
+        _identityLabels = identities.ToDictionary(x => x.Id, BuildIdentityLabel);
+
+        var credentials = await DataContext.Query<IdentityCredential>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Include(x => x.IdentityInfo)
+            .Where(x => x.TenantId == tenantId)
+            .Take(500)
+            .ToListAsync();
+        _credentialLabels = credentials.ToDictionary(x => x.Id, BuildCredentialLabel);
+
+        var identityTypes = await DataContext.Query<CommunityIdentityType>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .Take(100)
+            .ToListAsync();
+        _typeNames = identityTypes.ToDictionary(x => x.Id, x => x.Name);
+
+        var contentTypes = await DataContext.Query<CommunityContentType>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .Take(100)
+            .ToListAsync();
+        _contentTypeNames = contentTypes.ToDictionary(x => x.Id, x => x.Name);
+
+        var connectionTypes = await DataContext.Query<CommunityConnectionType>()
+            .IgnoreQueryFilters()
+            .NoCache()
+            .Where(x => x.TenantId == tenantId)
+            .Take(100)
+            .ToListAsync();
+        _connectionTypeNames = connectionTypes.ToDictionary(x => x.Id, x => x.Name);
+    }
+
+    private async Task ToggleEnabled()
+    {
+        if (_identity is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var fresh = await DataContext.Query<CommunityIdentity>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null || fresh.TenantId != _access.TenantId)
+            {
+                ToastService.Show("Identity not found in the selected tenant.");
+                return;
+            }
+
+            fresh.IsEnabled = !fresh.IsEnabled;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
+
+            if (result.IsSuccess)
+            {
+                ToastService.Show(fresh.IsEnabled ? "Identity enabled." : "Identity disabled.");
+                await LoadData();
+            }
+            else
+            {
+                ToastService.Show($"Failed to update identity: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error updating identity: {ex.Message}");
+        }
+    }
+
+    private async Task SaveStatus()
+    {
+        if (!int.TryParse(_statusEdit, out var status))
+        {
+            ToastService.Show("Choose a valid status.");
+            return;
+        }
+
+        _savingStatus = true;
+        try
+        {
+            var fresh = await DataContext.Query<CommunityIdentity>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.Id == Id)
+                .FirstOrDefaultAsync();
+
+            if (fresh is null || fresh.TenantId != _access.TenantId)
+            {
+                ToastService.Show("Identity not found in the selected tenant.");
+                return;
+            }
+
+            fresh.Status = status;
+            fresh.ModifiedAt = DateTime.UtcNow;
+            DataContext.Update(fresh);
+            var result = await DataContext.SaveChangesAsync();
+
+            if (result.IsSuccess)
+            {
+                ToastService.Show("Identity status updated.");
+                await LoadData();
+            }
+            else
+            {
+                ToastService.Show($"Failed to update status: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Error updating status: {ex.Message}");
+        }
+        finally
+        {
+            _savingStatus = false;
+        }
+    }
+
+    private void ClearData()
+    {
+        _identity = null;
+        _content = [];
+        _connections = [];
+        _reactions = [];
+        _identityLabels = [];
+        _credentialLabels = [];
+        _typeNames = [];
+        _contentTypeNames = [];
+        _connectionTypeNames = [];
+        _outsideTenantContext = false;
+        _followers = 0;
+        _following = 0;
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/community/identities");
+
+    private string GetCredentialLabel(Guid credentialId) =>
+        _credentialLabels.TryGetValue(credentialId, out var label)
+            ? label
+            : $"{credentialId.ToString()[..8]}...";
+
+    private string GetIdentityLabel(Guid identityId) =>
+        _identityLabels.TryGetValue(identityId, out var label)
+            ? label
+            : $"{identityId.ToString()[..8]}...";
+
+    private string GetTypeName(Guid typeId) =>
+        _typeNames.TryGetValue(typeId, out var name) ? name : $"{typeId.ToString()[..8]}...";
+
+    private string GetContentTypeName(Guid typeId) =>
+        _contentTypeNames.TryGetValue(typeId, out var name) ? name : $"{typeId.ToString()[..8]}...";
+
+    private string GetConnectionTypeName(Guid typeId) =>
+        _connectionTypeNames.TryGetValue(typeId, out var name) ? name : $"{typeId.ToString()[..8]}...";
+
+    private static string BuildIdentityLabel(CommunityIdentity identity) =>
+        identity.HandleName ?? identity.Alias ?? $"{identity.Id.ToString()[..8]}...";
+
+    private static string BuildCredentialLabel(IdentityCredential credential)
+    {
+        var name = credential.IdentityInfo?.FullName ?? credential.IdentityInfo?.IdentityName;
+        var username = credential.UserName ?? credential.UserAlias;
+        return string.IsNullOrWhiteSpace(username)
+            ? name ?? credential.Id.ToString()[..8]
+            : $"{name ?? "Credential"} ({username})";
+    }
+
+    private static string GetIdentityStatusText(int status) =>
+        Enum.IsDefined(typeof(CommunityIdentityStatus), status)
+            ? ((CommunityIdentityStatus)status).ToString()
+            : status.ToString();
+
+    private static string GetIdentityStatusKey(int status) => (CommunityIdentityStatus)status switch
+    {
+        CommunityIdentityStatus.Active => "active",
+        CommunityIdentityStatus.Suspended => "suspended",
+        CommunityIdentityStatus.Inactive => "inactive",
+        _ => "inactive"
+    };
+
+    private static string FormatDate(DateTime value) =>
+        value == default ? "Never" : value.ToString("g");
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Untitled";
+        }
+
+        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
+    }
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantFilterChanged;
+    }
+}

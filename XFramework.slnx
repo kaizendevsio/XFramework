@@ -20,6 +20,7 @@
   <Folder Name="/Services/Community/">
     <Project Path="src\Modules\XFramework.Community\Community.Api\Community.Api.csproj" />
     <Project Path="src\Modules\XFramework.Community\Community.Domain.Shared\Community.Domain.Shared.csproj" />
+    <Project Path="src\Modules\XFramework.Community\Community.Integration\Community.Integration.csproj" />
   </Folder>
   <Folder Name="/Services/IdentityServer/">
     <Project Path="src\Modules\XFramework.IdentityServer\IdentityServer.Api\IdentityServer.Api.csproj" />
