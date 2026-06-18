@@ -1,4 +1,5 @@
 @page "/identity/tenants/{Id:guid}"
+@page "/identity/tenants/{Id:guid}/{Section}"
 @implements IDisposable
 
 <PageTitle>Tenant Detail - Control Panel</PageTitle>
@@ -61,15 +62,8 @@ else
             </BbButton>
         </div>
 
-        @* -- Detail Tabs -- *@
-        <BbTabs DefaultValue="summary">
-            <BbTabsList>
-                <BbTabsTrigger Value="summary">Tenant Summary</BbTabsTrigger>
-                <BbTabsTrigger Value="modules">Modules (@_moduleFeatureRows.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="users">Users (@_detailUsers.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="configurations">Configurations (@_detailConfigs.Count)</BbTabsTrigger>
-                <BbTabsTrigger Value="roletypes">Role Types (@_detailRoleTypes.Count)</BbTabsTrigger>
-            </BbTabsList>
+        @* -- Detail section selected by the tenant detail sidebar route -- *@
+        <BbTabs @key="CurrentSection" DefaultValue="@CurrentSection">
 
             <BbTabsContent Value="summary" Class="xf-fade-in">
                 <EditableForm @ref="_editableForm" TModel="Tenant" Model="_tenant"
@@ -137,8 +131,8 @@ else
                                     <div class="rounded-lg border bg-card p-4 shadow-sm">
                                         <div class="flex items-start justify-between gap-3">
                                             <div class="flex min-w-0 gap-3">
-                                                <div class="grid h-9 w-9 shrink-0 place-items-center rounded-md border bg-muted">
-                                                    <LucideIcon Name="@row.Icon" class="h-4 w-4" />
+                                                <div class="tenant-module-icon">
+                                                    <LucideIcon Name="@row.Icon" class="h-5 w-5" />
                                                 </div>
                                                 <div class="min-w-0">
                                                     <div class="flex flex-wrap items-center gap-2">
@@ -253,7 +247,7 @@ else
                 </BbCard>
             </BbTabsContent>
 
-            <BbTabsContent Value="roletypes" Class="xf-fade-in">
+            <BbTabsContent Value="role-types" Class="xf-fade-in">
                 <BbCard>
                     <BbCardContent>
                         @if (_detailRoleTypes.Count == 0)
@@ -336,6 +330,7 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
+    [Parameter] public string? Section { get; set; }
 
     [Inject] private global::XFramework.Domain.Shared.DataContext.IDataContext DataContext { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -374,6 +369,7 @@ else
     private List<ModuleFeatureRow> _moduleFeatureRows = [];
     private HashSet<Guid> _savingModuleFeatureIds = [];
     private bool _moduleFeaturesLoading;
+    private string CurrentSection => NormalizeSection(Section);
 
     // -- Config dialog --
     private bool _configDialogOpen;
@@ -391,6 +387,12 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!IsValidSection(Section))
+        {
+            Navigation.NavigateTo($"/identity/tenants/{Id}", replace: true);
+            return;
+        }
+
         if (_loadedId == Id)
         {
             return;
@@ -728,6 +730,22 @@ else
             TenantModuleFeatureKeys.Payments => "inactive",
             _ => "inactive"
         };
+
+    private static string NormalizeSection(string? section)
+    {
+        if (string.IsNullOrWhiteSpace(section))
+        {
+            return "summary";
+        }
+
+        return section.Equals("roletypes", StringComparison.OrdinalIgnoreCase)
+            ? "role-types"
+            : section.ToLowerInvariant();
+    }
+
+    private static bool IsValidSection(string? section) =>
+        string.IsNullOrWhiteSpace(section)
+        || NormalizeSection(section) is "summary" or "modules" or "users" or "configurations" or "role-types";
 
     private void OpenUserDetail(IdentityInformation user) =>
         Navigation.NavigateTo($"/identity/users/{user.Id}");
