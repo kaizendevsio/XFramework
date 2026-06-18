@@ -49,6 +49,25 @@
     </div>
 }
 
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.MessagingChat))
+{
+    @* Messaging *@
+    <div class="mt-4">
+        <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Messaging</p>
+        <div class="space-y-0.5">
+            <NavLink href="/messaging/threads" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="messages-square" class="h-4 w-4" /> Threads
+            </NavLink>
+            <NavLink href="/messaging/direct-messages" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="send" class="h-4 w-4" /> Direct Messages
+            </NavLink>
+            <NavLink href="/messaging/settings" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="settings" class="h-4 w-4" /> Settings
+            </NavLink>
+        </div>
+    </div>
+}
+
 @* Finance *@
 <div class="mt-4">
     <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Finance</p>
