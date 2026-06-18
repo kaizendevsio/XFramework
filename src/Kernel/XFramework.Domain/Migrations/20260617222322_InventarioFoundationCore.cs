@@ -18,27 +18,6 @@ namespace XFramework.Domain.Migrations
             migrationBuilder.EnsureSchema(name: "Inventario");
 
             migrationBuilder.CreateTable(
-                name: "ProductCategory",
-                schema: "Inventario",
-                columns: table => new
-                {
-                    ID = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "(uuid_generate_v4())"),
-                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
-                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    ConcurrencyStamp = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "(uuid_generate_v4())"),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    ModifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true, defaultValueSql: "now()"),
-                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Inventario_ProductCategory", x => x.ID);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Warehouse",
                 schema: "Inventario",
                 columns: table => new
@@ -64,44 +43,6 @@ namespace XFramework.Domain.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Inventario_Warehouse", x => x.ID);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Product",
-                schema: "Inventario",
-                columns: table => new
-                {
-                    ID = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "(uuid_generate_v4())"),
-                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    Price = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    StockQuantity = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
-                    CategoryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Image = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
-                    SKU = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
-                    Brand = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    Weight = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: true),
-                    Rating = table.Column<decimal>(type: "numeric(5,2)", precision: 5, scale: 2, nullable: true),
-                    Discount = table.Column<decimal>(type: "numeric(5,2)", precision: 5, scale: 2, nullable: true),
-                    IsAvailable = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
-                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
-                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    ConcurrencyStamp = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "(uuid_generate_v4())"),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    ModifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true, defaultValueSql: "now()"),
-                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Inventario_Product", x => x.ID);
-                    table.ForeignKey(
-                        name: "FK_Inventario_Product_Category",
-                        column: x => x.CategoryId,
-                        principalSchema: "Inventario",
-                        principalTable: "ProductCategory",
-                        principalColumn: "ID",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -140,65 +81,6 @@ namespace XFramework.Domain.Migrations
                         column: x => x.WarehouseId,
                         principalSchema: "Inventario",
                         principalTable: "Warehouse",
-                        principalColumn: "ID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ProductTransaction",
-                schema: "Inventario",
-                columns: table => new
-                {
-                    ID = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "(uuid_generate_v4())"),
-                    ProductId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Quantity = table.Column<int>(type: "integer", nullable: false),
-                    TotalPrice = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    TransactionDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
-                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    ConcurrencyStamp = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "(uuid_generate_v4())"),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    ModifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true, defaultValueSql: "now()"),
-                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Inventario_ProductTransaction", x => x.ID);
-                    table.ForeignKey(
-                        name: "FK_Inventario_ProductTransaction_Product",
-                        column: x => x.ProductId,
-                        principalSchema: "Inventario",
-                        principalTable: "Product",
-                        principalColumn: "ID",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ProductVariation",
-                schema: "Inventario",
-                columns: table => new
-                {
-                    ID = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "(uuid_generate_v4())"),
-                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    AdditionalPrice = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    ProductId = table.Column<Guid>(type: "uuid", nullable: false),
-                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
-                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    ConcurrencyStamp = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "(uuid_generate_v4())"),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    ModifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true, defaultValueSql: "now()"),
-                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Inventario_ProductVariation", x => x.ID);
-                    table.ForeignKey(
-                        name: "FK_Inventario_ProductVariation_Product",
-                        column: x => x.ProductId,
-                        principalSchema: "Inventario",
-                        principalTable: "Product",
                         principalColumn: "ID",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -376,41 +258,25 @@ namespace XFramework.Domain.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(name: "InventoryMovement", schema: "Inventario");
-            migrationBuilder.DropTable(name: "ProductTransaction", schema: "Inventario");
-            migrationBuilder.DropTable(name: "ProductVariation", schema: "Inventario");
             migrationBuilder.DropTable(name: "Reservation", schema: "Inventario");
             migrationBuilder.DropTable(name: "StockBalance", schema: "Inventario");
             migrationBuilder.DropTable(name: "InventoryLocation", schema: "Inventario");
-            migrationBuilder.DropTable(name: "Product", schema: "Inventario");
             migrationBuilder.DropTable(name: "Warehouse", schema: "Inventario");
-            migrationBuilder.DropTable(name: "ProductCategory", schema: "Inventario");
         }
 
         private static void CreateIndexes(MigrationBuilder migrationBuilder)
         {
-            CreateTenantIndexes(migrationBuilder, "ProductCategory");
             CreateTenantIndexes(migrationBuilder, "Warehouse");
-            CreateTenantIndexes(migrationBuilder, "Product");
             CreateTenantIndexes(migrationBuilder, "InventoryLocation");
-            CreateTenantIndexes(migrationBuilder, "ProductTransaction");
-            CreateTenantIndexes(migrationBuilder, "ProductVariation");
             CreateTenantIndexes(migrationBuilder, "StockBalance");
             CreateTenantIndexes(migrationBuilder, "InventoryMovement");
             CreateTenantIndexes(migrationBuilder, "Reservation");
 
-            migrationBuilder.CreateIndex("IX_ProductCategory_TenantId_Name", "ProductCategory", new[] { "TenantId", "Name" }, schema: "Inventario");
             migrationBuilder.CreateIndex("IX_Warehouse_TenantId_Code", "Warehouse", new[] { "TenantId", "Code" }, schema: "Inventario", unique: true);
-            migrationBuilder.CreateIndex("IX_Product_CategoryId", "Product", "CategoryId", schema: "Inventario");
-            migrationBuilder.CreateIndex("IX_Product_TenantId_CategoryId", "Product", new[] { "TenantId", "CategoryId" }, schema: "Inventario");
-            migrationBuilder.CreateIndex("IX_Product_TenantId_SKU", "Product", new[] { "TenantId", "SKU" }, schema: "Inventario");
             migrationBuilder.CreateIndex("IX_InventoryLocation_ParentLocationId", "InventoryLocation", "ParentLocationId", schema: "Inventario");
             migrationBuilder.CreateIndex("IX_InventoryLocation_WarehouseId", "InventoryLocation", "WarehouseId", schema: "Inventario");
             migrationBuilder.CreateIndex("IX_InventoryLocation_TenantId_WarehouseId_Code", "InventoryLocation", new[] { "TenantId", "WarehouseId", "Code" }, schema: "Inventario", unique: true);
             migrationBuilder.CreateIndex("IX_InventoryLocation_TenantId_ParentLocationId", "InventoryLocation", new[] { "TenantId", "ParentLocationId" }, schema: "Inventario");
-            migrationBuilder.CreateIndex("IX_ProductTransaction_ProductId", "ProductTransaction", "ProductId", schema: "Inventario");
-            migrationBuilder.CreateIndex("IX_ProductTransaction_TenantId_ProductId_TransactionDate", "ProductTransaction", new[] { "TenantId", "ProductId", "TransactionDate" }, schema: "Inventario");
-            migrationBuilder.CreateIndex("IX_ProductVariation_ProductId", "ProductVariation", "ProductId", schema: "Inventario");
-            migrationBuilder.CreateIndex("IX_ProductVariation_TenantId_ProductId", "ProductVariation", new[] { "TenantId", "ProductId" }, schema: "Inventario");
             migrationBuilder.CreateIndex("IX_StockBalance_LocationId", "StockBalance", "LocationId", schema: "Inventario");
             migrationBuilder.CreateIndex("IX_StockBalance_ProductId", "StockBalance", "ProductId", schema: "Inventario");
             migrationBuilder.CreateIndex("IX_StockBalance_WarehouseId", "StockBalance", "WarehouseId", schema: "Inventario");
