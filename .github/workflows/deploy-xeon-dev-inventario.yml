@@ -1,0 +1,22 @@
+name: Deploy Xeon Dev - Inventario
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - src/Modules/XFramework.Inventario/Inventario.Api/**
+      - src/Modules/XFramework.Inventario/Inventario.Domain.Shared/**
+      - src/Modules/XFramework.Messaging/Messaging.Domain.Shared/**
+      - src/Modules/XFramework.Messaging/Messaging.Integration/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-xeon-dev-service.yml
+    with:
+      service: inventario
+      health_url: http://localhost:8105/health/ready
+      diagnostics_services: bolt-hub messaging inventario

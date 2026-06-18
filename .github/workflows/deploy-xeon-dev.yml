@@ -1,8 +1,25 @@
-name: Deploy Xeon Dev
+name: Deploy Xeon Dev - All Services
 
 on:
   push:
     branches: [develop]
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - Directory.Build.props
+      - Directory.Build.targets
+      - Directory.Packages.props
+      - Version.props
+      - XFramework.slnx
+      - global.json
+      - NuGet.config
+      - src/Kernel/**
+      - src/Infrastructure/**
+      - src/Shared/**
+      - src/SourceGenerators/**
+      - src/Libraries/**
+      - src/Tools/XFramework.MigrationRunner/**
+      - src/Modules/XFramework.Bolt/Bolt.Domain.Shared/**
   workflow_dispatch:
 
 permissions:
@@ -14,7 +31,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to xeon-dev
+    name: Deploy all services to xeon-dev
     runs-on: [self-hosted, Linux, xeon-dev-deploy]
     timeout-minutes: 60
     env:
@@ -64,8 +81,10 @@ jobs:
             "bolt-hub=http://localhost:7000/health/ready"
             "identityserver=http://localhost:8261/health/ready"
             "messaging=http://localhost:5148/health/ready"
+            "notifications=http://localhost:5166/health/ready"
             "smsgateway=http://localhost:5274/health/ready"
             "wallets=http://localhost:9696/health/ready"
+            "inventario=http://localhost:8105/health/ready"
             "controlpanel=http://localhost:5000/health/ready"
           )
 
@@ -99,4 +118,4 @@ jobs:
         shell: bash
         run: |
           docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps || true
-          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 migrate bolt-hub identityserver messaging smsgateway wallets controlpanel || true
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 migrate bolt-hub identityserver messaging notifications smsgateway wallets inventario controlpanel || true

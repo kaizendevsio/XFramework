@@ -176,6 +176,27 @@ services:
       retries: 15
       start_period: 15s
 
+  # ── Inventario Server ───────────────────────────────────────
+  inventario:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/Modules/XFramework.Inventario/Inventario.Api/Inventario.Api.csproj
+    environment:
+      <<: *common-env
+    ports:
+      - "${INVENTARIO_EXPOSE_PORT:-8105}:8080"
+    depends_on:
+      bolt-hub:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '' http://localhost:8080/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
   # ── Control Panel ───────────────────────────────────────────
   controlpanel:
     build:
@@ -192,6 +213,10 @@ services:
       bolt-hub:
         condition: service_healthy
       identityserver:
+        condition: service_healthy
+      messaging:
+        condition: service_healthy
+      inventario:
         condition: service_healthy
       wallets:
         condition: service_healthy

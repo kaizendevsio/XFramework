@@ -1,0 +1,22 @@
+name: Deploy Xeon Dev - Messaging
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - src/Modules/XFramework.Messaging/Messaging.Api/**
+      - src/Modules/XFramework.Messaging/Messaging.Domain.Shared/**
+      - src/Modules/XFramework.SmsGateway/SmsGateway.Domain.Shared/**
+      - src/Modules/XFramework.SmsGateway/SmsGateway.Integration/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-xeon-dev-service.yml
+    with:
+      service: messaging
+      health_url: http://localhost:5148/health/ready
+      diagnostics_services: bolt-hub smsgateway messaging

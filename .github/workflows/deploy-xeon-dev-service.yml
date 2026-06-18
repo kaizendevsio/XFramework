@@ -1,0 +1,139 @@
+name: Deploy Xeon Dev - Service
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      health_url:
+        required: true
+        type: string
+      diagnostics_services:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xeon-dev-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.service }} to xeon-dev
+    runs-on: [self-hosted, Linux, xeon-dev-deploy]
+    timeout-minutes: 45
+    env:
+      COMPOSE_FILE_PATH: docker-compose.yml
+      XFRAMEWORK_ENV_FILE: /opt/xframework/xeon-dev.env
+      SERVICE_NAME: ${{ inputs.service }}
+      HEALTH_URL: ${{ inputs.health_url }}
+      DIAGNOSTICS_SERVICES: ${{ inputs.diagnostics_services }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect shared changes
+        id: shared
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          has_shared=false
+
+          if [ "${{ github.event_name }}" = "push" ]; then
+            base_sha="${{ github.event.before }}"
+
+            if [ -z "$base_sha" ] || [[ "$base_sha" =~ ^0+$ ]]; then
+              base_sha="$(git rev-list --max-parents=0 HEAD)"
+            fi
+
+            git diff --name-only "$base_sha" "$GITHUB_SHA" > /tmp/xframework-changed-files.txt
+
+            while IFS= read -r path; do
+              case "$path" in
+                Dockerfile|docker-compose.yml|Directory.Build.props|Directory.Build.targets|Directory.Packages.props|Version.props|XFramework.slnx|global.json|NuGet.config|src/Kernel/*|src/Infrastructure/*|src/Shared/*|src/SourceGenerators/*|src/Libraries/*|src/Tools/XFramework.MigrationRunner/*|src/Modules/XFramework.Bolt/Bolt.Domain.Shared/*)
+                  has_shared=true
+                  echo "Shared deployment path changed: $path"
+                  ;;
+              esac
+            done < /tmp/xframework-changed-files.txt
+          fi
+
+          echo "has_shared=$has_shared" >> "$GITHUB_OUTPUT"
+
+      - name: Skip service deploy for shared changes
+        if: steps.shared.outputs.has_shared == 'true'
+        shell: bash
+        run: |
+          echo "Shared paths changed in this push; the all-services deploy workflow owns this deployment."
+
+      - name: Verify runner and Docker
+        if: steps.shared.outputs.has_shared != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Runner host: $(hostname)"
+          uname -a
+          docker --version
+          docker compose version
+          curl --version
+
+          test -r "$XFRAMEWORK_ENV_FILE"
+          test -S /var/run/docker.sock
+          docker info --format 'Docker daemon: {{.Name}} {{.ServerVersion}}'
+
+      - name: Validate compose
+        if: steps.shared.outputs.has_shared != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" config
+
+      - name: Deploy service
+        if: steps.shared.outputs.has_shared != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" up --build -d --no-deps "$SERVICE_NAME"
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps "$SERVICE_NAME"
+
+      - name: Wait for readiness
+        if: steps.shared.outputs.has_shared != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          body="/tmp/xframework-${SERVICE_NAME}-health.json"
+          echo "Waiting for ${SERVICE_NAME}: ${HEALTH_URL}"
+
+          ready=0
+          for attempt in {1..60}; do
+            status="$(curl -fsS -o "$body" -w "%{http_code}" "$HEALTH_URL" || true)"
+            if [ "$status" = "200" ]; then
+              ready=1
+              break
+            fi
+
+            echo "${SERVICE_NAME} not ready yet; attempt ${attempt}/60 returned ${status:-no response}"
+            sleep 5
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::${SERVICE_NAME} failed readiness check at ${HEALTH_URL}"
+            cat "$body" || true
+            exit 1
+          fi
+
+      - name: Deployment diagnostics
+        if: failure() && steps.shared.outputs.has_shared != 'true'
+        shell: bash
+        run: |
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" ps || true
+          docker compose --env-file "$XFRAMEWORK_ENV_FILE" -f "$COMPOSE_FILE_PATH" logs --tail=200 $DIAGNOSTICS_SERVICES || true

@@ -1,0 +1,29 @@
+name: Deploy Xeon Dev - ControlPanel
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - src/Presentation/ControlPanel.Server/**
+      - src/Modules/XFramework.Community/Community.Domain.Shared/**
+      - src/Modules/XFramework.Community/Community.Integration/**
+      - src/Modules/XFramework.IdentityServer/IdentityServer.Domain.Shared/**
+      - src/Modules/XFramework.IdentityServer/IdentityServer.Integration/**
+      - src/Modules/XFramework.Inventario/Inventario.Domain.Shared/**
+      - src/Modules/XFramework.Inventario/Inventario.Integration/**
+      - src/Modules/XFramework.Messaging/Messaging.Domain.Shared/**
+      - src/Modules/XFramework.Messaging/Messaging.Integration/**
+      - src/Modules/XFramework.Wallets/Wallets.Domain.Shared/**
+      - src/Modules/XFramework.Wallets/Wallets.Integration/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-xeon-dev-service.yml
+    with:
+      service: controlpanel
+      health_url: http://localhost:5000/health/ready
+      diagnostics_services: bolt-hub identityserver messaging wallets inventario controlpanel
