@@ -61,6 +61,17 @@ public class ProductService
                 return Result<Product>.NotFound("Product category not found");
             }
 
+            var normalizedSku = NormalizeSku(request.SKU);
+            if (normalizedSku is not null)
+            {
+                var skuExists = await _dataContext.Query<Product>()
+                    .AnyAsync(p => p.TenantId == tenantId && !p.IsDeleted && p.SKU == normalizedSku, ct);
+                if (skuExists)
+                {
+                    return Result<Product>.Failure("A product with the same SKU already exists for this tenant.", 409);
+                }
+            }
+
             var productId = Guid.NewGuid();
             activity?.SetTag("product.id", productId);
 
@@ -76,7 +87,7 @@ public class ProductService
                 Price = request.Price,
                 StockQuantity = request.StockQuantity,
                 CategoryId = request.CategoryId,
-                SKU = request.SKU,
+                SKU = normalizedSku,
                 Brand = request.Brand,
                 Weight = request.Weight,
                 Image = request.Image,
@@ -303,12 +314,28 @@ public class ProductService
                 return Result<Product>.NotFound("Product category not found");
             }
 
+            var normalizedSku = NormalizeSku(request.SKU);
+            if (normalizedSku is not null)
+            {
+                var skuExists = await _dataContext.Query<Product>()
+                    .AnyAsync(p =>
+                        p.TenantId == tenantId &&
+                        !p.IsDeleted &&
+                        p.Id != id &&
+                        p.SKU == normalizedSku,
+                        ct);
+                if (skuExists)
+                {
+                    return Result<Product>.Failure("A product with the same SKU already exists for this tenant.", 409);
+                }
+            }
+
             // Update properties
             product.Name = request.Name;
             product.Description = request.Description;
             product.Price = request.Price;
             product.CategoryId = request.CategoryId;
-            product.SKU = request.SKU;
+            product.SKU = normalizedSku;
             product.Brand = request.Brand;
             product.Weight = request.Weight;
             product.Image = request.Image;
@@ -406,6 +433,9 @@ public class ProductService
 
     private static string BuildProductListCachePrefix(Guid tenantId) =>
         $"products:list:{tenantId}:";
+
+    private static string? NormalizeSku(string? sku) =>
+        string.IsNullOrWhiteSpace(sku) ? null : sku.Trim();
 }
 
 /// <summary>

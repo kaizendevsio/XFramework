@@ -14,6 +14,8 @@ public class ProductCategoryConfiguration : IEntityTypeConfiguration<ProductCate
         entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
         entity.Property(e => e.Description).HasMaxLength(1000);
 
-        entity.HasIndex(e => new { e.TenantId, e.Name });
+        entity.HasIndex(e => new { e.TenantId, e.Name })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
     }
 }

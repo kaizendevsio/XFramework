@@ -35,5 +35,9 @@ public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
         RuleFor(x => x.Description)
             .MaximumLength(1000).WithMessage("Description cannot exceed 1000 characters")
             .When(x => !string.IsNullOrEmpty(x.Description));
+
+        RuleFor(x => x.Image)
+            .MaximumLength(2048).WithMessage("Image cannot exceed 2048 characters")
+            .When(x => !string.IsNullOrEmpty(x.Image));
     }
 }
