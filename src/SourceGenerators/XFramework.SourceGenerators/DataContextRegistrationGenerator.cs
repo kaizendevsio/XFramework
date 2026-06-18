@@ -16,6 +16,9 @@ namespace XFramework.SourceGenerators;
 public class DataContextRegistrationGenerator : IIncrementalGenerator
 {
     private const int MutatingEndpointActions = 1 | 8 | 16; // Create | Update | Delete
+    private const string CoreGenerateEndpointsAttribute = "XFramework.Core.Attributes.GenerateEndpointsAttribute";
+    private const string SharedGenerateEndpointsAttribute = "XFramework.Domain.Shared.Attributes.GenerateEndpointsAttribute";
+    private const string SharedAllowRemoteMutationAttribute = "XFramework.Domain.Shared.Attributes.AllowRemoteDataContextMutationAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -54,7 +57,8 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
                 ClassName = classSymbol.Name,
                 FullyQualifiedName = classSymbol.ToDisplayString(),
                 AssemblyName = classSymbol.ContainingAssembly?.Name ?? "",
-                EndpointActionsValue = GetEndpointActionsValue(attributeData)
+                EndpointActionsValue = GetEndpointActionsValue(attributeData),
+                AllowRemoteMutation = HasAllowRemoteMutationAttribute(classSymbol)
             };
         }
 
@@ -74,8 +78,6 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         }
 
         // Discover from referenced assemblies
-        var coreAttr = "XFramework.Core.Attributes.GenerateEndpointsAttribute";
-        var sharedAttr = "XFramework.Domain.Shared.Attributes.GenerateEndpointsAttribute";
         foreach (var reference in compilation.References)
         {
             var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
@@ -91,8 +93,8 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
                     continue;
 
                 var generateEndpointsAttribute = type.GetAttributes().FirstOrDefault(a =>
-                    a.AttributeClass?.ToDisplayString() == coreAttr ||
-                    a.AttributeClass?.ToDisplayString() == sharedAttr);
+                    a.AttributeClass?.ToDisplayString() == CoreGenerateEndpointsAttribute ||
+                    a.AttributeClass?.ToDisplayString() == SharedGenerateEndpointsAttribute);
 
                 if (generateEndpointsAttribute is not null)
                 {
@@ -101,7 +103,8 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
                         ClassName = type.Name,
                         FullyQualifiedName = type.ToDisplayString(),
                         AssemblyName = assembly.Name,
-                        EndpointActionsValue = GetEndpointActionsValue(generateEndpointsAttribute)
+                        EndpointActionsValue = GetEndpointActionsValue(generateEndpointsAttribute),
+                        AllowRemoteMutation = HasAllowRemoteMutationAttribute(type)
                     });
                 }
             }
@@ -144,7 +147,7 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
 
         sb.AppendLine("    public static HashSet<string> GetDataContextMutableEntityTypes() => new(StringComparer.OrdinalIgnoreCase)");
         sb.AppendLine("    {");
-        foreach (var entity in validEntities.Where(static e => HasMutatingEndpointActions(e.EndpointActionsValue)))
+        foreach (var entity in validEntities.Where(static e => HasMutatingEndpointActions(e.EndpointActionsValue) || e.AllowRemoteMutation))
         {
             sb.AppendLine($"        \"{entity.ClassName}\",");
         }
@@ -212,6 +215,10 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
     private static bool HasMutatingEndpointActions(int endpointActionsValue) =>
         (endpointActionsValue & MutatingEndpointActions) != 0;
 
+    private static bool HasAllowRemoteMutationAttribute(INamedTypeSymbol type) =>
+        type.GetAttributes().Any(static a =>
+            a.AttributeClass?.ToDisplayString() == SharedAllowRemoteMutationAttribute);
+
     private static bool ShouldIncludeEntity(string assemblyName, string currentModuleName)
     {
         if (string.IsNullOrWhiteSpace(assemblyName) || string.IsNullOrWhiteSpace(currentModuleName))
@@ -253,5 +260,6 @@ public class DataContextRegistrationGenerator : IIncrementalGenerator
         public string FullyQualifiedName { get; set; } = "";
         public string AssemblyName { get; set; } = "";
         public int EndpointActionsValue { get; set; } = 31;
+        public bool AllowRemoteMutation { get; set; }
     }
 }

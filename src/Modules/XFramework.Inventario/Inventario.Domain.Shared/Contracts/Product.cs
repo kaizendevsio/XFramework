@@ -3,6 +3,7 @@ using XFramework.Domain.Shared.Attributes;
 namespace XFramework.Inventario.Domain.Shared.Contracts;
 
 [MemoryPackable(GenerateType.CircularReference)]
+[AllowRemoteDataContextMutation]
 [GenerateEndpoints(
     Type = EndpointType.Rest,
     Actions = EndpointActions.None,
