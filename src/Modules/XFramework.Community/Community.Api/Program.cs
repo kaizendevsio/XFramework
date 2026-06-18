@@ -32,6 +32,7 @@ app.UseXFrameworkRateLimiting();
 app.UseTenantModuleFeatureGate(options =>
 {
     options.RequireFeature(TenantModuleFeatureKeys.Notifications, "/api/community/notifications");
+    options.RequireFeature(TenantModuleFeatureKeys.Notifications, "/api/community-notifications");
     options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community");
     options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-identities");
     options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-identity-types");
@@ -42,6 +43,7 @@ app.UseTenantModuleFeatureGate(options =>
     options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-content-files");
     options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-content-reactions");
     options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-content-reaction-types");
+    options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-connections");
     options.RequireFeature(TenantModuleFeatureKeys.Community, "/api/community-connection-types");
 });
 app.EnsureDatabase<AppDbContext>();

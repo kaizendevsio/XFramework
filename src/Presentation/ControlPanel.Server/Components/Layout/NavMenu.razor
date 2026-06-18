@@ -68,6 +68,31 @@
     </div>
 }
 
+@if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Community))
+{
+    @* Community *@
+    <div class="mt-4">
+        <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Community</p>
+        <div class="space-y-0.5">
+            <NavLink href="/community/identities" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="user-round" class="h-4 w-4" /> Identities
+            </NavLink>
+            <NavLink href="/community/content" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="newspaper" class="h-4 w-4" /> Content
+            </NavLink>
+            <NavLink href="/community/connections" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="network" class="h-4 w-4" /> Connections
+            </NavLink>
+            <NavLink href="/community/notifications" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="bell" class="h-4 w-4" /> Notifications
+            </NavLink>
+            <NavLink href="/community/settings" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                <LucideIcon Name="settings" class="h-4 w-4" /> Settings
+            </NavLink>
+        </div>
+    </div>
+}
+
 @* Finance *@
 <div class="mt-4">
     <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Finance</p>

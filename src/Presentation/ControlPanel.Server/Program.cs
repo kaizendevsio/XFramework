@@ -1,6 +1,7 @@
 using BlazorBlueprint.Components;
 using System.Security.Claims;
 using System.Text.Json;
+using Community.Integration.Drivers;
 using ControlPanel.Server.Extensions;
 using ControlPanel.Server.Health;
 using ControlPanel.Server.Services;
@@ -64,6 +65,7 @@ builder.Services.AddHealthChecks()
         tags: ["ready"]);
 
 // Service wrappers — auto-generated CRUD + custom operations for each microservice
+builder.Services.AddCommunityWrapperServices();
 builder.Services.AddIdentityServerWrapperServices();
 builder.Services.AddInventarioWrapperServices();
 builder.Services.AddMessagingWrapperServices();
@@ -93,6 +95,7 @@ builder.Services.AddScoped<TenantFilterService>();
 builder.Services.AddScoped<TenantModuleNavigationService>();
 builder.Services.AddScoped<MessagingControlPanelGuard>();
 builder.Services.AddScoped<NavigationHistoryService>();
+builder.Services.AddScoped<CommunityControlPanelAccessService>();
 builder.Services.AddScoped<ControlPanelAuthService>();
 builder.Services.AddScoped<ControlPanelBootstrapSeeder>();
 builder.Services.AddHostedService<ControlPanelBootstrapHostedService>();
