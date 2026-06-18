@@ -52,6 +52,12 @@
                     <LucideIcon Name="boxes" class="h-4 w-4" /> Stock
                 </NavLink>
             }
+            @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reservations"))
+            {
+                <NavLink href="/inventario/reservations" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <LucideIcon Name="clipboard-check" class="h-4 w-4" /> Reservations
+                </NavLink>
+            }
             @if (ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "transactions"))
             {
                 <NavLink href="/inventario/transactions" class="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">

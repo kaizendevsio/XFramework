@@ -44,6 +44,7 @@ app.UseTenantModuleFeatureGate(options =>
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/balances", "stock_balances");
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/movements", "movements");
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/stock/post", "movements");
+    options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api/inventario/reservations", "reservations");
     options.RequireFeature(TenantModuleFeatureKeys.Inventario, "/api");
 });
 

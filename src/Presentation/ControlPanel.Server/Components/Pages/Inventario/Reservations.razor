@@ -1,0 +1,383 @@
+@page "/inventario/reservations"
+@using XFramework.Domain.Shared.BusinessObjects
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Inventario Reservations - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_reservationsEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Reservations" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Reservations</BbTypographyH3>
+                    <BbTypographyMuted>Reserve, release, fulfill, and expire allocated inventory.</BbTypographyMuted>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@ExpireDueReservations" Disabled="@_expiring">
+                        <LucideIcon Name="timer" class="mr-2 h-4 w-4" />
+                        Expire Due
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Reserve Inventory</BbCardTitle>
+                    <BbCardDescription>Reservations reduce available quantity without changing on-hand stock.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <div class="grid gap-3">
+                        <div class="grid gap-3 xl:grid-cols-3">
+                            <BbFormFieldSelect TValue="string" @bind-Value="_form.ProductId" Label="Product" Placeholder="Select product">
+                                @foreach (var product in _products)
+                                {
+                                    <BbSelectItem Value="@product.Id.ToString()">@GetProductLabel(product)</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
+                            <BbFormFieldSelect TValue="string" @bind-Value="_form.WarehouseId" Label="Warehouse" Placeholder="Select warehouse">
+                                @foreach (var warehouse in _warehouses)
+                                {
+                                    <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Code - @warehouse.Name</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
+                            <BbFormFieldSelect TValue="string" @bind-Value="_form.LocationId" Label="Location" Placeholder="Select location">
+                                @foreach (var location in LocationsForSelectedWarehouse())
+                                {
+                                    <BbSelectItem Value="@location.Id.ToString()">@location.Code - @location.Name</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
+                        </div>
+                        <div class="grid gap-3 md:grid-cols-3">
+                            <BbFormFieldInput TValue="string" @bind-Value="_form.Quantity" Label="Quantity" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_form.ExpiresAt" Label="Expires At" Placeholder="YYYY-MM-DD HH:mm" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceType" Label="Reference Type" />
+                        </div>
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <BbFormFieldInput TValue="string" @bind-Value="_form.ReferenceId" Label="Reference ID" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_form.Reason" Label="Reason" />
+                        </div>
+                        <div>
+                            <BbButton OnClick="@ReserveInventory" Disabled="@IsReserveDisabled">
+                                <LucideIcon Name="clipboard-plus" class="mr-2 h-4 w-4" />
+                                Reserve
+                            </BbButton>
+                        </div>
+                    </div>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Reservation List</BbCardTitle>
+                    <BbCardDescription>@_reservations.Count reservation(s) loaded</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_reservations" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Product">
+                                <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Location">
+                                <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Status">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@item.Status.ToString()" Status="@GetStatusBadge(item.Status)" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.ReferenceType)" Title="Reference" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.ExpiresAt)" Title="Expires" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Actions">
+                                <ChildContent Context="item">
+                                    @if (item.Status == ReservationStatus.Active)
+                                    {
+                                        <div class="flex flex-wrap gap-1">
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => ReleaseReservation(item.Id))">Release</BbButton>
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" OnClick="@(() => FulfillReservation(item.Id))">Fulfill</BbButton>
+                                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" OnClick="@(() => CancelReservation(item.Id))">Cancel</BbButton>
+                                        </div>
+                                    }
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private readonly ReservationForm _form = new();
+    private List<Product> _products = [];
+    private List<Warehouse> _warehouses = [];
+    private List<InventoryLocation> _locations = [];
+    private List<Reservation> _reservations = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _reservationsEnabled;
+    private bool _reserving;
+    private bool _expiring;
+    private bool IsReserveDisabled => _reserving || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _reservationsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reservations");
+            _products = [];
+            _warehouses = [];
+            _locations = [];
+            _reservations = [];
+
+            if (!_hasTenant || !_reservationsEnabled) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _products = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(250)
+                .ToListAsync();
+
+            _warehouses = (await Inventario.GetWarehouses(new GetWarehousesRequest { Metadata = BuildMetadata() })).Response ?? [];
+            _locations = (await Inventario.GetInventoryLocations(new GetInventoryLocationsRequest { Metadata = BuildMetadata() })).Response ?? [];
+            _reservations = (await Inventario.GetReservations(new GetReservationsRequest { Metadata = BuildMetadata() })).Response ?? [];
+
+            ApplyDefaultSelections();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load reservations: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ReserveInventory()
+    {
+        if (!Guid.TryParse(_form.ProductId, out var productId) ||
+            !Guid.TryParse(_form.WarehouseId, out var warehouseId) ||
+            !Guid.TryParse(_form.LocationId, out var locationId))
+        {
+            ToastService.Show("Select product, warehouse, and location.");
+            return;
+        }
+
+        if (!decimal.TryParse(_form.Quantity, out var quantity) || quantity <= 0)
+        {
+            ToastService.Show("Quantity must be greater than zero.");
+            return;
+        }
+
+        if (!TryParseOptionalDate(_form.ExpiresAt, out var expiresAt))
+        {
+            ToastService.Show("Expiration date is invalid.");
+            return;
+        }
+
+        _reserving = true;
+        try
+        {
+            var result = await Inventario.ReserveInventory(new ReserveInventoryRequest
+            {
+                Metadata = BuildMetadata(),
+                ProductId = productId,
+                WarehouseId = warehouseId,
+                LocationId = locationId,
+                Quantity = quantity,
+                ExpiresAt = expiresAt,
+                ReferenceType = NullIfEmpty(_form.ReferenceType),
+                ReferenceId = Guid.TryParse(_form.ReferenceId, out var referenceId) ? referenceId : (Guid?)null,
+                Reason = NullIfEmpty(_form.Reason)
+            });
+
+            ToastService.Show(result.IsSuccess ? "Inventory reserved." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _form.Quantity = "0";
+                _form.Reason = "";
+                await Reload();
+            }
+        }
+        finally
+        {
+            _reserving = false;
+        }
+    }
+
+    private async Task ReleaseReservation(Guid reservationId) =>
+        await RunReservationAction(
+            () => Inventario.ReleaseReservation(new ReleaseReservationRequest
+            {
+                Metadata = BuildMetadata(),
+                ReservationId = reservationId
+            }),
+            "Reservation released.");
+
+    private async Task FulfillReservation(Guid reservationId) =>
+        await RunReservationAction(
+            () => Inventario.FulfillReservation(new FulfillReservationRequest
+            {
+                Metadata = BuildMetadata(),
+                ReservationId = reservationId
+            }),
+            "Reservation fulfilled.");
+
+    private async Task CancelReservation(Guid reservationId) =>
+        await RunReservationAction(
+            () => Inventario.CancelReservation(new CancelReservationRequest
+            {
+                Metadata = BuildMetadata(),
+                ReservationId = reservationId
+            }),
+            "Reservation cancelled.");
+
+    private async Task ExpireDueReservations()
+    {
+        _expiring = true;
+        try
+        {
+            await RunReservationAction(
+                () => Inventario.ExpireReservations(new ExpireReservationsRequest
+                {
+                    Metadata = BuildMetadata(),
+                    ExpiresBefore = DateTime.UtcNow
+                }),
+                "Due reservations expired.");
+        }
+        finally
+        {
+            _expiring = false;
+        }
+    }
+
+    private async Task RunReservationAction(Func<Task<CmdResponse>> action, string successMessage)
+    {
+        var result = await action();
+        ToastService.Show(result.IsSuccess ? successMessage : $"Failed: {result.Message}");
+        if (result.IsSuccess)
+            await Reload();
+    }
+
+    private IEnumerable<InventoryLocation> LocationsForSelectedWarehouse()
+    {
+        if (!Guid.TryParse(_form.WarehouseId, out var warehouseId))
+            return _locations;
+
+        return _locations.Where(x => x.WarehouseId == warehouseId);
+    }
+
+    private void ApplyDefaultSelections()
+    {
+        _form.ProductId = _form.ProductId.Length > 0 ? _form.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
+        _form.WarehouseId = _form.WarehouseId.Length > 0 ? _form.WarehouseId : _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
+        var location = LocationsForSelectedWarehouse().FirstOrDefault() ?? _locations.FirstOrDefault();
+        _form.LocationId = _form.LocationId.Length > 0 ? _form.LocationId : location?.Id.ToString() ?? "";
+    }
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel"
+    };
+
+    private string GetProductLabel(Product product) =>
+        string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
+
+    private string GetProductName(Guid productId) =>
+        _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
+
+    private string GetLocationName(Guid? locationId)
+    {
+        if (locationId is not { } id)
+            return "N/A";
+
+        return _locations.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString()[..8];
+    }
+
+    private static string GetStatusBadge(ReservationStatus status) =>
+        status == ReservationStatus.Active ? "active" : "inactive";
+
+    private static bool TryParseOptionalDate(string? value, out DateTime? date)
+    {
+        date = null;
+        if (string.IsNullOrWhiteSpace(value))
+            return true;
+
+        if (!DateTime.TryParse(value, out var parsed))
+            return false;
+
+        date = parsed.ToUniversalTime();
+        return true;
+    }
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class ReservationForm
+    {
+        public string ProductId { get; set; } = "";
+        public string WarehouseId { get; set; } = "";
+        public string LocationId { get; set; } = "";
+        public string Quantity { get; set; } = "0";
+        public string ExpiresAt { get; set; } = "";
+        public string ReferenceType { get; set; } = "";
+        public string ReferenceId { get; set; } = "";
+        public string Reason { get; set; } = "";
+    }
+}
