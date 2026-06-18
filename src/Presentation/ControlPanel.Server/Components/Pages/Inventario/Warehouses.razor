@@ -1,0 +1,361 @@
+@page "/inventario/warehouses"
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Inventario Warehouses - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_warehousingEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Warehousing" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Warehouses</BbTypographyH3>
+                    <BbTypographyMuted>Set up stock storage warehouses and internal locations.</BbTypographyMuted>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Create Warehouse</BbCardTitle>
+                        <BbCardDescription>Warehouse codes are unique inside a tenant.</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <div class="grid gap-3">
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Code" Label="Code" Required="true" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Name" Label="Name" Required="true" />
+                            </div>
+                            <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Description" Label="Description" />
+                            <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.AddressLine" Label="Address" />
+                            <div class="grid gap-3 md:grid-cols-3">
+                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.City" Label="City" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.Region" Label="Region" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_warehouseForm.CountryCode" Label="Country Code" />
+                            </div>
+                            <BbFormFieldSwitch Checked="@_warehouseForm.IsDefault"
+                                               CheckedChanged="@((bool value) => _warehouseForm.IsDefault = value)"
+                                               Label="Default warehouse" />
+                            <div>
+                                <BbButton OnClick="@CreateWarehouse" Disabled="@_savingWarehouse">
+                                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                                    Create Warehouse
+                                </BbButton>
+                            </div>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Create Location</BbCardTitle>
+                        <BbCardDescription>Locations belong to a warehouse and can represent bins, shelves, or zones.</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <div class="grid gap-3">
+                            <BbFormFieldSelect TValue="string" @bind-Value="_locationForm.WarehouseId" Label="Warehouse" Placeholder="Select warehouse">
+                                @foreach (var warehouse in _warehouses)
+                                {
+                                    <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Code - @warehouse.Name</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Code" Label="Code" Required="true" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Name" Label="Name" Required="true" />
+                            </div>
+                            <BbFormFieldSelect TValue="string" @bind-Value="_locationForm.LocationType" Label="Location Type">
+                                @foreach (var type in Enum.GetValues<InventoryLocationType>())
+                                {
+                                    <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
+                                }
+                            </BbFormFieldSelect>
+                            <BbFormFieldInput TValue="string" @bind-Value="_locationForm.Description" Label="Description" />
+                            <BbFormFieldSwitch Checked="@_locationForm.IsPickable"
+                                               CheckedChanged="@((bool value) => _locationForm.IsPickable = value)"
+                                               Label="Pickable location" />
+                            <div>
+                                <BbButton OnClick="@CreateLocation" Disabled="@IsCreateLocationDisabled">
+                                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                                    Create Location
+                                </BbButton>
+                            </div>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+            </div>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Warehouse List</BbCardTitle>
+                    <BbCardDescription>@_warehouses.Count warehouse(s), @_locations.Count location(s)</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_warehouses" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.City)" Title="City" />
+                            <BbDataGridTemplateColumn Title="Default">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsDefault ? "Default" : "Standard")" Status="@(item.IsDefault ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridTemplateColumn Title="Locations">
+                                <ChildContent Context="item">@_locations.Count(x => x.WarehouseId == item.Id)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Locations</BbCardTitle>
+                    <BbCardDescription>Internal stock positions by warehouse.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    <BbDataGrid Items="@_locations" ShowPagination="true" InitialPageSize="20">
+                        <Columns>
+                            <BbDataGridTemplateColumn Title="Warehouse">
+                                <ChildContent Context="item">@GetWarehouseLabel(item.WarehouseId)</ChildContent>
+                            </BbDataGridTemplateColumn>
+                            <BbDataGridPropertyColumn Property="@(x => x.Code)" Title="Code" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.Name)" Title="Name" Sortable="true" />
+                            <BbDataGridPropertyColumn Property="@(x => x.LocationType)" Title="Type" Sortable="true" />
+                            <BbDataGridTemplateColumn Title="Pickable">
+                                <ChildContent Context="item">
+                                    <StatusBadge Text="@(item.IsPickable ? "Pickable" : "Storage")" Status="@(item.IsPickable ? "active" : "inactive")" />
+                                </ChildContent>
+                            </BbDataGridTemplateColumn>
+                        </Columns>
+                    </BbDataGrid>
+                </BbCardContent>
+            </BbCard>
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private readonly WarehouseForm _warehouseForm = new();
+    private readonly LocationForm _locationForm = new();
+    private List<Warehouse> _warehouses = [];
+    private List<InventoryLocation> _locations = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _warehousingEnabled;
+    private bool _savingWarehouse;
+    private bool _savingLocation;
+    private bool IsCreateLocationDisabled => _savingLocation || _warehouses.Count == 0;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _warehousingEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "warehousing");
+            _warehouses = [];
+            _locations = [];
+
+            if (!_hasTenant || !_warehousingEnabled) return;
+
+            var warehouseResult = await Inventario.GetWarehouses(new GetWarehousesRequest { Metadata = BuildMetadata() });
+            _warehouses = warehouseResult.Response ?? [];
+            _locationForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
+
+            var locationResult = await Inventario.GetInventoryLocations(new GetInventoryLocationsRequest { Metadata = BuildMetadata() });
+            _locations = locationResult.Response ?? [];
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load warehouses: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateWarehouse()
+    {
+        if (TenantFilter.SelectedTenantId is not Guid)
+        {
+            ToastService.Show("Select a tenant before creating a warehouse.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_warehouseForm.Code) || string.IsNullOrWhiteSpace(_warehouseForm.Name))
+        {
+            ToastService.Show("Warehouse code and name are required.");
+            return;
+        }
+
+        _savingWarehouse = true;
+        try
+        {
+            var result = await Inventario.CreateWarehouse(new CreateWarehouseRequest
+            {
+                Metadata = BuildMetadata(),
+                Code = _warehouseForm.Code,
+                Name = _warehouseForm.Name,
+                Description = NullIfEmpty(_warehouseForm.Description),
+                AddressLine = NullIfEmpty(_warehouseForm.AddressLine),
+                City = NullIfEmpty(_warehouseForm.City),
+                Region = NullIfEmpty(_warehouseForm.Region),
+                CountryCode = NullIfEmpty(_warehouseForm.CountryCode),
+                IsDefault = _warehouseForm.IsDefault
+            });
+            ToastService.Show(result.IsSuccess ? "Warehouse created." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _warehouseForm.Reset();
+                await Reload();
+            }
+        }
+        finally
+        {
+            _savingWarehouse = false;
+        }
+    }
+
+    private async Task CreateLocation()
+    {
+        if (!Guid.TryParse(_locationForm.WarehouseId, out var warehouseId))
+        {
+            ToastService.Show("Select a warehouse.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_locationForm.Code) || string.IsNullOrWhiteSpace(_locationForm.Name))
+        {
+            ToastService.Show("Location code and name are required.");
+            return;
+        }
+
+        _savingLocation = true;
+        try
+        {
+            var result = await Inventario.CreateInventoryLocation(new CreateInventoryLocationRequest
+            {
+                Metadata = BuildMetadata(),
+                WarehouseId = warehouseId,
+                Code = _locationForm.Code,
+                Name = _locationForm.Name,
+                Description = NullIfEmpty(_locationForm.Description),
+                LocationType = Enum.TryParse<InventoryLocationType>(_locationForm.LocationType, out var type) ? type : InventoryLocationType.Bin,
+                IsPickable = _locationForm.IsPickable
+            });
+            ToastService.Show(result.IsSuccess ? "Location created." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _locationForm.Reset();
+                _locationForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
+                await Reload();
+            }
+        }
+        finally
+        {
+            _savingLocation = false;
+        }
+    }
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel"
+    };
+
+    private string GetWarehouseLabel(Guid warehouseId) =>
+        _warehouses.FirstOrDefault(x => x.Id == warehouseId) is { } warehouse
+            ? $"{warehouse.Code} - {warehouse.Name}"
+            : warehouseId.ToString()[..8];
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class WarehouseForm
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string AddressLine { get; set; } = "";
+        public string City { get; set; } = "";
+        public string Region { get; set; } = "";
+        public string CountryCode { get; set; } = "";
+        public bool IsDefault { get; set; }
+
+        public void Reset()
+        {
+            Code = "";
+            Name = "";
+            Description = "";
+            AddressLine = "";
+            City = "";
+            Region = "";
+            CountryCode = "";
+            IsDefault = false;
+        }
+    }
+
+    private sealed class LocationForm
+    {
+        public string WarehouseId { get; set; } = "";
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string LocationType { get; set; } = InventoryLocationType.Bin.ToString();
+        public bool IsPickable { get; set; } = true;
+
+        public void Reset()
+        {
+            Code = "";
+            Name = "";
+            Description = "";
+            LocationType = InventoryLocationType.Bin.ToString();
+            IsPickable = true;
+        }
+    }
+}

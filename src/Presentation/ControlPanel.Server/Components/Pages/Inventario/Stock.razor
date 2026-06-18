@@ -1,0 +1,331 @@
+@page "/inventario/stock"
+@using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
+@using XFramework.Inventario.Domain.Shared.Enums
+@implements IDisposable
+
+<PageTitle>Inventario Stock - Control Panel</PageTitle>
+
+@if (_loading)
+{
+    <CenteredSpinner />
+}
+else if (!_hasTenant)
+{
+    <ModuleUnavailable ModuleName="Inventario" RequiresTenant="true" />
+}
+else if (!_stockEnabled && !_movementsEnabled)
+{
+    <ModuleUnavailable ModuleName="Inventario Stock" />
+}
+else
+{
+    <FadeInContent>
+        <div class="space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <BbTypographyH3>Stock Control</BbTypographyH3>
+                    <BbTypographyMuted>Post stock movements and inspect balances for the selected tenant.</BbTypographyMuted>
+                </div>
+                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                    Refresh
+                </BbButton>
+            </div>
+
+            @if (_movementsEnabled)
+            {
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Post Movement</BbCardTitle>
+                        <BbCardDescription>Movements are append-only and update stock balances through Inventario services.</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <div class="grid gap-3">
+                            <div class="grid gap-3 xl:grid-cols-4">
+                                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.ProductId" Label="Product" Placeholder="Select product">
+                                    @foreach (var product in _products)
+                                    {
+                                        <BbSelectItem Value="@product.Id.ToString()">@GetProductLabel(product)</BbSelectItem>
+                                    }
+                                </BbFormFieldSelect>
+                                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.WarehouseId" Label="Warehouse" Placeholder="Select warehouse">
+                                    @foreach (var warehouse in _warehouses)
+                                    {
+                                        <BbSelectItem Value="@warehouse.Id.ToString()">@warehouse.Code - @warehouse.Name</BbSelectItem>
+                                    }
+                                </BbFormFieldSelect>
+                                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.LocationId" Label="Location" Placeholder="Select location">
+                                    @foreach (var location in LocationsForSelectedWarehouse())
+                                    {
+                                        <BbSelectItem Value="@location.Id.ToString()">@location.Code - @location.Name</BbSelectItem>
+                                    }
+                                </BbFormFieldSelect>
+                                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
+                                    @foreach (var type in Enum.GetValues<InventoryMovementType>())
+                                    {
+                                        <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
+                                    }
+                                </BbFormFieldSelect>
+                            </div>
+                            <div class="grid gap-3 md:grid-cols-3">
+                                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Quantity" Label="Quantity" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
+                                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
+                            </div>
+                            <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Reason" Label="Reason" />
+                            <BbFormFieldSwitch Checked="@_movementForm.AllowNegativeStock"
+                                               CheckedChanged="@((bool value) => _movementForm.AllowNegativeStock = value)"
+                                               Label="Allow negative stock for this posting" />
+                            <div>
+                                <BbButton OnClick="@PostMovement" Disabled="@IsPostMovementDisabled">
+                                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                                    Post Movement
+                                </BbButton>
+                            </div>
+                        </div>
+                    </BbCardContent>
+                </BbCard>
+            }
+
+            @if (_stockEnabled)
+            {
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Stock Balances</BbCardTitle>
+                        <BbCardDescription>@_balances.Count balance row(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridTemplateColumn Title="Product">
+                                    <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Warehouse">
+                                    <ChildContent Context="item">@GetWarehouseName(item.WarehouseId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridTemplateColumn Title="Location">
+                                    <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.LastMovementAt)" Title="Last Movement" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            }
+
+            @if (_movementsEnabled)
+            {
+                <BbCard>
+                    <BbCardHeader>
+                        <BbCardTitle>Movement Ledger</BbCardTitle>
+                        <BbCardDescription>@_movements.Count movement(s) loaded</BbCardDescription>
+                    </BbCardHeader>
+                    <BbCardContent>
+                        <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20">
+                            <Columns>
+                                <BbDataGridTemplateColumn Title="Product">
+                                    <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="Before" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
+                                <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
+                            </Columns>
+                        </BbDataGrid>
+                    </BbCardContent>
+                </BbCard>
+            }
+        </div>
+    </FadeInContent>
+}
+
+@code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
+    [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
+
+    private readonly MovementForm _movementForm = new();
+    private List<Product> _products = [];
+    private List<Warehouse> _warehouses = [];
+    private List<InventoryLocation> _locations = [];
+    private List<StockBalance> _balances = [];
+    private List<InventoryMovement> _movements = [];
+    private bool _loading = true;
+    private bool _hasTenant;
+    private bool _stockEnabled;
+    private bool _movementsEnabled;
+    private bool _postingMovement;
+    private bool IsPostMovementDisabled => _postingMovement || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
+
+    protected override void OnInitialized()
+    {
+        TenantFilter.OnChanged += OnTenantChanged;
+        ModuleNavigation.OnChanged += OnTenantChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private void OnTenantChanged() => _ = InvokeAsync(Reload);
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            await ModuleNavigation.EnsureLoadedAsync();
+            _hasTenant = TenantFilter.SelectedTenantId is Guid;
+            _stockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances");
+            _movementsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements");
+            _products = [];
+            _warehouses = [];
+            _locations = [];
+            _balances = [];
+            _movements = [];
+
+            if (!_hasTenant || (!_stockEnabled && !_movementsEnabled)) return;
+
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _products = await DataContext.Query<Product>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .Take(250)
+                .ToListAsync();
+
+            _warehouses = (await Inventario.GetWarehouses(new GetWarehousesRequest { Metadata = BuildMetadata() })).Response ?? [];
+            _locations = (await Inventario.GetInventoryLocations(new GetInventoryLocationsRequest { Metadata = BuildMetadata() })).Response ?? [];
+
+            if (_stockEnabled)
+                _balances = (await Inventario.GetStockBalances(new GetStockBalancesRequest { Metadata = BuildMetadata() })).Response ?? [];
+
+            if (_movementsEnabled)
+                _movements = (await Inventario.GetInventoryMovements(new GetInventoryMovementsRequest { Metadata = BuildMetadata() })).Response ?? [];
+
+            ApplyDefaultMovementSelections();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show($"Failed to load stock control: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PostMovement()
+    {
+        if (!Guid.TryParse(_movementForm.ProductId, out var productId) ||
+            !Guid.TryParse(_movementForm.WarehouseId, out var warehouseId) ||
+            !Guid.TryParse(_movementForm.LocationId, out var locationId))
+        {
+            ToastService.Show("Select product, warehouse, and location.");
+            return;
+        }
+
+        if (!decimal.TryParse(_movementForm.Quantity, out var quantity) || quantity == 0)
+        {
+            ToastService.Show("Quantity must not be zero.");
+            return;
+        }
+
+        _postingMovement = true;
+        try
+        {
+            var result = await Inventario.PostStockMovement(new PostStockMovementRequest
+            {
+                Metadata = BuildMetadata(),
+                ProductId = productId,
+                WarehouseId = warehouseId,
+                LocationId = locationId,
+                MovementType = Enum.TryParse<InventoryMovementType>(_movementForm.MovementType, out var type) ? type : InventoryMovementType.Adjustment,
+                Quantity = quantity,
+                UnitOfMeasure = NullIfEmpty(_movementForm.UnitOfMeasure),
+                ReferenceType = NullIfEmpty(_movementForm.ReferenceType),
+                Reason = NullIfEmpty(_movementForm.Reason),
+                AllowNegativeStock = _movementForm.AllowNegativeStock
+            });
+
+            ToastService.Show(result.IsSuccess ? "Stock movement posted." : $"Failed: {result.Message}");
+            if (result.IsSuccess)
+            {
+                _movementForm.Quantity = "0";
+                _movementForm.Reason = "";
+                await Reload();
+            }
+        }
+        finally
+        {
+            _postingMovement = false;
+        }
+    }
+
+    private IEnumerable<InventoryLocation> LocationsForSelectedWarehouse()
+    {
+        if (!Guid.TryParse(_movementForm.WarehouseId, out var warehouseId))
+            return _locations;
+
+        return _locations.Where(x => x.WarehouseId == warehouseId);
+    }
+
+    private void ApplyDefaultMovementSelections()
+    {
+        _movementForm.ProductId = _movementForm.ProductId.Length > 0 ? _movementForm.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
+        _movementForm.WarehouseId = _movementForm.WarehouseId.Length > 0 ? _movementForm.WarehouseId : _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
+        var location = LocationsForSelectedWarehouse().FirstOrDefault() ?? _locations.FirstOrDefault();
+        _movementForm.LocationId = _movementForm.LocationId.Length > 0 ? _movementForm.LocationId : location?.Id.ToString() ?? "";
+    }
+
+    private RequestMetadata BuildMetadata() => new()
+    {
+        TenantId = TenantFilter.SelectedTenantId,
+        RequestId = Guid.NewGuid(),
+        Name = "ControlPanel"
+    };
+
+    private string GetProductLabel(Product product) =>
+        string.IsNullOrWhiteSpace(product.SKU) ? product.Name ?? product.Id.ToString()[..8] : $"{product.Name} ({product.SKU})";
+
+    private string GetProductName(Guid productId) =>
+        _products.FirstOrDefault(x => x.Id == productId)?.Name ?? productId.ToString()[..8];
+
+    private string GetWarehouseName(Guid warehouseId) =>
+        _warehouses.FirstOrDefault(x => x.Id == warehouseId)?.Name ?? warehouseId.ToString()[..8];
+
+    private string GetLocationName(Guid locationId) =>
+        _locations.FirstOrDefault(x => x.Id == locationId)?.Name ?? locationId.ToString()[..8];
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        TenantFilter.OnChanged -= OnTenantChanged;
+        ModuleNavigation.OnChanged -= OnTenantChanged;
+    }
+
+    private sealed class MovementForm
+    {
+        public string ProductId { get; set; } = "";
+        public string WarehouseId { get; set; } = "";
+        public string LocationId { get; set; } = "";
+        public string MovementType { get; set; } = InventoryMovementType.Adjustment.ToString();
+        public string Quantity { get; set; } = "0";
+        public string UnitOfMeasure { get; set; } = "each";
+        public string ReferenceType { get; set; } = "";
+        public string Reason { get; set; } = "";
+        public bool AllowNegativeStock { get; set; }
+    }
+}
