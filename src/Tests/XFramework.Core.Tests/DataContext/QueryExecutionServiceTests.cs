@@ -154,6 +154,48 @@ public partial class QueryExecutionServiceTests
     }
 
     [Test]
+    public async Task ExecuteAsync_TenantOwnedEntityWithMetadata_ReturnsSerializedRows()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var services = new ServiceCollection()
+            .AddDbContext<TestTenantEntityDbContext>(options => options.UseSqlite(connection))
+            .AddScoped<DbContext>(provider => provider.GetRequiredService<TestTenantEntityDbContext>())
+            .BuildServiceProvider();
+
+        var tenantId = Guid.NewGuid();
+        await using (var setupScope = services.CreateAsyncScope())
+        {
+            var setupDbContext = setupScope.ServiceProvider.GetRequiredService<TestTenantEntityDbContext>();
+            await setupDbContext.Database.EnsureCreatedAsync();
+            setupDbContext.TestTenantEntities.Add(new TestTenantEntity
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = "Tenant scoped"
+            });
+            await setupDbContext.SaveChangesAsync();
+        }
+
+        var service = new QueryExecutionService(services, NullLogger<QueryExecutionService>.Instance);
+        service.RegisterEntity<TestTenantEntity>("TestTenantEntity");
+
+        var descriptor = new QueryDescriptor
+        {
+            EntityTypeName = "TestTenantEntity",
+            Mode = QueryExecutionMode.ToList,
+            Metadata = new RequestMetadata { TenantId = tenantId }
+        };
+
+        var resultBytes = await service.ExecuteAsync(MemoryPackSerializer.Serialize(descriptor));
+        var rows = MemoryPackSerializer.Deserialize<List<TestTenantEntity>>(resultBytes);
+
+        rows.Should().NotBeNull();
+        rows!.Should().ContainSingle(x => x.Name == "Tenant scoped");
+    }
+
+    [Test]
     public async Task ExecuteChangesAsync_TenantOwnedEntityWithMismatchedMetadata_ReturnsFailureAndDoesNotSave()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
