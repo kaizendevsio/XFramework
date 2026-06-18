@@ -1,11 +1,15 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using XFramework.Domain.Contexts;
 
 #nullable disable
 
 namespace XFramework.Domain.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20260617222322_InventarioFoundationCore")]
     public partial class InventarioFoundationCore : Migration
     {
         /// <inheritdoc />
