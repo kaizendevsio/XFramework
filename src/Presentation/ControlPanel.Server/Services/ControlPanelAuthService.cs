@@ -14,6 +14,7 @@ public sealed class ControlPanelAuthService(
     IDataContext dataContext,
     IIdentityServerServiceWrapper identityServer,
     IConfiguration configuration,
+    RequestMetadata requestMetadata,
     ILogger<ControlPanelAuthService> logger)
 {
     public async Task<ControlPanelLoginResult> AuthenticateAsync(
@@ -42,6 +43,8 @@ public sealed class ControlPanelAuthService(
         {
             return ControlPanelLoginResult.Failed("ControlPanel admin tenant is not seeded yet.");
         }
+
+        requestMetadata.TenantId = tenant.Id;
 
         var roleType = await dataContext.Query<IdentityRoleType>()
             .IgnoreQueryFilters()

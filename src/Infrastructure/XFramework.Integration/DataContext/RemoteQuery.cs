@@ -330,10 +330,35 @@ public class RemoteQuery<T> : IRemoteQuery<T> where T : class
         {
             return MemoryPackSerializer.Deserialize<TQueryResult>(resultBytes);
         }
-        catch (MemoryPackSerializationException ex)
+        catch (Exception ex) when (ex is MemoryPackSerializationException or OverflowException or InvalidOperationException)
         {
+            if (TryDeserializeFailure(resultBytes, out var failure))
+            {
+                throw new InvalidOperationException(
+                    $"Remote data context query '{mode}' failed: {failure.Message}", ex);
+            }
+
             throw new InvalidOperationException(
                 $"Remote data context query '{mode}' returned an invalid response: {ex.Message}", ex);
+        }
+    }
+
+    private static bool TryDeserializeFailure(byte[] resultBytes, out DataContextResult failure)
+    {
+        failure = null!;
+
+        try
+        {
+            var result = MemoryPackSerializer.Deserialize<DataContextResult>(resultBytes);
+            if (result is not { IsSuccess: false } || string.IsNullOrWhiteSpace(result.Message))
+                return false;
+
+            failure = result;
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
