@@ -285,14 +285,6 @@
     position: relative;
 }
 
-.profile-menu > summary {
-    list-style: none;
-}
-
-.profile-menu > summary::-webkit-details-marker {
-    display: none;
-}
-
 .profile-trigger {
     display: flex;
     align-items: center;
@@ -364,9 +356,6 @@
 }
 
 .profile-menu-panel {
-    position: absolute;
-    top: calc(100% + 0.5rem);
-    right: 0;
     z-index: 60;
     display: flex;
     width: min(22rem, calc(100vw - 2rem));
@@ -421,6 +410,24 @@
 
 .profile-tenant-combobox {
     width: 100%;
+}
+
+.tenant-module-icon {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    flex: 0 0 3rem;
+    place-items: center;
+    align-self: flex-start;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    background: var(--muted);
+    color: var(--foreground);
+}
+
+.tenant-module-icon svg {
+    width: 1.35rem;
+    height: 1.35rem;
 }
 
 [role="row"][tabindex="0"]:focus,

@@ -1,0 +1,66 @@
+@* Tenant detail section navigation *@
+@inject NavigationManager Navigation
+
+<div class="space-y-1">
+    <NavLink href="/identity/tenants"
+             Match="NavLinkMatch.All"
+             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+        <LucideIcon Name="arrow-left" class="h-4 w-4" />
+        Tenant List
+    </NavLink>
+</div>
+
+<div class="mt-4">
+    <p class="px-3 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tenant Detail</p>
+    <div class="space-y-0.5">
+        <a href="@SectionHref("summary")" class="@SectionClass("summary")">
+            <LucideIcon Name="file-text" class="h-4 w-4" />
+            Summary
+        </a>
+        <a href="@SectionHref("modules")" class="@SectionClass("modules")">
+            <LucideIcon Name="blocks" class="h-4 w-4" />
+            Modules
+        </a>
+        <a href="@SectionHref("users")" class="@SectionClass("users")">
+            <LucideIcon Name="users" class="h-4 w-4" />
+            Users
+        </a>
+        <a href="@SectionHref("configurations")" class="@SectionClass("configurations")">
+            <LucideIcon Name="settings" class="h-4 w-4" />
+            Configurations
+        </a>
+        <a href="@SectionHref("role-types")" class="@SectionClass("role-types")">
+            <LucideIcon Name="shield" class="h-4 w-4" />
+            Role Types
+        </a>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid TenantId { get; set; }
+
+    private string CurrentPath => new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/');
+    private string BaseHref => $"/identity/tenants/{TenantId}";
+
+    private string CurrentSection
+    {
+        get
+        {
+            var segments = CurrentPath
+                .Trim('/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            return segments.Length >= 4 ? NormalizeSection(segments[3]) : "summary";
+        }
+    }
+
+    private string SectionHref(string section) =>
+        section == "summary" ? BaseHref : $"{BaseHref}/{section}";
+
+    private string SectionClass(string section) =>
+        "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-sidebar-accent "
+        + (CurrentSection == section ? "bg-sidebar-accent text-sidebar-accent-foreground" : "");
+
+    private static string NormalizeSection(string section) =>
+        section.Equals("roletypes", StringComparison.OrdinalIgnoreCase) ? "role-types" : section.ToLowerInvariant();
+}

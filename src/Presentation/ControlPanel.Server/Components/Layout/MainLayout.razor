@@ -20,7 +20,18 @@
 
             @* Scrollable nav *@
             <nav class="flex-1 overflow-y-auto p-3">
-                <NavMenu />
+                @if (IsTenantListRoute)
+                {
+                    <TenantListSidebar />
+                }
+                else if (TryGetTenantDetailRoute(out var tenantRouteId, out _))
+                {
+                    <TenantDetailSidebar TenantId="@tenantRouteId" />
+                }
+                else
+                {
+                    <NavMenu />
+                }
             </nav>
 
             @* Footer *@
@@ -56,49 +67,58 @@
             <div class="flex items-center gap-2">
                 <BbDarkModeToggle Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" />
                 <BbThemeSwitcher />
-                <details class="profile-menu">
-                    <summary class="profile-trigger" aria-label="Open profile menu">
-                        <span class="profile-avatar">@_userInitials</span>
-                        <span class="profile-trigger-text">
-                            <span class="profile-name">@_displayName</span>
-                            <span class="profile-tenant">@ActiveTenantLabel</span>
-                        </span>
-                        <LucideIcon Name="chevron-down" class="h-4 w-4 text-muted-foreground" />
-                    </summary>
-                    <div class="profile-menu-panel">
-                        <div class="profile-menu-user">
-                            <span class="profile-avatar profile-avatar-large">@_userInitials</span>
-                            <div class="min-w-0">
-                                <div class="profile-menu-name">@_displayName</div>
-                                <div class="profile-menu-username">@_userName</div>
+                <div class="profile-menu">
+                    <BbPopover @bind-Open="_profileMenuOpen"
+                               CloseOnClickOutside="true"
+                               CloseOnEscape="true"
+                               RestoreFocusOnClose="true">
+                        <BbPopoverTrigger AsChild>
+                            <button type="button" class="profile-trigger" aria-label="Open profile menu">
+                                <span class="profile-avatar">@_userInitials</span>
+                                <span class="profile-trigger-text">
+                                    <span class="profile-name">@_displayName</span>
+                                    <span class="profile-tenant">@ActiveTenantLabel</span>
+                                </span>
+                                <LucideIcon Name="chevron-down" class="h-4 w-4 text-muted-foreground" />
+                            </button>
+                        </BbPopoverTrigger>
+                        <BbPopoverContent Side="PopoverSide.Bottom"
+                                          Align="PopoverAlign.End"
+                                          Class="profile-menu-panel">
+                            <div class="profile-menu-user">
+                                <span class="profile-avatar profile-avatar-large">@_userInitials</span>
+                                <div class="min-w-0">
+                                    <div class="profile-menu-name">@_displayName</div>
+                                    <div class="profile-menu-username">@_userName</div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="profile-menu-section">
-                            <label class="profile-menu-label">Active Tenant</label>
-                            <BbCombobox TValue="string"
-                                         Value="@_selectedTenantId"
-                                         ValueChanged="@OnTenantSelectionChanged"
-                                         Options="@TenantOptions"
-                                         Placeholder="All Tenants"
-                                         SearchPlaceholder="Search tenants..."
-                                         EmptyMessage="No tenants found."
-                                         Class="tenant-filter-combobox profile-tenant-combobox"
-                                         MatchTriggerWidth="true" />
-                        </div>
+                            <div class="profile-menu-section">
+                                <label class="profile-menu-label">Active Tenant</label>
+                                <BbCombobox TValue="string"
+                                             Value="@_selectedTenantId"
+                                             ValueChanged="@OnTenantSelectionChanged"
+                                             Options="@TenantOptions"
+                                             Placeholder="All Tenants"
+                                             SearchPlaceholder="Search tenants..."
+                                             EmptyMessage="No tenants found."
+                                             Class="tenant-filter-combobox profile-tenant-combobox"
+                                             MatchTriggerWidth="true" />
+                            </div>
 
-                        <div class="profile-menu-actions">
-                            <BbButton Variant="ButtonVariant.Outline" OnClick="@ManageTenants" Class="profile-menu-button">
-                                <LucideIcon Name="building-2" class="mr-2 h-4 w-4" />
-                                Manage Tenants
-                            </BbButton>
-                            <BbButton Variant="ButtonVariant.Ghost" OnClick="@Logout" Class="profile-menu-button">
-                                <LucideIcon Name="log-out" class="mr-2 h-4 w-4" />
-                                Sign Out
-                            </BbButton>
-                        </div>
-                    </div>
-                </details>
+                            <div class="profile-menu-actions">
+                                <BbButton Variant="ButtonVariant.Outline" OnClick="@ManageTenants" Class="profile-menu-button">
+                                    <LucideIcon Name="building-2" class="mr-2 h-4 w-4" />
+                                    Manage Tenants
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Ghost" OnClick="@Logout" Class="profile-menu-button">
+                                    <LucideIcon Name="log-out" class="mr-2 h-4 w-4" />
+                                    Sign Out
+                                </BbButton>
+                            </div>
+                        </BbPopoverContent>
+                    </BbPopover>
+                </div>
             </div>
         </header>
         <main class="app-main flex-1 min-w-0 p-6 overflow-y-auto">
@@ -127,8 +147,11 @@
     private string _displayName = "Administrator";
     private string _userName = "";
     private string _userInitials = "A";
+    private bool _profileMenuOpen;
     private string _selectedTenantName => TenantFilter.SelectedTenantName ?? "";
     private string ActiveTenantLabel => string.IsNullOrWhiteSpace(_selectedTenantName) ? "All Tenants" : _selectedTenantName;
+    private string CurrentPath => new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+    private bool IsTenantListRoute => string.Equals(CurrentPath, "/identity/tenants", StringComparison.OrdinalIgnoreCase);
 
     private List<SelectOption<string>> TenantOptions =>
     [
@@ -219,16 +242,45 @@
         {
             TenantFilter.Clear();
         }
+
+        _profileMenuOpen = false;
     }
 
     private void ManageTenants()
     {
+        _profileMenuOpen = false;
         Nav.NavigateTo("/identity/tenants");
     }
 
     private void Logout()
     {
+        _profileMenuOpen = false;
         Nav.NavigateTo("/auth/logout", forceLoad: true);
+    }
+
+    private bool TryGetTenantDetailRoute(out Guid tenantId, out string section)
+    {
+        tenantId = Guid.Empty;
+        section = "summary";
+
+        var segments = CurrentPath
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 3
+            || !string.Equals(segments[0], "identity", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(segments[1], "tenants", StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(segments[2], out tenantId))
+        {
+            return false;
+        }
+
+        if (segments.Length >= 4)
+        {
+            section = segments[3];
+        }
+
+        return true;
     }
 
     private static string BuildInitials(string displayName)
