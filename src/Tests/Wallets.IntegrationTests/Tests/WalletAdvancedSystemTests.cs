@@ -201,6 +201,49 @@ public class WalletAdvancedSystemTests : WalletsTestBase
     }
 
     [Test]
+    public async Task Http_CreateDeposit_WithExplicitWalletAndDifferentCredential_ReturnsBadRequest()
+    {
+        var owner = await SeedCredential();
+        var otherCredential = await SeedCredential();
+        var wallet = await SeedWallet(owner.Id, 100m);
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/deposits", new CreateDepositWorkflowRequest
+        {
+            CredentialId = otherCredential.Id,
+            WalletId = wallet.Id,
+            Amount = 25m,
+            ExternalReference = $"deposit-wrong-credential-{Guid.NewGuid():N}",
+            Metadata = CreateMetadata()
+        });
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, body);
+        body.Should().Contain("Wallet does not belong to the requested credential");
+    }
+
+    [Test]
+    public async Task Http_CreateDeposit_WithExplicitWalletAndDifferentWalletType_ReturnsBadRequest()
+    {
+        var credential = await SeedCredential();
+        var wallet = await SeedWallet(credential.Id, 100m);
+        var wrongWalletTypeId = Guid.NewGuid();
+
+        var response = await HttpClient.PostAsJsonAsync("/api/wallets/deposits", new CreateDepositWorkflowRequest
+        {
+            CredentialId = credential.Id,
+            WalletId = wallet.Id,
+            WalletTypeId = wrongWalletTypeId,
+            Amount = 25m,
+            ExternalReference = $"deposit-wrong-type-{Guid.NewGuid():N}",
+            Metadata = CreateMetadata()
+        });
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, body);
+        body.Should().Contain("Wallet does not match requested wallet type");
+    }
+
+    [Test]
     public async Task Http_AddFunds_DuplicateWebhookIdempotencyKey_CreatesOneOperationTransactionAndOutbox()
     {
         var credential = await SeedCredential();

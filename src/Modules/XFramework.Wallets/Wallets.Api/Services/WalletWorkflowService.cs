@@ -37,10 +37,33 @@ public sealed class WalletWorkflowService(
             return Result<WalletWorkflowResponse>.Failure("Amount must be greater than zero", 400);
         }
 
+        var requestedWalletTypeId = request.WalletTypeId;
+        if (request.WalletId.HasValue)
+        {
+            var walletResult = await ResolveExistingDepositWalletAsync(
+                contextResult.Data!.TenantId,
+                request.WalletId.Value,
+                request.CredentialId,
+                request.WalletTypeId,
+                ct);
+            if (!walletResult.IsSuccess)
+            {
+                return Result<WalletWorkflowResponse>.Failure(walletResult.Message!, walletResult.StatusCode);
+            }
+
+            requestedWalletTypeId = walletResult.Data!.WalletTypeId ?? request.WalletTypeId;
+        }
+        else if (!request.WalletTypeId.HasValue)
+        {
+            return Result<WalletWorkflowResponse>.Failure(
+                "Wallet type is required to create a deposit without an existing wallet",
+                400);
+        }
+
         var feeResult = await feeCalculator.CalculateAsync(
             contextResult.Data!.TenantId,
             WalletOperationType.DepositApproval,
-            request.WalletTypeId,
+            requestedWalletTypeId,
             request.CurrencyId,
             request.Amount,
             request.RequestedFee,
@@ -60,7 +83,7 @@ public sealed class WalletWorkflowService(
             TenantId = contextResult.Data.TenantId,
             CredentialId = request.CredentialId,
             WalletId = request.WalletId,
-            WalletTypeId = request.WalletTypeId,
+            WalletTypeId = requestedWalletTypeId,
             SourceCurrencyId = request.CurrencyId,
             GatewayId = request.GatewayId,
             Amount = request.Amount,
@@ -1939,11 +1962,12 @@ public sealed class WalletWorkflowService(
     {
         if (deposit.WalletId.HasValue)
         {
-            var wallet = await dbContext.Set<Wallet>()
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == deposit.WalletId && x.TenantId == deposit.TenantId && !x.IsDeleted, ct);
-            return wallet is null ? Result<Wallet>.NotFound("Wallet not found") : Result<Wallet>.Success(wallet);
+            return await ResolveExistingDepositWalletAsync(
+                deposit.TenantId,
+                deposit.WalletId.Value,
+                deposit.CredentialId,
+                deposit.WalletTypeId,
+                ct);
         }
 
         if (!deposit.WalletTypeId.HasValue)
@@ -1976,6 +2000,35 @@ public sealed class WalletWorkflowService(
             Status = WalletStatus.Active,
             IsEnabled = true
         });
+    }
+
+    private async Task<Result<Wallet>> ResolveExistingDepositWalletAsync(
+        Guid tenantId,
+        Guid walletId,
+        Guid credentialId,
+        Guid? walletTypeId,
+        CancellationToken ct)
+    {
+        var wallet = await dbContext.Set<Wallet>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == walletId && x.TenantId == tenantId && !x.IsDeleted, ct);
+        if (wallet is null)
+        {
+            return Result<Wallet>.NotFound("Wallet not found");
+        }
+
+        if (credentialId != Guid.Empty && wallet.CredentialId != credentialId)
+        {
+            return Result<Wallet>.Failure("Wallet does not belong to the requested credential", 400);
+        }
+
+        if (walletTypeId.HasValue && wallet.WalletTypeId != walletTypeId)
+        {
+            return Result<Wallet>.Failure("Wallet does not match requested wallet type", 400);
+        }
+
+        return Result<Wallet>.Success(wallet);
     }
 
     private async Task<Result<WalletApprovalResponse>> DecideApprovalAsync(
