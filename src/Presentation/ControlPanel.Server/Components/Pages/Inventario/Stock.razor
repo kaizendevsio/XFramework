@@ -29,82 +29,20 @@ else
                     <BbTypographyH3>Stock Control</BbTypographyH3>
                     <BbTypographyMuted>Post stock movements and inspect balances for the selected tenant.</BbTypographyMuted>
                 </div>
-                <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
-                    <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
-                    Refresh
-                </BbButton>
+                <div class="flex flex-wrap gap-2">
+                    @if (_movementsEnabled)
+                    {
+                        <BbButton OnClick="@OpenMovementDialog">
+                            <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
+                            Post Movement
+                        </BbButton>
+                    }
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="@Reload">
+                        <LucideIcon Name="refresh-cw" class="mr-2 h-4 w-4" />
+                        Refresh
+                    </BbButton>
+                </div>
             </div>
-
-            @if (_movementsEnabled)
-            {
-                <BbCard>
-                    <BbCardHeader>
-                        <BbCardTitle>Post Movement</BbCardTitle>
-                        <BbCardDescription>Movements are append-only and update stock balances through Inventario services.</BbCardDescription>
-                    </BbCardHeader>
-                    <BbCardContent>
-                        <div class="grid gap-3">
-                            <div class="grid gap-3 xl:grid-cols-4">
-                                <div class="xf-form-field">
-                                    <BbLabel>Product</BbLabel>
-                                    <BbCombobox TValue="string"
-                                                 @bind-Value="_movementForm.ProductId"
-                                                 Options="@ProductOptions"
-                                                 Placeholder="Select product"
-                                                 SearchPlaceholder="Search products..."
-                                                 EmptyMessage="No products found."
-                                                 Class="xf-entity-combobox"
-                                                 MatchTriggerWidth="true" />
-                                </div>
-                                <div class="xf-form-field">
-                                    <BbLabel>Warehouse</BbLabel>
-                                    <BbCombobox TValue="string"
-                                                 Value="@_movementForm.WarehouseId"
-                                                 ValueChanged="@OnMovementWarehouseChanged"
-                                                 Options="@WarehouseOptions"
-                                                 Placeholder="Select warehouse"
-                                                 SearchPlaceholder="Search warehouses..."
-                                                 EmptyMessage="No warehouses found."
-                                                 Class="xf-entity-combobox"
-                                                 MatchTriggerWidth="true" />
-                                </div>
-                                <div class="xf-form-field">
-                                    <BbLabel>Location</BbLabel>
-                                    <BbCombobox TValue="string"
-                                                 @bind-Value="_movementForm.LocationId"
-                                                 Options="@MovementLocationOptions"
-                                                 Placeholder="Select location"
-                                                 SearchPlaceholder="Search locations..."
-                                                 EmptyMessage="No locations found."
-                                                 Class="xf-entity-combobox"
-                                                 MatchTriggerWidth="true" />
-                                </div>
-                                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
-                                    @foreach (var type in Enum.GetValues<InventoryMovementType>())
-                                    {
-                                        <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
-                                    }
-                                </BbFormFieldSelect>
-                            </div>
-                            <div class="grid gap-3 md:grid-cols-3">
-                                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Quantity" Label="Quantity" />
-                                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
-                                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
-                            </div>
-                            <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Reason" Label="Reason" />
-                            <BbFormFieldSwitch Checked="@_movementForm.AllowNegativeStock"
-                                               CheckedChanged="@((bool value) => _movementForm.AllowNegativeStock = value)"
-                                               Label="Allow negative stock for this posting" />
-                            <div>
-                                <BbButton OnClick="@PostMovement" Disabled="@IsPostMovementDisabled">
-                                    <LucideIcon Name="plus" class="mr-2 h-4 w-4" />
-                                    Post Movement
-                                </BbButton>
-                            </div>
-                        </div>
-                    </BbCardContent>
-                </BbCard>
-            }
 
             @if (_stockEnabled)
             {
@@ -114,7 +52,9 @@ else
                         <BbCardDescription>@_balances.Count balance row(s) loaded</BbCardDescription>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="20">
+                        <BbDataGrid Items="@_balances" ShowPagination="true" InitialPageSize="20"
+                                    OnRowClick="@((StockBalance item) => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))"
+                                    Class="cursor-pointer">
                             <Columns>
                                 <BbDataGridTemplateColumn Title="Product">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
@@ -129,6 +69,14 @@ else
                                 <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.LastMovementAt)" Title="Last Movement" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/balances/{item.Id}"))">
+                                            <LucideIcon Name="eye" class="h-4 w-4" />
+                                        </BbButton>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
                             </Columns>
                         </BbDataGrid>
                     </BbCardContent>
@@ -143,7 +91,9 @@ else
                         <BbCardDescription>@_movements.Count movement(s) loaded</BbCardDescription>
                     </BbCardHeader>
                     <BbCardContent>
-                        <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20">
+                        <BbDataGrid Items="@_movements" ShowPagination="true" InitialPageSize="20"
+                                    OnRowClick="@((InventoryMovement item) => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))"
+                                    Class="cursor-pointer">
                             <Columns>
                                 <BbDataGridTemplateColumn Title="Product">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
@@ -154,6 +104,14 @@ else
                                 <BbDataGridPropertyColumn Property="@(x => x.QuantityAfter)" Title="After" Sortable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.Reason)" Title="Reason" />
                                 <BbDataGridPropertyColumn Property="@(x => x.MovementDate)" Title="Movement Date" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Actions">
+                                    <ChildContent Context="item">
+                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                                                  OnClick="@(() => Navigation.NavigateTo($"/inventario/stock/movements/{item.Id}"))">
+                                            <LucideIcon Name="eye" class="h-4 w-4" />
+                                        </BbButton>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
                             </Columns>
                         </BbDataGrid>
                     </BbCardContent>
@@ -163,9 +121,78 @@ else
     </FadeInContent>
 }
 
+<BbDialog Open="@_movementDialogOpen" OpenChanged="@(v => _movementDialogOpen = v)">
+    <BbDialogContent TrapFocus="false">
+        <BbDialogHeader>
+            <BbDialogTitle>Post Movement</BbDialogTitle>
+            <BbDialogDescription>Movements are append-only and update stock balances through Inventario services.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="grid gap-4 py-4">
+            <div class="grid gap-3 xl:grid-cols-2">
+                <div class="xf-form-field">
+                    <BbLabel>Product</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_movementForm.ProductId"
+                                 Options="@ProductOptions"
+                                 Placeholder="Select product"
+                                 SearchPlaceholder="Search products..."
+                                 EmptyMessage="No products found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Warehouse</BbLabel>
+                    <BbCombobox TValue="string"
+                                 Value="@_movementForm.WarehouseId"
+                                 ValueChanged="@OnMovementWarehouseChanged"
+                                 Options="@WarehouseOptions"
+                                 Placeholder="Select warehouse"
+                                 SearchPlaceholder="Search warehouses..."
+                                 EmptyMessage="No warehouses found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <div class="xf-form-field">
+                    <BbLabel>Location</BbLabel>
+                    <BbCombobox TValue="string"
+                                 @bind-Value="_movementForm.LocationId"
+                                 Options="@MovementLocationOptions"
+                                 Placeholder="Select location"
+                                 SearchPlaceholder="Search locations..."
+                                 EmptyMessage="No locations found."
+                                 Class="xf-entity-combobox"
+                                 MatchTriggerWidth="true" />
+                </div>
+                <BbFormFieldSelect TValue="string" @bind-Value="_movementForm.MovementType" Label="Movement Type">
+                    @foreach (var type in Enum.GetValues<InventoryMovementType>())
+                    {
+                        <BbSelectItem Value="@type.ToString()">@type</BbSelectItem>
+                    }
+                </BbFormFieldSelect>
+            </div>
+            <div class="grid gap-3 md:grid-cols-3">
+                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Quantity" Label="Quantity" />
+                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.UnitOfMeasure" Label="Unit" />
+                <BbFormFieldInput TValue="string" @bind-Value="_movementForm.ReferenceType" Label="Reference Type" />
+            </div>
+            <BbFormFieldInput TValue="string" @bind-Value="_movementForm.Reason" Label="Reason" />
+            <BbFormFieldSwitch Checked="@_movementForm.AllowNegativeStock"
+                               CheckedChanged="@((bool value) => _movementForm.AllowNegativeStock = value)"
+                               Label="Allow negative stock for this posting" />
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _movementDialogOpen = false)">Cancel</BbButton>
+            <BbButton OnClick="@PostMovement" Disabled="@IsPostMovementDisabled">
+                Post Movement
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
@@ -181,6 +208,7 @@ else
     private bool _stockEnabled;
     private bool _movementsEnabled;
     private bool _postingMovement;
+    private bool _movementDialogOpen;
     private bool IsPostMovementDisabled => _postingMovement || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
     private List<SelectOption<string>> ProductOptions =>
         _products.Select(product => new SelectOption<string>(product.Id.ToString(), GetProductLabel(product))).ToList();
@@ -310,6 +338,7 @@ else
             {
                 _movementForm.Quantity = "0";
                 _movementForm.Reason = "";
+                _movementDialogOpen = false;
                 await Reload();
             }
         }
@@ -317,6 +346,12 @@ else
         {
             _postingMovement = false;
         }
+    }
+
+    private void OpenMovementDialog()
+    {
+        ApplyDefaultMovementSelections();
+        _movementDialogOpen = true;
     }
 
     private IEnumerable<InventoryLocation> LocationsForSelectedWarehouse()
