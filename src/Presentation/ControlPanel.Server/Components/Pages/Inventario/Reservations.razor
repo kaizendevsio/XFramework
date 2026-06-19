@@ -184,9 +184,29 @@ else
                 .Take(250)
                 .ToListAsync();
 
-            _warehouses = (await Inventario.GetWarehouses(new GetWarehousesRequest { Metadata = BuildMetadata() })).Response ?? [];
-            _locations = (await Inventario.GetInventoryLocations(new GetInventoryLocationsRequest { Metadata = BuildMetadata() })).Response ?? [];
-            _reservations = (await Inventario.GetReservations(new GetReservationsRequest { Metadata = BuildMetadata() })).Response ?? [];
+            _warehouses = await DataContext.Query<Warehouse>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Code)
+                .Take(200)
+                .ToListAsync();
+
+            _locations = await DataContext.Query<InventoryLocation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Code)
+                .Take(500)
+                .ToListAsync();
+
+            _reservations = await DataContext.Query<Reservation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(500)
+                .ToListAsync();
 
             ApplyDefaultSelections();
         }

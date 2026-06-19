@@ -1,4 +1,5 @@
 @page "/inventario/warehouses"
+@using XFramework.Domain.Shared.DataContext
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
 @using XFramework.Inventario.Domain.Shared.Enums
@@ -155,6 +156,7 @@ else
 }
 
 @code {
+    [Inject] private IDataContext DataContext { get; set; } = default!;
     [Inject] private IInventarioServiceWrapper Inventario { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
     [Inject] private TenantModuleNavigationService ModuleNavigation { get; set; } = default!;
@@ -194,12 +196,23 @@ else
 
             if (!_hasTenant || !_warehousingEnabled) return;
 
-            var warehouseResult = await Inventario.GetWarehouses(new GetWarehousesRequest { Metadata = BuildMetadata() });
-            _warehouses = warehouseResult.Response ?? [];
+            var tenantId = TenantFilter.SelectedTenantId!.Value;
+            _warehouses = await DataContext.Query<Warehouse>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Code)
+                .Take(200)
+                .ToListAsync();
             _locationForm.WarehouseId = _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
 
-            var locationResult = await Inventario.GetInventoryLocations(new GetInventoryLocationsRequest { Metadata = BuildMetadata() });
-            _locations = locationResult.Response ?? [];
+            _locations = await DataContext.Query<InventoryLocation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                .OrderBy(x => x.Code)
+                .Take(500)
+                .ToListAsync();
         }
         catch (Exception ex)
         {
