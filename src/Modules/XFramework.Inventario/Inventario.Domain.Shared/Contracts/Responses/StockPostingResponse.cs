@@ -8,4 +8,9 @@ public partial record StockPostingResponse(
     Guid LocationId,
     decimal OnHandQuantity,
     decimal ReservedQuantity,
-    decimal AvailableQuantity);
+    decimal AvailableQuantity)
+{
+    public Guid? LotId { get; init; }
+    public string? IdempotencyKey { get; init; }
+    public bool IsIdempotentReplay { get; init; }
+}

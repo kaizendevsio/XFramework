@@ -1,5 +1,6 @@
 @page "/inventario/stock"
 @using XFramework.Domain.Shared.DataContext
+@using XFramework.Inventario.Domain.Shared.Contracts.Requests.Lots
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Locations
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock
 @using XFramework.Inventario.Domain.Shared.Contracts.Requests.Warehouses
@@ -65,6 +66,12 @@ else
                                 <BbDataGridTemplateColumn Title="Location">
                                     <ChildContent Context="item">@GetLocationName(item.LocationId)</ChildContent>
                                 </BbDataGridTemplateColumn>
+                                @if (_traceabilityEnabled)
+                                {
+                                    <BbDataGridTemplateColumn Title="Lot">
+                                        <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                }
                                 <BbDataGridPropertyColumn Property="@(x => x.OnHandQuantity)" Title="On Hand" Sortable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.ReservedQuantity)" Title="Reserved" Sortable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.AvailableQuantity)" Title="Available" Sortable="true" />
@@ -98,6 +105,12 @@ else
                                 <BbDataGridTemplateColumn Title="Product">
                                     <ChildContent Context="item">@GetProductName(item.ProductId)</ChildContent>
                                 </BbDataGridTemplateColumn>
+                                @if (_traceabilityEnabled)
+                                {
+                                    <BbDataGridTemplateColumn Title="Lot">
+                                        <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
+                                    </BbDataGridTemplateColumn>
+                                }
                                 <BbDataGridPropertyColumn Property="@(x => x.MovementType)" Title="Type" Sortable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.QuantityDelta)" Title="Delta" Sortable="true" />
                                 <BbDataGridPropertyColumn Property="@(x => x.QuantityBefore)" Title="Before" Sortable="true" />
@@ -132,7 +145,8 @@ else
                 <div class="xf-form-field">
                     <BbLabel>Product</BbLabel>
                     <BbCombobox TValue="string"
-                                 @bind-Value="_movementForm.ProductId"
+                                 Value="@_movementForm.ProductId"
+                                 ValueChanged="@OnMovementProductChanged"
                                  Options="@ProductOptions"
                                  Placeholder="Select product"
                                  SearchPlaceholder="Search products..."
@@ -140,6 +154,20 @@ else
                                  Class="xf-entity-combobox"
                                  MatchTriggerWidth="true" />
                 </div>
+                @if (_traceabilityEnabled)
+                {
+                    <div class="xf-form-field">
+                        <BbLabel>Lot / Batch</BbLabel>
+                        <BbCombobox TValue="string"
+                                     @bind-Value="_movementForm.LotId"
+                                     Options="@MovementLotOptions"
+                                     Placeholder="No lot"
+                                     SearchPlaceholder="Search lots..."
+                                     EmptyMessage="No lots found."
+                                     Class="xf-entity-combobox"
+                                     MatchTriggerWidth="true" />
+                    </div>
+                }
                 <div class="xf-form-field">
                     <BbLabel>Warehouse</BbLabel>
                     <BbCombobox TValue="string"
@@ -201,12 +229,14 @@ else
     private List<Product> _products = [];
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
+    private List<InventoryLot> _lots = [];
     private List<StockBalance> _balances = [];
     private List<InventoryMovement> _movements = [];
     private bool _loading = true;
     private bool _hasTenant;
     private bool _stockEnabled;
     private bool _movementsEnabled;
+    private bool _traceabilityEnabled;
     private bool _postingMovement;
     private bool _movementDialogOpen;
     private bool IsPostMovementDisabled => _postingMovement || _products.Count == 0 || _warehouses.Count == 0 || _locations.Count == 0;
@@ -216,6 +246,19 @@ else
         _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
     private List<SelectOption<string>> MovementLocationOptions =>
         LocationsForSelectedWarehouse().Select(location => new SelectOption<string>(location.Id.ToString(), GetLocationLabel(location))).ToList();
+    private List<SelectOption<string>> MovementLotOptions
+    {
+        get
+        {
+            var options = new List<SelectOption<string>>
+            {
+                new("", "No lot / untracked")
+            };
+            options.AddRange(LotsForSelectedProduct()
+                .Select(lot => new SelectOption<string>(lot.Id.ToString(), GetLotLabel(lot))));
+            return options;
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -236,9 +279,11 @@ else
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _stockEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "stock_balances");
             _movementsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "movements");
+            _traceabilityEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability");
             _products = [];
             _warehouses = [];
             _locations = [];
+            _lots = [];
             _balances = [];
             _movements = [];
 
@@ -268,6 +313,15 @@ else
                 .OrderBy(x => x.Code)
                 .Take(500)
                 .ToListAsync();
+
+            if (_traceabilityEnabled)
+                _lots = await DataContext.Query<InventoryLot>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                    .OrderBy(x => x.LotNumber)
+                    .Take(500)
+                    .ToListAsync();
 
             if (_stockEnabled)
                 _balances = await DataContext.Query<StockBalance>()
@@ -325,6 +379,7 @@ else
                 ProductId = productId,
                 WarehouseId = warehouseId,
                 LocationId = locationId,
+                LotId = Guid.TryParse(_movementForm.LotId, out var lotId) ? lotId : null,
                 MovementType = Enum.TryParse<InventoryMovementType>(_movementForm.MovementType, out var type) ? type : InventoryMovementType.Adjustment,
                 Quantity = quantity,
                 UnitOfMeasure = NullIfEmpty(_movementForm.UnitOfMeasure),
@@ -369,12 +424,26 @@ else
         _movementForm.LocationId = location?.Id.ToString() ?? "";
     }
 
+    private void OnMovementProductChanged(string? value)
+    {
+        _movementForm.ProductId = value ?? "";
+        _movementForm.LotId = "";
+    }
+
     private void ApplyDefaultMovementSelections()
     {
         _movementForm.ProductId = _movementForm.ProductId.Length > 0 ? _movementForm.ProductId : _products.FirstOrDefault()?.Id.ToString() ?? "";
         _movementForm.WarehouseId = _movementForm.WarehouseId.Length > 0 ? _movementForm.WarehouseId : _warehouses.FirstOrDefault()?.Id.ToString() ?? "";
         var location = LocationsForSelectedWarehouse().FirstOrDefault() ?? _locations.FirstOrDefault();
         _movementForm.LocationId = _movementForm.LocationId.Length > 0 ? _movementForm.LocationId : location?.Id.ToString() ?? "";
+    }
+
+    private IEnumerable<InventoryLot> LotsForSelectedProduct()
+    {
+        if (!Guid.TryParse(_movementForm.ProductId, out var productId))
+            return _lots;
+
+        return _lots.Where(x => x.ProductId == productId);
     }
 
     private RequestMetadata BuildMetadata() => new()
@@ -400,6 +469,14 @@ else
 
     private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
 
+    private string GetLotLabel(Guid? lotId) =>
+        lotId is { } id
+            ? _lots.FirstOrDefault(x => x.Id == id)?.LotNumber ?? id.ToString()[..8]
+            : "No lot";
+
+    private string GetLotLabel(InventoryLot lot) =>
+        string.IsNullOrWhiteSpace(lot.LotNumber) ? lot.Id.ToString()[..8] : lot.LotNumber;
+
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -414,6 +491,7 @@ else
         public string ProductId { get; set; } = "";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
+        public string LotId { get; set; } = "";
         public string MovementType { get; set; } = InventoryMovementType.Adjustment.ToString();
         public string Quantity { get; set; } = "0";
         public string UnitOfMeasure { get; set; } = "each";

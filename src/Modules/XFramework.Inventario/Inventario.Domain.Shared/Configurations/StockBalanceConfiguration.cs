@@ -15,7 +15,12 @@ public class StockBalanceConfiguration : IEntityTypeConfiguration<StockBalance>
         entity.Property(e => e.ReservedQuantity).HasPrecision(18, 4);
         entity.Property(e => e.AvailableQuantity).HasPrecision(18, 4);
 
-        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.WarehouseId, e.LocationId }).IsUnique();
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.WarehouseId, e.LocationId })
+            .IsUnique()
+            .HasFilter("\"LotId\" IS NULL AND \"IsDeleted\" = false");
+        entity.HasIndex(e => new { e.TenantId, e.ProductId, e.WarehouseId, e.LocationId, e.LotId })
+            .IsUnique()
+            .HasFilter("\"LotId\" IS NOT NULL AND \"IsDeleted\" = false");
 
         entity.HasOne(e => e.Product)
             .WithMany()
@@ -34,5 +39,11 @@ public class StockBalanceConfiguration : IEntityTypeConfiguration<StockBalance>
             .HasForeignKey(e => e.LocationId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Inventario_StockBalance_Location");
+
+        entity.HasOne(e => e.Lot)
+            .WithMany()
+            .HasForeignKey(e => e.LotId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Inventario_StockBalance_Lot");
     }
 }
