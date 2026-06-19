@@ -20,3 +20,4 @@ jobs:
       service: inventario
       health_url: http://localhost:8105/health/ready
       diagnostics_services: bolt-hub messaging inventario
+    secrets: inherit

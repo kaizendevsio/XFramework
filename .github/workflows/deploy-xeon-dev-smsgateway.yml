@@ -18,3 +18,4 @@ jobs:
       service: smsgateway
       health_url: http://localhost:5274/health/ready
       diagnostics_services: bolt-hub smsgateway
+    secrets: inherit

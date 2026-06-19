@@ -38,6 +38,7 @@ services:
 
   # ── Database Migration Runner (runs once, then exits) ───────
   migrate:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/migrate:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -53,6 +54,7 @@ services:
 
   # ── Bolt Hub (must be healthy before services start) ─────────
   bolt-hub:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/bolt-hub:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -77,6 +79,7 @@ services:
 
   # ── Identity Server ─────────────────────────────────────────
   identityserver:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/identityserver:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -98,6 +101,7 @@ services:
 
   # ── Messaging Server ────────────────────────────────────────
   messaging:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/messaging:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -119,6 +123,7 @@ services:
 
   # ── Notifications Server ────────────────────────────────────
   notifications:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/notifications:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -140,6 +145,7 @@ services:
 
   # ── SMS Gateway ─────────────────────────────────────────────
   smsgateway:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/smsgateway:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -161,6 +167,7 @@ services:
 
   # ── Wallets Server ──────────────────────────────────────────
   wallets:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/wallets:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -182,6 +189,7 @@ services:
 
   # ── Inventario Server ───────────────────────────────────────
   inventario:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/inventario:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -203,6 +211,7 @@ services:
 
   # ── Control Panel ───────────────────────────────────────────
   controlpanel:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/controlpanel:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
@@ -234,6 +243,7 @@ services:
   # ── Seq (structured log aggregator) ──────────────────────────
   # Operations Dashboard
   operations-dashboard:
+    image: ${REGISTRY_HOST:-xsystems-registry-dev.tailed40e.ts.net}/${REGISTRY_NAMESPACE:-xframework}/operations-dashboard:${IMAGE_TAG:-develop}
     build:
       context: .
       dockerfile: Dockerfile
