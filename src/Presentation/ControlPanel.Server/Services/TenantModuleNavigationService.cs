@@ -8,6 +8,7 @@ public sealed class TenantModuleNavigationService(
     IDataContext dataContext) : IDisposable
 {
     private readonly Dictionary<string, bool> _features = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
     private Guid? _loadedTenantId;
     private bool _loading;
 
@@ -19,7 +20,7 @@ public sealed class TenantModuleNavigationService(
 
     public async Task EnsureLoadedAsync(CancellationToken ct = default)
     {
-        if (_loadedTenantId == tenantFilter.SelectedTenantId)
+        if (!_loading && _loadedTenantId == tenantFilter.SelectedTenantId)
         {
             return;
         }
@@ -49,15 +50,17 @@ public sealed class TenantModuleNavigationService(
 
     private async Task LoadAsync(CancellationToken ct = default)
     {
-        if (_loading)
-        {
-            return;
-        }
+        await _loadGate.WaitAsync(ct);
 
         _loading = true;
 
         try
         {
+            if (_loadedTenantId == tenantFilter.SelectedTenantId)
+            {
+                return;
+            }
+
             _features.Clear();
             _loadedTenantId = tenantFilter.SelectedTenantId;
 
@@ -82,6 +85,7 @@ public sealed class TenantModuleNavigationService(
         finally
         {
             _loading = false;
+            _loadGate.Release();
             OnChanged?.Invoke();
         }
     }
@@ -89,5 +93,6 @@ public sealed class TenantModuleNavigationService(
     public void Dispose()
     {
         tenantFilter.OnChanged -= OnTenantFilterChanged;
+        _loadGate.Dispose();
     }
 }
