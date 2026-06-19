@@ -43,7 +43,8 @@ public sealed class TenantModuleFeatureConfiguration : IEntityTypeConfiguration<
         entity.Property(e => e.IsDeleted).HasDefaultValueSql("false");
         entity.Property(e => e.IsEnabled)
             .IsRequired()
-            .HasDefaultValueSql("true");
+            .HasDefaultValueSql("true")
+            .HasSentinel(true);
 
         entity.HasOne(d => d.Tenant).WithMany(p => p.TenantModuleFeatures)
             .HasForeignKey(d => d.TenantId)

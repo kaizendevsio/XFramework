@@ -1,5 +1,7 @@
+using IdentityServer.Domain.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 using XFramework.Core.Patterns;
+using XFramework.Core.Services.FeatureGates;
 using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
@@ -11,7 +13,8 @@ namespace XFramework.Inventario.Api.Services;
 
 public sealed class WarehouseService(
     IDataContext dataContext,
-    IHttpContextAccessor httpContextAccessor)
+    IHttpContextAccessor httpContextAccessor,
+    ITenantModuleFeatureService featureService)
 {
     public async Task<Result<List<Warehouse>>> GetWarehousesAsync(
         GetWarehousesRequest request,
@@ -20,6 +23,10 @@ public sealed class WarehouseService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<List<Warehouse>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureWarehousingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<Warehouse>>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var warehouses = await dataContext.Query<Warehouse>()
             .IgnoreQueryFilters()
@@ -36,6 +43,10 @@ public sealed class WarehouseService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<Warehouse>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureWarehousingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<Warehouse>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
         var code = NormalizeRequired(request.Code);
@@ -83,6 +94,10 @@ public sealed class WarehouseService(
         if (!tenantResult.IsSuccess)
             return Result<List<InventoryLocation>>.Failure(tenantResult.Message!, tenantResult.StatusCode);
 
+        var featureResult = await EnsureWarehousingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<List<InventoryLocation>>.Failure(featureResult.Message!, featureResult.StatusCode);
+
         var query = dataContext.Query<InventoryLocation>()
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantResult.Data && !x.IsDeleted);
@@ -103,6 +118,10 @@ public sealed class WarehouseService(
         var tenantResult = GetCurrentTenantId(request);
         if (!tenantResult.IsSuccess)
             return Result<InventoryLocation>.Failure(tenantResult.Message!, tenantResult.StatusCode);
+
+        var featureResult = await EnsureWarehousingEnabledAsync(tenantResult.Data, ct);
+        if (!featureResult.IsSuccess)
+            return Result<InventoryLocation>.Failure(featureResult.Message!, featureResult.StatusCode);
 
         var tenantId = tenantResult.Data;
         var code = NormalizeRequired(request.Code);
@@ -175,4 +194,11 @@ public sealed class WarehouseService(
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task<Result> EnsureWarehousingEnabledAsync(Guid tenantId, CancellationToken ct) =>
+        await featureService.EnsureEnabledAsync(
+            tenantId,
+            TenantModuleFeatureKeys.Inventario,
+            TenantModuleFeatureKeys.WarehousingSubFeature,
+            ct);
 }

@@ -453,21 +453,24 @@ public sealed class PurchasingService(
         if (!lotResult.IsSuccess)
             return Result<ReceivingLine>.Failure(lotResult.Message!, lotResult.StatusCode);
 
-        var stockResult = await stockPostingService.StageAsync(new PostStockMovementRequest
-        {
-            Metadata = new() { TenantId = tenantId },
-            ProductId = lineRequest.ProductId,
-            WarehouseId = document.WarehouseId,
-            LocationId = document.LocationId,
-            LotId = lotResult.Data?.Id,
-            MovementType = InventoryMovementType.Receipt,
-            Quantity = lineRequest.Quantity,
-            UnitOfMeasure = NormalizeOptional(lineRequest.UnitOfMeasure),
-            ReferenceType = "receiving",
-            ReferenceId = document.Id,
-            Reason = $"Receiving {document.ReceiptNumber}",
-            IdempotencyKey = receivingIdempotencyKey is null ? null : $"{receivingIdempotencyKey}:line:{lineIndex}"
-        }, ct);
+        var stockResult = await stockPostingService.StageAsync(
+            new PostStockMovementRequest
+            {
+                Metadata = new() { TenantId = tenantId },
+                ProductId = lineRequest.ProductId,
+                WarehouseId = document.WarehouseId,
+                LocationId = document.LocationId,
+                LotId = lotResult.Data?.Id,
+                MovementType = InventoryMovementType.Receipt,
+                Quantity = lineRequest.Quantity,
+                UnitOfMeasure = NormalizeOptional(lineRequest.UnitOfMeasure),
+                ReferenceType = "receiving",
+                ReferenceId = document.Id,
+                Reason = $"Receiving {document.ReceiptNumber}",
+                IdempotencyKey = receivingIdempotencyKey is null ? null : $"{receivingIdempotencyKey}:line:{lineIndex}"
+            },
+            lotResult.Data,
+            ct);
         if (!stockResult.IsSuccess)
             return Result<ReceivingLine>.Failure(stockResult.Message!, stockResult.StatusCode);
 

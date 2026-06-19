@@ -19,9 +19,11 @@ using XFramework.Core.Middlewares;
 using XFramework.Domain.Contexts;
 using XFramework.Domain.Interceptors;
 using XFramework.Domain.Shared.BusinessObjects;
+using XFramework.Domain.Shared.DataContext;
 using XFramework.Extensions;
 using XFramework.Integration.Abstractions.Wrappers;
 using XFramework.Integration.Extensions;
+using XFramework.TestInfrastructure;
 using BatchDecrementEndpoint = Wallets.Api.Features.Batch.DecrementBatch.Endpoint;
 using BatchIncrementEndpoint = Wallets.Api.Features.Batch.IncrementBatch.Endpoint;
 using BatchTransferEndpoint = Wallets.Api.Features.Batch.TransferBatch.Endpoint;
@@ -48,6 +50,8 @@ public class WalletsTestFixture
     public static IServiceProvider Services => _walletsApp.Services;
     public static IWalletsServiceWrapper ServiceWrapper =>
         _testClientApp.Services.GetRequiredService<IWalletsServiceWrapper>();
+    public static IDataContext DataContext =>
+        _testClientApp.Services.CreateScope().ServiceProvider.GetRequiredService<IDataContext>();
 
     public static readonly Guid TestTenantId = Guid.Parse("7602c2d3-01df-4bdb-9a67-02c144e4a2ac");
     public static readonly Guid TestWalletTypeId = Guid.Parse("e1e2e3e4-e5f6-7890-abcd-ef1234567890");
@@ -212,6 +216,12 @@ public class WalletsTestFixture
         builder.Services.AddSingleton(new DeviceAgentProvider("WalletTest"));
         builder.Services.AddXFrameworkBoltClient(builder.Configuration, autoConnect: false);
         builder.Services.AddWalletsWrapperServices();
+        builder.Services.AddRemoteDataContext();
+        builder.Services.AddScoped(_ => new RequestMetadata
+        {
+            TenantId = TestTenantId,
+            RequestId = Guid.NewGuid()
+        });
 
         var app = builder.Build();
         app.MapGet("/health/live", () => Results.Ok("healthy"));
@@ -382,17 +392,36 @@ public class WalletsTestFixture
     {
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var tenantId = Request.Headers.TryGetValue("X-Wallets-Test-TenantId", out var tenantHeader) &&
+            if (Request.Headers.TryGetValue(TestAuthHeaders.Unauthenticated, out var unauthenticatedHeader) &&
+                bool.TryParse(unauthenticatedHeader.FirstOrDefault(), out var unauthenticated) &&
+                unauthenticated)
+            {
+                return Task.FromResult(AuthenticateResult.NoResult());
+            }
+
+            var tenantId = TryGetGuidHeader(TestAuthHeaders.TenantId, out var standardTenantId)
+                ? standardTenantId
+                : Request.Headers.TryGetValue("X-Wallets-Test-TenantId", out var tenantHeader) &&
                            Guid.TryParse(tenantHeader.FirstOrDefault(), out var suppliedTenantId)
                 ? suppliedTenantId
                 : TestTenantId;
-            var credentialId = Request.Headers.TryGetValue("X-Wallets-Test-CredentialId", out var credentialHeader) &&
+            var credentialId = TryGetGuidHeader(TestAuthHeaders.CredentialId, out var standardCredentialId)
+                ? standardCredentialId
+                : Request.Headers.TryGetValue("X-Wallets-Test-CredentialId", out var credentialHeader) &&
                                Guid.TryParse(credentialHeader.FirstOrDefault(), out var suppliedCredentialId)
                 ? suppliedCredentialId
                 : (Guid?)null;
+            var identityId = TryGetGuidHeader(TestAuthHeaders.IdentityId, out var suppliedIdentityId)
+                ? suppliedIdentityId
+                : Guid.Parse("00000000-0000-0000-0000-000000000099");
+            var username = Request.Headers.TryGetValue(TestAuthHeaders.Username, out var usernameHeader)
+                ? usernameHeader.FirstOrDefault() ?? "wallets-test"
+                : "wallets-test";
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, "wallets-test"),
+                new Claim(ClaimTypes.NameIdentifier, identityId.ToString()),
+                new Claim(ClaimTypes.Name, username),
+                new Claim("identity_id", identityId.ToString()),
                 new Claim("tenantId", tenantId.ToString()),
                 new Claim("TenantId", tenantId.ToString()),
                 new Claim("tid", tenantId.ToString())
@@ -406,7 +435,14 @@ public class WalletsTestFixture
             var suppressDefaultRole = Request.Headers.TryGetValue("X-Wallets-Test-No-Role", out var noRoleHeader) &&
                                       bool.TryParse(noRoleHeader.FirstOrDefault(), out var noRole) &&
                                       noRole;
-            if (Request.Headers.TryGetValue("X-Wallets-Test-Role", out var roleHeader))
+            if (Request.Headers.TryGetValue(TestAuthHeaders.Roles, out var standardRoleHeader))
+            {
+                foreach (var role in standardRoleHeader.SelectMany(static x => x?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? []))
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, role));
+                }
+            }
+            else if (Request.Headers.TryGetValue("X-Wallets-Test-Role", out var roleHeader))
             {
                 foreach (var role in roleHeader.Where(static x => !string.IsNullOrWhiteSpace(x)))
                 {
@@ -423,6 +459,13 @@ public class WalletsTestFixture
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
             return Task.FromResult(AuthenticateResult.Success(ticket));
+        }
+
+        private bool TryGetGuidHeader(string headerName, out Guid value)
+        {
+            value = Guid.Empty;
+            return Request.Headers.TryGetValue(headerName, out var header) &&
+                   Guid.TryParse(header.FirstOrDefault(), out value);
         }
     }
 }
