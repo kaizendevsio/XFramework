@@ -4,8 +4,6 @@ using XFramework.Domain.Shared.Contracts.Requests;
 using XFramework.Domain.Shared.DataContext;
 using XFramework.Inventario.Domain.Shared.Contracts;
 using XFramework.Inventario.Domain.Shared.Contracts.Requests.Reservations;
-using XFramework.Inventario.Domain.Shared.Contracts.Requests.Stock;
-using XFramework.Inventario.Domain.Shared.Contracts.Responses;
 using XFramework.Inventario.Domain.Shared.Enums;
 
 namespace XFramework.Inventario.Api.Services;
@@ -13,7 +11,7 @@ namespace XFramework.Inventario.Api.Services;
 public sealed class ReservationService(
     IDataContext dataContext,
     IHttpContextAccessor httpContextAccessor,
-    StockPostingService stockPostingService)
+    InventoryAllocationService allocationService)
 {
     public async Task<Result<List<Reservation>>> GetReservationsAsync(
         GetReservationsRequest request,
@@ -60,24 +58,12 @@ public sealed class ReservationService(
             return Result<Reservation>.Failure("Reservation quantity must be greater than zero.", 400);
 
         var reservationId = Guid.NewGuid();
-        var stockResult = await stockPostingService.StageAsync(new PostStockMovementRequest
-        {
-            Metadata = request.Metadata,
-            ProductId = request.ProductId,
-            WarehouseId = request.WarehouseId,
-            LocationId = request.LocationId,
-            MovementType = InventoryMovementType.Reservation,
-            Quantity = request.Quantity,
-            UnitOfMeasure = request.UnitOfMeasure,
-            ReferenceType = "reservation",
-            ReferenceId = reservationId,
-            Reason = request.Reason ?? "Inventory reservation"
-        }, ct);
-
-        if (!stockResult.IsSuccess)
-            return Result<Reservation>.Failure(stockResult.Message!, stockResult.StatusCode);
+        var allocationsResult = await allocationService.ReserveAsync(tenantResult.Data, reservationId, request, ct);
+        if (!allocationsResult.IsSuccess)
+            return Result<Reservation>.Failure(allocationsResult.Message!, allocationsResult.StatusCode);
 
         var now = DateTime.UtcNow;
+        var allocations = allocationsResult.Data!;
         var reservation = new Reservation
         {
             Id = reservationId,
@@ -85,7 +71,7 @@ public sealed class ReservationService(
             ProductId = request.ProductId,
             WarehouseId = request.WarehouseId,
             LocationId = request.LocationId,
-            StockBalanceId = stockResult.Data!.StockBalanceId,
+            StockBalanceId = allocations.FirstOrDefault()?.StockBalanceId,
             Quantity = request.Quantity,
             Status = ReservationStatus.Active,
             ReferenceType = NormalizeOptional(request.ReferenceType),
@@ -94,7 +80,8 @@ public sealed class ReservationService(
             ExpiresAt = request.ExpiresAt,
             IsEnabled = true,
             CreatedAt = now,
-            ConcurrencyStamp = Guid.NewGuid()
+            ConcurrencyStamp = Guid.NewGuid(),
+            Allocations = allocations
         };
 
         dataContext.Add(reservation);
@@ -114,9 +101,15 @@ public sealed class ReservationService(
             return reservationResult;
 
         var reservation = reservationResult.Data!;
-        var releaseResult = await StageReleaseAsync(reservation, request, request.Reason ?? "Reservation released", ct);
+        var releaseResult = await allocationService.ReleaseAsync(
+            reservation,
+            request,
+            ReservationAllocationStatus.Released,
+            request.Reason ?? "Reservation released",
+            ct);
         if (!releaseResult.IsSuccess)
             return Result<Reservation>.Failure(releaseResult.Message!, releaseResult.StatusCode);
+        reservation.Allocations = releaseResult.Data!;
 
         CompleteReservation(reservation, ReservationStatus.Released, releasedAt: DateTime.UtcNow);
 
@@ -136,25 +129,15 @@ public sealed class ReservationService(
             return reservationResult;
 
         var reservation = reservationResult.Data!;
-        var releaseResult = await StageReleaseAsync(reservation, request, "Reservation fulfilled: release reserved quantity", ct);
-        if (!releaseResult.IsSuccess)
-            return Result<Reservation>.Failure(releaseResult.Message!, releaseResult.StatusCode);
-
-        var shipmentResult = await stockPostingService.StageAsync(new PostStockMovementRequest
-        {
-            Metadata = request.Metadata,
-            ProductId = reservation.ProductId,
-            WarehouseId = reservation.WarehouseId!.Value,
-            LocationId = reservation.LocationId!.Value,
-            MovementType = InventoryMovementType.Shipment,
-            Quantity = reservation.Quantity,
-            ReferenceType = "reservation",
-            ReferenceId = reservation.Id,
-            Reason = request.Reason ?? "Reservation fulfilled"
-        }, ct);
-
-        if (!shipmentResult.IsSuccess)
-            return Result<Reservation>.Failure(shipmentResult.Message!, shipmentResult.StatusCode);
+        var fulfillmentResult = await allocationService.FulfillAsync(
+            reservation,
+            request,
+            "Reservation fulfilled: release reserved quantity",
+            request.Reason ?? "Reservation fulfilled",
+            ct);
+        if (!fulfillmentResult.IsSuccess)
+            return Result<Reservation>.Failure(fulfillmentResult.Message!, fulfillmentResult.StatusCode);
+        reservation.Allocations = fulfillmentResult.Data!;
 
         CompleteReservation(reservation, ReservationStatus.Fulfilled, fulfilledAt: DateTime.UtcNow);
 
@@ -174,9 +157,15 @@ public sealed class ReservationService(
             return reservationResult;
 
         var reservation = reservationResult.Data!;
-        var releaseResult = await StageReleaseAsync(reservation, request, request.Reason ?? "Reservation cancelled", ct);
+        var releaseResult = await allocationService.ReleaseAsync(
+            reservation,
+            request,
+            ReservationAllocationStatus.Cancelled,
+            request.Reason ?? "Reservation cancelled",
+            ct);
         if (!releaseResult.IsSuccess)
             return Result<Reservation>.Failure(releaseResult.Message!, releaseResult.StatusCode);
+        reservation.Allocations = releaseResult.Data!;
 
         CompleteReservation(reservation, ReservationStatus.Cancelled, releasedAt: DateTime.UtcNow);
 
@@ -214,9 +203,15 @@ public sealed class ReservationService(
 
         foreach (var reservation in reservations)
         {
-            var releaseResult = await StageReleaseAsync(reservation, request, "Reservation expired", ct);
+            var releaseResult = await allocationService.ReleaseAsync(
+                reservation,
+                request,
+                ReservationAllocationStatus.Expired,
+                "Reservation expired",
+                ct);
             if (!releaseResult.IsSuccess)
                 return Result<int>.Failure(releaseResult.Message!, releaseResult.StatusCode);
+            reservation.Allocations = releaseResult.Data!;
 
             CompleteReservation(reservation, ReservationStatus.Expired, releasedAt: DateTime.UtcNow);
         }
@@ -249,29 +244,6 @@ public sealed class ReservationService(
         return reservation is null
             ? Result<Reservation>.NotFound("Active reservation not found.")
             : Result<Reservation>.Success(reservation);
-    }
-
-    private async Task<Result<StockPostingResponse>> StageReleaseAsync(
-        Reservation reservation,
-        RequestBase request,
-        string reason,
-        CancellationToken ct)
-    {
-        if (reservation.WarehouseId is not { } warehouseId || reservation.LocationId is not { } locationId)
-            return Result<StockPostingResponse>.Failure("Reservation does not have a warehouse and location.", 409);
-
-        return await stockPostingService.StageAsync(new PostStockMovementRequest
-        {
-            Metadata = request.Metadata,
-            ProductId = reservation.ProductId,
-            WarehouseId = warehouseId,
-            LocationId = locationId,
-            MovementType = InventoryMovementType.Release,
-            Quantity = reservation.Quantity,
-            ReferenceType = "reservation",
-            ReferenceId = reservation.Id,
-            Reason = reason
-        }, ct);
     }
 
     private void CompleteReservation(

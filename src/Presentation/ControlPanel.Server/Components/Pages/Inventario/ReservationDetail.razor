@@ -145,6 +145,43 @@ else
                     </div>
                 </BbCardContent>
             </BbCard>
+
+            <BbCard>
+                <BbCardHeader>
+                    <BbCardTitle>Allocation Output</BbCardTitle>
+                    <BbCardDescription>Lots and balances selected for this reservation.</BbCardDescription>
+                </BbCardHeader>
+                <BbCardContent>
+                    @if (_allocations.Count == 0)
+                    {
+                        <BbTypographyMuted>No allocation rows recorded for this reservation.</BbTypographyMuted>
+                    }
+                    else
+                    {
+                        <BbDataGrid Items="@_allocations" ShowPagination="true" InitialPageSize="10">
+                            <Columns>
+                                <BbDataGridTemplateColumn Title="Lot">
+                                    <ChildContent Context="item">@GetLotLabel(item.LotId)</ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.Quantity)" Title="Qty" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Status">
+                                    <ChildContent Context="item">
+                                        <StatusBadge Text="@item.Status.ToString()" Status="@GetAllocationStatusBadge(item.Status)" />
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                                <BbDataGridPropertyColumn Property="@(x => x.ReservedAt)" Title="Reserved" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.ReleasedAt)" Title="Released" Sortable="true" />
+                                <BbDataGridPropertyColumn Property="@(x => x.FulfilledAt)" Title="Fulfilled" Sortable="true" />
+                                <BbDataGridTemplateColumn Title="Balance">
+                                    <ChildContent Context="item">
+                                        <span class="font-mono text-xs">@ShortId(item.StockBalanceId)</span>
+                                    </ChildContent>
+                                </BbDataGridTemplateColumn>
+                            </Columns>
+                        </BbDataGrid>
+                    }
+                </BbCardContent>
+            </BbCard>
         </div>
     </FadeInContent>
 }
@@ -164,6 +201,8 @@ else
     private Warehouse? _warehouse;
     private InventoryLocation? _location;
     private StockBalance? _balance;
+    private List<ReservationAllocation> _allocations = [];
+    private List<InventoryLot> _lots = [];
     private bool _loading = true;
     private bool _hasTenant;
     private bool _reservationsEnabled;
@@ -200,6 +239,8 @@ else
             _warehouse = null;
             _location = null;
             _balance = null;
+            _allocations = [];
+            _lots = [];
 
             if (!_hasTenant || !_reservationsEnabled) return;
 
@@ -244,6 +285,27 @@ else
                     .NoCache()
                     .Where(x => x.TenantId == tenantId && x.Id == balanceId && !x.IsDeleted)
                     .FirstOrDefaultAsync();
+            }
+
+            _allocations = await DataContext.Query<ReservationAllocation>()
+                .IgnoreQueryFilters()
+                .NoCache()
+                .Where(x => x.TenantId == tenantId && x.ReservationId == Id && !x.IsDeleted)
+                .OrderBy(x => x.ReservedAt)
+                .ToListAsync();
+
+            var lotIds = _allocations
+                .Where(x => x.LotId is not null)
+                .Select(x => x.LotId!.Value)
+                .Distinct()
+                .ToList();
+            if (lotIds.Count > 0)
+            {
+                _lots = await DataContext.Query<InventoryLot>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && lotIds.Contains(x.Id) && !x.IsDeleted)
+                    .ToListAsync();
             }
         }
         catch (Exception ex)
@@ -321,6 +383,15 @@ else
     private string GetBalanceLabel() =>
         _balance is null ? ShortId(_reservation?.StockBalanceId) : $"{_balance.OnHandQuantity:N2} on hand";
 
+    private string GetLotLabel(Guid? lotId)
+    {
+        if (lotId is not { } id)
+            return "Untracked";
+
+        var lot = _lots.FirstOrDefault(x => x.Id == id);
+        return lot is null ? id.ToString()[..8] : $"{lot.LotNumber} ({FormatDate(lot.ExpiresAt)})";
+    }
+
     private string FormatReference() =>
         string.IsNullOrWhiteSpace(_reservation?.ReferenceType)
             ? "N/A"
@@ -328,6 +399,9 @@ else
 
     private static string GetStatusBadge(ReservationStatus status) =>
         status == ReservationStatus.Active ? "active" : "inactive";
+
+    private static string GetAllocationStatusBadge(ReservationAllocationStatus status) =>
+        status == ReservationAllocationStatus.Reserved ? "active" : "inactive";
 
     private static string FormatDate(DateTime value) => value.ToLocalTime().ToString("g");
 

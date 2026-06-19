@@ -111,7 +111,8 @@ else
                 <div class="xf-form-field">
                     <BbLabel>Product</BbLabel>
                     <BbCombobox TValue="string"
-                                 @bind-Value="_form.ProductId"
+                                 Value="@_form.ProductId"
+                                 ValueChanged="@OnReservationProductChanged"
                                  Options="@ProductOptions"
                                  Placeholder="Select product"
                                  SearchPlaceholder="Search products..."
@@ -143,6 +144,29 @@ else
                                  MatchTriggerWidth="true" />
                 </div>
             </div>
+            @if (_traceabilityEnabled)
+            {
+                <div class="grid gap-3 md:grid-cols-2">
+                    <div class="xf-form-field">
+                        <BbLabel>Lot / Batch</BbLabel>
+                        <BbCombobox TValue="string"
+                                     @bind-Value="_form.LotId"
+                                     Options="@ReservationLotOptions"
+                                     Placeholder="Auto FEFO allocation"
+                                     SearchPlaceholder="Search lots..."
+                                     EmptyMessage="No lots found."
+                                     Class="xf-entity-combobox"
+                                     MatchTriggerWidth="true" />
+                    </div>
+                    <BbFormFieldSwitch Checked="@_form.AllowExpiredLotOverride"
+                                       CheckedChanged="@((bool value) => _form.AllowExpiredLotOverride = value)"
+                                       Label="Allow expired lot override" />
+                </div>
+                @if (_form.AllowExpiredLotOverride)
+                {
+                    <BbFormFieldInput TValue="string" @bind-Value="_form.ExpiredLotOverrideReason" Label="Override Reason" />
+                }
+            }
             <div class="grid gap-3 md:grid-cols-3">
                 <BbFormFieldInput TValue="string" @bind-Value="_form.Quantity" Label="Quantity" />
                 <div class="xf-form-field">
@@ -180,10 +204,12 @@ else
     private List<Product> _products = [];
     private List<Warehouse> _warehouses = [];
     private List<InventoryLocation> _locations = [];
+    private List<InventoryLot> _lots = [];
     private List<Reservation> _reservations = [];
     private bool _loading = true;
     private bool _hasTenant;
     private bool _reservationsEnabled;
+    private bool _traceabilityEnabled;
     private bool _reserving;
     private bool _expiring;
     private bool _reservationDialogOpen;
@@ -194,6 +220,19 @@ else
         _warehouses.Select(warehouse => new SelectOption<string>(warehouse.Id.ToString(), GetWarehouseLabel(warehouse))).ToList();
     private List<SelectOption<string>> ReservationLocationOptions =>
         LocationsForSelectedWarehouse().Select(location => new SelectOption<string>(location.Id.ToString(), GetLocationLabel(location))).ToList();
+    private List<SelectOption<string>> ReservationLotOptions
+    {
+        get
+        {
+            var options = new List<SelectOption<string>>
+            {
+                new("", "Auto FEFO allocation")
+            };
+            options.AddRange(LotsForSelectedProduct()
+                .Select(lot => new SelectOption<string>(lot.Id.ToString(), GetLotLabel(lot))));
+            return options;
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -213,9 +252,11 @@ else
             await ModuleNavigation.EnsureLoadedAsync();
             _hasTenant = TenantFilter.SelectedTenantId is Guid;
             _reservationsEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "reservations");
+            _traceabilityEnabled = ModuleNavigation.IsFeatureEnabled(TenantModuleFeatureKeys.Inventario, "traceability");
             _products = [];
             _warehouses = [];
             _locations = [];
+            _lots = [];
             _reservations = [];
 
             if (!_hasTenant || !_reservationsEnabled) return;
@@ -244,6 +285,18 @@ else
                 .OrderBy(x => x.Code)
                 .Take(500)
                 .ToListAsync();
+
+            if (_traceabilityEnabled)
+            {
+                _lots = await DataContext.Query<InventoryLot>()
+                    .IgnoreQueryFilters()
+                    .NoCache()
+                    .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+                    .OrderBy(x => x.ExpiresAt)
+                    .ThenBy(x => x.LotNumber)
+                    .Take(500)
+                    .ToListAsync();
+            }
 
             _reservations = await DataContext.Query<Reservation>()
                 .IgnoreQueryFilters()
@@ -298,10 +351,13 @@ else
                 WarehouseId = warehouseId,
                 LocationId = locationId,
                 Quantity = quantity,
+                LotId = Guid.TryParse(_form.LotId, out var lotId) ? lotId : null,
                 ExpiresAt = expiresAt,
                 ReferenceType = NullIfEmpty(_form.ReferenceType),
                 ReferenceId = Guid.TryParse(_form.ReferenceId, out var referenceId) ? referenceId : (Guid?)null,
-                Reason = NullIfEmpty(_form.Reason)
+                Reason = NullIfEmpty(_form.Reason),
+                AllowExpiredLotOverride = _form.AllowExpiredLotOverride,
+                ExpiredLotOverrideReason = NullIfEmpty(_form.ExpiredLotOverrideReason)
             });
 
             ToastService.Show(result.IsSuccess ? "Inventory reserved." : $"Failed: {result.Message}");
@@ -309,6 +365,9 @@ else
             {
                 _form.Quantity = "0";
                 _form.ExpiresAt = "";
+                _form.LotId = "";
+                _form.AllowExpiredLotOverride = false;
+                _form.ExpiredLotOverrideReason = "";
                 _form.Reason = "";
                 _reservationDialogOpen = false;
                 await Reload();
@@ -388,6 +447,20 @@ else
         return _locations.Where(x => x.WarehouseId == warehouseId);
     }
 
+    private IEnumerable<InventoryLot> LotsForSelectedProduct()
+    {
+        if (!Guid.TryParse(_form.ProductId, out var productId))
+            return _lots;
+
+        return _lots.Where(x => x.ProductId == productId);
+    }
+
+    private void OnReservationProductChanged(string? value)
+    {
+        _form.ProductId = value ?? "";
+        _form.LotId = "";
+    }
+
     private void OnReservationWarehouseChanged(string? value)
     {
         _form.WarehouseId = value ?? "";
@@ -428,6 +501,12 @@ else
 
     private static string GetLocationLabel(InventoryLocation location) => $"{location.Code} - {location.Name}";
 
+    private static string GetLotLabel(InventoryLot lot)
+    {
+        var expiry = lot.ExpiresAt is null ? "No expiry" : lot.ExpiresAt.Value.ToLocalTime().ToString("d");
+        return $"{lot.LotNumber} - {expiry}";
+    }
+
     private static string GetStatusBadge(ReservationStatus status) =>
         status == ReservationStatus.Active ? "active" : "inactive";
 
@@ -458,10 +537,13 @@ else
         public string ProductId { get; set; } = "";
         public string WarehouseId { get; set; } = "";
         public string LocationId { get; set; } = "";
+        public string LotId { get; set; } = "";
         public string Quantity { get; set; } = "0";
         public string ExpiresAt { get; set; } = "";
         public string ReferenceType { get; set; } = "";
         public string ReferenceId { get; set; } = "";
         public string Reason { get; set; } = "";
+        public bool AllowExpiredLotOverride { get; set; }
+        public string ExpiredLotOverrideReason { get; set; } = "";
     }
 }
