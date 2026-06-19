@@ -454,7 +454,7 @@
 
         _traces = await JaegerTraceClient.GetTracesAsync(
             new DashboardTraceQuery(
-                service.LogApplicationName,
+                service.TraceServiceName,
                 lookback,
                 Options.Value.DefaultTraceLimit),
             ct);

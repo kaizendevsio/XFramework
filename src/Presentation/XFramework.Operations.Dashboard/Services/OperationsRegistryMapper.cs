@@ -4,6 +4,19 @@ namespace XFramework.Operations.Dashboard.Services;
 
 public static class OperationsRegistryMapper
 {
+    private static readonly HashSet<string> BuiltInApiServiceNames =
+    [
+        "IdentityServer",
+        "Inventario",
+        "Messaging",
+        "Notifications",
+        "SmsGateway",
+        "Wallets",
+        "XFramework.Messaging",
+        "XFramework.Notifications",
+        "XFramework.SmsGateway"
+    ];
+
     public static DashboardRegistrySnapshot CreateSnapshot(
         IEnumerable<BoltServiceRegistryItem> serviceItems,
         IEnumerable<BoltModuleRegistryItem> moduleItems,
@@ -61,8 +74,47 @@ public static class OperationsRegistryMapper
             AsNullableOffset(service.LastConnectedAt),
             AsNullableOffset(service.LastDisconnectedAt),
             string.IsNullOrWhiteSpace(machineName) ? null : machineName,
+            ResolveTraceServiceName(service),
             serviceModules.Select(MapModule).ToList(),
             dependencies);
+    }
+
+    public static string ResolveTraceServiceName(BoltServiceRegistryItem service)
+    {
+        if (service.Manifest.Metadata.TryGetValue("TraceServiceName", out var traceServiceName)
+            && !string.IsNullOrWhiteSpace(traceServiceName))
+        {
+            return traceServiceName;
+        }
+
+        if (service.Manifest.Metadata.TryGetValue("OpenTelemetryServiceName", out var openTelemetryServiceName)
+            && !string.IsNullOrWhiteSpace(openTelemetryServiceName))
+        {
+            return openTelemetryServiceName;
+        }
+
+        var candidate = FirstNonEmpty(service.ServiceName, service.ClientName);
+        if (string.Equals(candidate, "OperationsDashboard", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(service.ClientName, "OperationsDashboard", StringComparison.OrdinalIgnoreCase))
+        {
+            return "XFramework.Operations.Dashboard";
+        }
+
+        if (candidate.StartsWith("XFramework.", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate.EndsWith(".Api", StringComparison.OrdinalIgnoreCase)
+                || candidate.EndsWith(".Dashboard", StringComparison.OrdinalIgnoreCase)
+                    ? candidate
+                    : $"{candidate}.Api";
+        }
+
+        if (BuiltInApiServiceNames.Contains(candidate)
+            || BuiltInApiServiceNames.Contains(service.ClientName))
+        {
+            return $"XFramework.{candidate}.Api";
+        }
+
+        return candidate;
     }
 
     private static ServiceModuleSummary MapModule(BoltModuleRegistryItem module)
