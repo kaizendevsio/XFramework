@@ -432,18 +432,18 @@ else
         <BbDialogHeader>
             <BbDialogTitle>Close Wallet</BbDialogTitle>
             <BbDialogDescription>
-                Are you sure you want to close this wallet? This action cannot be easily undone.
-                @if (_wallet?.Balance > 0)
+                Are you sure you want to close this wallet? Closed wallets cannot be used for future financial operations.
+                @if (_wallet?.Balance != 0 || _wallet?.DebitOnHoldBalance != 0 || _wallet?.CreditOnHoldBalance != 0)
                 {
                     <span class="mt-2 block font-semibold text-red-500">
-                        Warning: This wallet still has a balance of @_wallet.Balance.ToString("N2").
+                        Wallets can only be closed after balance and held funds are zero.
                     </span>
                 }
             </BbDialogDescription>
         </BbDialogHeader>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => _showCloseDialog = false)">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" OnClick="@CloseWallet">
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="@CloseWallet" Disabled="@_isProcessing">
                 Confirm Close
             </BbButton>
         </BbDialogFooter>
@@ -1040,13 +1040,32 @@ else
                 return;
             }
 
-            ToastService.Show("Closing wallets requires the backend close-wallet workflow and was not applied.");
-            _showCloseDialog = false;
-            await Task.CompletedTask;
+            _isProcessing = true;
+            var response = await WalletsService.CloseWallet(new CloseWalletRequest
+            {
+                WalletId = fresh.Id,
+                Reason = "Closed from ControlPanel",
+                Metadata = BuildCommandMetadata(fresh.TenantId)
+            });
+
+            if (response.IsSuccess)
+            {
+                ToastService.Show("Wallet closed successfully.");
+                _showCloseDialog = false;
+                await LoadWallet();
+            }
+            else
+            {
+                ToastService.Show($"Failed to close wallet: {response.Message}");
+            }
         }
         catch (Exception ex)
         {
             ToastService.Show($"Error closing wallet: {ex.Message}");
+        }
+        finally
+        {
+            _isProcessing = false;
         }
     }
 
