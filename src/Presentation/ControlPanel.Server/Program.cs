@@ -5,6 +5,7 @@ using Community.Integration.Drivers;
 using ControlPanel.Server.Extensions;
 using ControlPanel.Server.Health;
 using ControlPanel.Server.Services;
+using IdentityServer.Domain.Shared.Contracts;
 using XFramework.Integration.Extensions;
 using IdentityServer.Integration.Drivers;
 using Inventario.Integration.Drivers;
@@ -70,6 +71,7 @@ builder.Services.AddIdentityServerWrapperServices();
 builder.Services.AddInventarioWrapperServices();
 builder.Services.AddMessagingWrapperServices();
 builder.Services.AddWalletsWrapperServices();
+builder.Services.AddTenantModuleFeatureDefinitions(builder.Configuration);
 
 // IDataContext — universal query layer routed through service wrappers
 builder.Services.AddScoped(sp =>
@@ -103,6 +105,7 @@ builder.Services.AddRemoteDataContext();
 // Tenant filter state (sidebar selection)
 builder.Services.AddScoped<TenantFilterService>();
 builder.Services.AddScoped<TenantModuleNavigationService>();
+builder.Services.AddScoped<TenantModuleFeatureDefinitionResolver>();
 builder.Services.AddScoped<MessagingControlPanelGuard>();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddScoped<CommunityControlPanelAccessService>();

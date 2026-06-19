@@ -23,6 +23,82 @@ namespace XFramework.Domain.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "uuid-ossp");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Bolt.Domain.Shared.Contracts.ServiceDiscovery.BoltServiceManifestRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("ID")
+                        .HasDefaultValueSql("(uuid_generate_v4())");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("ClientName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying");
+
+                    b.Property<int>("ConnectionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying");
+
+                    b.Property<bool>("IsConnected")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastConnectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastDisconnectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ManifestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("ManifestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("ModifiedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying");
+
+                    b.HasKey("Id")
+                        .HasName("boltservicemanifest_pk");
+
+                    b.HasIndex("ClientId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ServiceManifest_ClientId");
+
+                    b.ToTable("ServiceManifest", "Bolt");
+                });
+
             modelBuilder.Entity("Community.Domain.Shared.Contracts.CommunityConnection", b =>
                 {
                     b.Property<Guid>("Id")

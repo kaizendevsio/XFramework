@@ -1,0 +1,352 @@
+using Bolt.Client;
+using Bolt.Domain.Shared.Contracts.ServiceDiscovery;
+using Bolt.Hub.Services;
+using Bolt.Server;
+using FluentAssertions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using NUnit.Framework;
+using System.Text.Json;
+using XFramework.Domain.Contexts;
+
+namespace Bolt.Tests;
+
+[TestFixture]
+[CancelAfter(30000)]
+public sealed class BoltServiceDiscoveryIntegrationTests
+{
+    private static int _portCounter = 20200;
+    private WebApplication _hubApp = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private string _databaseName = string.Empty;
+    private int _port;
+
+    [SetUp]
+    public async Task SetUp()
+    {
+        _port = Interlocked.Increment(ref _portCounter);
+        _databaseName = $"bolt-discovery-{Guid.NewGuid():N}";
+
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls($"http://localhost:{_port}");
+        builder.Services.AddDbContext<DbContext, AppDbContext>(options =>
+            options.UseInMemoryDatabase(_databaseName));
+        builder.Services.AddBoltServer();
+        builder.Services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
+        builder.Services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
+        builder.Services.AddHostedService<BoltServiceDiscoveryHostedService>();
+        builder.Logging.SetMinimumLevel(LogLevel.Warning);
+
+        _hubApp = builder.Build();
+        _hubApp.UseWebSockets();
+        _hubApp.MapBolt("/bolt");
+        _hubApp.MapGet("/health", () => "ok");
+        _ = Task.Run(() => _hubApp.RunAsync());
+        await WaitForHealth($"http://localhost:{_port}/health");
+        _loggerFactory = _hubApp.Services.GetRequiredService<ILoggerFactory>();
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        try { await _hubApp.StopAsync(); } catch { }
+        try { await _hubApp.DisposeAsync(); } catch { }
+    }
+
+    [Test]
+    public async Task AdvertiseServiceManifest_ThroughHubLocalHandler_PersistsSenderClientAndReturnsRegistry()
+    {
+        var client = CreateClient("discovery_client", "DiscoveryService");
+        await client.ConnectAsync();
+
+        var response = await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.AdvertiseServiceManifest,
+            CreateJuanBarangayManifest());
+
+        response.Should().NotBeNull();
+        response!.Accepted.Should().BeTrue();
+
+        var modules = await client.SendAsync<BoltModuleRegistryRequest, BoltModuleRegistryResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.GetModuleRegistry,
+            new BoltModuleRegistryRequest { IncludeOffline = true });
+
+        modules!.Modules.Should().ContainSingle(module => module.ModuleKey == "juan_barangay");
+        modules.Modules.Single(module => module.ModuleKey == "juan_barangay")
+            .Features.Should().Contain(feature => feature.Key == "juan_barangay.residents");
+
+        using var scope = _hubApp.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+        var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "discovery_client");
+        record.ClientName.Should().Be("DiscoveryService");
+        record.ServiceName.Should().Be("Juan_Barangay_Service");
+        record.IsConnected.Should().BeTrue();
+
+        await client.DisposeAsync();
+    }
+
+    [Test]
+    public async Task Disconnect_AfterManifestAdvertisement_KeepsManifestAndMarksServiceOffline()
+    {
+        var client = CreateClient("disconnect_client", "DisconnectService");
+        await client.ConnectAsync();
+        await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.AdvertiseServiceManifest,
+            CreateJuanBarangayManifest());
+
+        await client.DisposeAsync();
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _hubApp.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "disconnect_client");
+            return !record.IsConnected && record.ConnectionCount == 0 && record.ManifestJson.Contains("juan_barangay");
+        });
+    }
+
+    [Test]
+    public async Task ResetPresenceAsync_KeepsManifestAndMarksPersistedOnlineServicesOffline()
+    {
+        var manifestJson = JsonSerializer.Serialize(
+            CreateJuanBarangayManifest(),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        using (var scope = _hubApp.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            db.Add(new BoltServiceManifestRecord
+            {
+                Id = Guid.NewGuid(),
+                ClientId = "stale_client",
+                ClientName = "StaleService",
+                ServiceName = "Juan_Barangay_Service",
+                DisplayName = "Juan Barangay",
+                Version = "1.0.0",
+                IsConnected = true,
+                ConnectionCount = 2,
+                LastSeenAt = DateTime.UtcNow.AddMinutes(-5),
+                LastConnectedAt = DateTime.UtcNow.AddMinutes(-5),
+                ManifestHash = "stale-hash",
+                ManifestJson = manifestJson,
+                CreatedAt = DateTime.UtcNow.AddMinutes(-5)
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using (var scope = _hubApp.Services.CreateScope())
+        {
+            var registry = scope.ServiceProvider.GetRequiredService<IBoltServiceDiscoveryRegistry>();
+            await registry.ResetPresenceAsync(CancellationToken.None);
+        }
+
+        using (var scope = _hubApp.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "stale_client");
+            record.IsConnected.Should().BeFalse();
+            record.ConnectionCount.Should().Be(0);
+            record.ManifestJson.Should().Be(manifestJson);
+            record.LastDisconnectedAt.Should().NotBeNull();
+        }
+    }
+
+    [Test]
+    public async Task MultipleConnectionsForSameClient_DisconnectingOneKeepsServiceOnlineUntilFinalConnectionCloses()
+    {
+        var firstClient = CreateClient("pooled_client", "PooledService");
+        var secondClient = CreateClient("pooled_client", "PooledService");
+
+        try
+        {
+            await Task.WhenAll(firstClient.ConnectAsync(), secondClient.ConnectAsync());
+
+            await WaitUntilAsync(async () =>
+            {
+                using var scope = _hubApp.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+                var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "pooled_client");
+                return record.IsConnected && record.ConnectionCount == 2;
+            });
+
+            await firstClient.DisposeAsync();
+
+            await WaitUntilAsync(async () =>
+            {
+                using var scope = _hubApp.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+                var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "pooled_client");
+                return record.IsConnected && record.ConnectionCount == 1;
+            });
+
+            await secondClient.DisposeAsync();
+
+            await WaitUntilAsync(async () =>
+            {
+                using var scope = _hubApp.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+                var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "pooled_client");
+                return !record.IsConnected && record.ConnectionCount == 0;
+            });
+        }
+        finally
+        {
+            await firstClient.DisposeAsync();
+            await secondClient.DisposeAsync();
+        }
+    }
+
+    [Test]
+    public async Task Reconnect_AfterDisconnect_MarksServiceOnlineAndUpdatesLastSeen()
+    {
+        var firstClient = CreateClient("reconnect_client", "ReconnectService");
+        await firstClient.ConnectAsync();
+        await firstClient.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.AdvertiseServiceManifest,
+            CreateJuanBarangayManifest());
+        await firstClient.DisposeAsync();
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _hubApp.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "reconnect_client");
+            return !record.IsConnected;
+        });
+
+        DateTime offlineSeenAt;
+        using (var scope = _hubApp.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            offlineSeenAt = (await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "reconnect_client")).LastSeenAt;
+        }
+
+        var secondClient = CreateClient("reconnect_client", "ReconnectService");
+        await secondClient.ConnectAsync();
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _hubApp.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DbContext>();
+            var record = await db.Set<BoltServiceManifestRecord>().SingleAsync(x => x.ClientId == "reconnect_client");
+            return record.IsConnected && record.ConnectionCount == 1 && record.LastSeenAt >= offlineSeenAt;
+        });
+
+        await secondClient.DisposeAsync();
+    }
+
+    [Test]
+    public async Task GetModuleRegistry_RequiredMissingServiceDependency_ReturnsDegradedModuleAndFeature()
+    {
+        var client = CreateClient("dependency_client", "DependencyService");
+        await client.ConnectAsync();
+        var manifest = CreateJuanBarangayManifest();
+        manifest.Modules[0].Dependencies.Add(new BoltDependencyRequirement
+        {
+            Kind = BoltDependencyKind.Service,
+            Key = "missing_service",
+            DisplayName = "Missing Service",
+            Required = true
+        });
+
+        await client.SendAsync<BoltServiceManifest, BoltServiceManifestAdvertisementResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.AdvertiseServiceManifest,
+            manifest);
+
+        var modules = await client.SendAsync<BoltModuleRegistryRequest, BoltModuleRegistryResponse>(
+            string.Empty,
+            BoltServiceDiscoveryCommands.GetModuleRegistry,
+            new BoltModuleRegistryRequest { IncludeOffline = true });
+
+        var module = modules!.Modules.Single(x => x.ModuleKey == "juan_barangay");
+        module.Status.Should().Be(BoltRegistryStatus.Degraded);
+        module.DependencyStatuses.Should().Contain(status =>
+            status.Requirement.Key == "missing_service" && !status.IsSatisfied && status.Requirement.Required);
+        module.Features.Should().Contain(feature =>
+            feature.Key == "juan_barangay.residents" && feature.Status == BoltRegistryStatus.Degraded);
+
+        await client.DisposeAsync();
+    }
+
+    private BoltClient CreateClient(string id, string name) =>
+        new(
+            new Uri($"ws://localhost:{_port}/bolt"),
+            id,
+            name,
+            new BoltClientOptions { RpcTimeoutSeconds = 5 },
+            _loggerFactory.CreateLogger<BoltClient>());
+
+    private static BoltServiceManifest CreateJuanBarangayManifest() =>
+        new()
+        {
+            ServiceName = "Juan_Barangay_Service",
+            DisplayName = "Juan Barangay",
+            Version = "1.0.0",
+            Modules =
+            [
+                new BoltModuleManifest
+                {
+                    ModuleKey = "Juan_Barangay",
+                    DisplayName = "Juan Barangay",
+                    Description = "Barangay resident operations.",
+                    IconName = "users",
+                    Features =
+                    [
+                        new BoltTenantModuleFeatureManifest
+                        {
+                            Key = "Juan_Barangay.Residents",
+                            DisplayName = "Residents",
+                            Description = "Resident registry.",
+                            IconName = "users"
+                        }
+                    ]
+                }
+            ]
+        };
+
+    private static async Task WaitForHealth(string url, int timeoutSeconds = 15)
+    {
+        using var client = new HttpClient();
+        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                if ((await client.GetAsync(url)).IsSuccessStatusCode)
+                {
+                    return;
+                }
+            }
+            catch
+            {
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"Service at {url} not healthy within {timeoutSeconds}s");
+    }
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition, int timeoutSeconds = 10)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await condition())
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException("Condition was not met before timeout.");
+    }
+}

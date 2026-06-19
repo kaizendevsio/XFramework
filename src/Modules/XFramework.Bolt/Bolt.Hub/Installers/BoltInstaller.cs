@@ -1,3 +1,4 @@
+using Bolt.Hub.Services;
 using Bolt.Server;
 using Microsoft.AspNetCore.ResponseCompression;
 using XFramework.Domain.Shared.Configurations;
@@ -19,6 +20,9 @@ public sealed class BoltInstaller : IInstaller
 
         // Bolt thin protocol server
         services.AddBoltServer();
+        services.AddSingleton<IBoltServicePresenceTracker, BoltServicePresenceTracker>();
+        services.AddScoped<IBoltServiceDiscoveryRegistry, BoltServiceDiscoveryRegistry>();
+        services.AddHostedService<BoltServiceDiscoveryHostedService>();
 
         // Durable queue store (Redis if configured, in-memory fallback)
         services.Configure<Bolt.Server.Durable.DurableQueueOptions>(configuration.GetSection("BoltConfiguration:Durable"));

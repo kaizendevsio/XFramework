@@ -141,6 +141,10 @@ else
                                                     </div>
                                                     <div class="mt-1 text-sm text-muted-foreground">@row.Description</div>
                                                     <div class="mt-2 font-mono text-xs text-muted-foreground">@row.Key</div>
+                                                    @if (!string.IsNullOrWhiteSpace(row.DependencySummary))
+                                                    {
+                                                        <div class="mt-2 text-xs text-amber-600 dark:text-amber-400">@row.DependencySummary</div>
+                                                    }
                                                 </div>
                                             </div>
                                             <StatusBadge Text="@(row.IsEnabled ? "Enabled" : "Disabled")"
@@ -149,7 +153,7 @@ else
                                         <div class="mt-4 border-t pt-3">
                                             <BbFormFieldSwitch Checked="@row.IsEnabled"
                                                                CheckedChanged="@((bool enabled) => ToggleModuleFeature(row, enabled))"
-                                                               Disabled="@(_savingModuleFeatureIds.Contains(row.Id))"
+                                                               Disabled="@(_savingModuleFeatureIds.Contains(row.Id) || (!row.IsEnabled && row.IsBlocked))"
                                                                Label="Module enabled" />
                                         </div>
                                         @if (IsInventarioRootFeature(row) && _inventarioSubFeatureRows.Count > 0)
@@ -178,6 +182,10 @@ else
                                                                         </div>
                                                                         <div class="mt-1 text-sm text-muted-foreground">@childRow.Description</div>
                                                                         <div class="mt-2 font-mono text-xs text-muted-foreground">@childRow.Key</div>
+                                                                        @if (!string.IsNullOrWhiteSpace(childRow.DependencySummary))
+                                                                        {
+                                                                            <div class="mt-2 text-xs text-amber-600 dark:text-amber-400">@childRow.DependencySummary</div>
+                                                                        }
                                                                     </div>
                                                                 </div>
                                                                 <StatusBadge Text="@(childRow.IsEnabled ? "Enabled" : "Disabled")"
@@ -186,7 +194,7 @@ else
                                                             <div class="mt-3 border-t pt-3">
                                                                 <BbFormFieldSwitch Checked="@childRow.IsEnabled"
                                                                                    CheckedChanged="@((bool enabled) => ToggleModuleFeature(childRow, enabled))"
-                                                                                   Disabled="@(_savingModuleFeatureIds.Contains(childRow.Id))"
+                                                                                   Disabled="@(_savingModuleFeatureIds.Contains(childRow.Id) || (!childRow.IsEnabled && childRow.IsBlocked))"
                                                                                    Label="Feature enabled" />
                                                             </div>
                                                         </div>
@@ -378,6 +386,7 @@ else
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private TenantFilterService TenantFilter { get; set; } = default!;
+    [Inject] private TenantModuleFeatureDefinitionResolver ModuleFeatureDefinitionResolver { get; set; } = default!;
 
     private Tenant? _tenant;
     private bool _loading;
@@ -570,15 +579,17 @@ else
                     .ToListAsync())
                 .ToList();
 
-            var missingDefinitions = TenantModuleFeatureKeys.All
-                .Where(definition => _detailModuleFeatures.All(feature =>
-                    !string.Equals(feature.Key, definition.Key, StringComparison.OrdinalIgnoreCase)))
+            var resolvedDefinitions = await ModuleFeatureDefinitionResolver.ResolveAsync(_detailModuleFeatures);
+            var missingDefinitions = resolvedDefinitions
+                .Where(resolved => _detailModuleFeatures.All(feature =>
+                    !string.Equals(feature.Key, resolved.Definition.Key, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
             if (missingDefinitions.Count > 0)
             {
-                foreach (var definition in missingDefinitions)
+                foreach (var resolved in missingDefinitions)
                 {
+                    var definition = resolved.Definition;
                     DataContext.Add(new TenantModuleFeature
                     {
                         Id = Guid.NewGuid(),
@@ -587,7 +598,7 @@ else
                         SubFeatureKey = definition.SubFeatureKey,
                         DisplayName = definition.DisplayName,
                         Description = definition.Description,
-                        IsEnabled = definition.DefaultEnabled,
+                        IsEnabled = definition.DefaultEnabled && !resolved.IsBlocked,
                         CreatedAt = DateTime.UtcNow
                     });
                 }
@@ -606,11 +617,14 @@ else
                         .ThenBy(x => x.SubFeatureKey)
                         .ToListAsync())
                     .ToList();
+
+                resolvedDefinitions = await ModuleFeatureDefinitionResolver.ResolveAsync(_detailModuleFeatures);
             }
 
-            _moduleFeatureRows = TenantModuleFeatureKeys.All
-                .Select(definition =>
+            _moduleFeatureRows = resolvedDefinitions
+                .Select(resolved =>
                 {
+                    var definition = resolved.Definition;
                     var feature = _detailModuleFeatures.FirstOrDefault(item =>
                         string.Equals(item.Key, definition.Key, StringComparison.OrdinalIgnoreCase));
 
@@ -622,7 +636,10 @@ else
                         feature?.DisplayName ?? definition.DisplayName,
                         feature?.Description ?? definition.Description,
                         definition.IconName,
-                        feature?.IsEnabled ?? false);
+                        feature?.IsEnabled ?? false,
+                        resolved.IsBlocked,
+                        resolved.MissingRequiredDependencies,
+                        resolved.MissingOptionalDependencies);
                 })
                 .ToList();
             ApplyModuleFeatureGrouping();
@@ -650,6 +667,12 @@ else
 
     private async Task ToggleModuleFeature(ModuleFeatureRow row, bool enabled)
     {
+        if (enabled && row.IsBlocked)
+        {
+            ToastService.Show($"Cannot enable {row.DisplayName}: {row.DependencySummary}");
+            return;
+        }
+
         if (row.Id == Guid.Empty)
         {
             ToastService.Show("Module toggle is still initializing. Refresh the page and try again.");
@@ -921,7 +944,10 @@ else
         string displayName,
         string description,
         string icon,
-        bool isEnabled)
+        bool isEnabled,
+        bool isBlocked,
+        IReadOnlyList<string> missingRequiredDependencies,
+        IReadOnlyList<string> missingOptionalDependencies)
     {
         public Guid Id { get; } = id;
         public string Key { get; } = key;
@@ -931,6 +957,13 @@ else
         public string Description { get; } = description;
         public string Icon { get; } = icon;
         public bool IsEnabled { get; set; } = isEnabled;
+        public bool IsBlocked { get; } = isBlocked;
+        public IReadOnlyList<string> MissingRequiredDependencies { get; } = missingRequiredDependencies;
+        public IReadOnlyList<string> MissingOptionalDependencies { get; } = missingOptionalDependencies;
+        public string DependencySummary =>
+            MissingRequiredDependencies.Count > 0
+                ? string.Join(" ", MissingRequiredDependencies)
+                : string.Join(" ", MissingOptionalDependencies);
     }
 
     public void Dispose()
