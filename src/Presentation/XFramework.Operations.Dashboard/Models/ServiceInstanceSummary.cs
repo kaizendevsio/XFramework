@@ -14,6 +14,7 @@ public sealed record ServiceInstanceSummary(
     DateTimeOffset? LastConnectedAt,
     DateTimeOffset? LastDisconnectedAt,
     string? MachineName,
+    string TraceServiceName,
     IReadOnlyList<ServiceModuleSummary> Modules,
     IReadOnlyList<DependencySummary> Dependencies)
 {

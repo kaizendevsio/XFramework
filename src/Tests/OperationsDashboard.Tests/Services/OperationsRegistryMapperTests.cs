@@ -94,4 +94,47 @@ public sealed class OperationsRegistryMapperTests
         snapshot.Services.Single().Status.Should().Be("Degraded");
         snapshot.Services.Single().MissingRequiredDependencies.Should().Be(1);
     }
+
+    [Test]
+    public void CreateSnapshot_BuiltInService_MapsTraceServiceNameToOpenTelemetryName()
+    {
+        var service = new BoltServiceRegistryItem
+        {
+            ClientId = "client-identity",
+            ClientName = "IdentityServer",
+            ServiceName = "IdentityServer",
+            Status = BoltRegistryStatus.Online,
+            ConnectionCount = 1,
+            LastSeenAt = DateTime.UtcNow
+        };
+
+        var snapshot = OperationsRegistryMapper.CreateSnapshot([service], [], DateTimeOffset.UtcNow);
+
+        snapshot.Services.Single().TraceServiceName.Should().Be("XFramework.IdentityServer.Api");
+    }
+
+    [Test]
+    public void CreateSnapshot_MetadataTraceServiceName_PreservesExternalModuleName()
+    {
+        var service = new BoltServiceRegistryItem
+        {
+            ClientId = "client-barangay",
+            ClientName = "JuanBarangay",
+            ServiceName = "JuanBarangay",
+            Status = BoltRegistryStatus.Online,
+            ConnectionCount = 1,
+            LastSeenAt = DateTime.UtcNow,
+            Manifest =
+            {
+                Metadata =
+                {
+                    ["TraceServiceName"] = "JuanBarangay.Api"
+                }
+            }
+        };
+
+        var snapshot = OperationsRegistryMapper.CreateSnapshot([service], [], DateTimeOffset.UtcNow);
+
+        snapshot.Services.Single().TraceServiceName.Should().Be("JuanBarangay.Api");
+    }
 }

@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
 <div class="ops-shell">
     <aside class="ops-sidebar">
@@ -15,11 +16,11 @@
                 <LucideIcon Name="activity" class="ops-nav-icon" />
                 Services
             </a>
-            <a class="ops-nav-link" href="http://localhost:5341" target="_blank" rel="noreferrer">
+            <a class="ops-nav-link" href="@BuildPeerServiceUrl(5341)" target="_blank" rel="noreferrer">
                 <LucideIcon Name="scroll-text" class="ops-nav-icon" />
                 Seq
             </a>
-            <a class="ops-nav-link" href="http://localhost:16686" target="_blank" rel="noreferrer">
+            <a class="ops-nav-link" href="@BuildPeerServiceUrl(16686)" target="_blank" rel="noreferrer">
                 <LucideIcon Name="waypoints" class="ops-nav-icon" />
                 Jaeger
             </a>
@@ -51,3 +52,11 @@
 <BbToastProvider Position="ToastPosition.BottomRight" />
 <BbDialogProvider />
 <BbPortalHost />
+
+@code {
+    private string BuildPeerServiceUrl(int port)
+    {
+        var current = new Uri(Navigation.Uri);
+        return new UriBuilder(current.Scheme, current.Host, port).Uri.ToString();
+    }
+}
