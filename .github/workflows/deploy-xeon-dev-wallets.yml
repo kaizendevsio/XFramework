@@ -12,7 +12,24 @@ permissions:
   contents: read
 
 jobs:
+  detect-shared-changes:
+    name: Detect shared deploy ownership
+    runs-on: ubuntu-latest
+    outputs:
+      has_shared: ${{ steps.shared.outputs.has_shared }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect shared changes
+        id: shared
+        uses: ./.github/actions/detect-shared-deploy-changes
+
   deploy:
+    needs: detect-shared-changes
+    if: needs.detect-shared-changes.outputs.has_shared != 'true'
     uses: ./.github/workflows/deploy-xeon-dev-service.yml
     with:
       service: wallets

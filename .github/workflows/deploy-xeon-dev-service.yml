@@ -54,43 +54,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect shared changes
-        id: shared
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          has_shared=false
-
-          if [ "${{ github.event_name }}" = "push" ]; then
-            base_sha="${{ github.event.before }}"
-
-            if [ -z "$base_sha" ] || [[ "$base_sha" =~ ^0+$ ]]; then
-              base_sha="$(git rev-list --max-parents=0 HEAD)"
-            fi
-
-            git diff --name-only "$base_sha" "$GITHUB_SHA" > /tmp/xframework-changed-files.txt
-
-            while IFS= read -r path; do
-              case "$path" in
-                Dockerfile|docker-compose.yml|Directory.Build.props|Directory.Build.targets|Directory.Packages.props|Version.props|XFramework.slnx|global.json|NuGet.config|src/Kernel/*|src/Infrastructure/*|src/Shared/*|src/SourceGenerators/*|src/Libraries/*|src/Tools/XFramework.MigrationRunner/*|src/Modules/*/Migrations/*|src/Modules/XFramework.Bolt/Bolt.Domain.Shared/*)
-                  has_shared=true
-                  echo "Shared deployment path changed: $path"
-                  ;;
-              esac
-            done < /tmp/xframework-changed-files.txt
-          fi
-
-          echo "has_shared=$has_shared" >> "$GITHUB_OUTPUT"
-
-      - name: Skip service deploy for shared changes
-        if: steps.shared.outputs.has_shared == 'true'
-        shell: bash
-        run: |
-          echo "Shared paths changed in this push; the all-services deploy workflow owns this deployment."
-
       - name: Verify build runner, Docker, registry, and deploy host
-        if: steps.shared.outputs.has_shared != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -117,14 +81,12 @@ jobs:
             "test -r '$XFRAMEWORK_ENV_FILE' && docker --version && docker compose version && curl -sSI 'https://${REGISTRY_HOST}/v2/' | sed -n '1,8p'"
 
       - name: Validate compose
-        if: steps.shared.outputs.has_shared != 'true'
         shell: bash
         run: |
           set -euo pipefail
           docker compose -f "$COMPOSE_FILE_PATH" config >/tmp/xframework-compose.yml
 
       - name: Login to dev registry
-        if: steps.shared.outputs.has_shared != 'true'
         shell: bash
         env:
           XSYSTEMS_DEV_REGISTRY_USERNAME: ${{ secrets.XSYSTEMS_DEV_REGISTRY_USERNAME }}
@@ -142,14 +104,12 @@ jobs:
                 "docker login '$REGISTRY_HOST' --username '$XSYSTEMS_DEV_REGISTRY_USERNAME' --password-stdin"
 
       - name: Build image on buildserver
-        if: steps.shared.outputs.has_shared != 'true'
         shell: bash
         run: |
           set -euo pipefail
           docker compose -f "$COMPOSE_FILE_PATH" build "$SERVICE_NAME"
 
       - name: Push image to dev registry
-        if: steps.shared.outputs.has_shared != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -161,7 +121,6 @@ jobs:
           docker push "$channel_image"
 
       - name: Deploy service on xeon-dev
-        if: steps.shared.outputs.has_shared != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -180,7 +139,6 @@ jobs:
             "$remote_env docker compose --env-file '$XFRAMEWORK_ENV_FILE' -f '$REMOTE_COMPOSE_FILE' ps '$SERVICE_NAME'"
 
       - name: Wait for readiness
-        if: steps.shared.outputs.has_shared != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -210,7 +168,7 @@ jobs:
           fi
 
       - name: Deployment diagnostics
-        if: failure() && steps.shared.outputs.has_shared != 'true'
+        if: failure()
         shell: bash
         run: |
           remote_env="COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME' REGISTRY_HOST='$REGISTRY_HOST' REGISTRY_NAMESPACE='$REGISTRY_NAMESPACE' IMAGE_TAG='$IMAGE_TAG'"
